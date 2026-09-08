@@ -256,6 +256,8 @@ export interface ImportPdfResult {
     pagesNeedingOcr: number[];
     ocrUsed: boolean;
     selectedPages: number[];
+    /** 云回填命中的页（无云调用时缺席） */
+    azurePages?: number[];
   };
   stats: {
     lessons: number;
@@ -273,8 +275,8 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
     mutationFn: async (
       vars:
-        | { file: File; startPage?: number; endPage?: number }
-        | { filePath: string; startPage?: number; endPage?: number }
+        | { file: File; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
+        | { filePath: string; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
     ): Promise<ImportPdfResult> => {
       const hasPath = 'filePath' in vars;
       const res = hasPath
@@ -285,6 +287,7 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
               filePath: vars.filePath,
               ...(vars.startPage !== undefined ? { startPage: vars.startPage } : {}),
               ...(vars.endPage !== undefined ? { endPage: vars.endPage } : {}),
+              ...azureBodyFields(vars.azure),
             }),
           })
         : await (async () => {
@@ -292,6 +295,7 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
             form.append('file', vars.file, vars.file.name);
             if (vars.startPage !== undefined) form.append('startPage', String(vars.startPage));
             if (vars.endPage !== undefined) form.append('endPage', String(vars.endPage));
+            azureFormFields(form, vars.azure);
             return fetch(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/import-pdf`, {
               method: 'POST',
               body: form,
@@ -504,14 +508,15 @@ export function useAppendPdfMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
     mutationFn: async (
       vars: { documentId: string } & (
-        | { file: File; startPage?: number; endPage?: number }
-        | { filePath: string; startPage?: number; endPage?: number }
+        | { file: File; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
+        | { filePath: string; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
       )
     ): Promise<AppendPdfResult> => {
       const hasPath = 'filePath' in vars;
       const { documentId, ...src } = vars;
       const startPage = (src as { startPage?: number }).startPage;
       const endPage = (src as { endPage?: number }).endPage;
+      const azure = (src as { azure?: PdfAzureCredential }).azure;
       const res = hasPath
         ? await fetch(
             `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${encodeURIComponent(documentId)}/append-pdf`,
@@ -522,6 +527,7 @@ export function useAppendPdfMutation(userId = DEFAULT_USER_ID) {
                 filePath: (src as { filePath: string }).filePath,
                 ...(startPage !== undefined ? { startPage } : {}),
                 ...(endPage !== undefined ? { endPage } : {}),
+                ...azureBodyFields(azure),
               }),
             }
           )
@@ -531,6 +537,7 @@ export function useAppendPdfMutation(userId = DEFAULT_USER_ID) {
             form.append('file', f, f.name);
             if (startPage !== undefined) form.append('startPage', String(startPage));
             if (endPage !== undefined) form.append('endPage', String(endPage));
+            azureFormFields(form, azure);
             return fetch(
               `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${encodeURIComponent(documentId)}/append-pdf`,
               { method: 'POST', body: form }
@@ -587,10 +594,29 @@ export interface MapPdfResult {
     pagesNeedingOcr: number[];
     ocrUsed: boolean;
     selectedPages: number[];
+    /** 云回填命中的页（无云调用时缺席） */
+    azurePages?: number[];
   };
   window: number[];
   headings: PdfPageHeading[];
   tocEntries: PdfTocEntry[];
+}
+
+/** 云 OCR 凭据（随请求发网关，内存态用完即弃；不填走纯本地链路）。 */
+export interface PdfAzureCredential {
+  endpoint: string;
+  key: string;
+}
+
+function azureBodyFields(azure: PdfAzureCredential | undefined): Record<string, string> {
+  if (!azure || !azure.endpoint.trim() || !azure.key.trim()) return {};
+  return { azureEndpoint: azure.endpoint.trim(), azureKey: azure.key.trim() };
+}
+
+function azureFormFields(form: FormData, azure: PdfAzureCredential | undefined): void {
+  const fields = azureBodyFields(azure);
+  if (fields.azureEndpoint) form.append('azureEndpoint', fields.azureEndpoint);
+  if (fields.azureKey) form.append('azureKey', fields.azureKey);
 }
 
 /**
@@ -601,8 +627,8 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
     mutationFn: async (
       vars:
-        | { file: File; startPage?: number; endPage?: number }
-        | { filePath: string; startPage?: number; endPage?: number }
+        | { file: File; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
+        | { filePath: string; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
     ): Promise<MapPdfResult> => {
       const hasPath = 'filePath' in vars;
       const res = hasPath
@@ -613,6 +639,7 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
               filePath: vars.filePath,
               ...(vars.startPage !== undefined ? { startPage: vars.startPage } : {}),
               ...(vars.endPage !== undefined ? { endPage: vars.endPage } : {}),
+              ...azureBodyFields(vars.azure),
             }),
           })
         : await (async () => {
@@ -620,6 +647,7 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
             form.append('file', vars.file, vars.file.name);
             if (vars.startPage !== undefined) form.append('startPage', String(vars.startPage));
             if (vars.endPage !== undefined) form.append('endPage', String(vars.endPage));
+            azureFormFields(form, vars.azure);
             return fetch(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/map-pdf`, {
               method: 'POST',
               body: form,

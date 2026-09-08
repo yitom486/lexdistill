@@ -1,9 +1,14 @@
 import { BusinessError, err, generateId, isOk, logger, ok, type Result } from '@study-studio/shared';
 import { parseTextbookAST, type DocumentItem, type TextbookAST } from '@study-studio/protocol';
 import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
-import { markdownToAst } from './markdown-to-ast.js';
+import { detectDocScript, markdownToAst } from './markdown-to-ast.js';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from './extract-headings.js';
-import { collectLayoutCandidates, mergeHeadingCandidates } from './layout-headings.js';
+import { collectLayoutCandidates, layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from './layout-headings.js';
+import {
+  analyzePagesWithAzure,
+  AZURE_FALLBACK_MIN_CHARS,
+  type AzureOcrPage,
+} from '../ocr/azure-document.js';
 
 /**
  * PDF 导入编排：校验 → 按需运行时 → 分类（文字直提 / 扫描 OCR）→ AST → 入库。
@@ -19,13 +24,55 @@ export const MAX_PDF_PAGES = 400;
 export const MAX_OCR_PAGES_PER_IMPORT = 30;
 /** 结构预览默认/上限扫描窗口（页） */
 export const MAX_MAP_PAGES = 30;
+/** 单次云回填上限（页；Azure 按页计费，30 页约几分钱，轮询 120s 内可完成） */
+export const MAX_AZURE_PAGES_PER_CALL = 30;
+
+/**
+ * 失败页挑选（纯函数，可单测）：本地结果过薄（去空 < 阈值）的页才值得打云。
+ * 稀疏但合法的页（练习留白）可能被多打一页，接受（用户显式给了 Key 才触发）。
+ */
+export function selectFailedPages(pageMarkdown: Map<number, string>): number[] {
+  const out: number[] = [];
+  for (const [page, md] of pageMarkdown) {
+    if ((md ?? '').trim().length < AZURE_FALLBACK_MIN_CHARS) out.push(page);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/** Azure 行 → 版式条目（云页复活 relSize/居中/独立行；粗体 v1 缺席，见 azure-document）。 */
+export function azureLinesToLayoutItems(azure: AzureOcrPage): LayoutTextItem[] {
+  return azure.lines
+    .filter((l) => l.text.trim().length > 0)
+    .map((l) => ({
+      text: l.text,
+      page: azure.pageNumber,
+      x: l.x,
+      y: l.y,
+      width: l.width,
+      height: l.height > 0 ? l.height : 12,
+      fontSize: l.height > 0 ? l.height : 12,
+      isBold: false,
+    }));
+}
+
+function detectAzureLocale(sample: string): string {
+  const script = detectDocScript(sample);
+  if (script === 'KO') return 'ko';
+  if (script === 'EN') return 'en';
+  return 'ja';
+}
 
 export interface PdfImportInput {
   userId: string;
   filename: string;
   bytes: Uint8Array;
-  /** 1-based 选页（不传 = 全书；大书请按课分段） */
+  /** 1-based ????????= ?????????????????*/
   pages?: number[];
+  /**
+   * Azure 云 OCR 凭据（失败页回填用；随请求内存态传递，网关不落盘、不打日志）。
+   * 不提供 = 纯本地链路（行为不变）。
+   */
+  azure?: { endpoint: string; apiKey: string };
 }
 
 export interface PdfImportClassification {
@@ -34,6 +81,8 @@ export interface PdfImportClassification {
   pagesNeedingOcr: number[];
   ocrUsed: boolean;
   selectedPages: number[];
+  /** 云回填命中的页（来源可追溯；无云调用时缺席） */
+  azurePages?: number[];
 }
 
 export interface PdfImportStats {
@@ -142,6 +191,44 @@ export async function mapPdfPages(
     inspector = runtime.inspector;
     const ocr = await inspector.processPdfWithOcr(input.bytes, { pageNumbers: window });
     const perPage = Array.isArray(ocr.pages) ? ocr.pages : [];
+    // Azure 失败页回填（显式给了 Key 才触发；失败只 warn，本地结果不受影响）
+    let azurePages: AzureOcrPage[] = [];
+    if (input.azure?.apiKey) {
+      const perPageMd = new Map<number, string>();
+      if (perPage.length > 0) {
+        for (const pg of perPage) {
+          perPageMd.set(pg.pageNumber, typeof pg.markdown === 'string' ? pg.markdown : '');
+        }
+      } else {
+        perPageMd.set(window[0] ?? 1, typeof ocr.markdown === 'string' ? ocr.markdown : '');
+      }
+      const failed = selectFailedPages(perPageMd).slice(0, MAX_AZURE_PAGES_PER_CALL);
+      if (failed.length > 0) {
+        const az = await analyzePagesWithAzure({
+          pdfBytes: input.bytes,
+          pages: failed,
+          credentials: input.azure,
+          locale: detectAzureLocale([...perPageMd.values()].join('\n')),
+        });
+        if (isOk(az)) {
+          azurePages = az.value.pages;
+          const byPage = new Map(azurePages.map((p) => [p.pageNumber, p]));
+          for (const pg of perPage) {
+            const hit = byPage.get(pg.pageNumber);
+            if (hit && hit.markdown.trim()) pg.markdown = hit.markdown;
+          }
+          const single = byPage.get(window[0] ?? 1);
+          if (perPage.length === 0 && single && single.markdown.trim()) {
+            ocr.markdown = single.markdown;
+          }
+        } else {
+          logger.warn('[pdf-map] azure fallback failed', {
+            code: az.error.code,
+            pages: failed.length,
+          });
+        }
+      }
+    }
     let headings: PageHeading[] = [];
     let combined = '';
     if (perPage.length > 0) {
@@ -154,11 +241,17 @@ export async function mapPdfPages(
       combined = typeof ocr.markdown === 'string' ? ocr.markdown : '';
       headings.push(...extractHeadingsFromMarkdown(combined, window[0] ?? 1));
     }
-    // 版式候选（有接口才有；失败静默降级，正则结果不受影响）
+    // 版式候选（原生接口 + Azure 云行框，两路都失败就纯正则，不影响主流程）
+    const azureItems: LayoutTextItem[] = [];
+    for (const ap of azurePages) azureItems.push(...azureLinesToLayoutItems(ap));
     headings = mergeHeadingCandidates(
       headings,
-      collectLayoutCandidates(inspector, input.bytes, window)
+      [
+        ...collectLayoutCandidates(inspector, input.bytes, window),
+        ...layoutItemsToCandidates(azureItems, []),
+      ]
     );
+    const azureHitPages = azurePages.filter((p) => p.markdown.trim()).map((p) => p.pageNumber);
     return ok({
       classification: {
         pdfType,
@@ -166,6 +259,7 @@ export async function mapPdfPages(
         pagesNeedingOcr: needing,
         ocrUsed: window.some((p) => needing.includes(p)),
         selectedPages: window,
+        ...(azureHitPages.length > 0 ? { azurePages: azureHitPages } : {}),
       },
       window,
       headings,
@@ -347,17 +441,59 @@ export async function convertPdfToAst(
     }
   }
 
-  if (!markdown.trim()) {
+  // 本地零产出且无云钥：直接报错（有钥则落到下面的云回填，不在此提前 return）
+  if (!markdown.trim() && !input.azure?.apiKey) {
     return err(
       new BusinessError(
         'E_OCR_LANG_UNSUPPORTED',
-        '未能从 PDF 中识别出文字：扫描版韩语暂不支持本地 OCR（模型包无谚文覆盖），请改用文字版 PDF，或等待云端 OCR 接入',
+        '未能从 PDF 中识别出文字：扫描版韩语暂不支持本地 OCR（模型包无谚文覆盖），请改用文字版 PDF，或在设置页填入 Azure Key 走云端识别',
         'TOOL_EXECUTION'
       )
     );
   }
 
+  // Azure 失败页回填（convert 侧：整窗过薄才整窗打云；给了 Key 才触发）
+  let azureHitPages: number[] = [];
+  if (input.azure?.apiKey) {
+    const windowPages =
+      selectedPages ??
+      Array.from({ length: Math.min(pageCount, MAX_AZURE_PAGES_PER_CALL) }, (_, i) => i + 1);
+    const thin =
+      markdown.trim().length < AZURE_FALLBACK_MIN_CHARS * windowPages.length;
+    if (thin && !selectedPages && pageCount > MAX_AZURE_PAGES_PER_CALL) {
+      logger.warn('[pdf-import] azure skipped (whole-book convert too wide)', { pageCount });
+    } else if (thin) {
+      const az = await analyzePagesWithAzure({
+        pdfBytes: input.bytes,
+        pages: windowPages,
+        credentials: input.azure,
+        locale: detectAzureLocale(markdown),
+      });
+      if (isOk(az)) {
+        const got = [...az.value.pages]
+          .sort((a, b) => a.pageNumber - b.pageNumber)
+          .filter((p) => p.markdown.trim());
+        if (got.length > 0) {
+          markdown = got.map((p) => p.markdown).join('\n');
+          azureHitPages = got.map((p) => p.pageNumber);
+          ocrUsed = true;
+        }
+      } else {
+        logger.warn('[pdf-import] azure fallback failed', { code: az.error.code });
+      }
+    }
+  }
+
   const title = input.filename.replace(/\.pdf$/i, '');
+  if (!markdown.trim()) {
+    return err(
+      new BusinessError(
+        'E_OCR_FAILED',
+        '本地与云端均未识别出文字（云端可能配额不足或页窗过大），请缩小选页范围后重试',
+        'TOOL_EXECUTION'
+      )
+    );
+  }
   const astRes = markdownToAst(markdown, { title });
   if (!astRes.ok) return err(astRes.error);
   // 协议层再验一次：服务绝不向外吐出非法 AST
@@ -379,6 +515,7 @@ export async function convertPdfToAst(
       pagesNeedingOcr: pagesNeedingOcr.filter(inScope),
       ocrUsed,
       selectedPages: selectedPages ?? [],
+      ...(azureHitPages.length > 0 ? { azurePages: azureHitPages } : {}),
     },
     stats,
   });

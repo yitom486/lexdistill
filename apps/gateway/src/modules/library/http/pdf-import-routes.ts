@@ -37,6 +37,7 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
             filename: input.value.filename,
             bytes: input.value.bytes,
             ...(input.value.pages ? { pages: input.value.pages } : {}),
+            ...(input.value.azure ? { azure: input.value.azure } : {}),
           }
         );
         if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
@@ -68,6 +69,7 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
             filename: input.value.filename,
             bytes: input.value.bytes,
             ...(input.value.pages ? { pages: input.value.pages } : {}),
+            ...(input.value.azure ? { azure: input.value.azure } : {}),
           }
         );
         if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
@@ -105,9 +107,10 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
             filename: input.value.filename,
             bytes: input.value.bytes,
             ...(input.value.pages ? { pages: input.value.pages } : {}),
+            ...(input.value.azure ? { azure: input.value.azure } : {}),
           }
         );
-        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'appendPdfDocument');
         // 接力追加写回即拆：重读 AST 全量 shred（全删全插天然幂等），失败只 warn
         const reread = await deps.repo.getDocumentById(res.value.document.id);
         if (isOk(reread) && reread.value?.astJson) {
@@ -138,6 +141,20 @@ interface PdfRouteInput {
   filename: string;
   bytes: Uint8Array;
   pages?: number[];
+  /** Azure 云 OCR 凭据（内存态透传，网关不落盘） */
+  azure?: { endpoint: string; apiKey: string };
+}
+
+/** 字符串字段收窄（Key/endpoint 随请求来，用完即弃）。 */
+function strField(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function azureField(source: Record<string, unknown>): { endpoint: string; apiKey: string } | undefined {
+  const endpoint = strField(source['azureEndpoint']);
+  const apiKey = strField(source['azureKey']);
+  if (endpoint && apiKey) return { endpoint, apiKey };
+  return undefined;
 }
 
 function pageRange(startPage?: number, endPage?: number): number[] | undefined {
@@ -173,6 +190,8 @@ async function readPdfInput(
       filePath?: unknown;
       startPage?: unknown;
       endPage?: unknown;
+      azureEndpoint?: unknown;
+      azureKey?: unknown;
     } | null;
     if (typeof body?.filePath !== 'string' || !body.filePath) {
       return fail('JSON 模式请提供 filePath（本机 PDF 绝对路径）');
@@ -182,20 +201,28 @@ async function readPdfInput(
     const read = await readLocalPdfFile(body.filePath);
     if (!read.ok) return { ok: false, error: read.error };
     const pages = pageRange(startPage, endPage);
+    const azure = azureField(body as Record<string, unknown>);
     return {
       ok: true,
-      value: { filename: read.value.filename, bytes: read.value.bytes, ...(pages ? { pages } : {}) },
+      value: {
+        filename: read.value.filename,
+        bytes: read.value.bytes,
+        ...(pages ? { pages } : {}),
+        ...(azure ? { azure } : {}),
+      },
     };
   }
   let file: File | null = null;
   let startPage: number | undefined;
   let endPage: number | undefined;
+  let azure: { endpoint: string; apiKey: string } | undefined;
   try {
     const body = await c.req.parseBody();
     const candidate = body['file'];
     if (candidate instanceof File) file = candidate;
     startPage = numField(body['startPage']);
     endPage = numField(body['endPage']);
+    azure = azureField(body as Record<string, unknown>);
   } catch {
     return fail('上传体不是合法 multipart，请用 file 字段上传 PDF');
   }
@@ -205,5 +232,13 @@ async function readPdfInput(
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
   const pages = pageRange(startPage, endPage);
-  return { ok: true, value: { filename: file.name || 'upload.pdf', bytes, ...(pages ? { pages } : {}) } };
+  return {
+    ok: true,
+    value: {
+      filename: file.name || 'upload.pdf',
+      bytes,
+      ...(pages ? { pages } : {}),
+      ...(azure ? { azure } : {}),
+    },
+  };
 }

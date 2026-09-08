@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
 import { useImportPdfMutation, useMapPdfMutation, useAppendPdfMutation, useImportDocumentMutation, useClassifyStructureMutation, useSaveDocumentStructureMutation, type StructureClassItem, type StructureHeading } from '../queries/useLearnerQueries.js';
+import { useOcrStore } from '../stores/useOcrStore.js';
 import { useCodexModelsQuery } from '../queries/useCodexQueries.js';
 import { pickClassifyEffort } from '../utils/classify-effort.js';
 import { sound } from '../utils/audio.js';
@@ -81,6 +82,14 @@ export function TextbookImporterModal({
   const [classifyEffort, setClassifyEffort] = useState<string>('');
   const appendPdf = useAppendPdfMutation();
   const importDoc = useImportDocumentMutation();
+  // Azure 云 OCR（失败页回填；只存本机，不填=纯本地链路）
+  const azureDiEndpoint = useOcrStore((s) => s.azureDiEndpoint);
+  const azureDiKey = useOcrStore((s) => s.azureDiKey);
+  const setAzureDi = useOcrStore((s) => s.setAzureDi);
+  const azureCreds =
+    azureDiEndpoint.trim() && azureDiKey.trim()
+      ? { endpoint: azureDiEndpoint.trim(), key: azureDiKey.trim() }
+      : undefined;
   const [appendTarget, setAppendTarget] = useState<string>('');
   const [docPath, setDocPath] = useState<string>('');
   const [docUrl, setDocUrl] = useState<string>('');
@@ -194,11 +203,13 @@ export function TextbookImporterModal({
           file: pdfFile,
           ...(startPage !== undefined ? { startPage } : {}),
           ...(endPage !== undefined ? { endPage } : {}),
+          ...(azureCreds ? { azure: azureCreds } : {}),
         }
       : {
           filePath: path,
           ...(startPage !== undefined ? { startPage } : {}),
           ...(endPage !== undefined ? { endPage } : {}),
+          ...(azureCreds ? { azure: azureCreds } : {}),
         };
     mapPdf.mutate(vars,
       {
@@ -305,12 +316,14 @@ export function TextbookImporterModal({
             file: pdfFile,
             ...(startPage !== undefined ? { startPage } : {}),
             ...(endPage !== undefined ? { endPage } : {}),
+            ...(azureCreds ? { azure: azureCreds } : {}),
           }
         : {
             documentId: appendTarget,
             filePath: path,
             ...(startPage !== undefined ? { startPage } : {}),
             ...(endPage !== undefined ? { endPage } : {}),
+            ...(azureCreds ? { azure: azureCreds } : {}),
           };
       appendPdf.mutate(vars, {
         onSuccess: (r) => {
@@ -330,11 +343,13 @@ export function TextbookImporterModal({
           file: pdfFile,
           ...(startPage !== undefined ? { startPage } : {}),
           ...(endPage !== undefined ? { endPage } : {}),
+          ...(azureCreds ? { azure: azureCreds } : {}),
         }
       : {
           filePath: path,
           ...(startPage !== undefined ? { startPage } : {}),
           ...(endPage !== undefined ? { endPage } : {}),
+          ...(azureCreds ? { azure: azureCreds } : {}),
         };
     importPdf.mutate(vars,
       {
@@ -350,7 +365,8 @@ export function TextbookImporterModal({
             : '';
         setPdfNote(
           `识别为${kind} · ${c.pageCount} 页${range} · ${result.stats.lessons} 课 ${result.stats.dialogues} 句` +
-            (c.ocrUsed ? ' · 首次 OCR 已按需下载运行时（约 80MB，一次性）' : '')
+            (c.ocrUsed ? ' · 首次 OCR 已按需下载运行时（约 80MB，一次性）' : '') +
+            ((c.azurePages?.length ?? 0) > 0 ? ` · 云回填 ${c.azurePages?.length} 页` : '')
         );
         sound.playCorrect();
         toast.success(`PDF 解析成功：${result.stats.lessons} 课，${result.stats.dialogues} 句，确认后入库`);
@@ -553,6 +569,7 @@ export function TextbookImporterModal({
               </Button>
               <span className="text-[11px] text-stone-500 dark:text-stone-400">
                 文字版直接提取；扫描版自动 OCR（首次约 80MB 按需下载，不进安装包）· 扫描版韩语暂不支持
+                {azureCreds ? ' · 云回填已启用（只打本地失败页）' : ''}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
@@ -612,6 +629,27 @@ export function TextbookImporterModal({
                 }}
                 disabled={importPdf.isPending || mapPdf.isPending}
                 className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 font-mono"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+              <span title="只打本地 OCR 失败的页（<50 字），平时零花费；Key 只存本机，随请求发网关，网关不落盘">
+                Azure 云回填（选填，难啃扫描页用）：
+              </span>
+              <input
+                type="text"
+                placeholder="endpoint（https://xxx.cognitiveservices.azure.com）"
+                value={azureDiEndpoint}
+                onChange={(e) => setAzureDi(e.target.value, azureDiKey)}
+                disabled={importPdf.isPending || mapPdf.isPending}
+                className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 font-mono"
+              />
+              <input
+                type="password"
+                placeholder="Key"
+                value={azureDiKey}
+                onChange={(e) => setAzureDi(azureDiEndpoint, e.target.value)}
+                disabled={importPdf.isPending || mapPdf.isPending}
+                className="w-36 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 font-mono"
               />
             </div>
             {pdfNote && (
