@@ -11,11 +11,57 @@
 :root {
   --theme-transition-duration: 200ms;
   --theme-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  view-transition-name: root;
 }
 
 @theme inline {
   --default-transition-duration: var(--theme-transition-duration);
   --default-transition-timing-function: var(--theme-transition-timing-function);
+}
+
+/*
+ * Theme changes use one document-level cross-fade when the WebView supports
+ * the View Transition API. This keeps modules without a transition utility
+ * from switching abruptly while avoiding layout/transform animation.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--theme-transition-duration);
+  animation-timing-function: var(--theme-transition-timing-function);
+  animation-fill-mode: both;
+}
+
+::view-transition-old(root) {
+  animation-name: theme-view-transition-old;
+}
+
+::view-transition-new(root) {
+  animation-name: theme-view-transition-new;
+}
+
+@keyframes theme-view-transition-old {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes theme-view-transition-new {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 1ms;
+  }
 }
 
 @keyframes shine {

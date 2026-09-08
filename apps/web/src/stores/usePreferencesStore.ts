@@ -77,6 +77,33 @@ const applyThemeToDom = (theme: 'light' | 'dark') => {
   }
 };
 
+/**
+ * Change the theme as one document-level visual transition when supported by
+ * the browser/WebView. The callback remains synchronous for Zustand state
+ * updates and falls back safely on older WebViews.
+ */
+const runThemeTransition = (update: () => void) => {
+  if (typeof document === 'undefined') {
+    update();
+    return;
+  }
+
+  type ViewTransitionDocument = Document & {
+    startViewTransition?: (callback: () => void) => unknown;
+  };
+  const viewTransitionDocument = document as ViewTransitionDocument;
+  if (typeof viewTransitionDocument.startViewTransition !== 'function') {
+    update();
+    return;
+  }
+
+  try {
+    viewTransitionDocument.startViewTransition(update);
+  } catch {
+    update();
+  }
+};
+
 export const usePreferencesStore = create<PreferencesState>()(
   persist(
     (set, get) => ({
@@ -100,14 +127,18 @@ export const usePreferencesStore = create<PreferencesState>()(
       reviewCardFormatId: 'study-basic',
 
       setTheme: (theme: 'light' | 'dark') => {
-        applyThemeToDom(theme);
-        set({ theme });
+        runThemeTransition(() => {
+          applyThemeToDom(theme);
+          set({ theme });
+        });
       },
 
       toggleTheme: () => {
         const next = get().theme === 'light' ? 'dark' : 'light';
-        applyThemeToDom(next);
-        set({ theme: next });
+        runThemeTransition(() => {
+          applyThemeToDom(next);
+          set({ theme: next });
+        });
       },
 
       setFuriganaEnabled: (enabled: boolean) => set({ furiganaEnabled: enabled }),
