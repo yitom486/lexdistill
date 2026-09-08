@@ -93,6 +93,83 @@ describe('markdownToAst', () => {
     expect(detectDocScript('注意助词で表示场所')).toBe('JA');
     expect(detectDocScript('纯中文讲解无假名')).toBe('JA'); // 无信号回退默认
   });
+
+  test('MinerU 方言：非课标题不成课，行末中文括号拆译文', () => {
+    const md = [
+      '# 目次',
+      '# 第1課',
+      '1・わたしは マイク・ミラーです。',
+      '2： それは わたしの 傘です。',
+      '# 会話：初めまして',
+      'サントスさん：はじめまして。',
+      'エアコンをつけます（开空调）',
+      '会社員（かいしゃいん）です。',
+      '## 第2課',
+      'これは 辞書です（这是词典）。',
+    ].join('\n');
+    const res = markdownToAst(md, { bookId: 'pdf-mineru' });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    // 目次/会話不成课：只切出 2 课
+    expect(res.value.lessons.length).toBe(2);
+    expect(res.value.lessons[0]?.title).toBe('第1課');
+    const d0 = res.value.lessons[0]?.dialogues ?? [];
+    // 习题编号剥离、无说话人数字
+    expect(d0.some((d) => d.speaker === '2')).toBe(false);
+    expect(d0.some((d) => d.japanese.startsWith('わたしは マイク'))).toBe(true);
+    // 行末中文括号拆译文；注音括号不动
+    const aircon = d0.find((d) => d.japanese.includes('エアコン'));
+    expect(aircon).toMatchObject({ japanese: 'エアコンをつけます', chinese: '开空调' });
+    const emp = d0.find((d) => d.japanese.includes('会社員'));
+    expect(emp?.chinese).toBe('');
+    // 第二课译文（句末句号在括号外也拆）
+    const d1 = res.value.lessons[1]?.dialogues ?? [];
+    expect(d1.some((d) => d.japanese === 'これは 辞書です' && d.chinese === '这是词典')).toBe(true);
+  });
+
+  test('扫描版页眉重复标题合并（页码不同也算同名）', () => {
+    const md = [
+      '# 第10課 118',
+      'ここは 食堂です。',
+      '# 第10課 119',
+      'エレベーターは あそこです。',
+      '# 第11課',
+      '今何時ですか。',
+    ].join('\n');
+    const res = markdownToAst(md, { bookId: 'pdf-runhead' });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.lessons.length).toBe(2);
+    expect(res.value.lessons[0]?.dialogues.length).toBe(2);
+    expect(res.value.lessons[1]?.title).toBe('第11課');
+  });
+
+  test('同课本文+題按N归并，復習自成单元，开篇杂页丢弃', () => {
+    const md = [
+      'ISBN 978-4-88319-000-0',
+      'CIP data page',
+      '# 第1課',
+      'わたしは マイクです。',
+      '# だい 円第1課',
+      'れんしゅう1です。',
+      '# ふくしゆう 復習A',
+      'ふくしゅうです。',
+      '# 第2課',
+      'これは 辞書です。',
+    ].join('\n');
+    const res = markdownToAst(md, { bookId: 'pdf-group' });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.lessons.length).toBe(3);
+    expect(res.value.lessons[0]?.title).toBe('第1課');
+    expect(res.value.lessons[0]?.dialogues.length).toBe(2);
+    expect(res.value.lessons[1]?.title).toContain('復習');
+    expect(res.value.lessons[2]?.title).toBe('第2課');
+    // 开篇杂页（ISBN/CIP）没混进第一课
+    expect(
+      res.value.lessons[0]?.dialogues.some((d) => d.japanese.includes('ISBN'))
+    ).toBe(false);
+  });
 });
 
 function stubInspector(result: {
