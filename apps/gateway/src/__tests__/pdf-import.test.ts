@@ -246,6 +246,26 @@ describe('mapPdfPages（目录感知第一步）', () => {
     ]);
   });
 
+  test('扫描版 OCR 毛病缝合（J1 点线断行 / J2 页码前置 / 復習A粘连）', () => {
+    // J1：点线结尾，页码掉到后面两行内
+    expect(extractTocEntries('## 第3課 ………\n\n30\n')).toEqual([
+      { label: '第3課 ……… 30', lessonNo: '3', printedPage: 30 },
+    ]);
+    // J2：裸页码紧贴裸课标题之前（OCR 先吐右端数字）
+    expect(
+      extractTocEntries('4.サントスさんも会社員です。\n18\n## 第2課\n1.これは辞書です。')
+    ).toEqual([{ label: '第2課 … 18', lessonNo: '2', printedPage: 18 }]);
+    // 復習A 粘连与点线式
+    expect(extractTocEntries('#### 復習A42')).toEqual([
+      { label: '復習A42', lessonNo: '復習A', printedPage: 42 },
+    ]);
+    expect(extractTocEntries('復習B ………… 78')).toEqual([
+      { label: '復習B ………… 78', lessonNo: '復習B', printedPage: 78 },
+    ]);
+    // 反例：有点线的非课行不误收；裸数字后跟的不是课标题不回贴
+    expect(extractTocEntries('はじめに ………\n第3課の復習 12\n18\n今日はいい天気です。')).toEqual([]);
+  });
+
   test('map 服务：窗口扫描 + 越界拒绝', async () => {
     const perPage = [
       { pageNumber: 16, markdown: '# 目录\n第 1 課 … 18' },

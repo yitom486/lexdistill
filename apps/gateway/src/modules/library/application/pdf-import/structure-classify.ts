@@ -5,6 +5,7 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
+  logger,
 } from '@study-studio/shared';
 import type { AgentAdapter, AgentSession } from '@study-studio/agent-core';
 import { listKnownSkillIds } from '@study-studio/learner-core';
@@ -202,7 +203,24 @@ export async function classifyStructure(
     const parsed = parseStructureJson(text);
     const items = asRecord(parsed)?.items;
     const { classes, dropped } = groundClassifications(items, candidates, allowedIds);
-    return ok({ classes, dropped, model: input.model ?? 'gateway-default' });
+    const model = input.model ?? 'gateway-default';
+    logger.debug('[classify] raw output', {
+      model,
+      chars: text.length,
+      head: text.slice(0, 800),
+      candidates: candidates.length,
+      classes: classes.length,
+      dropped,
+    });
+    if (classes.length === 0 && candidates.length > 0) {
+      // 空结果是运营显著事件（用户只看到"0条"）：warn 让网关控制台可见，排查看上面的 debug。
+      logger.warn('[classify] empty result (model returned no usable items)', {
+        model,
+        candidates: candidates.length,
+        chars: text.length,
+      });
+    }
+    return ok({ classes, dropped, model });
   } catch (e) {
     return err(
       translateToBusinessError(e, { category: 'AGENT_RUNTIME', action: 'classifyStructure' })

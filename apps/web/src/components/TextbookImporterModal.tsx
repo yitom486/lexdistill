@@ -250,9 +250,15 @@ export function TextbookImporterModal({
       },
       {
         onSuccess: (r) => {
-          sound.playCorrect();
           setClassifyResult({ classes: r.classes, dropped: r.dropped, model: r.model });
-          toast.success(`AI 分类完成：${r.classes.length} 条已判，丢弃 ${r.dropped} 条（${r.model}）`);
+          if (r.classes.length === 0) {
+            // 空结果不是成功：模型没吐出可用条目（网关日志有 warn+debug），提示换模型/重试
+            sound.playMistake();
+            toast.warning('AI 分类空结果：模型没有返回可用判选（网关控制台有 warn 详情），换个模型或重试');
+          } else {
+            sound.playCorrect();
+            toast.success(`AI 分类完成：${r.classes.length} 条已判，丢弃 ${r.dropped} 条（${r.model}）`);
+          }
         },
         onError: (e) => {
           sound.playMistake();
