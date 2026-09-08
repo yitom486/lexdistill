@@ -2,6 +2,22 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Theme transitions share one token. Components that use Tailwind's
+ * transition utilities without an explicit duration resolve to this value.
+ * Interaction-specific animations (progress, layout, and transforms) may
+ * still opt into their own duration when that timing is part of the UX.
+ */
+:root {
+  --theme-transition-duration: 200ms;
+  --theme-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@theme inline {
+  --default-transition-duration: var(--theme-transition-duration);
+  --default-transition-timing-function: var(--theme-transition-timing-function);
+}
+
 @keyframes shine {
   0% {
     left: -100%;

@@ -253,7 +253,7 @@ export function App() {
     <div
       className={`h-[100dvh] ${
         theme === 'dark' ? 'dark bg-[#141312] text-stone-100' : 'bg-[#fbfaf8] text-stone-800'
-      } transition-colors duration-200 flex font-sans relative overflow-hidden`}
+      } transition-colors flex font-sans relative overflow-hidden`}
     >
       <Toaster position="top-center" richColors />
       <SelectionLookupPopup />

@@ -7,7 +7,9 @@ import {
   Moon,
   Sun,
   PanelLeft,
+  RefreshCw,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from './ui/button.js';
 import { sound } from '../utils/audio.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
@@ -15,6 +17,8 @@ import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { SystemSettingsPopover } from './SystemSettingsPopover.js';
 import { UserProfileModal } from './UserProfileModal.js';
 import { useGatewayStore } from '../stores/useGatewayStore.js';
+import { getPlatform } from '../platform/capabilities.js';
+import { checkForAppUpdate, logUpdaterFailure } from '../platform/app-updater.js';
 
 interface AppHeaderProps {
   onOpenMobileNav?: () => void;
@@ -28,6 +32,45 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
   const activeTab = useStudySessionStore((s) => s.activeTab);
   const isConnected = useGatewayStore((s) => s.isConnected);
   const latencyMs = useGatewayStore((s) => s.latencyMs);
+  const isDesktop = React.useMemo(() => {
+    try {
+      return getPlatform().isDesktop();
+    } catch {
+      return false;
+    }
+  }, []);
+  const [updateChecking, setUpdateChecking] = React.useState(false);
+
+  const handleCheckForUpdate = async () => {
+    if (updateChecking) return;
+    sound.playClick();
+    setUpdateChecking(true);
+    try {
+      const update = await checkForAppUpdate();
+      if (!update) {
+        toast.success('当前已是最新版本');
+        return;
+      }
+      toast(`Lingua Studio ${update.version} 已可用`, {
+        description: update.notes || '包含稳定性改进与学习体验优化。',
+        duration: 12_000,
+        action: {
+          label: '立即更新',
+          onClick: () => {
+            void update.install().catch((error) => {
+              logUpdaterFailure(error);
+              toast.error('更新安装失败，当前版本仍可继续使用。');
+            });
+          },
+        },
+      });
+    } catch (error) {
+      logUpdaterFailure(error);
+      toast.error('暂时无法检查更新，请稍后再试。');
+    } finally {
+      setUpdateChecking(false);
+    }
+  };
 
   return (
     <header className="shrink-0 border-b border-stone-200/80 dark:border-stone-800/80 bg-white/85 dark:bg-[#1a1917]/85 backdrop-blur-md sticky top-0 z-40 transition-colors">
@@ -130,6 +173,22 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
 
           {/* 偏好与系统控制中心收纳面板 (集成 Edge-TTS 音色、网关状态、画像入口) */}
           <SystemSettingsPopover />
+
+          {/* 桌面端更新入口：放在顶栏，避免用户需要滚动设置面板查找 */}
+          {isDesktop && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 border-amber-500/30 px-2.5 text-amber-700 hover:bg-amber-100/70 dark:text-amber-300 dark:hover:bg-amber-950/40 sm:h-9 sm:px-3"
+              disabled={updateChecking}
+              onClick={() => void handleCheckForUpdate()}
+              title="检查应用更新"
+              aria-label="检查应用更新"
+            >
+              <RefreshCw className={updateChecking ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
+              <span>更新</span>
+            </Button>
+          )}
 
           {/* 明暗模式主题切换 */}
           <Button
