@@ -22,7 +22,9 @@ import {
  * - scanned-shapes-no-text.pdf（1 页纯形状无字）：OCR 路由 + 零产出友好失败
  *
  * 锁定的线上真实行为（实测，非假设）：
- * - lesson_number 是导入顺序计数器：復習A 显示 Lesson 3（不是“A”）；付録/まえがき无切课标记，并入相邻课
+ * - lesson_number 是 legacy positional field（导入顺序计数器）：復習A 显示 Lesson 3（不是“A”）；
+ *   P1-B 起 ordering 由 sort_order（AST 数组 index+1）表达，display 另议；本断言仅做 legacy characterization
+ * - 付録/まえがき无切课标记，并入相邻课
  * - ことば/文法/練習段落目前不进 AST（vocab/grammar/exercises 全 0，缺口已记录）
  * - 零产出错误不断言语种（E_OCR_LANG_UNSUPPORTED 文案已修正）
  */
@@ -90,7 +92,7 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     expect(byNo.get('4')).toBe(31);
   }, 120000);
 
-  itNative('convert：3 课 + 復習A 位置编号 + 前言付録并入 + 零 OCR', async () => {
+  itNative('convert：3 课 + legacy positional lesson_number + 前言付録并入 + 零 OCR', async () => {
     const bytes = await bytesOf(RICH_URL);
     const res = await convertPdfToAst({}, { userId: 'u1', filename: 'rich.pdf', bytes });
     expect(isOk(res)).toBe(true);
@@ -99,7 +101,8 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     expect(res.value.classification.azurePages).toBeUndefined();
     const lessons = res.value.book.lessons;
     expect(lessons).toHaveLength(3);
-    // lesson_number 是位置计数器（线上错位行为锁定：復習A 拿 3 号，不是“A”）
+    // legacy characterization（P1-B replacement target）：lesson_number 是位置计数器，
+    // 不是教材真实课号（線上錯位：復習A 拿 3 号）。P1-B 后 ordering 看 sort_order。
     expect(lessons.map((l) => l.lessonNumber)).toEqual([1, 2, 3]);
     const review = lessons.find((l) => l.title.includes('復習A'));
     expect(review?.lessonNumber).toBe(3);

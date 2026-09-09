@@ -438,7 +438,9 @@ describe('appendPdfToDocument（接力）', () => {
     },
     loadInspector: stubInspector({ pdfType: 'TextBased', pageCount: 2, markdown: '李さん：はじめまして。' }),
   };
-  test('新课续排号并存库', async () => {
+  // legacy characterization（P1-B replacement target）：续排号是 positional maxNo+1，
+  // 不是教材真实课号；P1-B 后新课 sort_order = 现有 canonical 课数 + i + 1。
+  test('新课续排号并存库（legacy positional）', async () => {
     const res = await appendPdfToDocument(deps, {
       userId: 'u1',
       documentId: 'doc1',
