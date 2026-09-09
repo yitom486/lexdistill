@@ -7,6 +7,8 @@ export interface ShredStats {
   vocab: number;
   grammar: number;
   lines: number;
+  /** 自带习题行数（v16；AST exercises 同源） */
+  exercises: number;
   ftsRows: number;
   /** 精确命中词典的生词数（含文法标题命中） */
   mappedEntries: number;
@@ -59,6 +61,7 @@ export function shredDocument(
     vocab: 0,
     grammar: 0,
     lines: 0,
+    exercises: 0,
     ftsRows: 0,
     mappedEntries: 0,
     unmapped: 0,
@@ -70,6 +73,7 @@ export function shredDocument(
       db.prepare('DELETE FROM textbook_vocab WHERE document_id = ?').run(documentId);
       db.prepare('DELETE FROM textbook_grammar WHERE document_id = ?').run(documentId);
       db.prepare('DELETE FROM textbook_lines WHERE document_id = ?').run(documentId);
+      db.prepare('DELETE FROM textbook_exercises WHERE document_id = ?').run(documentId);
       db.prepare('DELETE FROM textbook_fts WHERE document_id = ?').run(documentId);
       db.prepare('DELETE FROM textbook_term_map WHERE document_id = ?').run(documentId);
 
@@ -82,8 +86,13 @@ export function shredDocument(
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       const insGrammar = db.prepare(
-        `INSERT INTO textbook_grammar (document_id, lesson_id, ord, title, connection, explanation)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO textbook_grammar (document_id, lesson_id, ord, title, connection, explanation, examples_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      );
+      const insExercise = db.prepare(
+        `INSERT INTO textbook_exercises
+           (document_id, lesson_id, ord, exercise_id, type, prompt, options_json, answer, explanation)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       const insLine = db.prepare(
         'INSERT INTO textbook_lines (document_id, lesson_id, ord, speaker, ja, zh) VALUES (?, ?, ?, ?, ?, ?)'
@@ -158,7 +167,21 @@ export function shredDocument(
           const gTitle = r.title.trim().slice(0, 200);
           const connection = typeof r.connection === 'string' ? r.connection.slice(0, 500) : null;
           const explanation = typeof r.explanation === 'string' ? r.explanation.slice(0, 2000) : null;
-          insGrammar.run(documentId, lessonId, gOrd, gTitle, connection, explanation);
+          // 文法例句全量存 JSON（v16 前只在 AST，查询面够不着；上限 10 条防异常膨胀）。
+          const rawExamples = Array.isArray(r.examples) ? (r.examples as unknown[]) : [];
+          const examplesJson = JSON.stringify(
+            rawExamples
+              .filter(
+                (e): e is Record<string, unknown> =>
+                  !!e && typeof e === 'object' && typeof (e as Record<string, unknown>).japanese === 'string'
+              )
+              .slice(0, 10)
+              .map((e) => ({
+                japanese: String(e.japanese).slice(0, 500),
+                chinese: typeof e.chinese === 'string' ? e.chinese.slice(0, 500) : '',
+              }))
+          );
+          insGrammar.run(documentId, lessonId, gOrd, gTitle, connection, explanation, examplesJson);
           stats.grammar++;
           let entryId: string | null = null;
           if (findEntry) {
@@ -187,6 +210,31 @@ export function shredDocument(
           stats.lines++;
           stats.ftsRows++;
           dOrd++;
+        }
+
+        // 自带习题拆行（v16；AST exercises 同源，组卷读这里不再现场解析 AST）。
+        // type 非白名单仍原样存（读侧按白名单收敛，未知类型当不透明行，不臆造改写）。
+        const exercises = Array.isArray((lesson as { exercises?: unknown }).exercises)
+          ? ((lesson as { exercises: unknown[] }).exercises)
+          : [];
+        let eOrd = 0;
+        for (const e of exercises) {
+          if (!e || typeof e !== 'object') continue;
+          const r = e as Record<string, unknown>;
+          if (typeof r.type !== 'string' || !r.type.trim()) continue;
+          if (typeof r.prompt !== 'string' || !r.prompt.trim()) continue;
+          const exerciseId = typeof r.id === 'string' && r.id ? r.id.slice(0, 64) : null;
+          const type = r.type.trim().slice(0, 32);
+          const prompt = r.prompt.trim().slice(0, 2000);
+          const rawOptions = Array.isArray(r.options) ? r.options : [];
+          const optionsJson = JSON.stringify(
+            rawOptions.filter((o): o is string => typeof o === 'string').slice(0, 10).map((o) => o.slice(0, 500))
+          );
+          const answer = typeof r.answer === 'string' ? r.answer.slice(0, 2000) : '';
+          const explanation = typeof r.explanation === 'string' ? r.explanation.slice(0, 2000) : null;
+          insExercise.run(documentId, lessonId, eOrd, exerciseId, type, prompt, optionsJson, answer, explanation);
+          stats.exercises++;
+          eOrd++;
         }
       }
     });

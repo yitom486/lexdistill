@@ -76,7 +76,7 @@ export function createDocumentEnrichRoutes(deps: GatewayDeps) {
       if (!isOk(saved)) return formatBusinessErrorResponse(c, saved.error);
       // enrich 写回即拆：shred 与 AST 同源，失败只 warn（下次 enrich 回填），不推翻课文
       const shredded = await deps.repo.shredDocument(saved.value.id, enriched.value.book);
-      let shredStats: { lessons: number; vocab: number; lines: number; mappedEntries: number; unmapped: number } | undefined;
+      let shredStats: { lessons: number; vocab: number; lines: number; mappedEntries: number; unmapped: number; exercises: number } | undefined;
       if (isOk(shredded)) {
         shredStats = {
           lessons: shredded.value.lessons,
@@ -84,6 +84,7 @@ export function createDocumentEnrichRoutes(deps: GatewayDeps) {
           lines: shredded.value.lines,
           mappedEntries: shredded.value.mappedEntries,
           unmapped: shredded.value.unmapped,
+          exercises: shredded.value.exercises,
         };
       } else {
         logger.warn('[document-enrich] shred failed', {

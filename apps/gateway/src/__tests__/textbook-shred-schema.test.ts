@@ -27,6 +27,33 @@ describe('textbook shred schema（v14）', () => {
     expect(rows.map((r) => r.version)).toContain(14);
   });
 
+  it('迁移 v16 已登记：习题表 + 文法例句列', () => {
+    const db = repo.getRawDb();
+    const rows = db
+      .query<{ version: number }, []>('SELECT version AS version FROM schema_migrations ORDER BY version')
+      .all();
+    expect(rows.map((r) => r.version)).toContain(16);
+    // 习题表主键防重
+    db.query(
+      `INSERT INTO textbook_exercises (document_id, lesson_id, ord, type, prompt, answer)
+       VALUES ('d1', 'l1', 0, 'CHOICE', '选读音', 'たべる')`
+    ).run();
+    expect(() =>
+      db.query(
+        `INSERT INTO textbook_exercises (document_id, lesson_id, ord, type, prompt, answer)
+         VALUES ('d1', 'l1', 0, 'CHOICE', '选读音', 'たべる')`
+      ).run()
+    ).toThrow();
+    // 存量文法行例句列默认空数组（v16 只建结构，数据随下次 shred 回填）
+    db.query(
+      `INSERT INTO textbook_grammar (document_id, lesson_id, ord, title) VALUES ('d1', 'l1', 0, '〜ます')`
+    ).run();
+    const g = db
+      .query('SELECT examples_json AS examplesJson FROM textbook_grammar WHERE document_id = ?')
+      .get('d1') as { examplesJson: string };
+    expect(JSON.parse(g.examplesJson)).toEqual([]);
+  });
+
   it('行表主键防重（同文档同课同序只存一行）', () => {
     const db = repo.getRawDb();
     db.query(

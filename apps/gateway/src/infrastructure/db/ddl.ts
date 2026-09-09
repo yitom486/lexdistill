@@ -811,6 +811,31 @@ const SCHEMA_MIGRATIONS: SchemaMigration[] = [
       );
     `,
   },
+  {
+    // v16：教材六层补齐——自带习题拆行 + 文法例句落列（读路径切换的前置）。
+    // - textbook_exercises：AST exercises 同源拆行（ord 保序，exercise_id 透传 AST 原 id）；
+    // - textbook_grammar.examples_json：[{japanese, chinese}] 全量存（此前只在 AST，查询面够不着）；
+    // - 只建结构不写数据：存量书的习题/例句随下一次 enrich/append/shred 回填（全删全插天然覆盖）。
+    version: 16,
+    name: 'textbook-exercises-grammar-examples',
+    sql: `
+      CREATE TABLE IF NOT EXISTS textbook_exercises (
+        document_id TEXT NOT NULL,
+        lesson_id TEXT NOT NULL,
+        ord INTEGER NOT NULL,
+        exercise_id TEXT,
+        type TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        options_json TEXT NOT NULL DEFAULT '[]',
+        answer TEXT NOT NULL DEFAULT '',
+        explanation TEXT,
+        PRIMARY KEY (document_id, lesson_id, ord)
+      );
+      CREATE INDEX IF NOT EXISTS idx_textbook_exercises_lesson
+        ON textbook_exercises(document_id, lesson_id, ord);
+      ALTER TABLE textbook_grammar ADD COLUMN examples_json TEXT NOT NULL DEFAULT '[]';
+    `,
+  },
 ];
 
 export function runMigrations(sqlite: Database): { applied: number[] } {

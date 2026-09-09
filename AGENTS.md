@@ -65,7 +65,8 @@
 - **教材六层模型对号入座**（新增教材相关表必须能映射进这六层，映射不进就说明设计错了）：
   - `material/document` → `documents`（`source_kind` 区分私产 `user_import` / 公共种子）；
   - `section` → `textbook_lessons`；`content_block` → `textbook_lines`；
-  - `knowledge_point` → `textbook_vocab` + `textbook_grammar`；`exercise` → shred 行表（待 v16 补齐，当前仅 AST 内）；
+  - `knowledge_point` → `textbook_vocab` + `textbook_grammar`（文法例句存 `examples_json`，v16）；
+  - `exercise` → `textbook_exercises`（v16 起 shred 落库；此前仅 AST 内）；
   - 底稿 `documents.ast_json` 为 SSOT，shred 表永远由它同事务拆出（全删全插），两边永不分叉。
 - **JSON 列只当底稿**：`ast_json` / `*_json` 存动态结构可以，但查询面要用的字段必须 shred 成列；全文检索走 FTS 虚表（建表语句静态，变的只是行）。
 

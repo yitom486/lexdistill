@@ -20,7 +20,17 @@ const BOOK: TextbookAST = {
       id: 'l1',
       lessonNumber: 1,
       title: '第1課',
-      exercises: [],
+      exercises: [
+        {
+          id: 'ex1',
+          type: 'CHOICE',
+          prompt: '「食べる」的正确读音是？',
+          options: ['たべる', 'のむ', 'みる'],
+          answer: 'たべる',
+          explanation: '食べる读たべる',
+        },
+        { id: 'ex2', type: 'FILL_BLANK', prompt: 'ご飯を＿＿。', answer: '食べる' },
+      ],
       vocabularies: [
         {
           id: 'v1',
@@ -66,7 +76,7 @@ describe('textbook shred 写逻辑', () => {
   it('拆行/FTS/精确映射一次写齐', async () => {
     const res = await repo.shredDocument('d1', BOOK);
     if (!isOk(res)) throw new Error(`shred failed: ${res.error.code}`);
-    expect(res.value).toMatchObject({ lessons: 1, vocab: 2, grammar: 1, lines: 2 });
+    expect(res.value).toMatchObject({ lessons: 1, vocab: 2, grammar: 1, lines: 2, exercises: 2 });
     const db = repo.getRawDb();
     const fts = db
       .query('SELECT COUNT(*) AS n FROM textbook_fts WHERE document_id = ?')
@@ -87,6 +97,20 @@ describe('textbook shred 写逻辑', () => {
       .query('SELECT lesson_id AS lessonId FROM textbook_fts WHERE textbook_fts MATCH ?')
       .all('たべる') as Array<{ lessonId: string }>;
     expect(rows.map((r) => r.lessonId)).toContain('l1');
+    // v16：习题拆行 + 文法例句落列
+    const exRows = db
+      .query(
+        'SELECT type AS type, prompt AS prompt, options_json AS optionsJson, answer AS answer FROM textbook_exercises WHERE document_id = ? ORDER BY ord'
+      )
+      .all('d1') as Array<{ type: string; prompt: string; optionsJson: string; answer: string }>;
+    expect(exRows).toHaveLength(2);
+    expect(exRows[0]).toMatchObject({ type: 'CHOICE', answer: 'たべる' });
+    expect(JSON.parse(exRows[0]?.optionsJson ?? '[]')).toEqual(['たべる', 'のむ', 'みる']);
+    expect(exRows[1]).toMatchObject({ type: 'FILL_BLANK', answer: '食べる' });
+    const gRow = db
+      .query('SELECT examples_json AS examplesJson FROM textbook_grammar WHERE document_id = ?')
+      .get('d1') as { examplesJson: string };
+    expect(JSON.parse(gRow.examplesJson)).toEqual([{ japanese: '食べます', chinese: '吃' }]);
   });
 
   it('重跑全删全插（幂等，不翻倍）', async () => {
@@ -99,7 +123,11 @@ describe('textbook shred 写逻辑', () => {
       .query('SELECT COUNT(*) AS n FROM textbook_vocab WHERE document_id = ?')
       .get('d1') as { n: number };
     expect(n.n).toBe(2);
-    expect(second.value).toMatchObject({ lessons: 1, vocab: 2 });
+    expect(second.value).toMatchObject({ lessons: 1, vocab: 2, exercises: 2 });
+    const ne = db
+      .query('SELECT COUNT(*) AS n FROM textbook_exercises WHERE document_id = ?')
+      .get('d1') as { n: number };
+    expect(ne.n).toBe(2);
   });
 
   it('tryParseTextbookAst 挡坏输入（读侧永不抛）', () => {
