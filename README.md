@@ -41,7 +41,7 @@ bun run dev:desktop   # Tauri 桌面壳（自动拉起 Gateway sidecar）
 
 ```bash
 bun run typecheck   # 全仓严格类型检查（tsc -b），提交前必须零报错
-bun test            # 全量单测（bunfig.toml 已忽略 dist 编译产物，只跑源码）
+bun run test:all    # 唯一正式门禁：全 workspace 测试（122 文件级，含 PDF native 38 E2E；显式排除 dist，见下）
 bun --filter @study-studio/web build   # Web 生产构建
 bun run build:sidecar                  # 编译 Tauri Gateway sidecar
 bun run release:sync -- 0.1.0          # 同步所有包、Tauri、Cargo 与 Changelog 版本

@@ -128,10 +128,12 @@
 ## 4. 测试与验证标准 (Quality & Testing)
 
 - **单测先行**：`packages/shared`、`packages/protocol`、`packages/learner-core` 等所有核心逻辑必须编写单元测试。
-- **统一测试命令**：
-  - 单元测试：`bun test`
+- **统一测试命令（唯一正式门禁 `bun run test:all`）**：
+  - 单元+集成测试：`bun run test:all`（仓库根执行；全 workspace，含 PDF native E2E，永不 skip native）
   - 全局严格类型检查：`bun run typecheck`
-- 任何提交前，必须确保 `bun test` 零失败，`bun run typecheck` 零报错。
+- 任何提交前，必须确保 `bun run test:all` 零失败，`bun run typecheck` 零报错。
+- 不得把裸 `bun test` 宣称为全量门禁：`bun test <filter>` 会绕过 bunfig 的 pathIgnorePatterns
+  把 `tsc -b` 的 stale dist 编译副本也跑一遍；`test:all` 显式排除 dist（`--path-ignore-patterns`）。
 
 ---
 

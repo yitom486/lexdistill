@@ -266,3 +266,20 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 未决（需 schema 扩展，不擅自发明，候选记录）：
 - document_imports 是否需要 `tombstone` 状态或 `deleted_document_title` 快照列：当前悬空 `document_id` 只能证明"导过删了的书"，标题不可考。候选：加 `document_title_snapshot` 列（P1-C 级别，本轮只记录）。
 - `deleteDocument` 是否需要软删除（`deleted_at`）：当前硬删，误删不可回。候选，未决。
+
+## 8. 真实库 migration/backfill/repair 操作顺序（rollout guardrail）
+
+真实 hazard（2026-09-10 实测）：工作区加入 v17 后，遗留 `bun --watch` dev 进程随代码热加载
+自动对真库执行了 schema migration（initSchema→runMigrations 常驻启动路径）。本次只加 nullable 列，
+无数据事故，但 rollout 顺序错了就是事故。任何真实 SQLite migration/backfill/repair 必须按序：
+
+1. 停止 Gateway 与所有 dev/watch writer（含 `--watch src/index.ts` 这类遗留进程）；
+2. 确认端口（:8080 无监听）、进程（无 gateway cwd 的 bun）和 DB mtime 稳定；
+3. 创建 SQLite-consistent snapshot（`VACUUM INTO`，不进 git，记录 SHA-256）；
+4. `PRAGMA integrity_check` 必须 ok；
+5. readonly dry-run（不信旧结果，重跑）；
+6. 显式 `--apply`（preflight 有 unresolved 即整体拒绝，不做部分回填）；
+7. `db-doctor`（目标 errors=0，已知 audit WARN 可保留）；
+8. 再启动服务。
+
+本轮不改 migration runner 行为，不新增 approval flag；顺序即 guardrail。

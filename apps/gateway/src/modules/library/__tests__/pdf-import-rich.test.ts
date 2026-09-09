@@ -1,9 +1,6 @@
 import { describe, expect, it, afterEach } from 'bun:test';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { defaultRuntimeDir } from '../../../infrastructure/persistence/app-paths.js';
 import { extractTocEntries } from '../application/pdf-import/extract-headings.js';
 import {
   appendPdfToDocument,
@@ -12,9 +9,10 @@ import {
   mapPdfPages,
 } from '../application/pdf-import/pdf-import-service.js';
 import { tryParseTextbookAst } from '../persistence/textbook-shred.js';
+import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 
 /**
- * pdf-import rich 集成测试（tag：pdf-import）。
+ * pdf-import rich 集成测试（tag：pdf-import；native E2E 永不 skip，见 pdf-test-runtime.ts）。
  * 本次修复期 tag 命令见 fixtures/gen/README.md（含 dist 绕行说明）。
  *
  * fixtures（__tests__/fixtures/，git 追踪）：
@@ -32,22 +30,15 @@ import { tryParseTextbookAst } from '../persistence/textbook-shred.js';
 const RICH_URL = new URL('./fixtures/rich-textbook-toc-review.pdf', import.meta.url);
 const SCAN_URL = new URL('./fixtures/scanned-shapes-no-text.pdf', import.meta.url);
 
+// 测试进程默认运行时钉到测试目录（显式 env 优先）；随后 bootstrap，失败即抛（不 skip）。
+pinProcessToTestRuntime();
+await ensurePdfTestRuntime();
+
 async function bytesOf(url: URL): Promise<Uint8Array> {
   const buf = await Bun.file(url).arrayBuffer();
   expect(buf.byteLength).toBeGreaterThan(0);
   return new Uint8Array(buf);
 }
-
-function hasNativeRuntime(): boolean {
-  try {
-    return existsSync(join(defaultRuntimeDir(), 'manifest.json'));
-  } catch {
-    return false;
-  }
-}
-
-const NATIVE = hasNativeRuntime();
-const itNative = NATIVE ? it : it.skip;
 
 const repos: DrizzleLearnerRepository[] = [];
 afterEach(() => {
@@ -78,7 +69,7 @@ describe('pdf-import TOC（单元，离线）', () => {
 });
 
 describe('pdf-import rich 真 E2E（本机运行时）', () => {
-  itNative('map：6 条目录全收（含 J1/頁碼前置/復習/付録）', async () => {
+  it('map：6 条目录全收（含 J1/頁碼前置/復習/付録）', async () => {
     const bytes = await bytesOf(RICH_URL);
     const res = await mapPdfPages({}, { userId: 'u1', filename: 'rich.pdf', bytes });
     expect(isOk(res)).toBe(true);
@@ -93,7 +84,7 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     expect(byNo.get('4')).toBe(31);
   }, 120000);
 
-  itNative('convert：3 课 + legacy positional lesson_number + 前言付録并入 + 零 OCR', async () => {
+  it('convert：3 课 + legacy positional lesson_number + 前言付録并入 + 零 OCR', async () => {
     const bytes = await bytesOf(RICH_URL);
     const res = await convertPdfToAst({}, { userId: 'u1', filename: 'rich.pdf', bytes });
     expect(isOk(res)).toBe(true);
@@ -118,7 +109,7 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     }
   }, 120000);
 
-  itNative('append：接力追加课数增长（smoke 2 课 + rich 3 课）', async () => {
+  it('append：接力追加课数增长（smoke 2 课 + rich 3 课）', async () => {
     const smokeBytes = new Uint8Array(
       await Bun.file(new URL('./fixtures/smoke-native-2lessons.pdf', import.meta.url)).arrayBuffer()
     );
@@ -163,7 +154,7 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
 });
 
 describe('pdf-import 扫描页（本机 OCR 运行时）', () => {
-  itNative('无字形状页：走 OCR → 零产出友好失败，不崩不打云', async () => {
+  it('无字形状页：走 OCR → 零产出友好失败，不崩不打云', async () => {
     const bytes = await bytesOf(SCAN_URL);
     const res = await convertPdfToAst({}, { userId: 'u1', filename: 'scan.pdf', bytes });
     expect(isOk(res)).toBe(false);

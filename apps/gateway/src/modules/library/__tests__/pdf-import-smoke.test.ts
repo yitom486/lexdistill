@@ -1,21 +1,19 @@
-import { describe, expect, it, afterEach, beforeAll } from 'bun:test';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { describe, expect, it, afterEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { defaultRuntimeDir } from '../../../infrastructure/persistence/app-paths.js';
 import {
   convertPdfToAst,
   importPdfDocument,
   mapPdfPages,
 } from '../application/pdf-import/pdf-import-service.js';
 import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
+import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 
 /**
  * PDF 导入集成测试（fixture = smoke-native-2lessons.pdf，2 页日语教材）。
  *
- * 三层：
- * 1. 真 E2E（本机 pdf-inspector 运行时，离线可跑；缺运行时则 skip，CI 不红）；
+ * 三层（native E2E 永不 skip）：
+ * 1. 真 E2E（测试拥有的 pinned 运行时，见 pdf-test-runtime.ts；就绪失败即整文件失败）；
  * 2. 不启用 OCR 单元测试（mock inspector 计数取证：processPdfWithOcr 零调用）；
  * 3. 入库集成（:memory: 库，跑完即弃，生产库零接触）。
  *
@@ -26,6 +24,9 @@ import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js'
  * fixture 内容：2 课（第1課/第2課）× 会話（アキ/ミナ）+ ことば + 文法 + 練習。
  * 已知缺口（后续 richer fixture 覆盖）：无目录页、无真扫描页、无 復習/附录非数字章节。
  */
+// 测试进程默认运行时钉到测试目录（显式 env 优先）；随后 bootstrap，失败即抛（不 skip）。
+pinProcessToTestRuntime();
+await ensurePdfTestRuntime();
 const FIXTURE_URL = new URL('./fixtures/smoke-native-2lessons.pdf', import.meta.url);
 
 async function fixtureBytes(): Promise<Uint8Array> {
@@ -34,26 +35,9 @@ async function fixtureBytes(): Promise<Uint8Array> {
   return new Uint8Array(buf);
 }
 
-function hasNativeRuntime(): boolean {
-  try {
-    return existsSync(join(defaultRuntimeDir(), 'manifest.json'));
-  } catch {
-    return false;
-  }
-}
-
-const NATIVE = hasNativeRuntime();
-const itNative = NATIVE ? it : it.skip;
-
 const repos: DrizzleLearnerRepository[] = [];
 afterEach(() => {
   for (const r of repos.splice(0)) r.getRawDb().close();
-});
-
-beforeAll(() => {
-  if (!NATIVE) {
-    console.warn('[pdf-import-smoke] 本机无 pdf-inspector 运行时，真 E2E 用例 skip（mock 覆盖照常跑）');
-  }
 });
 
 describe('smoke 文档型 PDF 不启用 OCR（mock 取证）', () => {
@@ -87,7 +71,7 @@ describe('smoke 文档型 PDF 不启用 OCR（mock 取证）', () => {
 });
 
 describe('smoke 真 E2E（本机运行时）', () => {
-  itNative('convert：2 页走 OCR 回填（无文本层）+ 2 课 + 说话人齐全 + 不碰 Azure', async () => {
+  it('convert：2 页走 OCR 回填（无文本层）+ 2 课 + 说话人齐全 + 不碰 Azure', async () => {
     const bytes = await fixtureBytes();
     const res = await convertPdfToAst({}, { userId: 'u1', filename: 'smoke.pdf', bytes });
     expect(isOk(res)).toBe(true);
@@ -107,7 +91,7 @@ describe('smoke 真 E2E（本机运行时）', () => {
     expect(res.value.stats.dialogues).toBeGreaterThan(0);
   }, 120000);
 
-  itNative('map：结构预览页数对齐', async () => {
+  it('map：结构预览页数对齐', async () => {
     const bytes = await fixtureBytes();
     const res = await mapPdfPages({}, { userId: 'u1', filename: 'smoke.pdf', bytes });
     expect(isOk(res)).toBe(true);
@@ -119,7 +103,7 @@ describe('smoke 真 E2E（本机运行时）', () => {
 });
 
 describe('smoke 入库集成（:memory:，跑完即弃）', () => {
-  itNative('import + shred 落库行数对齐，生产库零接触', async () => {
+  it('import + shred 落库行数对齐，生产库零接触', async () => {
     const bytes = await fixtureBytes();
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);

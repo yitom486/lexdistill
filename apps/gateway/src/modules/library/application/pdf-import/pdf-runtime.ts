@@ -318,7 +318,9 @@ async function ensurePdfRuntimeInner(
       await writeEntries(pdfiumDir, extractTarGz(pdfiumPkg));
       await writeEntries(
         ortDir,
-        pins.ortUrl.endsWith('.zip') ? extractZip(ortPkg) : extractTarGz(ortPkg)
+        // ORT 上游包内含 403MB 的 *.pdb 调试符号（MAX_ENTRY_BYTES=150MB 会整体拒绝；
+        // pdb 永不被加载，跳过。见 archive.ExtractOptions）。
+        (pins.ortUrl.endsWith('.zip') ? extractZip(ortPkg, { skipEntry: (p) => /\.pdb$/i.test(p) }) : extractTarGz(ortPkg))
       );
     }
     pdfiumLib = await findFileByName(pdfiumDir, pins.pdfiumLibName);

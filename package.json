@@ -7,13 +7,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:web": "bun --filter @study-studio/web dev",
+    "dev:web": "bun --parallel --filter @study-studio/web --filter @study-studio/gateway dev",
     "dev:gateway": "bun --filter @study-studio/gateway dev",
     "dev:desktop": "bun --filter @study-studio/desktop dev",
     "build": "bun --filter \"*\" build",
     "build:sidecar": "bun run --filter @study-studio/gateway sidecar:build",
     "typecheck": "tsc -b --force",
-    "test": "bun test",
+    "test:all": "bun test --path-ignore-patterns \"**/dist/**\"",
+    "test": "bun run test:all",
     "release:sync": "bun scripts/release.ts sync",
     "release:notes": "bun scripts/release.ts notes",
     "release": "bun scripts/release.ts publish"

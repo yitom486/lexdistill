@@ -39,7 +39,16 @@ function octal(view: Uint8Array, off: number, len: number): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export function extractTarGz(input: Uint8Array): ArchiveEntry[] {
+export interface ExtractOptions {
+  /**
+   *  ingredient 级 denylist（运行时 bootstrap 用）：返回 true 即跳过该条目，
+   *  不解压不落盘。当前唯一用途：跳过 ORT 包内 403MB 的 *.pdb 调试符号
+   * （MAX_ENTRY_BYTES=150MB 会整体拒绝解包；pdb 永不被加载，跳过是安全的）。
+   */
+  skipEntry?: (path: string) => boolean;
+}
+
+export function extractTarGz(input: Uint8Array, opts: ExtractOptions = {}): ArchiveEntry[] {
   let tar: Uint8Array;
   try {
     tar = gunzipSync(input);
@@ -66,7 +75,9 @@ export function extractTarGz(input: Uint8Array): ArchiveEntry[] {
     if ((typeflag === '0' || typeflag === '\0') && size > 0 && size <= MAX_ENTRY_BYTES) {
       const prefix = ascii(tar, off + 345, 155);
       const fullName = prefix ? `${prefix}/${name}` : name;
-      entries.push({ path: fullName, data: tar.subarray(dataStart, dataEnd) });
+      if (!opts.skipEntry?.(fullName)) {
+        entries.push({ path: fullName, data: tar.subarray(dataStart, dataEnd) });
+      }
     }
     off = dataEnd + ((512 - (size % 512)) % 512);
   }
@@ -86,7 +97,7 @@ function u32(view: Uint8Array, off: number): number {
   );
 }
 
-export function extractZip(input: Uint8Array): ArchiveEntry[] {
+export function extractZip(input: Uint8Array, opts: ExtractOptions = {}): ArchiveEntry[] {
   if (input.length > MAX_ARCHIVE_BYTES) {
     throw new BusinessError('E_RUNTIME_EXTRACT', '构件包过大，拒绝解包', 'TOOL_EXECUTION');
   }
@@ -101,10 +112,10 @@ export function extractZip(input: Uint8Array): ArchiveEntry[] {
   if (eocd < 0) {
     throw new BusinessError('E_RUNTIME_EXTRACT', '构件包解压失败：不是有效的 zip 数据', 'TOOL_EXECUTION');
   }
-  return extractZipInner(input, eocd);
+  return extractZipInner(input, eocd, opts);
 }
 
-function extractZipInner(input: Uint8Array, eocd: number): ArchiveEntry[] {
+function extractZipInner(input: Uint8Array, eocd: number, opts: ExtractOptions): ArchiveEntry[] {
   const text = (off: number, len: number) =>
     Buffer.from(input.subarray(off, off + len)).toString('utf8');
   const centralCount = u16(input, eocd + 10);
@@ -125,6 +136,7 @@ function extractZipInner(input: Uint8Array, eocd: number): ArchiveEntry[] {
     const name = text(ptr + 46, nameLen);
     ptr += 46 + nameLen + extraLen + commentLen;
     if (name.endsWith('/') || uncompSize === 0) continue; // 目录或空项
+    if (opts.skipEntry?.(name)) continue; // denylist（如 *.pdb）：连解压都不做，省内存
     if (uncompSize > MAX_ENTRY_BYTES || compSize > MAX_ENTRY_BYTES) {
       throw new BusinessError('E_RUNTIME_EXTRACT', '构件包内单文件过大，拒绝解包', 'TOOL_EXECUTION');
     }
