@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { BusinessError, isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import { clampEnrichConcurrency } from '../application/pdf-import/enrich-job-runner.js';
 
 /**
  * 整本 enrich 后台任务：POST /api/documents/:userId/:documentId/enrich-jobs …。
@@ -29,15 +30,31 @@ export function createEnrichJobRoutes(deps: GatewayDeps) {
         const documentId = c.req.param('documentId');
         let lessonIds: string[] | undefined;
         let sessionId: string | undefined;
+        let concurrency: number | undefined;
+        let model: string | undefined;
+        let effort: string | undefined;
         try {
           const body = (await c.req.json().catch(() => null)) as {
             lessonIds?: unknown;
             sessionId?: unknown;
+            concurrency?: unknown;
+            model?: unknown;
+            effort?: unknown;
           } | null;
           if (Array.isArray(body?.lessonIds) && body.lessonIds.every((v) => typeof v === 'string')) {
             lessonIds = [...body.lessonIds];
           }
           if (typeof body?.sessionId === 'string' && body.sessionId) sessionId = body.sessionId;
+          // 并发 1–4（越界钳制不断言，失败课可重试）；模型分流只收窄字符串，透传引擎。
+          if (typeof body?.concurrency === 'number' && Number.isInteger(body.concurrency)) {
+            concurrency = clampEnrichConcurrency(body.concurrency);
+          }
+          if (typeof body?.model === 'string' && body.model.trim().length > 0 && body.model.length <= 200) {
+            model = body.model.trim();
+          }
+          if (typeof body?.effort === 'string' && body.effort.trim().length > 0 && body.effort.length <= 40) {
+            effort = body.effort.trim();
+          }
         } catch {
           // 无 body = 整本抽取
         }
@@ -52,6 +69,9 @@ export function createEnrichJobRoutes(deps: GatewayDeps) {
             documentId,
             ...(lessonIds ? { lessonIds } : {}),
             ...(sessionId ? { sessionId } : {}),
+            ...(concurrency !== undefined ? { concurrency } : {}),
+            ...(model ? { model } : {}),
+            ...(effort ? { effort } : {}),
           }
         );
         if (!isOk(started)) return formatBusinessErrorResponse(c, started.error);

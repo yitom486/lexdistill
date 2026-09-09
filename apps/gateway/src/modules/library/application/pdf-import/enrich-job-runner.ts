@@ -63,6 +63,25 @@ export interface StartEnrichJobInput {
   lessonIds?: string[];
   /** 发起方的 WS 会话（有则推送 import.enrich.*，无则只靠 GET 轮询） */
   sessionId?: string;
+  /**
+   * 并发课数 1–4（缺省 1）。
+   * 每课独立临时会话 + 独立落库，提速约线性；服务端钳制上限，
+   * 触发模型限流时失败课进 failed[]，用“重试失败”补跑即可。
+   */
+  concurrency?: number;
+  /** 模型分流（透传给每课抽取；不填走网关缺省强模型） */
+  model?: string;
+  /** 思考档（必须取目标模型支持列表，调用方负责选对） */
+  effort?: string;
+}
+
+/** 并发上下限（经验值：同账号 4 路内稳定；超限失败课可重试补跑） */
+export const MIN_ENRICH_CONCURRENCY = 1;
+export const MAX_ENRICH_CONCURRENCY = 4;
+
+export function clampEnrichConcurrency(raw: unknown): number {
+  const n = typeof raw === 'number' && Number.isInteger(raw) ? raw : MIN_ENRICH_CONCURRENCY;
+  return Math.min(MAX_ENRICH_CONCURRENCY, Math.max(MIN_ENRICH_CONCURRENCY, n));
 }
 
 interface RunningJob {
@@ -217,81 +236,33 @@ export class EnrichJobRegistry {
       const lessons = [...parsed.value.lessons];
       let book: TextbookAST = { ...parsed.value, lessons };
       const trackLanguage = toTrackLanguage(parsed.value.language);
-
-      for (const target of targets) {
-        if (signal.aborted) {
-          await this.persist(deps, doc, book);
-          snapshot.status = 'cancelled';
-          snapshot.finishedAt = new Date().toISOString();
-          delete snapshot.currentLessonId;
-          delete snapshot.currentLessonTitle;
-          this.emit(deps, input.sessionId, snapshot);
-          return;
-        }
-        snapshot.currentLessonId = target.id;
-        snapshot.currentLessonTitle = target.title;
-        this.emit(deps, input.sessionId, snapshot);
-
-        const res = await enrichLessonVocab(deps.adapter, {
-          lessonId: target.id,
-          lessonTitle: target.title,
-          language: parsed.value.language,
-          dialogueTexts: target.dialogues.map((d) => `${d.speaker}：${d.japanese}`),
-          signal,
-        });
-        if (!res.ok) {
-          if (res.error.code === 'E_ENRICH_CANCELLED') {
-            await this.persist(deps, doc, book);
-            snapshot.status = 'cancelled';
-            snapshot.finishedAt = new Date().toISOString();
-            delete snapshot.currentLessonId;
-            delete snapshot.currentLessonTitle;
-            this.emit(deps, input.sessionId, snapshot);
-            return;
-          }
-          const failedLesson: EnrichJobFailedLesson = {
-            lessonId: target.id,
-            lessonTitle: target.title,
-            error: res.error.userMessage,
-          };
-          snapshot.failed.push(failedLesson);
-          snapshot.doneLessons += 1;
-          delete snapshot.currentLessonId;
-          delete snapshot.currentLessonTitle;
-          logger.warn('[enrich-job] 单课失败，继续下一课', {
-            jobId: snapshot.jobId,
-            lessonId: target.id,
-            code: res.error.code,
+      const concurrency = clampEnrichConcurrency(input.concurrency);
+      // 并发池：游标分课，各 worker 独立会话+独立落库。
+      // 收敛安全：各课只写自己的 lessons[idx]；每次落库存全量 AST，
+      // 后完成的覆盖先完成的（含其全部已落课），终态必全。
+      let cursor = 0;
+      const worker = async (): Promise<void> => {
+        for (;;) {
+          if (signal.aborted) return;
+          const target = targets[cursor];
+          cursor += 1;
+          if (!target) return;
+          if (signal.aborted) return;
+          await this.processOne(deps, input, snapshot, signal, doc, lessons, trackLanguage, target, book, (next) => {
+            book = next;
           });
-          this.emit(deps, input.sessionId, snapshot);
-          continue;
         }
-        const idx = lessons.findIndex((l) => l.id === target.id);
-        if (idx >= 0 && lessons[idx]) {
-          lessons[idx] = {
-            ...lessons[idx]!,
-            vocabularies: res.value.vocabularies,
-            grammarPoints: res.value.grammarPoints,
-          };
-        }
-        book = { ...parsed.value, lessons };
-        snapshot.vocabularies += res.value.vocabularies.length;
-        snapshot.grammarPoints += res.value.grammarPoints.length;
-        snapshot.dropped += res.value.dropped;
-        snapshot.doneLessons += 1;
-        // 逐课落库：save + shred + 草稿，课课落袋（崩了也不丢已完成的课）。
-        const persisted = await this.persistLesson(deps, input, doc, book, target.id, target.title, res.value.vocabularies, trackLanguage);
-        if (!persisted.ok) {
-          const failedLesson: EnrichJobFailedLesson = {
-            lessonId: target.id,
-            lessonTitle: target.title,
-            error: persisted.error.userMessage,
-          };
-          snapshot.failed.push(failedLesson);
-        }
+      };
+      await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, () => worker()));
+      if (signal.aborted) {
+        await this.persist(deps, doc, book);
+        snapshot.status = 'cancelled';
+        snapshot.finishedAt = new Date().toISOString();
         delete snapshot.currentLessonId;
         delete snapshot.currentLessonTitle;
+        logger.info('[enrich-job] 任务已取消', { jobId: snapshot.jobId, done: `${snapshot.doneLessons}/${snapshot.totalLessons}` });
         this.emit(deps, input.sessionId, snapshot);
+        return;
       }
       snapshot.status = 'done';
       snapshot.finishedAt = new Date().toISOString();
@@ -305,6 +276,84 @@ export class EnrichJobRegistry {
       const biz = translateToBusinessError(e, { category: 'AGENT_RUNTIME', action: 'enrichJobRun' });
       fail(biz.userMessage);
     }
+  }
+
+  /**
+   * 单课全链路：抽取→合入 AST→逐课落库→进度上报。
+   * 并发安全：只写自己的 lessons[idx]；计数器/doneLessons 为单调累加；
+   * currentLesson* 为 last-writer-wins 的展示位（并发时显示其中一课在途）。
+   * 取消（E_ENRICH_CANCELLED）不记失败不计数，由 run() 尾部统一收成 cancelled。
+   */
+  private async processOne(
+    deps: EnrichJobRunnerDeps,
+    input: StartEnrichJobInput,
+    snapshot: EnrichJobSnapshot,
+    signal: AbortSignal,
+    doc: DocumentItem,
+    lessons: TextbookAST['lessons'],
+    trackLanguage: 'ja' | 'en' | 'ko' | null,
+    target: TextbookAST['lessons'][number],
+    base: TextbookAST,
+    onBook: (next: TextbookAST) => void
+  ): Promise<void> {
+    snapshot.currentLessonId = target.id;
+    snapshot.currentLessonTitle = target.title;
+    this.emit(deps, input.sessionId, snapshot);
+
+    const res = await enrichLessonVocab(deps.adapter, {
+      lessonId: target.id,
+      lessonTitle: target.title,
+      language: base.language,
+      dialogueTexts: target.dialogues.map((d) => `${d.speaker}：${d.japanese}`),
+      signal,
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.effort ? { effort: input.effort } : {}),
+    });
+    if (!res.ok) {
+      if (res.error.code === 'E_ENRICH_CANCELLED') return;
+      const failedLesson: EnrichJobFailedLesson = {
+        lessonId: target.id,
+        lessonTitle: target.title,
+        error: res.error.userMessage,
+      };
+      snapshot.failed.push(failedLesson);
+      snapshot.doneLessons += 1;
+      delete snapshot.currentLessonId;
+      delete snapshot.currentLessonTitle;
+      logger.warn('[enrich-job] 单课失败，继续下一课', {
+        jobId: snapshot.jobId,
+        lessonId: target.id,
+        code: res.error.code,
+      });
+      this.emit(deps, input.sessionId, snapshot);
+      return;
+    }
+    const idx = lessons.findIndex((l) => l.id === target.id);
+    if (idx >= 0 && lessons[idx]) {
+      lessons[idx] = {
+        ...lessons[idx]!,
+        vocabularies: res.value.vocabularies,
+        grammarPoints: res.value.grammarPoints,
+      };
+    }
+    onBook({ ...base, lessons });
+    snapshot.vocabularies += res.value.vocabularies.length;
+    snapshot.grammarPoints += res.value.grammarPoints.length;
+    snapshot.dropped += res.value.dropped;
+    snapshot.doneLessons += 1;
+    // 逐课落库：save + shred + 草稿，课课落袋（崩了也不丢已完成的课）。
+    const persisted = await this.persistLesson(deps, input, doc, { ...base, lessons }, target.id, target.title, res.value.vocabularies, trackLanguage);
+    if (!persisted.ok) {
+      const failedLesson: EnrichJobFailedLesson = {
+        lessonId: target.id,
+        lessonTitle: target.title,
+        error: persisted.error.userMessage,
+      };
+      snapshot.failed.push(failedLesson);
+    }
+    delete snapshot.currentLessonId;
+    delete snapshot.currentLessonTitle;
+    this.emit(deps, input.sessionId, snapshot);
   }
 
   /** 整本 AST 写回 + shred（取消收尾 / 失败兜底用，不抛）。 */

@@ -242,6 +242,68 @@ describe('EnrichJobRegistry', () => {
     registry.cancel(a.value.jobId);
   });
 
+  it('并发：concurrency=2 双路并行，结果照收齐', async () => {
+    const book = makeBook();
+    book.lessons.push(
+      {
+        id: 'l3',
+        lessonNumber: 3,
+        title: '第 3 課',
+        vocabularies: [],
+        grammarPoints: [],
+        exercises: [],
+        dialogues: [{ speaker: '森', japanese: '森です。', chinese: '我是森。' }],
+      },
+      {
+        id: 'l4',
+        lessonNumber: 4,
+        title: '第 4 課',
+        vocabularies: [],
+        grammarPoints: [],
+        exercises: [],
+        dialogues: [{ speaker: '王', japanese: '森です。', chinese: '我是森。' }],
+      }
+    );
+    const registry = new EnrichJobRegistry();
+    const repo = makeRepo(makeDoc(book));
+    let inFlight = 0;
+    let peak = 0;
+    const base = makeAdapter();
+    const timed: AgentAdapter = {
+      ...base,
+      createSession: async (...args: Parameters<AgentAdapter['createSession']>) => {
+        const res = await base.createSession(...args);
+        if (!isOk(res)) return res;
+        const session = res.value;
+        return ok({
+          ...session,
+          send: async function* (...sendArgs: Parameters<AgentSession['send']>) {
+            inFlight += 1;
+            peak = Math.max(peak, inFlight);
+            try {
+              await new Promise((r) => setTimeout(r, 30));
+              yield* session.send(...sendArgs);
+            } finally {
+              inFlight -= 1;
+            }
+          },
+        });
+      },
+    };
+    const deps: EnrichJobRunnerDeps = { repo, adapter: timed, emitToSession: () => {} };
+    const started = registry.start(deps, { userId: 'u1', documentId: 'doc1', concurrency: 2 });
+    expect(isOk(started)).toBe(true);
+    if (!isOk(started)) return;
+    await waitFor(registry, started.value.jobId, true);
+    const snap = registry.get(started.value.jobId)!;
+    expect(snap.status).toBe('done');
+    expect(snap.doneLessons).toBe(4);
+    expect(snap.vocabularies).toBe(4);
+    expect(snap.failed).toEqual([]);
+    expect(peak).toBe(2);
+    expect(repo.saved).toHaveLength(4);
+  });
+
   it('文档不存在/无归属：任务直接 failed（用户可读原因）', async () => {
     const registry = new EnrichJobRegistry();
     const repo = makeRepo(makeDoc(makeBook()));

@@ -33,6 +33,13 @@ export interface EnrichLessonInput {
    * 返回 E_ENRICH_CANCELLED 而非模型错误。
    */
   signal?: AbortSignal;
+  /**
+   * 模型分流（与 structure-classify 同口径）：抽取是结构化体力活，
+   * 允许指定便宜模型 + 低 effort；不填则走网关缺省（强模型）。
+   * effort 必须取目标模型的支持列表（硬塞未知档会被拒收），调用方负责选对。
+   */
+  model?: string;
+  effort?: string;
 }
 
 export interface EnrichLessonResult {
@@ -357,6 +364,13 @@ export async function enrichLessonVocab(
   if (!isOk(sessionRes)) return err(sessionRes.error);
   const session = sessionRes.value;
   const signal = input.signal;
+  const turnOptions =
+    input.model || input.effort
+      ? {
+          ...(input.model ? { model: input.model } : {}),
+          ...(input.effort ? { effort: input.effort } : {}),
+        }
+      : undefined;
   // 取消→中断本会话的在途轮次（CodexSession.interrupt 是 per-session 的，
   // 只 abort 自己的控制器；finally 照常 close，会话不泄漏）。
   const onAbort = () => {
@@ -372,7 +386,10 @@ export async function enrichLessonVocab(
   const ask = async (message: string): Promise<Result<string, BusinessError>> => {
     try {
       let text = '';
-      for await (const ev of session.send({ message })) {
+      for await (const ev of session.send({
+        message,
+        ...(turnOptions ? { turnOptions } : {}),
+      })) {
         if (ev.type === 'TEXT_DELTA') {
           text += ev.delta;
         } else if (ev.type === 'ERROR') {

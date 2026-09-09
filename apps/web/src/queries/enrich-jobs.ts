@@ -37,6 +37,8 @@ export function useStartEnrichJobMutation(userId = DEFAULT_USER_ID) {
     mutationFn: async (vars: {
       documentId: string;
       lessonIds?: string[];
+      /** 并发课数 1–4（缺省 1；服务端钳制，限流失败可重试） */
+      concurrency?: number;
     }): Promise<EnrichJobSnapshot> => {
       const sessionId = gatewayClient.getSessionId();
       const res = await fetch(
@@ -47,6 +49,7 @@ export function useStartEnrichJobMutation(userId = DEFAULT_USER_ID) {
           body: JSON.stringify({
             ...(vars.lessonIds ? { lessonIds: vars.lessonIds } : {}),
             ...(sessionId ? { sessionId } : {}),
+            ...(vars.concurrency !== undefined ? { concurrency: vars.concurrency } : {}),
           }),
         }
       );

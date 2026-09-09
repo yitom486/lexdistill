@@ -6,6 +6,13 @@ import { sound } from '../utils/audio.js';
 import { Button } from './ui/button.js';
 import { Progress } from './ui/progress.js';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select.js';
+import {
   DEFAULT_USER_ID,
   useStartEnrichJobMutation,
   useEnrichJobQuery,
@@ -37,6 +44,7 @@ export function EnrichJobPanel({ documentId, pendingCount }: EnrichJobPanelProps
   useEnrichJobSubscription(DEFAULT_USER_ID, documentId ?? '', trackedJobId);
   const job: EnrichJobSnapshot | undefined = jobQuery.data;
   const announcedRef = useRef<string | null>(null);
+  const [concurrency, setConcurrency] = React.useState<string>('1');
 
   // 终态播报一次：成功音/失败 toast，并从台账摘除（失败保留 jobId？不清——面板就地给重试入口）
   useEffect(() => {
@@ -65,8 +73,13 @@ export function EnrichJobPanel({ documentId, pendingCount }: EnrichJobPanelProps
   const launch = (lessonIds?: string[]) => {
     sound.playClick();
     announcedRef.current = null;
+    const parsedConcurrency = Number.parseInt(concurrency, 10);
     startJob.mutate(
-      { documentId, ...(lessonIds ? { lessonIds } : {}) },
+      {
+        documentId,
+        ...(lessonIds ? { lessonIds } : {}),
+        ...(Number.isInteger(parsedConcurrency) ? { concurrency: parsedConcurrency } : {}),
+      },
       {
         onSuccess: (snapshot) => {
           track(documentId, snapshot.jobId);
@@ -93,6 +106,17 @@ export function EnrichJobPanel({ documentId, pendingCount }: EnrichJobPanelProps
       <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
         <Sparkles className="w-3.5 h-3.5 text-amber-500" />
         <span>整本 {pendingCount} 课待抽（后台运行，不锁页面）</span>
+        <Select value={concurrency} onValueChange={(v) => v && setConcurrency(v)}>
+          <SelectTrigger className="w-[6.5rem] h-7 text-xs" title="并发课数：多路并行提速，限流失败可重试">
+            <SelectValue placeholder="并发" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1">并发 1 路</SelectItem>
+            <SelectItem value="2">并发 2 路</SelectItem>
+            <SelectItem value="3">并发 3 路</SelectItem>
+            <SelectItem value="4">并发 4 路</SelectItem>
+          </SelectContent>
+        </Select>
         <Button
           variant="outline"
           size="sm"

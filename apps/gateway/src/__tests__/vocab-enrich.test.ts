@@ -469,3 +469,49 @@ describe('enrichLessonVocab 取消', () => {
     expect(res.error.code).toBe('E_ENRICH_CANCELLED');
   });
 });
+
+describe('enrichLessonVocab 模型分流', () => {
+  const shuntInput = {
+    lessonId: 'l1',
+    lessonTitle: '第 1 課',
+    language: 'JA' as const,
+    dialogueTexts: LESSON_TEXT.split('\n'),
+  };
+  it('model/effort 透传给两轮 send 的 turnOptions；不填则缺席', async () => {
+    const seen: unknown[] = [];
+    const session: AgentSession = {
+      sessionId: 's-turnopts',
+      send: async function* (input: unknown) {
+        seen.push(input);
+        yield { type: 'TEXT_DELTA' as const, delta: AI_VOCAB_JSON };
+        yield { type: 'COMPLETED' as const };
+      },
+      submitToolResult: async () => ok(undefined),
+      submitApproval: async () => ok(undefined),
+      steer: async () => ok(undefined),
+      interrupt: async () => ok(undefined),
+      close: async () => ok(undefined),
+    };
+    const adapter: AgentAdapter = {
+      id: 'mock-turnopts',
+      name: 'mock-turnopts',
+      createSession: async () => ok(session),
+      resumeSession: async () => ok(session),
+    };
+    const withModel = await enrichLessonVocab(adapter, {
+      ...shuntInput,
+      model: 'mini-x',
+      effort: 'low',
+    });
+    expect(isOk(withModel)).toBe(true);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({
+      turnOptions: { model: 'mini-x', effort: 'low' },
+    });
+    seen.length = 0;
+    const withoutModel = await enrichLessonVocab(adapter, { ...shuntInput });
+    expect(isOk(withoutModel)).toBe(true);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).not.toHaveProperty('turnOptions');
+  });
+});
