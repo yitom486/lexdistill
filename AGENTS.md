@@ -70,6 +70,13 @@
   - 底稿 `documents.ast_json` 为 SSOT，shred 表永远由它同事务拆出（全删全插），两边永不分叉。
 - **JSON 列只当底稿**：`ast_json` / `*_json` 存动态结构可以，但查询面要用的字段必须 shred 成列；全文检索走 FTS 虚表（建表语句静态，变的只是行）。
 
+### 1.9 ORM 使用边界 (Drizzle First, Raw When Forced)
+
+- **默认走 drizzle 构造器**：`db/schema.ts` 的表定义与 `ddl.ts` 的建表 SQL 必须一字对齐（SSOT 是 `ddl.ts`）；简单 CRUD 一律 `db.select/insert/update/delete` + `eq/and`，列名拼错要在编译期炸，不许裸写 `INSERT INTO …`。
+- **只在三处允许原生 SQL**（且必须注释说明哪一条）：① DDL 与版本化迁移；② FTS 虚表建表与 `MATCH` 查询（drizzle 无一等支持）；③ 经实测证明的万行级批量热点。
+- **drizzle builder 是惰性的**：同步事务里必须显式 `.run()`（或 `await`），光 `tx.insert(...).values(...)` 不执行也不报错——静默零写是最阴的 bug，写完必须有行数断言的单测覆盖。
+- **禁止新的双源漂移**：新增表必须同时落 `ddl.ts`（建表）+ `schema.ts`（类型），缺一边即视为未完成。
+
 ---
 
 ## 2. 错误处理机制与链条规范 (Error Handling & Result Pattern)

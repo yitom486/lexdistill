@@ -1,5 +1,14 @@
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
+import { eq, sql } from 'drizzle-orm';
+import {
+  textbookExercises,
+  textbookGrammar,
+  textbookLessons,
+  textbookLines,
+  textbookTermMap,
+  textbookVocab,
+} from '../../../infrastructure/db/schema.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 export interface ShredStats {
@@ -40,8 +49,10 @@ export function tryParseTextbookAst(raw: unknown): TextbookAST | null {
 }
 
 /**
- * 教材 shred（纯行写，同事务全删全插）：
+ * 教材 shred（drizzle 事务内全删全插）：
  * - 输入是已过 zod 的 TextbookAST（调用方保证），这里只做防御性收窄；
+ * - 行表删插走 drizzle 构造器（列名拼错编译期炸，不再裸写 INSERT）；
+ * - FTS 虚表 + 词典精确匹配走原生 sql（drizzle 无 FTS 一等支持）；
  * - textbook_term_map 只记精确匹配（词典 headword 逐字相等），对不上记 NULL 行；
  * - skill_id v1 恒为 NULL（能力映射靠分类结果，另行落盘，不在此臆造边）；
  * - 课文行（lines）只进 FTS，不进 term_map（行级映射粒度另议，不膨胀）。
@@ -66,51 +77,25 @@ export function shredDocument(
     mappedEntries: 0,
     unmapped: 0,
   };
+  /** 词典精确命中（headword 逐字相等）；无语种/未命中回 null（记 NULL 行，不臆造边）。 */
+  const findEntry = (
+    tx: Parameters<Parameters<RepoDeps['db']['transaction']>[0]>[0],
+    surface: string
+  ): string | null => {
+    if (!dictLang) return null;
+    const rows = tx.all(sql`SELECT id FROM local_dictionary_entries WHERE language = ${dictLang} AND headword = ${surface} ORDER BY id LIMIT 1`) as unknown[];
+    const first = rows[0] as { id?: unknown } | undefined;
+    return first && typeof first.id === 'string' ? first.id : null;
+  };
   try {
-    const tx = deps.sqlite.transaction(() => {
-      const db = deps.sqlite;
-      db.prepare('DELETE FROM textbook_lessons WHERE document_id = ?').run(documentId);
-      db.prepare('DELETE FROM textbook_vocab WHERE document_id = ?').run(documentId);
-      db.prepare('DELETE FROM textbook_grammar WHERE document_id = ?').run(documentId);
-      db.prepare('DELETE FROM textbook_lines WHERE document_id = ?').run(documentId);
-      db.prepare('DELETE FROM textbook_exercises WHERE document_id = ?').run(documentId);
-      db.prepare('DELETE FROM textbook_fts WHERE document_id = ?').run(documentId);
-      db.prepare('DELETE FROM textbook_term_map WHERE document_id = ?').run(documentId);
-
-      const insLesson = db.prepare(
-        'INSERT INTO textbook_lessons (document_id, lesson_id, lesson_number, title) VALUES (?, ?, ?, ?)'
-      );
-      const insVocab = db.prepare(
-        `INSERT INTO textbook_vocab
-           (document_id, lesson_id, ord, surface, reading, pos, gloss_zh, pitch, example_ja, example_zh)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      );
-      const insGrammar = db.prepare(
-        `INSERT INTO textbook_grammar (document_id, lesson_id, ord, title, connection, explanation, examples_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      );
-      const insExercise = db.prepare(
-        `INSERT INTO textbook_exercises
-           (document_id, lesson_id, ord, exercise_id, type, prompt, options_json, answer, explanation)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      );
-      const insLine = db.prepare(
-        'INSERT INTO textbook_lines (document_id, lesson_id, ord, speaker, ja, zh) VALUES (?, ?, ?, ?, ?, ?)'
-      );
-      const insFts = db.prepare(
-        `INSERT INTO textbook_fts
-           (surface, reading, gloss, ja, zh, document_id, lesson_id, kind, ref)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      );
-      const insMap = db.prepare(
-        `INSERT INTO textbook_term_map (document_id, lesson_id, kind, ref_text, skill_id, entry_id)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      );
-      const findEntry = dictLang
-        ? db.prepare(
-            'SELECT id FROM local_dictionary_entries WHERE language = ? AND headword = ? ORDER BY id LIMIT 1'
-          )
-        : null;
+    deps.db.transaction((tx) => {
+      tx.delete(textbookLessons).where(eq(textbookLessons.documentId, documentId)).run();
+      tx.delete(textbookVocab).where(eq(textbookVocab.documentId, documentId)).run();
+      tx.delete(textbookGrammar).where(eq(textbookGrammar.documentId, documentId)).run();
+      tx.delete(textbookLines).where(eq(textbookLines.documentId, documentId)).run();
+      tx.delete(textbookExercises).where(eq(textbookExercises.documentId, documentId)).run();
+      tx.delete(textbookTermMap).where(eq(textbookTermMap.documentId, documentId)).run();
+      tx.run(sql`DELETE FROM textbook_fts WHERE document_id = ${documentId}`);
 
       for (const lesson of lessons) {
         if (!lesson || typeof lesson !== 'object') continue;
@@ -122,12 +107,16 @@ export function shredDocument(
             ? l.lessonNumber
             : stats.lessons + 1;
         const title = typeof l.title === 'string' ? l.title.slice(0, 200) : '';
-        insLesson.run(documentId, lessonId, lessonNumber, title);
+        // 注意：drizzle builder 是惰性的——同步事务里必须显式 .run()，
+        // 光 tx.insert(...).values(...) 不执行也不报错（静默零写，已实测）。
+        tx.insert(textbookLessons).values({ documentId, lessonId, lessonNumber, title }).run();
         stats.lessons++;
 
         const vocabularies = Array.isArray((lesson as { vocabularies?: unknown }).vocabularies)
           ? ((lesson as { vocabularies: unknown[] }).vocabularies)
           : [];
+        const vocabRows: Array<typeof textbookVocab.$inferInsert> = [];
+        const vocabFts: Array<{ surface: string; reading: string | null; gloss: string | null; ord: number }> = [];
         let vOrd = 0;
         for (const v of vocabularies) {
           if (!v || typeof v !== 'object') continue;
@@ -141,24 +130,35 @@ export function shredDocument(
           const ex = r.example && typeof r.example === 'object' ? (r.example as Record<string, unknown>) : null;
           const exJa = ex && typeof ex.japanese === 'string' ? ex.japanese.slice(0, 500) : null;
           const exZh = ex && typeof ex.chinese === 'string' ? ex.chinese.slice(0, 500) : null;
-          insVocab.run(documentId, lessonId, vOrd, surface, reading, pos, gloss, pitch, exJa, exZh);
-          insFts.run(surface, reading, gloss, null, null, documentId, lessonId, 'vocab', `${lessonId}#v${vOrd}`);
+          vocabRows.push({
+            documentId, lessonId, ord: vOrd, surface, reading, pos,
+            glossZh: gloss, pitch, exampleJa: exJa, exampleZh: exZh,
+          });
+          vocabFts.push({ surface, reading, gloss, ord: vOrd });
           stats.vocab++;
+          vOrd++;
+        }
+        if (vocabRows.length > 0) tx.insert(textbookVocab).values(vocabRows).run();
+        for (const f of vocabFts) {
+          tx.run(
+            sql`INSERT INTO textbook_fts (surface, reading, gloss, ja, zh, document_id, lesson_id, kind, ref)
+                VALUES (${f.surface}, ${f.reading}, ${f.gloss}, ${null}, ${null}, ${documentId}, ${lessonId}, ${'vocab'}, ${`${lessonId}#v${f.ord}`})`
+          );
           stats.ftsRows++;
-          let entryId: string | null = null;
-          if (findEntry) {
-            const hit = findEntry.get(dictLang, surface) as { id?: unknown } | null;
-            if (hit && typeof hit.id === 'string') entryId = hit.id;
-          }
-          insMap.run(documentId, lessonId, 'vocab', surface, null, entryId);
+        }
+        const mapRows: Array<typeof textbookTermMap.$inferInsert> = [];
+        for (const f of vocabFts) {
+          const entryId = findEntry(tx, f.surface);
+          mapRows.push({ documentId, lessonId, kind: 'vocab', refText: f.surface, skillId: null, entryId });
           if (entryId) stats.mappedEntries++;
           else stats.unmapped++;
-          vOrd++;
         }
 
         const grammars = Array.isArray((lesson as { grammarPoints?: unknown }).grammarPoints)
           ? ((lesson as { grammarPoints: unknown[] }).grammarPoints)
           : [];
+        const grammarRows: Array<typeof textbookGrammar.$inferInsert> = [];
+        const grammarTitles: string[] = [];
         let gOrd = 0;
         for (const g of grammars) {
           if (!g || typeof g !== 'object') continue;
@@ -181,22 +181,26 @@ export function shredDocument(
                 chinese: typeof e.chinese === 'string' ? e.chinese.slice(0, 500) : '',
               }))
           );
-          insGrammar.run(documentId, lessonId, gOrd, gTitle, connection, explanation, examplesJson);
+          grammarRows.push({
+            documentId, lessonId, ord: gOrd, title: gTitle, connection, explanation, examplesJson,
+          });
+          grammarTitles.push(gTitle);
           stats.grammar++;
-          let entryId: string | null = null;
-          if (findEntry) {
-            const hit = findEntry.get(dictLang, gTitle) as { id?: unknown } | null;
-            if (hit && typeof hit.id === 'string') entryId = hit.id;
-          }
-          insMap.run(documentId, lessonId, 'grammar', gTitle, null, entryId);
-          if (entryId) stats.mappedEntries++;
-          else stats.unmapped++;
           gOrd++;
         }
+        if (grammarRows.length > 0) tx.insert(textbookGrammar).values(grammarRows).run();
+        for (const gTitle of grammarTitles) {
+          const entryId = findEntry(tx, gTitle);
+          mapRows.push({ documentId, lessonId, kind: 'grammar', refText: gTitle, skillId: null, entryId });
+          if (entryId) stats.mappedEntries++;
+          else stats.unmapped++;
+        }
+        if (mapRows.length > 0) tx.insert(textbookTermMap).values(mapRows).run();
 
         const dialogues = Array.isArray((lesson as { dialogues?: unknown }).dialogues)
           ? ((lesson as { dialogues: unknown[] }).dialogues)
           : [];
+        const lineRows: Array<typeof textbookLines.$inferInsert> = [];
         let dOrd = 0;
         for (const d of dialogues) {
           if (!d || typeof d !== 'object') continue;
@@ -205,18 +209,25 @@ export function shredDocument(
           const ja = r.japanese.trim().slice(0, 2000);
           const zh = typeof r.chinese === 'string' ? r.chinese.slice(0, 2000) : null;
           const speaker = typeof r.speaker === 'string' ? r.speaker.slice(0, 64) : null;
-          insLine.run(documentId, lessonId, dOrd, speaker, ja, zh);
-          insFts.run(null, null, null, ja, zh, documentId, lessonId, 'line', `${lessonId}#d${dOrd}`);
+          lineRows.push({ documentId, lessonId, ord: dOrd, speaker, ja, zh });
           stats.lines++;
-          stats.ftsRows++;
           dOrd++;
         }
+        if (lineRows.length > 0) tx.insert(textbookLines).values(lineRows).run();
+        lineRows.forEach((row, i) => {
+          tx.run(
+            sql`INSERT INTO textbook_fts (surface, reading, gloss, ja, zh, document_id, lesson_id, kind, ref)
+                VALUES (${null}, ${null}, ${null}, ${row.ja}, ${row.zh}, ${documentId}, ${lessonId}, ${'line'}, ${`${lessonId}#d${i}`})`
+          );
+          stats.ftsRows++;
+        });
 
         // 自带习题拆行（v16；AST exercises 同源，组卷读这里不再现场解析 AST）。
         // type 非白名单仍原样存（读侧按白名单收敛，未知类型当不透明行，不臆造改写）。
         const exercises = Array.isArray((lesson as { exercises?: unknown }).exercises)
           ? ((lesson as { exercises: unknown[] }).exercises)
           : [];
+        const exerciseRows: Array<typeof textbookExercises.$inferInsert> = [];
         let eOrd = 0;
         for (const e of exercises) {
           if (!e || typeof e !== 'object') continue;
@@ -232,13 +243,15 @@ export function shredDocument(
           );
           const answer = typeof r.answer === 'string' ? r.answer.slice(0, 2000) : '';
           const explanation = typeof r.explanation === 'string' ? r.explanation.slice(0, 2000) : null;
-          insExercise.run(documentId, lessonId, eOrd, exerciseId, type, prompt, optionsJson, answer, explanation);
+          exerciseRows.push({
+            documentId, lessonId, ord: eOrd, exerciseId, type, prompt, optionsJson, answer, explanation,
+          });
           stats.exercises++;
           eOrd++;
         }
+        if (exerciseRows.length > 0) tx.insert(textbookExercises).values(exerciseRows).run();
       }
     });
-    tx();
     return ok(stats);
   } catch (e) {
     if (e instanceof BusinessError) return err(e);

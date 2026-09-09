@@ -602,3 +602,107 @@ export const documentImports = sqliteTable('document_imports', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
+
+/**
+ * 教材 shred 行表（v14/v16；与 ddl.ts 的建表 SQL 一字对齐，SSOT 是 ddl.ts）。
+ * - 查询面：组卷/检索/统计读这里，不读 ast_json；
+ * - 底稿 documents.ast_json 改后由 shredDocument 同事务全删全插重建；
+ * - FTS 虚表 drizzle 无一等支持，保持原生 SQL（见 textbook-shred.ts），故不在此声明。
+ */
+export const textbookLessons = sqliteTable(
+  'textbook_lessons',
+  {
+    documentId: text('document_id').notNull(),
+    lessonId: text('lesson_id').notNull(),
+    lessonNumber: integer('lesson_number').notNull(),
+    title: text('title').notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.documentId, table.lessonId] }),
+  })
+);
+
+export const textbookVocab = sqliteTable(
+  'textbook_vocab',
+  {
+    documentId: text('document_id').notNull(),
+    lessonId: text('lesson_id').notNull(),
+    ord: integer('ord').notNull(),
+    surface: text('surface').notNull(),
+    reading: text('reading'),
+    pos: text('pos'),
+    glossZh: text('gloss_zh'),
+    pitch: text('pitch'),
+    exampleJa: text('example_ja'),
+    exampleZh: text('example_zh'),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.documentId, table.lessonId, table.ord] }),
+  })
+);
+
+export const textbookGrammar = sqliteTable(
+  'textbook_grammar',
+  {
+    documentId: text('document_id').notNull(),
+    lessonId: text('lesson_id').notNull(),
+    ord: integer('ord').notNull(),
+    title: text('title').notNull(),
+    connection: text('connection'),
+    explanation: text('explanation'),
+    examplesJson: text('examples_json').notNull().default('[]'),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.documentId, table.lessonId, table.ord] }),
+  })
+);
+
+export const textbookLines = sqliteTable(
+  'textbook_lines',
+  {
+    documentId: text('document_id').notNull(),
+    lessonId: text('lesson_id').notNull(),
+    ord: integer('ord').notNull(),
+    speaker: text('speaker'),
+    ja: text('ja').notNull(),
+    zh: text('zh'),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.documentId, table.lessonId, table.ord] }),
+  })
+);
+
+export const textbookExercises = sqliteTable(
+  'textbook_exercises',
+  {
+    documentId: text('document_id').notNull(),
+    lessonId: text('lesson_id').notNull(),
+    ord: integer('ord').notNull(),
+    exerciseId: text('exercise_id'),
+    type: text('type').notNull(),
+    prompt: text('prompt').notNull(),
+    optionsJson: text('options_json').notNull().default('[]'),
+    answer: text('answer').notNull().default(''),
+    explanation: text('explanation'),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.documentId, table.lessonId, table.ord] }),
+  })
+);
+
+export const textbookTermMap = sqliteTable(
+  'textbook_term_map',
+  {
+    documentId: text('document_id').notNull(),
+    lessonId: text('lesson_id').notNull(),
+    kind: text('kind').notNull(),
+    refText: text('ref_text').notNull(),
+    skillId: text('skill_id'),
+    entryId: text('entry_id'),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.documentId, table.lessonId, table.kind, table.refText],
+    }),
+  })
+);
