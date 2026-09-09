@@ -441,12 +441,13 @@ export async function convertPdfToAst(
     }
   }
 
-  // 本地零产出且无云钥：直接报错（有钥则落到下面的云回填，不在此提前 return）
+  // 本地零产出且无云钥：直接报错（有钥则落到下面的云回填，不在此提前 return）。
+  // 注意：零产出≠韩语——空白页/纯图页同样零产出，文案不得断言具体语种（实测：无字形状页也走这里）。
   if (!markdown.trim() && !input.azure?.apiKey) {
     return err(
       new BusinessError(
         'E_OCR_LANG_UNSUPPORTED',
-        '未能从 PDF 中识别出文字：扫描版韩语暂不支持本地 OCR（模型包无谚文覆盖），请改用文字版 PDF，或在设置页填入 Azure Key 走云端识别',
+        '未能从 PDF 中识别出文字：可能是纯图片页/空白页，或扫描语种暂无本地模型覆盖。请改用文字版 PDF，或在设置页填入 Azure Key 走云端识别',
         'TOOL_EXECUTION'
       )
     );

@@ -229,7 +229,7 @@ describe('convertPdfToAst', () => {
     expect(res.value.classification.ocrUsed).toBe(true);
   });
 
-  test('OCR 无输出 → E_OCR_LANG_UNSUPPORTED（韩语包缺口如实报错）', async () => {
+  test('OCR 无输出 → E_OCR_LANG_UNSUPPORTED（零产出不断言语种）', async () => {
     const res = await convertPdfToAst(
       {
         loadInspector: stubInspector({

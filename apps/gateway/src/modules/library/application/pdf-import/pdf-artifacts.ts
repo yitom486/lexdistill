@@ -6,13 +6,13 @@
  * （STUDY_STUDIO_RUNTIME_DIR，默认用户主目录下 .study-studio/runtime），并校验完整性。
  *
  * Pin 来源：
- * - npm 包：registry 元数据 integrity（sha512，2026-09-06 实测抓取）；
+ * - npm 包：registry 元数据 integrity（sha512，2026-09-06 实测抓取，1.18.0 于 2026-09-10 复核更新）；
  * - PDFium：上游 release SHA256SUMS（native-v7988，2026-09-06 实测下载比对一致）；
  * - ONNX Runtime：上游未给单文件摘要，仅做版本 + 域名白名单 + 体积 sanity 校验；
  * - OCR 模型：由 pdf-inspector 首次路由时自行下载并 SHA-256 校验（见其 ocr-runtime 文档）。
  */
 
-export const PDF_INSPECTOR_VERSION = '1.17.0';
+export const PDF_INSPECTOR_VERSION = '1.18.0';
 const NPM = 'https://registry.npmjs.org';
 
 export interface NpmArtifactPin {
@@ -22,9 +22,9 @@ export interface NpmArtifactPin {
 }
 
 export const PDF_INSPECTOR_MAIN: NpmArtifactPin = {
-  url: `${NPM}/@firecrawl/pdf-inspector/-/pdf-inspector-1.17.0.tgz`,
+  url: `${NPM}/@firecrawl/pdf-inspector/-/pdf-inspector-1.18.0.tgz`,
   integrity:
-    'sha512-qSXKbJ6s3psJSjwFopssxUzUfpdwwTJ0f0IFj8xqzF/ZeO4dDTpZG0mpo+D8iLlfH+ks3CEIC72dedzevnoohQ==',
+    'sha512-xcI7rrnTP0xxQTQ/4+aJx9ztjciRGEhB4LGjvxpy8Q6fLblf5p4EACfGMhKldZAP2YVkLWNXlFpBbX5tiB2f8w==',
 };
 
 export type PdfRuntimePlatform = 'win32-x64' | 'linux-x64' | 'darwin-arm64' | 'linux-arm64';
@@ -48,9 +48,9 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   'win32-x64': {
     napiPkg: '@firecrawl/pdf-inspector-win32-x64-msvc',
     napi: {
-      url: `${NPM}/@firecrawl/pdf-inspector-win32-x64-msvc/-/pdf-inspector-win32-x64-msvc-1.17.0.tgz`,
+      url: `${NPM}/@firecrawl/pdf-inspector-win32-x64-msvc/-/pdf-inspector-win32-x64-msvc-1.18.0.tgz`,
       integrity:
-        'sha512-P4Z9s34DHoG6g/b9zcvmCGhg1RB7yilLRo1+p1GVSW9RBh+IN4ZWqZpgBDErcQ0eHjPKw0spzZ9mGex8tHewKA==',
+        'sha512-5qCcPYVsBkg+xUUDsqiRvE1bVD041tqyj8WieqdD/f5G4hovMJyZdk1NEp100SMUyVDMowGfTgCkcNAsw2lCfg==',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-win-x64.tgz`,
     pdfiumSha256: '6f398552d8021a89078f64466557251a204999177287b876be49877eb8750d50',
@@ -61,9 +61,9 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   'linux-x64': {
     napiPkg: '@firecrawl/pdf-inspector-linux-x64-gnu',
     napi: {
-      url: `${NPM}/@firecrawl/pdf-inspector-linux-x64-gnu/-/pdf-inspector-linux-x64-gnu-1.17.0.tgz`,
+      url: `${NPM}/@firecrawl/pdf-inspector-linux-x64-gnu/-/pdf-inspector-linux-x64-gnu-1.18.0.tgz`,
       integrity:
-        'sha512-S38w/sigwvTPk57hGBPjYyogPdmHvUCdsi4OU6xzOo3pyJVjvXO7lCpywU1QhzDH1l5a3weCzgK3+zZPiIb3kQ==',
+        'sha512-p3vqt7dzdtimGNBl2Zg8dxEOBxQJKyTXQ62cBFM0/0UJvE3TrH78UtagjCYMfdAdkSr0hW1gYAUhSsizxelJ3g==',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-linux-x64.tgz`,
     pdfiumSha256: '6248189e07bbc33cdeb31976c539a88614307c8a19f3276dbd018efbe5b4a2a2',
@@ -74,9 +74,9 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   'darwin-arm64': {
     napiPkg: '@firecrawl/pdf-inspector-darwin-arm64',
     napi: {
-      url: `${NPM}/@firecrawl/pdf-inspector-darwin-arm64/-/pdf-inspector-darwin-arm64-1.17.0.tgz`,
+      url: `${NPM}/@firecrawl/pdf-inspector-darwin-arm64/-/pdf-inspector-darwin-arm64-1.18.0.tgz`,
       integrity:
-        'sha512-1Bbri4vHGAmsCot/wHHku9BiXO1DQMy3N2aSEK4vDpWrkV/n7hyuSt/0ErE1k/3952/Ng4Z7Dxrw5gsYFxDXAw==',
+        'sha512-TlmPHAGc8+WTKwOXTK1+Vk4iW2svMeavwRBKL7k3eh/B1kktqtoEOfZor+hih8JrH74B8EtHkuAG6Q/8VuBIYQ==',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-mac-arm64.tgz`,
     pdfiumSha256: '4168356c2e62ad5e79553e2e9162f5c99949759d90cb83876a50311f0c32b9b3',
@@ -87,9 +87,9 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   'linux-arm64': {
     napiPkg: '@firecrawl/pdf-inspector-linux-arm64-gnu',
     napi: {
-      // integrity 未在 2026-09-06 抓取（本机为 win32）；启用该平台前必须补 pin，否则拒绝下载。
-      url: `${NPM}/@firecrawl/pdf-inspector-linux-arm64-gnu/-/pdf-inspector-linux-arm64-gnu-1.17.0.tgz`,
-      integrity: '',
+      // 2026-09-10 补 pin（此前为空，本机 win32 未覆盖）；该平台启用前仍建议真机复核。
+      url: `${NPM}/@firecrawl/pdf-inspector-linux-arm64-gnu/-/pdf-inspector-linux-arm64-gnu-1.18.0.tgz`,
+      integrity: 'sha512-y8edzzCWSDh/bDTNzEvQjdIAA4nzHbRHi9IxQZDfjPcU7Sx/YaeAHJY6TZIyigPaNSfDMIt80J6RcTKcPwPHBA==',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-linux-arm64.tgz`,
     pdfiumSha256: '',

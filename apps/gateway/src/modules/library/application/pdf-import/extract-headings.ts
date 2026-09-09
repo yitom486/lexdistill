@@ -25,10 +25,17 @@ export interface TocEntry {
 
 const HEADING_LINE = /^(#{1,6})\s+(.+)$/;
 const LESSON_HEAD = /第\s*[0-9一二三四五六七八九十百]+\s*[課课]|Lesson\s*\d+|Unit\s*\d+|復習|复习|練習|练习|会話|かいわ/;
-// 目录行：第N課/復習A ... 数字（点线/空格分隔；页码可能在同一行）
+// 目录行：第N課/復習A/付録 ... 数字（点线/空格分隔；页码可能在同一行）
 // 分支二分隔符放宽到 *（OCR 常把"復習A42"粘在一起，中间零分隔）
-const TOC_LINE =
-  /^第\s*([0-9一二三四五六七八九十百]+)\s*[課课]\s*(.{0,30}?)\s*[.…·\s]{2,}(\d{1,4})\s*$|^((?:復習|复习)\s*[A-Z]?)\s*(.{0,30}?)\s*[.…·\s]*(\d{1,4})\s*$/;
+// 分支三种 covers 页码前置同行（"31 第4課"，inspector 按视觉流合并时 J2 拼行逻辑够不着）
+const NON_LESSON_SECTION = '(?:復習|复习|付録|付录|前言|序言|索引)';
+const TOC_LINE = new RegExp(
+  `^第\\s*([0-9一二三四五六七八九十百]+)\\s*[課课]\\s*(.{0,30}?)\\s*[.…·\\s]{2,}(\\d{1,4})\\s*$` +
+  `|^(${NON_LESSON_SECTION}\\s*[A-Z]?)\\s*(.{0,30}?)\\s*[.…·\\s]*(\\d{1,4})\\s*$` +
+  `|^(\\d{1,4})\\s+(第\\s*[0-9一二三四五六七八九十百]+\\s*[課课].{0,30}?)\\s*$`
+);
+/** 页码前置分支的课号回抽（label 里必含 第N課，取数字部分） */
+const LEADING_PAGE_LESSON_NO = /第\s*([0-9一二三四五六七八九十百]+)\s*[課课]/;
 /** 课标题行（拼接后回贴页码用：本身无页码、无点线才是"裸标题"） */
 const LESSON_TITLE_HEAD = /第\s*[0-9一二三四五六七八九十百]+\s*[課课]|(?:復習|复习)\s*[A-Z]?/;
 /** 裸页码行（OCR 把行末页码甩到下一行/上一行） */
@@ -114,8 +121,10 @@ export function extractTocEntries(markdown: string): TocEntry[] {
     if (line.length > 80) continue;
     const m = TOC_LINE.exec(line);
     if (!m) continue;
-    const lessonNo = ((m[1] ?? m[4] ?? '') as string).trim();
-    const printedPage = Number(m[3] ?? m[6]);
+    // 分支三（页码前置）：m[7]=页码，m[8]=含 第N課 的 label，课号回抽
+    const leadingNo = m[8] ? (LEADING_PAGE_LESSON_NO.exec(m[8])?.[1] ?? '') : '';
+    const lessonNo = ((m[1] ?? m[4] ?? leadingNo ?? '') as string).trim();
+    const printedPage = Number(m[3] ?? m[6] ?? m[7]);
     const key = `${lessonNo}@${printedPage}`;
     if (!lessonNo || !Number.isFinite(printedPage) || seen.has(key)) continue;
     seen.add(key);
