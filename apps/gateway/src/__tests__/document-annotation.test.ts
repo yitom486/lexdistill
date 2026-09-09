@@ -276,3 +276,130 @@ describe('Document & Annotation Hono RPC Routes', () => {
     expect(body.error.userMessage).toContain('批注必须包含所属文档与划线摘录');
   });
 });
+
+describe('deleteDocument 生命周期（P0.5）', () => {
+  let repo: DrizzleLearnerRepository;
+  const testUserId = 'test_user_del_lifecycle';
+
+  beforeEach(() => {
+    repo = new DrizzleLearnerRepository(':memory:');
+  });
+
+  const BOOK = {
+    id: 'lifecycle-book',
+    language: 'JA' as const,
+    title: '删前有料书',
+    shortTitle: '删',
+    level: 'N5',
+    lessons: [
+      {
+        id: 'll1',
+        lessonNumber: 1,
+        title: '第1課',
+        vocabularies: [
+          {
+            id: 'lv1',
+            kanji: '食べる',
+            kana: 'たべる',
+            pos: '动词',
+            pitchAccent: '②',
+            chinese: '吃',
+            example: { japanese: 'ご飯を食べる', chinese: '吃饭' },
+          },
+        ],
+        grammarPoints: [],
+        dialogues: [{ speaker: 'A', japanese: 'おはよう', chinese: '早上好' }],
+        exercises: [],
+      },
+    ],
+  };
+
+  async function seedFullDoc(docId: string): Promise<void> {
+    const now = new Date().toISOString();
+    const saved = await repo.saveDocument({
+      id: docId,
+      userId: testUserId,
+      title: '待删书',
+      sourceKind: 'user_import',
+      language: 'ja',
+      content: 'x',
+      astJson: JSON.stringify(BOOK),
+      createdAt: now,
+      updatedAt: now,
+    });
+    expect(isOk(saved)).toBe(true);
+    const shredded = await repo.shredDocument(docId, BOOK);
+    expect(isOk(shredded)).toBe(true);
+    expect(isOk(await repo.saveAnnotation({
+      id: `ann-${docId}`,
+      documentId: docId,
+      userId: testUserId,
+      kind: 'KEY_POINT',
+      quote: 'おはよう',
+      createdBy: 'USER',
+      startOffset: 0,
+      endOffset: 4,
+      createdAt: now,
+    }))).toBe(true);
+    expect(isOk(await repo.saveReadingPosition(testUserId, docId, { lessonId: 'll1' }))).toBe(true);
+    expect(isOk(await repo.saveDocumentStructure(testUserId, docId, {
+      headings: [],
+      classes: [],
+      model: 'm',
+      effort: 'e',
+      dropped: 0,
+    }))).toBe(true);
+  }
+
+  function countFor(docId: string, table: string): number {
+    const row = repo
+      .getRawDb()
+      .query(`SELECT COUNT(*) AS n FROM ${table} WHERE document_id = ?`)
+      .get(docId) as { n: number };
+    return row.n;
+  }
+
+  it('删除清掉 shred/FTS/位置/批注/结构，doctor 无孤儿', async () => {
+    const { runDoctor } = await import('../infrastructure/db/doctor.js');
+    await seedFullDoc('doc_life_01');
+    expect(countFor('doc_life_01', 'textbook_vocab')).toBe(1);
+    expect(countFor('doc_life_01', 'textbook_fts')).toBe(2);
+
+    const del = await repo.deleteDocument('doc_life_01', testUserId);
+    expect(isOk(del)).toBe(true);
+    for (const t of [
+      'textbook_lessons', 'textbook_lines', 'textbook_vocab', 'textbook_grammar',
+      'textbook_exercises', 'textbook_term_map', 'textbook_fts',
+      'reading_positions', 'annotations', 'document_structure',
+    ]) {
+      expect(countFor('doc_life_01', t)).toBe(0);
+    }
+    const got = await repo.getDocumentById('doc_life_01');
+    expect(isOk(got) && got.value).toBe(null);
+
+    const report = runDoctor(repo.getRawDb());
+    expect(report.errors).toEqual([]);
+  });
+
+  it('事务中途失败整体回滚，不留半删除', async () => {
+    await seedFullDoc('doc_life_02');
+    // 破坏一张子表：事务内必抛，验证原子性
+    repo.getRawDb().exec('DROP TABLE textbook_lines');
+    const del = await repo.deleteDocument('doc_life_02', testUserId);
+    expect(isOk(del)).toBe(false);
+    // documents 本行与批注都在（回滚了）
+    const got = await repo.getDocumentById('doc_life_02');
+    expect(isOk(got) && got.value !== null).toBe(true);
+    const anns = await repo.listAnnotations('doc_life_02', testUserId);
+    expect(isOk(anns) && anns.value.length).toBe(1);
+  });
+
+  it('别人的文档删不动（先验归属，不清 shred 行）', async () => {
+    await seedFullDoc('doc_life_03');
+    const del = await repo.deleteDocument('doc_life_03', 'intruder');
+    expect(isOk(del)).toBe(false);
+    const got = await repo.getDocumentById('doc_life_03');
+    expect(isOk(got) && got.value !== null).toBe(true);
+    expect(countFor('doc_life_03', 'textbook_vocab')).toBe(1);
+  });
+});

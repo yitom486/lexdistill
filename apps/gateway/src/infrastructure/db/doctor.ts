@@ -38,7 +38,25 @@ export function runDoctor(db: Database): DoctorReport {
     findings.push({ rule, level, count: n, detail });
   };
 
-  // ---- 1. documents 孤儿（删文档只清 annotations+本行，shred 等全残留） ----
+  // ---- 0. schema 覆盖：预期表缺失不再静默跳过（缺席=结构损坏或史前库） ----
+  // 注意：缺席只 WARN 不 FAIL——doctor 也跑在部分库/测试库上，缺席本身不是数据错。
+  const EXPECTED_TABLES = [
+    'documents',
+    'textbook_lessons', 'textbook_lines', 'textbook_vocab', 'textbook_grammar',
+    'textbook_exercises', 'textbook_term_map', 'textbook_fts',
+    'local_dictionary_entries', 'dictionary_sources',
+    'document_imports', 'document_structure', 'reading_positions', 'annotations',
+    'flashcards', 'card_drafts', 'dictionary_search_history', 'practice_items',
+  ];
+  for (const table of EXPECTED_TABLES) {
+    if (!existing.has(table)) {
+      push(`schema-coverage:${table}`, 'WARN', 1, `预期表 ${table} 缺失（规则自动跳过，覆盖不全）`);
+    }
+  }
+
+  // ---- 1. documents 孤儿（删文档清 shred/FTS/位置/批注/结构，不清任务审计） ----
+  // document_imports 不在此列：任务行是审计（删除生命周期表 §8），悬空由 import:done-doc 置 WARN。
+  // term_occurrences.document_id 存 docRef=documentId/lessonId 字符串，不是 FK，永不按此查。
   const docChildren: Array<[string, string]> = [
     ['textbook_lessons', 'document_id'],
     ['textbook_lines', 'document_id'],
@@ -46,10 +64,10 @@ export function runDoctor(db: Database): DoctorReport {
     ['textbook_grammar', 'document_id'],
     ['textbook_exercises', 'document_id'],
     ['textbook_term_map', 'document_id'],
+    ['textbook_fts', 'document_id'],
     ['reading_positions', 'document_id'],
     ['annotations', 'document_id'],
     ['document_structure', 'document_id'],
-    ['document_imports', 'document_id'],
   ];
   if (has('documents')) {
     for (const [table, col] of docChildren) {
@@ -85,7 +103,8 @@ export function runDoctor(db: Database): DoctorReport {
     }
   }
 
-  // ---- 3. ord 完整性（代码不强制连续，只查重复与负值） ----
+  // ---- 3. ord 完整性（代码不强制连续，只查重复/负值/非法亲和） ----
+  // 非法亲和说明：SQLite INTEGER 列可存 'abc' 文本（affinity 不强制），裸写/外部工具会埋雷。
   for (const table of ['textbook_lines', 'textbook_vocab', 'textbook_grammar', 'textbook_exercises']) {
     if (!has(table)) continue;
     const dup = count(
@@ -94,6 +113,8 @@ export function runDoctor(db: Database): DoctorReport {
     push(`ord-dup:${table}`, dup > 0 ? 'FAIL' : 'PASS', dup, dup > 0 ? `${dup} 组重复 ord` : '无重复');
     const neg = count(`SELECT COUNT(*) AS n FROM "${table}" WHERE ord < 0`);
     push(`ord-negative:${table}`, neg > 0 ? 'FAIL' : 'PASS', neg, neg > 0 ? `${neg} 行负 ord` : '无负值');
+    const badAffinity = count(`SELECT COUNT(*) AS n FROM "${table}" WHERE typeof(ord) != 'integer'`);
+    push(`ord-affinity:${table}`, badAffinity > 0 ? 'FAIL' : 'PASS', badAffinity, badAffinity > 0 ? `${badAffinity} 行 ord 非整数亲和` : '亲和正常');
   }
 
   // ---- 4. term_map ----
@@ -121,9 +142,16 @@ export function runDoctor(db: Database): DoctorReport {
   }
 
   // ---- 5. FTS 双向（textbook_fts 是可重建索引，FAIL=该重建了） ----
+  // 为何 stale 检查曾对孤儿行误报 PASS：stale 只验 fts↔源行表（vocab/lines）一致，
+  // 而孤儿行仍躺在源行表里（删文档不清 shred），所以能 resolve；文档级孤儿由
+  // documents-orphan 规则负责。两层各查各的，不重叠。
   if (has('textbook_fts')) {
     const badKind = count(`SELECT COUNT(*) AS n FROM textbook_fts WHERE kind NOT IN ('vocab','line')`);
     push('fts:kind', badKind > 0 ? 'FAIL' : 'PASS', badKind, badKind > 0 ? `${badKind} 行非法 kind` : 'kind 合法');
+    const dupRef = count(
+      `SELECT COUNT(*) AS n FROM (SELECT document_id, lesson_id, kind, ref FROM textbook_fts GROUP BY document_id, lesson_id, kind, ref HAVING COUNT(*) > 1)`
+    );
+    push('fts:dup-ref', dupRef > 0 ? 'FAIL' : 'PASS', dupRef, dupRef > 0 ? `${dupRef} 组重复映射（同源被索引两次）` : '无重复映射');
     if (has('textbook_vocab')) {
       const missing = count(
         `SELECT COUNT(*) AS n FROM textbook_vocab v WHERE NOT EXISTS (SELECT 1 FROM textbook_fts f WHERE f.document_id = v.document_id AND f.lesson_id = v.lesson_id AND f.kind = 'vocab' AND f.ref = v.lesson_id || '#v' || v.ord)`
@@ -215,10 +243,11 @@ export function runDoctor(db: Database): DoctorReport {
     const bad = count(`SELECT COUNT(*) AS n FROM document_imports WHERE status NOT IN ('processing','done','failed')`);
     push('import:status', bad > 0 ? 'FAIL' : 'PASS', bad, bad > 0 ? `${bad} 行非法状态` : '状态合法');
     if (has('documents')) {
+      // 导入任务行是审计（删文档不删任务，见删除生命周期表），悬空置 WARN 不置 FAIL。
       const dangling = count(
         `SELECT COUNT(*) AS n FROM document_imports i LEFT JOIN documents d ON d.id = i.document_id WHERE i.status = 'done' AND (i.document_id IS NULL OR d.id IS NULL)`
       );
-      push('import:done-doc', dangling > 0 ? 'FAIL' : 'PASS', dangling, dangling > 0 ? `${dangling} 个 done 任务找不到文档` : 'done 任务齐全');
+      push('import:done-doc', dangling > 0 ? 'WARN' : 'PASS', dangling, dangling > 0 ? `${dangling} 个 done 任务找不到文档（审计保留，未删）` : 'done 任务齐全');
       // 空课文档：只查教材形 AST（含 lessons 数组）却 0 课的；阅读/新闻是 {questions} 形，天生 0 课，不算。
       const candidates = db
         .query(

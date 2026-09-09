@@ -32,6 +32,11 @@ function seedClean(db: Database): void {
     CREATE TABLE document_imports (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, source_kind TEXT NOT NULL, filename TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'processing', document_id TEXT, lessons INTEGER, error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
     CREATE TABLE reading_positions (user_id TEXT NOT NULL, document_id TEXT NOT NULL, locator TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (user_id, document_id));
     CREATE TABLE annotations (id TEXT PRIMARY KEY, document_id TEXT NOT NULL, user_id TEXT NOT NULL, kind TEXT NOT NULL, quote TEXT NOT NULL, note TEXT, start_offset INTEGER NOT NULL DEFAULT 0, end_offset INTEGER NOT NULL DEFAULT 0, page_number INTEGER, created_by TEXT NOT NULL DEFAULT 'USER', flashcard_id TEXT, created_at TEXT NOT NULL);
+    CREATE TABLE document_structure (document_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, headings_json TEXT NOT NULL DEFAULT '[]', classes_json TEXT NOT NULL DEFAULT '[]', model TEXT NOT NULL DEFAULT '', effort TEXT NOT NULL DEFAULT '', dropped INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+    CREATE TABLE flashcards (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, language TEXT NOT NULL DEFAULT 'ja', type TEXT NOT NULL, front TEXT NOT NULL, back TEXT NOT NULL, tags TEXT NOT NULL, fsrs TEXT NOT NULL, source_entry_id TEXT, created_at TEXT NOT NULL);
+    CREATE TABLE card_drafts (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, language TEXT NOT NULL, term_key TEXT NOT NULL, headword TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', flashcard_id TEXT, created_at TEXT NOT NULL);
+    CREATE TABLE dictionary_search_history (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, language TEXT NOT NULL, query TEXT NOT NULL, hit_count INTEGER NOT NULL DEFAULT 0, top_entry_id TEXT, created_at TEXT NOT NULL);
+    CREATE TABLE practice_items (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, language TEXT NOT NULL DEFAULT 'ja', collection_id TEXT NOT NULL, question_json TEXT NOT NULL, passage_document_id TEXT, sort_order INTEGER NOT NULL DEFAULT 0, collected_at TEXT NOT NULL);
     INSERT INTO documents VALUES ('d1','u1','书','user_import','ja','c','{}','t','t');
     INSERT INTO textbook_lessons VALUES ('d1','l1',1,'第1課');
     INSERT INTO textbook_vocab VALUES ('d1','l1',0,'食べる','たべる','动词','吃',NULL,NULL,NULL);
@@ -95,14 +100,14 @@ describe('db doctor', () => {
     expect(levelOf(report, 'fts:stale')).toBe('WARN');
   });
 
-  it('done 任务悬空 + 空课文档命中', () => {
+  it('done 任务悬空记 WARN（审计保留，不删）', () => {
     const db = mem();
     seedClean(db);
     db.exec(`INSERT INTO document_imports VALUES ('i1','u1','pdf','a.pdf','done','ghost-doc',1,NULL,'t','t')`);
     db.exec(`INSERT INTO documents VALUES ('d2','u1','空书','user_import','ja','c','{"lessons":[]}','t','t')`);
     db.exec(`INSERT INTO documents VALUES ('d3','u1','新闻','news','ja','c','{"questions":[]}','t','t')`);
     const report = runDoctor(db);
-    expect(levelOf(report, 'import:done-doc')).toBe('FAIL');
+    expect(levelOf(report, 'import:done-doc')).toBe('WARN');
     // d2 教材形 0 课命中；d3 新闻形不算
     expect(levelOf(report, 'import:empty-lessons')).toBe('WARN');
     const f = report.findings.find((x) => x.rule === 'import:empty-lessons');
@@ -121,9 +126,54 @@ describe('db doctor', () => {
     const db = mem();
     db.exec(`CREATE TABLE documents (id TEXT PRIMARY KEY)`);
     const report = runDoctor(db);
-    // 子表全缺席 → 无规则可跑，但不能抛
-    expect(report.findings).toEqual([]);
+    // 子表全缺席 → schema-coverage 报 WARN，但不能抛
+    expect(report.findings.some((f) => f.rule.startsWith('schema-coverage:'))).toBe(true);
     expect(report.errors).toEqual([]);
     expect(() => runDoctor(db)).not.toThrow();
+  });
+
+  it('ord 非整数亲和命中 FAIL', () => {
+    const db = mem();
+    db.exec(`CREATE TABLE textbook_vocab (document_id TEXT, lesson_id TEXT, ord INTEGER, surface TEXT)`);
+    db.exec(`INSERT INTO textbook_vocab VALUES ('d1','l1','abc','x')`);
+    const report = runDoctor(db);
+    expect(levelOf(report, 'ord-affinity:textbook_vocab')).toBe('FAIL');
+  });
+
+  it('FTS 重复映射 + 悬空索引命中', () => {
+    const db = mem();
+    seedClean(db);
+    db.exec(`INSERT INTO textbook_fts VALUES ('食べる','たべる','吃',NULL,NULL,'d1','l1','vocab','l1#v0')`);
+    db.exec(`INSERT INTO textbook_fts VALUES (NULL,NULL,NULL,'xx',NULL,'ghost','l1','line','l1#d0')`);
+    const report = runDoctor(db);
+    expect(levelOf(report, 'fts:dup-ref')).toBe('FAIL');
+    expect(levelOf(report, 'documents-orphan:textbook_fts')).toBe('FAIL');
+  });
+
+  it('term_occurrences docRef 永不误报（非 FK 列）', () => {
+    const db = mem();
+    db.exec(`CREATE TABLE documents (id TEXT PRIMARY KEY)`);
+    db.exec(`INSERT INTO documents VALUES ('d1')`);
+    db.exec(`CREATE TABLE term_occurrences (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, language TEXT NOT NULL, term_key TEXT NOT NULL, source TEXT NOT NULL, document_id TEXT, quote TEXT, created_at TEXT NOT NULL)`);
+    db.exec(`INSERT INTO term_occurrences VALUES ('o1','u1','ja','k','reading','d1/lesson3','q','t')`);
+    db.exec(`INSERT INTO term_occurrences VALUES ('o2','u1','ja','k','reading','deleted-doc/lesson1','q','t')`);
+    const report = runDoctor(db);
+    // 即使指向已删文档，也不许出现任何关于 term_occurrences 的 finding
+    expect(report.findings.some((f) => f.rule.includes('term_occurrences'))).toBe(false);
+    expect(report.errors).toEqual([]);
+  });
+
+  it('starter source 映射回归：后缀对上 PASS，不对 FAIL', () => {
+    const db = mem();
+    db.exec(`CREATE TABLE dictionary_sources (id TEXT PRIMARY KEY)`);
+    db.exec(`CREATE TABLE local_dictionary_entries (id TEXT PRIMARY KEY, language TEXT NOT NULL, headword TEXT NOT NULL, source_id TEXT)`);
+    db.exec(`INSERT INTO dictionary_sources VALUES ('study-studio-starter-v1-ja'),('study-studio-starter-v1-ko'),('study-studio-starter-v1-en'),('study-studio-n5-ja-v1-ja')`);
+    db.exec(`INSERT INTO local_dictionary_entries VALUES ('a','ja','x','study-studio-starter-v1-ja'),('b','ko','y','study-studio-starter-v1-ko'),('c','en','z','study-studio-starter-v1-en'),('d','ja','w','study-studio-n5-ja-v1-ja')`);
+    const okReport = runDoctor(db);
+    expect(levelOf(okReport, 'dict:entry-source')).toBe('PASS');
+    // 旧种子写法（未后缀）必须 FAIL——这就是线上 172 条的形状
+    db.exec(`INSERT INTO local_dictionary_entries VALUES ('e','ja','v','study-studio-starter-v1')`);
+    const badReport = runDoctor(db);
+    expect(levelOf(badReport, 'dict:entry-source')).toBe('FAIL');
   });
 });

@@ -14,7 +14,8 @@ export * from './errors/http-error-handler.js';
 
 // 生产单例：进程内只装配一次。测试如需隔离请用 createGateway() 显式注入，
 // 不要依赖本模块单例；路由装配见 transport/http/create-app.ts。
-const gateway = createGateway();
+// 注：createGateway 为 async（含种子 shred 回填），顶层 await 装配完成再 export。
+const gateway = await createGateway();
 export const drizzleRepo = gateway.repo;
 export const gatewayServer = gateway.server;
 

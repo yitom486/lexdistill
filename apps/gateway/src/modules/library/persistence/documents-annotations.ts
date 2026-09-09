@@ -1,4 +1,4 @@
-import { eq, and, desc, or } from 'drizzle-orm';
+import { eq, and, desc, or, sql } from 'drizzle-orm';
 import {
   ok,
   err,
@@ -17,7 +17,7 @@ import {
   DocumentSourceKindSchema,
   type DocumentSourceKind,
 } from '@study-studio/protocol';
-import { documents, annotations } from '../../../infrastructure/db/index.js';
+import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, textbookTermMap, documentStructures, readingPositions } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { recordTermExposure } from '../../dictionary/persistence/encountered-terms.js';
 
@@ -194,13 +194,34 @@ export async function deleteDocument(
   id: string,
   userId: string
 ): Promise<Result<void, BusinessError>> {
+  // 删除生命周期（见 docs/database-architecture.md §8）：
+  // - 随删（同事务）：annotations + shred 六表 + textbook_fts + document_structure + reading_positions；
+  // - 保留（审计/历史）：document_imports、作答事件、草稿（含 source_ref 出处文本）、相遇审计；
+  // - 单事务：中途失败整体回滚，不留半删除。
   try {
-    await deps.db
-      .delete(annotations)
-      .where(and(eq(annotations.documentId, id), eq(annotations.userId, userId)));
-    await deps.db
-      .delete(documents)
-      .where(and(eq(documents.id, id), eq(documents.userId, userId)));
+    // 先验归属：shred 行表无 user_id 列，id 归属必须在清行前确认，否则可跨用户清别人的行。
+    const got = await getDocumentById(deps, id);
+    if (!isOk(got)) return err(got.error);
+    if (!got.value || got.value.userId !== userId) {
+      return err(new BusinessError('E_NOT_FOUND', '未找到指定的教材或文档', 'LEARNER_STATE'));
+    }
+    deps.db.transaction((tx) => {
+      tx.delete(annotations)
+        .where(and(eq(annotations.documentId, id), eq(annotations.userId, userId)))
+        .run();
+      tx.delete(textbookTermMap).where(eq(textbookTermMap.documentId, id)).run();
+      tx.delete(textbookVocab).where(eq(textbookVocab.documentId, id)).run();
+      tx.delete(textbookGrammar).where(eq(textbookGrammar.documentId, id)).run();
+      tx.delete(textbookLines).where(eq(textbookLines.documentId, id)).run();
+      tx.delete(textbookExercises).where(eq(textbookExercises.documentId, id)).run();
+      tx.delete(textbookLessons).where(eq(textbookLessons.documentId, id)).run();
+      tx.run(sql`DELETE FROM textbook_fts WHERE document_id = ${id}`);
+      tx.delete(documentStructures).where(eq(documentStructures.documentId, id)).run();
+      tx.delete(readingPositions).where(eq(readingPositions.documentId, id)).run();
+      tx.delete(documents)
+        .where(and(eq(documents.id, id), eq(documents.userId, userId)))
+        .run();
+    });
     return ok(undefined);
   } catch (error) {
     return err(

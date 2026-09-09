@@ -577,6 +577,7 @@ export function seedInitialData(sqlite: Database): void {
       `);
       const starterJaCount = STARTER_WORD_SEEDS.filter((w) => w.language === 'ja').length;
       const starterKoCount = STARTER_WORD_SEEDS.filter((w) => w.language === 'ko').length;
+      const starterEnCount = STARTER_WORD_SEEDS.filter((w) => w.language === 'en').length;
       insertStarterSource.run(
         `${STARTER_SOURCE_ID}-ja`,
         'ja',
@@ -601,6 +602,19 @@ export function seedInitialData(sqlite: Database): void {
         starterKoCount,
         now
       );
+      // en 源行此前缺失（词条有 en 24 词，源目录没有）：补上，否则 en 词条来源悬空。
+      insertStarterSource.run(
+        `${STARTER_SOURCE_ID}-en`,
+        'en',
+        'Lingua Studio',
+        'v1',
+        'https://study-studio.local/curriculum/starter-words',
+        STARTER_LICENSE,
+        'https://study-studio.local/licenses',
+        'Lingua Studio starter vocabulary with original Chinese glosses.',
+        starterEnCount,
+        now
+      );
       const insertStarter = sqlite.prepare(`
         INSERT OR IGNORE INTO local_dictionary_entries (
           id, language, headword, reading, romanization, meanings_json,
@@ -617,7 +631,8 @@ export function seedInitialData(sqlite: Database): void {
           JSON.stringify(w.meanings),
           null,
           w.partOfSpeech ?? null,
-          STARTER_SOURCE_ID,
+          // 源行 id 带语言后缀（…-ja/-ko/-en），词条必须对齐；此前未后缀致悬空（doctor dict:entry-source）。
+          `${STARTER_SOURCE_ID}-${w.language}`,
           STARTER_SOURCE_LABEL,
           STARTER_LICENSE,
           now
@@ -694,7 +709,8 @@ export function seedInitialData(sqlite: Database): void {
           JSON.stringify(w.meanings),
           null,
           w.partOfSpeech ?? null,
-          N5_SOURCE_ID,
+          // N5_SOURCE_ID 本身已带 -ja 后缀，源行 id 是 `${N5_SOURCE_ID}-ja`，词条必须对齐（此前少一截致悬空）。
+          `${N5_SOURCE_ID}-ja`,
           N5_SOURCE_LABEL,
           N5_LICENSE,
           now2
