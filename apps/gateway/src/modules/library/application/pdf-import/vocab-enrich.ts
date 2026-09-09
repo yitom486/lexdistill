@@ -83,31 +83,66 @@ export function normalizePitch(raw: unknown): string {
 
 const VOCAB_KEYS = ['vocabularies', '生词', 'vocabulary', 'words', 'wordList', 'vocab'];
 const GRAMMAR_KEYS = ['grammarPoints', '文法', '核心文法', '语法', '句型', 'grammar', 'grammarList'];
-/** 附赠数组（重点应答/活用表）：拼在主表之后，照常走接地与上限 */
-const EXTRA_VOCAB_KEYS = ['key_responses', '重点表达', '重点应答'];
-const EXTRA_GRAMMAR_KEYS = ['te_form_conjugation', '活用表'];
+/** 词面键全集（形状判定用：含其一即生词形条目） */
+const WORD_KEYS = [
+  'kanji', '词', '词汇', '词语', '词面', '单词', 'word', 'expression', '表达', 'surface', '日语', '日文',
+];
+/** 文法标题键全集（含其一即文法形条目） */
+const GRAMMAR_TITLE_KEYS = [
+  'title', '句型', '句式', '文型', 'pattern', 'rule', '标题', '文法点',
+];
 
-/** 顶层键别名归一（附赠数组拼主表后；条目内字段见 normalize*Item 的键别名，只映射键名不编值）。 */
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function looksVocabItem(v: unknown): boolean {
+  if (!isRecord(v)) return false;
+  return WORD_KEYS.some((k) => typeof v[k] === 'string' && (v[k] as string).trim().length > 0);
+}
+
+function looksGrammarItem(v: unknown): boolean {
+  if (!isRecord(v)) return false;
+  return GRAMMAR_TITLE_KEYS.some((k) => typeof v[k] === 'string' && (v[k] as string).trim().length > 0);
+}
+
+/**
+ * 顶层归一（形状驱动，替代键名枚举）：
+ * - 数组值：按条目形状分拣（生词形/文法形各归其表；两都不像的丢弃计数上游处理）；
+ * - 对象值：展一层后同样分拣（`生词: {动词: [...], 名词: [...]}` 按词性分组是实测方言）；
+ * - 已知主表键优先（顺序稳定），附赠键与杂散数组随后，未知键靠形状收编。
+ * 防护网没变：分拣只定去向，生词仍须原文逐字接地，编的词进不了库。
+ */
 export function normalizeEnrichJson(obj: Record<string, unknown>): { vocabularies: unknown; grammarPoints: unknown } {
-  const pickFirst = (keys: string[]): unknown[] => {
-    for (const k of keys) {
-      const v = obj[k];
-      if (Array.isArray(v)) return v;
+  const vocab: unknown[] = [];
+  const grammar: unknown[] = [];
+  const seen = new Set<unknown>();
+  const feed = (v: unknown): void => {
+    if (seen.has(v)) return;
+    seen.add(v);
+    if (looksGrammarItem(v)) grammar.push(v);
+    // 其余一切（生词形/未知形/标量）都进生词表：下游 zod+接地照样丢弃计数，
+    // 可观测性不变，不静默吞（与旧版直通行为一致）。
+    else vocab.push(v);
+  };
+  const feedArray = (arr: unknown[]): void => {
+    for (const item of arr) feed(item);
+  };
+  const orderedKeys = [...VOCAB_KEYS, ...GRAMMAR_KEYS, ...Object.keys(obj)];
+  const doneKeys = new Set<string>();
+  for (const k of orderedKeys) {
+    if (doneKeys.has(k)) continue;
+    doneKeys.add(k);
+    const v = obj[k];
+    if (Array.isArray(v)) feedArray(v);
+    else if (isRecord(v)) {
+      // 分组对象：展一层（值是数组才收；字符串等噪声跳过）
+      for (const sub of Object.values(v)) {
+        if (Array.isArray(sub)) feedArray(sub);
+      }
     }
-    return [];
-  };
-  const pickAll = (keys: string[]): unknown[] => {
-    const out: unknown[] = [];
-    for (const k of keys) {
-      const v = obj[k];
-      if (Array.isArray(v)) out.push(...v);
-    }
-    return out;
-  };
-  return {
-    vocabularies: [...pickFirst(VOCAB_KEYS), ...pickAll(EXTRA_VOCAB_KEYS)],
-    grammarPoints: [...pickFirst(GRAMMAR_KEYS), ...pickAll(EXTRA_GRAMMAR_KEYS)],
-  };
+  }
+  return { vocabularies: vocab, grammarPoints: grammar };
 }
 
 function pickStr(src: Record<string, unknown>, keys: string[]): unknown {
@@ -126,7 +161,7 @@ export function normalizeVocabItem(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null) return raw;
   const src = raw as Record<string, unknown>;
   const out: Record<string, unknown> = { ...src };
-  const kanji = pickStr(src, ['kanji', '词', '词汇', '词语', '词面', '单词', 'word', 'expression', '表达', 'surface']);
+  const kanji = pickStr(src, ['kanji', '词', '词汇', '词语', '词面', '单词', 'word', 'expression', '表达', 'surface', '日语', '日文']);
   const kana = pickStr(src, ['kana', '读音', '注音', '假名', 'reading', 'pronunciation']);
   const chinese = pickStr(src, ['chinese', 'meaning_zh', '释义', '中文', '意思', 'meaning', 'gloss']);
   const pos = pickStr(src, ['pos', 'part_of_speech', '词性', '品詞', 'partOfSpeech']);

@@ -314,6 +314,23 @@ describe('normalizePitch / normalizeEnrichJson / parseAndGround', () => {
     expect(g?.dropped).toBe(0);
   });
 
+  it('分组对象展平（生词按词性分组是实测方言）', () => {
+    const raw = JSON.stringify({
+      课名: '第14課',
+      生词: {
+        动词: [
+          { 日语: 'つけます', 中文: '打开' },
+          { 日语: '消します', 中文: '关掉' },
+        ],
+        名词: [{ 日语: '電気', 中文: '电' }],
+      },
+    });
+    const lessonText = 'つけます\n消します\n電気を消します';
+    const g = parseAndGround(raw, lessonText, 'l14');
+    expect(g?.vocabularies.map((v) => v.kanji)).toEqual(['つけます', '消します', '電気']);
+    expect(g?.dropped).toBe(0);
+  });
+
   it('附赠数组拼主表（key_responses/te_form_conjugation/formation接续）', () => {
     const raw = JSON.stringify({
       vocabulary: [{ word: 'つけます', reading: 'つけます', part_of_speech: '动词', meaning_zh: '打开' }],
