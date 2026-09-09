@@ -17,6 +17,7 @@ import { createReviewRoutes } from '../../modules/review/http/review-routes.js';
 import { createLibraryRoutes } from '../../modules/library/http/library-routes.js';
 import { createDocumentImportRoutes } from '../../modules/library/http/document-import-routes.js';
 import { createDocumentEnrichRoutes } from '../../modules/library/http/document-enrich-routes.js';
+import { createEnrichJobRoutes } from '../../modules/library/http/enrich-job-routes.js';
 import { createDocumentStructureRoutes } from '../../modules/library/http/document-structure-routes.js';
 import { createTextbookQuizRoutes } from '../../modules/library/http/textbook-quiz-routes.js';
 import { createPdfImportRoutes } from '../../modules/library/http/pdf-import-routes.js';
@@ -62,6 +63,7 @@ export function createApp(deps: GatewayDeps) {
     .route('/', createLibraryRoutes(deps))
     .route('/', createDocumentImportRoutes(deps))
     .route('/', createDocumentEnrichRoutes(deps))
+    .route('/', createEnrichJobRoutes(deps))
     .route('/', createDocumentStructureRoutes(deps))
     .route('/', createTextbookQuizRoutes(deps))
     .route('/', createPdfImportRoutes(deps))

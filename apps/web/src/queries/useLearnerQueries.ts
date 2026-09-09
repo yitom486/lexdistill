@@ -27,5 +27,8 @@ export { useCurriculumKanaQuery, useAdaptiveKanaQueueQuery, useKanaPracticeMutat
 // P-TTS：语音合成代理组已下沉 tts.ts，此处重导出保持对外不变。
 export { useAzureVoicesQuery, useInvalidateTtsVoices, type AzureVoiceOption } from './tts.js';
 
+// 后台抽取任务组（整本 enrich Job：启动/轮询/取消/WS 订阅）。
+export { useStartEnrichJobMutation, useEnrichJobQuery, useCancelEnrichJobMutation, useEnrichJobSubscription } from './enrich-jobs.js';
+
 // P1-2 拆分：练习计划组已下沉 practice-plan.ts，此处重导出保持对外不变。
 export { usePracticeTemplatesQuery, useSavePracticeTemplateMutation, useDeletePracticeTemplateMutation, useTogglePracticeTemplateMutation, useCopyPracticeTemplateMutation, useStartPracticeRunMutation, usePracticeRunQuery, useSavePracticeDraftMutation, useSubmitObjectiveMutation, useSubmitSubjectiveMutation, useSubmitBatchMutation, useFinalizePracticeRunMutation, type AssessBatchResult, useGradeBatchMutation, type AssessSingleResult, useGradeSingleMutation, useAssemblePracticeRunMutation, type PracticeRunnerItemDTO, usePracticeRunItemsQuery, type PracticeProposalDTO, useProposeTemplateMutation, useApplyProposalMutation, type RunSummaryDTO, usePracticeRunSummaryQuery, type PlacementLevel, type PlacementExamInfo, type PlacementFinishInfo, useStartPlacementMutation, useFinishPlacementMutation } from './practice-plan.js';

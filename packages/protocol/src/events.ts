@@ -49,6 +49,10 @@ export const WsEventTypes = {
   LEARNER_PROFILE_UPDATED: 'learner.profile.updated',
   LEARNER_DAILY_TASK_UPDATED: 'learner.daily_task.updated',
   LEARNER_MISTAKE_ADDED: 'learner.mistake.added',
+  /** 整本 enrich 后台任务：逐课进度 / 终态（成功） / 终态（失败或取消） */
+  IMPORT_ENRICH_PROGRESS: 'import.enrich.progress',
+  IMPORT_ENRICH_COMPLETED: 'import.enrich.completed',
+  IMPORT_ENRICH_FAILED: 'import.enrich.failed',
   GATEWAY_PONG: 'gateway.pong',
 } as const;
 

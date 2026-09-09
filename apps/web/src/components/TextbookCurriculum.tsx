@@ -26,6 +26,7 @@ import { ShimmerButton } from './magicui/index.js';
 import { InteractivePdfReader } from './InteractivePdfReader.js';
 import { TextbookImporterModal } from './TextbookImporterModal.js';
 import { BookStructureRow } from './BookStructureRow.js';
+import { EnrichJobPanel } from './EnrichJobPanel.js';
 import {
   useTextbooksQuery,
   useImportTextbookMutation,
@@ -361,6 +362,14 @@ export function TextbookCurriculum({
           documentId={currentBook?.documentId}
           bookTitle={currentBook?.shortTitle || currentBook?.title || ''}
         />
+        <div className="mt-3">
+          <EnrichJobPanel
+            documentId={currentBook?.documentId}
+            pendingCount={
+              currentBook?.lessons.filter((l) => l.vocabularies.length === 0).length ?? 0
+            }
+          />
+        </div>
       </div>
 
 

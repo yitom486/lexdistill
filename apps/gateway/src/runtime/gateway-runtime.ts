@@ -6,6 +6,7 @@ import { CodexAdapter } from '@study-studio/agent-codex';
 import { ResponsesAdapter } from '@study-studio/agent-responses';
 import {
   type WsEnvelope,
+  type EnrichJobSnapshot,
   WsEventTypes,
 } from '@study-studio/protocol';
 import {
@@ -27,6 +28,7 @@ import {
   handleQuizGradeSubjective,
 } from './handlers/learner-handlers.js';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
+import { EnrichJobRegistry, buildEnrichWsEnvelope } from '../modules/library/application/pdf-import/enrich-job-runner.js';
 import { registerGatewayTools } from '../transport/tools/register-tools.js';
 import {
   handleTurnSend,
@@ -56,6 +58,8 @@ export class GatewayServer {
   public readonly activeTurnLane = new Map<string, AgentLane>();
   /** sessionId → 持久 WS 下发（旁路通知用） */
   private readonly sessionEmitters = new Map<string, (env: WsEnvelope) => void>();
+  /** 整本 enrich 后台任务注册表（进程内；已落库课天然续跑，重启不丢数据） */
+  public readonly enrichJobs = new EnrichJobRegistry();
 
   constructor(
     learnerRepo?: LearnerRepository,
@@ -121,6 +125,18 @@ export class GatewayServer {
   public unregisterSessionEmit(sessionId: string | undefined): void {
     if (!sessionId) return;
     this.sessionEmitters.delete(sessionId);
+  }
+
+  /**
+   * 向指定浏览器会话定向推送（enrich 后台任务进度用）。
+   * 会话已断开时静默跳过——前端 GET 轮询会兜底补齐状态。
+   */
+  public emitToSession(sessionId: string, type: string, payload: unknown): void {
+    const emit = this.sessionEmitters.get(sessionId);
+    if (!emit) return;
+    emit(
+      buildEnrichWsEnvelope(sessionId, type, payload as EnrichJobSnapshot)
+    );
   }
 
   private handleCodexNotification(method: string, params: unknown): void {

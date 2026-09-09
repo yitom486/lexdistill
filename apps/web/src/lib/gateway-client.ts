@@ -151,6 +151,9 @@ type ActiveStream = {
   accumulatedReasoning: string;
 };
 
+/** 通用 WS 事件订阅（旁路通知用，如 import.enrich.*；Turn 流仍走专属回调）。 */
+export type WsEventHandler = (envelope: WsEnvelope) => void;
+
 export interface GatewayClientOptions {
   url?: string;
   userId?: string;
@@ -170,6 +173,7 @@ export class GatewayClient {
   private activeStream: ActiveStream | null = null;
   private pendingResolvers = new Map<string, (val: unknown) => void>();
   private started = false;
+  private eventSubscribers = new Map<string, Set<WsEventHandler>>();
   private options: Required<GatewayClientOptions> = {
     url: DEFAULT_GATEWAY_WS_URL,
     userId: DEFAULT_GATEWAY_USER_ID,
@@ -212,6 +216,38 @@ export class GatewayClient {
 
   public getSessionId(): string | null {
     return this.sessionId;
+  }
+
+  /**
+   * 按事件类型订阅旁路通知（返回退订函数）。
+   * 供 hooks 层使用；业务组件禁止直连本单例（经 hook 消费）。
+   */
+  public subscribe(type: string, handler: WsEventHandler): () => void {
+    let set = this.eventSubscribers.get(type);
+    if (!set) {
+      set = new Set();
+      this.eventSubscribers.set(type, set);
+    }
+    set.add(handler);
+    return () => {
+      const live = this.eventSubscribers.get(type);
+      if (live) {
+        live.delete(handler);
+        if (live.size === 0) this.eventSubscribers.delete(type);
+      }
+    };
+  }
+
+  private dispatchToSubscribers(envelope: WsEnvelope): void {
+    const set = this.eventSubscribers.get(envelope.type);
+    if (!set || set.size === 0) return;
+    for (const handler of [...set]) {
+      try {
+        handler(envelope);
+      } catch {
+        // 订阅者异常不影响主分发
+      }
+    }
   }
 
   public connect(): void {
@@ -615,6 +651,7 @@ export class GatewayClient {
               '本轮请求未完成，请稍后重试。';
         toast.error(userMsg);
       }
+      this.dispatchToSubscribers(envelope);
     } catch {
       // 忽略畸形帧
     }

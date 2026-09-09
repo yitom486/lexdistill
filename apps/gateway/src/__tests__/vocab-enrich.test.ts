@@ -404,3 +404,68 @@ describe('enrichLessonVocab 修复重试', () => {
     expect(res.value.vocabularies.length).toBeGreaterThan(0);
   });
 });
+
+describe('enrichLessonVocab 取消', () => {
+  const cancelInput = {
+    lessonId: 'l1',
+    lessonTitle: '第 1 課',
+    language: 'JA' as const,
+    dialogueTexts: LESSON_TEXT.split('\n'),
+  };
+  it('预取消：不建会话，直接 E_ENRICH_CANCELLED', async () => {
+    let created = 0;
+    const base = makeMockAdapter({ kind: 'success', text: AI_VOCAB_JSON });
+    const counting: AgentAdapter = {
+      ...base,
+      createSession: async (...args: Parameters<AgentAdapter['createSession']>) => {
+        created += 1;
+        return base.createSession(...args);
+      },
+    };
+    const controller = new AbortController();
+    controller.abort();
+    const res = await enrichLessonVocab(counting, { ...cancelInput, signal: controller.signal });
+    expect(isOk(res)).toBe(false);
+    if (isOk(res)) return;
+    expect(res.error.code).toBe('E_ENRICH_CANCELLED');
+    expect(created).toBe(0);
+  });
+
+  it('在途取消：interrupt 被调用，返回 E_ENRICH_CANCELLED', async () => {
+    let interrupted = 0;
+    let release: (() => void) | null = null;
+    const session: AgentSession = {
+      sessionId: 's-hang',
+      send: async function* () {
+        yield { type: 'TEXT_DELTA' as const, delta: '{"vocabularies":[' };
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      },
+      submitToolResult: async () => ok(undefined),
+      submitApproval: async () => ok(undefined),
+      steer: async () => ok(undefined),
+      interrupt: async () => {
+        interrupted += 1;
+        release?.();
+        return ok(undefined);
+      },
+      close: async () => ok(undefined),
+    };
+    const adapter: AgentAdapter = {
+      id: 'mock-hang',
+      name: 'mock-hang',
+      createSession: async () => ok(session),
+      resumeSession: async () => ok(session),
+    };
+    const controller = new AbortController();
+    const pending = enrichLessonVocab(adapter, { ...cancelInput, signal: controller.signal });
+    await new Promise((r) => setTimeout(r, 50));
+    controller.abort();
+    const res = await pending;
+    expect(interrupted).toBe(1);
+    expect(isOk(res)).toBe(false);
+    if (isOk(res)) return;
+    expect(res.error.code).toBe('E_ENRICH_CANCELLED');
+  });
+});

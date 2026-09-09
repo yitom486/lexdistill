@@ -27,6 +27,12 @@ export interface EnrichLessonInput {
   lessonTitle: string;
   language: 'JA' | 'EN' | 'KO';
   dialogueTexts: string[];
+  /**
+   * 取消信号（后台任务用）：abort 后课间即停；在途的模型轮次经
+   * session.interrupt() 中断（per-session，不影响其他会话），
+   * 返回 E_ENRICH_CANCELLED 而非模型错误。
+   */
+  signal?: AbortSignal;
 }
 
 export interface EnrichLessonResult {
@@ -325,10 +331,15 @@ const REPAIR_PROMPT =
   '生词条目字段 kanji / kana / chinese / pos / pitchAccent / example{ japanese / chinese }；' +
   '文法条目字段 title / connection / explanation / examples[{ japanese / chinese }]。重返本课结果，不要解释。';
 
+export function enrichCancelledError(): BusinessError {
+  return new BusinessError('E_ENRICH_CANCELLED', '已取消抽取，已完成的课次均已保存', 'AGENT_RUNTIME', true);
+}
+
 export async function enrichLessonVocab(
   adapter: AgentAdapter | undefined,
   input: EnrichLessonInput
 ): Promise<Result<EnrichLessonResult, BusinessError>> {
+  if (input.signal?.aborted) return err(enrichCancelledError());
   if (!adapter) {
     return err(
       new BusinessError('E_ENRICH_NO_ADAPTER', 'AI 抽生词需要连接模型，请确认网关已连接后重试', 'AGENT_RUNTIME')
@@ -345,6 +356,19 @@ export async function enrichLessonVocab(
   });
   if (!isOk(sessionRes)) return err(sessionRes.error);
   const session = sessionRes.value;
+  const signal = input.signal;
+  // 取消→中断本会话的在途轮次（CodexSession.interrupt 是 per-session 的，
+  // 只 abort 自己的控制器；finally 照常 close，会话不泄漏）。
+  const onAbort = () => {
+    void session.interrupt().catch(() => {});
+  };
+  if (signal) {
+    if (signal.aborted) {
+      void session.close().catch(() => {});
+      return err(enrichCancelledError());
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
   const ask = async (message: string): Promise<Result<string, BusinessError>> => {
     try {
       let text = '';
@@ -367,6 +391,7 @@ export async function enrichLessonVocab(
     const numbered = input.dialogueTexts.map((t, i) => `【句${i + 1}｜${input.language}】${t}`).join('\n');
     const message = `课名：${input.lessonTitle}\n${numbered}\n\n请抽取本课生词与核心文法，只返回 JSON。`;
     const first = await ask(message);
+    if (signal?.aborted) return err(enrichCancelledError());
     if (!first.ok) return err(first.error);
     const lessonText = input.dialogueTexts.join('\n');
     logger.debug('[vocab-enrich] raw output round1', {
@@ -380,6 +405,7 @@ export async function enrichLessonVocab(
       // 文法允许为零（模型偶发不给文法，不值得为此多花一轮）。
       logger.info('[vocab-enrich] 首轮生词零收成，同会话修复一次', { lessonId: input.lessonId });
       const second = await ask(REPAIR_PROMPT);
+      if (signal?.aborted) return err(enrichCancelledError());
       if (!second.ok) return err(second.error);
       logger.debug('[vocab-enrich] raw output round2', {
         lessonId: input.lessonId,
@@ -409,6 +435,7 @@ export async function enrichLessonVocab(
       dropped: grounded.dropped,
     });
   } finally {
+    signal?.removeEventListener('abort', onAbort);
     void session.close().catch(() => {});
   }
 }
