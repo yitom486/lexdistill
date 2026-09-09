@@ -43,6 +43,15 @@ export async function shredSeedTextbooks(repo: DrizzleLearnerRepository): Promis
       });
       continue;
     }
+    // R1-D 保护：解析出的 AST id 必须等于种子文档 id，防止错位 shred 到别的文档。
+    if (parsed.id !== book.id) {
+      skipped++;
+      logger.warn('[shred-seed] 种子书 AST id 与文档 id 不一致，跳过 shred', {
+        bookId: book.id,
+        astId: parsed.id,
+      });
+      continue;
+    }
     const res = await repo.shredDocument(parsed.id, parsed);
     if (isOk(res)) {
       shredded++;

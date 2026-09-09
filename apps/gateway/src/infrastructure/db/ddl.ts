@@ -728,7 +728,7 @@ const SCHEMA_MIGRATIONS: SchemaMigration[] = [
     // v14：教材 shred——AST 大绳拆成关系行 + FTS + 知识映射（只建表，不写数据）。
     // - 四张行表与 documents.ast_json 同源（底稿保留），落库/enrich 时同事务全删全插；
     // - textbook_term_map 只记精确匹配（skill_id/entry_id 为空=未映射，可统计覆盖率，绝不臆造边）；
-    // - FTS 为 contentless 手工同步（shred 时同事务重建），不设触发器。
+    // - FTS 为 contentful FTS5 虚表，手工同步（shred 时同事务重建），不设触发器。
     version: 14,
     name: 'textbook-shred',
     sql: `

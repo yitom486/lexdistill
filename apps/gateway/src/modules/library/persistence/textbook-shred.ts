@@ -57,6 +57,8 @@ export function tryParseTextbookAst(raw: unknown): TextbookAST | null {
  * - skill_id v1 恒为 NULL（能力映射靠分类结果，另行落盘，不在此臆造边）；
  * - 课文行（lines）只进 FTS，不进 term_map（行级映射粒度另议，不膨胀）。
  */
+export type ShredTx = Parameters<Parameters<RepoDeps['db']['transaction']>[0]>[0];
+
 export function shredDocument(
   deps: RepoDeps,
   documentId: string,
@@ -65,6 +67,23 @@ export function shredDocument(
   if (!documentId) {
     return err(new BusinessError('E_INVALID_INPUT', '缺少文档标识', 'VALIDATION'));
   }
+  try {
+    const stats = deps.db.transaction((tx) => shredIntoTransaction(tx, documentId, book));
+    return ok(stats);
+  } catch (e) {
+    if (e instanceof BusinessError) return err(e);
+    return err(
+      new BusinessError('E_INTERNAL', '教材拆行入库失败，请重试', 'DATABASE', true)
+    );
+  }
+}
+
+/**
+ * 事务内 shred 内核（供单事务组合复用：seed AST 迁移时“AST 更新 + shred”原子落库）。
+ * 调用方负责开事务；本函数不建事务、不吞错（抛给外层回滚）。
+ * 注：函数体缩进保持原事务闭包层级，仅外层包装变化，行为一字未动。
+ */
+export function shredIntoTransaction(tx: ShredTx, documentId: string, book: TextbookAST): ShredStats {
   const lessons = Array.isArray(book?.lessons) ? book.lessons : [];
   const dictLang = toDictLanguage(book?.language);
   const stats: ShredStats = {
@@ -79,7 +98,7 @@ export function shredDocument(
   };
   /** 词典精确命中（headword 逐字相等）；无语种/未命中回 null（记 NULL 行，不臆造边）。 */
   const findEntry = (
-    tx: Parameters<Parameters<RepoDeps['db']['transaction']>[0]>[0],
+    tx: ShredTx,
     surface: string
   ): string | null => {
     if (!dictLang) return null;
@@ -87,8 +106,6 @@ export function shredDocument(
     const first = rows[0] as { id?: unknown } | undefined;
     return first && typeof first.id === 'string' ? first.id : null;
   };
-  try {
-    deps.db.transaction((tx) => {
       tx.delete(textbookLessons).where(eq(textbookLessons.documentId, documentId)).run();
       tx.delete(textbookVocab).where(eq(textbookVocab.documentId, documentId)).run();
       tx.delete(textbookGrammar).where(eq(textbookGrammar.documentId, documentId)).run();
@@ -251,12 +268,5 @@ export function shredDocument(
         }
         if (exerciseRows.length > 0) tx.insert(textbookExercises).values(exerciseRows).run();
       }
-    });
-    return ok(stats);
-  } catch (e) {
-    if (e instanceof BusinessError) return err(e);
-    return err(
-      new BusinessError('E_INTERNAL', '教材拆行入库失败，请重试', 'DATABASE', true)
-    );
+    return stats;
   }
-}

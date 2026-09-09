@@ -75,6 +75,7 @@
 - **默认走 drizzle 构造器**：`db/schema.ts` 的表定义与 `ddl.ts` 的建表 SQL 必须一字对齐（SSOT 是 `ddl.ts`）；简单 CRUD 一律 `db.select/insert/update/delete` + `eq/and`，列名拼错要在编译期炸，不许裸写 `INSERT INTO …`。
 - **只在三处允许原生 SQL**（且必须注释说明哪一条）：① DDL 与版本化迁移；② FTS 虚表建表与 `MATCH` 查询（drizzle 无一等支持）；③ 经实测证明的万行级批量热点。
 - **drizzle builder 是惰性的**：同步事务里必须显式 `.run()`（或 `await`），光 `tx.insert(...).values(...)` 不执行也不报错——静默零写是最阴的 bug，写完必须有行数断言的单测覆盖。
+- **原生 sql 查询只用 `db.all(...)[0]`**：`db.get(sql`…`)` 在 bun-sqlite 会话上返回形状不对（实测回 `[0]`），COUNT 查出来是 0——静默误报，同样要单测锁。
 - **禁止新的双源漂移**：新增表必须同时落 `ddl.ts`（建表）+ `schema.ts`（类型），缺一边即视为未完成。
 
 ---

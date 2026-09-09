@@ -15,18 +15,17 @@ import { LEARNING_CONTENT_TEMPLATE_SEEDS } from './seeds/content-template-seed.j
 import { PITCH_LEXICON } from './seeds/pitch-seed.js';
 import {
   STARTER_LICENSE,
-  STARTER_SOURCE_ID,
   STARTER_SOURCE_LABEL,
   STARTER_WORD_SEEDS,
 } from './seeds/starter-words-seed.js';
 import { LESSON_SEEDS } from './seeds/lesson-seed.js';
 import {
   N5_LICENSE,
-  N5_SOURCE_ID,
   N5_SOURCE_LABEL,
   N5_WORD_SEEDS,
 } from './seeds/n5-words-seed.js';
 import { TEXTBOOK_BOOKS } from './seeds/textbook-seed.js';
+import { ensureSeedDictionarySources, seedSourceRowId, STARTER_SOURCE_ID, N5_SOURCE_ID } from './seeds/seed-sources.js';
 
 /**
  * 声调词表标签 → 词典释义：标签形如「中文 (English)」时取英文 gloss（与 JMdict/Kengdic
@@ -566,55 +565,12 @@ export function seedInitialData(sqlite: Database): void {
       console.warn('[initSchema] Failed to auto-seed local dictionary entries:', e);
     }
 
-    // 8b. 开箱初级词包（日韩各 24，自撰中文释义）。INSERT OR IGNORE 按 id 补齐，
+    // 8b. 开箱初级词包（日韩英各 24，自撰中文释义）。INSERT OR IGNORE 按 id 补齐，
     // 不依赖表空判断：老库升级也能补进；用户后装词典包与之并存，互不覆盖。
+    // 源行经共享契约确保（与 repair 共用 ensureSeedDictionarySources，不各自拼 id）。
     try {
       const now = new Date().toISOString();
-      const insertStarterSource = sqlite.prepare(`
-        INSERT OR IGNORE INTO dictionary_sources (
-          id, language, provider, version, source_url, license_name, license_url, attribution, entry_count, imported_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      const starterJaCount = STARTER_WORD_SEEDS.filter((w) => w.language === 'ja').length;
-      const starterKoCount = STARTER_WORD_SEEDS.filter((w) => w.language === 'ko').length;
-      const starterEnCount = STARTER_WORD_SEEDS.filter((w) => w.language === 'en').length;
-      insertStarterSource.run(
-        `${STARTER_SOURCE_ID}-ja`,
-        'ja',
-        'Lingua Studio',
-        'v1',
-        'https://study-studio.local/curriculum/starter-words',
-        STARTER_LICENSE,
-        'https://study-studio.local/licenses',
-        'Lingua Studio starter vocabulary with original Chinese glosses.',
-        starterJaCount,
-        now
-      );
-      insertStarterSource.run(
-        `${STARTER_SOURCE_ID}-ko`,
-        'ko',
-        'Lingua Studio',
-        'v1',
-        'https://study-studio.local/curriculum/starter-words',
-        STARTER_LICENSE,
-        'https://study-studio.local/licenses',
-        'Lingua Studio starter vocabulary with original Chinese glosses.',
-        starterKoCount,
-        now
-      );
-      // en 源行此前缺失（词条有 en 24 词，源目录没有）：补上，否则 en 词条来源悬空。
-      insertStarterSource.run(
-        `${STARTER_SOURCE_ID}-en`,
-        'en',
-        'Lingua Studio',
-        'v1',
-        'https://study-studio.local/curriculum/starter-words',
-        STARTER_LICENSE,
-        'https://study-studio.local/licenses',
-        'Lingua Studio starter vocabulary with original Chinese glosses.',
-        starterEnCount,
-        now
-      );
+      ensureSeedDictionarySources(sqlite, now);
       const insertStarter = sqlite.prepare(`
         INSERT OR IGNORE INTO local_dictionary_entries (
           id, language, headword, reading, romanization, meanings_json,
@@ -632,7 +588,7 @@ export function seedInitialData(sqlite: Database): void {
           null,
           w.partOfSpeech ?? null,
           // 源行 id 带语言后缀（…-ja/-ko/-en），词条必须对齐；此前未后缀致悬空（doctor dict:entry-source）。
-          `${STARTER_SOURCE_ID}-${w.language}`,
+          seedSourceRowId(STARTER_SOURCE_ID, w.language),
           STARTER_SOURCE_LABEL,
           STARTER_LICENSE,
           now
@@ -672,27 +628,10 @@ export function seedInitialData(sqlite: Database): void {
     }
 
     // 8d. 日语 N5 核心 100 词（自撰释义，汉字表记+标准读音）。INSERT OR IGNORE 按 id 补齐，
-    // 与 starter 包（纯假名）/JMdict 并存，source 独立可开关。
+    // 与 starter 包（纯假名）/JMdict 并存，source 独立可开关。源行走共享契约（8b 已确保，此处再保一次防乱序）。
     try {
       const now2 = new Date().toISOString();
-      sqlite
-        .prepare(
-          `INSERT OR IGNORE INTO dictionary_sources (
-            id, language, provider, version, source_url, license_name, license_url, attribution, entry_count, imported_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        )
-        .run(
-          `${N5_SOURCE_ID}-ja`,
-          'ja',
-          'Lingua Studio',
-          'v1',
-          'https://study-studio.local/curriculum/n5-words',
-          N5_LICENSE,
-          'https://study-studio.local/licenses',
-          'Lingua Studio N5 core vocabulary with original Chinese glosses.',
-          N5_WORD_SEEDS.length,
-          now2
-        );
+      ensureSeedDictionarySources(sqlite, now2);
       const insertN5 = sqlite.prepare(`
         INSERT OR IGNORE INTO local_dictionary_entries (
           id, language, headword, reading, romanization, meanings_json,
@@ -709,8 +648,8 @@ export function seedInitialData(sqlite: Database): void {
           JSON.stringify(w.meanings),
           null,
           w.partOfSpeech ?? null,
-          // N5_SOURCE_ID 本身已带 -ja 后缀，源行 id 是 `${N5_SOURCE_ID}-ja`，词条必须对齐（此前少一截致悬空）。
-          `${N5_SOURCE_ID}-ja`,
+          // N5_SOURCE_ID 本身已带 -ja 后缀，源行 id 是 seedSourceRowId(N5_SOURCE_ID,'ja')，词条必须对齐（此前少一截致悬空）。
+          seedSourceRowId(N5_SOURCE_ID, 'ja'),
           N5_SOURCE_LABEL,
           N5_LICENSE,
           now2
