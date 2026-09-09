@@ -19,7 +19,8 @@ import {
  */
 
 export const MAX_VOCAB_PER_LESSON = 24;
-export const MAX_GRAMMAR_PER_LESSON = 6;
+/** 文法上限 10（活用表类附赠内容也是合法文法资产，与主表同权） */
+export const MAX_GRAMMAR_PER_LESSON = 10;
 
 export interface EnrichLessonInput {
   lessonId: string;
@@ -80,19 +81,33 @@ export function normalizePitch(raw: unknown): string {
   return '？';
 }
 
-const VOCAB_KEYS = ['vocabularies', '生词', 'words', 'wordList', 'vocab'];
+const VOCAB_KEYS = ['vocabularies', '生词', 'vocabulary', 'words', 'wordList', 'vocab'];
 const GRAMMAR_KEYS = ['grammarPoints', '文法', '核心文法', '语法', '句型', 'grammar', 'grammarList'];
+/** 附赠数组（重点应答/活用表）：拼在主表之后，照常走接地与上限 */
+const EXTRA_VOCAB_KEYS = ['key_responses', '重点表达', '重点应答'];
+const EXTRA_GRAMMAR_KEYS = ['te_form_conjugation', '活用表'];
 
-/** 顶层键别名归一（模型偶发中文键；条目内字段仍严格英文，错即丢）。 */
+/** 顶层键别名归一（附赠数组拼主表后；条目内字段见 normalize*Item 的键别名，只映射键名不编值）。 */
 export function normalizeEnrichJson(obj: Record<string, unknown>): { vocabularies: unknown; grammarPoints: unknown } {
-  const pick = (keys: string[]): unknown => {
+  const pickFirst = (keys: string[]): unknown[] => {
     for (const k of keys) {
       const v = obj[k];
       if (Array.isArray(v)) return v;
     }
     return [];
   };
-  return { vocabularies: pick(VOCAB_KEYS), grammarPoints: pick(GRAMMAR_KEYS) };
+  const pickAll = (keys: string[]): unknown[] => {
+    const out: unknown[] = [];
+    for (const k of keys) {
+      const v = obj[k];
+      if (Array.isArray(v)) out.push(...v);
+    }
+    return out;
+  };
+  return {
+    vocabularies: [...pickFirst(VOCAB_KEYS), ...pickAll(EXTRA_VOCAB_KEYS)],
+    grammarPoints: [...pickFirst(GRAMMAR_KEYS), ...pickAll(EXTRA_GRAMMAR_KEYS)],
+  };
 }
 
 function pickStr(src: Record<string, unknown>, keys: string[]): unknown {
@@ -111,18 +126,23 @@ export function normalizeVocabItem(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null) return raw;
   const src = raw as Record<string, unknown>;
   const out: Record<string, unknown> = { ...src };
-  const kanji = pickStr(src, ['kanji', '词', '词汇', '词语', '词面', '单词', 'word', 'surface']);
+  const kanji = pickStr(src, ['kanji', '词', '词汇', '词语', '词面', '单词', 'word', 'expression', '表达', 'surface']);
   const kana = pickStr(src, ['kana', '读音', '注音', '假名', 'reading', 'pronunciation']);
-  const chinese = pickStr(src, ['chinese', '释义', '中文', '意思', 'meaning', 'gloss']);
-  const pos = pickStr(src, ['pos', '词性', '品詞', 'partOfSpeech']);
+  const chinese = pickStr(src, ['chinese', 'meaning_zh', '释义', '中文', '意思', 'meaning', 'gloss']);
+  const pos = pickStr(src, ['pos', 'part_of_speech', '词性', '品詞', 'partOfSpeech']);
   const pitch = pickStr(src, ['pitchAccent', '声调', '声调符号', 'pitch']);
   if (kanji !== undefined) out['kanji'] = kanji;
+  // 注音缺席记空串（重点应答类短语常无注音；接地走词面，不编读音）
   if (kana !== undefined) out['kana'] = kana;
+  else out['kana'] = '';
   if (chinese !== undefined) out['chinese'] = chinese;
   if (pos !== undefined) out['pos'] = pos;
   if (pitch !== undefined) out['pitchAccent'] = pitch;
+  // 例句字符串 → 包成对象（中文译文缺席即空串，不编）
   const exRaw = src['example'] ?? src['例句'] ?? src['exampleSentence'];
-  if (typeof exRaw === 'object' && exRaw !== null) {
+  if (typeof exRaw === 'string') {
+    out['example'] = { japanese: exRaw, chinese: '' };
+  } else if (typeof exRaw === 'object' && exRaw !== null) {
     const ex = exRaw as Record<string, unknown>;
     out['example'] = {
       japanese: pickStr(ex, ['japanese', '日文', '例句日文', 'ja']) ?? '',
@@ -136,12 +156,13 @@ export function normalizeGrammarItem(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null) return raw;
   const src = raw as Record<string, unknown>;
   const out: Record<string, unknown> = { ...src };
-  const title = pickStr(src, ['title', '句型', '句式', '文型', '标题', '文法点']);
-  const connection = pickStr(src, ['connection', '接续', '连接']);
+  const title = pickStr(src, ['title', '句型', '句式', '文型', 'pattern', 'rule', '标题', '文法点']);
+  const connection = pickStr(src, ['connection', '接续', '连接', 'formation']);
   // 含义+要点都是讲法（模型中文方言常见组合），如实拼接，不编造
-  const meaningParts = [pickStr(src, ['含义', '讲解', '说明', '用法']), pickStr(src, ['要点'])].filter(
-    (v): v is string => typeof v === 'string' && v.trim().length > 0
-  );
+  const meaningParts = [
+    pickStr(src, ['含义', '讲解', '说明', '用法', 'usage_zh', 'name_zh', 'verb_group']),
+    pickStr(src, ['要点']),
+  ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
   if (title !== undefined) out['title'] = title;
   // connection（接续）在模型中文方言里常无对应键：缺席记空串（诚实缺口），不断整条
   out['connection'] = connection ?? '';

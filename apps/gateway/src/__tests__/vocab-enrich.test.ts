@@ -296,6 +296,46 @@ describe('normalizePitch / normalizeEnrichJson / parseAndGround', () => {
     });
     expect(g?.dropped).toBe(0);
   });
+
+  it('英文混排方言（vocabulary/meaning_zh/part_of_speech/字符串例句）', () => {
+    const raw = JSON.stringify({
+      vocabulary: [
+        { word: 'つけます', reading: 'つけます', part_of_speech: '动词', meaning_zh: '打开', example: 'エアコンをつけます。' },
+        { word: '消します', reading: 'けします', part_of_speech: '动词', meaning_zh: '关掉' },
+      ],
+    });
+    const lessonText = 'エアコンをつけます\n電気を消します';
+    const g = parseAndGround(raw, lessonText, 'l14');
+    expect(g?.vocabularies.map((v) => v.kanji)).toEqual(['つけます', '消します']);
+    expect(g?.vocabularies[0]).toMatchObject({
+      chinese: '打开',
+      example: { japanese: 'エアコンをつけます。', chinese: '' },
+    });
+    expect(g?.dropped).toBe(0);
+  });
+
+  it('附赠数组拼主表（key_responses/te_form_conjugation/formation接续）', () => {
+    const raw = JSON.stringify({
+      vocabulary: [{ word: 'つけます', reading: 'つけます', part_of_speech: '动词', meaning_zh: '打开' }],
+      grammar: [
+        { pattern: 'Vて形 + ください', name_zh: '请求', formation: '动词て形 + ください', usage_zh: '请对方做某事', examples: ['待ってください'] },
+      ],
+      te_form_conjugation: [
+        { verb_group: 'Ⅰ类', rule: 'いちり去い接って', examples: ['買います→買って'] },
+      ],
+      key_responses: [{ expression: 'はい、お願いします', meaning_zh: '好的拜托了' }],
+    });
+    const lessonText = 'つけます\n待ってください\n買います→買って\nはい、お願いします';
+    const g = parseAndGround(raw, lessonText, 'l14');
+    expect(g?.vocabularies.map((v) => v.kanji)).toEqual(['つけます', 'はい、お願いします']);
+    expect(g?.grammarPoints).toHaveLength(2);
+    expect(g?.grammarPoints[0]).toMatchObject({
+      title: 'Vて形 + ください',
+      connection: '动词て形 + ください',
+    });
+    expect(g?.grammarPoints[1]).toMatchObject({ title: 'いちり去い接って' });
+    expect(g?.dropped).toBe(0);
+  });
 });
 
 describe('enrichLessonVocab 修复重试', () => {
