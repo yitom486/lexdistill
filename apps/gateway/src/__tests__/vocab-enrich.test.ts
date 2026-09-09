@@ -268,6 +268,34 @@ describe('normalizePitch / normalizeEnrichJson / parseAndGround', () => {
     expect(normalizeVocabItem('x')).toBe('x');
     expect(normalizeGrammarItem(null)).toBe(null);
   });
+
+  it('真机方言全链路（词/句型/含义/要点/字符串例句/核心文法）', () => {
+    // 2026-09-09 大家的日语第10課实测：模型全中文键 + 无例句对象 + 无接续
+    const raw = JSON.stringify({
+      课名: '第10課',
+      生词: [
+        { 词: 'あります', 读音: 'あります', 中文: '有；在', 词性: '动词' },
+        { 词: '郵便局', 读音: 'ゆうびんきょく', 中文: '邮局', 词性: '名词' },
+      ],
+      核心文法: [
+        { 句型: '名詞1は名詞2です', 含义: '判断句', 要点: '用は提示主题', 例句: 'わたしは学生です' },
+      ],
+    });
+    const lessonText = 'ここは郵便局です\nわたしは学生です\nありますか';
+    const g = parseAndGround(raw, lessonText, 'l10');
+    expect(g?.vocabularies.map((v) => v.kanji)).toEqual(['あります', '郵便局']);
+    expect(g?.vocabularies[0]?.pitchAccent).toBe('？');
+    expect(g?.grammarPoints).toHaveLength(1);
+    expect(g?.grammarPoints[0]).toMatchObject({
+      title: '名詞1は名詞2です',
+      explanation: '判断句\n用は提示主题',
+    });
+    expect(g?.grammarPoints[0]?.examples[0]).toMatchObject({
+      japanese: 'わたしは学生です',
+      chinese: '',
+    });
+    expect(g?.dropped).toBe(0);
+  });
 });
 
 describe('enrichLessonVocab 修复重试', () => {

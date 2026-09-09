@@ -39,8 +39,9 @@ export interface EnrichLessonResult {
 export const ENRICH_SYSTEM_PROMPT = [
   '你是外语教材编辑。用户给你一课的课文句（日语/英语/韩语其一），请抽出生词与核心文法，只返回 JSON。',
   '格式：{"vocabularies": [{"kanji": "词面（必须原文出现）", "kana": "注音（日文假名/英语音标/韩文罗马音）", "chinese": "简短中文释义", "pos": "词性", "pitchAccent": "声调符号", "example": {"japanese": "含该词的课文原句或短句", "chinese": "中文"}}], "grammarPoints": [{"title": "文法点", "connection": "接续", "explanation": "中文一两句", "examples": [{"japanese": "例句", "chinese": "中文"}]}]}。',
-  '铁律：kanji 必须是课文里真实出现的词，绝不编考生词；不要输出 markdown 围栏之外的任何文字；',
-  '声调不知道就写"？"，不要猜；例句优先用课文原句。',
+ '铁律：kanji 必须是课文里真实出现的词，绝不编考生词；不要输出 markdown 围栏之外的任何文字；',
+ '键名必须用英文（vocabularies/kanji/kana/chinese/pos/pitchAccent/example，grammarPoints/title/connection/explanation/examples），中文键会被丢弃；',
+ '声调不知道就写"？"，不要猜；例句优先用课文原句。',
 ].join('\n');
 
 function extractJsonObject(raw: string): Record<string, unknown> | null {
@@ -80,7 +81,7 @@ export function normalizePitch(raw: unknown): string {
 }
 
 const VOCAB_KEYS = ['vocabularies', '生词', 'words', 'wordList', 'vocab'];
-const GRAMMAR_KEYS = ['grammarPoints', '文法', 'grammar', 'grammarList'];
+const GRAMMAR_KEYS = ['grammarPoints', '文法', '核心文法', '语法', '句型', 'grammar', 'grammarList'];
 
 /** 顶层键别名归一（模型偶发中文键；条目内字段仍严格英文，错即丢）。 */
 export function normalizeEnrichJson(obj: Record<string, unknown>): { vocabularies: unknown; grammarPoints: unknown } {
@@ -110,7 +111,7 @@ export function normalizeVocabItem(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null) return raw;
   const src = raw as Record<string, unknown>;
   const out: Record<string, unknown> = { ...src };
-  const kanji = pickStr(src, ['kanji', '词语', '词面', '单词', 'word', 'surface']);
+  const kanji = pickStr(src, ['kanji', '词', '词汇', '词语', '词面', '单词', 'word', 'surface']);
   const kana = pickStr(src, ['kana', '读音', '注音', '假名', 'reading', 'pronunciation']);
   const chinese = pickStr(src, ['chinese', '释义', '中文', '意思', 'meaning', 'gloss']);
   const pos = pickStr(src, ['pos', '词性', '品詞', 'partOfSpeech']);
@@ -135,22 +136,34 @@ export function normalizeGrammarItem(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null) return raw;
   const src = raw as Record<string, unknown>;
   const out: Record<string, unknown> = { ...src };
-  const title = pickStr(src, ['title', '标题', '文法点']);
-  const connection = pickStr(src, ['connection', '接续']);
-  const explanation = pickStr(src, ['explanation', '讲解', '说明']);
+  const title = pickStr(src, ['title', '句型', '句式', '文型', '标题', '文法点']);
+  const connection = pickStr(src, ['connection', '接续', '连接']);
+  // 含义+要点都是讲法（模型中文方言常见组合），如实拼接，不编造
+  const meaningParts = [pickStr(src, ['含义', '讲解', '说明', '用法']), pickStr(src, ['要点'])].filter(
+    (v): v is string => typeof v === 'string' && v.trim().length > 0
+  );
   if (title !== undefined) out['title'] = title;
-  if (connection !== undefined) out['connection'] = connection;
-  if (explanation !== undefined) out['explanation'] = explanation;
-  const examples = src['examples'] ?? src['例句'];
-  if (Array.isArray(examples)) {
-    out['examples'] = examples.map((e) => {
-      if (typeof e !== 'object' || e === null) return e;
+  // connection（接续）在模型中文方言里常无对应键：缺席记空串（诚实缺口），不断整条
+  out['connection'] = connection ?? '';
+  if (meaningParts.length > 0) out['explanation'] = meaningParts.join('\n');
+  else if (out['explanation'] === undefined) out['explanation'] = '';
+  const rawExamples = src['examples'] ?? src['例句'] ?? src['例子'];
+  const wrapExample = (e: unknown): unknown => {
+    // 模型中文方言常给纯字符串例句 → 包成对象（中文译文缺席即空串，不编）
+    if (typeof e === 'string') return { japanese: e, chinese: '' };
+    if (typeof e === 'object' && e !== null) {
       const ex = e as Record<string, unknown>;
       return {
         japanese: pickStr(ex, ['japanese', '日文', '例句日文', 'ja']) ?? '',
         chinese: pickStr(ex, ['chinese', '中文', '译文', 'zh']) ?? '',
       };
-    });
+    }
+    return e;
+  };
+  if (Array.isArray(rawExamples)) {
+    out['examples'] = rawExamples.map(wrapExample);
+  } else if (rawExamples !== undefined) {
+    out['examples'] = [wrapExample(rawExamples)];
   }
   return out;
 }
@@ -300,6 +313,11 @@ export async function enrichLessonVocab(
     const first = await ask(message);
     if (!first.ok) return err(first.error);
     const lessonText = input.dialogueTexts.join('\n');
+    logger.debug('[vocab-enrich] raw output round1', {
+      lessonId: input.lessonId,
+      chars: first.value.length,
+      head: first.value.slice(0, 600),
+    });
     let grounded = parseAndGround(first.value, lessonText, input.lessonId);
     if (!grounded || grounded.vocabularies.length === 0) {
       // 生词零收成：同会话修复一次（格式跑偏是已知偶发）；仍无结果才报错，不写库。
@@ -307,9 +325,20 @@ export async function enrichLessonVocab(
       logger.info('[vocab-enrich] 首轮生词零收成，同会话修复一次', { lessonId: input.lessonId });
       const second = await ask(REPAIR_PROMPT);
       if (!second.ok) return err(second.error);
+      logger.debug('[vocab-enrich] raw output round2', {
+        lessonId: input.lessonId,
+        chars: second.value.length,
+        head: second.value.slice(0, 600),
+      });
       grounded = parseAndGround(second.value, lessonText, input.lessonId);
     }
     if (!grounded || grounded.vocabularies.length === 0) {
+      // 空收成是运营显著事件：warn 让网关控制台可见（raw 查上面的 debug）。
+      logger.warn('[vocab-enrich] empty result (no keepable vocab after repair)', {
+        lessonId: input.lessonId,
+        sentences: input.dialogueTexts.length,
+        round1chars: first.value.length,
+      });
       return err(new BusinessError('E_ENRICH_PARSE', '模型返回无法解析，未写入任何内容', 'AGENT_RUNTIME'));
     }
     logger.info('[vocab-enrich] 抽取完成', {
