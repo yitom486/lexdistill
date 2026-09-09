@@ -314,6 +314,20 @@ describe('normalizePitch / normalizeEnrichJson / parseAndGround', () => {
     expect(g?.dropped).toBe(0);
   });
 
+  it('文法形分拣与归一同源（名称/结构/功能实测方言）', () => {
+    const raw = JSON.stringify({
+      核心文法: [
+        { 名称: '动词て形+もいいですか', 结构: 'Vて+もいいですか', 功能: '请求许可', 例句: '写真を撮ってもいいですか。' },
+      ],
+    });
+    const g = parseAndGround(raw, '写真を撮ってもいいですか', 'l15');
+    expect(g?.grammarPoints).toHaveLength(1);
+    expect(g?.grammarPoints[0]).toMatchObject({
+      title: '动词て形+もいいですか',
+      connection: 'Vて+もいいですか',
+    });
+  });
+
   it('分组对象展平（生词按词性分组是实测方言）', () => {
     const raw = JSON.stringify({
       课名: '第14課',

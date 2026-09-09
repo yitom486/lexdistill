@@ -87,9 +87,9 @@ const GRAMMAR_KEYS = ['grammarPoints', '文法', '核心文法', '语法', '句�
 const WORD_KEYS = [
   'kanji', '词', '词汇', '词语', '词面', '单词', 'word', 'expression', '表达', 'surface', '日语', '日文',
 ];
-/** 文法标题键全集（含其一即文法形条目） */
+/** 文法标题键全集（含其一即文法形条目；与 normalizeGrammarItem 的 title 别名同源） */
 const GRAMMAR_TITLE_KEYS = [
-  'title', '句型', '句式', '文型', 'pattern', 'rule', '标题', '文法点',
+  'title', '句型', '句式', '文型', 'pattern', 'rule', '名称', '标题', '文法点',
 ];
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -191,11 +191,11 @@ export function normalizeGrammarItem(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null) return raw;
   const src = raw as Record<string, unknown>;
   const out: Record<string, unknown> = { ...src };
-  const title = pickStr(src, ['title', '句型', '句式', '文型', 'pattern', 'rule', '标题', '文法点']);
-  const connection = pickStr(src, ['connection', '接续', '连接', 'formation']);
+  const title = pickStr(src, ['title', '句型', '句式', '文型', 'pattern', 'rule', '名称', '标题', '文法点']);
+  const connection = pickStr(src, ['connection', '接续', '连接', 'formation', '结构']);
   // 含义+要点都是讲法（模型中文方言常见组合），如实拼接，不编造
   const meaningParts = [
-    pickStr(src, ['含义', '讲解', '说明', '用法', 'usage_zh', 'name_zh', 'verb_group']),
+    pickStr(src, ['含义', '讲解', '说明', '用法', 'usage_zh', 'name_zh', 'verb_group', '功能', '规则']),
     pickStr(src, ['要点']),
   ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
   if (title !== undefined) out['title'] = title;
