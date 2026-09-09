@@ -58,6 +58,17 @@
 - **多入口复用同一业务链路**：同一能力必须可被不同界面、HTTP / WebSocket，以及未来 Agent 原生 Tool 复用；新增 AI 分析时应消费持久化学习资产与 `ContextSnapshot`，再通过同一命令写回结果，而不是读取或操纵 UI 私有状态。
 - **数据归属明确**：词典包是可再分发的公共课程资产；生词卡、复习历史、每日统计和 AI 分析结果均为用户学习资产，必须按用户与目标语种持久化并可追溯。
 
+### 1.8 静态表结构与行表达动态 (Static Schema, Rows for Dynamics)
+
+- **禁止运行时动态建表**：任何"新教材 / 新用户 / 新内容"的需求一律用**加行**表达（`documents` / `textbook_*` 按 `document_id`、`user_id` 扩展行），绝不 `CREATE TABLE book_xxx` / `user_123_progress`。动态表名意味着 SQL 字符串拼接（注入风险）、迁移不可管、drizzle 类型不可见（只能 `as any` 糊，直接违反 §2.3）。
+- **新维度才值得一次版本化迁移**：只有"以前从没存过的一类信息"（如文法例句列、自带习题表）才允许 `ALTER TABLE` / 新表，且必须走 `ddl.ts` 的 `schema_migrations` 版本登记（`runMigrations` 可重放、可断言），随发版一次性升级，不在导入某本书的瞬间现造。
+- **教材六层模型对号入座**（新增教材相关表必须能映射进这六层，映射不进就说明设计错了）：
+  - `material/document` → `documents`（`source_kind` 区分私产 `user_import` / 公共种子）；
+  - `section` → `textbook_lessons`；`content_block` → `textbook_lines`；
+  - `knowledge_point` → `textbook_vocab` + `textbook_grammar`；`exercise` → shred 行表（待 v16 补齐，当前仅 AST 内）；
+  - 底稿 `documents.ast_json` 为 SSOT，shred 表永远由它同事务拆出（全删全插），两边永不分叉。
+- **JSON 列只当底稿**：`ast_json` / `*_json` 存动态结构可以，但查询面要用的字段必须 shred 成列；全文检索走 FTS 虚表（建表语句静态，变的只是行）。
+
 ---
 
 ## 2. 错误处理机制与链条规范 (Error Handling & Result Pattern)
