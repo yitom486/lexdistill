@@ -6,6 +6,8 @@ import {
   translateToBusinessError,
   nowIso,
 } from '@study-studio/shared';
+import { and, eq } from 'drizzle-orm';
+import { readingPositions } from '../../../infrastructure/db/schema.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 /**
@@ -54,14 +56,13 @@ export async function saveReadingPosition(
   const raw = JSON.stringify(locator).slice(0, 4000);
   const now = nowIso();
   try {
-    deps.sqlite
-      .query(
-        `INSERT INTO reading_positions (user_id, document_id, locator, updated_at)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(user_id, document_id) DO UPDATE SET
-           locator = excluded.locator, updated_at = excluded.updated_at`
-      )
-      .run(uid, docId, raw, now);
+    await deps.db
+      .insert(readingPositions)
+      .values({ userId: uid, documentId: docId, locator: raw, updatedAt: now })
+      .onConflictDoUpdate({
+        target: [readingPositions.userId, readingPositions.documentId],
+        set: { locator: raw, updatedAt: now },
+      });
     return ok({ userId: uid, documentId: docId, locator: parseLocator(raw), updatedAt: now });
   } catch (error) {
     return err(
@@ -86,24 +87,23 @@ export async function getReadingPosition(
     return err(new BusinessError('E_INVALID_INPUT', 'userId 或 documentId 非法', 'VALIDATION'));
   }
   try {
-    const row = deps.sqlite
-      .query(
-        `SELECT user_id AS user_id, document_id AS document_id,
-                locator AS locator, updated_at AS updated_at
-         FROM reading_positions WHERE user_id = ? AND document_id = ?`
+    const rows = await deps.db
+      .select()
+      .from(readingPositions)
+      .where(
+        and(
+          eq(readingPositions.userId, uid),
+          eq(readingPositions.documentId, docId)
+        )
       )
-      .get(uid, docId) as {
-      user_id: string;
-      document_id: string;
-      locator: string;
-      updated_at: string;
-    } | null;
+      .limit(1);
+    const row = rows[0];
     if (!row) return ok(null);
     return ok({
-      userId: row.user_id,
-      documentId: row.document_id,
+      userId: row.userId,
+      documentId: row.documentId,
       locator: parseLocator(row.locator),
-      updatedAt: row.updated_at,
+      updatedAt: row.updatedAt,
     });
   } catch (error) {
     return err(

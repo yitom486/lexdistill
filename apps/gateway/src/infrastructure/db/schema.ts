@@ -706,3 +706,34 @@ export const textbookTermMap = sqliteTable(
     }),
   })
 );
+
+/**
+ * 阅读位置（每用户每文档一条；locator 为不透明 JSON）。
+ * 与 ddl.ts 对齐；upsert 语义由调用方经 onConflictDoUpdate 表达。
+ */
+export const readingPositions = sqliteTable(
+  'reading_positions',
+  {
+    userId: text('user_id').notNull(),
+    documentId: text('document_id').notNull(),
+    locator: text('locator').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.documentId] }),
+  })
+);
+
+/**
+ * 文档结构分类结果（一文档一行，后跑覆盖先跑；与 ddl.ts v15 对齐）。
+ */
+export const documentStructures = sqliteTable('document_structure', {
+  documentId: text('document_id').primaryKey(),
+  userId: text('user_id').notNull(),
+  headingsJson: text('headings_json').notNull().default('[]'),
+  classesJson: text('classes_json').notNull().default('[]'),
+  model: text('model').notNull().default(''),
+  effort: text('effort').notNull().default(''),
+  dropped: integer('dropped').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+});

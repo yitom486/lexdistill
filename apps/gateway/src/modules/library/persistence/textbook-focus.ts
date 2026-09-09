@@ -6,6 +6,11 @@ import {
   translateToBusinessError,
 } from '@study-studio/shared';
 import { parseTextbookAST } from '@study-studio/protocol';
+import { and, desc, eq, isNotNull, or } from 'drizzle-orm';
+import {
+  documents,
+  readingPositions,
+} from '../../../infrastructure/db/schema.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import {
   normalizeTrackLanguage,
@@ -20,14 +25,6 @@ export interface TextbookFocus {
   lessonNumber: number;
 }
 
-interface FocusRow {
-  document_id: string;
-  locator: string;
-  doc_title: string;
-  doc_language: string;
-  ast_json: string | null;
-}
-
 /**
  * 教材焦点 = 最近读到的教材课次（给今日计划指“学哪课”）。
  * 数据源复用 reading_positions（切课即记，已有链路），只认带 AST 课次的文档；
@@ -40,18 +37,30 @@ export async function getTextbookFocus(
 ): Promise<Result<TextbookFocus | null, BusinessError>> {
   try {
     const track: TrackLanguage = normalizeTrackLanguage(language);
-    const rows = deps.sqlite
-      .query(
-        `SELECT rp.document_id AS document_id, rp.locator AS locator,
-                d.title AS doc_title, d.language AS doc_language, d.ast_json AS ast_json
-         FROM reading_positions rp JOIN documents d ON d.id = rp.document_id
-         WHERE rp.user_id = ? AND (d.user_id = ? OR d.source_kind = 'curriculum_textbook')
-           AND d.ast_json IS NOT NULL
-         ORDER BY rp.updated_at DESC LIMIT 10`
+    const rows = await deps.db
+      .select({
+        documentId: readingPositions.documentId,
+        locator: readingPositions.locator,
+        docTitle: documents.title,
+        docLanguage: documents.language,
+        astJson: documents.astJson,
+      })
+      .from(readingPositions)
+      .innerJoin(documents, eq(documents.id, readingPositions.documentId))
+      .where(
+        and(
+          eq(readingPositions.userId, userId),
+          or(
+            eq(documents.userId, userId),
+            eq(documents.sourceKind, 'curriculum_textbook')
+          ),
+          isNotNull(documents.astJson)
+        )
       )
-      .all(userId, userId) as FocusRow[];
+      .orderBy(desc(readingPositions.updatedAt))
+      .limit(10);
     for (const row of rows) {
-      if ((row.doc_language || '').toLowerCase() !== track) continue;
+      if ((row.docLanguage || '').toLowerCase() !== track) continue;
       let lessonId = '';
       try {
         const locator = JSON.parse(row.locator || '{}') as { lessonId?: unknown };
@@ -62,7 +71,7 @@ export async function getTextbookFocus(
       if (!lessonId) continue;
       let astRaw: unknown = null;
       try {
-        astRaw = JSON.parse(row.ast_json as string);
+        astRaw = JSON.parse(row.astJson as string);
       } catch {
         continue;
       }
@@ -71,8 +80,8 @@ export async function getTextbookFocus(
       const lesson = parsed.value.lessons.find((l) => l.id === lessonId);
       if (!lesson) continue;
       return ok({
-        documentId: row.document_id,
-        bookTitle: row.doc_title,
+        documentId: row.documentId,
+        bookTitle: row.docTitle,
         lessonId: lesson.id,
         lessonTitle: lesson.title,
         lessonNumber: lesson.lessonNumber,

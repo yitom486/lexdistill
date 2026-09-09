@@ -367,12 +367,15 @@ export async function convertAnnotationToCard(
     //    失败只 warn，永不挡建卡主路径。
     const quoteHead = (ann.quote ?? '').trim().slice(0, 64);
     if (quoteHead && [...quoteHead].length <= 12) {
-      const docRow = deps.sqlite
-        .query('SELECT language AS language FROM documents WHERE id = ?')
-        .get(ann.documentId) as { language: string } | null;
+      const docRows = await deps.db
+        .select({ language: documents.language })
+        .from(documents)
+        .where(eq(documents.id, ann.documentId))
+        .limit(1);
+      const docLanguage = docRows[0]?.language;
       const exposure = await recordTermExposure(deps, {
         userId,
-        language: typeof docRow?.language === 'string' ? docRow.language : '',
+        language: typeof docLanguage === 'string' ? docLanguage : '',
         headword: quoteHead,
         source: 'collect',
         markCollected: true,

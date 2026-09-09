@@ -7,6 +7,8 @@ import {
   translateToBusinessError,
   nowIso,
 } from '@study-studio/shared';
+import { and, eq } from 'drizzle-orm';
+import { documentStructures } from '../../../infrastructure/db/schema.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { getDocumentById } from './documents-annotations.js';
 import type {
@@ -59,29 +61,29 @@ export async function saveDocumentStructure(
       return err(new BusinessError('E_NOT_FOUND', '未找到指定的教材或文档', 'LEARNER_STATE'));
     }
     const now = nowIso();
-    deps.sqlite
-      .query(
-        `INSERT INTO document_structure
-           (document_id, user_id, headings_json, classes_json, model, effort, dropped, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(document_id) DO UPDATE SET
-           headings_json = excluded.headings_json,
-           classes_json = excluded.classes_json,
-           model = excluded.model,
-           effort = excluded.effort,
-           dropped = excluded.dropped,
-           created_at = excluded.created_at`
-      )
-      .run(
+    await deps.db
+      .insert(documentStructures)
+      .values({
         documentId,
         userId,
-        JSON.stringify(input.headings),
-        JSON.stringify(input.classes),
-        input.model,
-        input.effort,
-        input.dropped,
-        now
-      );
+        headingsJson: JSON.stringify(input.headings),
+        classesJson: JSON.stringify(input.classes),
+        model: input.model,
+        effort: input.effort,
+        dropped: input.dropped,
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: documentStructures.documentId,
+        set: {
+          headingsJson: JSON.stringify(input.headings),
+          classesJson: JSON.stringify(input.classes),
+          model: input.model,
+          effort: input.effort,
+          dropped: input.dropped,
+          createdAt: now,
+        },
+      });
     return ok({
       documentId,
       userId,
@@ -110,25 +112,17 @@ export async function getDocumentStructure(
   documentId: string
 ): Promise<Result<SavedDocumentStructure | null, BusinessError>> {
   try {
-    const row = deps.sqlite
-      .query(
-        `SELECT document_id AS documentId, user_id AS userId, headings_json AS headingsJson,
-                classes_json AS classesJson, model AS model, effort AS effort,
-                dropped AS dropped, created_at AS createdAt
-         FROM document_structure WHERE document_id = ? AND user_id = ?`
+    const rows = await deps.db
+      .select()
+      .from(documentStructures)
+      .where(
+        and(
+          eq(documentStructures.documentId, documentId),
+          eq(documentStructures.userId, userId)
+        )
       )
-      .get(documentId, userId) as
-      | {
-          documentId: string;
-          userId: string;
-          headingsJson: string;
-          classesJson: string;
-          model: string;
-          effort: string;
-          dropped: number;
-          createdAt: string;
-        }
-      | null;
+      .limit(1);
+    const row = rows[0];
     if (!row) return ok(null);
     const headings = parseJsonArray(row.headingsJson)
       .filter((h) => typeof h.text === 'string' && typeof h.page === 'number')
