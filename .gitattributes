@@ -1,0 +1,8 @@
+# 二进制资产不做换行转换（PDF xref 偏移按字节算，CRLF 会搞坏文件）
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.apkg binary
+*.onnx binary
+*.db binary
