@@ -162,7 +162,7 @@ export function normalizeVocabItem(raw: unknown): unknown {
   const src = raw as Record<string, unknown>;
   const out: Record<string, unknown> = { ...src };
   const kanji = pickStr(src, ['kanji', '词', '词汇', '词语', '词面', '单词', 'word', 'expression', '表达', 'surface', '日语', '日文']);
-  const kana = pickStr(src, ['kana', '读音', '注音', '假名', 'reading', 'pronunciation']);
+  const kana = pickStr(src, ['kana', '读音', '注音', '假名', 'かな', 'カナ', '仮名', 'reading', 'pronunciation']);
   const chinese = pickStr(src, ['chinese', 'meaning_zh', '释义', '中文', '意思', 'meaning', 'gloss']);
   const pos = pickStr(src, ['pos', 'part_of_speech', '词性', '品詞', 'partOfSpeech']);
   const pitch = pickStr(src, ['pitchAccent', '声调', '声调符号', 'pitch']);
