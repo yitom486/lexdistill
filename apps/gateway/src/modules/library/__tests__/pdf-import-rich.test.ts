@@ -11,6 +11,7 @@ import {
   importPdfDocument,
   mapPdfPages,
 } from '../application/pdf-import/pdf-import-service.js';
+import { tryParseTextbookAst } from '../persistence/textbook-shred.js';
 
 /**
  * pdf-import rich 集成测试（tag：pdf-import）。
@@ -142,6 +143,22 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     // smoke 出 2 课（OCR 回填后）+ rich 3 课 = 5 课，且续排不断号
     expect(appended.value.addedLessons).toBe(3);
     expect(appended.value.totalLessons).toBe(5);
+    // P1-B：append 后最终 AST 数组顺序即 canonical 顺序；shred 落 sort_order 连续，
+    // legacy lessonNumber（maxNo+1 续排）原样保留，两者不必相等
+    const finalAst = tryParseTextbookAst(appended.value.document.astJson);
+    expect(finalAst).not.toBeNull();
+    if (!finalAst) return;
+    expect(finalAst.lessons).toHaveLength(5);
+    const shredRes = await repo.shredDocument(first.value.document.id, finalAst);
+    expect(isOk(shredRes)).toBe(true);
+    const dbRows = repo
+      .getRawDb()
+      .query(
+        'SELECT lesson_number AS n, sort_order AS s FROM textbook_lessons WHERE document_id = ? ORDER BY sort_order'
+      )
+      .all(first.value.document.id) as Array<{ n: number; s: number }>;
+    expect(dbRows.map((r) => r.n)).toEqual([1, 2, 3, 4, 5]);
+    expect(dbRows.map((r) => r.s)).toEqual([1, 2, 3, 4, 5]);
   }, 180000);
 });
 

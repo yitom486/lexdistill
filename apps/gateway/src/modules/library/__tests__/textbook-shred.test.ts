@@ -136,4 +136,32 @@ describe('textbook shred 写逻辑', () => {
     expect(tryParseTextbookAst(JSON.stringify(BOOK))?.lessons.length).toBe(1);
     expect(tryParseTextbookAst(BOOK)?.id).toBe('book1');
   });
+
+  it('P1-B：gap AST 的 sort_order 按数组 index 连续，lesson_number 保持 legacy', async () => {
+    const gapBook: TextbookAST = {
+      ...BOOK,
+      id: 'gap-book',
+      lessons: [15, 16, 18, 20].map((n, i) => ({
+        id: `g-l${i + 1}`,
+        lessonNumber: n,
+        title: `第${n}課`,
+        vocabularies: [],
+        grammarPoints: [],
+        dialogues: [{ speaker: 'A', japanese: 'こんにちは。', chinese: '' }],
+        exercises: [],
+      })),
+    };
+    const res = await repo.shredDocument('gap-doc', gapBook);
+    if (!isOk(res)) throw new Error(`gap shred failed: ${res.error.code}`);
+    const db = repo.getRawDb();
+    const rows = db
+      .query(
+        'SELECT lesson_id AS lessonId, lesson_number AS lessonNumber, sort_order AS sortOrder FROM textbook_lessons WHERE document_id = ? ORDER BY sort_order'
+      )
+      .all('gap-doc') as Array<{ lessonId: string; lessonNumber: number; sortOrder: number }>;
+    // lessonNumber 有 gap 但合法保留；sort_order 必须 1-based 连续
+    expect(rows.map((r) => r.lessonNumber)).toEqual([15, 16, 18, 20]);
+    expect(rows.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4]);
+    expect(rows[2]).toMatchObject({ lessonId: 'g-l3', lessonNumber: 18, sortOrder: 3 });
+  });
 });

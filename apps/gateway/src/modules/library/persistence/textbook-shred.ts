@@ -114,11 +114,15 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
       tx.delete(textbookTermMap).where(eq(textbookTermMap.documentId, documentId)).run();
       tx.run(sql`DELETE FROM textbook_fts WHERE document_id = ${documentId}`);
 
-      for (const lesson of lessons) {
+      for (const [li, lesson] of lessons.entries()) {
         if (!lesson || typeof lesson !== 'object') continue;
         const l = lesson as { id?: unknown; lessonNumber?: unknown; title?: unknown };
         if (typeof l.id !== 'string' || !l.id) continue;
         const lessonId = l.id;
+        // P1-B：sort_order 唯一来源 = 最终 canonical AST 数组 index + 1（1-based 连续）。
+        // 禁止 sort_order = lessonNumber（可 gap）、禁止从 lesson_id 后缀/插入顺序推导。
+        const sortOrder = li + 1;
+        // lesson_number 保持 legacy 兼容写法（positional，可 gap，不排序，不展示）。
         const lessonNumber =
           typeof l.lessonNumber === 'number' && Number.isInteger(l.lessonNumber) && l.lessonNumber > 0
             ? l.lessonNumber
@@ -126,7 +130,7 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
         const title = typeof l.title === 'string' ? l.title.slice(0, 200) : '';
         // 注意：drizzle builder 是惰性的——同步事务里必须显式 .run()，
         // 光 tx.insert(...).values(...) 不执行也不报错（静默零写，已实测）。
-        tx.insert(textbookLessons).values({ documentId, lessonId, lessonNumber, title }).run();
+        tx.insert(textbookLessons).values({ documentId, lessonId, lessonNumber, title, sortOrder }).run();
         stats.lessons++;
 
         const vocabularies = Array.isArray((lesson as { vocabularies?: unknown }).vocabularies)

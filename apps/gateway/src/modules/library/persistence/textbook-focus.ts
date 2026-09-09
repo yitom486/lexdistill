@@ -16,6 +16,7 @@ import {
   normalizeTrackLanguage,
   type TrackLanguage,
 } from '../../../infrastructure/persistence/language.js';
+import { normalizeLessonDisplayTitle } from '../lesson-display-title.js';
 
 export interface TextbookFocus {
   documentId: string;
@@ -23,6 +24,11 @@ export interface TextbookFocus {
   lessonId: string;
   lessonTitle: string;
   lessonNumber: number;
+  /**
+   * P1-B：展示用标题（网关保守归一，高置信度 token 或 null）。
+   * daily-plan 只消费本字段；lessonTitle（raw）/lessonNumber（legacy）仅留诊断，不进用户文本。
+   */
+  displayTitle: string | null;
 }
 
 /**
@@ -85,6 +91,7 @@ export async function getTextbookFocus(
         lessonId: lesson.id,
         lessonTitle: lesson.title,
         lessonNumber: lesson.lessonNumber,
+        displayTitle: normalizeLessonDisplayTitle(lesson.title),
       });
     }
     return ok(null);

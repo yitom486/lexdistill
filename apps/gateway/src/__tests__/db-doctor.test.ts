@@ -176,4 +176,53 @@ describe('db doctor', () => {
     const badReport = runDoctor(db);
     expect(levelOf(badReport, 'dict:entry-source')).toBe('FAIL');
   });
+
+  it('缺 sort_order 列即跳过（旧最小 schema 不炸）', () => {
+    const db = mem();
+    seedClean(db);
+    const report = runDoctor(db);
+    expect(report.findings.some((f) => f.rule.startsWith('lesson:sortorder'))).toBe(false);
+    expect(report.errors).toEqual([]);
+  });
+
+  it('sort_order 脏数据逐规则 FAIL：NULL/亲和/非正/重复/断号', () => {
+    const db = mem();
+    db.exec(
+      `CREATE TABLE textbook_lessons (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, lesson_number INTEGER NOT NULL, title TEXT NOT NULL, sort_order INTEGER, PRIMARY KEY (document_id, lesson_id))`
+    );
+    // d-null: NULL；d-aff: 文本亲和；d-neg: <=0；d-dup: 重复；d-gap: 1,3 断号
+    db.exec(`INSERT INTO textbook_lessons VALUES
+      ('d-null','l1',16,'第16課',NULL),
+      ('d-aff','l1',1,'t','x'),
+      ('d-neg','l1',1,'t',0),
+      ('d-dup','l1',1,'t',1),('d-dup','l2',2,'t',1),
+      ('d-gap','l1',1,'t',1),('d-gap','l2',3,'t',3)`);
+    const report = runDoctor(db);
+    expect(levelOf(report, 'lesson:sortorder-null')).toBe('FAIL');
+    expect(levelOf(report, 'lesson:sortorder-affinity')).toBe('FAIL');
+    expect(levelOf(report, 'lesson:sortorder-nonpositive')).toBe('FAIL');
+    expect(levelOf(report, 'lesson:sortorder-dup')).toBe('FAIL');
+    expect(levelOf(report, 'lesson:sortorder-gap')).toBe('FAIL');
+    expect(report.errors.length).toBeGreaterThan(0);
+  });
+
+  it('sort_order 连续 dense 全 PASS（lessonNumber 有 gap 也合法）', () => {
+    const db = mem();
+    db.exec(
+      `CREATE TABLE textbook_lessons (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, lesson_number INTEGER NOT NULL, title TEXT NOT NULL, sort_order INTEGER, PRIMARY KEY (document_id, lesson_id))`
+    );
+    // lessonNumber 16/18/20 跳号 + 噪声 title：doctor 不得要求连续/相等/唯一
+    db.exec(`INSERT INTO textbook_lessons VALUES
+      ('d1','l1',16,'第16課',1),('d1','l2',18,'第19課',2),('d1','l3',20,'第21課',3)`);
+    const report = runDoctor(db);
+    for (const rule of [
+      'lesson:sortorder-null',
+      'lesson:sortorder-affinity',
+      'lesson:sortorder-nonpositive',
+      'lesson:sortorder-dup',
+      'lesson:sortorder-gap',
+    ]) {
+      expect(levelOf(report, rule)).toBe('PASS');
+    }
+  });
 });

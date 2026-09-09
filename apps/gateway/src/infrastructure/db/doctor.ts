@@ -29,6 +29,15 @@ export function runDoctor(db: Database): DoctorReport {
     ).map((r) => r.n)
   );
   const has = (...names: string[]) => names.every((n) => existing.has(n));
+  const hasColumn = (table: string, column: string): boolean => {
+    if (!existing.has(table)) return false;
+    try {
+      const cols = db.query(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;
+      return cols.some((c) => c.name === column);
+    } catch {
+      return false;
+    }
+  };
   const count = (sql: string): number => {
     const row = db.query(sql).get() as { n: number } | null;
     return row ? row.n : 0;
@@ -101,6 +110,26 @@ export function runDoctor(db: Database): DoctorReport {
       );
       push(`lesson-orphan:${table}`, n > 0 ? 'FAIL' : 'PASS', n, n > 0 ? `${n} 行课不存在` : '无孤儿');
     }
+  }
+
+  // ---- 2b. sort_order（v17 P1-B：唯一 ordering truth，1-based dense 连续） ----
+  // - 缺列即跳过（旧测试最小 schema / 未迁移库不炸，由迁移测试覆盖）；
+  // - 不查 lessonNumber（可 gap 是合法 legacy），不查 title 唯一（復習/重名合法）。
+  if (hasColumn('textbook_lessons', 'sort_order')) {
+    const nullN = count(`SELECT COUNT(*) AS n FROM textbook_lessons WHERE sort_order IS NULL`);
+    push('lesson:sortorder-null', nullN > 0 ? 'FAIL' : 'PASS', nullN, nullN > 0 ? `${nullN} 行 sort_order 为空（未回填？）` : '顺序齐全');
+    const badAff = count(`SELECT COUNT(*) AS n FROM textbook_lessons WHERE sort_order IS NOT NULL AND typeof(sort_order) != 'integer'`);
+    push('lesson:sortorder-affinity', badAff > 0 ? 'FAIL' : 'PASS', badAff, badAff > 0 ? `${badAff} 行 sort_order 非整数亲和` : '亲和正常');
+    const nonPos = count(`SELECT COUNT(*) AS n FROM textbook_lessons WHERE typeof(sort_order) = 'integer' AND sort_order <= 0`);
+    push('lesson:sortorder-nonpositive', nonPos > 0 ? 'FAIL' : 'PASS', nonPos, nonPos > 0 ? `${nonPos} 行 sort_order <= 0` : '无非正值');
+    const dup = count(
+      `SELECT COUNT(*) AS n FROM (SELECT document_id, sort_order FROM textbook_lessons WHERE sort_order IS NOT NULL GROUP BY document_id, sort_order HAVING COUNT(*) > 1)`
+    );
+    push('lesson:sortorder-dup', dup > 0 ? 'FAIL' : 'PASS', dup, dup > 0 ? `${dup} 组同文档重复 sort_order` : '无重复');
+    const gap = count(
+      `SELECT COUNT(*) AS n FROM (SELECT document_id FROM textbook_lessons WHERE sort_order IS NOT NULL GROUP BY document_id HAVING COUNT(*) != COUNT(sort_order) OR MIN(sort_order) != 1 OR MAX(sort_order) != COUNT(*))`
+    );
+    push('lesson:sortorder-gap', gap > 0 ? 'FAIL' : 'PASS', gap, gap > 0 ? `${gap} 个文档顺序不连续（非 1-based dense）` : '顺序连续');
   }
 
   // ---- 3. ord 完整性（代码不强制连续，只查重复/负值/非法亲和） ----

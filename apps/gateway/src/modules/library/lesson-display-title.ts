@@ -1,5 +1,6 @@
 /**
- * P1-B1 display-title 原型（纯函数，未接入任何业务写路径）。
+ * P1-B lesson display title（模块级纯函数，无依赖，可被 persistence/application 同用）。
+ * P1-B1 原型转正为 Gateway 内唯一展示归一入口（仍未进 DB/AST/UI，仅 focus→daily-plan 消费）。
  *
  * 背景：parser raw title 是 OCR heading candidate（含 `だい -第11課` / `第10課 118` 类噪声），
  * 不能直接当 canonical display label，也不能用 lessonNumber 推导展示。

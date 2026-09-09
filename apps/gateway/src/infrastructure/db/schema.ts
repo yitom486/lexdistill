@@ -604,10 +604,15 @@ export const documentImports = sqliteTable('document_imports', {
 });
 
 /**
- * 教材 shred 行表（v14/v16；与 ddl.ts 的建表 SQL 一字对齐，SSOT 是 ddl.ts）。
+ * 教材 shred 行表（v14/v16/v17；与 ddl.ts 的建表 SQL 一字对齐，SSOT 是 ddl.ts）。
  * - 查询面：组卷/检索/统计读这里，不读 ast_json；
  * - 底稿 documents.ast_json 改后由 shredDocument 同事务全删全插重建；
  * - FTS 虚表 drizzle 无一等支持，保持原生 SQL（见 textbook-shred.ts），故不在此声明。
+ * - v17 语义：lesson_id=冻结的 positional identity；sort_order=canonical 顺序唯一 truth
+ *   （最终 AST lessons[] index+1，1-based 连续）；lesson_number=legacy compatibility
+ *   （可 gap，不排序，不展示）；title=raw parser/OCR heading candidate。
+ * - DB 列 sort_order 保持 nullable（SQLite 不支持事后加 NOT NULL）：invariant 由
+ *   shred 全写 + doctor FAIL 规则锁，读侧必须收窄后使用。
  */
 export const textbookLessons = sqliteTable(
   'textbook_lessons',
@@ -616,6 +621,7 @@ export const textbookLessons = sqliteTable(
     lessonId: text('lesson_id').notNull(),
     lessonNumber: integer('lesson_number').notNull(),
     title: text('title').notNull(),
+    sortOrder: integer('sort_order'),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.documentId, table.lessonId] }),

@@ -53,11 +53,11 @@ describe('daily plan sequencing', () => {
       dueCardsCount: 0,
       unresolvedMistakesCount: 0,
       alphabetReady: true,
-      textbookFocus: { bookTitle: '标日初上', lessonTitle: '第 3 課', lessonNumber: 3 },
+      textbookFocus: { bookTitle: '标日初上', lessonTitle: '第 3 課', lessonNumber: 3, displayTitle: '第 3 課' },
     });
     const reading = focused.find((s) => s.kind === 'READING');
     expect(reading?.title).toContain('标日初上');
-    expect(reading?.title).toContain('第3课');
+    expect(reading?.title).toContain('第 3 課');
     expect(reading?.navigateTo).toBe('TEXTBOOK');
 
     const generic = buildDailyPlanStepTemplates({
@@ -71,6 +71,26 @@ describe('daily plan sequencing', () => {
     const reading2 = generic.find((s) => s.kind === 'READING');
     expect(reading2?.title).toBe('精读一篇');
     expect(reading2?.navigateTo).toBe('READING');
+  });
+
+  it('P1-B：displayTitle 为 null 时不得用 lessonNumber 当教材编号，也不得展示 raw 噪声标题', () => {
+    const steps = buildDailyPlanStepTemplates({
+      track: 'ja',
+      dailyGoalQuizzes: 5,
+      dailyGoalCards: 10,
+      dueCardsCount: 0,
+      unresolvedMistakesCount: 0,
+      alphabetReady: true,
+      // 线上真实错位形：positional 26 + 噪声 raw title
+      textbookFocus: { bookTitle: '标日初下', lessonTitle: 'だい -第11課', lessonNumber: 26, displayTitle: null },
+    });
+    const reading = steps.find((s) => s.kind === 'READING');
+    expect(reading?.title).toBe('继续精读《标日初下》');
+    expect(reading?.title).not.toContain('26');
+    expect(reading?.title).not.toContain('第11課');
+    expect(reading?.summary).not.toContain('だい -第11課');
+    expect(reading?.summary).not.toContain('26');
+    expect(reading?.navigateTo).toBe('TEXTBOOK');
   });
 
   it('路线单元置顶：单元步在前，路线覆盖的通用步让路', () => {

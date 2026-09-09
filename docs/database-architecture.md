@@ -32,8 +32,9 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 - classification：Canonical。source of truth：是（教材底稿）。rebuildable：否。
 
 ### textbook_lessons —— 课目录（Derived 查询面）
-- PK `(document_id, lesson_id)`；`lesson_number INTEGER`（**导入顺序计数器，见 §4**）；`title`（OCR 原文，含噪）
-- 来源：`documents.ast_json` shred 全删全插；writers：`shredDocument`；readers：教材页/组卷/focus
+- PK `(document_id, lesson_id)`；`lesson_number INTEGER`（**legacy positional，可 gap，不排序，不展示**）；`title`（raw parser/OCR heading candidate，含噪，不是 canonical display）；`sort_order INTEGER`（v17，**唯一 ordering truth**：最终 canonical AST lessons[] index+1，1-based dense；DB 列 nullable，invariant 由 shred 全写 + doctor FAIL 锁）
+- 语义（P1-B）：lesson_id=冻结的 positional identity；sort_order=顺序；lesson_number=兼容；title=原文候选；展示归一走 `normalizeLessonDisplayTitle`（Gateway 纯函数，不落库）
+- 来源：`documents.ast_json` shred 全删全插；writers：`shredDocument`；回填：`lesson-ordering-apply --apply`（仅 UPDATE sort_order）；readers：教材页/组卷/focus
 - lifecycle：随 shred 重建；rebuildable：是（由 ast_json）。source of truth：否（真相在 ast_json）
 
 ### textbook_lines / textbook_vocab / textbook_grammar / textbook_exercises —— 行/词/文法/习题（Derived 查询面）
@@ -210,6 +211,9 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
   - 排序错误风险：无（数组序即展示序，稳定但"稳定地错"）
   - 展示错误风险：**有，线上正在发生**（第11課→Lesson 26）
 - P1 候选（本轮不动）：`lesson_id`（稳定身份，保持）+ `sort_order`（物理序，保持导入序）+ `lesson_label`（展示串，如"第11課"/"復習A"，parser 填，缺失回退 `第{n}課`）
+- P1-B 落定（v17，已实施）：只加 `sort_order`，**不加 `lesson_label`**（raw title 已在 AST/DB；归一是廉价纯函数；持久化只增同步债）。
+  `lesson_number` 正式定为 legacy compatibility；relay 保持 `maxNo+1`（Gate 0：不得改长度续排）；
+  展示走 Gateway `displayTitle`（focus 计算）→ learner-core 只消费；`第11課→Lesson 26` 类文本已在 daily-plan 消除（UI 组件 debt 另记）。
 
 ## 5. 已知一致性风险（doctor 覆盖项的依据）
 

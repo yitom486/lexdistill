@@ -567,12 +567,12 @@ export async function hydrateDailyStudyPlan(
   const topWeakness = snapshotRes.value.weaknesses[0];
   // 教材焦点：最近读到的教材课次（计划 READING 步点名跟读；失败/无记录不挡计划）。
   // 经 repo 外观调用（跨域走接口，不直引 library 域实现；接口缺实现时保持通用精读）。
-  let textbookFocus: { bookTitle: string; lessonTitle: string; lessonNumber: number } | undefined;
+  let textbookFocus: { bookTitle: string; lessonTitle: string; lessonNumber: number; displayTitle: string | null } | undefined;
   try {
     const focusRes = await deps.repo.getTextbookFocus?.(userId, language);
     if (focusRes && isOk(focusRes) && focusRes.value) {
       const f = focusRes.value;
-      textbookFocus = { bookTitle: f.bookTitle, lessonTitle: f.lessonTitle, lessonNumber: f.lessonNumber };
+      textbookFocus = { bookTitle: f.bookTitle, lessonTitle: f.lessonTitle, lessonNumber: f.lessonNumber, displayTitle: f.displayTitle };
     }
   } catch {
     textbookFocus = undefined;

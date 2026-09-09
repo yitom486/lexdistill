@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 /**
  * P1-B1 ordering 契约回归（离线，不碰 DB）。
+ * P1-B 实施后：shred/relay 的 sort_order 语义以本契约为准，legacy lessonNumber 保持 maxNo+1 兼容。
  *
  * 真实依据（2026-09-10 只读验证，doc_mtt3n2rp0v4d5u）：
  * canonical AST 最终 lessons[] 相邻项 lessonNumber 会跳号（16→18→20），
@@ -11,7 +12,8 @@ import { describe, expect, it } from 'bun:test';
  *
  * 本文件把“提议的 shred 投影”写成纯函数契约（P1-B 实施时搬进 shred）：
  * - AST projection：sort_order(i) = i + 1
- * - relay projection：新课 sort_order = 现有 canonical 课数 + i + 1（不是 maxNo + i + 1）
+ * - relay projection：新课 sort_order = 追加后最终数组长度位置（= 现有 canonical 课数 + i + 1）；
+ *   legacy lessonNumber 保持 maxNo + i + 1 不变，两者不必相等（Gate 0 修正）。
  */
 
 /** 提议的 shred 投影：canonical AST 数组 → 每课 sort_order（P1-B 实施目标）。 */
@@ -52,14 +54,18 @@ describe('P1-B ordering 契约：sort_order 来自数组位置', () => {
     expect(GAP_FIXTURE[2]?.lessonNumber).toBe(18);
   });
 
-  it('relay 回归：新课 sort_order = 现有课数 + i + 1，而非 maxNo + i + 1', () => {
+  it('relay 回归：legacy lessonNumber 保持 maxNo + i + 1；sort_order 由最终数组位置定', () => {
     // 现有 7 课 canonical，最大 lessonNumber 是 23
     const maxNo = Math.max(...GAP_FIXTURE.map((l) => l.lessonNumber));
     expect(maxNo).toBe(23);
-    // legacy 做法会给出 24（把 23 当顺序，错）；正确做法给出 8
-    expect(maxNo + 0 + 1).toBe(24);
+    // legacy 兼容行为保持：新课 lessonNumber = maxNo + i + 1（=24），不得改成课数续排
+    // （legacy number 不是 canonical ordinal，改成长度续排可能重复/倒退）
+    const legacyNewNumber = maxNo + 0 + 1;
+    expect(legacyNewNumber).toBe(24);
+    // 追加后最终数组 8 项 → shred 按 index 写 sort_order，新课 sort_order = 8；两者不必相等
     expect(proposedRelaySortOrder(GAP_FIXTURE.length, 0)).toBe(8);
     expect(proposedRelaySortOrder(GAP_FIXTURE.length, 1)).toBe(9);
+    expect(legacyNewNumber).not.toBe(proposedRelaySortOrder(GAP_FIXTURE.length, 0));
   });
 
   it('ordering 与 display 完全独立：噪声 title 不影响顺序', () => {

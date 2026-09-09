@@ -836,6 +836,20 @@ const SCHEMA_MIGRATIONS: SchemaMigration[] = [
       ALTER TABLE textbook_grammar ADD COLUMN examples_json TEXT NOT NULL DEFAULT '[]';
     `,
   },
+  {
+    // v17：P1-B lesson ordering——canonical 顺序显式落库。
+    // - sort_order = 最终 canonical AST lessons[] 的 1-based 连续顺序（index+1），唯一 ordering truth；
+    // - lesson_number 冻结为 legacy compatibility（可 gap，不参与排序，不作展示课号）；
+    // - title 仍是 raw parser/OCR heading candidate，不作 canonical display；
+    // - 只加 nullable 列不写数据：回填走 lesson-ordering-apply（AST index+1 × lesson_id 匹配），
+    //   不在 migration 里猜（禁止 sort_order = lesson_number）。
+    // - 新库同样走本 ALTER（v14 CREATE 保持原样，沿 v16 examples_json 先例，避免重复加列）。
+    version: 17,
+    name: 'lesson-sort-order',
+    sql: `
+      ALTER TABLE textbook_lessons ADD COLUMN sort_order INTEGER;
+    `,
+  },
 ];
 
 export function runMigrations(sqlite: Database): { applied: number[] } {

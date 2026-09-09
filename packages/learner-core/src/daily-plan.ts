@@ -73,10 +73,12 @@ export interface DailyPlanSignals {
   unitSteps?: DailyPlanStepTemplate[] | undefined;
   /**
    * 教材焦点（投影仪装配，由网关 reading_positions 推导“学到哪课”）：
-   * 有焦点时 READING 步直接点名“精读《X》第 Y 课”，计划跟着教材走；
-   * 无焦点保持通用精读（零教材用户不受影响）。
+   * - displayTitle 由网关保守归一（P1-B lesson-display-title），learner-core 只消费不懂规则；
+   * - 有 displayTitle：READING 步点名“精读《X》${displayTitle}”；
+   * - 无（null）：用通用跟读文本，绝不把 lessonNumber 当教材编号，也不展示 ambiguous raw title；
+   * - lessonTitle（raw）/lessonNumber（legacy）仅留诊断，不进用户可见文本。
    */
-  textbookFocus?: { bookTitle: string; lessonTitle: string; lessonNumber: number } | undefined;
+  textbookFocus?: { bookTitle: string; lessonTitle: string; lessonNumber: number; displayTitle: string | null } | undefined;
   /**
    * 字母门：五十音/谚文是否已过关（累计字母尝试≥15；en 恒 true）。
    * 未过关时只排字母跟读（+到期卡/错题），不推精读与自适应难题——
@@ -187,12 +189,16 @@ export function buildDailyPlanStepTemplates(signals: DailyPlanSignals): DailyPla
 
   if (!alphabetGate && !novice) {
     const focus = signals.textbookFocus;
+    // P1-B：displayTitle 为 null 时不得用 lessonNumber 凑“第 N 课”，也不展示 ambiguous raw title。
+    const display = focus?.displayTitle ?? null;
     steps.push({
       id: 'step_reading',
       kind: 'READING',
-      title: focus ? `精读《${focus.bookTitle}》第${focus.lessonNumber}课` : '精读一篇',
+      title: focus ? (display ? `精读《${focus.bookTitle}》${display}` : `继续精读《${focus.bookTitle}》`) : '精读一篇',
       summary: focus
-        ? `继续读${focus.lessonTitle}：划词即转生词本；切到下一课后计划自动跟过去。`
+        ? display
+          ? `继续读${display}：划词即转生词本；切到下一课后计划自动跟过去。`
+          : `按阅读位置继续精读《${focus.bookTitle}》；划词可直接转入 FSRS 生词本。`
         : '完成一篇阅读理解；划词可直接转入 FSRS 生词本。',
       // 有焦点进教材页（按阅读位置自动恢复到该课）；无焦点去通用阅读。
       navigateTo: focus ? 'TEXTBOOK' : 'READING',
