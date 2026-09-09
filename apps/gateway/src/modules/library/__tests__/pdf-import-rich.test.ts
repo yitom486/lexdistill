@@ -13,10 +13,8 @@ import {
 } from '../application/pdf-import/pdf-import-service.js';
 
 /**
- * pdf-import rich 集成测试（tag：pdf-import；本次修复期只跑 `bun test pdf-import`）。
- * 注意：`bun test <filter>` 会绕过 bunfig 的 pathIgnorePatterns 扫到 stale dist，
- * 必须带 `--path-ignore-patterns "**/dist/**"`（或先删 apps/gateway/dist）。
- * 完整命令（apps/gateway 下）：bun test pdf-import --path-ignore-patterns "**/dist/**"
+ * pdf-import rich 集成测试（tag：pdf-import）。
+ * 本次修复期 tag 命令见 fixtures/gen/README.md（含 dist 绕行说明）。
  *
  * fixtures（__tests__/fixtures/，git 追踪）：
  * - rich-textbook-toc-review.pdf（5 页真文本）：TOC（普通点线/J1 断行/J2 前置同行/復習/付録）

@@ -3,6 +3,8 @@
 *.png binary
 *.jpg binary
 *.jpeg binary
+*.ttf binary
+*.otf binary
 *.apkg binary
 *.onnx binary
 *.db binary

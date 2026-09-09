@@ -25,6 +25,8 @@
     "sidecar:build": "bun scripts/build-sidecar.ts"
   },
   "devDependencies": {
-    "@types/jsdom": "^30.0.0"
+    "@types/jsdom": "^30.0.0",
+    "fontkit": "1.9.0",
+    "pdf-lib": "1.17.1"
   }
 }
