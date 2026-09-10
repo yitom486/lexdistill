@@ -154,6 +154,51 @@ function probePdfPageCount(inspector: PdfInspectorLike, bytes: Uint8Array): numb
   }
 }
 
+interface WindowClassification {
+  pdfType?: string;
+  pageCount?: number;
+  markdown?: string | null;
+  pagesNeedingOcr?: number[];
+  confidence?: number;
+}
+
+/**
+ * CMD-P0.1 分块窗口分类：pages 按 chunkSize 切块逐窗调用并合并。
+ * pageCount 取首个有效值（window 调用仍返回全书页数）；needing 取并集
+ *（调用方再与选页求交即得精确值，不受原生窗内外口径影响）；markdown 拼接
+ *（选页路径不用它，仅保形）。禁止无参全书调用。
+ */
+function classifySelectedWindow(
+  inspector: PdfInspectorLike,
+  bytes: Uint8Array,
+  pages: number[],
+  chunkSize: number
+): WindowClassification {
+  const size = Math.max(1, Math.floor(chunkSize));
+  let head: WindowClassification | null = null;
+  const needing = new Set<number>();
+  const markdownParts: string[] = [];
+  for (let i = 0; i < pages.length; i += size) {
+    const part = inspector.processPdf(bytes, pages.slice(i, i + size));
+    if (!head) {
+      head = {};
+      if (part.pdfType !== undefined) head.pdfType = part.pdfType;
+      if (part.pageCount !== undefined) head.pageCount = part.pageCount;
+      if (part.confidence !== undefined) head.confidence = part.confidence;
+    }
+    if (typeof part.markdown === 'string' && part.markdown) markdownParts.push(part.markdown);
+    const list = Array.isArray(part.pagesNeedingOcr) ? part.pagesNeedingOcr : [];
+    for (const n of list) {
+      if (typeof n === 'number') needing.add(n);
+    }
+  }
+  return {
+    ...(head ?? {}),
+    markdown: markdownParts.length > 0 ? markdownParts.join('\n') : null,
+    pagesNeedingOcr: [...needing].sort((a, b) => a - b),
+  };
+}
+
 export interface PdfMapOutput {
   classification: PdfImportClassification;
   window: number[];
@@ -193,6 +238,21 @@ export async function mapPdfPages(
     pagesNeedingOcr?: number[];
     confidence?: number;
   };
+  // CMD-P0.1：探页数前置定窗——选页先按诚实总数清洗出处理窗，分类只扫该窗；
+  // 未选页沿用 CMD-10 开窗。任何路径禁止单参 processPdf(bytes)。
+  const window: number[] = [];
+  if (input.pages !== undefined) {
+    const total = probePdfPageCount(inspector, input.bytes);
+    if (total > 0) {
+      const cleaned = [...new Set(input.pages)].filter(
+        (n) => Number.isInteger(n) && n >= 1 && n <= total
+      );
+      if (cleaned.length > 0) {
+        cleaned.sort((a, b) => a - b);
+        window.push(...cleaned.slice(0, MAX_MAP_PAGES));
+      }
+    }
+  }
   try {
     // CMD-10：未选页不用无窗口 processPdf 扫全书——先 [1] 拿全书页数，再开窗分类
     //（window 调用仍返回全书 pageCount，探针实测；超界窗不抛）。
@@ -200,8 +260,12 @@ export async function mapPdfPages(
       const total = probePdfPageCount(inspector, input.bytes);
       const end = total > 0 ? Math.min(total, MAX_MAP_PAGES) : MAX_MAP_PAGES;
       classification = inspector.processPdf(input.bytes, rangePages(1, end));
+    } else if (window.length > 0) {
+      classification = inspector.processPdf(input.bytes, window);
     } else {
-      classification = inspector.processPdf(input.bytes);
+      // 探页失败或选页越界：一次小窗分类拿诚实页数（错误语义与此前一致），不扫全书。
+      const raw = [...new Set(input.pages ?? [])].filter((n) => Number.isInteger(n) && n >= 1);
+      classification = inspector.processPdf(input.bytes, raw.length > 0 ? raw.slice(0, MAX_MAP_PAGES) : [1]);
     }
   } catch (e) {
     logger.warn('[pdf-map] processPdf failed', { message: errorMessage(e) });
@@ -212,8 +276,8 @@ export async function mapPdfPages(
   if (!Number.isFinite(pageCount) || pageCount < 1) {
     return err(new BusinessError('E_PDF_PARSE', 'PDF 页数识别失败，文件可能已损坏', 'TOOL_EXECUTION'));
   }
-  const window: number[] = [];
-  if (input.pages !== undefined) {
+  // 窗已在分类前预填（选页）；此处只处理探页失败/越界回退与未选页默认窗。
+  if (input.pages !== undefined && window.length === 0) {
     const cleaned = [...new Set(input.pages)].filter(
       (n) => Number.isInteger(n) && n >= 1 && n <= pageCount
     );
@@ -222,7 +286,7 @@ export async function mapPdfPages(
     }
     cleaned.sort((a, b) => a - b);
     window.push(...cleaned.slice(0, MAX_MAP_PAGES));
-  } else {
+  } else if (input.pages === undefined) {
     for (let p = 1; p <= Math.min(pageCount, MAX_MAP_PAGES); p++) window.push(p);
   }
   const needing = Array.isArray(classification.pagesNeedingOcr)
@@ -434,7 +498,19 @@ export async function convertPdfToAst(
         classification = inspector.processPdf(input.bytes, rangePages(1, end));
       }
     } else {
-      classification = inspector.processPdf(input.bytes);
+      // CMD-P0.1：已选页用用户页窗分类（分块 ≤30 并合并），禁止无参全书调用。
+      // 先 [1] 拿诚实页数做清洗上界；needing 并集再与选页求交即精确值。
+      const total = probePdfPageCount(inspector, input.bytes);
+      const raw = [...new Set(input.pages)].filter((n) => Number.isInteger(n) && n >= 1);
+      const cleanedHint = total > 0 ? raw.filter((n) => n <= total) : raw.slice(0, MAX_OCR_PAGES_PER_IMPORT);
+      if (cleanedHint.length === 0 && total > 0) {
+        // 选页越界：占位分类，下方校验块报与此前一致的错误，不扫全书。
+        classification = { pdfType: 'Unknown', pageCount: total, markdown: '', pagesNeedingOcr: [] };
+      } else if (cleanedHint.length === 0) {
+        classification = inspector.processPdf(input.bytes, [1]);
+      } else {
+        classification = classifySelectedWindow(inspector, input.bytes, cleanedHint, MAX_OCR_PAGES_PER_IMPORT);
+      }
     }
   } catch (e) {
     logger.warn('[pdf-import] processPdf failed', { message: errorMessage(e) });
