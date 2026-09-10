@@ -20,6 +20,7 @@
 ```sh
 bun src/modules/library/__tests__/fixtures/gen/gen-rich-textbook.ts
 bun src/modules/library/__tests__/fixtures/gen/gen-scanned-shapes.ts
+bun src/modules/library/__tests__/fixtures/gen/gen-scanned-lesson-dialect.ts
 ```
 
 ## fixtures 一览
@@ -29,6 +30,7 @@ bun src/modules/library/__tests__/fixtures/gen/gen-scanned-shapes.ts
 | `smoke-native-2lessons.pdf` | 2 | 外部输入（output/ 拷贝）：无文本层（转曲）→ thin-page OCR 回填 |
 | `rich-textbook-toc-review.pdf` | 5 | 本脚本生成：TOC（点线/J1/J2前置/復習/付録）+ 第1課（含前言）+ 第2課 + 復習A + 付録 |
 | `scanned-shapes-no-text.pdf` | 1 | 本脚本生成：纯形状无字页 → OCR 路由 + 零产出友好失败 |
+| `scanned-lesson-dialect.pdf` | 3 | 本脚本生成：无文字层扫描课结构（第1課/会話/自撰对话/練習A噪声/第2課/復習A42，全页位图 + fontkit 光栅化）→ 本地 OCR 切课 |
 
 改了生成器必须重跑 + 跑 tag 验证（apps/gateway 下）：
 
