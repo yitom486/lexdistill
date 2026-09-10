@@ -293,6 +293,26 @@ export function runDoctor(db: Database): DoctorReport {
         }
       }
       push('import:empty-lessons', empty > 0 ? 'WARN' : 'PASS', empty, empty > 0 ? `${empty} 个教材形文档有 AST 但 0 课（种子未 shred？）` : '教材文档皆有课');
+      // 课数漂移：canonical AST lessons 数 vs derived 行数不一致（append/enrich 的
+      // “AST 已更新、shred 失败仅 WARN”即此形状；原子写普及后应恒为 0，留作护栏）。
+      if (has('textbook_lessons')) {
+        const shaped = db
+          .query(`SELECT d.id AS id, d.ast_json AS ast FROM documents d WHERE d.ast_json IS NOT NULL`)
+          .all() as Array<{ id: string; ast: string }>;
+        let drift = 0;
+        for (const c of shaped) {
+          try {
+            const o: unknown = JSON.parse(c.ast);
+            if (!o || typeof o !== 'object' || !Array.isArray((o as Record<string, unknown>).lessons)) continue;
+            const astN = ((o as Record<string, unknown>).lessons as unknown[]).length;
+            const row = db.query('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?').get(c.id) as { n: number };
+            if (row.n !== astN) drift++;
+          } catch {
+            // 坏 JSON 不归本规则
+          }
+        }
+        push('import:lesson-count-drift', drift > 0 ? 'WARN' : 'PASS', drift, drift > 0 ? `${drift} 个文档 AST 课数与 derived 行数不一致（双源漂移，需回填）` : '课数一致');
+      }
     }
     const stuck = count(`SELECT COUNT(*) AS n FROM document_imports WHERE status = 'processing'`);
     push('import:processing', stuck > 0 ? 'WARN' : 'PASS', stuck, stuck > 0 ? `${stuck} 个 processing（在跑或卡死，请结合网关日志看）` : '无卡住任务');

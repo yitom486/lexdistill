@@ -206,8 +206,7 @@ describe('db doctor', () => {
     expect(report.errors.length).toBeGreaterThan(0);
   });
 
-  it('sort_order 连续 dense 全 PASS（lessonNumber 有 gap 也合法）', () => {
-    const db = mem();
+  it('sort_order 连续 dense 全 PASS（lessonNumber 有 gap 也合法）', () => {    const db = mem();
     db.exec(
       `CREATE TABLE textbook_lessons (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, lesson_number INTEGER NOT NULL, title TEXT NOT NULL, sort_order INTEGER, PRIMARY KEY (document_id, lesson_id))`
     );
@@ -224,5 +223,28 @@ describe('db doctor', () => {
     ]) {
       expect(levelOf(report, rule)).toBe('PASS');
     }
+  });
+
+  it('AST 课数 vs derived 行数漂移置 WARN（append 双源漂移护栏）', () => {
+    const db = mem();
+    db.exec(`CREATE TABLE documents (id TEXT PRIMARY KEY, ast_json TEXT)`);
+    db.exec(`CREATE TABLE document_imports (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, source_kind TEXT NOT NULL, filename TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'processing', document_id TEXT, lessons INTEGER, error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+    db.exec(
+      `CREATE TABLE textbook_lessons (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, lesson_number INTEGER NOT NULL, title TEXT NOT NULL, sort_order INTEGER, PRIMARY KEY (document_id, lesson_id))`
+    );
+    const ast2 = JSON.stringify({
+      id: 'b', language: 'JA', title: 'B', shortTitle: 'B',
+      lessons: [
+        { id: 'l1', lessonNumber: 1, title: 't1', vocabularies: [], grammarPoints: [], dialogues: [], exercises: [] },
+        { id: 'l2', lessonNumber: 2, title: 't2', vocabularies: [], grammarPoints: [], dialogues: [], exercises: [] },
+      ],
+    });
+    // d-ok：2 课对 2 行；d-drift：AST 2 课但 derived 只有 1 行（append 未 shred 形状）
+    db.query(`INSERT INTO documents (id, ast_json) VALUES ('d-ok', ?), ('d-drift', ?)`).run(ast2, ast2);
+    db.exec(`INSERT INTO textbook_lessons VALUES ('d-ok','l1',1,'t1',1),('d-ok','l2',2,'t2',2),('d-drift','l1',1,'t1',1)`);
+    const report = runDoctor(db);
+    expect(levelOf(report, 'import:lesson-count-drift')).toBe('WARN');
+    const f = report.findings.find((x) => x.rule === 'import:lesson-count-drift');
+    expect(f?.count).toBe(1);
   });
 });

@@ -201,6 +201,7 @@ import {
 } from '../modules/learning-progress/persistence/mistakes.js';
 import {
   saveDocument as saveDocumentDomain,
+  saveDocumentWithShred as saveDocumentWithShredDomain,
   listDocuments as listDocumentsDomain,
   getDocumentById as getDocumentByIdDomain,
   deleteDocument as deleteDocumentDomain,
@@ -1004,6 +1005,17 @@ export class DrizzleLearnerRepository implements LearnerRepository {
    */
   public async saveDocument(doc: DocumentItem): Promise<Result<DocumentItem, BusinessError>> {
     return saveDocumentDomain(this.deps, doc);
+  }
+
+  /**
+   * 原子保存（documents 写回 + shred 同一事务；任一步失败整体回滚）。
+   * append 路由走这里，杜绝“AST 已更新、shred 失败仅 WARN”双源漂移。
+   */
+  public async saveDocumentWithShred(
+    doc: DocumentItem,
+    book: TextbookAST
+  ): Promise<Result<DocumentItem, BusinessError>> {
+    return saveDocumentWithShredDomain(this.deps, doc, book);
   }
 
   /**

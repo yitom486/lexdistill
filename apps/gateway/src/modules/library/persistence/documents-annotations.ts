@@ -10,7 +10,7 @@ import {
   nowIso,
   logger,
 } from '@study-studio/shared';
-import type { DocumentItem, AnnotationItem, Flashcard } from '@study-studio/protocol';
+import type { DocumentItem, AnnotationItem, Flashcard, TextbookAST } from '@study-studio/protocol';
 import {
   AnnotationKindSchema,
   type AnnotationKind,
@@ -19,6 +19,7 @@ import {
 } from '@study-studio/protocol';
 import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, textbookTermMap, documentStructures, readingPositions } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+import { shredIntoTransaction } from './textbook-shred.js';
 import { recordTermExposure } from '../../dictionary/persistence/encountered-terms.js';
 
 /**
@@ -94,6 +95,72 @@ export async function saveDocument(
       translateToBusinessError(error, {
         category: 'DATABASE',
         action: 'saveDocument',
+        entityId: doc.id,
+      })
+    );
+  }
+}
+
+/**
+ * 原子保存：documents 行写回 + shred 全删全插在同一事务内。
+ * 任一步失败整体回滚并返回 err——调用方绝不允许“AST 已更新、shred 失败仅 WARN”的
+ * 双源漂移（append 路由走这里；document-import/enrich 的 warn-only 后拆是已知遗留，另行收敛）。
+ * book 必须是已过 parseTextbookAST 的 canonical AST（与传入 astJson 同源；不一致即拒写）。
+ */
+export async function saveDocumentWithShred(
+  deps: RepoDeps,
+  doc: DocumentItem,
+  book: TextbookAST
+): Promise<Result<DocumentItem, BusinessError>> {
+  try {
+    deps.db.transaction((tx) => {
+      const existing = tx.select().from(documents).where(eq(documents.id, doc.id)).limit(1).all();
+      if (existing.length > 0) {
+        tx.update(documents)
+          .set({
+            title: doc.title,
+            sourceKind: doc.sourceKind,
+            language: doc.language,
+            content: doc.content,
+            astJson: doc.astJson ?? null,
+            topic: doc.topic ?? null,
+            difficulty: doc.difficulty ?? null,
+            sourceUrl: doc.sourceUrl ?? null,
+            sourcePublisher: doc.sourcePublisher ?? null,
+            examTag: doc.examTag ?? null,
+            updatedAt: doc.updatedAt || nowIso(),
+          })
+          .where(eq(documents.id, doc.id))
+          .run();
+      } else {
+        tx.insert(documents)
+          .values({
+            id: doc.id,
+            userId: doc.userId,
+            title: doc.title,
+            sourceKind: doc.sourceKind,
+            language: doc.language,
+            content: doc.content,
+            astJson: doc.astJson ?? null,
+            topic: doc.topic ?? null,
+            difficulty: doc.difficulty ?? null,
+            sourceUrl: doc.sourceUrl ?? null,
+            sourcePublisher: doc.sourcePublisher ?? null,
+            examTag: doc.examTag ?? null,
+            createdAt: doc.createdAt || nowIso(),
+            updatedAt: doc.updatedAt || nowIso(),
+          })
+          .run();
+      }
+      shredIntoTransaction(tx, doc.id, book);
+    });
+    return ok(doc);
+  } catch (error) {
+    if (error instanceof BusinessError) return err(error);
+    return err(
+      translateToBusinessError(error, {
+        category: 'DATABASE',
+        action: 'saveDocumentWithShred',
         entityId: doc.id,
       })
     );

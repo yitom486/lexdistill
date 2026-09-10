@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, afterEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import type { DocumentItem } from '@study-studio/protocol';
 import { markdownToAst } from '../application/pdf-import/markdown-to-ast.js';
 import { appendPdfToDocument } from '../application/pdf-import/pdf-import-service.js';
+import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 
 /**
  * P1-A0 lesson id 生命周期回归（真实代码路径，非合成复刻）。
@@ -25,23 +26,58 @@ function stubMarkdownInspector(markdown: string) {
 }
 const PDF_HEAD = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
 
+const repos: DrizzleLearnerRepository[] = [];
+afterEach(() => {
+  for (const r of repos.splice(0)) r.getRawDb().close();
+});
+
+function testDoc(astJson: string): DocumentItem {
+  return {
+    id: 'doc1',
+    userId: 'u1',
+    title: 'Base',
+    sourceKind: 'user_import' as const,
+    language: 'ja',
+    content: 'Base',
+    astJson,
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+  };
+}
+
 describe('P1-A0 lesson id 生命周期（真实路径）', () => {
   it('reparse 同一内容：id  authority = 时间戳 bookId + 位置（无复用点）', () => {
     const a = markdownToAst(MD_V1, {});
     const b = markdownToAst(MD_V1, {});
     expect(isOk(a) && isOk(b)).toBe(true);
     if (!isOk(a) || !isOk(b)) return;
-    // id 形状即证据：bookId 来自 Date.now() ms 精度（markdown-to-ast:255），
-    // 快速连调甚至可能碰撞——同一内容两次 parse 没有任何复用旧 id 的逻辑
+    // id 形状即证据：bookId = 时间戳 + 进程计数器 + 随机（markdown-to-ast:newProvisionalBookId），
+    // 同内容连续 parse 不再可能碰撞；旧 `pdf-<纯时间戳>` 形状仍被前缀兼容
     for (const book of [a.value, b.value]) {
-      expect(book.id).toMatch(/^pdf-[a-z0-9]+$/);
+      expect(book.id).toMatch(/^pdf-[a-z0-9-]+$/);
       expect(book.lessons.map((l) => l.id)).toEqual([
         `${book.id}-l1`,
         `${book.id}-l2`,
       ]);
     }
+    expect(a.value.id).not.toBe(b.value.id);
+    expect(a.value.lessons.map((l) => l.id)).not.toEqual(b.value.lessons.map((l) => l.id));
     // 语义位置一致：title/number 序列相同（变的是身份，不是内容）
     expect(a.value.lessons.map((l) => l.title)).toEqual(b.value.lessons.map((l) => l.title));
+  });
+
+  it('provisional id 永不碰撞：200 次连调 bookId/lessonId 全唯一（计数器保证）', () => {
+    const bookIds = new Set<string>();
+    const lessonIds = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const r = markdownToAst(MD_V1, {});
+      expect(isOk(r)).toBe(true);
+      if (!isOk(r)) return;
+      bookIds.add(r.value.id);
+      for (const l of r.value.lessons) lessonIds.add(l.id);
+    }
+    expect(bookIds.size).toBe(200);
+    expect(lessonIds.size).toBe(400);
   });
 
   it('同 bookId + 同分组 → id 确定性重现（positional 纯函数）', () => {
@@ -113,5 +149,86 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
     // 新课 id 来自新 parse（时间戳前缀），与旧 id 不撞
     expect(merged.lessons[2]?.id).not.toBe('doc-l3');
     expect(merged.lessons[2]?.id).toMatch(/^pdf-/);
+  });
+
+  it('原子 append：AST 与 shred 同成功，derived sort_order 连续', async () => {
+    const base = markdownToAst(MD_V1, { bookId: 'doc' });
+    expect(isOk(base)).toBe(true);
+    if (!isOk(base)) return;
+    const repo = new DrizzleLearnerRepository(':memory:');
+    repos.push(repo);
+    const baseDoc = testDoc(JSON.stringify(base.value));
+    expect(isOk(await repo.saveDocument(baseDoc))).toBe(true);
+    expect(isOk(await repo.shredDocument('doc1', base.value))).toBe(true);
+    const res = await appendPdfToDocument(
+      {
+        saveDocument: (doc) => repo.saveDocument(doc),
+        saveDocumentWithShred: (doc, book) => repo.saveDocumentWithShred(doc, book),
+        getDocument: (id) => repo.getDocumentById(id),
+        loadInspector: stubMarkdownInspector(MD_V2_DELETE),
+      },
+      { userId: 'u1', filename: 'part2.pdf', bytes: PDF_HEAD, documentId: 'doc1' }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.totalLessons).toBe(3);
+    const rows = repo.getRawDb().query(
+      'SELECT sort_order AS s FROM textbook_lessons WHERE document_id = ? ORDER BY sort_order'
+    ).all('doc1') as Array<{ s: number }>;
+    expect(rows.map((r) => r.s)).toEqual([1, 2, 3]);
+  });
+
+  it('原子回滚：shred 失败则 AST 也不更新（无双源漂移）', async () => {
+    const base = markdownToAst(MD_V1, { bookId: 'doc' });
+    expect(isOk(base)).toBe(true);
+    if (!isOk(base)) return;
+    const repo = new DrizzleLearnerRepository(':memory:');
+    repos.push(repo);
+    const before = testDoc(JSON.stringify(base.value));
+    expect(isOk(await repo.saveDocument(before))).toBe(true);
+    expect(isOk(await repo.shredDocument('doc1', base.value))).toBe(true);
+    // 破坏 shred 必经表，模拟 shred 失败
+    repo.getRawDb().run('DROP TABLE textbook_lines');
+    const next = markdownToAst(MD_V2_INSERT, { bookId: 'doc' });
+    expect(isOk(next)).toBe(true);
+    if (!isOk(next)) return;
+    const res = await repo.saveDocumentWithShred(
+      { ...before, astJson: JSON.stringify(next.value) },
+      next.value
+    );
+    expect(isOk(res)).toBe(false);
+    // AST 原样 + derived 原样：没有任何部分写入
+    const got = await repo.getDocumentById('doc1');
+    expect(isOk(got)).toBe(true);
+    if (!isOk(got) || !got.value?.astJson) return;
+    expect(JSON.parse(got.value?.astJson as string)).toMatchObject({ id: 'doc' });
+    expect((JSON.parse(got.value?.astJson as string) as { lessons: unknown[] }).lessons).toHaveLength(2);
+    const n = repo.getRawDb().query('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?').get('doc1') as { n: number };
+    expect(n.n).toBe(2);
+  });
+
+  it('大声失败：原子保存 err 则 append 直接 err，不吞成 WARN', async () => {
+    const base = markdownToAst(MD_V1, { bookId: 'doc' });
+    expect(isOk(base)).toBe(true);
+    if (!isOk(base)) return;
+    const baseDoc = testDoc(JSON.stringify(base.value));
+    const { err, BusinessError } = await import('@study-studio/shared');
+    const res = await appendPdfToDocument(
+      {
+        saveDocument: async (doc) => {
+          const { ok } = await import('@study-studio/shared');
+          return ok(doc);
+        },
+        saveDocumentWithShred: async () =>
+          err(new BusinessError('E_INTERNAL', 'shred 失败（测试注入）', 'DATABASE', true)),
+        getDocument: async () => {
+          const { ok } = await import('@study-studio/shared');
+          return ok({ ...baseDoc });
+        },
+        loadInspector: stubMarkdownInspector(MD_V2_DELETE),
+      },
+      { userId: 'u1', filename: 'part2.pdf', bytes: PDF_HEAD, documentId: 'doc1' }
+    );
+    expect(isOk(res)).toBe(false);
   });
 });

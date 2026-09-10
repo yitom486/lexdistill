@@ -14,6 +14,19 @@ const MAX_LESSONS = 64;
 const MAX_DIALOGUES_PER_LESSON = 300;
 const MAX_MARKDOWN_CHARS = 2000000;
 
+/**
+ * provisional bookId（P1-A0 取证：`pdf-<ms时间戳>` 在快速连调下可碰撞，
+ * 曾导致同内容两次 parse 产出完全相同的 lesson id 集合）。
+ * 构成：时间戳（跨进程分散）+ 进程内单调计数器（同进程必唯一）+ 4 位随机（跨进程同 ms 兜底）。
+ * 显式 bookId（测试/种子）不受影响；`pdf-` 前缀保留，旧前缀断言兼容。
+ */
+let provisionalCounter = 0;
+export function newProvisionalBookId(): string {
+  provisionalCounter += 1;
+  const rand = Math.floor(Math.random() * 36 * 36 * 36 * 36).toString(36).padStart(4, '0');
+  return `pdf-${Date.now().toString(36)}-${provisionalCounter.toString(36)}${rand}`;
+}
+
 const KANA_CLASS = '[぀-ヿｦ-ﾟ]';
 const HANGUL_CLASS = '[가-힣ㄱ-ㅎㅏ-ㅣ]';
 const HAN_CLASS = '[一-鿿]';
@@ -252,7 +265,7 @@ export function markdownToAst(
     current.lines.push(l);
   }
 
-  const bookId = options.bookId ?? `pdf-${Date.now().toString(36)}`;
+  const bookId = options.bookId ?? newProvisionalBookId();
   const bookTitle = options.title ?? sections.find((s) => s.title)?.title ?? 'PDF 导入教材';
 
   // 按课归组（扫描版方言）：同一课的本文/练习/题目页标题各异

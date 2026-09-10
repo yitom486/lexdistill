@@ -106,6 +106,11 @@ export interface PdfAstOutput {
 
 export interface PdfImportServiceDeps {
   saveDocument: (doc: DocumentItem) => Promise<Result<DocumentItem, BusinessError>>;
+  /**
+   * 原子保存（documents 写回 + shred 同一事务；append 优先用它）。
+   * 缺省时 append 退化为 saveDocument（调用方必须自行保证 shred，否则双源漂移）。
+   */
+  saveDocumentWithShred?: (doc: DocumentItem, book: TextbookAST) => Promise<Result<DocumentItem, BusinessError>>;
   /** 测试注入：跳过真实下载/原生绑定 */
   loadInspector?: () => Promise<PdfInspectorLike>;
   runtimeDir?: string;
@@ -598,7 +603,12 @@ export async function appendPdfToDocument(
   const rechecked = parseTextbookAST(merged);
   if (!rechecked.ok) return err(rechecked.error);
 
-  const saved = await deps.saveDocument({
+  // 原子写回：AST + shred 同一事务（调用方提供 saveDocumentWithShred 时）。
+  // 无该依赖时退化为旧 saveDocument（单测兼容；生产路由必须接原子写，否则仍是双源漂移）。
+  const saver = deps.saveDocumentWithShred
+    ? (doc: DocumentItem) => deps.saveDocumentWithShred!(doc, rechecked.value)
+    : deps.saveDocument;
+  const saved = await saver({
     ...doc,
     astJson: JSON.stringify(rechecked.value),
     updatedAt: new Date().toISOString(),
