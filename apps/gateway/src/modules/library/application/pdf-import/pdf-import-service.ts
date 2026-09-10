@@ -1,6 +1,6 @@
 import { BusinessError, err, generateId, isOk, logger, ok, type Result } from '@study-studio/shared';
 import { parseTextbookAST, StructureClassSchema, type DocumentItem, type TextbookAST, type StructureClass } from '@study-studio/protocol';
-import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
+import { ensurePdfRuntime, type EmbeddedOutlineResult, type PdfInspectorLike } from './pdf-runtime.js';
 import { detectDocScript, markdownToAst, promoteLessonHeadings } from './markdown-to-ast.js';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from './extract-headings.js';
 import { collectLayoutCandidates, layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from './layout-headings.js';
@@ -204,6 +204,60 @@ export interface PdfMapOutput {
   window: number[];
   headings: PageHeading[];
   tocEntries: TocEntry[];
+  /** CMD-LINGUA-P1A：目录来源（embedded = 原生目录命中且可用，none = 走既有窗口/OCR 路径）。 */
+  outlineSource: 'embedded' | 'none';
+  /**
+   * 校验后的原生目录条目（仅可用项：title 非空、level ≥1 整数、
+   * physicalPage 为落在真实页数内的 1-based 页；不可解析/越界项丢弃不猜）。
+   * none 时为空数组；绝不混入 TocEntry.printedPage 语义。
+   */
+  embeddedOutline: EmbeddedOutlineEntry[];
+}
+
+/** 校验后的单条原生目录（physicalPage 必存在且合法）。 */
+export interface EmbeddedOutlineEntry {
+  title: string;
+  level: number;
+  physicalPage: number;
+}
+
+/**
+ * CMD-LINGUA-P1A 内置目录读取 + 校验（纯判定逻辑；绝不猜页）。
+ * 返回可用条目；以下情况返回 null（调用方走既有 none 路径，不伪造目录）：
+ * 老运行时无该导出、调用抛错、truncated、空目录、全是不可用项。
+ */
+function readEmbeddedOutlineEntries(
+  inspector: PdfInspectorLike,
+  bytes: Uint8Array,
+  pageCount: number
+): EmbeddedOutlineEntry[] | null {
+  if (typeof inspector.extractEmbeddedOutline !== 'function') return null;
+  let result: EmbeddedOutlineResult;
+  try {
+    result = inspector.extractEmbeddedOutline(bytes);
+  } catch {
+    return null;
+  }
+  if (!result || typeof result !== 'object') return null;
+  if (result.truncated === true) return null;
+  if (!Array.isArray(result.items) || result.items.length === 0) return null;
+  const kept: EmbeddedOutlineEntry[] = [];
+  for (const entry of result.items) {
+    if (!entry || typeof entry !== 'object') continue;
+    const rec = entry as { title?: unknown; level?: unknown; physicalPage?: unknown };
+    if (typeof rec.title !== 'string' || !rec.title.trim()) continue;
+    if (typeof rec.level !== 'number' || !Number.isInteger(rec.level) || rec.level < 1) continue;
+    if (
+      typeof rec.physicalPage !== 'number' ||
+      !Number.isInteger(rec.physicalPage) ||
+      rec.physicalPage < 1 ||
+      rec.physicalPage > pageCount
+    ) {
+      continue;
+    }
+    kept.push({ title: rec.title.trim(), level: rec.level, physicalPage: rec.physicalPage });
+  }
+  return kept.length > 0 ? kept : null;
 }
 
 /**
@@ -298,6 +352,28 @@ export async function mapPdfPages(
   const needing = Array.isArray(classification.pagesNeedingOcr)
     ? classification.pagesNeedingOcr.filter((n): n is number => typeof n === 'number')
     : [];
+  // CMD-LINGUA-P1A：内置目录优先——native 有可用且未截断的 embedded entries 时，
+  // 目录来源标 embedded，不触发 OCR（不扫目录页、不调 Azure、不混 tocEntries）。
+  // 校验用上面的诚实 pageCount；目录不可用时落到既有 none 路径。
+  const embedded = readEmbeddedOutlineEntries(inspector, input.bytes, pageCount);
+  if (embedded) {
+    // 只记条数，不记 title 原文。
+    logger.warn('[pdf-map] embedded outline 命中', { pageCount, entries: embedded.length });
+    return ok({
+      classification: {
+        pdfType,
+        pageCount,
+        pagesNeedingOcr: needing,
+        ocrUsed: false,
+        selectedPages: [...window],
+      },
+      window: [],
+      headings: [],
+      tocEntries: [],
+      outlineSource: 'embedded',
+      embeddedOutline: embedded,
+    });
+  }
   try {
     const runtime = await ensurePdfRuntime({
       ...(deps.loadInspector ? { loadInspector: deps.loadInspector } : {}),
@@ -393,6 +469,8 @@ export async function mapPdfPages(
       window,
       headings,
       tocEntries,
+      outlineSource: 'none',
+      embeddedOutline: [],
     });
   } catch (e) {
     logger.warn('[pdf-map] map window failed', { message: errorMessage(e) });

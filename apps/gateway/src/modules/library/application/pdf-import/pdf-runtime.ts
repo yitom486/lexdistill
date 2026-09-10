@@ -32,6 +32,37 @@ export interface PdfInspectorLike {
   extractTextWithPositions?: (pdf: Uint8Array, pages?: number[]) => LayoutTextItemLike[];
   /** 可选：标签化 PDF 结构角色（`extractStructureElements`，H1..H6/P 等）。 */
   extractStructureElements?: (pdf: Uint8Array, pages?: number[]) => LayoutStructRoleLike[];
+  /**
+   * 可选：内置目录（fork 1.18.1+ `extractEmbeddedOutline`；老版本缺席即降级为 none）。
+   * 只接受安全返回（见 EmbeddedOutlineResult）；调用方另行校验页码范围。
+   */
+  extractEmbeddedOutline?: (pdf: Uint8Array) => EmbeddedOutlineResult;
+}
+
+/**
+ * 内置目录（bookmark）安全返回（fork `extractEmbeddedOutline` 原样透传形状）。
+ * 只含稳定纯数据：无对象引用、无 action 字典、无 URI、无正文。
+ */
+export interface EmbeddedOutlineItem {
+  /** 解码后的标题（非空；原生兜底 "(untitled)"）。 */
+  title: string;
+  /** 1-based 嵌套深度：顶层为 1。 */
+  level: number;
+  /**
+   * 1-based 物理页；缺席或 null 表示目标缺失/外部/不可解析——调用方不得猜页。
+   */
+  physicalPage?: number | null;
+}
+
+export interface EmbeddedOutlineResult {
+  /** 文档序条目（先序深度优先）。 */
+  items: EmbeddedOutlineItem[];
+  /** physicalPage 缺席的条目数（不含截断）。 */
+  unresolvedCount: number;
+  /**
+   * true 表示因节点/深度预算跳过了子树或兄弟——不得当作完整目录使用。
+   */
+  truncated: boolean;
 }
 
 /** 版式条目最小形状（只取判标题需要的字段，不绑 SDK 类型）。 */
@@ -282,8 +313,8 @@ async function ensurePdfRuntimeInner(
   if (!extractorReady) {
     logger.info('[pdf-runtime] 首次使用：按需下载 PDF 解析运行时（约 10MB，一次性）');
     const [mainPkg, napiPkg] = await Promise.all([
-      downloadArtifact(PDF_INSPECTOR_MAIN.url, fetchImpl, PDF_INSPECTOR_MAIN.integrity),
-      downloadArtifact(pins.napi.url, fetchImpl, pins.napi.integrity),
+      downloadArtifact(PDF_INSPECTOR_MAIN.url, fetchImpl, PDF_INSPECTOR_MAIN.integrity, PDF_INSPECTOR_MAIN.sha256),
+      downloadArtifact(pins.napi.url, fetchImpl, pins.napi.integrity, pins.napi.sha256),
     ]);
     const napiShortName = napiDirName(pins.napiPkg);
     await writeEntries(nodeModulesDir, [

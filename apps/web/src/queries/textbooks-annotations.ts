@@ -625,6 +625,10 @@ export interface MapPdfResult {
   window: number[];
   headings: PdfPageHeading[];
   tocEntries: PdfTocEntry[];
+  /** CMD-LINGUA-P1A：目录来源（老网关缺席即视为 none）。 */
+  outlineSource?: 'embedded' | 'none';
+  /** 校验后的原生目录条目（physicalPage 必合法；none 时缺席或空）。 */
+  embeddedOutline?: Array<{ title: string; level: number; physicalPage: number }>;
 }
 
 /** 云 OCR 凭据（随请求发网关，内存态用完即弃；不填走纯本地链路）。 */
@@ -686,6 +690,7 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
         });
       }
       const p = (payload ?? {}) as Partial<MapPdfResult>;
+      const rawOutline = (payload ?? {}) as { embeddedOutline?: unknown };
       return {
         classification: p.classification ?? {
           pdfType: 'Unknown',
@@ -697,6 +702,22 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
         window: Array.isArray(p.window) ? p.window : [],
         headings: Array.isArray(p.headings) ? p.headings : [],
         tocEntries: Array.isArray(p.tocEntries) ? p.tocEntries : [],
+        // CMD-LINGUA-P1A：原生目录透传（本轮 UI 不消费，只收窄不断言，缺席即 undefined）。
+        ...(p.outlineSource === 'embedded' || p.outlineSource === 'none'
+          ? { outlineSource: p.outlineSource }
+          : {}),
+        ...(Array.isArray(rawOutline.embeddedOutline)
+          ? {
+              embeddedOutline: rawOutline.embeddedOutline.filter(
+                (e): e is { title: string; level: number; physicalPage: number } =>
+                  !!e &&
+                  typeof e === 'object' &&
+                  typeof (e as { title?: unknown }).title === 'string' &&
+                  typeof (e as { level?: unknown }).level === 'number' &&
+                  typeof (e as { physicalPage?: unknown }).physicalPage === 'number'
+              ),
+            }
+          : {}),
       };
     },
     onError: (e) => {

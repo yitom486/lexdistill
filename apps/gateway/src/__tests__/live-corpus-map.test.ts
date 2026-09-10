@@ -44,6 +44,8 @@ describe('live-corpus-map 探针安全行为', () => {
       window: [1],
       headings: Array.from({ length: 35 }, (_, i) => ({ page: 1, level: 1, text: `第${i + 1}課` })),
       tocEntries: [{ label: '第1課', lessonNo: '1', printedPage: 2 }],
+      outlineSource: 'none',
+      embeddedOutline: [],
     };
     const out = formatMapSummary(result, 'some.pdf');
     expect(out).toContain('pageCount=371');

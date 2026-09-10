@@ -7,24 +7,29 @@
  *
  * Pin 来源：
  * - npm 包：registry 元数据 integrity（sha512，2026-09-06 实测抓取，1.18.0 于 2026-09-10 复核更新）；
+ * - fork 1.18.1-inkdown.1：GitHub Release 实际资产直链 + 本地实测 SHA-256
+ *  （2026-09-10 下载 5 个包逐个 certutil 测得；repo yitom486/pdf-inspector，
+ *   tag inkdown-napi-v1.18.1-inkdown.1，资产 7 tgz + 2 源码包）；
  * - PDFium：上游 release SHA256SUMS（native-v7988，2026-09-06 实测下载比对一致）；
  * - ONNX Runtime：上游未给单文件摘要，仅做版本 + 域名白名单 + 体积 sanity 校验；
  * - OCR 模型：由 pdf-inspector 首次路由时自行下载并 SHA-256 校验（见其 ocr-runtime 文档）。
  */
 
-export const PDF_INSPECTOR_VERSION = '1.18.0';
-const NPM = 'https://registry.npmjs.org';
+export const PDF_INSPECTOR_VERSION = '1.18.1-inkdown.1';
+const FORK_RELEASE =
+  'https://github.com/yitom486/pdf-inspector/releases/download/inkdown-napi-v1.18.1-inkdown.1';
 
 export interface NpmArtifactPin {
   url: string;
-  /** registry integrity，形如 'sha512-<base64>' */
-  integrity: string;
+  /** registry integrity，形如 'sha512-<base64>'（fork Release 资产改用 sha256，不填此项） */
+  integrity?: string;
+  /** 实测 SHA-256（hex 小写；与 integrity 二选一，至少其一） */
+  sha256?: string;
 }
 
 export const PDF_INSPECTOR_MAIN: NpmArtifactPin = {
-  url: `${NPM}/@firecrawl/pdf-inspector/-/pdf-inspector-1.18.0.tgz`,
-  integrity:
-    'sha512-xcI7rrnTP0xxQTQ/4+aJx9ztjciRGEhB4LGjvxpy8Q6fLblf5p4EACfGMhKldZAP2YVkLWNXlFpBbX5tiB2f8w==',
+  url: `${FORK_RELEASE}/firecrawl-pdf-inspector-1.18.1-inkdown.1.tgz`,
+  sha256: 'b5bb59574483b12ac32593dbb7cf74e07a80e09a6866dfdfc7ed495f0db05ce9',
 };
 
 export type PdfRuntimePlatform = 'win32-x64' | 'linux-x64' | 'darwin-arm64' | 'linux-arm64';
@@ -48,9 +53,8 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   'win32-x64': {
     napiPkg: '@firecrawl/pdf-inspector-win32-x64-msvc',
     napi: {
-      url: `${NPM}/@firecrawl/pdf-inspector-win32-x64-msvc/-/pdf-inspector-win32-x64-msvc-1.18.0.tgz`,
-      integrity:
-        'sha512-5qCcPYVsBkg+xUUDsqiRvE1bVD041tqyj8WieqdD/f5G4hovMJyZdk1NEp100SMUyVDMowGfTgCkcNAsw2lCfg==',
+      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-win32-x64-msvc-1.18.1-inkdown.1.tgz`,
+      sha256: '621d877ee7ede94abb802bfa2fb7d940d1a79b14639abda50ccae3675fb6547f',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-win-x64.tgz`,
     pdfiumSha256: '6f398552d8021a89078f64466557251a204999177287b876be49877eb8750d50',
@@ -61,9 +65,8 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   'linux-x64': {
     napiPkg: '@firecrawl/pdf-inspector-linux-x64-gnu',
     napi: {
-      url: `${NPM}/@firecrawl/pdf-inspector-linux-x64-gnu/-/pdf-inspector-linux-x64-gnu-1.18.0.tgz`,
-      integrity:
-        'sha512-p3vqt7dzdtimGNBl2Zg8dxEOBxQJKyTXQ62cBFM0/0UJvE3TrH78UtagjCYMfdAdkSr0hW1gYAUhSsizxelJ3g==',
+      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-linux-x64-gnu-1.18.1-inkdown.1.tgz`,
+      sha256: '84019bcd32a499a530bc34d2755e86ce2eda3fb1650b9ae048d2ac59a081df30',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-linux-x64.tgz`,
     pdfiumSha256: '6248189e07bbc33cdeb31976c539a88614307c8a19f3276dbd018efbe5b4a2a2',
@@ -74,9 +77,8 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   'darwin-arm64': {
     napiPkg: '@firecrawl/pdf-inspector-darwin-arm64',
     napi: {
-      url: `${NPM}/@firecrawl/pdf-inspector-darwin-arm64/-/pdf-inspector-darwin-arm64-1.18.0.tgz`,
-      integrity:
-        'sha512-TlmPHAGc8+WTKwOXTK1+Vk4iW2svMeavwRBKL7k3eh/B1kktqtoEOfZor+hih8JrH74B8EtHkuAG6Q/8VuBIYQ==',
+      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-darwin-arm64-1.18.1-inkdown.1.tgz`,
+      sha256: 'bd9103e0f96a2742363bb1f348922c0f9cecd6c7b5d99f2f6dd5e693a3de23c8',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-mac-arm64.tgz`,
     pdfiumSha256: '4168356c2e62ad5e79553e2e9162f5c99949759d90cb83876a50311f0c32b9b3',
@@ -88,8 +90,8 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
     napiPkg: '@firecrawl/pdf-inspector-linux-arm64-gnu',
     napi: {
       // 2026-09-10 补 pin（此前为空，本机 win32 未覆盖）；该平台启用前仍建议真机复核。
-      url: `${NPM}/@firecrawl/pdf-inspector-linux-arm64-gnu/-/pdf-inspector-linux-arm64-gnu-1.18.0.tgz`,
-      integrity: 'sha512-y8edzzCWSDh/bDTNzEvQjdIAA4nzHbRHi9IxQZDfjPcU7Sx/YaeAHJY6TZIyigPaNSfDMIt80J6RcTKcPwPHBA==',
+      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-linux-arm64-gnu-1.18.1-inkdown.1.tgz`,
+      sha256: '52613e0089c7fd193e25bff310c2e3f80baf7d4826b132c8234780d0d42636b1',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-linux-arm64.tgz`,
     pdfiumSha256: '',
@@ -99,11 +101,12 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   },
 };
 
-/** 允许下载的域名白名单（SSRF 防护：只认这三处官方源）。 */
+/** 允许下载的域名白名单（SSRF 防护：只认这几处官方源 + 本次 fork Release）。 */
 export const ARTIFACT_HOST_ALLOWLIST = [
   'https://registry.npmjs.org/',
   'https://github.com/firecrawl/pdfium-rs/releases/download/',
   'https://github.com/microsoft/onnxruntime/releases/download/',
+  'https://github.com/yitom486/pdf-inspector/releases/download/',
 ] as const;
 
 export function assertArtifactUrlAllowed(url: string): void {

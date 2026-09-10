@@ -78,6 +78,8 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
           window: res.value.window,
           headings: res.value.headings,
           tocEntries: res.value.tocEntries,
+          outlineSource: res.value.outlineSource,
+          embeddedOutline: res.value.embeddedOutline,
         });
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'mapPdfDocument');
