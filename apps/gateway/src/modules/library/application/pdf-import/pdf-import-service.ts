@@ -4,7 +4,7 @@ import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
 import { detectDocScript, markdownToAst, promoteLessonHeadings } from './markdown-to-ast.js';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from './extract-headings.js';
 import { collectLayoutCandidates, layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from './layout-headings.js';
-import { buildPdfConvertReport, buildPdfMapReport } from './pdf-import-report.js';
+import { buildPdfConvertReport, buildPdfMapReport, buildOcrOverflowError } from './pdf-import-report.js';
 import {
   analyzePagesWithAzure,
   AZURE_FALLBACK_MIN_CHARS,
@@ -425,11 +425,12 @@ export async function convertPdfToAst(
       const selectedNeeding = pagesNeedingOcr.filter(inScope);
       if (selectedNeeding.length > MAX_OCR_PAGES_PER_IMPORT) {
         return err(
-          new BusinessError(
-            'E_INVALID_INPUT',
-            `所选页中有 ${selectedNeeding.length} 页需 OCR（单次上限 ${MAX_OCR_PAGES_PER_IMPORT} 页），请缩小选页范围`,
-            'VALIDATION'
-          )
+          buildOcrOverflowError({
+            scope: 'range',
+            pageCount,
+            ocrPages: selectedNeeding,
+            limit: MAX_OCR_PAGES_PER_IMPORT,
+          })
         );
       }
       const runtime = await ensurePdfRuntime({
@@ -459,11 +460,12 @@ export async function convertPdfToAst(
     if (!markdown.trim() && pagesNeedingOcr.length > 0) {
       if (pagesNeedingOcr.length > MAX_OCR_PAGES_PER_IMPORT) {
         return err(
-          new BusinessError(
-            'E_INVALID_INPUT',
-            `本书 ${pagesNeedingOcr.length} 页需 OCR（单次上限 ${MAX_OCR_PAGES_PER_IMPORT} 页），请按课分段选页导入`,
-            'VALIDATION'
-          )
+          buildOcrOverflowError({
+            scope: 'all',
+            pageCount,
+            ocrPages: pagesNeedingOcr,
+            limit: MAX_OCR_PAGES_PER_IMPORT,
+          })
         );
       }
       // 扫描页：按需准备 OCR 运行时（PDFium + ORT + 模型，不进安装包）

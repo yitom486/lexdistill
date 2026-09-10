@@ -2,6 +2,7 @@
  * PDF 导入结果摘要（只含结构，不含课文正文）。
  * 给默认 warn 日志和验收对照用：页范围、是否 OCR、课标题列表。
  */
+import { BusinessError } from '@study-studio/shared';
 
 export interface PdfConvertReport {
   title: string;
@@ -46,8 +47,40 @@ export function buildPdfConvertReport(input: {
   };
 }
 
-export function buildPdfMapReport(input: {
+/** OCR 超限引导 details：弹窗据此切「指定页码」并填首个 30 页窗，不自动重试。 */
+export interface PdfOcrOverflowDetails {
   pageCount: number;
+  ocrPages: number[];
+  suggestedStartPage: number;
+  suggestedEndPage: number;
+}
+
+/**
+ * 扫描页超单次 OCR 上限的友好失败（上限保持 30，禁止自动切完整本）。
+ * userMessage 文案与此前一字相同；details 给前端引导用，经 HTTP 信封透出。
+ */
+export function buildOcrOverflowError(input: {
+  scope: 'all' | 'range';
+  pageCount: number;
+  ocrPages: number[];
+  limit: number;
+}): BusinessError {
+  const startPage = 1;
+  const endPage = Math.min(input.limit, input.pageCount);
+  const details: PdfOcrOverflowDetails = {
+    pageCount: input.pageCount,
+    ocrPages: [...input.ocrPages],
+    suggestedStartPage: startPage,
+    suggestedEndPage: endPage,
+  };
+  const userMessage =
+    input.scope === 'all'
+      ? `本书 ${input.ocrPages.length} 页需 OCR（单次上限 ${input.limit} 页），请按课分段选页导入`
+      : `所选页中有 ${input.ocrPages.length} 页需 OCR（单次上限 ${input.limit} 页），请缩小选页范围`;
+  return new BusinessError('E_INVALID_INPUT', userMessage, 'VALIDATION', false, details);
+}
+
+export function buildPdfMapReport(input: {  pageCount: number;
   window: number[];
   ocrUsed: boolean;
   ocrPages: number[];

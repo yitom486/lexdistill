@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  buildOcrOverflowError,
   buildPdfConvertReport,
   buildPdfMapReport,
 } from '../application/pdf-import/pdf-import-report.js';
@@ -74,5 +75,36 @@ describe('pdf-import-report', () => {
       'tocCount',
       'window',
     ]);
+  });
+});
+
+describe('buildOcrOverflowError（全部页扫描超限引导）', () => {
+  it('all：文案不变 + details 带首个 30 页窗', () => {
+    const e = buildOcrOverflowError({
+      scope: 'all',
+      pageCount: 371,
+      ocrPages: Array.from({ length: 371 }, (_, i) => i + 1),
+      limit: 30,
+    });
+    expect(e.code).toBe('E_INVALID_INPUT');
+    expect(e.category).toBe('VALIDATION');
+    expect(e.userMessage).toBe('本书 371 页需 OCR（单次上限 30 页），请按课分段选页导入');
+    expect(e.internalDetails).toEqual({
+      pageCount: 371,
+      ocrPages: Array.from({ length: 371 }, (_, i) => i + 1),
+      suggestedStartPage: 1,
+      suggestedEndPage: 30,
+    });
+  });
+
+  it('range：文案不变 + 上限仍 30', () => {
+    const e = buildOcrOverflowError({ scope: 'range', pageCount: 371, ocrPages: [40, 41], limit: 30 });
+    expect(e.userMessage).toBe('所选页中有 2 页需 OCR（单次上限 30 页），请缩小选页范围');
+    expect(e.internalDetails).toEqual({
+      pageCount: 371,
+      ocrPages: [40, 41],
+      suggestedStartPage: 1,
+      suggestedEndPage: 30,
+    });
   });
 });

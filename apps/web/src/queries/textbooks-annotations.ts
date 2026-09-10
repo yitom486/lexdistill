@@ -2,6 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { logger } from '@study-studio/shared';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
+import {
+  GatewayRequestError,
+  readGatewayErrorCode,
+  readGatewayErrorDetails,
+  readGatewayUserMessage,
+} from '../lib/gateway-error.js';
 import type { TextbookBook } from '../models/textbook.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 
@@ -64,7 +70,8 @@ export function useImportTextbookMutation(userId = DEFAULT_USER_ID) {
             id: book.id,
             title: book.title,
             sourceKind: 'user_import',
-            language: 'ja',
+            // E：入库语种跟 AST（JA/EN/KO → ja/en/ko），缺席回退 ja，不写死。
+            language: book.language === 'EN' ? 'en' : book.language === 'KO' ? 'ko' : 'ja',
             content: (typeof bookDescription === 'string' && bookDescription) || book.title,
             astJson: JSON.stringify(book),
             sourcePublisher: book.publisher || '用户自主导入',
@@ -306,11 +313,10 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
           })();
       const payload: unknown = await res.json().catch(() => null);
       if (!res.ok) {
-        const msg =
-          typeof payload === 'object' && payload !== null && 'userMessage' in payload
-            ? String((payload as { userMessage: unknown }).userMessage)
-            : `PDF 导入失败（HTTP ${res.status}）`;
-        throw new Error(msg);
+        throw new GatewayRequestError(readGatewayUserMessage(payload, `PDF 导入失败（HTTP ${res.status}）`), {
+          code: readGatewayErrorCode(payload),
+          details: readGatewayErrorDetails(payload),
+        });
       }
       const bookRaw =
         typeof payload === 'object' && payload !== null && 'book' in payload
@@ -367,11 +373,10 @@ export function useImportDocumentMutation(userId = DEFAULT_USER_ID) {
       });
       const payload: unknown = await res.json().catch(() => null);
       if (!res.ok) {
-        const msg =
-          typeof payload === 'object' && payload !== null && 'userMessage' in payload
-            ? String((payload as { userMessage: unknown }).userMessage)
-            : `文档导入失败（HTTP ${res.status}）`;
-        throw new Error(msg);
+        throw new GatewayRequestError(readGatewayUserMessage(payload, `文档导入失败（HTTP ${res.status}）`), {
+          code: readGatewayErrorCode(payload),
+          details: readGatewayErrorDetails(payload),
+        });
       }
       const body =
         typeof payload === 'object' && payload !== null
@@ -419,11 +424,10 @@ export function useEnrichLessonMutation(userId = DEFAULT_USER_ID) {
       );
       const payload: unknown = await res.json().catch(() => null);
       if (!res.ok) {
-        const msg =
-          typeof payload === 'object' && payload !== null && 'userMessage' in payload
-            ? String((payload as { userMessage: unknown }).userMessage)
-            : `抽生词失败（HTTP ${res.status}）`;
-        throw new Error(msg);
+        throw new GatewayRequestError(readGatewayUserMessage(payload, `抽生词失败（HTTP ${res.status}）`), {
+          code: readGatewayErrorCode(payload),
+          details: readGatewayErrorDetails(payload),
+        });
       }
       const p = (payload ?? {}) as Partial<EnrichLessonResult>;
       return {
@@ -477,11 +481,10 @@ export function useTextbookLessonQuizMutation(userId = DEFAULT_USER_ID) {
       });
       const payload: unknown = await res.json().catch(() => null);
       if (!res.ok) {
-        const msg =
-          typeof payload === 'object' && payload !== null && 'userMessage' in payload
-            ? String((payload as { userMessage: unknown }).userMessage)
-            : `本课出题失败（HTTP ${res.status}）`;
-        throw new Error(msg);
+        throw new GatewayRequestError(readGatewayUserMessage(payload, `本课出题失败（HTTP ${res.status}）`), {
+          code: readGatewayErrorCode(payload),
+          details: readGatewayErrorDetails(payload),
+        });
       }
       const p = (payload ?? {}) as Record<string, unknown>;
       return {
@@ -548,11 +551,10 @@ export function useAppendPdfMutation(userId = DEFAULT_USER_ID) {
           })();
       const payload: unknown = await res.json().catch(() => null);
       if (!res.ok) {
-        const msg =
-          typeof payload === 'object' && payload !== null && 'userMessage' in payload
-            ? String((payload as { userMessage: unknown }).userMessage)
-            : `接力追加失败（HTTP ${res.status}）`;
-        throw new Error(msg);
+        throw new GatewayRequestError(readGatewayUserMessage(payload, `接力追加失败（HTTP ${res.status}）`), {
+          code: readGatewayErrorCode(payload),
+          details: readGatewayErrorDetails(payload),
+        });
       }
       const p = (payload ?? {}) as Partial<AppendPdfResult>;
       return {
@@ -658,11 +660,10 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
           })();
       const payload: unknown = await res.json().catch(() => null);
       if (!res.ok) {
-        const msg =
-          typeof payload === 'object' && payload !== null && 'userMessage' in payload
-            ? String((payload as { userMessage: unknown }).userMessage)
-            : `结构预览失败（HTTP ${res.status}）`;
-        throw new Error(msg);
+        throw new GatewayRequestError(readGatewayUserMessage(payload, `结构预览失败（HTTP ${res.status}）`), {
+          code: readGatewayErrorCode(payload),
+          details: readGatewayErrorDetails(payload),
+        });
       }
       const p = (payload ?? {}) as Partial<MapPdfResult>;
       return {
@@ -775,11 +776,10 @@ export function useClassifyStructureMutation() {
       });
       const payload: unknown = await res.json().catch(() => null);
       if (!res.ok) {
-        const msg =
-          typeof payload === 'object' && payload !== null && 'userMessage' in payload
-            ? String((payload as { userMessage: unknown }).userMessage)
-            : `结构分类失败（HTTP ${res.status}）`;
-        throw new Error(msg);
+        throw new GatewayRequestError(readGatewayUserMessage(payload, `结构分类失败（HTTP ${res.status}）`), {
+          code: readGatewayErrorCode(payload),
+          details: readGatewayErrorDetails(payload),
+        });
       }
       const p = (payload ?? {}) as Record<string, unknown>;
       const kinds = new Set(['lesson', 'section', 'toc', 'noise']);

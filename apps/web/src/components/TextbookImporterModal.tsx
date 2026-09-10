@@ -17,7 +17,9 @@ import { useImportPdfMutation, useMapPdfMutation, useAppendPdfMutation, useImpor
 import { useOcrStore } from '../stores/useOcrStore.js';
 import { useCodexModelsQuery } from '../queries/useCodexQueries.js';
 import { pickClassifyEffort } from '../utils/classify-effort.js';
-import { resolvePdfPageRange } from '../lib/pdf-page-range.js';
+import { resolveOcrOverflowWindow, resolvePdfPageRange } from '../lib/pdf-page-range.js';
+import { isPdfUploadTooLarge } from '../lib/pdf-upload-guard.js';
+import { GatewayRequestError } from '../lib/gateway-error.js';
 import { sound } from '../utils/audio.js';
 import { getPlatform } from '../platform/capabilities.js';
 import type { TextbookBook, FuriganaWord } from '../models/textbook.js';
@@ -38,6 +40,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select.js';
+
+/** D：超大文件拒绝上传的统一引导（用户可见，不含任何本机路径）。 */
+const PDF_TOO_LARGE_MESSAGE =
+  '文件过大（≥32MB），请把本机 PDF 绝对路径填到「大文件本地直读」，不要用选择文件上传';
 
 interface TextbookImporterModalProps {
   isOpen: boolean;
@@ -181,6 +187,14 @@ export function TextbookImporterModal({
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    // D：≥32MB 的 File 不收（multipart 会撑网关），引导改填本机绝对路径直读。
+    if (isPdfUploadTooLarge(file.size)) {
+      setPdfFile(null);
+      setPdfNote(null);
+      setParseError(PDF_TOO_LARGE_MESSAGE);
+      sound.playMistake();
+      return;
+    }
     // 选文件只暂存不自动导：大书先预览结构再定范围，小文件一点即导
     setPdfFile(file);
     setParseError(null);
@@ -193,7 +207,12 @@ export function TextbookImporterModal({
   const handlePdfMap = () => {
     if (mapPdf.isPending) return;
     const path = pdfPath.trim();
-    if (!pdfFile && !path) return;
+    // D：超大 File 视为无文件（有路径走直读，无路径报错引导，不上传）。
+    const mapFile = pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null;
+    if (!mapFile && !path) {
+      if (pdfFile) setParseError(PDF_TOO_LARGE_MESSAGE);
+      return;
+    }
     setParseError(null);
     const range = readPageRange();
     if (range === 'incomplete-range') {
@@ -202,9 +221,9 @@ export function TextbookImporterModal({
     }
     sound.playClick();
     const { startPage, endPage } = range;
-    const vars = pdfFile
+    const vars = mapFile
       ? {
-          file: pdfFile,
+          file: mapFile,
           ...(startPage !== undefined ? { startPage } : {}),
           ...(endPage !== undefined ? { endPage } : {}),
           ...(azureCreds ? { azure: azureCreds } : {}),
@@ -314,7 +333,12 @@ export function TextbookImporterModal({
 
   const handlePdfImport = () => {    if (importPdf.isPending || appendPdf.isPending) return;
     const path = pdfPath.trim();
-    if (!pdfFile && !path) return;
+    // D：超大 File 视为无文件（有路径走直读，无路径报错引导，不上传）。
+    const importFile = pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null;
+    if (!importFile && !path) {
+      if (pdfFile) setParseError(PDF_TOO_LARGE_MESSAGE);
+      return;
+    }
     setParseError(null);
     setPdfNote(null);
     const range = readPageRange();
@@ -326,10 +350,10 @@ export function TextbookImporterModal({
     const { startPage, endPage } = range;
     // 接力模式：直接追加到已有书（网关合并+续排号），不走新书预览链路
     if (appendTarget) {
-      const vars = pdfFile
+      const vars = importFile
         ? {
             documentId: appendTarget,
-            file: pdfFile,
+            file: importFile,
             ...(startPage !== undefined ? { startPage } : {}),
             ...(endPage !== undefined ? { endPage } : {}),
             ...(azureCreds ? { azure: azureCreds } : {}),
@@ -354,9 +378,9 @@ export function TextbookImporterModal({
       });
       return;
     }
-    const vars = pdfFile
+    const vars = importFile
       ? {
-          file: pdfFile,
+          file: importFile,
           ...(startPage !== undefined ? { startPage } : {}),
           ...(endPage !== undefined ? { endPage } : {}),
           ...(azureCreds ? { azure: azureCreds } : {}),
@@ -398,8 +422,22 @@ export function TextbookImporterModal({
         toast.success(`PDF 解析成功：${result.stats.lessons} 课（${titles.slice(0, 8).join('、')}${titles.length > 8 ? '…' : ''}），确认后入库`);
       },
       onError: (err) => {
+        // A：err.message 即网关 userMessage，直接展示。
+        // C：全部页扫描超限→切「指定页码」填首个 30 页窗（有标题从首条标题页起），不自动重试。
         setParseError(err instanceof Error ? err.message : 'PDF 导入失败');
         sound.playMistake();
+        if (pdfScope === 'all' && err instanceof GatewayRequestError) {
+          const suggestion = resolveOcrOverflowWindow(
+            err.details,
+            mapPdf.data?.headings,
+            mapPdf.data?.classification.pageCount
+          );
+          if (suggestion) {
+            setPdfScope('range');
+            setPdfStartPage(String(suggestion.startPage));
+            setPdfEndPage(String(suggestion.endPage));
+          }
+        }
       },
     });
   };

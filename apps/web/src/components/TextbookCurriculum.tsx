@@ -38,6 +38,8 @@ import {
   useRecordReadingExposuresMutation,
 } from '../queries/useLearnerQueries.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
+import { useUserProfileStore } from '../stores/useUserProfileStore.js';
+import { pickDefaultTextbook, targetLanguageToFilter } from '../lib/textbook-default.js';
 import { toUiQuizType } from '@study-studio/protocol';
 import type { QuizQuestionItem } from '../models/learning.js';
 import { Tabs, TabsList, TabsTrigger, TabsIndicator } from './ui/tabs.js';
@@ -65,6 +67,7 @@ export function TextbookCurriculum({
   onAskAiTutor,
 }: TextbookCurriculumProps) {
   const { data: booksList = [] } = useTextbooksQuery();
+  const targetLanguage = useUserProfileStore((s) => s.profile.targetLanguage);
   const importTextbook = useImportTextbookMutation();
   const enrichLesson = useEnrichLessonMutation();
   const [selectedBookId, setSelectedBookId] = useState<string>('');
@@ -73,16 +76,20 @@ export function TextbookCurriculum({
   const [activeWordCard, setActiveWordCard] = useState<FuriganaWord | null>(null);
   const [addedCardsMap, setAddedCardsMap] = useState<Record<string, boolean>>({});
   const [isImporterOpen, setIsImporterOpen] = useState(false);
-  const [languageFilter, setLanguageFilter] = useState<'ALL' | 'JA' | 'EN' | 'KO'>('ALL');
+  // B：默认跟轨道（ja→JA/en→EN/ko→KO，不要 ALL），ALL 仍在下拉里可手选。
+  const [languageFilter, setLanguageFilter] = useState<'ALL' | 'JA' | 'EN' | 'KO'>(
+    () => targetLanguageToFilter(targetLanguage)
+  );
 
   React.useEffect(() => {
     if (booksList.length === 0) return;
     const stillValid = booksList.some((b) => b.id === selectedBookId);
     if (!stillValid) {
-      setSelectedBookId(booksList[0]!.id);
-      setSelectedLessonId(booksList[0]!.lessons[0]?.id ?? '');
+      const pick = pickDefaultTextbook(booksList, languageFilter);
+      setSelectedBookId(pick?.id ?? '');
+      setSelectedLessonId(pick?.lessons[0]?.id ?? '');
     }
-  }, [booksList, selectedBookId]);
+  }, [booksList, selectedBookId, languageFilter]);
 
   const filteredBooks = booksList.filter((b) => {
     if (languageFilter === 'ALL') return true;
@@ -91,8 +98,8 @@ export function TextbookCurriculum({
 
   const currentBook =
     filteredBooks.find((b) => b.id === selectedBookId) ??
-    filteredBooks[0] ??
-    booksList[0];
+    pickDefaultTextbook(filteredBooks, languageFilter) ??
+    pickDefaultTextbook(booksList, languageFilter);
   const currentLesson = currentBook?.lessons.find((l) => l.id === selectedLessonId) ?? currentBook?.lessons[0];
 
   // 本课真出题（自包含：mutation + 题库前插 + 切 QUIZ；App 传的旧假跳转仅作无 documentId 防御回退）。
