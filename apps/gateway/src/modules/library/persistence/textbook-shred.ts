@@ -59,6 +59,14 @@ export function tryParseTextbookAst(raw: unknown): TextbookAST | null {
  */
 export type ShredTx = Parameters<Parameters<RepoDeps['db']['transaction']>[0]>[0];
 
+/**
+ * P1-D1 term_map 去重键 = 持久化完整主键（截断/清洗之后计算）。
+ * shred 与 seed projection health 共用，保证两边口径一字相同。
+ */
+export function termMapDedupKey(documentId: string, lessonId: string, kind: string, refText: string): string {
+  return JSON.stringify([documentId, lessonId, kind, refText]);
+}
+
 export function shredDocument(
   deps: RepoDeps,
   documentId: string,
@@ -167,12 +175,10 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
           );
           stats.ftsRows++;
         }
-        const mapRows: Array<typeof textbookTermMap.$inferInsert> = [];
+        const mapCandidates: Array<typeof textbookTermMap.$inferInsert> = [];
         for (const f of vocabFts) {
           const entryId = findEntry(tx, f.surface);
-          mapRows.push({ documentId, lessonId, kind: 'vocab', refText: f.surface, skillId: null, entryId });
-          if (entryId) stats.mappedEntries++;
-          else stats.unmapped++;
+          mapCandidates.push({ documentId, lessonId, kind: 'vocab', refText: f.surface, skillId: null, entryId });
         }
 
         const grammars = Array.isArray((lesson as { grammarPoints?: unknown }).grammarPoints)
@@ -212,8 +218,21 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
         if (grammarRows.length > 0) tx.insert(textbookGrammar).values(grammarRows).run();
         for (const gTitle of grammarTitles) {
           const entryId = findEntry(tx, gTitle);
-          mapRows.push({ documentId, lessonId, kind: 'grammar', refText: gTitle, skillId: null, entryId });
-          if (entryId) stats.mappedEntries++;
+          mapCandidates.push({ documentId, lessonId, kind: 'grammar', refText: gTitle, skillId: null, entryId });
+        }
+        // P1-D1：按“最终写入的完整主键”确定性去重（截断/清洗之后）。
+        // term_map 是 best-effort 词典桥（非 identity）：同课同 kind 同 ref_text 只保留
+        // 首条映射；vocab/grammar（kind 不同）与跨 lesson 永不互斥。occurrence 行
+        //（vocab/grammar/lines/FTS）不受影响。无重复输入时结果与此前一字相同。
+        const seenTermKeys = new Set<string>();
+        const mapRows = mapCandidates.filter((row) => {
+          const key = termMapDedupKey(row.documentId, row.lessonId, row.kind, row.refText);
+          if (seenTermKeys.has(key)) return false;
+          seenTermKeys.add(key);
+          return true;
+        });
+        for (const row of mapRows) {
+          if (row.entryId) stats.mappedEntries++;
           else stats.unmapped++;
         }
         if (mapRows.length > 0) tx.insert(textbookTermMap).values(mapRows).run();

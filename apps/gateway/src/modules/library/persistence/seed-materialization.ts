@@ -3,7 +3,7 @@ import type { Database } from 'bun:sqlite';
 import { BusinessError, err, ok, type Result, nowIso } from '@study-studio/shared';
 import type { TextbookAST } from '@study-studio/protocol';
 import { documents, seedMaterialization } from '../../../infrastructure/db/schema.js';
-import { shredIntoTransaction } from './textbook-shred.js';
+import { shredIntoTransaction, termMapDedupKey } from './textbook-shred.js';
 import { fingerprintCanonical } from '../../../infrastructure/db/canonical-fingerprint.js';
 import { eq } from 'drizzle-orm';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
@@ -12,7 +12,7 @@ import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.
  * Seed materialization gating（P1-D1）。
  *
  * fingerprint 语义：“任何会改变 seed derived projection 的输入变化，fp 就变化”：
- * - deterministic semantic seed AST 全量（含稳定 seed lesson id——id 变即 fp 变，Task 4）；
+ * - deterministic semantic seed AST 全量（含手写静态但位置性的 seed lesson id——id 变即 fp 变，Task 4）；
  * - mapping 切片：seed 词面/文法标题 → local_dictionary_entries 精确命中 entry id
  *  （与 shred.findEntry 同口径 `language/headword`；只 hash 引用到的映射，不 hash 35 万全文）；
  * - SEED_MATERIALIZER_VERSION（算法/语义变更显式 bump，见下）。
@@ -26,15 +26,15 @@ import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.
 
 /**
  * Materializer 版本：凡改以下任一必须 bump（否则 gating 认不出输出语义变化）：
- * - shredIntoTransaction 的行/列/切片/归一语义；
+ * - shredIntoTransaction 的行/列/切片/归一语义（含 P1-D1 term_map 去重语义 → v2）；
  * - findEntry 的匹配语义（language 映射、相等定义）；
  * - 本文件 mapping 切片口径。
  * 不要把 app version / package version 纳入（无依据的全局失效）。
  */
-export const SEED_MATERIALIZER_VERSION = 1;
+export const SEED_MATERIALIZER_VERSION = 2;
 
 export interface SeedMaterializationInput {
-  /** canonical seed AST 全量（含稳定 ids） */
+  /** canonical seed AST 全量（含 generation-local 的位置性 ids） */
   ast: TextbookAST;
   /** [kind, surface, entryId|null][] 已排序 */
   mapping: Array<{ kind: string; surface: string; entryId: string | null }>;
@@ -108,13 +108,43 @@ export interface ProjectionHealth {
 }
 
 /**
+ * P1-D1a：期望 term_map 行数（与 shredIntoTransaction 完全同规则）。
+ * 清洗/截断与 shred 一字相同（vocab kanji trim+slice(0,64) 跳空；
+ * grammar title trim+slice(0,200) 跳空），键为完整持久化 PK 四元组。
+ * 只计行数健康，不查 entry_id（词典正确性由 fingerprint mapping 切片 + 版本管，
+ * 行数健康与 entry 正确性是两种检查，不得混淆）。
+ */
+export function expectedTermMapCountForLesson(
+  documentId: string,
+  lessonId: string,
+  vocabs: unknown[],
+  grammars: unknown[]
+): number {
+  const seen = new Set<string>();
+  for (const v of vocabs) {
+    if (!v || typeof v !== 'object') continue;
+    const kanji = (v as Record<string, unknown>).kanji;
+    if (typeof kanji !== 'string' || !kanji.trim()) continue;
+    seen.add(termMapDedupKey(documentId, lessonId, 'vocab', kanji.trim().slice(0, 64)));
+  }
+  for (const g of grammars) {
+    if (!g || typeof g !== 'object') continue;
+    const title = (g as Record<string, unknown>).title;
+    if (typeof title !== 'string' || !title.trim()) continue;
+    seen.add(termMapDedupKey(documentId, lessonId, 'grammar', title.trim().slice(0, 200)));
+  }
+  return seen.size;
+}
+
+/**
  * Projection health（只读轻量，不跑全 doctor）。
  * - derived lesson 集合/数量与 AST 一致；
  * - sort_order = index+1（1-based dense 按文档）；
  * - lesson_number/title 与 AST 一致（shred 透传语义）；
  * - 非空数组有行、空数组无行（lines/vocab/grammar/exercises）；
  * - FTS：每个 vocab/line 行有对应 kind/ref 索引行；
- * - term_map：每课 map 行数 == vocab 数 + grammar 数（当 generation invariant）。
+ * - term_map：每课 map 行数 == 按最终 PK 去重后的期望桥行数（P1-D1a；
+ *   不是 vocab+grammar occurrence 总数，同课重复面只计一行）。
  * term_map mapping *正确性*（entry 对不对）不在此验证——由 materializer/dependency
  * version 保证 freshness（全量比对等于重做 mapping，不廉价）。
  */
@@ -193,9 +223,58 @@ export function isTextbookProjectionHealthy(
     const mapN = (sqlite.query(
       'SELECT COUNT(*) AS n FROM textbook_term_map WHERE document_id = ? AND lesson_id = ?'
     ).get(documentId, l.id) as { n: number }).n;
-    if (mapN !== vocabN + grammarN) reasons.push(`term_map 行数异常: ${l.id} 期望 ${vocabN + grammarN} 实际 ${mapN}`);
+    const expectedMapN = expectedTermMapCountForLesson(documentId, l.id, vocabs, grammars);
+    if (mapN !== expectedMapN) reasons.push(`term_map 行数异常: ${l.id} 期望 ${expectedMapN} 实际 ${mapN}`);
   });
   return { healthy: reasons.length === 0, reasons };
+}
+
+export interface SeedStatusEntry {
+  documentId: string;
+  stateExists: boolean;
+  storedVersion: number | null;
+  currentVersion: number;
+  shouldSkip: boolean;
+  reason: string;
+}
+
+/**
+ * 只读单本状态（status CLI 与单测共用；不 migration、不 materialize、不写库）。
+ * state 缺席（表缺/无行）时 storedVersion 为 null，shouldSkip 由 shouldSkipSeedMaterialization 判定。
+ */
+export function describeSeedStatus(
+  sqlite: Database,
+  documentId: string,
+  book: TextbookAST,
+  currentVersion: number = SEED_MATERIALIZER_VERSION
+): SeedStatusEntry {
+  let stateExists = false;
+  let storedVersion: number | null = null;
+  try {
+    const hasTable = (
+      sqlite.query("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='seed_materialization'").get() as { n: number }
+    ).n;
+    if (hasTable > 0) {
+      const row = sqlite.query(
+        'SELECT fingerprint AS fp, materializer_version AS v FROM seed_materialization WHERE document_id = ?'
+      ).get(documentId) as { fp: string; v: number } | null;
+      if (row) {
+        stateExists = true;
+        storedVersion = row.v;
+      }
+    }
+  } catch {
+    // 表缺失即无 state（只读探测，不建表）。
+  }
+  const decision = shouldSkipSeedMaterialization(sqlite, documentId, book, currentVersion);
+  return {
+    documentId,
+    stateExists,
+    storedVersion,
+    currentVersion,
+    shouldSkip: decision.skip,
+    reason: decision.reason,
+  };
 }
 
 export interface SeedSkipDecision {

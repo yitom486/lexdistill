@@ -43,12 +43,15 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 - vocab 列：`surface/reading/pos/gloss_zh/pitch/example_ja/example_zh`
 - grammar 列：`title/connection/explanation/examples_json`（v16，`[{japanese,chinese}]` 全量）
 - exercises 列：`exercise_id/type/prompt/options_json/answer/explanation`（v16；线上主书 0 行——AST 本来就没有习题，不是 bug）
-- 注意：vocab/grammar 在 AST 里有稳定 `id`（zod 必填），**shred 丢弃了，只用 ord 做身份**（P1 事项）
+- 注意：vocab/grammar 的 AST `id`（zod 必填）是 generation-local 的位置性 ID（PDF 路径为 `${lessonId}-v/g${kept序号}`，种子为手写 `v1-1` 形；插入/删除/重排/enrich 都会移位，P1-D0），**不是稳定 identity**；shred 丢弃 id，只用 `ord` 做行身份（P1 事项）
 - lifecycle：随 shred 重建；rebuildable：是
 
-### textbook_term_map —— 教材词→词典标准条目的桥（Derived）
-- PK `(document_id, lesson_id, kind, ref_text)`；`kind ∈ {vocab, grammar}`；`skill_id` v1 恒 NULL；`entry_id` 可空（空=未映射，可统计覆盖率）
+### textbook_term_map —— 教材词→词典标准条目的桥（Derived, best-effort）
+- PK `(document_id, lesson_id, kind, ref_text)`；`kind ∈ {vocab, grammar}`；`skill_id` v1 恒 NULL；`entry_id` 可空（空=未映射，是允许状态，可统计覆盖率）
 - 生成：shred 时 `headword` 逐字精确匹配 `local_dictionary_entries`，对不上记 NULL 行，绝不模糊
+- 它不是教材 vocab/grammar identity：AST 的 `vocab.id/grammar.id` 为位置性 ID（P1-D0），shred 根本不存 id；行身份是 `(document_id, lesson_id, ord)`，term_map 只按面字符串挂词典
+- 同课重复 mapping 按数据库关系语义去重（P1-D1）：去重键为截断/清洗后实际持久化的完整主键四元组，课内同 kind 同 `ref_text` 只保留首条确定性映射；`vocab/grammar`（kind 不同）与跨 lesson 永不互斥；occurrence 行（vocab/grammar/lines/FTS）不受影响
+- 行数口径（P1-D1a）：term_map 行数是按最终 PK 去重后的 dictionary bridge 行数，**不等于** `vocab + grammar` occurrence 总数；同课同 kind 同面越多，差值越大。health 检查与 fingerprint 均按此口径，`entry_id` NULL 仍为健康允许态
 - lifecycle：随 shred 重建；rebuildable：是。source of truth：否
 
 ### textbook_fts —— 全文索引（Cache-Index，contentful）
