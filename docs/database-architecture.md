@@ -268,7 +268,6 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 - `deleteDocument` 是否需要软删除（`deleted_at`）：当前硬删，误删不可回。候选，未决。
 
 ## 8. 真实库 migration/backfill/repair 操作顺序（rollout guardrail）
-
 真实 hazard（2026-09-10 实测）：工作区加入 v17 后，遗留 `bun --watch` dev 进程随代码热加载
 自动对真库执行了 schema migration（initSchema→runMigrations 常驻启动路径）。本次只加 nullable 列，
 无数据事故，但 rollout 顺序错了就是事故。任何真实 SQLite migration/backfill/repair 必须按序：
@@ -283,3 +282,23 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 8. 再启动服务。
 
 本轮不改 migration runner 行为，不新增 approval flag；顺序即 guardrail。
+
+## 9. Identity scope 结论（P1-C2-A / P1-D0 决议，不改 schema）
+
+### Durable identity：lesson.id
+- 当前作为 durable lesson reference 使用（`reading_positions.locator.lessonId`、
+  `sourceRef/docRef` 的 lesson 段、quiz/enrich 请求）。
+- positional 生成是已知债（P1-C 系列跟踪），但引用关系本身以 opaque 字符串成立；
+  reconciliation（shadow-ready）是未来的对齐手段，不是本轮改动。
+
+### Generation-local identity：vocab.id / grammar.id
+- 形如 `${lessonId}-v/g${kept序号}`，只在同一次 parse+enrich generation 内有效；
+- re-enrich / 列表顺序变化即整体重编（实测，见 `vocab-grammar-identity.test.ts`）；
+- **禁止未来 durable consumer 未经重新设计直接依赖这些 id**（它们跨代必变，
+  且 `term_map` 重建即换键）。
+
+### Projection locator（同代定位，不跨代）
+- textbook vocab/grammar/term_map 当前定位方式：
+  `document + lesson + kind + ord/ref`（`ref = lesson#v{ord}/#d{ord}`），
+  仅在同一 canonical generation 内有效，由 shred 同事务全量重建保证一致。
+- exercise.id 无生成器（种子手写或 null），不纳入 identity 体系。
