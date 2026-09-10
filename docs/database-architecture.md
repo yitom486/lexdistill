@@ -245,7 +245,7 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 - writer：`saveAnkiSettings`（不存在 INSERT 存在 UPDATE）；reader：推送前读开关。classification：Config。
 
 ### schema_migrations —— 迁移登记（Metadata）
-- PK `version`；`(name, applied_at)`。`runMigrations` 按序执行 `SCHEMA_MIGRATIONS` 缺失项，每条事务包裹。
+- PK `version`；`(name, applied_at)`。`runMigrations` 按序执行 `migrations/index.ts` 中 `SCHEMA_MIGRATIONS` 缺失项，每条事务包裹。
 - 只增不改；v1 为 legacy 基线。classification：Config/Metadata。rebuildable：否（删了会重跑迁移——幂等所以无害，但别手贱）。
 
 ## 8. 文档删除生命周期（P0.5 决议，代码见 `deleteDocument`）

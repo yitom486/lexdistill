@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { SCHEMA_MIGRATIONS } from './migrations/index.js';
 
-export { SCHEMA_MIGRATIONS } from './migrations/index.js';
+export { SCHEMA_MIGRATIONS };
 
 /**
  * 自动迁移/初始化数据表 DDL（P2-5 拆分：仅结构，不含种子数据）
