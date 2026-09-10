@@ -239,7 +239,9 @@ export async function mapPdfPages(
     confidence?: number;
   };
   // CMD-P0.1：探页数前置定窗——选页先按诚实总数清洗出处理窗，分类只扫该窗；
-  // 未选页沿用 CMD-10 开窗。任何路径禁止单参 processPdf(bytes)。
+  // 任何路径禁止单参 processPdf(bytes)。
+  // CMD-P0.1a：探页成功但选页全越界→直接拒绝，此路径只允许 probe 的 [1] 调用，
+  // 全越界选页不得再交给 inspector。
   const window: number[] = [];
   if (input.pages !== undefined) {
     const total = probePdfPageCount(inspector, input.bytes);
@@ -247,10 +249,13 @@ export async function mapPdfPages(
       const cleaned = [...new Set(input.pages)].filter(
         (n) => Number.isInteger(n) && n >= 1 && n <= total
       );
-      if (cleaned.length > 0) {
-        cleaned.sort((a, b) => a - b);
-        window.push(...cleaned.slice(0, MAX_MAP_PAGES));
+      if (cleaned.length === 0) {
+        return err(
+          new BusinessError('E_INVALID_INPUT', `选页超出范围（本书共 ${total} 页）`, 'VALIDATION')
+        );
       }
+      cleaned.sort((a, b) => a - b);
+      window.push(...cleaned.slice(0, MAX_MAP_PAGES));
     }
   }
   try {
@@ -263,7 +268,8 @@ export async function mapPdfPages(
     } else if (window.length > 0) {
       classification = inspector.processPdf(input.bytes, window);
     } else {
-      // 探页失败或选页越界：一次小窗分类拿诚实页数（错误语义与此前一致），不扫全书。
+      // 探页失败回退：一次小窗分类拿诚实页数（PDF parse error 语义不变），不扫全书。
+      // 探页成功时的全越界已在上一步直接拒绝，走不到这里。
       const raw = [...new Set(input.pages ?? [])].filter((n) => Number.isInteger(n) && n >= 1);
       classification = inspector.processPdf(input.bytes, raw.length > 0 ? raw.slice(0, MAX_MAP_PAGES) : [1]);
     }

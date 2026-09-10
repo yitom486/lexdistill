@@ -127,4 +127,51 @@ describe('P0.1 map 已选页开窗（371 页扫描 stub）', () => {
     expectAllWindowed(classifyCalls);
     expect(ocrCalls).toEqual([[300, 301, 302]]);
   });
+
+  it('P0.1a map pages:[400] 全越界直接拒绝：仅 probe [1] 调用，零 OCR', async () => {
+    const classifyCalls: Array<readonly number[] | undefined> = [];
+    const ocrCalls: Array<number[] | undefined> = [];
+    const res = await mapPdfPages(
+      { loadInspector: async () => scanned371Stub(classifyCalls, ocrCalls) },
+      { userId: 'u1', filename: 'scan371.pdf', bytes: mockBytes(), pages: [400] }
+    );
+    expect(isOk(res)).toBe(false);
+    if (isOk(res)) return;
+    expect(res.error.code).toBe('E_INVALID_INPUT');
+    expect(res.error.userMessage).toContain('本书共 371 页');
+    expect(classifyCalls).toEqual([[1]]);
+    expect(ocrCalls).toEqual([]);
+  });
+
+  it('P0.1a map pages:[31..60] 窗与 OCR 精确等于该窗，不得偷换为 [1..30]', async () => {
+    const classifyCalls: Array<readonly number[] | undefined> = [];
+    const ocrCalls: Array<number[] | undefined> = [];
+    const expected = Array.from({ length: 30 }, (_, i) => i + 31);
+    const res = await mapPdfPages(
+      { loadInspector: async () => scanned371Stub(classifyCalls, ocrCalls) },
+      { userId: 'u1', filename: 'scan371.pdf', bytes: mockBytes(), pages: expected }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.classification.pageCount).toBe(371);
+    expect(res.value.window).toEqual(expected);
+    expectAllWindowed(classifyCalls);
+    expect(ocrCalls).toEqual([expected]);
+  });
+
+  it('P0.1a convert pages:[31..60] 成功，OCR 精确等于该窗，全部分块 1–30', async () => {
+    const classifyCalls: Array<readonly number[] | undefined> = [];
+    const ocrCalls: Array<number[] | undefined> = [];
+    const expected = Array.from({ length: 30 }, (_, i) => i + 31);
+    const res = await convertPdfToAst(
+      { loadInspector: async () => scanned371Stub(classifyCalls, ocrCalls) },
+      { userId: 'u1', filename: 'scan371.pdf', bytes: mockBytes(), pages: expected }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.classification.pageCount).toBe(371);
+    expect(res.value.classification.selectedPages).toEqual(expected);
+    expectAllWindowed(classifyCalls);
+    expect(ocrCalls).toEqual([expected]);
+  });
 });
