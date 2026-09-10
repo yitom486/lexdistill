@@ -17,7 +17,7 @@ import { useImportPdfMutation, useMapPdfMutation, useAppendPdfMutation, useImpor
 import { useOcrStore } from '../stores/useOcrStore.js';
 import { useCodexModelsQuery } from '../queries/useCodexQueries.js';
 import { pickClassifyEffort } from '../utils/classify-effort.js';
-import { resolveOcrOverflowWindow, resolvePdfPageRange } from '../lib/pdf-page-range.js';
+import { nextRelayWindow, resolveOcrOverflowWindow, resolvePdfPageRange } from '../lib/pdf-page-range.js';
 import { isPdfUploadTooLarge } from '../lib/pdf-upload-guard.js';
 import { GatewayRequestError } from '../lib/gateway-error.js';
 import { sound } from '../utils/audio.js';
@@ -412,6 +412,30 @@ export function TextbookImporterModal({
             ? ` · 第 ${c.selectedPages[0]}–${c.selectedPages[c.selectedPages.length - 1]} 页`
             : '';
         const titles = result.book.lessons.map((l) => l.title);
+        // CMD-08：下一接力窗（书未导完时预填，不发请求，不改接力目标）。
+        const next = nextRelayWindow(c.selectedPages, c.pageCount);
+        if (c.clampedFromAll === true) {
+          const first = c.selectedPages[0] ?? 1;
+          const last = c.selectedPages[c.selectedPages.length - 1] ?? first;
+          if (next) {
+            setPdfScope('range');
+            setPdfStartPage(String(next.startPage));
+            setPdfEndPage(String(next.endPage));
+          }
+          setPdfNote(
+            `扫描书一次最多 30 页，已导入第 ${first}–${last} 页 · ${result.stats.lessons} 课 ${result.stats.dialogues} 句` +
+              (titles.length > 0 ? ` → ${titles.join(' / ')}` : '') +
+              (next
+                ? `；已预填第 ${next.startPage}–${next.endPage} 页，选「接力到已有书」继续`
+                : '；剩余请指定页码并选「接力到已有书」')
+          );
+          sound.playCorrect();
+          toast.success(
+            `扫描书一次最多 30 页，已导入第 ${first}–${last} 页` +
+              (next ? `，已预填第 ${next.startPage}–${next.endPage} 页待接力` : '，请指定页码接力')
+          );
+          return;
+        }
         setPdfNote(
           `识别为${kind} · ${c.pageCount} 页${range} · ${result.stats.lessons} 课 ${result.stats.dialogues} 句` +
             (c.ocrUsed ? ' · 已 OCR' : '') +
@@ -420,6 +444,11 @@ export function TextbookImporterModal({
         );
         sound.playCorrect();
         toast.success(`PDF 解析成功：${result.stats.lessons} 课（${titles.slice(0, 8).join('、')}${titles.length > 8 ? '…' : ''}），确认后入库`);
+        if (next && c.selectedPages.length > 0) {
+          // 自选范围成功且书未完：预填下一窗方便接力。
+          setPdfStartPage(String(next.startPage));
+          setPdfEndPage(String(next.endPage));
+        }
       },
       onError: (err) => {
         // A：err.message 即网关 userMessage，直接展示。

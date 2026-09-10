@@ -265,6 +265,8 @@ export interface ImportPdfResult {
     selectedPages: number[];
     /** 云回填命中的页（无云调用时缺席） */
     azurePages?: number[];
+    /** CMD-08 全部页夹持：超限未失败而是对首窗转换（无夹持时缺席） */
+    clampedFromAll?: boolean;
   };
   stats: {
     lessons: number;

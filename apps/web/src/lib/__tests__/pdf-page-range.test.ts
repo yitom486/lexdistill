@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { resolveOcrOverflowWindow, resolvePdfPageRange } from '../pdf-page-range.js';
+import { nextRelayWindow, resolveOcrOverflowWindow, resolvePdfPageRange } from '../pdf-page-range.js';
 
 describe('resolvePdfPageRange（导入页 全部/指定 两档）', () => {
   test('全部页：不带 start/end，输入框残留也不泄漏', () => {
@@ -51,5 +51,23 @@ describe('resolveOcrOverflowWindow（超限切指定页码，不重试）', () =
     expect(resolveOcrOverflowWindow(null, [], 371)).toBeNull();
     expect(resolveOcrOverflowWindow({ pageCount: 371 }, [], 371)).toBeNull();
     expect(resolveOcrOverflowWindow('boom', [], 371)).toBeNull();
+  });
+});
+
+describe('nextRelayWindow（接力预填下一窗）', () => {
+  const first30 = Array.from({ length: 30 }, (_, i) => i + 1);
+
+  test('首窗后预填 31–60', () => {
+    expect(nextRelayWindow(first30, 371)).toEqual({ startPage: 31, endPage: 60 });
+  });
+
+  test('尾部收敛到全书页数', () => {
+    expect(nextRelayWindow([351, 360], 371)).toEqual({ startPage: 361, endPage: 371 });
+  });
+
+  test('已导完 / 页数未知 / 选页为空 → null（不瞎填）', () => {
+    expect(nextRelayWindow(first30, 30)).toBeNull();
+    expect(nextRelayWindow(first30, undefined)).toBeNull();
+    expect(nextRelayWindow([], 371)).toBeNull();
   });
 });

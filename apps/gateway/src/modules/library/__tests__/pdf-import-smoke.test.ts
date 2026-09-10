@@ -70,6 +70,61 @@ describe('smoke 文档型 PDF 不启用 OCR（mock 取证）', () => {
   });
 });
 
+describe('CMD-08 全部页扫描超限改夹持（mock，不碰原生）', () => {
+  it('35 页全需 OCR 的全部页 convert：不 err，对 1–30 窗转换 + clampedFromAll', async () => {
+    const bytes = new TextEncoder().encode('%PDF-1.4 mock-clamp');
+    const expectedWindow = Array.from({ length: 30 }, (_, i) => i + 1);
+    let ocrWindows: Array<number[] | undefined> = [];
+    const inspector: PdfInspectorLike = {
+      processPdf: () => ({
+        pdfType: 'Scanned',
+        pageCount: 35,
+        markdown: '',
+        pagesNeedingOcr: Array.from({ length: 35 }, (_, i) => i + 1),
+      }),
+      processPdfWithOcr: async (_pdf, options) => {
+        ocrWindows.push(options?.pageNumbers);
+        return { markdown: '# 第1課\nアキ：はじめまして。\n# 第2課\nミナ：はい。\n' };
+      },
+    };
+    const res = await convertPdfToAst(
+      { loadInspector: async () => inspector },
+      { userId: 'u1', filename: 'scan35.pdf', bytes }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    // 第一次就成功：窗内转换，selectedPages 即该窗，不走错误
+    expect(res.value.classification.selectedPages).toEqual(expectedWindow);
+    expect(res.value.classification.clampedFromAll).toBe(true);
+    expect(res.value.classification.ocrUsed).toBe(true);
+    expect(ocrWindows).toEqual([expectedWindow]);
+    expect(res.value.book.lessons.map((l) => l.title)).toEqual(['第1課', '第2課']);
+  });
+
+  it('30 页整不触发夹持（边界）', async () => {
+    const bytes = new TextEncoder().encode('%PDF-1.4 mock-boundary');
+    const inspector: PdfInspectorLike = {
+      processPdf: () => ({
+        pdfType: 'Scanned',
+        pageCount: 30,
+        markdown: '',
+        pagesNeedingOcr: Array.from({ length: 30 }, (_, i) => i + 1),
+      }),
+      processPdfWithOcr: async () => ({
+        markdown: '# 第1課\nアキ：はじめまして。\n',
+      }),
+    };
+    const res = await convertPdfToAst(
+      { loadInspector: async () => inspector },
+      { userId: 'u1', filename: 'scan30.pdf', bytes }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.classification.selectedPages).toEqual([]);
+    expect(res.value.classification.clampedFromAll).toBeUndefined();
+  });
+});
+
 describe('smoke 真 E2E（本机运行时）', () => {
   it('convert：2 页走 OCR 回填（无文本层）+ 2 课 + 说话人齐全 + 不碰 Azure', async () => {
     const bytes = await fixtureBytes();

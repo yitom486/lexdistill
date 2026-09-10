@@ -17,6 +17,8 @@ export interface PdfConvertReport {
   lessons: number;
   dialogues: number;
   lessonTitles: string[];
+  /** CMD-08 全部页夹持：超限未失败而是对首窗转换，缺席/undefined 视同 false */
+  clampedFromAll: boolean;
 }
 
 export function buildPdfConvertReport(input: {
@@ -30,6 +32,7 @@ export function buildPdfConvertReport(input: {
   lessons: number;
   dialogues: number;
   lessonTitles: string[];
+  clampedFromAll?: boolean;
 }): PdfConvertReport {
   const selectedPages = Array.isArray(input.selectedPages) ? input.selectedPages : [];
   return {
@@ -44,6 +47,7 @@ export function buildPdfConvertReport(input: {
     lessons: input.lessons,
     dialogues: input.dialogues,
     lessonTitles: input.lessonTitles.slice(0, 80),
+    clampedFromAll: input.clampedFromAll === true,
   };
 }
 

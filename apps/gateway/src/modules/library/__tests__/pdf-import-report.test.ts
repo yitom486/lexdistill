@@ -23,6 +23,7 @@ describe('pdf-import-report', () => {
     // 结构锁：摘要只有计数/标题级字段，装不下 markdown 与对话正文
     expect(Object.keys(r).sort()).toEqual([
       'azurePages',
+      'clampedFromAll',
       'dialogues',
       'lessonTitles',
       'lessons',
@@ -34,6 +35,7 @@ describe('pdf-import-report', () => {
       'selectedPages',
       'title',
     ]);
+    expect(r.clampedFromAll).toBe(false);
     expect(JSON.stringify(r)).not.toContain('わたし');
   });
 
@@ -106,5 +108,25 @@ describe('buildOcrOverflowError（全部页扫描超限引导）', () => {
       suggestedStartPage: 1,
       suggestedEndPage: 30,
     });
+  });
+});
+
+describe('buildPdfConvertReport 夹持标志', () => {
+  it('clampedFromAll=true 透出且 scope=range（成功 warn 可见）', () => {
+    const r = buildPdfConvertReport({
+      title: 'scan35',
+      pdfType: 'Scanned',
+      pageCount: 35,
+      selectedPages: Array.from({ length: 30 }, (_, i) => i + 1),
+      ocrUsed: true,
+      ocrPages: Array.from({ length: 30 }, (_, i) => i + 1),
+      lessons: 2,
+      dialogues: 4,
+      lessonTitles: ['第1課', '第2課'],
+      clampedFromAll: true,
+    });
+    expect(r.scope).toBe('range');
+    expect(r.clampedFromAll).toBe(true);
+    expect(r.lessonTitles).toEqual(['第1課', '第2課']);
   });
 });

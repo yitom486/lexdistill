@@ -42,8 +42,7 @@ function readOverflowNumber(details: unknown, key: string): number | undefined {
  * 若刚 map 过且有标题页，起始页用第一条 heading.page，
  * 结束页 = min(start + 29, pageCount)。形状不对返回 null（不切换、不重试）。
  */
-export function resolveOcrOverflowWindow(
-  details: unknown,
+export function resolveOcrOverflowWindow(  details: unknown,
   headings: Array<{ page: number }> | undefined,
   pageCount: number | undefined
 ): OcrOverflowWindow | null {
@@ -59,4 +58,32 @@ export function resolveOcrOverflowWindow(
   const cap = typeof pageCount === 'number' && Number.isFinite(pageCount) && pageCount >= 1 ? Math.floor(pageCount) : start + windowSize - 1;
   const end = Math.max(start, Math.min(start + windowSize - 1, cap));
   return { startPage: start, endPage: end };
+}
+
+/** 接力窗宽：与单次 OCR 上限对齐（30），每窗独立转换，不抬上限。 */
+export const PDF_RELAY_WINDOW_PAGES = 30;
+
+export interface RelayPageWindow {
+  startPage: number;
+  endPage: number;
+}
+
+/**
+ * 下一接力窗（纯函数）：已导 selectedPages（升序）+ 全书 pageCount
+ * → [Y+1, min(Y+30, pageCount)]。书已导完 / 页数未知 / 选页为空 → null（不瞎填）。
+ * 只算页码，不发请求。
+ */
+export function nextRelayWindow(
+  selectedPages: number[],
+  pageCount: number | undefined,
+  windowSize: number = PDF_RELAY_WINDOW_PAGES
+): RelayPageWindow | null {
+  if (!Array.isArray(selectedPages) || selectedPages.length === 0) return null;
+  if (typeof pageCount !== 'number' || !Number.isFinite(pageCount) || pageCount < 1) return null;
+  const last = selectedPages[selectedPages.length - 1];
+  if (typeof last !== 'number' || !Number.isFinite(last)) return null;
+  const total = Math.floor(pageCount);
+  const start = Math.floor(last) + 1;
+  if (start > total) return null;
+  return { startPage: start, endPage: Math.min(start + Math.max(1, Math.floor(windowSize)) - 1, total) };
 }

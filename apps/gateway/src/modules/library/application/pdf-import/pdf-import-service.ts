@@ -89,6 +89,11 @@ export interface PdfImportClassification {
   selectedPages: number[];
   /** 云回填命中的页（来源可追溯；无云调用时缺席） */
   azurePages?: number[];
+  /**
+   * CMD-08 全部页夹持标志：扫描书超单次 OCR 上限时，网关不直接失败，
+   * 而对首个 30 页窗真正转换一次并置 true（弹窗据此提示接力）。
+   */
+  clampedFromAll?: boolean;
 }
 
 export interface PdfImportStats {
@@ -419,6 +424,20 @@ export async function convertPdfToAst(
 
   let markdown = '';
   let ocrUsed = false;
+  // CMD-08：全部页扫描超限不先失败——夹持到首个 30 页窗真正转换一次（上限仍 30）。
+  let clampedFromAll = false;
+  if (
+    !selectedPages &&
+    typeof classification.markdown === 'string' &&
+    !classification.markdown.trim() &&
+    pagesNeedingOcr.length > MAX_OCR_PAGES_PER_IMPORT
+  ) {
+    clampedFromAll = true;
+    selectedPages = Array.from(
+      { length: Math.min(MAX_OCR_PAGES_PER_IMPORT, pageCount) },
+      (_, i) => i + 1
+    );
+  }
   if (selectedPages) {
     // 选页导入：文字页直提 + 扫描页 OCR（Auto 只路由需 OCR 页）
     try {
@@ -584,6 +603,7 @@ export async function convertPdfToAst(
     ocrUsed,
     selectedPages: selectedPages ?? [],
     ...(azureHitPages.length > 0 ? { azurePages: azureHitPages } : {}),
+    ...(clampedFromAll ? { clampedFromAll: true } : {}),
   };
   logger.warn(
     '[pdf-import] 转换完成',
@@ -598,6 +618,7 @@ export async function convertPdfToAst(
       lessons: stats.lessons,
       dialogues: stats.dialogues,
       lessonTitles: book.lessons.map((l) => l.title),
+      ...(clampedFromAll ? { clampedFromAll: true } : {}),
     })
   );
   return ok({
