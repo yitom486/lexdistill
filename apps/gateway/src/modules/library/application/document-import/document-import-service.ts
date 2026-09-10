@@ -137,6 +137,8 @@ export interface DocumentImportInput {
   bytes?: Uint8Array | undefined;
   /** kind=url 时必填（经 SSRF 防护后抓取） */
   url?: string | undefined;
+  /** CMD-01：已确认结构分类（仅 pdf 分支透传给 convert；缺席走旧行为） */
+  classes?: unknown;
 }
 
 export interface DocumentImportOutput {
@@ -192,7 +194,12 @@ export async function importDocument(
           ...(readers.loadInspector ? { loadInspector: readers.loadInspector } : {}),
           ...(readers.runtimeDir ? { runtimeDir: readers.runtimeDir } : {}),
         },
-        { userId: input.userId, filename: input.filename, bytes: input.bytes }
+        {
+          userId: input.userId,
+          filename: input.filename,
+          bytes: input.bytes,
+          ...(input.classes !== undefined ? { classes: input.classes } : {}),
+        }
       );
       if (!isOk(converted)) throw converted.error;
       title = converted.value.book.title;

@@ -344,12 +344,20 @@ export function TextbookImporterModal({
           ...(startPage !== undefined ? { startPage } : {}),
           ...(endPage !== undefined ? { endPage } : {}),
           ...(azureCreds ? { azure: azureCreds } : {}),
+          // CMD-01：已跑过 AI 分类且结果非空时，把同一批 classes 交给 convert 切课
+          //（观测仍在确认后经 saveStructure 存档，此处只决定课边界）。
+          ...(classifyResult && classifyResult.classes.length > 0
+            ? { classes: classifyResult.classes }
+            : {}),
         }
       : {
           filePath: path,
           ...(startPage !== undefined ? { startPage } : {}),
           ...(endPage !== undefined ? { endPage } : {}),
           ...(azureCreds ? { azure: azureCreds } : {}),
+          ...(classifyResult && classifyResult.classes.length > 0
+            ? { classes: classifyResult.classes }
+            : {}),
         };
     importPdf.mutate(vars,
       {

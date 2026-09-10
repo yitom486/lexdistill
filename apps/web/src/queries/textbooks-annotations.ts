@@ -275,10 +275,11 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
     mutationFn: async (
       vars:
-        | { file: File; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
-        | { filePath: string; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
+        | { file: File; startPage?: number; endPage?: number; azure?: PdfAzureCredential; classes?: StructureClassItem[] }
+        | { filePath: string; startPage?: number; endPage?: number; azure?: PdfAzureCredential; classes?: StructureClassItem[] }
     ): Promise<ImportPdfResult> => {
       const hasPath = 'filePath' in vars;
+      const classes = vars.classes && vars.classes.length > 0 ? vars.classes : undefined;
       const res = hasPath
         ? await fetch(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/import-pdf`, {
             method: 'POST',
@@ -288,6 +289,7 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
               ...(vars.startPage !== undefined ? { startPage: vars.startPage } : {}),
               ...(vars.endPage !== undefined ? { endPage: vars.endPage } : {}),
               ...azureBodyFields(vars.azure),
+              ...(classes ? { classes } : {}),
             }),
           })
         : await (async () => {
@@ -296,6 +298,7 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
             if (vars.startPage !== undefined) form.append('startPage', String(vars.startPage));
             if (vars.endPage !== undefined) form.append('endPage', String(vars.endPage));
             azureFormFields(form, vars.azure);
+            if (classes) form.append('classes', JSON.stringify(classes));
             return fetch(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/import-pdf`, {
               method: 'POST',
               body: form,

@@ -1,5 +1,5 @@
 import { ok, err, BusinessError, type Result } from '@study-studio/shared';
-import type { TextbookAST } from '@study-studio/protocol';
+import type { StructureClass, TextbookAST } from '@study-studio/protocol';
 
 /**
  * PDF 提取 Markdown → TextbookAST 初版结构化（纯函数）。
@@ -84,6 +84,9 @@ interface LessonGroup {
   sections: RawSection[];
 }
 
+/** 课单元标题判定（与 markdownToAst 内联正则同一口径，提升为模块级供双路径共用）。 */
+const LESSON_HEAD_RE = /第\s*[0-9一二三四五六七八九十百]+\s*[課课章节節回話话]|lesson\s*\d+|unit\s*\d+|(?:復習|复习)\s*[A-Z]?/i;
+
 /**
  * 节 → 课归组（纯函数，可单测）：
  * - 同 N 合并（本文 + 題 + 页眉复读，不论是否相邻）；
@@ -130,6 +133,146 @@ export function groupSectionsByLesson(sections: RawSection[]): LessonGroup[] {
   }
   for (const g of groups) {
     const titles = g.sections.map((s) => s.title).filter((t) => t);
+    if (titles.length > 1) g.title = pickGroupTitle(titles);
+  }
+  return groups;
+}
+
+/** map 阶段标题候选的文本截断上限（extractHeadingsFromMarkdown 同值；grounding 需容忍它）。 */
+const CLASS_TEXT_TRUNCATE_CAP = 40;
+
+/** markdown `#` 标题行提取（切课预扫描用；与主 split 同一正则）。 */
+const MD_HEADING_RE = /^(#{1,6})\s+(.+)$/;
+
+function collectHeadingTitles(markdown: string): string[] {
+  const out: string[] = [];
+  for (const l of markdown.split('\n')) {
+    const m = MD_HEADING_RE.exec(l.trim());
+    if (m?.[2] && m[2].trim()) out.push(m[2].trim());
+  }
+  return out;
+}
+
+/**
+ * CMD-01：已确认分类接地（纯函数）。
+ * - class.text（trim 后）必须等于本 markdown 切出的某个 `#` 标题才算接地；
+ * - map 阶段 40 字截断的标题允许前缀 grounding（section 标题以 class 文本开头）；
+ * - 对不上的 class 直接丢弃，绝不臆造课；同一标题多个 class 取数组首个。
+ */
+export function groundClassesByTitle(
+  sections: RawSection[],
+  classes: StructureClass[]
+): Map<string, StructureClass> {
+  const titles: string[] = [];
+  const seen = new Set<string>();
+  for (const s of sections) {
+    const t = s.title.trim();
+    if (t && !seen.has(t)) {
+      seen.add(t);
+      titles.push(t);
+    }
+  }
+  const usable = classes.filter(
+    (c): c is StructureClass =>
+      !!c && typeof c === 'object' && typeof (c as { text?: unknown }).text === 'string'
+  );
+  const out = new Map<string, StructureClass>();
+  for (const c of usable) {
+    const text = c.text.trim();
+    if (!text || out.has(text)) continue;
+    if (seen.has(text)) out.set(text, c);
+  }
+  for (const c of usable) {
+    const text = c.text.trim();
+    if (!text || text.length < CLASS_TEXT_TRUNCATE_CAP) continue;
+    for (const t of titles) {
+      if (!out.has(t) && t.startsWith(text)) {
+        out.set(t, c);
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+interface KeyedLessonGroup extends LessonGroup {
+  key: string;
+}
+
+/**
+ * CMD-01：已确认分类驱动归组（纯函数）。
+ * - `kind === 'lesson'` 才另起一课（同键全局归并，首见序：显式 lessonNo 优先，
+ *   其次旧正则 N/復習键，最后标题；与旧逻辑同 N 全局归并一致，页眉复读不碎课）；
+ * - `section` 不另起一课，正文并入当前课；
+ * - `toc` / `noise` 不另起一课：丢弃噪声标题，正文行并入当前课，开篇（尚无课）则整体丢弃；
+ * - 未标记标题沿用旧正则口径；无标题/开篇杂项沿用旧口径（有课并入，无课丢弃）。
+ * - 生效前提：至少一个接地的 lesson 标记；否则返回 null，调用方回退旧正则归组。
+ */
+export function groupSectionsByClasses(
+  sections: RawSection[],
+  classOf: Map<string, StructureClass>
+): LessonGroup[] | null {
+  let hasLesson = false;
+  for (const s of sections) {
+    const t = s.title.trim();
+    if (t !== '' && classOf.get(t)?.kind === 'lesson') {
+      hasLesson = true;
+      break;
+    }
+  }
+  if (!hasLesson) return null;
+
+  const lessonKeyOf = (title: string, cls: StructureClass | undefined): string => {
+    const explicit = cls?.lessonNo?.trim();
+    if (explicit) return `no:${explicit}`;
+    const mNo = lessonNoOf(title);
+    if (mNo !== null) return `no:${mNo}`;
+    const rk = reviewKeyOf(title);
+    if (rk !== null) return `rk:${rk}`;
+    return `title:${title}`;
+  };
+  const groups: KeyedLessonGroup[] = [];
+  // 同键全局归并（首见序，与旧逻辑同 N 归并一致）+ 当前课恒为数组尾。
+  const byKey = new Map<string, KeyedLessonGroup>();
+  // 当前课恒为数组尾（只追加不删减；避免“闭包内赋值、外层收窄失效”的 CFA 陷阱）。
+  const top = (): KeyedLessonGroup | undefined => groups[groups.length - 1];
+  const startOrMergeLesson = (s: RawSection, key: string): void => {
+    const g = byKey.get(key);
+    if (g) {
+      g.sections.push(s);
+      return;
+    }
+    const ng: KeyedLessonGroup = { key, title: s.title, sections: [s] };
+    byKey.set(key, ng);
+    groups.push(ng);
+  };
+  for (const s of sections) {
+    const title = s.title.trim();
+    if (title === '') {
+      top()?.sections.push(s);
+      continue;
+    }
+    const cls = classOf.get(title);
+    if (cls !== undefined) {
+      if (cls.kind === 'lesson') {
+        startOrMergeLesson(s, lessonKeyOf(title, cls));
+        continue;
+      }
+      if (cls.kind === 'section') {
+        top()?.sections.push(s);
+        continue;
+      }
+      top()?.sections.push({ title: '', lines: s.lines });
+      continue;
+    }
+    if (LESSON_HEAD_RE.test(title)) {
+      startOrMergeLesson(s, lessonKeyOf(title, undefined));
+      continue;
+    }
+    top()?.sections.push(s);
+  }
+  for (const g of groups) {
+    const titles = g.sections.map((x) => x.title).filter((t) => t);
     if (titles.length > 1) g.title = pickGroupTitle(titles);
   }
   return groups;
@@ -229,7 +372,15 @@ export function splitInlineChinese(text: string): { ja: string; zh: string } {
 
 export function markdownToAst(
   markdown: string,
-  options: { title?: string; bookId?: string } = {}
+  options: {
+    title?: string;
+    bookId?: string;
+    /**
+     * CMD-01：用户已确认、已接地的结构分类（`kind === 'lesson'` 才另起一课）。
+     * 缺席/空/无接地 lesson 时整体回退旧正则切课（逐课/逐句一致）。
+     */
+    classes?: StructureClass[];
+  } = {}
 ): Result<TextbookAST, BusinessError> {
   if (!markdown || !markdown.trim()) {
     return err(new BusinessError('E_CONTENT_EMPTY', 'PDF 未提取到任何文字（可能是纯图片扫描页且 OCR 无输出）', 'VALIDATION'));
@@ -240,14 +391,27 @@ export function markdownToAst(
   // 按课标题切课（MinerU/OCR 方言：只有课单元标题才另起一课；
   // 普通 # 标题如会話/目次/页眉是课内行，不切——否则一本书碎成几十片）。
   // 单元字覆盖 課/章/節/回/話（教材课、语法书章、小说回都值得另起一课）。
-  const LESSON_HEAD = /第\s*[0-9一二三四五六七八九十百]+\s*[課课章节節回話话]|lesson\s*\d+|unit\s*\d+|(?:復習|复习)\s*[A-Z]?/i;
+  // CMD-01：调用方给了已确认分类时，被标记的 `#` 标题同样起新节
+  //（否则 marked-section 标题会漏成正文行）；课边界改由 classes 判定。
+  const hasClasses = !!options.classes && options.classes.length > 0;
+  // 预接地：供起节与归组共用同一 map（键为标题文本超集，归组只查实际存在的节）。
+  // 生效总开关：必须有接地的 lesson 标记，否则起节/归组整体走旧行为（逐课一致）。
+  const classOf: Map<string, StructureClass> | null = hasClasses
+    ? groundClassesByTitle(
+        collectHeadingTitles(capped).map((t) => ({ title: t, lines: [] })),
+        options.classes ?? []
+      )
+    : null;
+  const useClasses =
+    !!classOf && [...classOf.values()].some((c) => c.kind === 'lesson');
+  const groundedTitles = useClasses && classOf ? new Set(classOf.keys()) : null;
   const lines = capped.split('\n');
   const sections: RawSection[] = [];
   let current: RawSection | null = null;
   for (const l of lines) {
     const trimmed = l.trim();
     const h = /^(#{1,6})\s+(.+)$/.exec(trimmed);
-    if (h?.[2] && LESSON_HEAD.test(h[2])) {
+    if (h?.[2] && (LESSON_HEAD_RE.test(h[2]) || groundedTitles?.has(h[2].trim()) === true)) {
       const title = h[2].trim();
       // 页眉重复：与上一节同名（扫描版每页页眉都被抽成标题，页码不同也算同名）则合并
       const norm = (t: string): string => t.replace(/[\s…·.．]*\d{1,4}\s*$/, '').trim();
@@ -271,7 +435,11 @@ export function markdownToAst(
   // 按课归组（扫描版方言）：同一课的本文/练习/题目页标题各异
   // （`第1課` / `だい 円第1課`），按课序号 N 归并；復習X 自成单元；
   // 开篇无编号节（封面/CIP/前言）仅在全书无编号节时保留，否则丢弃。
-  const grouped = groupSectionsByLesson(sections);
+  // CMD-01：给了已确认分类则课边界由 classes 判定，否则旧行为一字不动。
+  const grouped =
+    useClasses && classOf
+      ? (groupSectionsByClasses(sections, classOf) ?? groupSectionsByLesson(sections))
+      : groupSectionsByLesson(sections);
 
   const lessons: TextbookAST['lessons'] = [];
   for (const [si, group] of grouped.slice(0, MAX_LESSONS).entries()) {

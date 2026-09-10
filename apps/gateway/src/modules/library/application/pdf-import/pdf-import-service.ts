@@ -1,5 +1,5 @@
 import { BusinessError, err, generateId, isOk, logger, ok, type Result } from '@study-studio/shared';
-import { parseTextbookAST, type DocumentItem, type TextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST, StructureClassSchema, type DocumentItem, type TextbookAST, type StructureClass } from '@study-studio/protocol';
 import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
 import { detectDocScript, markdownToAst } from './markdown-to-ast.js';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from './extract-headings.js';
@@ -68,6 +68,11 @@ export interface PdfImportInput {
   bytes: Uint8Array;
   /** 1-based ????????= ?????????????????*/
   pages?: number[];
+  /**
+   * CMD-01：用户已确认、已接地的结构分类（原样透传，convert 侧 zod 校验后驱动切课）。
+   * 缺席/空数组 = 旧正则切课行为。不提供则旧行为。
+   */
+  classes?: unknown;
   /**
    * Azure 云 OCR 凭据（失败页回填用；随请求内存态传递，网关不落盘、不打日志）。
    * 不提供 = 纯本地链路（行为不变）。
@@ -281,6 +286,28 @@ export async function mapPdfPages(
   }
 }
 
+/**
+ * CMD-01：已确认结构分类的信任边界收窄（zod 全量校验）。
+ * - 缺席/空数组 = 未提供，走旧正则切课；
+ * - 非数组或任一条目非法 = 友好 BusinessError（调用方零写，绝不抛底层栈）。
+ */
+function parseStructureClasses(raw: unknown): Result<StructureClass[] | undefined, BusinessError> {
+  if (raw === undefined) return ok(undefined);
+  if (!Array.isArray(raw)) {
+    return err(new BusinessError('E_INVALID_INPUT', '结构分类格式不正确，请重新分类后导入', 'VALIDATION'));
+  }
+  if (raw.length === 0) return ok(undefined);
+  const out: StructureClass[] = [];
+  for (const item of raw.slice(0, 200)) {
+    const parsed = StructureClassSchema.safeParse(item);
+    if (!parsed.success) {
+      return err(new BusinessError('E_INVALID_INPUT', '结构分类含非法条目，请重新分类后导入', 'VALIDATION'));
+    }
+    out.push(parsed.data);
+  }
+  return ok(out);
+}
+
 function validatePdfInput(input: PdfImportInput): Result<void, BusinessError> {
   if (!input.filename.toLowerCase().endsWith('.pdf')) {
     return err(new BusinessError('E_INVALID_INPUT', '只支持 .pdf 文件导入', 'VALIDATION'));
@@ -303,6 +330,9 @@ export async function convertPdfToAst(
 ): Promise<Result<PdfAstOutput, BusinessError>> {
   const valid = validatePdfInput(input);
   if (!valid.ok) return err(valid.error);
+  // CMD-01：classes 非法直接友好失败（运行时准备之前，零副作用）。
+  const classesRes = parseStructureClasses(input.classes);
+  if (!classesRes.ok) return err(classesRes.error);
 
   let inspector: PdfInspectorLike;
   try {
@@ -501,7 +531,10 @@ export async function convertPdfToAst(
       )
     );
   }
-  const astRes = markdownToAst(markdown, { title });
+  const astRes = markdownToAst(
+    markdown,
+    { title, ...(classesRes.value ? { classes: classesRes.value } : {}) }
+  );
   if (!astRes.ok) return err(astRes.error);
   // 协议层再验一次：服务绝不向外吐出非法 AST
   const checked = parseTextbookAST(astRes.value);

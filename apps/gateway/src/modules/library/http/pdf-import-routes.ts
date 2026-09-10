@@ -37,6 +37,7 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
             bytes: input.value.bytes,
             ...(input.value.pages ? { pages: input.value.pages } : {}),
             ...(input.value.azure ? { azure: input.value.azure } : {}),
+            ...(input.value.classes !== undefined ? { classes: input.value.classes } : {}),
           }
         );
         if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
@@ -128,6 +129,8 @@ interface PdfRouteInput {
   filename: string;
   bytes: Uint8Array;
   pages?: number[];
+  /** CMD-01：已确认结构分类（原样透传，convert 侧 zod 校验后驱动切课） */
+  classes?: unknown;
   /** Azure 云 OCR 凭据（内存态透传，网关不落盘） */
   azure?: { endpoint: string; apiKey: string };
 }
@@ -135,6 +138,24 @@ interface PdfRouteInput {
 /** 字符串字段收窄（Key/endpoint 随请求来，用完即弃）。 */
 function strField(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+/**
+ * CMD-01：从 JSON / multipart 请求体提取已确认结构分类（纯函数，可单测）。
+ * - 缺席 → undefined（旧行为）；数组 → 原样透传（convert 侧 zod 校验）；
+ * - 字符串 → 尝试 JSON 解析，解析失败则原样透传（convert 侧报友好错，不在此抛）。
+ */
+export function extractRequestClasses(source: Record<string, unknown>): unknown {
+  const raw = source['classes'];
+  if (raw === undefined) return undefined;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
 }
 
 function azureField(source: Record<string, unknown>): { endpoint: string; apiKey: string } | undefined {
@@ -189,6 +210,7 @@ async function readPdfInput(
     if (!read.ok) return { ok: false, error: read.error };
     const pages = pageRange(startPage, endPage);
     const azure = azureField(body as Record<string, unknown>);
+    const classes = extractRequestClasses(body as Record<string, unknown>);
     return {
       ok: true,
       value: {
@@ -196,6 +218,7 @@ async function readPdfInput(
         bytes: read.value.bytes,
         ...(pages ? { pages } : {}),
         ...(azure ? { azure } : {}),
+        ...(classes !== undefined ? { classes } : {}),
       },
     };
   }
@@ -203,6 +226,7 @@ async function readPdfInput(
   let startPage: number | undefined;
   let endPage: number | undefined;
   let azure: { endpoint: string; apiKey: string } | undefined;
+  let classesRaw: unknown;
   try {
     const body = await c.req.parseBody();
     const candidate = body['file'];
@@ -210,6 +234,7 @@ async function readPdfInput(
     startPage = numField(body['startPage']);
     endPage = numField(body['endPage']);
     azure = azureField(body as Record<string, unknown>);
+    classesRaw = body['classes'];
   } catch {
     return fail('上传体不是合法 multipart，请用 file 字段上传 PDF');
   }
@@ -219,6 +244,7 @@ async function readPdfInput(
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
   const pages = pageRange(startPage, endPage);
+  const classes = extractRequestClasses({ classes: classesRaw });
   return {
     ok: true,
     value: {
@@ -226,6 +252,7 @@ async function readPdfInput(
       bytes,
       ...(pages ? { pages } : {}),
       ...(azure ? { azure } : {}),
+      ...(classes !== undefined ? { classes } : {}),
     },
   };
 }
