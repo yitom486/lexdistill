@@ -10,26 +10,27 @@ import { ensurePdfRuntime, type PdfInspectorLike, type PdfRuntimePaths } from '.
  *（`~/.study-studio/runtime` 是否恰好存在且可加载），导致“同代码不同时间不同结果”，
  * 且失败面（E_RUNTIME_LOAD）与 runner/cwd 无关—— manifest 在但 inspector 不可加载即炸。
  * 本模块把 runtime 收归测试所有：
- * - 目录：`STUDY_STUDIO_RUNTIME_DIR` 显式指定则用之，否则用 `apps/gateway/src/.test-runtime/`（gitignored）；
+ * - 目录：只认 `STUDY_STUDIO_TEST_RUNTIME_DIR`，否则用 `apps/gateway/src/.test-runtime/`（gitignored）；
+ * - 通用生产变量 `STUDY_STUDIO_RUNTIME_DIR` 一律无视（见 pinProcessToTestRuntime），
+ *   避免开发者 shell 里 export 的生产路径把测试写进真 runtime；
  * - 首次调用即 bootstrap pinned 构件（含 OCR，供扫描页用例），复用已下载；
  * - 缺失/损坏/离线导致无法就绪时直接抛（测试文件加载失败→非零退出），绝不 `it.skip`。
- * 生产 `~/.study-studio` 绝不作为测试状态读写。
+ * 生产 `~/.study-studio` 绝不作为测试状态读写。产品 `defaultRuntimeDir` 行为一字未动。
  */
 export function testRuntimeDir(): string {
-  const override = process.env.STUDY_STUDIO_RUNTIME_DIR;
+  const override = process.env.STUDY_STUDIO_TEST_RUNTIME_DIR;
   if (override && override.trim()) return override.trim();
   return resolve(import.meta.dir, '../../../.test-runtime');
 }
 
 /**
- * 把本进程的默认运行时指向测试目录（用户显式指定 STUDY_STUDIO_RUNTIME_DIR 则尊重）。
+ * 把本进程的默认运行时钉到测试目录：无条件覆盖 `STUDY_STUDIO_RUNTIME_DIR`。
  * 产品代码只认该 env（见 defaultRuntimeDir），故一次设置即让所有 `{}` 空依赖调用
- * 走测试运行时；生产 `~/.study-studio` 零接触。仅测试 setup 模块调用。
+ * 走测试运行时；即使外部传入了指向生产 runtime 的该变量也会被改写——测试永不读写外部生产路径。
+ * 仅测试 setup 模块调用（进程局部副作用）。
  */
 export function pinProcessToTestRuntime(): string {
-  const current = process.env.STUDY_STUDIO_RUNTIME_DIR;
-  if (current && current.trim()) return current.trim();
-  const dir = resolve(import.meta.dir, '../../../.test-runtime');
+  const dir = testRuntimeDir();
   process.env.STUDY_STUDIO_RUNTIME_DIR = dir;
   return dir;
 }
