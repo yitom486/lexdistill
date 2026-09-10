@@ -75,13 +75,17 @@ describe('CMD-08 全部页扫描超限改夹持（mock，不碰原生）', () =>
     const bytes = new TextEncoder().encode('%PDF-1.4 mock-clamp');
     const expectedWindow = Array.from({ length: 30 }, (_, i) => i + 1);
     let ocrWindows: Array<number[] | undefined> = [];
+    const classifyCalls: Array<readonly number[] | undefined> = [];
     const inspector: PdfInspectorLike = {
-      processPdf: () => ({
-        pdfType: 'Scanned',
-        pageCount: 35,
-        markdown: '',
-        pagesNeedingOcr: Array.from({ length: 35 }, (_, i) => i + 1),
-      }),
+      processPdf: (_pdf, pages) => {
+        classifyCalls.push(pages);
+        return {
+          pdfType: 'Scanned',
+          pageCount: 35,
+          markdown: '',
+          pagesNeedingOcr: Array.from({ length: 35 }, (_, i) => i + 1),
+        };
+      },
       processPdfWithOcr: async (_pdf, options) => {
         ocrWindows.push(options?.pageNumbers);
         return { markdown: '# 第1課\nアキ：はじめまして。\n# 第2課\nミナ：はい。\n' };
@@ -99,6 +103,14 @@ describe('CMD-08 全部页扫描超限改夹持（mock，不碰原生）', () =>
     expect(res.value.classification.ocrUsed).toBe(true);
     expect(ocrWindows).toEqual([expectedWindow]);
     expect(res.value.book.lessons.map((l) => l.title)).toEqual(['第1課', '第2課']);
+    // CMD-10：未选页 processPdf 必带 ≤30 页窗，禁止无窗口扫全书
+    expect(classifyCalls.length).toBeGreaterThan(0);
+    for (const w of classifyCalls) {
+      expect(Array.isArray(w)).toBe(true);
+      if (!Array.isArray(w)) continue;
+      expect(w.length).toBeGreaterThan(0);
+      expect(w.length).toBeLessThanOrEqual(30);
+    }
   });
 
   it('30 页整不触发夹持（边界）', async () => {
@@ -122,6 +134,40 @@ describe('CMD-08 全部页扫描超限改夹持（mock，不碰原生）', () =>
     if (!isOk(res)) return;
     expect(res.value.classification.selectedPages).toEqual([]);
     expect(res.value.classification.clampedFromAll).toBeUndefined();
+  });
+
+  it('CMD-10 map 未选页：只开窗分类，页数仍诚实为全书', async () => {
+    const bytes = new TextEncoder().encode('%PDF-1.4 mock-map-window');
+    const classifyCalls: Array<readonly number[] | undefined> = [];
+    const inspector: PdfInspectorLike = {
+      processPdf: (_pdf, pages) => {
+        classifyCalls.push(pages);
+        return {
+          pdfType: 'Scanned',
+          pageCount: 35,
+          markdown: '',
+          pagesNeedingOcr: Array.from({ length: 35 }, (_, i) => i + 1),
+        };
+      },
+      processPdfWithOcr: async () => ({
+        markdown: '# 第1課\nアキ：はじめまして。\n',
+      }),
+    };
+    const res = await mapPdfPages(
+      { loadInspector: async () => inspector },
+      { userId: 'u1', filename: 'scan35.pdf', bytes }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.classification.pageCount).toBe(35);
+    expect(res.value.window).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
+    expect(classifyCalls.length).toBeGreaterThan(0);
+    for (const w of classifyCalls) {
+      expect(Array.isArray(w)).toBe(true);
+      if (!Array.isArray(w)) continue;
+      expect(w.length).toBeGreaterThan(0);
+      expect(w.length).toBeLessThanOrEqual(30);
+    }
   });
 });
 

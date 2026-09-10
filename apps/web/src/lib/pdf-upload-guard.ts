@@ -23,3 +23,19 @@ export function pdfTooLargeMessage(fileName: string, sizeBytes: number): string 
   const mb = Math.max(1, Math.round(sizeBytes / (1024 * 1024)));
   return `《${fileName}》约 ${mb}MB，不能用选择文件上传。请把该文件的完整绝对路径贴到下方「本机绝对路径直读」，再点开始导入。`;
 }
+
+/**
+ * 路径剥引号：文件选择器/截图复制常带一对 `"`（或 `'`）；trim 后只剥两端成对引号，
+ * 不动路径中间字符。网关 readLocalPdfFile 入口同样剥一次。
+ */
+export function stripPdfPathQuotes(rawPath: string): string {
+  const trimmed = rawPath.trim();
+  if (trimmed.length >= 2) {
+    const first = trimmed[0];
+    const last = trimmed[trimmed.length - 1];
+    if ((first === '"' || first === "'") && first === last) {
+      return trimmed.slice(1, -1).trim();
+    }
+  }
+  return trimmed;
+}

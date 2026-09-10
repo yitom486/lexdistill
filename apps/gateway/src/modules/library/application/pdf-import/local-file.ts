@@ -11,6 +11,22 @@ import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 
 export const MAX_LOCAL_PDF_BYTES = 500 * 1024 * 1024;
 
+/**
+ * 路径剥引号（纯函数）：trim 后只剥两端成对 `"` / `'`，不动中间字符。
+ * 前端发送前同样剥一次（见 web `pdf-upload-guard.ts`），此处是网关入口兜底。
+ */
+export function stripLocalPdfPathQuotes(rawPath: string): string {
+  const trimmed = rawPath.trim();
+  if (trimmed.length >= 2) {
+    const first = trimmed[0];
+    const last = trimmed[trimmed.length - 1];
+    if ((first === '"' || first === "'") && first === last) {
+      return trimmed.slice(1, -1).trim();
+    }
+  }
+  return trimmed;
+}
+
 export interface LocalPdfFile {
   bytes: Uint8Array;
   filename: string;
@@ -20,6 +36,8 @@ export async function readLocalPdfFile(filePath: string): Promise<Result<LocalPd
   if (typeof filePath !== 'string' || !filePath.trim()) {
     return err(new BusinessError('E_INVALID_INPUT', '请提供本地 PDF 路径', 'VALIDATION'));
   }
+  // CMD-10：截图/复制常带一对引号，入口先剥（只剥两端成对引号，不动中间字符）。
+  filePath = stripLocalPdfPathQuotes(filePath);
   if (!path.isAbsolute(filePath)) {
     return err(new BusinessError('E_INVALID_INPUT', '只接受绝对路径（相对路径拒绝）', 'VALIDATION'));
   }

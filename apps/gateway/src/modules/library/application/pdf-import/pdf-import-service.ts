@@ -133,6 +133,27 @@ function errorMessage(e: unknown): string {
   return 'PDF 解析运行时异常，请稍后重试';
 }
 
+/** 1-based 连续页窗 [start, end]（首尾收敛，end < start 即空窗）。 */
+function rangePages(start: number, end: number): number[] {
+  const pages: number[] = [];
+  for (let p = Math.max(1, Math.floor(start)); p <= Math.floor(end); p++) pages.push(p);
+  return pages;
+}
+
+/**
+ * CMD-10 轻量探页数：processPdf(bytes,[1]) 仍返回全书 pageCount（探针实测），
+ * 不扫全书内容。失败/非法回 0，调用方回退常规错误（不静默成功）。
+ */
+function probePdfPageCount(inspector: PdfInspectorLike, bytes: Uint8Array): number {
+  try {
+    const probe = inspector.processPdf(bytes, [1]);
+    const n = Number(probe.pageCount ?? 0);
+    return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export interface PdfMapOutput {
   classification: PdfImportClassification;
   window: number[];
@@ -173,7 +194,15 @@ export async function mapPdfPages(
     confidence?: number;
   };
   try {
-    classification = inspector.processPdf(input.bytes);
+    // CMD-10：未选页不用无窗口 processPdf 扫全书——先 [1] 拿全书页数，再开窗分类
+    //（window 调用仍返回全书 pageCount，探针实测；超界窗不抛）。
+    if (input.pages === undefined) {
+      const total = probePdfPageCount(inspector, input.bytes);
+      const end = total > 0 ? Math.min(total, MAX_MAP_PAGES) : MAX_MAP_PAGES;
+      classification = inspector.processPdf(input.bytes, rangePages(1, end));
+    } else {
+      classification = inspector.processPdf(input.bytes);
+    }
   } catch (e) {
     logger.warn('[pdf-map] processPdf failed', { message: errorMessage(e) });
     return err(new BusinessError('E_PDF_PARSE', 'PDF 解析失败（文件可能加密或已损坏）', 'TOOL_EXECUTION'));
@@ -376,8 +405,37 @@ export async function convertPdfToAst(
     pagesNeedingOcr?: number[];
     confidence?: number;
   };
+  // 选页状态（夹持在分类时即定，未选页解析不得覆盖它）
+  let selectedPages: number[] | null = null;
+  // CMD-08 夹持标志（分类时即定）
+  let clampedFromAll = false;
   try {
-    classification = inspector.processPdf(input.bytes);
+    if (input.pages === undefined) {
+      // CMD-10：未选页不用无窗口 processPdf 扫全书——先 [1] 拿全书页数，再开窗分类。
+      const total = probePdfPageCount(inspector, input.bytes);
+      if (total > MAX_OCR_PAGES_PER_IMPORT) {
+        const head = inspector.processPdf(input.bytes, rangePages(1, MAX_OCR_PAGES_PER_IMPORT));
+        const headMarkdown = typeof head.markdown === 'string' ? head.markdown : '';
+        const headNeeding = Array.isArray(head.pagesNeedingOcr)
+          ? head.pagesNeedingOcr.filter((n): n is number => typeof n === 'number')
+          : [];
+        if (!headMarkdown.trim() && headNeeding.length > 0) {
+          // 扫描头：夹持首窗，后续走选页 OCR 路径（≤30 页），永不扫全书。
+          clampedFromAll = true;
+          selectedPages = rangePages(1, MAX_OCR_PAGES_PER_IMPORT);
+          classification = head;
+        } else {
+          // 文字头大书：显式全范围取全文（带窗口参数，不走无参调用）。
+          classification = inspector.processPdf(input.bytes, rangePages(1, total));
+        }
+      } else {
+        // 30 页内：单窗即全书，与此前行为一致。
+        const end = total > 0 ? total : MAX_OCR_PAGES_PER_IMPORT;
+        classification = inspector.processPdf(input.bytes, rangePages(1, end));
+      }
+    } else {
+      classification = inspector.processPdf(input.bytes);
+    }
   } catch (e) {
     logger.warn('[pdf-import] processPdf failed', { message: errorMessage(e) });
     return err(new BusinessError('E_PDF_PARSE', 'PDF 解析失败（文件可能加密或已损坏）', 'TOOL_EXECUTION'));
@@ -401,8 +459,7 @@ export async function convertPdfToAst(
     );
   }
 
-  // 选页校验（1-based；不传 = 全书）
-  let selectedPages: number[] | null = null;
+  // 选页校验（1-based；不传 = 全书；夹持已在分类时定好，这里不得覆盖）
   if (input.pages !== undefined) {
     const cleaned = [...new Set(input.pages)].filter(
       (n) => Number.isInteger(n) && n >= 1 && n <= pageCount
@@ -424,8 +481,7 @@ export async function convertPdfToAst(
 
   let markdown = '';
   let ocrUsed = false;
-  // CMD-08：全部页扫描超限不先失败——夹持到首个 30 页窗真正转换一次（上限仍 30）。
-  let clampedFromAll = false;
+  // CMD-08：兜底（分类时已夹持的走不到这里；仅防御窗外仍超限的极端混合书）。
   if (
     !selectedPages &&
     typeof classification.markdown === 'string' &&

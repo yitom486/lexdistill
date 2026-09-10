@@ -4,10 +4,28 @@ import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,
+  GATEWAY_NO_RESPONSE_MESSAGE,
+  isGatewayNoResponseError,
   readGatewayErrorCode,
   readGatewayErrorDetails,
   readGatewayUserMessage,
 } from '../lib/gateway-error.js';
+
+/**
+ * CMD-10：PDF 三专线（import/map/append）的 fetch 统一包一层——连接级失败
+ *（网关被大书整本解析打断 / 未启动）抛中文 GatewayRequestError，
+ *禁止把 Failed to fetch 顶到 toast。HTTP 信封错误仍走各调用方的 readGatewayUserMessage。
+ */
+async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (e) {
+    if (isGatewayNoResponseError(e)) {
+      throw new GatewayRequestError(GATEWAY_NO_RESPONSE_MESSAGE, { code: 'E_GATEWAY_UNREACHABLE' });
+    }
+    throw e instanceof Error ? e : new Error('网络请求失败，请稍后重试');
+  }
+}
 import type { TextbookBook } from '../models/textbook.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 
@@ -290,7 +308,7 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
       const hasPath = 'filePath' in vars;
       const classes = vars.classes && vars.classes.length > 0 ? vars.classes : undefined;
       const res = hasPath
-        ? await fetch(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/import-pdf`, {
+        ? await fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/import-pdf`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -308,7 +326,7 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
             if (vars.endPage !== undefined) form.append('endPage', String(vars.endPage));
             azureFormFields(form, vars.azure);
             if (classes) form.append('classes', JSON.stringify(classes));
-            return fetch(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/import-pdf`, {
+            return fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/import-pdf`, {
               method: 'POST',
               body: form,
             });
@@ -526,7 +544,7 @@ export function useAppendPdfMutation(userId = DEFAULT_USER_ID) {
       const endPage = (src as { endPage?: number }).endPage;
       const azure = (src as { azure?: PdfAzureCredential }).azure;
       const res = hasPath
-        ? await fetch(
+        ? await fetchPdfGateway(
             `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${encodeURIComponent(documentId)}/append-pdf`,
             {
               method: 'POST',
@@ -546,7 +564,7 @@ export function useAppendPdfMutation(userId = DEFAULT_USER_ID) {
             if (startPage !== undefined) form.append('startPage', String(startPage));
             if (endPage !== undefined) form.append('endPage', String(endPage));
             azureFormFields(form, azure);
-            return fetch(
+            return fetchPdfGateway(
               `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${encodeURIComponent(documentId)}/append-pdf`,
               { method: 'POST', body: form }
             );
@@ -639,7 +657,7 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
     ): Promise<MapPdfResult> => {
       const hasPath = 'filePath' in vars;
       const res = hasPath
-        ? await fetch(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/map-pdf`, {
+        ? await fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/map-pdf`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -655,7 +673,7 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
             if (vars.startPage !== undefined) form.append('startPage', String(vars.startPage));
             if (vars.endPage !== undefined) form.append('endPage', String(vars.endPage));
             azureFormFields(form, vars.azure);
-            return fetch(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/map-pdf`, {
+            return fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/map-pdf`, {
               method: 'POST',
               body: form,
             });

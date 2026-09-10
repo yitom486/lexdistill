@@ -18,7 +18,7 @@ import { useOcrStore } from '../stores/useOcrStore.js';
 import { useCodexModelsQuery } from '../queries/useCodexQueries.js';
 import { pickClassifyEffort } from '../utils/classify-effort.js';
 import { nextRelayWindow, resolveOcrOverflowWindow, resolvePdfPageRange } from '../lib/pdf-page-range.js';
-import { isPdfUploadTooLarge, pdfTooLargeMessage } from '../lib/pdf-upload-guard.js';
+import { isPdfUploadTooLarge, pdfTooLargeMessage, stripPdfPathQuotes } from '../lib/pdf-upload-guard.js';
 import { GatewayRequestError } from '../lib/gateway-error.js';
 import { sound } from '../utils/audio.js';
 import { getPlatform } from '../platform/capabilities.js';
@@ -211,7 +211,8 @@ export function TextbookImporterModal({
 
   const handlePdfMap = () => {
     if (mapPdf.isPending) return;
-    const path = pdfPath.trim();
+    // CMD-10：截图路径常带一对引号，发送前剥掉。
+    const path = stripPdfPathQuotes(pdfPath);
     // D：超大 File 视为无文件（有路径走直读，无路径报错引导，不上传）。
     const mapFile = pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null;
     if (!mapFile && !path) {
@@ -341,7 +342,8 @@ export function TextbookImporterModal({
   };
 
   const handlePdfImport = () => {    if (importPdf.isPending || appendPdf.isPending) return;
-    const path = pdfPath.trim();
+    // CMD-10：截图路径常带一对引号，发送前剥掉。
+    const path = stripPdfPathQuotes(pdfPath);
     // D：超大 File 视为无文件（有路径走直读，无路径报错引导，不上传）。
     const importFile = pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null;
     if (!importFile && !path) {

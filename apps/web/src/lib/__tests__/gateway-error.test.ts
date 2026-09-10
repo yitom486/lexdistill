@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { readGatewayErrorCode, readGatewayErrorDetails, readGatewayUserMessage } from '../gateway-error.js';
+import {
+  GATEWAY_NO_RESPONSE_MESSAGE,
+  isGatewayNoResponseError,
+  readGatewayErrorCode,
+  readGatewayErrorDetails,
+  readGatewayUserMessage,
+} from '../gateway-error.js';
 
 const FALLBACK = 'PDF 导入失败（HTTP 400）';
 
@@ -45,5 +51,27 @@ describe('readGatewayUserMessage', () => {
     expect(readGatewayErrorDetails(payload)).toEqual({ suggestedEndPage: 30 });
     expect(readGatewayErrorCode({})).toBeUndefined();
     expect(readGatewayErrorDetails({})).toBeUndefined();
+  });
+});
+
+describe('isGatewayNoResponseError（无响应转中文，不再 Failed to fetch）', () => {
+  test('英文无响应失败全识别', () => {
+    expect(isGatewayNoResponseError(new TypeError('Failed to fetch'))).toBe(true);
+    expect(isGatewayNoResponseError(new Error('Load failed'))).toBe(true);
+    expect(isGatewayNoResponseError(new Error('NetworkError when attempting to fetch resource.'))).toBe(true);
+    expect(isGatewayNoResponseError('fetch failed')).toBe(true);
+  });
+
+  test('普通错误与网关信封不误判', () => {
+    expect(isGatewayNoResponseError(new Error('boom'))).toBe(false);
+    expect(isGatewayNoResponseError(null)).toBe(false);
+    expect(isGatewayNoResponseError({ success: false, error: { userMessage: '超限' } })).toBe(false);
+  });
+
+  test('固定中文案含重启与页码指引', () => {
+    expect(GATEWAY_NO_RESPONSE_MESSAGE).toContain('网关没有响应');
+    expect(GATEWAY_NO_RESPONSE_MESSAGE).toContain('重启网关');
+    expect(GATEWAY_NO_RESPONSE_MESSAGE).toContain('指定页码');
+    expect(GATEWAY_NO_RESPONSE_MESSAGE).not.toContain('Failed to fetch');
   });
 });

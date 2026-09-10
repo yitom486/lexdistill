@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { PDF_UPLOAD_SIZE_LIMIT_BYTES, isPdfUploadTooLarge, pdfTooLargeMessage } from '../pdf-upload-guard.js';
+import {
+  PDF_UPLOAD_SIZE_LIMIT_BYTES,
+  isPdfUploadTooLarge,
+  pdfTooLargeMessage,
+  stripPdfPathQuotes,
+} from '../pdf-upload-guard.js';
 
 describe('isPdfUploadTooLarge（大文件不走上传）', () => {
   test('32MiB 为界：小文件可上传，界上拒绝', () => {
@@ -29,5 +34,19 @@ describe('pdfTooLargeMessage（超大文件引导文案，单源）', () => {
 
   test('小于 32MiB 不触发上传守卫（不走该文案）', () => {
     expect(isPdfUploadTooLarge(31 * 1024 * 1024)).toBe(false);
+  });
+});
+
+describe('stripPdfPathQuotes（截图路径剥两端引号）', () => {
+  test('成对双引号/单引号剥掉，无引号不变', () => {
+    expect(stripPdfPathQuotes('"C:\\Books\\a.pdf"')).toBe('C:\\Books\\a.pdf');
+    expect(stripPdfPathQuotes("'C:\\Books\\a.pdf'")).toBe('C:\\Books\\a.pdf');
+    expect(stripPdfPathQuotes('C:\\Books\\a.pdf')).toBe('C:\\Books\\a.pdf');
+  });
+
+  test('只剥两端：不成对与中间字符不动', () => {
+    expect(stripPdfPathQuotes('"C:\\Books\\a.pdf')).toBe('"C:\\Books\\a.pdf');
+    expect(stripPdfPathQuotes("C:\\It's\\a.pdf")).toBe("C:\\It's\\a.pdf");
+    expect(stripPdfPathQuotes('  "C:\\Books\\a.pdf"  ')).toBe('C:\\Books\\a.pdf');
   });
 });
