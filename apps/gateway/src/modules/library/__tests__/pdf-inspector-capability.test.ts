@@ -11,7 +11,7 @@ import { ensurePdfTestRuntime, pinProcessToTestRuntime, testRuntimeDir } from '.
  * `@firecrawl/pdf-inspector`（与 E2E 同一 artifact），并用 ensurePdfTestRuntime
  * 拿到的真实 inspector 在内存 synthetic PDF 上实际调用。
  * P1 前身结论（1.18.0 上游包）：无 outline API → 曾 BLOCKED；
- * 本文件锁定新 pin 1.18.1-inkdown.1 的存在性与可调用性。
+ * 本文件锁定新 pin 1.18.2-inkdown.1 的存在性与可调用性。
  */
 
 pinProcessToTestRuntime();
@@ -62,11 +62,11 @@ function syntheticPlainPdf(): Uint8Array {
 }
 
 describe('P1A capability forensics（真实 fork 构件，非 mock）', () => {
-  it('真实构件版本 == 代码 pin（1.18.1-inkdown.1）', () => {
+  it('真实构件版本 == 代码 pin（1.18.2-inkdown.1）', () => {
     const req = createRequire(path.join(testRuntimeDir(), 'index.js'));
     const pkg = req(path.join(realInspectorPackageDir(), 'package.json')) as { version?: unknown };
     expect(pkg.version).toBe(PDF_INSPECTOR_VERSION);
-    expect(PDF_INSPECTOR_VERSION).toBe('1.18.1-inkdown.1');
+    expect(PDF_INSPECTOR_VERSION).toBe('1.18.2-inkdown.1');
   });
 
   it('真实 inspector 暴露可调用的 extractEmbeddedOutline', async () => {

@@ -7,17 +7,17 @@
  *
  * Pin 来源：
  * - npm 包：registry 元数据 integrity（sha512，2026-09-06 实测抓取，1.18.0 于 2026-09-10 复核更新）；
- * - fork 1.18.1-inkdown.1：GitHub Release 实际资产直链 + 本地实测 SHA-256
+ * - fork 1.18.2-inkdown.1：GitHub Release 实际资产直链 + 本地实测 SHA-256
  *  （2026-09-10 下载 5 个包逐个 certutil 测得；repo yitom486/pdf-inspector，
- *   tag inkdown-napi-v1.18.1-inkdown.1，资产 7 tgz + 2 源码包）；
+ *   tag inkdown-napi-v1.18.2-inkdown.1，资产 7 tgz + 2 源码包）；
  * - PDFium：上游 release SHA256SUMS（native-v7988，2026-09-06 实测下载比对一致）；
  * - ONNX Runtime：上游未给单文件摘要，仅做版本 + 域名白名单 + 体积 sanity 校验；
  * - OCR 模型：由 pdf-inspector 首次路由时自行下载并 SHA-256 校验（见其 ocr-runtime 文档）。
  */
 
-export const PDF_INSPECTOR_VERSION = '1.18.1-inkdown.1';
+export const PDF_INSPECTOR_VERSION = '1.18.2-inkdown.1';
 const FORK_RELEASE =
-  'https://github.com/yitom486/pdf-inspector/releases/download/inkdown-napi-v1.18.1-inkdown.1';
+  'https://github.com/yitom486/pdf-inspector/releases/download/inkdown-napi-v1.18.2-inkdown.1';
 
 export interface NpmArtifactPin {
   url: string;
@@ -28,8 +28,8 @@ export interface NpmArtifactPin {
 }
 
 export const PDF_INSPECTOR_MAIN: NpmArtifactPin = {
-  url: `${FORK_RELEASE}/firecrawl-pdf-inspector-1.18.1-inkdown.1.tgz`,
-  sha256: 'b5bb59574483b12ac32593dbb7cf74e07a80e09a6866dfdfc7ed495f0db05ce9',
+  url: `${FORK_RELEASE}/firecrawl-pdf-inspector-1.18.2-inkdown.1.tgz`,
+  sha256: '93643726b18cd83ba7272bfb975278a21ae2f993bcc1b6856236a5cf9d4be6ca',
 };
 
 export type PdfRuntimePlatform = 'win32-x64' | 'linux-x64' | 'darwin-arm64' | 'linux-arm64';
@@ -53,8 +53,8 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   'win32-x64': {
     napiPkg: '@firecrawl/pdf-inspector-win32-x64-msvc',
     napi: {
-      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-win32-x64-msvc-1.18.1-inkdown.1.tgz`,
-      sha256: '621d877ee7ede94abb802bfa2fb7d940d1a79b14639abda50ccae3675fb6547f',
+      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-win32-x64-msvc-1.18.2-inkdown.1.tgz`,
+      sha256: 'fc640402b1fea92128d5b07e128bf88a381ef57d6878eb4c8c0f2a800b060c19',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-win-x64.tgz`,
     pdfiumSha256: '6f398552d8021a89078f64466557251a204999177287b876be49877eb8750d50',
@@ -65,8 +65,8 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   'linux-x64': {
     napiPkg: '@firecrawl/pdf-inspector-linux-x64-gnu',
     napi: {
-      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-linux-x64-gnu-1.18.1-inkdown.1.tgz`,
-      sha256: '84019bcd32a499a530bc34d2755e86ce2eda3fb1650b9ae048d2ac59a081df30',
+      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-linux-x64-gnu-1.18.2-inkdown.1.tgz`,
+      sha256: 'c97c858b4c6d2a818c8c50742134c2caed8b1f0dcedb271e175be98d3c2b65fd',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-linux-x64.tgz`,
     pdfiumSha256: '6248189e07bbc33cdeb31976c539a88614307c8a19f3276dbd018efbe5b4a2a2',
@@ -77,8 +77,8 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
   'darwin-arm64': {
     napiPkg: '@firecrawl/pdf-inspector-darwin-arm64',
     napi: {
-      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-darwin-arm64-1.18.1-inkdown.1.tgz`,
-      sha256: 'bd9103e0f96a2742363bb1f348922c0f9cecd6c7b5d99f2f6dd5e693a3de23c8',
+      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-darwin-arm64-1.18.2-inkdown.1.tgz`,
+      sha256: '6aab10a6d54bad00a1f02186e3ec1fa5ae6bc58b809cc1bff77ebebcfc8ee0f2',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-mac-arm64.tgz`,
     pdfiumSha256: '4168356c2e62ad5e79553e2e9162f5c99949759d90cb83876a50311f0c32b9b3',
@@ -90,8 +90,8 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
     napiPkg: '@firecrawl/pdf-inspector-linux-arm64-gnu',
     napi: {
       // 2026-09-10 补 pin（此前为空，本机 win32 未覆盖）；该平台启用前仍建议真机复核。
-      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-linux-arm64-gnu-1.18.1-inkdown.1.tgz`,
-      sha256: '52613e0089c7fd193e25bff310c2e3f80baf7d4826b132c8234780d0d42636b1',
+      url: `${FORK_RELEASE}/firecrawl-pdf-inspector-linux-arm64-gnu-1.18.2-inkdown.1.tgz`,
+      sha256: 'ec636a98a8ab87a669976da643d26bed97b51d9199a55b2991b838c6dd76bb75',
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-linux-arm64.tgz`,
     pdfiumSha256: '',

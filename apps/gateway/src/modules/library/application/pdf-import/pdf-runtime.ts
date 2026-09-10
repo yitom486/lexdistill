@@ -37,6 +37,30 @@ export interface PdfInspectorLike {
    * 只接受安全返回（见 EmbeddedOutlineResult）；调用方另行校验页码范围。
    */
   extractEmbeddedOutline?: (pdf: Uint8Array) => EmbeddedOutlineResult;
+  /**
+   * 可选：受限页渲染 PNG（fork 1.18.2+ `renderPdfPages`；老版本缺席即报错，
+   * 提示重启网关以下载新运行时）。只做内存 PNG，不写文件、不跑 OCR。
+   */
+  renderPdfPages?: (
+    pdf: Uint8Array,
+    pageNumbers: number[],
+    options?: { dpi?: number }
+  ) => Promise<RenderedPagePng[]>;
+}
+
+/**
+ * 单页渲染 PNG（fork `renderPdfPages` 原样透传形状）。
+ * `png` 为 PNG 编码字节；`width`/`height` 为真实像素尺寸。
+ */
+export interface RenderedPagePng {
+  /** 1-based PDF 页码（与去重后请求顺序对应）。 */
+  pageNumber: number;
+  /** PNG 编码字节。 */
+  png: Uint8Array;
+  /** 像素宽。 */
+  width: number;
+  /** 像素高。 */
+  height: number;
 }
 
 /**
@@ -129,6 +153,11 @@ export interface EnsureRuntimeOptions {
   runtimeDir?: string;
   fetchImpl?: typeof fetch;
   needOcr?: boolean;
+  /**
+   * CMD-LINGUA-P4A-2：页面渲染只要 PDFium（不要 ORT/模型）。
+   * 与 needOcr 正交：只准备 pdfium 库 + PDFIUM_LIB_PATH，不碰 ORT 与模型缓存下载。
+   */
+  needPdfium?: boolean;
   platform?: PdfRuntimePlatform;
 }
 
@@ -284,7 +313,7 @@ export function ensurePdfRuntime(
   options: EnsureRuntimeOptions = {}
 ): Promise<{ inspector: PdfInspectorLike; paths: PdfRuntimePaths }> {
   const runtimeDir = options.runtimeDir ?? defaultRuntimeDir();
-  const key = `${runtimeDir}|ocr=${options.needOcr ? 1 : 0}`;
+  const key = `${runtimeDir}|ocr=${options.needOcr ? 1 : 0}|pdfium=${options.needPdfium ? 1 : 0}`;
   const existing = inFlight.get(key);
   if (existing) return existing;
   const task = ensurePdfRuntimeInner({ ...options, runtimeDir }).finally(() => {
@@ -326,6 +355,7 @@ async function ensurePdfRuntimeInner(
     manifest?.pdfInspector === PDF_INSPECTOR_VERSION &&
     manifest.platform === platform &&
     (await fileExists(inspectorIndex));
+  let inspectorInstalled = false;
   if (!extractorReady) {
     logger.info('[pdf-runtime] 首次使用：按需下载 PDF 解析运行时（约 10MB，一次性）');
     const [mainPkg, napiPkg] = await Promise.all([
@@ -343,17 +373,18 @@ async function ensurePdfRuntimeInner(
         data: e.data,
       })),
     ]);
+    inspectorInstalled = true;
   }
 
   let pdfiumLib: string | null = null;
   let ortLib: string | null = null;
+  const pdfiumDir = path.join(runtimeDir, 'pdfium');
   if (options.needOcr) {
     const freshManifest = await readManifest(runtimeDir);
     const ocrReady =
       freshManifest?.pdfInspector === PDF_INSPECTOR_VERSION &&
       freshManifest.withOcrLibs === true &&
       freshManifest.platform === platform;
-    const pdfiumDir = path.join(runtimeDir, 'pdfium');
     const ortDir = path.join(runtimeDir, 'onnxruntime');
     if (!ocrReady) {
       logger.info('[pdf-runtime] 检测到扫描页：按需下载 OCR 运行时（PDFium + ONNX Runtime，约 80MB，一次性）');
@@ -377,6 +408,24 @@ async function ensurePdfRuntimeInner(
     }
     if (!process.env.PDFIUM_LIB_PATH) process.env.PDFIUM_LIB_PATH = pdfiumLib;
     if (!process.env.ORT_DYLIB_PATH) process.env.ORT_DYLIB_PATH = ortLib;
+  } else if (options.needPdfium) {
+    // CMD-LINGUA-P4A-2：页面渲染只要 PDFium——版本对上 + 文件在即用，
+    // 不下载 ORT/模型；版本对不上或文件缺失才下载 pdfium 包（SHA 照常校验）。
+    const pdfiumManifest = await readManifest(runtimeDir);
+    const pdfiumReady =
+      pdfiumManifest?.pdfInspector === PDF_INSPECTOR_VERSION &&
+      pdfiumManifest.platform === platform &&
+      (await findFileByName(pdfiumDir, pins.pdfiumLibName)) !== null;
+    if (!pdfiumReady) {
+      logger.info('[pdf-runtime] 目录页渲染：按需准备 PDFium（仅渲染库，不含 OCR 模型）');
+      const pdfiumPkg = await downloadArtifact(pins.pdfiumUrl, fetchImpl, undefined, pins.pdfiumSha256);
+      await writeEntries(pdfiumDir, extractTarGz(pdfiumPkg));
+    }
+    pdfiumLib = await findFileByName(pdfiumDir, pins.pdfiumLibName);
+    if (!pdfiumLib) {
+      throw new BusinessError('E_RUNTIME_LOAD', 'PDFium 解包不完整（缺少本地库），请重试下载', 'TOOL_EXECUTION');
+    }
+    if (!process.env.PDFIUM_LIB_PATH) process.env.PDFIUM_LIB_PATH = pdfiumLib;
   }
 
   const modelCacheDir = path.join(runtimeDir, 'models');
@@ -387,12 +436,14 @@ async function ensurePdfRuntimeInner(
 
   // 非 OCR 调用不得降级 withOcrLibs（否则一次文字版导入会清掉已就绪的 OCR 标记，
   // 下次扫描导入被迫重下 80MB —— 真机抓到的 bug）。
+  // 同理：只有本轮实际安装了 inspector 才登记新 pin，否则沿用旧登记——
+  // 否则一次 needPdfium 调用会把 manifest 写成新版本，而 inspector 目录仍是旧版。
   const prevManifest = await readManifest(runtimeDir);
   await fsp.writeFile(
     path.join(runtimeDir, 'manifest.json'),
     JSON.stringify({
       version: 1,
-      pdfInspector: PDF_INSPECTOR_VERSION,
+      pdfInspector: inspectorInstalled ? PDF_INSPECTOR_VERSION : (prevManifest?.pdfInspector ?? PDF_INSPECTOR_VERSION),
       platform,
       withOcrLibs: options.needOcr ? Boolean(pdfiumLib && ortLib) : Boolean(prevManifest?.withOcrLibs),
     } satisfies ManifestShape)
