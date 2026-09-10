@@ -73,6 +73,7 @@ bun run release -- 0.1.0               # 校验、提交、打 tag 并推送，�
 | --- | --- | --- |
 | `sidecar:build` | `apps/gateway/scripts/build-sidecar.ts` | `Bun.build compile` 产出桌面端 sidecar 二进制到 `apps/desktop/src-tauri/binaries/`（gitignored，约 94MB，含 `bun:sqlite`） |
 | `dictionary:import:oewn` | `apps/gateway/src/scripts/import-oewn.ts` | Open English WordNet 离线导入（默认 dry-run，`--apply` 才写库） |
+| live 私人教材验收 | `apps/gateway/src/scripts/live-corpus-map.ts` + `docs/pdf-live-corpus-playbook.md` | 本机 PDF 只读结构预览（需 `STUDY_STUDIO_LIVE_PDF`，不写库；未设变量只打印用法） |
 
 ## 文档索引
 
