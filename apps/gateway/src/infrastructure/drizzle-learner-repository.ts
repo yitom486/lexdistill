@@ -95,6 +95,7 @@ import {
 import {
   saveReadingPosition as saveReadingPositionDomain,
   getReadingPosition as getReadingPositionDomain,
+  listDocumentLessonRefs as listDocumentLessonRefsDomain,
   type ReadingPosition,
 } from '../modules/library/persistence/reading-positions.js';
 import {
@@ -598,6 +599,13 @@ export class DrizzleLearnerRepository implements LearnerRepository {
     documentId: string
   ): Promise<Result<ReadingPosition | null, BusinessError>> {
     return getReadingPositionDomain(this.deps, userId, documentId);
+  }
+
+  /**
+   * 列出某文档下 locator 引用的 lessonId（只读，不含用户身份；shadow 风险评估用）。
+   */
+  public async listDocumentLessonRefs(documentId: string): Promise<Result<string[], BusinessError>> {
+    return listDocumentLessonRefsDomain(this.deps, documentId);
   }  /**
    * 词典包配置更新（开关 / 排序权重）。
    * 实现已下沉 dictionary 域，此处仅委托。

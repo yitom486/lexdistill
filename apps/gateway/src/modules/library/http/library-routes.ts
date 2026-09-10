@@ -1,6 +1,6 @@
 ﻿import { Hono } from 'hono';
 import { validator } from 'hono/validator';
-import { isOk, BusinessError, generateId } from '@study-studio/shared';
+import { isOk, BusinessError, generateId, logger } from '@study-studio/shared';
 import {
   AnnotationKindSchema,
   DocumentSourceKindSchema,
@@ -8,6 +8,8 @@ import {
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
+import { reconcileLessons, summarizeReconciliation, type ReconLessonInput } from '../lesson-reconciliation.js';
+import { tryParseTextbookAst } from '../persistence/textbook-shred.js';
 
 /** 文库域路由：文档与批注（G2 迁移，行为不变）。 */
 
@@ -52,10 +54,63 @@ export function classifyDocumentAstJson(raw: unknown): AstJsonClass {
   return { kind: 'invalid', code: 'E_INVALID_INPUT', message: '未知文档结构（非教材亦非已知阅读形），未保存' };
 }
 
+/** TextbookLesson → reconciliation 输入（只取 speaker/japanese 与词面，不含译文）。 */
+function toReconInput(lessons: TextbookAST['lessons']): ReconLessonInput[] {
+  return lessons.map((l) => ({
+    id: l.id,
+    title: l.title,
+    dialogues: l.dialogues.map((d) => ({ speaker: d.speaker, japanese: d.japanese })),
+    vocabularies: l.vocabularies.map((v) => ({ surface: v.kanji })),
+  }));
+}
+
+/** 序列确实变化（id 或标题序列任一不同）才值得 shadow；完全相同直接跳过。 */
+function lessonsChanged(oldL: TextbookAST['lessons'], newL: TextbookAST['lessons']): boolean {
+  if (oldL.length !== newL.length) return true;
+  return oldL.some((l, i) => l.id !== newL[i]?.id || l.title !== newL[i]?.title);
+}
+
 /** Hono validator 只保证 Record 形状；字符串字段在此处一次性收窄（非字符串一律 undefined）。 */
 function strField(body: Record<string, unknown>, key: string): string | undefined {
   const value = body[key];
   return typeof value === 'string' ? value : undefined;
+}
+
+/**
+ * Authorized replacement shadow（P1-C0.8，只观察不干预）。
+ * 前置：existing 已授权 + 旧 AST 合法 + incoming 合法 + 序列变化。
+ * 全程 try/catch：evaluator/logger 故障降级为最小运维日志，永不阻断保存、不写库。
+ */
+async function shadowReconcile(
+  deps: GatewayDeps,
+  documentId: string,
+  oldAstJson: string,
+  incoming: TextbookAST
+): Promise<void> {
+  try {
+    const oldBook = tryParseTextbookAst(oldAstJson);
+    if (!oldBook) return;
+    if (!lessonsChanged(oldBook.lessons, incoming.lessons)) return;
+    const result = reconcileLessons(toReconInput(oldBook.lessons), toReconInput(incoming.lessons));
+    // durable risk：REMOVED/AMBIGUOUS/split/merge/absorb 涉及的旧 id 被 locator 引用即计数
+    const risky = new Set<string>();
+    for (const p of result.pairs) if (p.status === 'AMBIGUOUS') risky.add(p.oldId);
+    for (const x of result.removed) risky.add(x.oldId);
+    for (const r of result.relations) for (const id of r.oldIds) risky.add(id);
+    let atRisk: string[] = [];
+    try {
+      const refs = await deps.repo.listDocumentLessonRefs(documentId);
+      if (refs.ok) atRisk = refs.value.filter((id) => risky.has(id));
+    } catch {
+      // 位置读取失败不阻断 shadow 主体（risk 计 0）
+    }
+    logger.info('[lesson-reconcile-shadow]', summarizeReconciliation(documentId, result, atRisk));
+  } catch (e) {
+    logger.warn('[lesson-reconcile-shadow] evaluator 故障，已降级（保存不受影响）', {
+      documentId,
+      message: e instanceof Error ? e.message.slice(0, 200) : String(e).slice(0, 200),
+    });
+  }
 }
 
 /** 文档来源标记：非法值回退 user_import（种子/正常写入均为合法枚举，不受影响）。 */
@@ -74,10 +129,13 @@ export function createLibraryRoutes(deps: GatewayDeps) {
     return formatBusinessErrorResponse(c, res.error);
   })
   .get('/api/documents/:userId/:documentId', async (c) => {
+    const userId = c.req.param('userId');
     const documentId = c.req.param('documentId');
     const res = await deps.repo.getDocumentById(documentId);
     if (isOk(res)) {
-      if (!res.value) {
+      // Ownership 边界（P1-C0.8 Task 0）：private 文档仅 owner 可读；
+      // 公共种子（curriculum_textbook）保持可见；其余统一 E_NOT_FOUND，不泄露存在性。
+      if (!res.value || (res.value.userId !== userId && res.value.sourceKind !== 'curriculum_textbook')) {
         return formatBusinessErrorResponse(
           c,
           new BusinessError('E_NOT_FOUND', '未找到指定的教材或文档', 'LEARNER_STATE')
@@ -177,6 +235,16 @@ export function createLibraryRoutes(deps: GatewayDeps) {
           createdAt: strField(body, 'createdAt') || now,
           updatedAt: now,
         };
+        // Ownership 边界（P1-C0.8 Task 0）：覆盖既有文档必须先验 owner；
+        // 他人文档（含公共种子，他人不可覆盖）统一 E_NOT_FOUND；新 id 创建不受影响。
+        const existing = await deps.repo.getDocumentById(docItem.id);
+        if (!isOk(existing)) return formatBusinessErrorResponse(c, existing.error);
+        if (existing.value && existing.value.userId !== userId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_NOT_FOUND', '未找到指定的教材或文档', 'LEARNER_STATE')
+          );
+        }
         // AST 输入边界：分类后分流；非法教材形/未知形态直接拒绝，绝不 saveDocument。
         const astClass = classifyDocumentAstJson(docItem.astJson);
         if (astClass.kind === 'invalid') {
@@ -188,6 +256,11 @@ export function createLibraryRoutes(deps: GatewayDeps) {
         }
         if (astClass.kind === 'textbook') {
           // 教材形走唯一 canonical 写入口（同事务；失败即 err）。
+          // Shadow：仅 existing 已授权 + 旧 AST 合法 + 序列变化时只读观察；
+          // 不改 incoming、不阻断保存、不写库。
+          if (existing.value?.astJson) {
+            await shadowReconcile(deps, docItem.id, existing.value.astJson, astClass.book);
+          }
           const { astJson: _omit, ...docBase } = docItem;
           void _omit;
           const res = await deps.repo.saveCanonicalAst(docBase, astClass.book);

@@ -76,8 +76,7 @@ export async function saveReadingPosition(
 }
 
 /** 读取阅读位置（无记录返回 null，不算错）。 */
-export async function getReadingPosition(
-  deps: RepoDeps,
+export async function getReadingPosition(  deps: RepoDeps,
   userId: string,
   documentId: string
 ): Promise<Result<ReadingPosition | null, BusinessError>> {
@@ -110,6 +109,40 @@ export async function getReadingPosition(
       translateToBusinessError(error, {
         category: 'DATABASE',
         action: 'getReadingPosition',
+        entityId: docId,
+      })
+    );
+  }
+}
+
+/**
+ * 列出某文档下所有 locator 引用的 lessonId（只读，P1-C0.8 shadow 风险评估用）。
+ * 只返回 lessonId 字符串集合，不返回用户身份；坏 locator 静默跳过。
+ */
+export async function listDocumentLessonRefs(
+  deps: RepoDeps,
+  documentId: string
+): Promise<Result<string[], BusinessError>> {
+  const docId = documentId.trim();
+  if (!docId) {
+    return err(new BusinessError('E_INVALID_INPUT', 'documentId 非法', 'VALIDATION'));
+  }
+  try {
+    const rows = await deps.db
+      .select({ locator: readingPositions.locator })
+      .from(readingPositions)
+      .where(eq(readingPositions.documentId, docId));
+    const out = new Set<string>();
+    for (const row of rows) {
+      const loc = parseLocator(row.locator);
+      if (typeof loc.lessonId === 'string' && loc.lessonId) out.add(loc.lessonId);
+    }
+    return ok([...out]);
+  } catch (error) {
+    return err(
+      translateToBusinessError(error, {
+        category: 'DATABASE',
+        action: 'listDocumentLessonRefs',
         entityId: docId,
       })
     );

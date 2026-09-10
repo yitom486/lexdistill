@@ -265,6 +265,72 @@ function align(weights: number[][]): DiagPair[] {
   return pairs.reverse();
 }
 
+export interface ShadowSummary {
+  event: 'lesson-reconcile-shadow';
+  documentId: string;
+  oldLessonCount: number;
+  newLessonCount: number;
+  auto: number;
+  ambiguous: number;
+  added: number;
+  removed: number;
+  split: number;
+  merge: number;
+  absorb: number;
+  autoPairs: Array<{
+    oldLessonId: string;
+    newIndex: number;
+    exactFp: boolean;
+    tokenMatch: boolean;
+    sim: number;
+  }>;
+  durableRefAtRiskCount: number;
+  riskyOldLessonIds: string[];
+}
+
+/**
+ * Shadow 摘要 mapper（纯函数，P1-C0.8 Task 3）。
+ * 允许字段：documentId、计数、AUTO 行（oldLessonId/newIndex/evidence flags/rounded sim）、
+ * risk 计数与 risky old ids。严禁：dialogue/OCR/vocab/grammar 正文、title token、
+ * sourceRef、用户 id、matcher 原始大对象。
+ */
+export function summarizeReconciliation(
+  documentId: string,
+  result: ReconcileResult,
+  atRiskOldIds: string[]
+): ShadowSummary {
+  const atRisk = new Set(atRiskOldIds);
+  const autoPairs = result.pairs
+    .filter((p) => p.status === 'AUTO_MATCH')
+    .map((p) => ({
+      oldLessonId: p.oldId,
+      newIndex: p.newIndex,
+      exactFp: p.evidence.exactFp,
+      tokenMatch: p.evidence.tokenEqual,
+      sim: Math.round(p.evidence.sim * 1000) / 1000,
+    }));
+  const riskyOldLessonIds = [...atRisk].sort();
+  return {
+    event: 'lesson-reconcile-shadow',
+    documentId,
+    oldLessonCount: result.pairs.length + result.removed.length,
+    newLessonCount: result.reconciledLessons.length,
+    auto: autoPairs.length,
+    ambiguous:
+      result.pairs.filter((p) => p.status === 'AMBIGUOUS').length +
+      result.added.filter((a) => a.status === 'AMBIGUOUS').length +
+      result.removed.filter((x) => x.status === 'AMBIGUOUS').length,
+    added: result.added.filter((a) => a.status === 'ADDED').length,
+    removed: result.removed.filter((x) => x.status === 'REMOVED').length,
+    split: result.relations.filter((x) => x.kind === 'split-candidate').length,
+    merge: result.relations.filter((x) => x.kind === 'merge-candidate').length,
+    absorb: result.relations.filter((x) => x.kind === 'absorb-candidate').length,
+    autoPairs,
+    durableRefAtRiskCount: riskyOldLessonIds.length,
+    riskyOldLessonIds,
+  };
+}
+
 export function reconcileLessons(
   oldLessons: ReconLessonInput[],
   newLessons: ReconLessonInput[]
