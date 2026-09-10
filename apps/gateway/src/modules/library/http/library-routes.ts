@@ -7,9 +7,50 @@ import {
 } from '@study-studio/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
-import { tryParseTextbookAst } from '../persistence/textbook-shred.js';
+import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
 
 /** 文库域路由：文档与批注（G2 迁移，行为不变）。 */
+
+export type AstJsonClass =
+  | { kind: 'none' }
+  | { kind: 'textbook'; book: TextbookAST }
+  | { kind: 'non-textbook' }
+  | { kind: 'invalid'; code: 'E_INVALID_INPUT' | 'E_INVALID_TEXTBOOK_AST'; message: string };
+
+/**
+ * POST /api/documents 输入边界分类器（纯函数，P1-C0.75a）：
+ * - 无 astJson → none（普通 saveDocument）；
+ * - 合法 TextbookAST → textbook（saveCanonicalAst）；
+ * - 已知合法非教材形（白名单：`{questions: [...]}` 阅读/新闻形，无 lessons）→ non-textbook；
+ * - JSON 非法 → invalid/E_INVALID_INPUT；
+ * - 含 lessons 但未通过 TextbookASTSchema（含重复 lesson.id、字段损坏）→ invalid/E_INVALID_TEXTBOOK_AST；
+ * - 其他未知形态 → invalid/E_INVALID_INPUT（绝不静默当普通文档保存）。
+ */
+export function classifyDocumentAstJson(raw: unknown): AstJsonClass {
+  if (raw === undefined || raw === null || raw === '') return { kind: 'none' };
+  let parsed: unknown;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { kind: 'invalid', code: 'E_INVALID_INPUT', message: '文档结构不是合法 JSON，请检查后重试' };
+    }
+  } else {
+    parsed = raw;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { kind: 'invalid', code: 'E_INVALID_INPUT', message: '文档结构不是合法对象，请检查后重试' };
+  }
+  const rec = parsed as Record<string, unknown>;
+  if (Array.isArray(rec.lessons)) {
+    const book = parseTextbookAST(parsed);
+    if (book.ok) return { kind: 'textbook', book: book.value };
+    return { kind: 'invalid', code: 'E_INVALID_TEXTBOOK_AST', message: '教材结构校验失败（课次缺失/重复课 id/字段损坏），未保存' };
+  }
+  // 已知合法非教材形白名单：阅读/新闻 `{questions: [...]}`（种子与阅读管线直写，路由透传兼容）。
+  if (Array.isArray(rec.questions)) return { kind: 'non-textbook' };
+  return { kind: 'invalid', code: 'E_INVALID_INPUT', message: '未知文档结构（非教材亦非已知阅读形），未保存' };
+}
 
 /** Hono validator 只保证 Record 形状；字符串字段在此处一次性收窄（非字符串一律 undefined）。 */
 function strField(body: Record<string, unknown>, key: string): string | undefined {
@@ -136,18 +177,24 @@ export function createLibraryRoutes(deps: GatewayDeps) {
           createdAt: strField(body, 'createdAt') || now,
           updatedAt: now,
         };
-        // 教材形 AST 走唯一 canonical 写入口（同事务；失败即 err，不再 warn 后成功）。
-        // 非教材（无 astJson / {questions} 等）继续普通保存。
-        if (docItem.astJson) {
-          const book = tryParseTextbookAst(docItem.astJson);
-          if (book) {
-            const { astJson: _omit, ...docBase } = docItem;
-            void _omit;
-            const res = await deps.repo.saveCanonicalAst(docBase, book);
-            if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'saveDocument');
-            return c.json(res.value);
-          }
+        // AST 输入边界：分类后分流；非法教材形/未知形态直接拒绝，绝不 saveDocument。
+        const astClass = classifyDocumentAstJson(docItem.astJson);
+        if (astClass.kind === 'invalid') {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError(astClass.code, astClass.message, 'VALIDATION'),
+            'saveDocument'
+          );
         }
+        if (astClass.kind === 'textbook') {
+          // 教材形走唯一 canonical 写入口（同事务；失败即 err）。
+          const { astJson: _omit, ...docBase } = docItem;
+          void _omit;
+          const res = await deps.repo.saveCanonicalAst(docBase, astClass.book);
+          if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'saveDocument');
+          return c.json(res.value);
+        }
+        // none / 已知非教材形：普通保存。
         const res = await deps.repo.saveDocument(docItem);
         if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
         return c.json(res.value);
