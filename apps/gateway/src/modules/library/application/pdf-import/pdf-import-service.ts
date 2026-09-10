@@ -4,6 +4,7 @@ import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
 import { detectDocScript, markdownToAst, promoteLessonHeadings } from './markdown-to-ast.js';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from './extract-headings.js';
 import { collectLayoutCandidates, layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from './layout-headings.js';
+import { buildPdfConvertReport, buildPdfMapReport } from './pdf-import-report.js';
 import {
   analyzePagesWithAzure,
   AZURE_FALLBACK_MIN_CHARS,
@@ -263,18 +264,31 @@ export async function mapPdfPages(
       ]
     );
     const azureHitPages = azurePages.filter((p) => p.markdown.trim()).map((p) => p.pageNumber);
+    const ocrUsed = window.some((p) => needing.includes(p));
+    const tocEntries = extractTocEntries(combined);
+    logger.warn(
+      '[pdf-map] 结构预览完成',
+      buildPdfMapReport({
+        pageCount,
+        window,
+        ocrUsed,
+        ocrPages: needing.filter((p) => window.includes(p)),
+        headings,
+        tocCount: tocEntries.length,
+      })
+    );
     return ok({
       classification: {
         pdfType,
         pageCount,
         pagesNeedingOcr: needing,
-        ocrUsed: window.some((p) => needing.includes(p)),
+        ocrUsed,
         selectedPages: window,
         ...(azureHitPages.length > 0 ? { azurePages: azureHitPages } : {}),
       },
       window,
       headings,
-      tocEntries: extractTocEntries(combined),
+      tocEntries,
     });
   } catch (e) {
     logger.warn('[pdf-map] map window failed', { message: errorMessage(e) });
@@ -561,18 +575,33 @@ export async function convertPdfToAst(
     lessons: book.lessons.length,
     dialogues: book.lessons.reduce((acc, l) => acc + l.dialogues.length, 0),
   };
-  logger.info('[pdf-import] 转换成功', { title: book.title, ...stats, ocrUsed });
+  const outClassification = {
+    pdfType,
+    pageCount,
+    pagesNeedingOcr: pagesNeedingOcr.filter(inScope),
+    ocrUsed,
+    selectedPages: selectedPages ?? [],
+    ...(azureHitPages.length > 0 ? { azurePages: azureHitPages } : {}),
+  };
+  logger.warn(
+    '[pdf-import] 转换完成',
+    buildPdfConvertReport({
+      title: book.title,
+      pdfType: outClassification.pdfType,
+      pageCount: outClassification.pageCount,
+      selectedPages: outClassification.selectedPages,
+      ocrUsed: outClassification.ocrUsed,
+      ocrPages: outClassification.pagesNeedingOcr,
+      ...(outClassification.azurePages ? { azurePages: outClassification.azurePages } : {}),
+      lessons: stats.lessons,
+      dialogues: stats.dialogues,
+      lessonTitles: book.lessons.map((l) => l.title),
+    })
+  );
   return ok({
     book,
     markdown,
-    classification: {
-      pdfType,
-      pageCount,
-      pagesNeedingOcr: pagesNeedingOcr.filter(inScope),
-      ocrUsed,
-      selectedPages: selectedPages ?? [],
-      ...(azureHitPages.length > 0 ? { azurePages: azureHitPages } : {}),
-    },
+    classification: outClassification,
     stats,
   });
 }
@@ -666,10 +695,12 @@ export async function appendPdfToDocument(
   );
   if (!isOk(saved)) return err(saved.error);
   const addedDialogues = appended.reduce((acc, l) => acc + l.dialogues.length, 0);
-  logger.info('[pdf-import] 接力追加成功', {
+  logger.warn('[pdf-import] 接力完成', {
     documentId: input.documentId,
     addedLessons: appended.length,
     addedDialogues,
+    totalLessons: rechecked.value.lessons.length,
+    addedTitles: appended.map((l) => l.title),
   });
   return ok({
     document: saved.value,

@@ -17,6 +17,7 @@ import { useImportPdfMutation, useMapPdfMutation, useAppendPdfMutation, useImpor
 import { useOcrStore } from '../stores/useOcrStore.js';
 import { useCodexModelsQuery } from '../queries/useCodexQueries.js';
 import { pickClassifyEffort } from '../utils/classify-effort.js';
+import { resolvePdfPageRange } from '../lib/pdf-page-range.js';
 import { sound } from '../utils/audio.js';
 import { getPlatform } from '../platform/capabilities.js';
 import type { TextbookBook, FuriganaWord } from '../models/textbook.js';
@@ -63,6 +64,8 @@ export function TextbookImporterModal({
   const [pdfPath, setPdfPath] = useState<string>('');
   const [pdfStartPage, setPdfStartPage] = useState<string>('');
   const [pdfEndPage, setPdfEndPage] = useState<string>('');
+  /** 全部页 = 不传 start/end；指定页码必须填齐两端 */
+  const [pdfScope, setPdfScope] = useState<'all' | 'range'>('all');
   const importPdf = useImportPdfMutation();
   const mapPdf = useMapPdfMutation();
   const classify = useClassifyStructureMutation();
@@ -185,19 +188,20 @@ export function TextbookImporterModal({
     sound.playClick();
   };
 
-  const readPageRange = () => {
-    const startPage = /^\d+$/.test(pdfStartPage.trim()) ? Number(pdfStartPage.trim()) : undefined;
-    const endPage = /^\d+$/.test(pdfEndPage.trim()) ? Number(pdfEndPage.trim()) : undefined;
-    return { startPage, endPage };
-  };
+  const readPageRange = () => resolvePdfPageRange(pdfScope, pdfStartPage, pdfEndPage);
 
   const handlePdfMap = () => {
     if (mapPdf.isPending) return;
     const path = pdfPath.trim();
     if (!pdfFile && !path) return;
     setParseError(null);
+    const range = readPageRange();
+    if (range === 'incomplete-range') {
+      setParseError('已选「指定页码」，请同时填写起始页和结束页');
+      return;
+    }
     sound.playClick();
-    const { startPage, endPage } = readPageRange();
+    const { startPage, endPage } = range;
     const vars = pdfFile
       ? {
           file: pdfFile,
@@ -215,9 +219,16 @@ export function TextbookImporterModal({
       {
         onSuccess: (result) => {
           sound.playCorrect();
-          if (result.headings.length === 0 && result.tocEntries.length === 0) {
-            setPdfNote(`已扫 ${result.window.length} 页，未发现课标题/目录，换一段页码再试`);
-          }
+          const headingPreview = result.headings
+            .slice(0, 12)
+            .map((h) => `p${h.page} ${h.text}`)
+            .join(' · ');
+          setPdfNote(
+            `结构预览：全书 ${result.classification.pageCount} 页 · 本窗 ${result.window.length} 页` +
+              (result.classification.ocrUsed ? ' · 已 OCR' : '') +
+              ` · 标题 ${result.headings.length} 条 · 目录 ${result.tocEntries.length} 条` +
+              (headingPreview ? ` → ${headingPreview}` : ' · 未发现课标题/目录，换一段页码再试')
+          );
         },
         onError: (err) => {
           setParseError(err instanceof Error ? err.message : '结构预览失败');
@@ -306,8 +317,13 @@ export function TextbookImporterModal({
     if (!pdfFile && !path) return;
     setParseError(null);
     setPdfNote(null);
+    const range = readPageRange();
+    if (range === 'incomplete-range') {
+      setParseError('已选「指定页码」，请同时填写起始页和结束页');
+      return;
+    }
     sound.playClick();
-    const { startPage, endPage } = readPageRange();
+    const { startPage, endPage } = range;
     // 接力模式：直接追加到已有书（网关合并+续排号），不走新书预览链路
     if (appendTarget) {
       const vars = pdfFile
@@ -371,13 +387,15 @@ export function TextbookImporterModal({
           c.selectedPages.length > 0
             ? ` · 第 ${c.selectedPages[0]}–${c.selectedPages[c.selectedPages.length - 1]} 页`
             : '';
+        const titles = result.book.lessons.map((l) => l.title);
         setPdfNote(
           `识别为${kind} · ${c.pageCount} 页${range} · ${result.stats.lessons} 课 ${result.stats.dialogues} 句` +
-            (c.ocrUsed ? ' · 首次 OCR 已按需下载运行时（约 80MB，一次性）' : '') +
-            ((c.azurePages?.length ?? 0) > 0 ? ` · 云回填 ${c.azurePages?.length} 页` : '')
+            (c.ocrUsed ? ' · 已 OCR' : '') +
+            ((c.azurePages?.length ?? 0) > 0 ? ` · 云回填 ${c.azurePages?.length} 页` : '') +
+            (titles.length > 0 ? ` → ${titles.join(' / ')}` : '')
         );
         sound.playCorrect();
-        toast.success(`PDF 解析成功：${result.stats.lessons} 课，${result.stats.dialogues} 句，确认后入库`);
+        toast.success(`PDF 解析成功：${result.stats.lessons} 课（${titles.slice(0, 8).join('、')}${titles.length > 8 ? '…' : ''}），确认后入库`);
       },
       onError: (err) => {
         setParseError(err instanceof Error ? err.message : 'PDF 导入失败');
@@ -602,26 +620,63 @@ export function TextbookImporterModal({
               </Select>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
-              <span>大书按课分段导（选填，1-based 页码）：</span>
-              <input
-                type="number"
-                min={1}
-                placeholder="起始页"
-                value={pdfStartPage}
-                onChange={(e) => setPdfStartPage(e.target.value)}
-                disabled={importPdf.isPending}
-                className="w-20 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500"
-              />
-              <span>–</span>
-              <input
-                type="number"
-                min={1}
-                placeholder="结束页"
-                value={pdfEndPage}
-                onChange={(e) => setPdfEndPage(e.target.value)}
-                disabled={importPdf.isPending}
-                className="w-20 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500"
-              />
+              <span>导入范围：</span>
+              <button
+                type="button"
+                className={`h-7 px-2.5 rounded-lg border text-[11px] font-semibold ${
+                  pdfScope === 'all'
+                    ? 'border-amber-600 bg-amber-600 text-white'
+                    : 'border-stone-200 dark:border-stone-700'
+                }`}
+                disabled={importPdf.isPending || mapPdf.isPending}
+                onClick={() => {
+                  setPdfScope('all');
+                  setPdfStartPage('');
+                  setPdfEndPage('');
+                }}
+              >
+                全部页
+              </button>
+              <button
+                type="button"
+                className={`h-7 px-2.5 rounded-lg border text-[11px] font-semibold ${
+                  pdfScope === 'range'
+                    ? 'border-amber-600 bg-amber-600 text-white'
+                    : 'border-stone-200 dark:border-stone-700'
+                }`}
+                disabled={importPdf.isPending || mapPdf.isPending}
+                onClick={() => setPdfScope('range')}
+              >
+                指定页码
+              </button>
+              {pdfScope === 'range' && (
+                <>
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="起始页"
+                    value={pdfStartPage}
+                    onChange={(e) => setPdfStartPage(e.target.value)}
+                    disabled={importPdf.isPending}
+                    className="w-20 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500"
+                  />
+                  <span>–</span>
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="结束页"
+                    value={pdfEndPage}
+                    onChange={(e) => setPdfEndPage(e.target.value)}
+                    disabled={importPdf.isPending}
+                    className="w-20 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500"
+                  />
+                </>
+              )}
+              <span className="text-stone-400">
+                {pdfScope === 'all'
+                  ? '扫描书单次 OCR 最多 30 页，超了会被拒绝，请改用指定页码再接力'
+                  : '1-based 页码，含两端；点下方标题可自动填一段'}
+              </span>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
               <span title="百 MB 大书走上传会崩网关；同机网关可直接填本机绝对路径直读（桌面端选文件即路径）">
@@ -688,6 +743,7 @@ export function TextbookImporterModal({
                       key={`${h.page}-${i}`}
                       type="button"
                       onClick={() => {
+                        setPdfScope('range');
                         setPdfStartPage(String(h.page));
                         setPdfEndPage(String(h.page + 14));
                         sound.playClick();
