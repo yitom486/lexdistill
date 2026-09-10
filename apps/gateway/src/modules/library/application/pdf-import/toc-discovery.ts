@@ -51,18 +51,18 @@ export const TOC_DISCOVERY_SCORE = {
   CANDIDATE: 6,
 } as const;
 
-/** 课号 token：日语教材形 + 通用拉丁形（不含中文章节正则）。 */
-const LESSON_TOKEN_RE = /(第\s*\d+\s*課|復習\s*[AB]|LESSON\s*\d+|UNIT\s*\d+)/i;
+/** 课号 token：日语教材形 + 通用拉丁形（P3 基线复用，不含中文章节正则）。 */
+export const LESSON_TOKEN_RE = /(第\s*\d+\s*課|復習\s*[AB]|LESSON\s*\d+|UNIT\s*\d+)/i;
 /** 目录标题：日语形 + 通用词（TABLE OF CONTENTS 含 CONTENTS，一并命中）。 */
 const TOC_TITLE_RE = /(目次|もくじ|目录|CONTENTS)/i;
 /** 点线：省略号/三点以上圆点/中点/全角点。 */
 const DOT_LEADER_RE = /…{2,}|(\.\s?){3,}|・{2,}|．{2,}/;
-/** 行尾页码：标题 + 空白 + 1–4 位数字；纯数字行（页码 folio）不命中。 */
-const TRAILING_PAGE_RE = /^(.*\S)\s+(\d{1,4})$/;
-/** 表格行：半角/全角竖线。 */
-const TABLE_ROW_RE = /[|｜]/;
-/** 习题行：问号题号/练习字样 + 数字（正文编号无此字样，不误伤）。 */
-const EXERCISE_RE = /^(問|问)\s*\d+|^Q\s*\d+[\.\)]?|^(練習|练习|EXERCISE)\s*\d+/i;
+/** 行尾页码：标题 + 空白 + 1–4 位数字（P3 基线复用；纯数字行不命中）。 */
+export const TRAILING_PAGE_RE = /^(.*\S)\s+(\d{1,4})$/;
+/** 表格行：半角/全角竖线（P3 基线复用）。 */
+export const TABLE_ROW_RE = /[|｜]/;
+/** 习题行：问号题号/练习字样 + 数字（P3 基线复用，拒绝习题正文）。 */
+export const EXERCISE_RE = /^(問|问)\s*\d+|^Q\s*\d+[\.\)]?|^(練習|练习|EXERCISE)\s*\d+/i;
 
 export interface TocPageFeatures {
   hasTocTitle: boolean;

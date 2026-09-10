@@ -94,9 +94,25 @@ export interface PdfClassifyResult {
 
 export interface PdfOcrResult {
   markdown?: string | null;
-  pages?: Array<{ pageNumber: number; markdown: string }>;
+  pages?: Array<{ pageNumber: number; markdown: string; spans?: OcrTextSpanLike[] }>;
   pagesRoutedToOcr?: number[];
   pagesRecommendingHosted?: number[];
+}
+
+/**
+ * 行级 OCR 识别结果（fork 原生 `OcrTextSpan` 透传形状，与 TextItem 同坐标系）。
+ * P3 只用它验证“同一行标题—右侧页码”几何关系；缺席即降级为纯文本证据。
+ */
+export interface OcrTextSpanLike {
+  /** 识别行文本（已 trim）。 */
+  text: string;
+  /** 行包围盒（PDF 点，同 TextItem 系）。 */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** 识别置信度 0–1。 */
+  confidence: number;
 }
 
 export interface PdfRuntimePaths {

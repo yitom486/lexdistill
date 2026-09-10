@@ -3,6 +3,7 @@ import { BusinessError, isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
 import { discoverTocPages } from '../application/pdf-import/toc-discovery.js';
+import { extractTocBaseline } from '../application/pdf-import/toc-baseline.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
@@ -109,6 +110,38 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
         return c.json(res.value);
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'discoverTocPages');
+      }
+    })
+        .post('/api/documents/:userId/extract-toc', async (c) => {
+      // 目录基线 OCR（只读草稿）：调用方已确认 fromPage/toPage（经 startPage/endPage 传入），
+      // 对该范围做本地 OCR 产出 title/printedPage/level/source/kind。不写库、不落 AST、不切课。
+      const input = await readPdfInput(c);
+      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+      try {
+        const userId = c.req.param('userId');
+        if (!userId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
+          );
+        }
+        const pages = input.value.pages;
+        const fromPage = pages?.[0];
+        const toPage = pages?.[pages.length - 1];
+        if (fromPage === undefined || toPage === undefined) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '请提供已确认的目录页范围（startPage/endPage）', 'VALIDATION')
+          );
+        }
+        const res = await extractTocBaseline(
+          {},
+          { userId, filename: input.value.filename, bytes: input.value.bytes, fromPage, toPage }
+        );
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
+        return c.json(res.value);
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'extractTocBaseline');
       }
     })
     .post('/api/documents/:userId/:documentId/append-pdf', async (c) => {      // 接力追加：新页段的课接在已有教材后面（大书分段导入）。
