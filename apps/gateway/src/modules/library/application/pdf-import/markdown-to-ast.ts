@@ -1,5 +1,6 @@
 import { ok, err, BusinessError, type Result } from '@study-studio/shared';
 import type { StructureClass, TextbookAST } from '@study-studio/protocol';
+import type { PageHeading, TocEntry } from './extract-headings.js';
 
 /**
  * PDF 提取 Markdown → TextbookAST 初版结构化（纯函数）。
@@ -352,6 +353,77 @@ function toDialogue(line: string): { speaker: string; japanese: string; chinese:
     return { speaker: '课文', japanese: ja, chinese: zh };
   }
   return null;
+}
+
+/** 独立课标题上限（正文长句即使以课号开头也不提升，防碎课）。 */
+const PROMOTE_TITLE_MAX = 30;
+
+/** 课单元形态前缀（与 LESSON_HEAD_RE 同口径；返回匹配到的头部）。 */
+function lessonPatternHead(cleaned: string): string | null {
+  const m =
+    /^(第\s*[0-9一二三四五六七八九十百]+\s*[課课章节節回話话]|lesson\s*\d+|unit\s*\d+|(?:復習|复习)\s*[A-Z]?)/i.exec(
+      cleaned
+    );
+  return m ? (m[1] ?? m[0] ?? '') : null;
+}
+
+/**
+ * CMD-02：无模型标题提升（纯函数，零 I/O，零模型）。
+ * 把“像课标题的行”加上 `# ` 前缀，交给现有切课；已是 `#` 的行一字不动。
+ * 提升规则（必须同时满足）：
+ * 1. 行首即课单元形态（第N課/课/章…、Lesson/Unit N、復習A/复习A 含粘连）；
+ * 2. 其后只许空白/页码（`第10課 118`、`復習A42` 可，`第1課 李さん…` 副标题不提升）；
+ * 3. 全行 ≤ 30 字（cleanLine 已先滤掉点线目录/目次/页码行）。
+ * 外部候选（map 阶段合并：markdown 抽取 + layout 版式 + TOC，只取课形态文本）
+ * 仅放行“行文本等于候选文本”的等价行（另容忍 40 字截断：候选在封顶长度上
+ * 恰为行前缀时同样放行，与 CMD-01 接地口径一致），不放宽课形态要求，
+ * 不发明切课点。无候选时纯规则独立工作。
+ */
+export function promoteLessonHeadings(
+  markdown: string,
+  opts: { headings?: PageHeading[]; tocEntries?: TocEntry[] } = {}
+): string {
+  const evidence: string[] = [];
+  const pushEvidence = (raw: unknown): void => {
+    if (typeof raw !== 'string') return;
+    const text = raw.trim().slice(0, 80);
+    if (text && lessonPatternHead(text)) evidence.push(text);
+  };
+  if (Array.isArray(opts.headings)) {
+    for (const h of opts.headings) {
+      if (h && typeof h === 'object') pushEvidence((h as { text?: unknown }).text);
+    }
+  }
+  if (Array.isArray(opts.tocEntries)) {
+    for (const e of opts.tocEntries) {
+      if (e && typeof e === 'object') pushEvidence((e as { label?: unknown }).label);
+    }
+  }
+  let changed = false;
+  const out = markdown.split('\n').map((raw) => {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith('#')) return raw;
+    const cleaned = cleanLine(trimmed);
+    if (!cleaned) return raw;
+    const head = lessonPatternHead(cleaned);
+    if (!head) return raw;
+    const rest = cleaned.slice(head.length).trim();
+    if (rest === '' || /^\d{1,4}$/.test(rest)) {
+      if (cleaned.length <= PROMOTE_TITLE_MAX) {
+        changed = true;
+        return `# ${cleaned}`;
+      }
+      return raw;
+    }
+    for (const ev of evidence) {
+      if (cleaned === ev || (ev.length >= 40 && cleaned.startsWith(ev))) {
+        changed = true;
+        return `# ${cleaned}`;
+      }
+    }
+    return raw;
+  });
+  return changed ? out.join('\n') : markdown;
 }
 
 /**

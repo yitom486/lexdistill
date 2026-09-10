@@ -1,7 +1,7 @@
 import { BusinessError, err, generateId, isOk, logger, ok, type Result } from '@study-studio/shared';
 import { parseTextbookAST, StructureClassSchema, type DocumentItem, type TextbookAST, type StructureClass } from '@study-studio/protocol';
 import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
-import { detectDocScript, markdownToAst } from './markdown-to-ast.js';
+import { detectDocScript, markdownToAst, promoteLessonHeadings } from './markdown-to-ast.js';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from './extract-headings.js';
 import { collectLayoutCandidates, layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from './layout-headings.js';
 import {
@@ -491,6 +491,7 @@ export async function convertPdfToAst(
 
   // Azure 失败页回填（convert 侧：整窗过薄才整窗打云；给了 Key 才触发）
   let azureHitPages: number[] = [];
+  let azureItems: LayoutTextItem[] = [];
   if (input.azure?.apiKey) {
     const windowPages =
       selectedPages ??
@@ -513,6 +514,7 @@ export async function convertPdfToAst(
         if (got.length > 0) {
           markdown = got.map((p) => p.markdown).join('\n');
           azureHitPages = got.map((p) => p.pageNumber);
+          for (const p of got) azureItems.push(...azureLinesToLayoutItems(p));
           ocrUsed = true;
         }
       } else {
@@ -531,8 +533,22 @@ export async function convertPdfToAst(
       )
     );
   }
+  // CMD-02：与 mapPdfPages 同源的标题候选（markdown 抽取 + layout 版式；Azure 行框有则一并）。
+  // 无模型：只把“像课标题的行”提升为 `#` 切课点，再交现有 markdownToAst（可带 classes）。
+  // layout 接口缺席/异常时 collect 内部降级为空，纯 markdown 规则照常工作。
+  const layoutWindow = selectedPages ?? Array.from({ length: pageCount }, (_, i) => i + 1);
+  const promoted = promoteLessonHeadings(markdown, {
+    headings: mergeHeadingCandidates(
+      extractHeadingsFromMarkdown(markdown, layoutWindow[0] ?? 1),
+      [
+        ...collectLayoutCandidates(inspector, input.bytes, layoutWindow),
+        ...layoutItemsToCandidates(azureItems, []),
+      ]
+    ),
+    tocEntries: extractTocEntries(markdown),
+  });
   const astRes = markdownToAst(
-    markdown,
+    promoted,
     { title, ...(classesRes.value ? { classes: classesRes.value } : {}) }
   );
   if (!astRes.ok) return err(astRes.error);
