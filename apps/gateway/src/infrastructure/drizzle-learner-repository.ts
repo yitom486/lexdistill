@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { isOk, ok, err, type Result, type BusinessError } from '@study-studio/shared';
+import { isOk, ok, err, type Result, BusinessError, translateToBusinessError } from '@study-studio/shared';
 import type {
   LearnerRepository,
   QuizAttemptRecord,
@@ -132,6 +132,10 @@ import {
   shredDocument as shredDocumentDomain,
   type ShredStats,
 } from '../modules/library/persistence/textbook-shred.js';
+import {
+  materializeSeedIntoTransaction,
+  type MaterializeSeedInput,
+} from '../modules/library/persistence/seed-materialization.js';
 import type { StudyGateSnapshot } from '@study-studio/learner-core';
 import {
   previewCard as previewCardDomain,
@@ -534,6 +538,37 @@ export class DrizzleLearnerRepository implements LearnerRepository {
     book: TextbookAST
   ): Promise<Result<ShredStats, BusinessError>> {
     return shredDocumentDomain(this.deps, documentId, book);
+  }
+
+  /**
+   * Seed 原子 materialize（documents upsert + shred + state 同一事务；失败整体回滚）。
+   * startup gating 专用；用户文档走 saveCanonicalAst。
+   */
+  public async materializeSeedDocument(
+    docBase: MaterializeSeedInput['docBase'],
+    book: TextbookAST,
+    fingerprint: string,
+    materializerVersion: number
+  ): Promise<Result<DocumentItem, BusinessError>> {
+    try {
+      this.deps.db.transaction((tx) => {
+        materializeSeedIntoTransaction(tx, { docBase, book, fingerprint, materializerVersion });
+      });
+      const got = await this.getDocumentById(docBase.id);
+      if (!isOk(got) || !got.value) {
+        return err(new BusinessError('E_INTERNAL', '种子落库后回读失败', 'DATABASE', true));
+      }
+      return ok(got.value);
+    } catch (error) {
+      if (error instanceof BusinessError) return err(error);
+      return err(
+        translateToBusinessError(error, {
+          category: 'DATABASE',
+          action: 'materializeSeedDocument',
+          entityId: docBase.id,
+        })
+      );
+    }
   }
 
   /**

@@ -2,6 +2,12 @@ import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repo
 import { GatewayServer } from '../runtime/gateway-runtime.js';
 import { TEXTBOOK_BOOKS } from '../infrastructure/db/seeds/textbook-seed.js';
 import { tryParseTextbookAst } from '../modules/library/persistence/textbook-shred.js';
+import {
+  computeSeedMaterializationFingerprint,
+  shouldSkipSeedMaterialization,
+  SEED_MATERIALIZER_VERSION,
+} from '../modules/library/persistence/seed-materialization.js';
+import { parseTextbookAST } from '@study-studio/protocol';
 import { isOk, logger } from '@study-studio/shared';
 import { dbPath } from './config.js';
 
@@ -17,53 +23,89 @@ export async function createGateway(db: string = dbPath) {
 }
 
 /**
- * 种子教材 shred 回填（P0.5）：seed-bootstrap 只 INSERT documents 行，
- * shred 走导入同一 AST→shred 领域能力（repo.shredDocument），不复制逻辑。
- * 幂等（全删全插）：升级库重跑即回填；单本失败只 warn，不挡网关启动。
- * 注意：只 shred 落库的 ast_json（Dialectal 旧种子会跳过，见 repair dry-run），
- * 绝不回写 ast_json 本身——底稿只增不改，旧种子同步走 repair 流程。
+ * 种子教材 materialization gating（P1-D1；旧名 shred 回填，语义升级为门控）：
+ * seed canonical input + mapping + materializer 版本均未变且 projection 健康
+ * → 跳过 shred（零 DELETE/INSERT/UPDATE，不重建 FTS/term_map）；
+ * 否则经 repo.materializeSeedDocument 原子重建（documents upsert + shred + state 同事务）。
+ * 单本失败只 warn，不挡网关启动（doctor 会继续报告 projection 问题）。
+ * 注意：只认代码 TEXTBOOK_BOOKS 为 input 真相；落库 AST 非法/错位时跳过（等 repair）。
  */
 export async function shredSeedTextbooks(repo: DrizzleLearnerRepository): Promise<{
   shredded: number;
   skipped: number;
+  skippedClean: number;
 }> {
   let shredded = 0;
   let skipped = 0;
-  for (const book of TEXTBOOK_BOOKS) {
-    const got = await repo.getDocumentById(book.id);
-    if (!isOk(got) || !got.value?.astJson) {
+  let skippedClean = 0;
+  const sqlite = repo.getRawDb();
+  for (const rawBook of TEXTBOOK_BOOKS) {
+    const bookId = (rawBook as { id?: unknown }).id;
+    if (typeof bookId !== 'string' || !bookId) {
       skipped++;
       continue;
     }
-    const parsed = tryParseTextbookAst(got.value.astJson);
-    if (!parsed) {
+    // input 真相 = 代码种子（先校验 canonical 形状，不合法绝不 shred）。
+    const checked = parseTextbookAST(JSON.parse(JSON.stringify(rawBook)));
+    if (!checked.ok) {
       skipped++;
-      logger.warn('[shred-seed] 种子书落库 AST 非法，跳过 shred（等 repair 同步底稿）', {
-        bookId: book.id,
-      });
+      logger.warn('[shred-seed] 种子书代码 AST 非法，跳过', { bookId });
       continue;
     }
-    // R1-D 保护：解析出的 AST id 必须等于种子文档 id，防止错位 shred 到别的文档。
-    if (parsed.id !== book.id) {
+    const book = checked.value;
+    const got = await repo.getDocumentById(bookId);
+    if (!isOk(got)) {
       skipped++;
-      logger.warn('[shred-seed] 种子书 AST id 与文档 id 不一致，跳过 shred', {
-        bookId: book.id,
-        astId: parsed.id,
-      });
+      logger.warn('[shred-seed] 种子书读取失败，跳过', { bookId });
       continue;
     }
-    const res = await repo.shredDocument(parsed.id, parsed);
+    if (got.value?.astJson) {
+      // R1-D 保护：落库 AST id 必须等于种子文档 id，防止错位。
+      const stored = tryParseTextbookAst(got.value.astJson);
+      if (!stored || stored.id !== bookId) {
+        skipped++;
+        logger.warn('[shred-seed] 种子书落库 AST 非法或 id 不一致，跳过 shred（等 repair）', {
+          bookId,
+        });
+        continue;
+      }
+    }
+    // 门控：fingerprint（含版本）一致 + projection 健康 → 跳过。
+    const decision = shouldSkipSeedMaterialization(sqlite, bookId, book, SEED_MATERIALIZER_VERSION);
+    if (decision.skip) {
+      skippedClean++;
+      continue;
+    }
+    const docBase = got.value
+      ? {
+          id: bookId,
+          userId: got.value.userId,
+          title: book.title,
+          sourceKind: 'curriculum_textbook' as const,
+          language: got.value.language,
+          content: book.title,
+        }
+      : {
+          id: bookId,
+          userId: 'default_user',
+          title: book.title,
+          sourceKind: 'curriculum_textbook' as const,
+          language: (book.language || 'JA').toLowerCase(),
+          content: book.title,
+        };
+    const fingerprint = computeSeedMaterializationFingerprint(sqlite, book, SEED_MATERIALIZER_VERSION);
+    const res = await repo.materializeSeedDocument(docBase, book, fingerprint, SEED_MATERIALIZER_VERSION);
     if (isOk(res)) {
       shredded++;
     } else {
       skipped++;
-      logger.warn('[shred-seed] 种子书 shred 失败', {
-        bookId: parsed.id,
+      logger.warn('[shred-seed] 种子书 materialize 失败（已回滚）', {
+        bookId,
         code: res.error.code,
       });
     }
   }
-  return { shredded, skipped };
+  return { shredded, skipped, skippedClean };
 }
 
 export type CreatedGateway = ReturnType<typeof createGateway>;

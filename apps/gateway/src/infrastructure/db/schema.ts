@@ -49,9 +49,7 @@ export const learnerLanguageProfiles = sqliteTable(
     totalQuizzesAnswered: integer('total_quizzes_answered').notNull().default(0),
     updatedAt: text('updated_at').notNull(),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.userId, table.language] }),
-  })
+  (table) => [primaryKey({ columns: [table.userId, table.language] })]
 );
 
 /**
@@ -77,13 +75,9 @@ export const studyActivityLogs = sqliteTable(
     isOvertimeBurst: integer('is_overtime_burst', { mode: 'boolean' }).notNull().default(false),
     completedAt: text('completed_at'),
   },
-  (table) => ({
-    userDateLangIdx: index('idx_activity_user_date_lang').on(
-      table.userId,
-      table.activityDate,
-      table.language
-    ),
-  })
+  (table) => [
+    index('idx_activity_user_date_lang').on(table.userId, table.activityDate, table.language),
+  ]
 );
 
 /**
@@ -104,9 +98,7 @@ export const skillMetrics = sqliteTable(
     status: text('status').notNull(),
     lastPracticedAt: text('last_practiced_at'),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.userId, table.skillId] }),
-  })
+  (table) => [primaryKey({ columns: [table.userId, table.skillId] })]
 );
 
 /**
@@ -130,13 +122,10 @@ export const flashcards = sqliteTable(
     /** v7：讲透时间（M2 学习门；NULL=没讲透，不进练习池 NEW 块）。 */
     studiedAt: text('studied_at'),
   },
-  (table) => ({
-    userLangIdx: index('idx_flashcards_user_lang').on(table.userId, table.language),
-    userSourceEntryIdx: index('idx_flashcards_user_source_entry').on(
-      table.userId,
-      table.sourceEntryId
-    ),
-  })
+  (table) => [
+    index('idx_flashcards_user_lang').on(table.userId, table.language),
+    index('idx_flashcards_user_source_entry').on(table.userId, table.sourceEntryId),
+  ]
 );
 
 /**
@@ -174,13 +163,9 @@ export const mistakes = sqliteTable(
     consecutiveCorrect: integer('consecutive_correct').notNull(),
     isResolved: integer('is_resolved', { mode: 'boolean' }).notNull(),
   },
-  (table) => ({
-    userLangResolvedIdx: index('idx_mistakes_user_lang_resolved').on(
-      table.userId,
-      table.language,
-      table.isResolved
-    ),
-  })
+  (table) => [
+    index('idx_mistakes_user_lang_resolved').on(table.userId, table.language, table.isResolved),
+  ]
 );
 
 /**
@@ -259,14 +244,10 @@ export const kanaPracticeStates = sqliteTable(
     consecutiveErrors: integer('consecutive_errors').notNull().default(0),
     updatedAt: text('updated_at').notNull(),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.userId, table.kanaId, table.scriptType] }),
-    userScriptIdx: index('idx_kana_practice_states_user_script').on(
-      table.userId,
-      table.scriptType,
-      table.updatedAt
-    ),
-  })
+  (table) => [
+    primaryKey({ columns: [table.userId, table.kanaId, table.scriptType] }),
+    index('idx_kana_practice_states_user_script').on(table.userId, table.scriptType, table.updatedAt),
+  ]
 );
 
 /**
@@ -311,13 +292,9 @@ export const quizQuestions = sqliteTable(
     extrasJson: text('extras_json'),
     createdAt: text('created_at').notNull(),
   },
-  (table) => ({
-    userLangCreatedIdx: index('idx_quiz_questions_user_lang').on(
-      table.userId,
-      table.language,
-      table.createdAt
-    ),
-  })
+  (table) => [
+    index('idx_quiz_questions_user_lang').on(table.userId, table.language, table.createdAt),
+  ]
 );
 
 /**
@@ -374,12 +351,7 @@ export const localDictionaryEntries = sqliteTable(
     licenseNote: text('license_note').notNull(),
     createdAt: text('created_at').notNull(),
   },
-  (table) => ({
-    languageHeadwordIdx: index('idx_local_dictionary_language_headword').on(
-      table.language,
-      table.headword
-    ),
-  })
+  (table) => [index('idx_local_dictionary_language_headword').on(table.language, table.headword)]
 );
 
 /** 每个已安装词典包的版本、来源与署名信息。 */
@@ -417,10 +389,10 @@ export const dictionarySources = sqliteTable('dictionary_sources', {
     sourceId: text('source_id').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.term, table.reading, table.sourceId] }),
-    termLangIdx: index('idx_dictionary_term_meta_term_lang').on(table.term, table.language),
-  })
+  (table) => [
+    primaryKey({ columns: [table.term, table.reading, table.sourceId] }),
+    index('idx_dictionary_term_meta_term_lang').on(table.term, table.language),
+  ]
 );
 
 /** 查词历史（用户学习资产：画像“查过什么”信号源；按用户+语种隔离，保留最近 200 条）。 */
@@ -435,9 +407,9 @@ export const dictionarySearchHistory = sqliteTable(
     topEntryId: text('top_entry_id'),
     createdAt: text('created_at').notNull(),
   },
-  (table) => ({
-    userLangIdx: index('idx_dictionary_history_user_lang').on(table.userId, table.language, table.createdAt),
-  })
+  (table) => [
+    index('idx_dictionary_history_user_lang').on(table.userId, table.language, table.createdAt),
+  ]
 );
 
 /**
@@ -458,13 +430,9 @@ export const learningContentTemplates = sqliteTable(
     payload: text('payload').notNull(),
     createdAt: text('created_at').notNull(),
   },
-  (table) => ({
-    actionLangIdx: index('idx_content_templates_action_lang').on(
-      table.action,
-      table.language,
-      table.sortOrder
-    ),
-  })
+  (table) => [
+    index('idx_content_templates_action_lang').on(table.action, table.language, table.sortOrder),
+  ]
 );
 
 /**
@@ -481,13 +449,9 @@ export const dailyStudyPlans = sqliteTable(
     completedStepIdsJson: text('completed_step_ids_json').notNull().default('[]'),
     createdAt: text('created_at').notNull(),
   },
-  (table) => ({
-    userLangDateUniq: uniqueIndex('idx_daily_plans_user_lang_date').on(
-      table.userId,
-      table.language,
-      table.planDate
-    ),
-  })
+  (table) => [
+    uniqueIndex('idx_daily_plans_user_lang_date').on(table.userId, table.language, table.planDate),
+  ]
 );
 
 /**
@@ -623,9 +587,7 @@ export const textbookLessons = sqliteTable(
     title: text('title').notNull(),
     sortOrder: integer('sort_order'),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.documentId, table.lessonId] }),
-  })
+  (table) => [primaryKey({ columns: [table.documentId, table.lessonId] })]
 );
 
 export const textbookVocab = sqliteTable(
@@ -642,9 +604,7 @@ export const textbookVocab = sqliteTable(
     exampleJa: text('example_ja'),
     exampleZh: text('example_zh'),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.documentId, table.lessonId, table.ord] }),
-  })
+  (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
 );
 
 export const textbookGrammar = sqliteTable(
@@ -658,9 +618,7 @@ export const textbookGrammar = sqliteTable(
     explanation: text('explanation'),
     examplesJson: text('examples_json').notNull().default('[]'),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.documentId, table.lessonId, table.ord] }),
-  })
+  (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
 );
 
 export const textbookLines = sqliteTable(
@@ -673,9 +631,7 @@ export const textbookLines = sqliteTable(
     ja: text('ja').notNull(),
     zh: text('zh'),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.documentId, table.lessonId, table.ord] }),
-  })
+  (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
 );
 
 export const textbookExercises = sqliteTable(
@@ -691,9 +647,7 @@ export const textbookExercises = sqliteTable(
     answer: text('answer').notNull().default(''),
     explanation: text('explanation'),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.documentId, table.lessonId, table.ord] }),
-  })
+  (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
 );
 
 export const textbookTermMap = sqliteTable(
@@ -706,12 +660,23 @@ export const textbookTermMap = sqliteTable(
     skillId: text('skill_id'),
     entryId: text('entry_id'),
   },
-  (table) => ({
-    pk: primaryKey({
-      columns: [table.documentId, table.lessonId, table.kind, table.refText],
-    }),
-  })
+  (table) => [
+    primaryKey({ columns: [table.documentId, table.lessonId, table.kind, table.refText] }),
+  ]
 );
+
+/**
+ * Seed materialization state（v18 P1-D1；startup gating 专用持久状态）。
+ * - 只有 atomic materialize 成功才写入/更新（与 shred 同一事务，rollback 联动）；
+ * - fingerprint 语义见 seed-materialization.ts（AST + mapping 切片 + materializer 版本）；
+ * - 用户文档永不进此表（种子专用）。
+ */
+export const seedMaterialization = sqliteTable('seed_materialization', {
+  documentId: text('document_id').primaryKey(),
+  fingerprint: text('fingerprint').notNull(),
+  materializerVersion: integer('materializer_version').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
 
 /**
  * 阅读位置（每用户每文档一条；locator 为不透明 JSON）。
@@ -725,9 +690,7 @@ export const readingPositions = sqliteTable(
     locator: text('locator').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.userId, table.documentId] }),
-  })
+  (table) => [primaryKey({ columns: [table.userId, table.documentId] })]
 );
 
 /**

@@ -1,4 +1,7 @@
 import type { Database } from 'bun:sqlite';
+import { SCHEMA_MIGRATIONS } from './migrations/index.js';
+
+export { SCHEMA_MIGRATIONS } from './migrations/index.js';
 
 /**
  * 自动迁移/初始化数据表 DDL（P2-5 拆分：仅结构，不含种子数据）
@@ -473,27 +476,27 @@ export function initSchema(sqlite: Database): void {
   ];
   for (const sql of alterStatements) {
     try {
-      sqlite.exec(sql);
+      sqlite.run(sql);
     } catch {
       /* column already exists */
     }
   }
 
   try {
-    sqlite.exec(
+    sqlite.run(
       'CREATE INDEX IF NOT EXISTS idx_activity_user_date_lang ON study_activity_logs(user_id, activity_date, language)'
     );
-    sqlite.exec('CREATE INDEX IF NOT EXISTS idx_flashcards_user_lang ON flashcards(user_id, language)');
-    sqlite.exec(
+    sqlite.run('CREATE INDEX IF NOT EXISTS idx_flashcards_user_lang ON flashcards(user_id, language)');
+    sqlite.run(
       'CREATE INDEX IF NOT EXISTS idx_flashcards_user_source_entry ON flashcards(user_id, source_entry_id)'
     );
-    sqlite.exec(
+    sqlite.run(
       'CREATE INDEX IF NOT EXISTS idx_mistakes_user_lang_resolved ON mistakes(user_id, language, is_resolved)'
     );
-    sqlite.exec(
+    sqlite.run(
       'CREATE INDEX IF NOT EXISTS idx_quiz_questions_user_lang ON quiz_questions(user_id, language, created_at)'
     );
-    sqlite.exec(
+    sqlite.run(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_plans_user_lang_date ON daily_study_plans(user_id, language, plan_date)'
     );
   } catch {
@@ -505,352 +508,11 @@ export function initSchema(sqlite: Database): void {
 }
 
 /**
- * 版本化迁移（2026-09 新增；此前的裸 DDL/ALTER 视为基线 v1）。
+ * 版本化迁移（此前的裸 DDL/ALTER 视为基线 v1）。
  * - legacy DDL 幂等先行：上方 CREATE/ALTER 全是 IF NOT EXISTS / try-catch，
  *   存量库跑完即等价 v1，直接记基线；
- * - 此后所有结构变更必须追加 MIGRATIONS 条目，禁止再加裸 ALTER。
+ * - 升级步骤登记在 `migrations/`，禁止再往本文件追加裸 ALTER。
  */
-interface SchemaMigration {
-  version: number;
-  name: string;
-  sql: string;
-}
-
-const SCHEMA_MIGRATIONS: SchemaMigration[] = [
-  {
-    version: 2,
-    name: 'encountered-terms',
-    sql: `
-      CREATE TABLE IF NOT EXISTS encountered_terms (
-        user_id TEXT NOT NULL,
-        language TEXT NOT NULL,
-        term_key TEXT NOT NULL,
-        headword TEXT NOT NULL,
-        reading TEXT,
-        status TEXT NOT NULL DEFAULT 'new',
-        exposure_count INTEGER NOT NULL DEFAULT 1,
-        first_seen_at TEXT NOT NULL,
-        last_seen_at TEXT NOT NULL,
-        flashcard_id TEXT,
-        PRIMARY KEY (user_id, language, term_key)
-      );
-      CREATE TABLE IF NOT EXISTS term_occurrences (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        language TEXT NOT NULL,
-        term_key TEXT NOT NULL,
-        source TEXT NOT NULL,
-        document_id TEXT,
-        quote TEXT,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_term_occurrences_user_term
-        ON term_occurrences(user_id, language, term_key, created_at);
-      CREATE INDEX IF NOT EXISTS idx_encountered_terms_user_lang
-        ON encountered_terms(user_id, language, last_seen_at);
-    `,
-  },
-  {
-    version: 3,
-    name: 'card-drafts-reading-positions',
-    sql: `
-      CREATE TABLE IF NOT EXISTS card_drafts (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        language TEXT NOT NULL,
-        term_key TEXT NOT NULL,
-        headword TEXT NOT NULL,
-        reading TEXT,
-        meanings_json TEXT NOT NULL,
-        part_of_speech TEXT,
-        source TEXT NOT NULL,
-        source_ref TEXT,
-        status TEXT NOT NULL DEFAULT 'pending',
-        edited_fields_json TEXT NOT NULL DEFAULT '[]',
-        flashcard_id TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_card_drafts_user_lang_status
-        ON card_drafts(user_id, language, status, updated_at);
-      CREATE TABLE IF NOT EXISTS reading_positions (
-        user_id TEXT NOT NULL,
-        document_id TEXT NOT NULL,
-        locator TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY (user_id, document_id)
-      );
-    `,
-  },
-  {
-    // v4：打卡日志加字母 drill 当日计数（带路按天判定的数据源；全新列，版本门保证只执行一次，原子提交）。
-    version: 4,
-    name: 'activity-alphabet-counts',
-    sql: `
-      ALTER TABLE study_activity_logs ADD COLUMN kana_count INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE study_activity_logs ADD COLUMN hangul_count INTEGER NOT NULL DEFAULT 0;
-    `,
-  },
-  {
-    // v5：五十音讲义资产；旧版数据库可能已误将该变更登记为 v4。
-    version: 5,
-    name: 'kana-learning-guides',
-    sql: `
-      ALTER TABLE curriculum_kana ADD COLUMN learning_guide_json TEXT;
-    `,
-  },
-  {
-    // v6：定级考记录表（跳级通道；自动升降级不依赖它，通过行仅用于当日掉级豁免）。
-    version: 6,
-    name: 'placement-exams',
-    sql: `
-      CREATE TABLE IF NOT EXISTS placement_exams (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        language TEXT NOT NULL,
-        target_level TEXT NOT NULL,
-        run_id TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        accuracy REAL,
-        created_at TEXT NOT NULL,
-        completed_at TEXT
-      );
-      CREATE INDEX IF NOT EXISTS idx_placement_user_lang
-        ON placement_exams(user_id, language, created_at);
-    `,
-  },
-  {
-    // v7：闪卡讲透时间（M2 学习门；存量 NULL=没讲透，不挡复习，只挡练习池 NEW 块）。
-    version: 7,
-    name: 'flashcards-studied-at',
-    sql: `
-      ALTER TABLE flashcards ADD COLUMN studied_at TEXT;
-    `,
-  },
-  {
-    // v8：假名逐项 FSRS 状态，用于按用户历史动态组建短练习队列。
-    version: 8,
-    name: 'kana-practice-states',
-    sql: `
-      CREATE TABLE IF NOT EXISTS kana_practice_states (
-        user_id TEXT NOT NULL,
-        kana_id TEXT NOT NULL,
-        script_type TEXT NOT NULL,
-        fsrs_json TEXT NOT NULL,
-        consecutive_errors INTEGER NOT NULL DEFAULT 0,
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY (user_id, kana_id, script_type)
-      );
-      CREATE INDEX IF NOT EXISTS idx_kana_practice_states_user_script
-        ON kana_practice_states(user_id, script_type, updated_at);
-    `,
-  },
-  {
-    // v9：草稿句子类型（kind/card_type；存量行读侧默认 word/VOCABULARY）。
-    version: 9,
-    name: 'card-drafts-kind',
-    sql: `
-      ALTER TABLE card_drafts ADD COLUMN kind TEXT NOT NULL DEFAULT 'word';
-      ALTER TABLE card_drafts ADD COLUMN card_type TEXT;
-    `,
-  },
-  {
-    // v10：词条例句缓存（AI 按需生成 + 永久缓存，供讲透卡/练习复用）。
-    version: 10,
-    name: 'term-examples',
-    sql: `
-      CREATE TABLE IF NOT EXISTS term_examples (
-        id TEXT PRIMARY KEY,
-        language TEXT NOT NULL,
-        term_key TEXT NOT NULL,
-        headword TEXT NOT NULL,
-        sentence TEXT NOT NULL,
-        translation TEXT NOT NULL,
-        source TEXT NOT NULL DEFAULT 'ai',
-        created_at TEXT NOT NULL
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_term_examples_unique
-        ON term_examples(language, term_key, sentence);
-    `,
-  },
-  {
-    // v11：语法讲义（先讲后测）：课程公共资产 + 用户学完进度。
-    // curriculum_lessons.id 即技能 id（= quiz testedSkillId），有讲义且未学完的技能，
-    // 系统代选出题时不出（NEED_LESSON）；用户自选/课内小测/定级考/自家卡豁免。
-    version: 11,
-    name: 'curriculum-lessons',
-    sql: `
-      CREATE TABLE IF NOT EXISTS curriculum_lessons (
-        id TEXT PRIMARY KEY,
-        language TEXT NOT NULL,
-        min_level TEXT NOT NULL DEFAULT 'NOVICE',
-        title TEXT NOT NULL,
-        summary TEXT NOT NULL DEFAULT '',
-        body_json TEXT NOT NULL DEFAULT '{}',
-        sort_order INTEGER NOT NULL DEFAULT 0
-      );
-      CREATE INDEX IF NOT EXISTS idx_lessons_lang ON curriculum_lessons(language, sort_order);
-      CREATE TABLE IF NOT EXISTS lesson_progress (
-        user_id TEXT NOT NULL,
-        skill_id TEXT NOT NULL,
-        completed_at TEXT NOT NULL,
-        PRIMARY KEY (user_id, skill_id)
-      );
-    `,
-  },
-  {
-    // v12：课程单元掌握记录（只记 mastered，不过渡态；已记录永不自动收回）。
-    // 证据全部来自既有表（做题/假名/讲义/生词/测评），本表只存结论 + 快照。
-    version: 12,
-    name: 'unit-progress',
-    sql: `
-      CREATE TABLE IF NOT EXISTS unit_progress (
-        user_id TEXT NOT NULL,
-        unit_id TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'mastered',
-        evidence_json TEXT NOT NULL DEFAULT '{}',
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY (user_id, unit_id)
-      );
-    `,
-  },
-  {
-    // v13：阶段测评蓝图版本 + 分项成绩（蓝图v1：技能组/题数/答对线/机动题）。
-    version: 13,
-    name: 'placement-blueprint',
-    sql: `
-      ALTER TABLE placement_exams ADD COLUMN blueprint_version TEXT;
-      ALTER TABLE placement_exams ADD COLUMN blueprint_json TEXT;
-      ALTER TABLE placement_exams ADD COLUMN subscores_json TEXT;
-    `,
-  },
-  {
-    // v14：教材 shred——AST 大绳拆成关系行 + FTS + 知识映射（只建表，不写数据）。
-    // - 四张行表与 documents.ast_json 同源（底稿保留），落库/enrich 时同事务全删全插；
-    // - textbook_term_map 只记精确匹配（skill_id/entry_id 为空=未映射，可统计覆盖率，绝不臆造边）；
-    // - FTS 为 contentful FTS5 虚表，手工同步（shred 时同事务重建），不设触发器。
-    version: 14,
-    name: 'textbook-shred',
-    sql: `
-      CREATE TABLE IF NOT EXISTS textbook_lessons (
-        document_id TEXT NOT NULL,
-        lesson_id TEXT NOT NULL,
-        lesson_number INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        PRIMARY KEY (document_id, lesson_id)
-      );
-      CREATE TABLE IF NOT EXISTS textbook_vocab (
-        document_id TEXT NOT NULL,
-        lesson_id TEXT NOT NULL,
-        ord INTEGER NOT NULL,
-        surface TEXT NOT NULL,
-        reading TEXT,
-        pos TEXT,
-        gloss_zh TEXT,
-        pitch TEXT,
-        example_ja TEXT,
-        example_zh TEXT,
-        PRIMARY KEY (document_id, lesson_id, ord)
-      );
-      CREATE INDEX IF NOT EXISTS idx_textbook_vocab_surface
-        ON textbook_vocab(document_id, surface);
-      CREATE TABLE IF NOT EXISTS textbook_grammar (
-        document_id TEXT NOT NULL,
-        lesson_id TEXT NOT NULL,
-        ord INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        connection TEXT,
-        explanation TEXT,
-        PRIMARY KEY (document_id, lesson_id, ord)
-      );
-      CREATE TABLE IF NOT EXISTS textbook_lines (
-        document_id TEXT NOT NULL,
-        lesson_id TEXT NOT NULL,
-        ord INTEGER NOT NULL,
-        speaker TEXT,
-        ja TEXT NOT NULL,
-        zh TEXT,
-        PRIMARY KEY (document_id, lesson_id, ord)
-      );
-      CREATE INDEX IF NOT EXISTS idx_textbook_lines_lesson
-        ON textbook_lines(document_id, lesson_id, ord);
-      CREATE VIRTUAL TABLE IF NOT EXISTS textbook_fts USING fts5(
-        surface, reading, gloss, ja, zh,
-        document_id UNINDEXED, lesson_id UNINDEXED, kind UNINDEXED, ref UNINDEXED
-      );
-      CREATE TABLE IF NOT EXISTS textbook_term_map (
-        document_id TEXT NOT NULL,
-        lesson_id TEXT NOT NULL,
-        kind TEXT NOT NULL,
-        ref_text TEXT NOT NULL,
-        skill_id TEXT,
-        entry_id TEXT,
-        PRIMARY KEY (document_id, lesson_id, kind, ref_text)
-      );
-      CREATE INDEX IF NOT EXISTS idx_textbook_term_map_skill
-        ON textbook_term_map(skill_id);
-      CREATE INDEX IF NOT EXISTS idx_textbook_term_map_entry
-        ON textbook_term_map(entry_id);
-    `,
-  },
-  {
-    // v15：文档结构分类结果（mini 模型判选 + 接地校验；观测先行，不影响导入主流程）。
-    // 一文档一行（后跑覆盖先跑）；headings 为输入候选，classes 为校验后输出。
-    version: 15,
-    name: 'document-structure',
-    sql: `
-      CREATE TABLE IF NOT EXISTS document_structure (
-        document_id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        headings_json TEXT NOT NULL DEFAULT '[]',
-        classes_json TEXT NOT NULL DEFAULT '[]',
-        model TEXT NOT NULL DEFAULT '',
-        effort TEXT NOT NULL DEFAULT '',
-        dropped INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL
-      );
-    `,
-  },
-  {
-    // v16：教材六层补齐——自带习题拆行 + 文法例句落列（读路径切换的前置）。
-    // - textbook_exercises：AST exercises 同源拆行（ord 保序，exercise_id 透传 AST 原 id）；
-    // - textbook_grammar.examples_json：[{japanese, chinese}] 全量存（此前只在 AST，查询面够不着）；
-    // - 只建结构不写数据：存量书的习题/例句随下一次 enrich/append/shred 回填（全删全插天然覆盖）。
-    version: 16,
-    name: 'textbook-exercises-grammar-examples',
-    sql: `
-      CREATE TABLE IF NOT EXISTS textbook_exercises (
-        document_id TEXT NOT NULL,
-        lesson_id TEXT NOT NULL,
-        ord INTEGER NOT NULL,
-        exercise_id TEXT,
-        type TEXT NOT NULL,
-        prompt TEXT NOT NULL,
-        options_json TEXT NOT NULL DEFAULT '[]',
-        answer TEXT NOT NULL DEFAULT '',
-        explanation TEXT,
-        PRIMARY KEY (document_id, lesson_id, ord)
-      );
-      CREATE INDEX IF NOT EXISTS idx_textbook_exercises_lesson
-        ON textbook_exercises(document_id, lesson_id, ord);
-      ALTER TABLE textbook_grammar ADD COLUMN examples_json TEXT NOT NULL DEFAULT '[]';
-    `,
-  },
-  {
-    // v17：P1-B lesson ordering——canonical 顺序显式落库。
-    // - sort_order = 最终 canonical AST lessons[] 的 1-based 连续顺序（index+1），唯一 ordering truth；
-    // - lesson_number 冻结为 legacy compatibility（可 gap，不参与排序，不作展示课号）；
-    // - title 仍是 raw parser/OCR heading candidate，不作 canonical display；
-    // - 只加 nullable 列不写数据：回填走 lesson-ordering-apply（AST index+1 × lesson_id 匹配），
-    //   不在 migration 里猜（禁止 sort_order = lesson_number）。
-    // - 新库同样走本 ALTER（v14 CREATE 保持原样，沿 v16 examples_json 先例，避免重复加列）。
-    version: 17,
-    name: 'lesson-sort-order',
-    sql: `
-      ALTER TABLE textbook_lessons ADD COLUMN sort_order INTEGER;
-    `,
-  },
-];
 
 export function runMigrations(sqlite: Database): { applied: number[] } {
   sqlite.run(`
@@ -916,7 +578,7 @@ export function runMigrations(sqlite: Database): { applied: number[] } {
     if (applied.has(m.version)) continue;
     sqlite.run('BEGIN');
     try {
-      sqlite.exec(m.sql);
+      sqlite.run(m.sql);
       sqlite
         .query('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
         .run(m.version, m.name, new Date().toISOString());
