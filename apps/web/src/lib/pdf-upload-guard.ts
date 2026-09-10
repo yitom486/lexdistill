@@ -13,3 +13,13 @@ export const PDF_UPLOAD_SIZE_LIMIT_BYTES = 32 * 1024 * 1024;
 export function isPdfUploadTooLarge(sizeBytes: number): boolean {
   return sizeBytes >= PDF_UPLOAD_SIZE_LIMIT_BYTES;
 }
+
+/**
+ * 超大文件引导文案（单源，toast 与 PDF 区内联错误共用，禁止另写第二套句子）。
+ * 带文件名与约 MB，明确指向「本机绝对路径直读」。Chrome File 无绝对路径，
+ * 此处只引导手填，禁止臆造盘符。
+ */
+export function pdfTooLargeMessage(fileName: string, sizeBytes: number): string {
+  const mb = Math.max(1, Math.round(sizeBytes / (1024 * 1024)));
+  return `《${fileName}》约 ${mb}MB，不能用选择文件上传。请把该文件的完整绝对路径贴到下方「本机绝对路径直读」，再点开始导入。`;
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Upload,
   Download,
@@ -18,7 +18,7 @@ import { useOcrStore } from '../stores/useOcrStore.js';
 import { useCodexModelsQuery } from '../queries/useCodexQueries.js';
 import { pickClassifyEffort } from '../utils/classify-effort.js';
 import { nextRelayWindow, resolveOcrOverflowWindow, resolvePdfPageRange } from '../lib/pdf-page-range.js';
-import { isPdfUploadTooLarge } from '../lib/pdf-upload-guard.js';
+import { isPdfUploadTooLarge, pdfTooLargeMessage } from '../lib/pdf-upload-guard.js';
 import { GatewayRequestError } from '../lib/gateway-error.js';
 import { sound } from '../utils/audio.js';
 import { getPlatform } from '../platform/capabilities.js';
@@ -40,10 +40,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select.js';
-
-/** D：超大文件拒绝上传的统一引导（用户可见，不含任何本机路径）。 */
-const PDF_TOO_LARGE_MESSAGE =
-  '文件过大（≥32MB），请把本机 PDF 绝对路径填到「大文件本地直读」，不要用选择文件上传';
 
 interface TextbookImporterModalProps {
   isOpen: boolean;
@@ -68,6 +64,9 @@ export function TextbookImporterModal({
   const [pdfNote, setPdfNote] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfPath, setPdfPath] = useState<string>('');
+  /** CMD-09：超大文件被拒的 PDF 区内联错误（底部 parseError 之外，选中即见） */
+  const [pdfFileError, setPdfFileError] = useState<string | null>(null);
+  const pdfPathInputRef = useRef<HTMLInputElement>(null);
   const [pdfStartPage, setPdfStartPage] = useState<string>('');
   const [pdfEndPage, setPdfEndPage] = useState<string>('');
   /** 全部页 = 不传 start/end；指定页码必须填齐两端 */
@@ -187,16 +186,22 @@ export function TextbookImporterModal({
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    // D：≥32MB 的 File 不收（multipart 会撑网关），引导改填本机绝对路径直读。
+    // CMD-09：≥32MB 的 File 不收（multipart 会撑网关）：立刻 toast + PDF 区内联错误
+    //（单源文案），focus 路径框引导手填直读；仍不保留 File、不上传。
     if (isPdfUploadTooLarge(file.size)) {
+      const msg = pdfTooLargeMessage(file.name, file.size);
       setPdfFile(null);
       setPdfNote(null);
-      setParseError(PDF_TOO_LARGE_MESSAGE);
+      setParseError(msg);
+      setPdfFileError(msg);
+      toast.error(msg);
       sound.playMistake();
+      pdfPathInputRef.current?.focus();
       return;
     }
     // 选文件只暂存不自动导：大书先预览结构再定范围，小文件一点即导
     setPdfFile(file);
+    setPdfFileError(null);
     setParseError(null);
     setPdfNote(`已选择 ${file.name}（${(file.size / 1024 / 1024).toFixed(1)}MB），可预览结构或直接导入`);
     sound.playClick();
@@ -210,7 +215,11 @@ export function TextbookImporterModal({
     // D：超大 File 视为无文件（有路径走直读，无路径报错引导，不上传）。
     const mapFile = pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null;
     if (!mapFile && !path) {
-      if (pdfFile) setParseError(PDF_TOO_LARGE_MESSAGE);
+      if (pdfFile) {
+        const msg = pdfTooLargeMessage(pdfFile.name, pdfFile.size);
+        setParseError(msg);
+        setPdfFileError(msg);
+      }
       return;
     }
     setParseError(null);
@@ -336,7 +345,11 @@ export function TextbookImporterModal({
     // D：超大 File 视为无文件（有路径走直读，无路径报错引导，不上传）。
     const importFile = pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null;
     if (!importFile && !path) {
-      if (pdfFile) setParseError(PDF_TOO_LARGE_MESSAGE);
+      if (pdfFile) {
+        const msg = pdfTooLargeMessage(pdfFile.name, pdfFile.size);
+        setParseError(msg);
+        setPdfFileError(msg);
+      }
       return;
     }
     setParseError(null);
@@ -631,7 +644,7 @@ export function TextbookImporterModal({
             <div className="flex flex-wrap items-center gap-2">
               <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors">
                 <FileUp className="w-3.5 h-3.5" />
-                {pdfFile ? '换一份 PDF' : '选择 PDF 教材（自有资料）'}
+                {pdfFile ? '换一份 PDF' : '选择 PDF（<32MB 小文件）'}
                 <input
                   type="file"
                   accept=".pdf"
@@ -665,6 +678,11 @@ export function TextbookImporterModal({
                 {azureCreds ? ' · 云回填已启用（只打本地失败页）' : ''}
               </span>
             </div>
+            {pdfFileError && (
+              <p role="alert" className="text-[11px] font-semibold text-red-600 dark:text-red-400">
+                {pdfFileError}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
               <span title="大书分段导：先导一段成书，后续段选这本书接力追加，别重复导同一段">
                 接力到已有书（选填，不选则成新书）：
@@ -741,25 +759,35 @@ export function TextbookImporterModal({
               )}
               <span className="text-stone-400">
                 {pdfScope === 'all'
-                  ? '扫描书单次 OCR 最多 30 页，超了会被拒绝，请改用指定页码再接力'
+                  ? '扫描书单次 OCR 最多 30 页，「全部页」只导前 30 页并提示接力；要指定位置请用指定页码'
                   : '1-based 页码，含两端；点下方标题可自动填一段'}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
-              <span title="百 MB 大书走上传会崩网关；同机网关可直接填本机绝对路径直读（桌面端选文件即路径）">
-                大文件本地直读（选填，本机绝对路径）：
+              <span
+                className="font-bold text-stone-700 dark:text-stone-200"
+                title="百 MB 大书走上传会崩网关；同机网关直接填本机绝对路径走 filePath 直读，上限 500MB"
+              >
+                本机绝对路径直读（大/扫描教材主入口）：
               </span>
               <input
+                ref={pdfPathInputRef}
                 type="text"
-                placeholder="例如 C:\Books\minna.pdf（留空则用上方已选文件上传）"
+                placeholder="贴完整绝对路径（含盘符，以 .pdf 结尾）；有路径可直接预览/导入"
                 value={pdfPath}
                 onChange={(e) => {
                   setPdfPath(e.target.value);
-                  if (e.target.value.trim()) setPdfFile(null);
+                  if (e.target.value.trim()) {
+                    setPdfFile(null);
+                    setPdfFileError(null);
+                  }
                 }}
                 disabled={importPdf.isPending || mapPdf.isPending}
                 className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 font-mono"
               />
+              <span className="text-stone-400">
+                扫描/大教材请把完整绝对路径贴到这里（含盘符与 .pdf）；「选择 PDF」仅用于几十页以内、小于 32MB 的小文件
+              </span>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
               <span title="只打本地 OCR 失败的页（<50 字），平时零花费；Key 只存本机，随请求发网关，网关不落盘">
