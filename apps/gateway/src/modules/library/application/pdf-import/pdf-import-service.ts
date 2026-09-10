@@ -133,8 +133,8 @@ function errorMessage(e: unknown): string {
   return 'PDF 解析运行时异常，请稍后重试';
 }
 
-/** 1-based 连续页窗 [start, end]（首尾收敛，end < start 即空窗）。 */
-function rangePages(start: number, end: number): number[] {
+/** 1-based 连续页窗 [start, end]（首尾收敛，end < start 即空窗；P2 发现模块复用）。 */
+export function rangePages(start: number, end: number): number[] {
   const pages: number[] = [];
   for (let p = Math.max(1, Math.floor(start)); p <= Math.floor(end); p++) pages.push(p);
   return pages;
@@ -144,7 +144,7 @@ function rangePages(start: number, end: number): number[] {
  * CMD-10 轻量探页数：processPdf(bytes,[1]) 仍返回全书 pageCount（探针实测），
  * 不扫全书内容。失败/非法回 0，调用方回退常规错误（不静默成功）。
  */
-function probePdfPageCount(inspector: PdfInspectorLike, bytes: Uint8Array): number {
+export function probePdfPageCount(inspector: PdfInspectorLike, bytes: Uint8Array): number {
   try {
     const probe = inspector.processPdf(bytes, [1]);
     const n = Number(probe.pageCount ?? 0);
@@ -226,7 +226,7 @@ export interface EmbeddedOutlineEntry {
  * 返回可用条目；以下情况返回 null（调用方走既有 none 路径，不伪造目录）：
  * 老运行时无该导出、调用抛错、truncated、空目录、全是不可用项。
  */
-function readEmbeddedOutlineEntries(
+export function readEmbeddedOutlineEntries(
   inspector: PdfInspectorLike,
   bytes: Uint8Array,
   pageCount: number
@@ -504,7 +504,7 @@ function parseStructureClasses(raw: unknown): Result<StructureClass[] | undefine
   return ok(out);
 }
 
-function validatePdfInput(input: PdfImportInput): Result<void, BusinessError> {
+export function validatePdfInput(input: PdfImportInput): Result<void, BusinessError> {
   if (!input.filename.toLowerCase().endsWith('.pdf')) {
     return err(new BusinessError('E_INVALID_INPUT', '只支持 .pdf 文件导入', 'VALIDATION'));
   }

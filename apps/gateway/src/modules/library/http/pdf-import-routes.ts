@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { BusinessError, isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
+import { discoverTocPages } from '../application/pdf-import/toc-discovery.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
@@ -85,8 +86,32 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
         return formatBusinessErrorResponse(c, e, 'mapPdfDocument');
       }
     })
-    .post('/api/documents/:userId/:documentId/append-pdf', async (c) => {
-      // 接力追加：新页段的课接在已有教材后面（大书分段导入）。
+    .post('/api/documents/:userId/discover-toc', async (c) => {
+      // 目录页发现（只读）：无 embedded outline 时，用受限 OCR 前窗找疑似目录页范围，
+      // 返回 found / ambiguous / not-found 供调用方确认。不写库、不落 AST、不自动导入。
+      // 输入复用 readPdfInput（filePath 直读或 multipart 上传）；选页/azure 忽略，
+      // 恒扫前窗、恒走本地链路。
+      const input = await readPdfInput(c);
+      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+      try {
+        const userId = c.req.param('userId');
+        if (!userId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
+          );
+        }
+        const res = await discoverTocPages(
+          {},
+          { userId, filename: input.value.filename, bytes: input.value.bytes }
+        );
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
+        return c.json(res.value);
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'discoverTocPages');
+      }
+    })
+    .post('/api/documents/:userId/:documentId/append-pdf', async (c) => {      // 接力追加：新页段的课接在已有教材后面（大书分段导入）。
       const input = await readPdfInput(c);
       if (!input.ok) return formatBusinessErrorResponse(c, input.error);
       try {
