@@ -615,9 +615,12 @@ describe('P1-C0.8a fail-open 与载荷安全', () => {
     expect(blob).not.toContain('c-content-marker');
     expect(blob).not.toContain('offset');
     expect(blob).not.toContain('locator');
-    expect(blob).not.toContain('token');
-    expect(blob).not.toContain('dialogue');
-    expect(blob).not.toContain('vocab');
+    // tokenMatch 为允许的布尔信号位；禁止的是 token 原文值与 oldToken/newToken 键。
+    expect(blob).not.toContain('"oldToken"');
+    expect(blob).not.toContain('"newToken"');
+    expect(blob).not.toContain('"dialogues"');
+    expect(blob).not.toContain('"vocabularies"');
+    expect(blob).not.toContain('"sourceRef"');
   });
 
   it('shadow 零额外写入：canonical 恰一次、provisional id 原样、行数=新课数', async () => {

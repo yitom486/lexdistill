@@ -77,21 +77,60 @@ function strField(body: Record<string, unknown>, key: string): string | undefine
 }
 
 /**
- * Authorized replacement shadow（P1-C0.8，只观察不干预）。
+ * Authorized replacement shadow（P1-C0.8，只观察不干预；P1-C0.8a 可观测性修复）。
  * 前置：existing 已授权 + 旧 AST 合法 + incoming 合法 + 序列变化。
- * 全程 try/catch：evaluator/logger 故障降级为最小运维日志，永不阻断保存、不写库。
+ * 全程 fail-open：evaluator/logger 故障只记固定分类运维日志，永不阻断保存、不写库。
+ * 可观测性：真实 replacement 经 logger.warn 输出（默认 level=warn 可见），明确标注为
+ * “需人工审阅的 shadow observation”，不是用户可见错误；不引新框架/遥测/表/文件。
+ * 安全：observation payload 仅为 summarizeReconciliation 的安全摘要（documentId、
+ * 计数、AUTO 行 oldLessonId/newIndex/信号/rounded sim、risk 计数与 old ids）；
+ * fault payload 仅固定 event+documentId+code；绝不记录 exception.message/stack、
+ * 正文/title 原文/token/dialogue/vocab surface/sourceRef/userId/locator。
  */
-async function shadowReconcile(
+const SHADOW_OBSERVE_MSG =
+  '[lesson-reconcile-shadow] replacement observed — needs human review (shadow only, save unaffected)';
+const SHADOW_FAULT_MSG =
+  '[lesson-reconcile-shadow] evaluator fault — shadow skipped (save unaffected)';
+const SHADOW_FAULT_EVENT = 'lesson-reconcile-shadow-evaluator-error';
+const SHADOW_FAULT_CODE = 'E_SHADOW_EVALUATOR_FAILED';
+
+/** P1-C0.8a：测试断言用常量导出（不改变路由行为，仅供单测锁定触发前缀与固定分类）。 */
+export const SHADOW_OBSERVE_CONSTANTS = {
+  observeMsg: SHADOW_OBSERVE_MSG,
+  faultMsg: SHADOW_FAULT_MSG,
+  faultEvent: SHADOW_FAULT_EVENT,
+  faultCode: SHADOW_FAULT_CODE,
+} as const;
+
+function emitShadowFault(documentId: string): void {
+  try {
+    logger.warn(SHADOW_FAULT_MSG, {
+      event: SHADOW_FAULT_EVENT,
+      documentId,
+      code: SHADOW_FAULT_CODE,
+    });
+  } catch {
+    // logger 本身故障时吞掉：保存不受影响，不再套娃记录。
+  }
+}
+
+/** P1-C0.8a：导出仅供单测直验 fail-open（生产仅 POST 教材覆盖路径调用；不改路由行为）。 */
+export async function shadowReconcile(
   deps: GatewayDeps,
   documentId: string,
   oldAstJson: string,
   incoming: TextbookAST
-): Promise<void> {
-  try {
+): Promise<void> {  try {
     const oldBook = tryParseTextbookAst(oldAstJson);
     if (!oldBook) return;
     if (!lessonsChanged(oldBook.lessons, incoming.lessons)) return;
-    const result = reconcileLessons(toReconInput(oldBook.lessons), toReconInput(incoming.lessons));
+    let result: ReturnType<typeof reconcileLessons>;
+    try {
+      result = reconcileLessons(toReconInput(oldBook.lessons), toReconInput(incoming.lessons));
+    } catch {
+      emitShadowFault(documentId);
+      return;
+    }
     // durable risk：REMOVED/AMBIGUOUS/split/merge/absorb 涉及的旧 id 被 locator 引用即计数
     const risky = new Set<string>();
     for (const p of result.pairs) if (p.status === 'AMBIGUOUS') risky.add(p.oldId);
@@ -104,12 +143,20 @@ async function shadowReconcile(
     } catch {
       // 位置读取失败不阻断 shadow 主体（risk 计 0）
     }
-    logger.info('[lesson-reconcile-shadow]', summarizeReconciliation(documentId, result, atRisk));
-  } catch (e) {
-    logger.warn('[lesson-reconcile-shadow] evaluator 故障，已降级（保存不受影响）', {
-      documentId,
-      message: e instanceof Error ? e.message.slice(0, 200) : String(e).slice(0, 200),
-    });
+    let summary: ReturnType<typeof summarizeReconciliation>;
+    try {
+      summary = summarizeReconciliation(documentId, result, atRisk);
+    } catch {
+      emitShadowFault(documentId);
+      return;
+    }
+    try {
+      logger.warn(SHADOW_OBSERVE_MSG, summary);
+    } catch {
+      // 运维日志自身故障不阻断保存。
+    }
+  } catch {
+    emitShadowFault(documentId);
   }
 }
 
