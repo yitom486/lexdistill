@@ -98,9 +98,8 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
         const res = await appendPdfToDocument(
           {
             saveDocument: (doc) => deps.repo.saveDocument(doc),
-            // 原子写回（AST + shred 同一事务）：shred 失败则整体回滚并 err，
-            // 杜绝“AST 已更新、shred 失败仅 WARN”双源漂移。下不再后拆。
-            saveDocumentWithShred: (doc, book) => deps.repo.saveDocumentWithShred(doc, book),
+            // 唯一 canonical 写入口（AST + shred 同一事务；失败整体回滚并 err）。
+            saveCanonicalAst: (docBase, book) => deps.repo.saveCanonicalAst(docBase, book),
             getDocument: (id) => deps.repo.getDocumentById(id),
           },
           {

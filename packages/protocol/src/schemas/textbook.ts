@@ -86,6 +86,21 @@ export const TextbookASTSchema = z.object({
   description: z.string().optional(),
   totalLessons: z.number().int().positive().optional(),
   lessons: z.array(TextbookLessonSchema).min(1),
+}).superRefine((ast, ctx) => {
+  // P1-C0.75 Task 3：同一 book 内 lesson.id 必须唯一（duplicate id 会让
+  // shred 主键冲突/覆盖、reconciliation 无法区分）。 provisinal 生成已防碰撞；
+  // 历史 AST 若有重复，只报告不修复（见 dry-run）。
+  const seen = new Set<string>();
+  ast.lessons.forEach((lesson, i) => {
+    if (seen.has(lesson.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `lessons[${i}].id 重复: ${lesson.id}`,
+        path: ['lessons', i, 'id'],
+      });
+    }
+    seen.add(lesson.id);
+  });
 });
 export type TextbookAST = z.infer<typeof TextbookASTSchema>;
 

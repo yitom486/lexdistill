@@ -7,7 +7,6 @@ import {
   translateToBusinessError,
   generateId,
   nowIso,
-  logger,
 } from '@study-studio/shared';
 import type { DocumentItem, TextbookAST } from '@study-studio/protocol';
 import { markdownToAst } from '../pdf-import/markdown-to-ast.js';
@@ -28,7 +27,7 @@ import {
   updateImportTask,
   type ImportTask,
 } from '../../persistence/import-tasks.js';
-import { shredDocument } from '../../persistence/textbook-shred.js';
+import { saveCanonicalAst } from '../../persistence/documents-annotations.js';
 import type { RepoDeps } from '../../../../infrastructure/persistence/repo-context.js';
 
 /**
@@ -213,29 +212,20 @@ export async function importDocument(
     if (!isOk(ast)) throw ast.error;
     const book = ast.value;
     const now = nowIso();
-    const saved = await deps.repo.saveDocument({
+    // 唯一 canonical 写入口：AST + shred 同一事务；失败即抛（任务 failed），
+    // 不再“AST 已存、shred 失败仅 WARN”（旧双源漂移，已消除）。
+    const saved = await saveCanonicalAst(deps, {
       id: generateId('doc'),
       userId: input.userId,
       title: book.title,
       sourceKind: 'user_import',
       language: book.language.toLowerCase(),
       content: markdown.slice(0, 2000),
-      astJson: JSON.stringify(book),
       sourcePublisher: TEXT_PUBLISHER[kind],
       createdAt: now,
       updatedAt: now,
-    });
+    }, book);
     if (!isOk(saved)) throw saved.error;
-    // 落库即拆：AST 主路径已存；shred 失败只 warn（下次 enrich/重导回填），不推翻导入
-    const shredded = shredDocument(deps, saved.value.id, book);
-    if (!shredded.ok) {
-      logger.warn('[document-import] shred failed', {
-        code: shredded.error.code,
-        documentId: saved.value.id,
-      });
-    } else {
-      logger.info('[document-import] shredded', { documentId: saved.value.id, ...shredded.value });
-    }
     const lessons = book.lessons.length;
     const done = await updateImportTask(deps, task.id, {
       status: 'done',

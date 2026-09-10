@@ -108,7 +108,10 @@ describe('smoke 入库集成（:memory:，跑完即弃）', () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const res = await importPdfDocument(
-      { saveDocument: (doc) => repo.saveDocument(doc) },
+      {
+        saveDocument: (doc) => repo.saveDocument(doc),
+        saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
+      },
       { userId: 'u1', filename: 'smoke.pdf', bytes }
     );
     expect(isOk(res)).toBe(true);

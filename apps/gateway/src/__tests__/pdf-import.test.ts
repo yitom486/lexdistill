@@ -388,6 +388,13 @@ describe('importPdfDocument', () => {
           const { ok } = await import('@study-studio/shared');
           return ok(doc);
         },
+        // 显式 atomic fake（import 必经 canonical 写入口）
+        saveCanonicalAst: async (docBase, book) => {
+          const full = { ...docBase, astJson: JSON.stringify(book) };
+          saved.push(full);
+          const { ok } = await import('@study-studio/shared');
+          return ok(full);
+        },
         loadInspector: stubInspector({ pdfType: 'TextBased', pageCount: 1, markdown: JA_MD }),
       },
       { userId: 'u1', filename: '标日.pdf', bytes: PDF_HEAD }
@@ -431,6 +438,11 @@ describe('appendPdfToDocument（接力）', () => {
     saveDocument: async (doc: typeof baseDoc) => {
       const { ok } = await import('@study-studio/shared');
       return ok(doc);
+    },
+    // 显式 atomic fake（append 必经 canonical 写入口，不退化）
+    saveCanonicalAst: async (docBase: Omit<typeof baseDoc, 'astJson'>, book: unknown) => {
+      const { ok } = await import('@study-studio/shared');
+      return ok({ ...docBase, astJson: JSON.stringify(book) });
     },
     getDocument: async () => {
       const { ok } = await import('@study-studio/shared');

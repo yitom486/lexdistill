@@ -11,6 +11,7 @@ import {
   logger,
 } from '@study-studio/shared';
 import type { DocumentItem, AnnotationItem, Flashcard, TextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST } from '@study-studio/protocol';
 import {
   AnnotationKindSchema,
   type AnnotationKind,
@@ -46,6 +47,8 @@ export async function saveDocument(
   deps: RepoDeps,
   doc: DocumentItem
 ): Promise<Result<DocumentItem, BusinessError>> {
+  // 注意：教材形 AST 禁止走这里静默落库（无 shred、无原子性）——教材写一律用
+  // saveCanonicalAst；本函数仅服务非教材 document 与刻意构造漂移态的测试/修复脚本。
   try {
     const existing = await deps.db
       .select()
@@ -102,16 +105,27 @@ export async function saveDocument(
 }
 
 /**
- * 原子保存：documents 行写回 + shred 全删全插在同一事务内。
- * 任一步失败整体回滚并返回 err——调用方绝不允许“AST 已更新、shred 失败仅 WARN”的
- * 双源漂移（append 路由走这里；document-import/enrich 的 warn-only 后拆是已知遗留，另行收敛）。
- * book 必须是已过 parseTextbookAST 的 canonical AST（与传入 astJson 同源；不一致即拒写）。
+ * 唯一 canonical AST 写入口（P1-C0.75 Task 2）：
+ * canonical TextbookAST
+ *   → 内部 validate + JSON.stringify
+ *   → documents.ast_json write + shredIntoTransaction，同一 transaction commit。
+ *
+ * - 不接受独立 doc.astJson：调用方传不含 astJson 的 docBase + 已解析 book，
+ *   ast_json 一律由入口内部从验证后的 book 生成，杜绝“两份 canonical 不一致”；
+ * - 任一步失败整体 rollback 并返回 err（绝不 WARN 后返回成功）；
+ * - 复用 shredIntoTransaction，不复制 shred 实现；
+ * - 非教材 document（{questions} 等）继续走普通 saveDocument；
+ * - 教材形 AST 禁止再经普通 saveDocument 静默落库（各生产调用方已迁移，见下）。
  */
-export async function saveDocumentWithShred(
+export async function saveCanonicalAst(
   deps: RepoDeps,
-  doc: DocumentItem,
+  docBase: Omit<DocumentItem, 'astJson'>,
   book: TextbookAST
 ): Promise<Result<DocumentItem, BusinessError>> {
+  const checked = parseTextbookAST(JSON.parse(JSON.stringify(book)));
+  if (!checked.ok) return err(checked.error);
+  const canonical = checked.value;
+  const doc: DocumentItem = { ...docBase, astJson: JSON.stringify(canonical) };
   try {
     deps.db.transaction((tx) => {
       const existing = tx.select().from(documents).where(eq(documents.id, doc.id)).limit(1).all();
@@ -152,7 +166,7 @@ export async function saveDocumentWithShred(
           })
           .run();
       }
-      shredIntoTransaction(tx, doc.id, book);
+      shredIntoTransaction(tx, doc.id, canonical);
     });
     return ok(doc);
   } catch (error) {
@@ -160,7 +174,7 @@ export async function saveDocumentWithShred(
     return err(
       translateToBusinessError(error, {
         category: 'DATABASE',
-        action: 'saveDocumentWithShred',
+        action: 'saveCanonicalAst',
         entityId: doc.id,
       })
     );

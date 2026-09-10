@@ -122,6 +122,13 @@ function makeRepo(doc: DocumentItem): EnrichJobRepo & { saved: DocumentItem[]; s
       state.saved.push(d);
       return ok(d);
     },
+    // 显式 atomic fake：一次调用记一次保存 + 一次 shred（与生产 saveCanonicalAst 同语义）
+    saveCanonicalAst: async (d: Omit<DocumentItem, 'astJson'>, book: { lessons: unknown[] }) => {
+      const full = { ...d, astJson: JSON.stringify(book) } as DocumentItem;
+      state.saved.push(full);
+      state.shreds += 1;
+      return ok(full);
+    },
     shredDocument: async () => {
       state.shreds += 1;
       return ok({ lessons: 1, vocab: 1, lines: 1, mappedEntries: 0, unmapped: 0 });

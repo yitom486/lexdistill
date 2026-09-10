@@ -132,6 +132,12 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
           const { ok } = await import('@study-studio/shared');
           return ok(doc);
         },
+        // 显式 atomic fake（内存实现：与 canonical 写同语义，astJson 内部生成）
+        saveCanonicalAst: async (docBase, book) => {
+          saved = { ...docBase, astJson: JSON.stringify(book) } as typeof baseDoc;
+          const { ok } = await import('@study-studio/shared');
+          return ok(saved);
+        },
         getDocument: async () => {
           const { ok } = await import('@study-studio/shared');
           return ok({ ...baseDoc });
@@ -163,7 +169,7 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
     const res = await appendPdfToDocument(
       {
         saveDocument: (doc) => repo.saveDocument(doc),
-        saveDocumentWithShred: (doc, book) => repo.saveDocumentWithShred(doc, book),
+        saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
         getDocument: (id) => repo.getDocumentById(id),
         loadInspector: stubMarkdownInspector(MD_V2_DELETE),
       },
@@ -192,10 +198,9 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
     const next = markdownToAst(MD_V2_INSERT, { bookId: 'doc' });
     expect(isOk(next)).toBe(true);
     if (!isOk(next)) return;
-    const res = await repo.saveDocumentWithShred(
-      { ...before, astJson: JSON.stringify(next.value) },
-      next.value
-    );
+    const { astJson: _beforeJson, ...beforeBase } = before;
+    void _beforeJson;
+    const res = await repo.saveCanonicalAst(beforeBase, next.value);
     expect(isOk(res)).toBe(false);
     // AST 原样 + derived 原样：没有任何部分写入
     const got = await repo.getDocumentById('doc1');
@@ -207,8 +212,7 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
     expect(n.n).toBe(2);
   });
 
-  it('大声失败：原子保存 err 则 append 直接 err，不吞成 WARN', async () => {
-    const base = markdownToAst(MD_V1, { bookId: 'doc' });
+  it('大声失败：原子保存 err 则 append 直接 err，不吞成 WARN', async () => {    const base = markdownToAst(MD_V1, { bookId: 'doc' });
     expect(isOk(base)).toBe(true);
     if (!isOk(base)) return;
     const baseDoc = testDoc(JSON.stringify(base.value));
@@ -219,7 +223,7 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
           const { ok } = await import('@study-studio/shared');
           return ok(doc);
         },
-        saveDocumentWithShred: async () =>
+        saveCanonicalAst: async () =>
           err(new BusinessError('E_INTERNAL', 'shred 失败（测试注入）', 'DATABASE', true)),
         getDocument: async () => {
           const { ok } = await import('@study-studio/shared');
@@ -230,5 +234,51 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
       { userId: 'u1', filename: 'part2.pdf', bytes: PDF_HEAD, documentId: 'doc1' }
     );
     expect(isOk(res)).toBe(false);
+  });
+
+  it('无退化：append 只走 saveCanonicalAst，旧 saveDocument 不被调用', async () => {
+    const base = markdownToAst(MD_V1, { bookId: 'doc' });
+    expect(isOk(base)).toBe(true);
+    if (!isOk(base)) return;
+    const baseDoc = testDoc(JSON.stringify(base.value));
+    let plainSaves = 0;
+    const res = await appendPdfToDocument(
+      {
+        saveDocument: async (doc) => {
+          plainSaves++;
+          const { ok } = await import('@study-studio/shared');
+          return ok(doc);
+        },
+        saveCanonicalAst: async (docBase, book) => {
+          const { ok } = await import('@study-studio/shared');
+          return ok({ ...docBase, astJson: JSON.stringify(book) } as typeof baseDoc);
+        },
+        getDocument: async () => {
+          const { ok } = await import('@study-studio/shared');
+          return ok({ ...baseDoc });
+        },
+        loadInspector: stubMarkdownInspector(MD_V2_DELETE),
+      },
+      { userId: 'u1', filename: 'part2.pdf', bytes: PDF_HEAD, documentId: 'doc1' }
+    );
+    expect(isOk(res)).toBe(true);
+    expect(plainSaves).toBe(0);
+  });
+
+  it('单源：落库存的 astJson 必等于内部验证后的 book（调用方无第二份 canonical）', async () => {
+    const book = markdownToAst(MD_V1, { bookId: 'doc' });
+    expect(isOk(book)).toBe(true);
+    if (!isOk(book)) return;
+    const repo = new DrizzleLearnerRepository(':memory:');
+    repos.push(repo);
+    const { astJson: _drop, ...noAst } = testDoc('{}');
+    void _drop;
+    const res = await repo.saveCanonicalAst(noAst, book.value);
+    expect(isOk(res)).toBe(true);
+    const got = await repo.getDocumentById('doc1');
+    expect(isOk(got)).toBe(true);
+    if (!isOk(got)) return;
+    const stored = JSON.parse(got.value?.astJson as string) as { lessons: Array<{ id: string }> };
+    expect(stored.lessons.map((l) => l.id)).toEqual(['doc-l1', 'doc-l2']);
   });
 });

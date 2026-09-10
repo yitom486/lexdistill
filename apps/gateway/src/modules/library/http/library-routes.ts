@@ -1,6 +1,6 @@
 ﻿import { Hono } from 'hono';
 import { validator } from 'hono/validator';
-import { isOk, BusinessError, generateId, logger } from '@study-studio/shared';
+import { isOk, BusinessError, generateId } from '@study-studio/shared';
 import {
   AnnotationKindSchema,
   DocumentSourceKindSchema,
@@ -136,21 +136,20 @@ export function createLibraryRoutes(deps: GatewayDeps) {
           createdAt: strField(body, 'createdAt') || now,
           updatedAt: now,
         };
-        const res = await deps.repo.saveDocument(docItem);
-        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
-        // 带 AST 的保存即拆（前端 PDF 确认导入主路）；坏 AST/失败只 warn，不推翻保存
+        // 教材形 AST 走唯一 canonical 写入口（同事务；失败即 err，不再 warn 后成功）。
+        // 非教材（无 astJson / {questions} 等）继续普通保存。
         if (docItem.astJson) {
           const book = tryParseTextbookAst(docItem.astJson);
           if (book) {
-            const shredded = await deps.repo.shredDocument(res.value.id, book);
-            if (!isOk(shredded)) {
-              logger.warn('[library-save] shred failed', {
-                code: shredded.error.code,
-                documentId: res.value.id,
-              });
-            }
+            const { astJson: _omit, ...docBase } = docItem;
+            void _omit;
+            const res = await deps.repo.saveCanonicalAst(docBase, book);
+            if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'saveDocument');
+            return c.json(res.value);
           }
         }
+        const res = await deps.repo.saveDocument(docItem);
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
         return c.json(res.value);
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'saveDocument');

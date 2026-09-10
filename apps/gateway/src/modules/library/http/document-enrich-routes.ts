@@ -68,30 +68,11 @@ export function createDocumentEnrichRoutes(deps: GatewayDeps) {
       );
       if (!enriched.ok) return formatBusinessErrorResponse(c, enriched.error);
       const now = new Date().toISOString();
-      const saved = await deps.repo.saveDocument({
-        ...doc,
-        astJson: JSON.stringify(enriched.value.book),
-        updatedAt: now,
-      });
+      // 唯一 canonical 写入口（AST + shred 同一事务；失败即 err，不再 warn 后成功）。
+      const { astJson: _omit, ...docBase } = { ...doc, updatedAt: now };
+      void _omit;
+      const saved = await deps.repo.saveCanonicalAst(docBase, enriched.value.book);
       if (!isOk(saved)) return formatBusinessErrorResponse(c, saved.error);
-      // enrich 写回即拆：shred 与 AST 同源，失败只 warn（下次 enrich 回填），不推翻课文
-      const shredded = await deps.repo.shredDocument(saved.value.id, enriched.value.book);
-      let shredStats: { lessons: number; vocab: number; lines: number; mappedEntries: number; unmapped: number; exercises: number } | undefined;
-      if (isOk(shredded)) {
-        shredStats = {
-          lessons: shredded.value.lessons,
-          vocab: shredded.value.vocab,
-          lines: shredded.value.lines,
-          mappedEntries: shredded.value.mappedEntries,
-          unmapped: shredded.value.unmapped,
-          exercises: shredded.value.exercises,
-        };
-      } else {
-        logger.warn('[document-enrich] shred failed', {
-          code: shredded.error.code,
-          documentId: saved.value.id,
-        });
-      }
       // 抽词→草稿：AST 落库为主路径；草稿提议失败只 warn，不推翻已存的课文。
       let draftsProposed = 0;
       let draftsError: string | undefined;
@@ -126,7 +107,7 @@ export function createDocumentEnrichRoutes(deps: GatewayDeps) {
         dropped: enriched.value.dropped,
         draftsProposed,
         ...(draftsError ? { draftsError } : {}),
-        ...(shredStats ? { shred: shredStats } : {}),
+        // 原子写成功即 shred 成功（同一事务），不再返回 shred 计数（前端未消费）。
       });
     } catch (e) {
       return formatBusinessErrorResponse(c, e, 'enrichDocument');

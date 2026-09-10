@@ -32,6 +32,11 @@ export function toTrackLanguage(bookLanguage: unknown): 'ja' | 'en' | 'ko' | nul
 export interface EnrichJobRepo {
   getDocumentById(id: string): Promise<Result<DocumentItem | null, BusinessError>>;
   saveDocument(doc: DocumentItem): Promise<Result<DocumentItem, BusinessError>>;
+  /** 唯一 canonical 写入口（AST + shred 同一事务；persist/persistLesson 必经此处）。 */
+  saveCanonicalAst(
+    docBase: Omit<DocumentItem, 'astJson'>,
+    book: TextbookAST
+  ): Promise<Result<DocumentItem, BusinessError>>;
   shredDocument(
     documentId: string,
     book: TextbookAST
@@ -358,22 +363,15 @@ export class EnrichJobRegistry {
 
   /** 整本 AST 写回 + shred（取消收尾 / 失败兜底用，不抛）。 */
   private async persist(deps: EnrichJobRunnerDeps, doc: DocumentItem, book: TextbookAST): Promise<void> {
-    const saved = await deps.repo.saveDocument({
-      ...doc,
-      astJson: JSON.stringify(book),
-      updatedAt: new Date().toISOString(),
-    });
+    const { astJson: _omit, ...docBase } = doc;
+    void _omit;
+    const saved = await deps.repo.saveCanonicalAst(docBase, book);
     if (!isOk(saved)) {
       logger.warn('[enrich-job] 取消收尾写库失败', { code: saved.error.code });
-      return;
-    }
-    const shredded = await deps.repo.shredDocument(saved.value.id, book);
-    if (!isOk(shredded)) {
-      logger.warn('[enrich-job] 取消收尾 shred 失败', { code: shredded.error.code });
     }
   }
 
-  /** 单课落库三件套：save → shred → 草稿；失败返回用户可读原因（记 failed，不中断）。 */
+  /** 单课落库三件套：save + shred 同一事务（原子）；失败返回用户可读原因（记 failed，不中断）。 */
   private async persistLesson(
     deps: EnrichJobRunnerDeps,
     input: StartEnrichJobInput,
@@ -384,19 +382,13 @@ export class EnrichJobRegistry {
     vocabularies: TextbookAST['lessons'][number]['vocabularies'],
     trackLanguage: 'ja' | 'en' | 'ko' | null
   ): Promise<Result<void, BusinessError>> {
-    const saved = await deps.repo.saveDocument({
-      ...doc,
-      astJson: JSON.stringify(book),
-      updatedAt: new Date().toISOString(),
-    });
+    const { astJson: _omit, ...docBase } = doc;
+    void _omit;
+    const saved = await deps.repo.saveCanonicalAst(
+      { ...docBase, updatedAt: new Date().toISOString() },
+      book
+    );
     if (!isOk(saved)) return err(saved.error);
-    const shredded = await deps.repo.shredDocument(saved.value.id, book);
-    if (!isOk(shredded)) {
-      logger.warn('[enrich-job] 单课 shred 失败（AST 已存，下次回填）', {
-        jobId: lessonId,
-        code: shredded.error.code,
-      });
-    }
     if (trackLanguage && vocabularies.length > 0) {
       const proposed = await deps.repo.proposeCardDrafts(
         vocabularies.map((v) => ({

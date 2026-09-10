@@ -313,6 +313,45 @@ export function runDoctor(db: Database): DoctorReport {
         }
         push('import:lesson-count-drift', drift > 0 ? 'WARN' : 'PASS', drift, drift > 0 ? `${drift} 个文档 AST 课数与 derived 行数不一致（双源漂移，需回填）` : '课数一致');
       }
+      // projection drift：行数相等也可能 id/排序/标题错位。逐课比对
+      // lesson_id 集合 × lesson_number × title × sort_order(=AST index+1)。
+      // derived 可重建，故 WARN；doctor 是第二防线，不替代写事务。
+      if (has('textbook_lessons')) {
+        const shaped = db
+          .query(`SELECT d.id AS id, d.ast_json AS ast FROM documents d WHERE d.ast_json IS NOT NULL`)
+          .all() as Array<{ id: string; ast: string }>;
+        let projDrift = 0;
+        for (const c of shaped) {
+          try {
+            const o: unknown = JSON.parse(c.ast);
+            if (!o || typeof o !== 'object' || !Array.isArray((o as Record<string, unknown>).lessons)) continue;
+            const astLessons = (o as Record<string, unknown>).lessons as Array<Record<string, unknown>>;
+            const derived = db.query(
+              'SELECT lesson_id AS lessonId, lesson_number AS lessonNumber, title AS title, sort_order AS sortOrder FROM textbook_lessons WHERE document_id = ?'
+            ).all(c.id) as Array<{ lessonId: string; lessonNumber: number; title: string; sortOrder: number | null }>;
+            if (derived.length !== astLessons.length) continue; // 行数差由 lesson-count-drift 报
+            let bad = false;
+            const byId = new Map(derived.map((r) => [r.lessonId, r]));
+            if (byId.size !== derived.length) {
+              bad = true; // derived 侧重复 id
+            } else {
+              for (let i = 0; i < astLessons.length && !bad; i++) {
+                const l = astLessons[i] as { id?: unknown; lessonNumber?: unknown; title?: unknown };
+                if (typeof l.id !== 'string') { bad = true; break; }
+                const row = byId.get(l.id);
+                if (!row) { bad = true; break; }
+                if (typeof l.lessonNumber === 'number' && Number.isInteger(l.lessonNumber) && l.lessonNumber > 0 && row.lessonNumber !== l.lessonNumber) bad = true;
+                if (typeof l.title === 'string' && row.title !== l.title.slice(0, 200)) bad = true;
+                if (row.sortOrder !== i + 1) bad = true;
+              }
+            }
+            if (bad) projDrift++;
+          } catch {
+            // 坏 JSON 不归本规则
+          }
+        }
+        push('import:projection-drift', projDrift > 0 ? 'WARN' : 'PASS', projDrift, projDrift > 0 ? `${projDrift} 个文档 AST 与 derived 课行错位（id/number/title/sort_order，需重 shred）` : '投影一致');
+      }
     }
     const stuck = count(`SELECT COUNT(*) AS n FROM document_imports WHERE status = 'processing'`);
     push('import:processing', stuck > 0 ? 'WARN' : 'PASS', stuck, stuck > 0 ? `${stuck} 个 processing（在跑或卡死，请结合网关日志看）` : '无卡住任务');

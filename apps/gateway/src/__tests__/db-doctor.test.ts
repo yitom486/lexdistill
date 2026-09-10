@@ -247,4 +247,26 @@ describe('db doctor', () => {
     const f = report.findings.find((x) => x.rule === 'import:lesson-count-drift');
     expect(f?.count).toBe(1);
   });
+
+  it('同课数但 id/sort 错位同样 WARN（projection drift）', () => {
+    const db = mem();
+    db.exec(`CREATE TABLE documents (id TEXT PRIMARY KEY, ast_json TEXT)`);
+    db.exec(`CREATE TABLE document_imports (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, source_kind TEXT NOT NULL, filename TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'processing', document_id TEXT, lessons INTEGER, error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+    db.exec(
+      `CREATE TABLE textbook_lessons (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, lesson_number INTEGER NOT NULL, title TEXT NOT NULL, sort_order INTEGER, PRIMARY KEY (document_id, lesson_id))`
+    );
+    const ast = JSON.stringify({
+      id: 'b', language: 'JA', title: 'B', shortTitle: 'B',
+      lessons: [
+        { id: 'l1', lessonNumber: 1, title: 't1', vocabularies: [], grammarPoints: [], dialogues: [], exercises: [] },
+        { id: 'l2', lessonNumber: 2, title: 't2', vocabularies: [], grammarPoints: [], dialogues: [], exercises: [] },
+      ],
+    });
+    db.query(`INSERT INTO documents (id, ast_json) VALUES ('d1', ?)`).run(ast);
+    // 行数同为 2，但 l2 的 sort_order 错写成 3（不是 2）
+    db.exec(`INSERT INTO textbook_lessons VALUES ('d1','l1',1,'t1',1),('d1','l2',2,'t2',3)`);
+    const report = runDoctor(db);
+    expect(levelOf(report, 'import:lesson-count-drift')).toBe('PASS');
+    expect(levelOf(report, 'import:projection-drift')).toBe('WARN');
+  });
 });

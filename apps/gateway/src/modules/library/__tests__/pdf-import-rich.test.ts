@@ -117,7 +117,10 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const first = await importPdfDocument(
-      { saveDocument: (doc) => repo.saveDocument(doc) },
+      {
+        saveDocument: (doc) => repo.saveDocument(doc),
+        saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
+      },
       { userId: 'u1', filename: 'smoke.pdf', bytes: smokeBytes }
     );
     expect(isOk(first)).toBe(true);
@@ -125,6 +128,7 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     const appended = await appendPdfToDocument(
       {
         saveDocument: (doc) => repo.saveDocument(doc),
+        saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
         getDocument: (id) => repo.getDocumentById(id),
       },
       { userId: 'u1', filename: 'rich.pdf', bytes: richBytes, documentId: first.value.document.id }

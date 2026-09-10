@@ -184,6 +184,24 @@ describe('Protocol Package Schemas', () => {
     }
   });
 
+  it('同一 book 内重复 lesson.id 直接拒绝（P1-C0.75 Task 3）', () => {
+    const dup = {
+      id: 'book-dup',
+      language: 'JA',
+      title: 'B',
+      shortTitle: 'B',
+      lessons: [
+        { id: 'l1', lessonNumber: 1, title: 't1', vocabularies: [], grammarPoints: [], dialogues: [], exercises: [] },
+        { id: 'l1', lessonNumber: 2, title: 't2', vocabularies: [], grammarPoints: [], dialogues: [], exercises: [] },
+      ],
+    };
+    const res = parseTextbookAST(dup);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.code).toBe('E_INVALID_TEXTBOOK_AST');
+    }
+  });
+
   it('should validate practice plan schedule (P6-1)', () => {
     expect(PracticePlanScheduleSchema.safeParse({ kind: 'daily' }).success).toBe(true);
     expect(

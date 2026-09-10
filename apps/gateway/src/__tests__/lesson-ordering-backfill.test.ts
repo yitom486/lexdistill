@@ -100,7 +100,7 @@ describe('lesson-ordering plan（只读 dry-run）', () => {
     expect(byId.get('news')?.status).toBe('skipped');
   });
 
-  it('duplicate lesson id：unresolved', () => {
+  it('duplicate lesson id：schema 直接拒收 → unresolved（不猜）', () => {
     const db = mem();
     const raw = JSON.parse(astOf([1, 2])) as { lessons: Array<{ id: string }> };
     raw.lessons[1]!.id = 'l1';
@@ -121,8 +121,9 @@ describe('lesson-ordering plan（只读 dry-run）', () => {
     }));
     seedDerived(db, 'd1', [{ id: 'l1', n: 1 }]);
     const plan = planLessonOrdering(db);
+    // P1-C0.75 Task 3 后：重复 id 过不了 parseTextbookAST，走“AST 非法但有 Derived”分支
     expect(plan.docs[0]?.status).toBe('unresolved');
-    expect(plan.docs[0]?.duplicateAst).toEqual(['l1']);
+    expect(plan.docs[0]?.updates).toEqual([]);
   });
 });
 
