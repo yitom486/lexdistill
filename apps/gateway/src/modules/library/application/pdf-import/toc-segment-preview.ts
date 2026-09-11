@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import { MAX_OCR_PAGES_PER_IMPORT } from './pdf-import-service.js';
+import { isSemanticOutlineTitle } from './embedded-outline-quality.js';
 
 /**
  * CMD-LINGUA-P5A：已确认目录 → 物理页映射与分段预览（纯函数，零副作用）。
@@ -213,6 +214,9 @@ export function previewTocSegments(
     const { title, printedPage, kind } = entry as { title?: unknown; printedPage?: unknown; kind?: unknown };
     if (kind !== 'lesson' && kind !== 'section') return invalid('目录条目 kind 只接受 lesson / section');
     if (typeof title !== 'string' || !title) return invalid('目录条目标题不能为空');
+    // P3.1B 标题内容门（与 P3 基线同一语义规则，不复制第二套）：
+    // 符号-only/Markdown 残留/纯数字形一律拒绝，垃圾基线到不了导入。
+    if (!isSemanticOutlineTitle(title)) return invalid('目录条目标题无语义内容（疑似符号残留或纯数字），请修正后重试');
     if (!isPositiveInt(printedPage)) return invalid('目录条目 printedPage 须为正整数');
     if (kind === 'section') {
       sections++;

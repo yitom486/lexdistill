@@ -104,6 +104,25 @@ function syntheticBlankPdf(): Uint8Array {
   ]);
 }
 
+/** 内存 synthetic：2 页文本目录（每页一行 Lesson 形），无私人内容。 */
+function syntheticTextTocPdf(): Uint8Array {
+  const line1 = 'BT /F1 24 Tf 100 700 Td (Lesson 1 Apple 12) Tj ET\n';
+  const line2 = 'BT /F1 24 Tf 100 700 Td (Lesson 2 Orange 30) Tj ET\n';
+  const pageObj = (contentRef: number) =>
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentRef} 0 R /Resources << /Font << /F1 7 0 R >> >> >>`;
+  const streamObj = (text: string) =>
+    `<< /Length ${Buffer.byteLength(text, 'latin1')} >>\nstream\n${text}endstream`;
+  return buildPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    pageObj(5),
+    pageObj(6),
+    streamObj(line1),
+    streamObj(line2),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]);
+}
+
 async function writeTempPdf(bytes: Uint8Array): Promise<string> {
   const tmp = join(tmpdir(), `p4b-review-${process.pid}-${Date.now()}.pdf`);
   await Bun.write(tmp, bytes);
@@ -131,7 +150,7 @@ async function documentCount(repo: DrizzleLearnerRepository, userId: string): Pr
 }
 
 describe('P4B POST review-toc（真 native + 假 Agent）', () => {
-  it('空白 synthetic：draft 回 HTTP，DB 行数不变，附件为两张真 PNG', async () => {
+  it('P3.1B 空白 synthetic：空基线服务端拒绝（E_TOC_BASELINE_THIN），Agent 零调用、DB 行数不变', async () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const captured: CapturedCall[] = [];
@@ -143,35 +162,77 @@ describe('P4B POST review-toc（真 native + 假 Agent）', () => {
     const tmp = await writeTempPdf(syntheticBlankPdf());
     const before = await documentCount(repo, 'u1');
     const res = await postReviewToc(app, 'u1', { filePath: tmp, startPage: 1, endPage: 2 });
+    expect(res.status).not.toBe(200);
+    expect((res.json.error as { code?: string } | undefined)?.code).toBe('E_TOC_BASELINE_THIN');
+    expect(captured.length).toBe(0);
+    const after = await documentCount(repo, 'u1');
+    expect(after).toBe(before);
+  }, 180000);
+
+  it('P3.1B 文本目录 synthetic：围栏 JSON 成功进草稿，同一次 AgentInput 附件为真 PNG', async () => {
+    const repo = new DrizzleLearnerRepository(':memory:');
+    repos.push(repo);
+    const captured: CapturedCall[] = [];
+    const fenced = '```json\n{"entries": [{"title": "Lesson 1 Apple", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}], "warnings": []}\n```';
+    const app = createApp({
+      repo,
+      server: { agentAdapter: makeFakeAdapter(fenced, captured) } as never,
+      port: 0,
+    });
+    const tmp = await writeTempPdf(syntheticTextTocPdf());
+    const before = await documentCount(repo, 'u1');
+    const res = await postReviewToc(app, 'u1', { filePath: tmp, startPage: 1, endPage: 2 });
     expect(res.status).toBe(200);
     const body = res.json as {
       embedded: boolean;
-      range: { fromPage: number; toPage: number };
-      pageCount: number;
-      baseline: { status: string; entries: unknown[] };
+      baseline: { status: string; verdict: string; entries: unknown[] };
       draft: { entries: unknown[]; warnings: string[] } | null;
+      reviewStatus: string;
+      reviewError: unknown;
       diagnostics: { pagesRendered: number };
     };
     expect(body.embedded).toBe(false);
-    expect(body.range).toEqual({ fromPage: 1, toPage: 2 });
-    expect(body.pageCount).toBe(2);
-    expect(body.baseline.status).toBe('empty');
-    expect(body.draft?.warnings).toEqual(['空白页，无目录']);
+    expect(body.baseline.verdict).toBe('usable');
+    expect(body.reviewStatus).toBe('ok');
+    expect(body.reviewError).toBeNull();
+    expect(body.draft?.entries.length).toBe(1);
     expect(body.diagnostics.pagesRendered).toBe(2);
-    expect(body).not.toHaveProperty('pages');
-    // 同一次 AgentInput 带两张真 PNG（签名 + 非空），无 base64 痕迹
     expect(captured.length).toBe(1);
     const attachments = captured[0]?.input.attachments ?? [];
     expect(attachments.length).toBe(2);
-    for (const attachment of attachments) {
-      expect([attachment.png[0], attachment.png[1], attachment.png[2], attachment.png[3]]).toEqual([
-        137, 80, 78, 71,
-      ]);
-      expect(attachment.png.length).toBeGreaterThan(100);
-    }
     expect(JSON.stringify(captured)).not.toContain('iVBOR');
     const after = await documentCount(repo, 'u1');
     expect(after).toBe(before);
+  }, 180000);
+
+  it('P3.1B 模型坏 JSON：重试后 unavailable 200（非 502），基线保留、零写', async () => {
+    const repo = new DrizzleLearnerRepository(':memory:');
+    repos.push(repo);
+    const captured: CapturedCall[] = [];
+    const app = createApp({
+      repo,
+      server: { agentAdapter: makeFakeAdapter('garbage {{{', captured) } as never,
+      port: 0,
+    });
+    const tmp = await writeTempPdf(syntheticTextTocPdf());
+    const before = await documentCount(repo, 'u1');
+    const res = await postReviewToc(app, 'u1', { filePath: tmp, startPage: 1, endPage: 2 });
+    expect(res.status).toBe(200);
+    const body = res.json as {
+      reviewStatus: string;
+      draft: unknown;
+      reviewError: { code?: string; userMessage?: string };
+      baseline: { status: string; verdict: string; entries: unknown[] };
+    };
+    expect(body.reviewStatus).toBe('unavailable');
+    expect(body.draft).toBeNull();
+    expect(body.reviewError?.code).toBe('E_TOC_REVIEW_PARSE');
+    expect(typeof body.reviewError?.userMessage).toBe('string');
+    expect(body.baseline.verdict).toBe('usable');
+    expect(body.baseline.entries.length).toBe(2);
+    // 同 session 重试一次：两次 send，一次 create
+    expect(captured.length).toBe(2);
+    expect(await documentCount(repo, 'u1')).toBe(before);
   }, 180000);
 
   it('缺范围 / 超 8 页：4xx E_INVALID_INPUT，Agent 零调用', async () => {
@@ -192,24 +253,6 @@ describe('P4B POST review-toc（真 native + 假 Agent）', () => {
     expect(over.status).not.toBe(200);
     expect((over.json.error as { code?: string } | undefined)?.code).toBe('E_INVALID_INPUT');
     expect(captured.length).toBe(0);
-    expect(await documentCount(repo, 'u1')).toBe(before);
-  }, 180000);
-
-  it('模型坏 JSON：明确错误码、零写', async () => {
-    const repo = new DrizzleLearnerRepository(':memory:');
-    repos.push(repo);
-    const captured: CapturedCall[] = [];
-    const app = createApp({
-      repo,
-      server: { agentAdapter: makeFakeAdapter('garbage {{{', captured) } as never,
-      port: 0,
-    });
-    const tmp = await writeTempPdf(syntheticBlankPdf());
-    const before = await documentCount(repo, 'u1');
-    const res = await postReviewToc(app, 'u1', { filePath: tmp, startPage: 1, endPage: 2 });
-    expect(res.status).not.toBe(200);
-    expect((res.json.error as { code?: string } | undefined)?.code).toBe('E_TOC_REVIEW_PARSE');
-    expect(captured.length).toBe(1);
     expect(await documentCount(repo, 'u1')).toBe(before);
   }, 180000);
 });

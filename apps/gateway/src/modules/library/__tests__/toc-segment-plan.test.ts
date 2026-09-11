@@ -237,3 +237,43 @@ describe('P5C POST preview-toc-segments（真运行时探针 + 自造 PDF）', (
     expect(JSON.stringify(after)).toBe(JSON.stringify(before));
   }, 300000);
 });
+
+describe('P3.1B 下游标题门（preview 漏斗）', () => {
+  it('无语义标题条目 → invalid，正常条目放行', () => {
+    const base = { pageCount: 100, anchors: ANCHORS };
+    for (const title of ['##### ……', '···', '12', 'Page 5']) {
+      const res = previewTocSegments({
+        ...base,
+        entries: [{ title, printedPage: 12, level: 1, kind: 'lesson' as const }, ENTRIES[1] as (typeof ENTRIES)[number]],
+      });
+      expect(isOk(res)).toBe(false);
+      if (isOk(res)) continue;
+      expect(res.error.code).toBe('E_INVALID_INPUT');
+      expect(res.error.userMessage).toContain('无语义');
+    }
+    const okRes = previewTocSegments({ ...base, entries: ENTRIES });
+    expect(isOk(okRes)).toBe(true);
+  });
+
+  it('planTocSegments 服务层同样拒绝垃圾标题（prepare/import/execute 同漏斗）', async () => {
+    const calls: PlanMockCalls = { load: 0, classify: [], ocr: 0, render: 0 };
+    const res = await planTocSegments(
+      {
+        loadInspector: async () => {
+          calls.load++;
+          return planMock({ pageCount: 100, calls });
+        },
+      },
+      {
+        userId: 'u1',
+        filename: 't.pdf',
+        bytes: mockBytes(),
+        entries: [{ title: '##### ……', printedPage: 322, level: 2, kind: 'section' as const }, ENTRIES[1] as (typeof ENTRIES)[number]],
+        anchors: ANCHORS,
+      }
+    );
+    expect(isOk(res)).toBe(false);
+    if (isOk(res)) return;
+    expect(res.error.code).toBe('E_INVALID_INPUT');
+  });
+});

@@ -37,6 +37,7 @@ import {
   canRequestTocReview,
   decideExtractRequest,
   decideReviewRequest,
+  diffBaselineDraft,
   initialTocConfirmState,
   toEditableEntries,
   tocConfirmReducer,
@@ -115,6 +116,14 @@ export interface TocReviewPanelViewProps {
   editedEntries: EditableTocEntry[];
   confirmed: boolean;
   confirmedSummary: string | null;
+  /** thin/empty 基线不可直接采用（服务端同样拒绝；前端禁用只是辅助）。 */
+  adoptDisabled: boolean;
+  /** 手动建草稿（thin/empty 时的唯一出路；不复制垃圾基线）。 */
+  onStartManual(): void;
+  onAddEntry(): void;
+  onRemoveEntry(key: string): void;
+  /** 确认按钮禁用（空表/空标题行）；hint 由容器经 rangeError 复用展示。 */
+  confirmDisabled: boolean;
   onDiscover(): void;
   onCancelDiscover(): void;
   onSelectCandidate(index: number): void;
@@ -158,6 +167,11 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
     confirmedSummary,
     onDiscover,
     onCancelDiscover,
+    adoptDisabled,
+    onStartManual,
+    onAddEntry,
+    onRemoveEntry,
+    confirmDisabled,
     onSelectCandidate,
     onStartChange,
     onEndChange,
@@ -340,6 +354,15 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
             printedPage 是教材印刷页，不等于 PDF 物理页，请勿直接当页码跳转。
             {baseline.entries.length === 0 && '本次没有提取到可用条目，可以换一段页码重试。'}
           </p>
+          {!baseline.embedded && baseline.verdict !== 'usable' && (
+            <div className="p-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-[11px] text-stone-600 dark:text-stone-300">
+              {baseline.verdict === 'empty'
+                ? '没有提取到可用条目，结果不足，不能采用。可以换一段页码重试，或在下方手动填写。'
+                : `结果不足，不能直接采用（仅 ${baseline.entries.length} 条有效条目${
+                    baseline.diagnostics.badTitle > 0 ? `，${baseline.diagnostics.badTitle} 行标题存疑已剔除` : ''
+                  }）。印刷页码（如 322）是书内页码，不是错误。可以换一段页码重试，或在下方手动填写。`}
+            </div>
+          )}
           {baseline.entries.length > 0 && (
             <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
               {baseline.entries.map((entry, index) => (
@@ -366,7 +389,23 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
           <p className="text-[10px] font-mono text-stone-400">
             请求 {baseline.diagnostics.pagesRequested} 页 · OCR {baseline.diagnostics.pagesOcr} 页 · 接受{' '}
             {baseline.diagnostics.entriesAccepted} · 拒绝 {baseline.diagnostics.entriesRejected}
+            {baseline.diagnostics.badTitle > 0 && ` · 标题不合 ${baseline.diagnostics.badTitle}`}
           </p>
+          {baseline.pageEvidence.length > 0 && (
+            <details className="text-[11px] text-stone-500 dark:text-stone-400">
+              <summary className="cursor-pointer font-bold">查看 OCR 原文证据（每页截断，只读）</summary>
+              <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1 pt-1">
+                {baseline.pageEvidence.map((evidence) => (
+                  <div key={evidence.page} className="space-y-0.5">
+                    <p className="font-mono text-[10px] text-stone-400">PDF 第 {evidence.page} 页</p>
+                    <pre className="whitespace-pre-wrap break-words px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px] font-sans">
+                      {evidence.excerpt || '（本页无保留行）'}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       )}
 
@@ -401,6 +440,14 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
             </Badge>
             <span>基线 {review.diagnostics.baselineEntries} 条 → 草稿 {review.diagnostics.draftEntries} 条</span>
           </p>
+          {(() => {
+            const diff = diffBaselineDraft(review.baseline.entries, review.draft?.entries ?? []);
+            return (
+              <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                与基线差异：新增 {diff.added} · 删除 {diff.removed} · 保留 {diff.kept}（需人工确认后采用）。
+              </p>
+            );
+          })()}
           <div className="grid md:grid-cols-2 gap-1.5">
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-stone-500">OCR 基线</p>
@@ -460,6 +507,12 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
           原生目录可用，本次没有触发 AI 审核（embedded=true），请直接用原生目录。
         </div>
       )}
+      {review && !review.embedded && review.reviewStatus === 'unavailable' && (
+        <div className="p-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+          <p className="font-bold">AI 审核暂不可用：{review.reviewError?.userMessage ?? '模型输出不合要求，已保留基线'}</p>
+          <p>基线仍在上方，可直接采用基线，或手动填写后确认（错误码 {review.reviewError?.code ?? 'E_TOC_REVIEW_PARSE'}，未记录模型原文）。</p>
+        </div>
+      )}
 
       {(baseline || (review && !review.embedded && review.draft)) && !confirmed && (
         <div className="flex flex-wrap items-center gap-2">
@@ -469,8 +522,9 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
               variant="outline"
               size="sm"
               className="h-7 text-[11px]"
-              disabled={extracting || reviewing}
+              disabled={extracting || reviewing || adoptDisabled}
               onClick={() => onAdopt('ocr')}
+              title={adoptDisabled ? '基线不足，不能直接采用（可手动填写）' : undefined}
             >
               采用 OCR 基线
             </Button>
@@ -485,6 +539,19 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
               onClick={() => onAdopt('ai')}
             >
               采用 AI 草稿
+            </Button>
+          )}
+          {baseline && !baseline.embedded && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px]"
+              disabled={extracting || reviewing}
+              onClick={onStartManual}
+              title="从空白行开始手动填写目录，不复制基线"
+            >
+              手动填写
             </Button>
           )}
           {adopted && !editing && (
@@ -504,7 +571,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
       {adopted && (
         <div className="rounded-xl border border-stone-200 dark:border-stone-700 p-2 space-y-1.5">
           <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200">
-            待确认：{adopted === 'ocr' ? 'OCR 基线' : 'AI 草稿'}（{editedEntries.length} 条，只改本地状态）
+            待确认：{adopted === 'ocr' ? 'OCR 基线' : adopted === 'ai' ? 'AI 草稿' : '手动填写'}（{editedEntries.length} 条，只改本地状态）
           </p>
           <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
             {editedEntries.map((entry) => (
@@ -569,15 +636,39 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
                     {entry.confidence}
                   </Badge>
                 )}
+                {editing && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-[11px] text-rose-600"
+                    onClick={() => onRemoveEntry(entry.key)}
+                    aria-label="删除本行"
+                  >
+                    删除
+                  </Button>
+                )}
               </div>
             ))}
           </div>
+          {editing && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px]"
+              onClick={onAddEntry}
+            >
+              添加一行
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
             className="h-7 text-[11px] gap-1.5"
-            disabled={editedEntries.length === 0}
+            disabled={confirmDisabled}
             onClick={onConfirm}
+            title={confirmDisabled ? '每行标题不能为空，确认范围需合法' : undefined}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             确认目录
@@ -696,10 +787,12 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
 
   const handleAdopt = (adoptSource: TocAdoptSource): void => {
     if (adoptSource === 'ocr') {
-      if (!baseline) return;
+      // P3.1B 前端辅助门：thin/empty 不直接采用（服务端同样拒绝）。
+      if (!baseline || baseline.embedded || baseline.verdict !== 'usable') return;
       dispatch({ type: 'adopt', source: 'ocr', entries: toEditableEntries(baseline.entries) });
       return;
     }
+    if (adoptSource === 'manual') return;
     if (!reviewData || reviewData.embedded || !reviewData.draft) return;
     dispatch({
       type: 'adopt',
@@ -711,21 +804,33 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
     });
   };
 
+  const handleStartManual = (): void => {
+    dispatch({ type: 'start-manual' });
+  };
+
+  const entriesValid =
+    flow.editedEntries.length > 0 && flow.editedEntries.every((entry) => entry.title.trim() !== '');
+  const confirmDisabled = !entriesValid || !validation.ok;
+
   const handleConfirm = (): void => {
-    if (!flow.adopted || flow.editedEntries.length === 0 || !validation.ok) return;
+    if (!flow.adopted || !entriesValid || !validation.ok) return;
     // 零写：只落本地 reducer，不调任何 mutation / 写接口。
     dispatch({ type: 'confirm', range: { fromPage: validation.from, toPage: validation.to } });
   };
+
+  const adoptDisabled = baseline !== null && !baseline.embedded && baseline.verdict !== 'usable';
 
   const reviewDisabledReason = !baseline
     ? '先提取目录基线'
     : baseline.embedded
       ? '原生目录可用，无需 AI 审核'
-      : !validation.ok
-        ? '请先填写合法确认范围'
-        : !reviewSizeOk
-          ? `AI 审核单次最多 ${TOC_REVIEW_MAX_PAGES_UI} 页，请缩小范围或只看基线`
-          : null;
+      : baseline.verdict !== 'usable'
+        ? '基线不足（结果不可直接采用），请换范围重试或手动填写'
+        : !validation.ok
+          ? '请先填写合法确认范围'
+          : !reviewSizeOk
+            ? `AI 审核单次最多 ${TOC_REVIEW_MAX_PAGES_UI} 页，请缩小范围或只看基线`
+            : null;
 
   return (
     <>
@@ -747,7 +852,12 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       extractError={messageOf(extract.error)}
       baseline={baseline}
       reviewDisabled={
-        baseline === null || baseline.embedded || review.isPending || !validation.ok || !reviewSizeOk
+        baseline === null ||
+        baseline.embedded ||
+        (!baseline.embedded && baseline.verdict !== 'usable') ||
+        review.isPending ||
+        !validation.ok ||
+        !reviewSizeOk
       }
       reviewDisabledReason={reviewDisabledReason}
       reviewSizeHint={
@@ -779,6 +889,11 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       onExtract={handleExtract}
       onReview={handleReview}
       onAdopt={handleAdopt}
+      adoptDisabled={adoptDisabled}
+      onStartManual={handleStartManual}
+      onAddEntry={() => dispatch({ type: 'add-entry' })}
+      onRemoveEntry={(key) => dispatch({ type: 'remove-entry', key })}
+      confirmDisabled={confirmDisabled}
       onStartEdit={() => dispatch({ type: 'start-edit' })}
       onUpdateEntry={(key, patch) => dispatch({ type: 'update-entry', key, patch })}
       onConfirm={handleConfirm}

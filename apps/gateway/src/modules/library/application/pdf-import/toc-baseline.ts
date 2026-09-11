@@ -13,7 +13,7 @@ import {
   MAX_OCR_PAGES_PER_IMPORT,
   type PdfImportServiceDeps,
 } from './pdf-import-service.js';
-import { classifyEmbeddedOutline } from './embedded-outline-quality.js';
+import { classifyEmbeddedOutline, isSemanticOutlineTitle } from './embedded-outline-quality.js';
 
 /**
  * CMD-LINGUA-P3：已确认目录页范围的本地 OCR 目录基线（只读，后端）。
@@ -54,6 +54,21 @@ export interface TocBaselineEntry {
 
 export type TocBaselineStatus = 'ok' | 'empty';
 
+/**
+ * CMD-LINGUA-P3.1B 基线质量 verdict（显式数据，不只看 entries.length）：
+ * - usable：≥2 条有效条目，可采用；
+ * - thin：0<有效条目<2，或标题大面积存疑——不可直接采用，下游服务端拒绝；
+ * - empty：0 条有效条目。
+ * 前端禁用只是辅助，真正保护在服务端各入口。
+ */
+export type TocBaselineVerdict = 'usable' | 'thin' | 'empty';
+
+/** 可采用下限（条）：低于此为 thin（P2.2 语义门槛的基线版，同等保守）。 */
+export const TOC_BASELINE_MIN_USABLE_ENTRIES = 2;
+
+/** 单页 OCR 证据上限（字符）：展示用截断，防大页刷屏；证据只读，不入库不记日志。 */
+export const TOC_EVIDENCE_MAX_CHARS_PER_PAGE = 1500;
+
 export interface TocBaselineDiagnostics {
   pagesRequested: number;
   pagesOcr: number;
@@ -61,15 +76,24 @@ export interface TocBaselineDiagnostics {
   linesDroppedWash: number;
   entriesAccepted: number;
   entriesRejected: number;
+  /** 标题无语义内容被拒的行数（符号-only/Markdown 残留/纯数字形，不记原文）。 */
+  badTitle: number;
 }
 
 export interface TocBaselineOutput {
   status: TocBaselineStatus;
+  /** P3.1B 质量 verdict（下游 review/preview/import 强制消费）。 */
+  verdict: TocBaselineVerdict;
   range: { fromPage: number; toPage: number };
   pageCount: number;
   entries: TocBaselineEntry[];
   /** 仅计数：无标题、无正文、无页文本。 */
   diagnostics: TocBaselineDiagnostics;
+  /**
+   * 每页受限 OCR 证据（只读展示用）：保留行原文按页拼接、每页截断；
+   * 不入库、不记日志、不参与判定。embedded 短路时为空。
+   */
+  pageEvidence: Array<{ page: number; excerpt: string }>;
   /**
    * true = 原生目录可用，本次零 OCR（entries 为空；
    * 调用方应直接用 map 的 embeddedOutline，而非 OCR 找目录）。
@@ -152,8 +176,21 @@ export function washRepeatedTocLines(pages: Array<{ page: number; lines: string[
 type LineEntry = { title: string; printedPage: number; tableRow: boolean } | { refused: string } | null;
 
 /**
+ * Markdown 行标记剥离（纯函数）：OCR markdown 常把大号文字变成 `#` 标题、
+ * 列表变成 `- `，这些残留不属于目录标题内容，先剥再做语义判定。
+ * 剥后仍无语义才拒绝；判定用 P2.2 唯一语义规则（不复制第二套）。
+ */
+export function stripMarkdownLineMarkers(title: string): string {
+  return title
+    .replace(/^[#>\-*+\s]+/, '')
+    .replace(/[#*]+$/, '')
+    .trim();
+}
+
+/**
  * 单行目录候选抽取（纯函数）：表格行取末格数字为页、余格为题；
- * 否则取行尾页码形；习题正文/数字汤/无题表格直接拒绝；其余返回 null（非条目行）。
+ * 否则取行尾页码形；习题正文/数字汤/无题表格/无语义标题直接拒绝；
+ * 其余返回 null（非条目行）。
  */
 export function extractTocLineEntry(line: string): LineEntry {
   const text = line.trim();
@@ -169,12 +206,15 @@ export function extractTocLineEntry(line: string): LineEntry {
     const last = cells[cells.length - 1] ?? '';
     const pageMatch = /^(\d{1,4})$/.exec(last);
     if (!pageMatch || cells.length < 2) return { refused: 'no-title' };
-    return { title: cells.slice(0, -1).join(' '), printedPage: Number(pageMatch[1]), tableRow: true };
+    const title = cells.slice(0, -1).join(' ');
+    if (!isSemanticOutlineTitle(stripMarkdownLineMarkers(title))) return { refused: 'bad-title' };
+    return { title, printedPage: Number(pageMatch[1]), tableRow: true };
   }
   const trailing = TRAILING_PAGE_RE.exec(text);
   if (trailing) {
     const title = (trailing[1] ?? '').trim();
     if (!title) return { refused: 'no-title' };
+    if (!isSemanticOutlineTitle(stripMarkdownLineMarkers(title))) return { refused: 'bad-title' };
     return { title, printedPage: Number(trailing[2]), tableRow: false };
   }
   return null;
@@ -293,6 +333,7 @@ export async function extractTocBaseline(
   if (outlineQuality.quality === 'usable') {
     return ok({
       status: 'empty',
+      verdict: 'empty',
       range: { fromPage, toPage },
       pageCount,
       entries: [],
@@ -303,7 +344,9 @@ export async function extractTocBaseline(
         linesDroppedWash: 0,
         entriesAccepted: 0,
         entriesRejected: 0,
+        badTitle: 0,
       },
+      pageEvidence: [],
       embedded: true,
     });
   }
@@ -353,11 +396,18 @@ export async function extractTocBaseline(
   );
   const entries: TocBaselineEntry[] = [];
   let rejected = 0;
+  let badTitle = 0;
   const keptByPage = new Map<number, WashedLine[]>();
   for (const line of washed.kept) {
     const list = keptByPage.get(line.page) ?? [];
     list.push(line);
     keptByPage.set(line.page, list);
+  }
+  const evidenceByPage = new Map<number, string[]>();
+  for (const line of washed.kept) {
+    const list = evidenceByPage.get(line.page) ?? [];
+    list.push(line.text);
+    evidenceByPage.set(line.page, list);
   }
   for (const page of window) {
     for (const line of keptByPage.get(page) ?? []) {
@@ -365,6 +415,7 @@ export async function extractTocBaseline(
       if (parsed === null) continue;
       if ('refused' in parsed) {
         rejected++;
+        if (parsed.refused === 'bad-title') badTitle++;
         continue;
       }
       const spans = spansByPage.get(page) ?? [];
@@ -379,16 +430,30 @@ export async function extractTocBaseline(
       });
     }
   }
-  // 只记计数：不记标题、不记正文、不记 spans。
+  // 只记计数：不记标题、不记正文、不记 spans、不记 evidence。
   logger.warn('[toc-baseline] 完成', {
     range: `${fromPage}-${toPage}`,
     entries: entries.length,
     rejected,
+    badTitle,
     washed: washed.dropped,
     ocrPages: ocrPages.length,
   });
+  const verdict: TocBaselineVerdict =
+    entries.length === 0 ? 'empty' : entries.length < TOC_BASELINE_MIN_USABLE_ENTRIES ? 'thin' : 'usable';
+  const pageEvidence = window.map((page) => {
+    const excerpt = (evidenceByPage.get(page) ?? []).join('\n');
+    return {
+      page,
+      excerpt:
+        excerpt.length > TOC_EVIDENCE_MAX_CHARS_PER_PAGE
+          ? `${excerpt.slice(0, TOC_EVIDENCE_MAX_CHARS_PER_PAGE)}…(已截断)`
+          : excerpt,
+    };
+  });
   return ok({
-    status: entries.length > 0 ? 'ok' : 'empty',    range: { fromPage, toPage },
+    status: entries.length > 0 ? 'ok' : 'empty', verdict,
+    range: { fromPage, toPage },
     pageCount,
     entries,
     diagnostics: {
@@ -398,7 +463,9 @@ export async function extractTocBaseline(
       linesDroppedWash: washed.dropped,
       entriesAccepted: entries.length,
       entriesRejected: rejected,
+      badTitle,
     },
+    pageEvidence,
     embedded: false,
   });
 }

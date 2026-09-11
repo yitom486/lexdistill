@@ -78,6 +78,13 @@ export interface TocReviewAgentOutput {
   baseline: TocBaselineOutput;
   /** embedded 命中时为 null（不需要 AI 审核）；否则为严格校验后的草稿。 */
   draft: TocReviewDraft | null;
+  /**
+   * CMD-LINGUA-P3.1B 审核可用态：ok = 草稿可用；unavailable = 模型两次输出
+   * 不合规（或通道错误），基线保留可编辑，调用方不得 502，必须展示可读态。
+   */
+  reviewStatus: 'ok' | 'unavailable';
+  /** unavailable 时的安全错误（code + userMessage，无模型原文）；ok 时为 null。 */
+  reviewError: { code: string; userMessage: string } | null;
   /** 仅计数：无标题、无正文、无图片、无路径。 */
   diagnostics: TocReviewAgentDiagnostics;
 }
@@ -92,19 +99,82 @@ export const TOC_REVIEW_SYSTEM_PROMPT = [
   '- 除 JSON 外不输出任何文字。',
 ].join('\n');
 
-/** 模型原文 → 严格草稿（纯函数）：全串 JSON.parse + zod strict；失败返回 null（调用方转 BusinessError）。 */
+/**
+ * 模型原文 → 严格草稿（纯函数）：围栏剥离 → 平衡切片 → 单次 JSON.parse →
+ * 数组直给则包成 {entries, warnings: []} → zod strict。
+ * 前后解释文字、代码围栏、裸数组全部容忍；失败返回 null（调用方重试或降级）。
+ * 模型原文永不外泄（只返回结构化草稿或 null）。
+ */
 export function parseTocReviewDraft(raw: string): TocReviewDraft | null {
-  const text = raw.trim();
-  if (!text) return null;
+  const sliced = sliceJsonPayload(raw);
+  if (!sliced) return null;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(sliced);
   } catch {
     return null;
+  }
+  if (Array.isArray(parsed)) {
+    parsed = { entries: parsed, warnings: [] };
   }
   const checked = TocReviewDraftSchema.safeParse(parsed);
   if (!checked.success) return null;
   return checked.data;
+}
+
+/**
+ * JSON 负载切片（纯函数）：去围栏 → 取最先出现的外层平衡容器（`{...}` 或
+ * `[...]`，字符串感知），裸数组由调用方包成 entries。都取不到返回 null。
+ */
+export function sliceJsonPayload(raw: string): string | null {
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
+  const text = (fenced?.[1] ?? raw).trim();
+  if (!text) return null;
+  const braceAt = text.indexOf('{');
+  const bracketAt = text.indexOf('[');
+  if (braceAt >= 0 && (bracketAt < 0 || braceAt < bracketAt)) {
+    return sliceBalanced(text, '{', '}');
+  }
+  if (bracketAt >= 0) {
+    return sliceBalanced(text, '[', ']');
+  }
+  return null;
+}
+
+/** 字符串感知的最外层平衡括号切片（纯函数）：转义/引号内括号不计数。 */
+function sliceBalanced(text: string, open: string, close: string): string | null {
+  const start = text.indexOf(open);
+  if (start < 0) return null;
+  let depth = 0;
+  let inString: string | null = null;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i] as string;
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === inString) {
+        inString = null;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = ch;
+    } else if (ch === open) {
+      depth++;
+    } else if (ch === close) {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/** 失败分类（纯函数）：以 `{` 开头疑似 JSON 但 schema 非法，否则视为非 JSON。 */
+export function classifyReviewFailure(raw: string): 'schema' | 'parse' {
+  return raw.trim().startsWith('{') || raw.trim().startsWith('[') ? 'schema' : 'parse';
 }
 
 /** 同一次 AgentInput 的文本部分（纯函数）：OCR 条目 + 页码范围 + 诊断计数；不含图片字节。 */
@@ -175,6 +245,8 @@ export async function reviewTocWithAgent(
       pageCount: baseline.pageCount,
       baseline,
       draft: null,
+      reviewStatus: 'ok',
+      reviewError: null,
       diagnostics: {
         pagesRequested: baseline.diagnostics.pagesRequested,
         pagesRendered: 0,
@@ -182,6 +254,20 @@ export async function reviewTocWithAgent(
         draftEntries: 0,
       },
     });
+  }
+
+  // P3.1B 基线质量门（服务端强制）：thin/empty 不进模型，返回可读错误；
+  // 前端禁用只是辅助。基线本身仍在调用方手里可编辑（本函数只拒绝，不销毁）。
+  if (baseline.verdict !== 'usable') {
+    return err(
+      new BusinessError(
+        'E_TOC_BASELINE_THIN',
+        baseline.verdict === 'empty'
+          ? '目录基线为空（没有提取到可用条目），请更换目录页范围后重试，或手动填写目录'
+          : `目录基线不足（仅 ${baseline.entries.length} 条有效条目，标题存疑 ${baseline.diagnostics.badTitle} 行），请更换目录页范围后重试，或手动填写目录`,
+        'VALIDATION'
+      )
+    );
   }
 
   // capability 查询在渲染之前：不支持图片的 Adapter 明确拒绝，绝不丢图做纯文本审核。
@@ -211,6 +297,8 @@ export async function reviewTocWithAgent(
       pageCount: material.pageCount,
       baseline,
       draft: null,
+      reviewStatus: 'ok',
+      reviewError: null,
       diagnostics: {
         pagesRequested: baseline.diagnostics.pagesRequested,
         pagesRendered: 0,
@@ -229,50 +317,92 @@ export async function reviewTocWithAgent(
   });
   if (!isOk(sessionRes)) return sessionRes;
   const session: AgentSession = sessionRes.value;
-  let rawText = '';
-  try {
-    for await (const ev of session.send({
-      message: buildTocReviewMessage(baseline, material.pages.length),
-      attachments: material.pages.map((p) => ({
-        png: p.png,
-        label: `toc-physical-page-${p.pageNumber}`,
-      })),
-    })) {
-      if (ev.type === 'TEXT_DELTA') {
-        rawText += ev.delta;
-      } else if (ev.type === 'ERROR') {
-        return err(ev.error);
-      } else if (ev.type === 'COMPLETED') {
-        if (typeof ev.finalOutput === 'string' && ev.finalOutput) rawText = ev.finalOutput;
-        break;
+
+  /**
+   * P3.1B 单轮发送（内部）：收集 TEXT_DELTA，ERROR 事件即停并透出，
+   * COMPLETED 用 finalOutput 覆盖累积。异常转业务错误。
+   */
+  const runTurn = async (
+    message: string,
+    attachments: Array<{ png: Uint8Array; label: string }>
+  ): Promise<Result<string, BusinessError>> => {
+    let rawText = '';
+    try {
+      for await (const ev of session.send({ message, attachments })) {
+        if (ev.type === 'TEXT_DELTA') {
+          rawText += ev.delta;
+        } else if (ev.type === 'ERROR') {
+          return err(ev.error);
+        } else if (ev.type === 'COMPLETED') {
+          if (typeof ev.finalOutput === 'string' && ev.finalOutput) rawText = ev.finalOutput;
+          break;
+        }
       }
+    } catch (e) {
+      return err(translateToBusinessError(e, 'TOC_REVIEW_AGENT:send'));
     }
-  } catch (e) {
-    return err(translateToBusinessError(e, 'TOC_REVIEW_AGENT:send'));
-  } finally {
+    return ok(rawText);
+  };
+
+  const closeSession = async (): Promise<void> => {
     try {
       await session.close();
     } catch {
       // 关闭失败不影响结果
     }
-  }
+  };
 
-  const draft = parseTocReviewDraft(rawText);
+  const firstRes = await runTurn(
+    buildTocReviewMessage(baseline, material.pages.length),
+    material.pages.map((p) => ({ png: p.png, label: `toc-physical-page-${p.pageNumber}` }))
+  );
+  if (!isOk(firstRes)) {
+    await closeSession();
+    return firstRes;
+  }
+  let draft = parseTocReviewDraft(firstRes.value);
   if (!draft) {
-    const looksJson = rawText.trim().startsWith('{');
-    return err(
-      new BusinessError(
-        looksJson ? 'E_TOC_REVIEW_SCHEMA' : 'E_TOC_REVIEW_PARSE',
-        looksJson
-          ? 'AI 审核草稿格式不合要求（字段非法），已丢弃，未写入任何数据'
-          : 'AI 审核草稿不是合法 JSON，已丢弃，未写入任何数据',
-        'AGENT_RUNTIME',
-        true
-      )
+    // P3.1B 同 session 最多重试一次：纯文本纠错轮，不新增 OCR、不重新渲染
+    // （复用首轮上下文，图片仍在 thread 内；附件不再重发）。
+    const retryRes = await runTurn(
+      '上一回复不是合法 JSON。请只返回严格 JSON：{"entries": [{"title": "条目标题", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}], "warnings": ["存疑说明"]}，除 JSON 外不输出任何文字。',
+      []
     );
+    if (!isOk(retryRes)) {
+      await closeSession();
+      return retryRes;
+    }
+    draft = parseTocReviewDraft(retryRes.value);
+    if (!draft) {
+      // 二次失败：正常的可读态（非 502），基线保留可编辑；不展示模型原文。
+      await closeSession();
+      const kind = classifyReviewFailure(retryRes.value);
+      return ok({
+        embedded: false,
+        range: { fromPage, toPage },
+        pageCount: baseline.pageCount,
+        baseline,
+        draft: null,
+        reviewStatus: 'unavailable',
+        reviewError: {
+          code: kind === 'schema' ? 'E_TOC_REVIEW_SCHEMA' : 'E_TOC_REVIEW_PARSE',
+          userMessage:
+            kind === 'schema'
+              ? 'AI 审核草稿格式不合要求（字段非法），已保留可编辑基线，可手动修正后继续'
+              : 'AI 审核草稿不是合法 JSON，已保留可编辑基线，可手动修正后继续',
+        },
+        diagnostics: {
+          pagesRequested: baseline.diagnostics.pagesRequested,
+          pagesRendered: material.pages.length,
+          baselineEntries: baseline.entries.length,
+          draftEntries: 0,
+        },
+      });
+    }
   }
+  await closeSession();
 
-  // 只记计数：不记标题、不记正文、不记图片、不记路径、不记用户。
+  // 只记计数：不记标题、不记正文、不记图片、不记路径、不记用户、不记模型原文。
   logger.warn('[toc-review-agent] 完成', {
     range: `${fromPage}-${toPage}`,
     baselineEntries: baseline.entries.length,
@@ -286,6 +416,8 @@ export async function reviewTocWithAgent(
     pageCount: baseline.pageCount,
     baseline,
     draft,
+    reviewStatus: 'ok',
+    reviewError: null,
     diagnostics: {
       pagesRequested: baseline.diagnostics.pagesRequested,
       pagesRendered: material.pages.length,

@@ -35,6 +35,11 @@ function baseProps(overrides: Partial<TocReviewPanelViewProps> = {}): TocReviewP
     editedEntries: [],
     confirmed: false,
     confirmedSummary: null,
+    adoptDisabled: false,
+    onStartManual: () => {},
+    onAddEntry: () => {},
+    onRemoveEntry: () => {},
+    confirmDisabled: false,
     onDiscover: () => {},
     onCancelDiscover: () => {},
     onSelectCandidate: () => {},
@@ -68,6 +73,7 @@ const AMBIGUOUS: TocDiscoveryData = {
 
 const BASELINE: TocBaselineData = {
   status: 'ok',
+  verdict: 'thin',
   range: { fromPage: 2, toPage: 4 },
   pageCount: 100,
   entries: [{ title: '第1課', printedPage: 12, level: 1, source: 'text', kind: 'lesson' }],
@@ -78,7 +84,9 @@ const BASELINE: TocBaselineData = {
     linesDroppedWash: 1,
     entriesAccepted: 1,
     entriesRejected: 0,
+    badTitle: 0,
   },
+  pageEvidence: [{ page: 2, excerpt: '第1課 12' }],
   embedded: false,
 };
 
@@ -91,6 +99,8 @@ const REVIEW: TocReviewData = {
     entries: [{ title: '第1課', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' }],
     warnings: ['第3页有污渍'],
   },
+  reviewStatus: 'ok',
+  reviewError: null,
   diagnostics: { pagesRequested: 3, pagesRendered: 3, baselineEntries: 1, draftEntries: 1 },
 };
 
@@ -232,5 +242,66 @@ describe('P4C TocReviewPanelView（SSR）', () => {
     expect(html).toContain('aria-label="层级"');
     expect(html).toContain('aria-label="类型"');
     expect(html).toContain('确认目录');
+  });
+});
+
+describe('P3.1B verdict/证据/手动/降级视图（SSR）', () => {
+  it('thin：结果不足横幅 + 采用禁用 + 手动填写入口 + 证据折叠', () => {
+    const html = render({ baseline: BASELINE, adoptDisabled: true });
+    expect(html).toContain('结果不足，不能直接采用');
+    expect(html).toContain('不是错误');
+    expect(html).toContain('手动填写');
+    expect(html).toContain('查看 OCR 原文证据');
+    expect(html).toContain('第1課 12');
+    expect(html).toContain('disabled');
+  });
+
+  it('empty：无条目说明 + 采用禁用', () => {
+    const html = render({
+      baseline: { ...BASELINE, status: 'empty', verdict: 'empty', entries: [], pageEvidence: [] },
+      adoptDisabled: true,
+    });
+    expect(html).toContain('没有提取到可用条目，结果不足，不能采用');
+  });
+
+  it('usable：无不足横幅（向后兼容旧断言）', () => {
+    const html = render({ baseline: { ...BASELINE, verdict: 'usable' }, adoptDisabled: false });
+    expect(html).not.toContain('结果不足');
+    expect(html).toContain('采用 OCR 基线');
+  });
+
+  it('编辑态有增删行按钮；空标题确认禁用', () => {
+    const html = render({
+      baseline: BASELINE,
+      adopted: 'manual',
+      editing: true,
+      editedEntries: [
+        { key: 'toc-manual-0', title: '', printedPage: '', level: 2, kind: 'section', confidence: null },
+      ],
+      confirmDisabled: true,
+    });
+    expect(html).toContain('待确认：手动填写');
+    expect(html).toContain('添加一行');
+    expect(html).toContain('删除本行');
+    const confirmOpen = html.slice(0, html.indexOf('确认目录')).split('<button').pop() ?? '';
+    expect(confirmOpen).toContain('disabled');
+  });
+
+  it('unavailable：可读错误 + 基线可采用提示，无 draft 面板', () => {
+    const html = render({
+      baseline: { ...BASELINE, verdict: 'usable' },
+      adoptDisabled: false,
+      review: { ...REVIEW, draft: null, reviewStatus: 'unavailable', reviewError: { code: 'E_TOC_REVIEW_PARSE', userMessage: 'AI 审核草稿不是合法 JSON，已保留可编辑基线' } },
+    });
+    expect(html).toContain('AI 审核暂不可用');
+    expect(html).toContain('已保留可编辑基线');
+    expect(html).toContain('E_TOC_REVIEW_PARSE');
+    expect(html).not.toContain('AI 草稿，需人工确认');
+  });
+
+  it('成功草稿显示与基线差异计数', () => {
+    const html = render({ baseline: BASELINE, review: REVIEW });
+    expect(html).toContain('新增 0');
+    expect(html).toContain('保留 1');
   });
 });

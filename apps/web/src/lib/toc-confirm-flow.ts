@@ -49,6 +49,8 @@ export interface TocBaselineEntry {
 
 export interface TocBaselineData {
   status: 'ok' | 'empty';
+  /** P3.1B 质量 verdict（usable/thin/empty；旧网关缺席按条数回填）。 */
+  verdict: 'usable' | 'thin' | 'empty';
   range: { fromPage: number; toPage: number };
   pageCount: number;
   entries: TocBaselineEntry[];
@@ -59,7 +61,11 @@ export interface TocBaselineData {
     linesDroppedWash: number;
     entriesAccepted: number;
     entriesRejected: number;
+    /** 无语义标题被拒行数（缺席回填 0）。 */
+    badTitle: number;
   };
+  /** 每页受限 OCR 证据（只读展示；缺席回填 []）。 */
+  pageEvidence: Array<{ page: number; excerpt: string }>;
   embedded: boolean;
 }
 
@@ -84,6 +90,10 @@ export interface TocReviewData {
   pageCount: number;
   baseline: TocBaselineData;
   draft: TocReviewDraft | null;
+  /** P3.1B 审核可用态（ok/unavailable；旧网关缺席回填 ok）。 */
+  reviewStatus: 'ok' | 'unavailable';
+  /** unavailable 时的安全错误（缺席回填 null；永不含模型原文）。 */
+  reviewError: { code: string; userMessage: string } | null;
   diagnostics: {
     pagesRequested: number;
     pagesRendered: number;
@@ -253,12 +263,39 @@ export function narrowTocBaseline(payload: unknown): TocBaselineData | null {
   const [pagesRequested, pagesOcr, linesConsidered, linesDroppedWash, entriesAccepted, entriesRejected] = counts as [
     number, number, number, number, number, number,
   ];
+  const badTitleRaw = (diagnostics as Record<string, unknown>).badTitle;
+  const badTitle = typeof badTitleRaw === 'number' && Number.isSafeInteger(badTitleRaw) && badTitleRaw >= 0 ? badTitleRaw : 0;
+  // verdict 缺席（旧网关）按条数回填；非法值回填 none→按规则重算
+  const verdictRaw = (payload as Record<string, unknown>).verdict;
+  const verdict: TocBaselineData['verdict'] =
+    verdictRaw === 'usable' || verdictRaw === 'thin' || verdictRaw === 'empty'
+      ? verdictRaw
+      : narrowedEntries.length === 0
+        ? 'empty'
+        : narrowedEntries.length < 2
+          ? 'thin'
+          : 'usable';
+  // pageEvidence 缺席回填 []；逐项收窄（page 正整数 + excerpt 字符串，上限 4k 防刷屏）
+  const pageEvidence: TocBaselineData['pageEvidence'] = [];
+  const evidenceRaw = (payload as Record<string, unknown>).pageEvidence;
+  if (evidenceRaw !== undefined) {
+    if (!Array.isArray(evidenceRaw)) return null;
+    for (const item of evidenceRaw) {
+      if (!isRecord(item)) return null;
+      const { page, excerpt } = item;
+      if (typeof page !== 'number' || !Number.isSafeInteger(page) || page < 1) return null;
+      if (typeof excerpt !== 'string' || excerpt.length > 4096) return null;
+      pageEvidence.push({ page, excerpt });
+    }
+  }
   return {
     status,
+    verdict,
     range: narrowedRange,
     pageCount,
     entries: narrowedEntries,
-    diagnostics: { pagesRequested, pagesOcr, linesConsidered, linesDroppedWash, entriesAccepted, entriesRejected },
+    diagnostics: { pagesRequested, pagesOcr, linesConsidered, linesDroppedWash, entriesAccepted, entriesRejected, badTitle },
+    pageEvidence,
     embedded: embedded === true,
   };
 }
@@ -287,6 +324,17 @@ export function narrowTocReview(payload: unknown): TocReviewData | null {
   );
   if (diagCounts.some((c) => typeof c !== 'number' || !Number.isSafeInteger(c))) return null;
   const [pagesRequested, pagesRendered, baselineEntries, draftEntries] = diagCounts as [number, number, number, number];
+  // reviewStatus 缺席（旧网关）回填 ok；reviewError 缺席回填 null
+  const statusRaw = (payload as Record<string, unknown>).reviewStatus;
+  const reviewStatus: TocReviewData['reviewStatus'] = statusRaw === 'unavailable' ? 'unavailable' : 'ok';
+  let reviewError: TocReviewData['reviewError'] = null;
+  const errorRaw = (payload as Record<string, unknown>).reviewError;
+  if (errorRaw !== undefined && errorRaw !== null) {
+    if (!isRecord(errorRaw) || typeof errorRaw.code !== 'string' || !errorRaw.code || typeof errorRaw.userMessage !== 'string' || !errorRaw.userMessage) {
+      return null;
+    }
+    reviewError = { code: errorRaw.code, userMessage: errorRaw.userMessage };
+  }
   if (embedded === true) {
     if (draft !== null) return null;
     return {
@@ -295,11 +343,26 @@ export function narrowTocReview(payload: unknown): TocReviewData | null {
       pageCount,
       baseline: narrowedBaseline,
       draft: null,
+      reviewStatus,
+      reviewError,
       diagnostics: { pagesRequested, pagesRendered, baselineEntries, draftEntries },
     };
   }
-  if (!isRecord(draft) || !Array.isArray(draft.entries) || !Array.isArray(draft.warnings)) return null;
-  const entries: TocReviewDraftEntry[] = [];
+  if (draft === null) {
+    // P3.1B unavailable 态：draft 为 null 合法（基线保留可编辑）；其他情况仍拒绝。
+    if (reviewStatus !== 'unavailable') return null;
+    return {
+      embedded: false,
+      range: narrowedRange,
+      pageCount,
+      baseline: narrowedBaseline,
+      draft: null,
+      reviewStatus,
+      reviewError,
+      diagnostics: { pagesRequested, pagesRendered, baselineEntries, draftEntries },
+    };
+  }
+  if (!isRecord(draft) || !Array.isArray(draft.entries) || !Array.isArray(draft.warnings)) return null;  const entries: TocReviewDraftEntry[] = [];
   for (const item of draft.entries) {
     const entry = narrowDraftEntry(item);
     if (!entry) return null;
@@ -316,6 +379,8 @@ export function narrowTocReview(payload: unknown): TocReviewData | null {
     pageCount,
     baseline: narrowedBaseline,
     draft: { entries, warnings },
+    reviewStatus,
+    reviewError,
     diagnostics: { pagesRequested, pagesRendered, baselineEntries, draftEntries },
   };
 }
@@ -344,7 +409,7 @@ export function toEditableEntries(
   }));
 }
 
-export type TocAdoptSource = 'ocr' | 'ai';
+export type TocAdoptSource = 'ocr' | 'ai' | 'manual';
 
 /** 确认摘要（纯函数）：只描述本地状态，不触网络，不写存储。 */
 export function summarizeConfirmedEntries(
@@ -354,8 +419,42 @@ export function summarizeConfirmedEntries(
 ): string {
   const lessons = entries.filter((e) => e.kind === 'lesson').length;
   const sections = entries.length - lessons;
-  const sourceLabel = source === 'ocr' ? 'OCR 基线' : 'AI 草稿';
+  const sourceLabel = source === 'ocr' ? 'OCR 基线' : source === 'ai' ? 'AI 草稿' : '手动填写';
   return `已确认${entries.length} 条（${lessons} 课 · ${sections} 节），来源：${sourceLabel}，目录页第 ${range.fromPage}–${range.toPage} 页。`;
+}
+
+/** 基线 vs 草稿差异计数（纯函数）：按标题+印刷页匹配，多重行按多重集结算。 */
+export interface TocDraftDiff {
+  added: number;
+  removed: number;
+  kept: number;
+}
+
+export function diffBaselineDraft(
+  baseline: Array<{ title: string; printedPage: number }>,
+  draft: Array<{ title: string; printedPage: number }>
+): TocDraftDiff {
+  const keyOf = (e: { title: string; printedPage: number }): string => `${e.title}@@${e.printedPage}`;
+  const baseCounts = new Map<string, number>();
+  for (const entry of baseline) {
+    const key = keyOf(entry);
+    baseCounts.set(key, (baseCounts.get(key) ?? 0) + 1);
+  }
+  let kept = 0;
+  let added = 0;
+  for (const entry of draft) {
+    const key = keyOf(entry);
+    const remaining = baseCounts.get(key) ?? 0;
+    if (remaining > 0) {
+      kept++;
+      baseCounts.set(key, remaining - 1);
+    } else {
+      added++;
+    }
+  }
+  let removed = 0;
+  for (const remaining of baseCounts.values()) removed += remaining;
+  return { added, removed, kept };
 }
 
 export interface TocConfirmState {
@@ -385,11 +484,32 @@ export type TocConfirmAction =
   | { type: 'select-candidate'; index: number; candidate: TocDiscoveryCandidate }
   | { type: 'set-range'; start: string; end: string }
   | { type: 'adopt'; source: TocAdoptSource; entries: EditableTocEntry[] }
+  | { type: 'start-manual' }
+  | { type: 'add-entry' }
+  | { type: 'remove-entry'; key: string }
   | { type: 'start-edit' }
   | { type: 'update-entry'; key: string; patch: Partial<EditableTocEntry> }
   | { type: 'confirm'; range: { fromPage: number; toPage: number } }
   | { type: 'clear-results' }
   | { type: 'reset-flow' };
+
+/** 空白手填行（纯函数）：保守默认 section/2 级，用户逐行改；绝不预填猜测。 */
+export function blankEditableEntry(key: string): EditableTocEntry {
+  return { key, title: '', printedPage: '', level: 2, kind: 'section', confidence: null };
+}
+
+/** 下一个手动行 key（纯函数）：扫描现有 toc-manual-N 取 max+1，不依赖外部计数。 */
+export function nextManualKey(entries: EditableTocEntry[]): string {
+  let max = -1;
+  for (const entry of entries) {
+    const match = /^toc-manual-(\d+)$/.exec(entry.key);
+    if (match) {
+      const n = Number(match[1]);
+      if (Number.isSafeInteger(n) && n > max) max = n;
+    }
+  }
+  return `toc-manual-${max + 1}`;
+}
 
 /**
  * 确认流程 reducer（纯函数）：选择/采纳/编辑/确认只改本地 state。
@@ -416,6 +536,32 @@ export function tocConfirmReducer(state: TocConfirmState, action: TocConfirmActi
         adopted: action.source,
         editing: false,
         editedEntries: action.entries.map((entry) => ({ ...entry })),
+        confirmed: false,
+        confirmedSummary: null,
+      };
+    case 'start-manual':
+      // P3.1B thin/empty 手动建草稿：从空白行开始手填，不复制任何垃圾基线。
+      return {
+        ...state,
+        adopted: 'manual',
+        editing: true,
+        editedEntries: [blankEditableEntry(nextManualKey(state.editedEntries))],
+        confirmed: false,
+        confirmedSummary: null,
+      };
+    case 'add-entry':
+      if (!state.adopted || !state.editing) return state;
+      return {
+        ...state,
+        editedEntries: [...state.editedEntries, blankEditableEntry(nextManualKey(state.editedEntries))],
+        confirmed: false,
+        confirmedSummary: null,
+      };
+    case 'remove-entry':
+      if (!state.adopted || !state.editing) return state;
+      return {
+        ...state,
+        editedEntries: state.editedEntries.filter((entry) => entry.key !== action.key),
         confirmed: false,
         confirmedSummary: null,
       };

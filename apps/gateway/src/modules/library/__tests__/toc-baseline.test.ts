@@ -209,7 +209,13 @@ describe('P3 extractTocBaseline 编排', () => {
       linesDroppedWash: 2,
       entriesAccepted: 6,
       entriesRejected: 0,
+      badTitle: 0,
     });
+    expect(res.value.verdict).toBe('usable');
+    expect(res.value.pageEvidence.map((e) => e.page)).toEqual([2, 3]);
+    for (const evidence of res.value.pageEvidence) {
+      expect(evidence.excerpt.length).toBeLessThanOrEqual(1500 + 6);
+    }
     // 分类全开窗（[1] 探 + [2,3] 窗），OCR 精确等于确认范围
     expect(calls.classify).toEqual([[1], [2, 3]]);
     expect(calls.ocr).toEqual([[2, 3]]);
@@ -328,6 +334,110 @@ describe('P3 extractTocBaseline 编排', () => {
     expect(res.value.embedded).toBe(true);
     expect(res.value.status).toBe('empty');
     expect(res.value.entries).toEqual([]);
+    expect(res.value.pageEvidence).toEqual([]);
     expect(calls.ocr).toEqual([]);
+  });
+});
+
+describe('P3.1B 基线质量 verdict（无语义标题拒绝）', () => {
+  it('extractTocLineEntry：符号-only/Markdown 残留/纯数字形 → bad-title', () => {
+    expect(extractTocLineEntry('##### …… 322')).toEqual({ refused: 'bad-title' });
+    expect(extractTocLineEntry('··· 15')).toEqual({ refused: 'bad-title' });
+    expect(extractTocLineEntry('12 34')).toEqual({ refused: 'bad-title' });
+    expect(extractTocLineEntry('| 120 |')).toEqual({ refused: 'no-title' });
+    // 正常行不受影响（含 Markdown 前导符但有实质标题的保留原文）
+    expect(extractTocLineEntry('第1課 はじめまして 3')).toMatchObject({ title: '第1課 はじめまして', printedPage: 3 });
+    expect(extractTocLineEntry('| 第3課 | さんぽ | 11 |')).toMatchObject({ title: '第3課 さんぽ', printedPage: 11 });
+  });
+
+  it('垃圾 + 1 条有效 → thin：拒绝采用链，badTitle 计数，证据有界', async () => {
+    const calls = newCalls();
+    const garbageMd = ['##### …… 322', '第1課 はじめまして 3', 'Lingua Textbook'].join('\n');
+    const res = await extractTocBaseline(
+      {
+        loadInspector: async () =>
+          baselineMock({ pageCount: 371, needing: [16], mdByPage: { 16: garbageMd }, routed: [16], calls }),
+      },
+      { userId: 'u1', filename: 'big.pdf', bytes: mockBytes(), fromPage: 16, toPage: 16 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.entries).toEqual([
+      { title: '第1課 はじめまして', printedPage: 3, level: 1, source: 'text', kind: 'lesson' },
+    ]);
+    expect(res.value.status).toBe('ok');
+    expect(res.value.verdict).toBe('thin');
+    expect(res.value.diagnostics.badTitle).toBe(1);
+    expect(res.value.pageEvidence).toEqual([{ page: 16, excerpt: expect.any(String) as string }]);
+    expect((res.value.pageEvidence[0]?.excerpt as string).length).toBeLessThanOrEqual(1506);
+  });
+
+  it('全垃圾 → empty', async () => {
+    const calls = newCalls();
+    const garbageMd = ['##### …… 322', '··· 15'].join('\n');
+    const res = await extractTocBaseline(
+      {
+        loadInspector: async () =>
+          baselineMock({ pageCount: 371, needing: [16], mdByPage: { 16: garbageMd }, routed: [16], calls }),
+      },
+      { userId: 'u1', filename: 'big.pdf', bytes: mockBytes(), fromPage: 16, toPage: 16 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.entries).toEqual([]);
+    expect(res.value.status).toBe('empty');
+    expect(res.value.verdict).toBe('empty');
+    expect(res.value.diagnostics.badTitle).toBe(2);
+  });
+
+  it('单条有效也 thin（<2 条不可采用）；两条有效 usable', async () => {
+    const oneCalls = newCalls();
+    const one = await extractTocBaseline(
+      {
+        loadInspector: async () =>
+          baselineMock({ pageCount: 371, needing: [2], mdByPage: { 2: '第1課 はじめまして 3' }, routed: [2], calls: oneCalls }),
+      },
+      { userId: 'u1', filename: 't.pdf', bytes: mockBytes(), fromPage: 2, toPage: 2 }
+    );
+    expect(isOk(one)).toBe(true);
+    if (!isOk(one)) return;
+    expect(one.value.entries.length).toBe(1);
+    expect(one.value.verdict).toBe('thin');
+
+    const twoCalls = newCalls();
+    const two = await extractTocBaseline(
+      {
+        loadInspector: async () =>
+          baselineMock({
+            pageCount: 371,
+            needing: [2],
+            mdByPage: { 2: '第1課 はじめまして 3\n第2課 これは本です 7' },
+            routed: [2],
+            calls: twoCalls,
+          }),
+      },
+      { userId: 'u1', filename: 't.pdf', bytes: mockBytes(), fromPage: 2, toPage: 2 }
+    );
+    expect(isOk(two)).toBe(true);
+    if (!isOk(two)) return;
+    expect(two.value.entries.length).toBe(2);
+    expect(two.value.verdict).toBe('usable');
+  });
+
+  it('超长页 evidence 截断有界（含截断标记）', async () => {
+    const calls = newCalls();
+    const longLine = `第1課 ${'あ'.repeat(5000)} 3`;
+    const res = await extractTocBaseline(
+      {
+        loadInspector: async () =>
+          baselineMock({ pageCount: 371, needing: [2], mdByPage: { 2: longLine }, routed: [2], calls }),
+      },
+      { userId: 'u1', filename: 't.pdf', bytes: mockBytes(), fromPage: 2, toPage: 2 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    const excerpt = res.value.pageEvidence[0]?.excerpt as string;
+    expect(excerpt.length).toBeLessThanOrEqual(1506);
+    expect(excerpt.endsWith('…(已截断)')).toBe(true);
   });
 });

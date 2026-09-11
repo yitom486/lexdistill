@@ -1,0 +1,195 @@
+import { describe, expect, it, afterEach } from 'bun:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { unlink } from 'node:fs/promises';
+import { BusinessError, err, ok } from '@study-studio/shared';
+import { createPdfImportRoutes } from '../../../../gateway/src/modules/library/http/pdf-import-routes.js';
+import { pinProcessToTestRuntime, ensurePdfTestRuntime } from '../../../../gateway/src/modules/library/__tests__/pdf-test-runtime.js';
+import { DEFAULT_GATEWAY_BASE_URL, configureGatewayBaseUrl } from '../../lib/api-client.js';
+import { GatewayRequestError } from '../../lib/gateway-error.js';
+import { requestExtractTocBaseline, requestReviewToc } from '../textbooks-annotations.js';
+
+/**
+ * CMD-LINGUA-P3.1B Gateway + Web 真实 HTTP 集成回归（真 native + 真 server + 真 Web 客户端）。
+ *
+ * - 临时 Bun.serve 全挂载 pdf-import 路由（非 app.request），真实 fetch；
+ * - Web 侧用生产 requestExtractTocBaseline / requestReviewToc（经 configureGatewayBaseUrl 指向临时服务）；
+ * - 合成文本目录 PDF（2 页 Lesson 形，无私人内容）→ usable 基线 → fenced 草稿成功；
+ *   同 PDF + 坏模型 → unavailable 200（非 502）；空白 PDF → thin 拒绝 + extract empty；
+ * - 真临时文件（os.tmpdir，用后即删）；test-runtime 钉死，永不读写生产路径。
+ */
+
+pinProcessToTestRuntime();
+await ensurePdfTestRuntime();
+
+function buildPdf(objects: string[]): Uint8Array {
+  const parts = ['%PDF-1.4\n'];
+  const offsets = [0];
+  for (let i = 0; i < objects.length; i++) {
+    offsets.push(Buffer.byteLength(parts.join('')));
+    parts.push(`${i + 1} 0 obj\n${objects[i]}\nendobj\n`);
+  }
+  const xrefAt = Buffer.byteLength(parts.join(''));
+  const n = objects.length + 1;
+  parts.push(`xref\n0 ${n}\n`);
+  parts.push('0000000000 65535 f \n');
+  for (let i = 1; i < n; i++) {
+    parts.push(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
+  }
+  parts.push(`trailer\n<< /Size ${n} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF`);
+  return new Uint8Array(Buffer.from(parts.join(''), 'latin1'));
+}
+
+function syntheticTextTocPdf(): Uint8Array {
+  const line = (text: string): string => `BT /F1 24 Tf 100 700 Td (${text}) Tj ET\n`;
+  const pageObj = (contentRef: number): string =>
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentRef} 0 R /Resources << /Font << /F1 7 0 R >> >> >>`;
+  const streamObj = (text: string): string =>
+    `<< /Length ${Buffer.byteLength(text, 'latin1')} >>\nstream\n${text}endstream`;
+  return buildPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    pageObj(5),
+    pageObj(6),
+    streamObj(line('Lesson 1 Apple 12')),
+    streamObj(line('Lesson 2 Orange 30')),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]);
+}
+
+function syntheticBlankPdf(): Uint8Array {
+  return buildPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>',
+  ]);
+}
+
+/** 脚本队列假通道：按 send 顺序吐脚本（重试测试用）。 */
+function fakeAdapter(scripts: string[]) {
+  let n = 0;
+  const session = {
+    sessionId: 'sess-it',
+    threadId: 'thread-it',
+    send: async function* (input: unknown) {
+      void input;
+      const script = scripts[Math.min(n, scripts.length - 1)] as string;
+      n++;
+      yield { type: 'TEXT_DELTA', delta: script };
+      yield { type: 'COMPLETED', finalOutput: script };
+    },
+    submitToolResult: async () => ok(undefined),
+    submitApproval: async () => ok(undefined),
+    steer: async () => ok(undefined),
+    interrupt: async () => ok(undefined),
+    close: async () => ok(undefined),
+  };
+  return {
+    id: 'it-fake-review',
+    name: 'IT fake review adapter',
+    supportsImageInput: () => true,
+    createSession: async () => ok(session),
+    resumeSession: async () => err(new BusinessError('E_CODEX_SESSION', 'it 不支持恢复', 'AGENT_RUNTIME')),
+  };
+}
+
+const servers: Array<{ stop: () => void }> = [];
+const tempFiles: string[] = [];
+afterEach(async () => {
+  for (const s of servers.splice(0)) {
+    try {
+      s.stop();
+    } catch {
+      // 已停
+    }
+  }
+  for (const f of tempFiles.splice(0)) {
+    try {
+      await unlink(f);
+    } catch {
+      // 已删
+    }
+  }
+  configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
+});
+
+async function writeTempPdf(bytes: Uint8Array): Promise<string> {
+  const tmp = join(tmpdir(), `p31b-it-${process.pid}-${Date.now()}.pdf`);
+  await Bun.write(tmp, bytes);
+  tempFiles.push(tmp);
+  return tmp;
+}
+
+function serve(scripts: string[]): string {
+  const app = createPdfImportRoutes(
+    { repo: {} as never, server: { agentAdapter: fakeAdapter(scripts) } as never, port: 0 },
+  );
+  const server = Bun.serve({ port: 0, fetch: (req) => app.fetch(req) });
+  servers.push(server);
+  return `http://localhost:${server.port}`;
+}
+
+describe('P3.1B extract+review 真实 HTTP 集成', () => {
+  it('文本目录：extract usable + 证据有界；fenced 草稿成功（200）', async () => {
+    const url = serve([
+      '```json\n{"entries": [{"title": "Lesson 1 Apple", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}], "warnings": []}\n```',
+    ]);
+    configureGatewayBaseUrl(url);
+    try {
+      const tmp = await writeTempPdf(syntheticTextTocPdf());
+      const baseline = await requestExtractTocBaseline('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
+      expect(baseline.verdict).toBe('usable');
+      expect(baseline.entries.length).toBe(2);
+      expect(baseline.pageEvidence.length).toBe(2);
+      for (const evidence of baseline.pageEvidence) {
+        expect(evidence.excerpt.length).toBeLessThanOrEqual(1506);
+      }
+      expect(baseline.pageEvidence[0]?.excerpt).toContain('Lesson 1 Apple');
+
+      const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
+      expect(review.reviewStatus).toBe('ok');
+      expect(review.reviewError).toBeNull();
+      expect(review.draft?.entries.length).toBe(1);
+      expect(review.baseline.verdict).toBe('usable');
+    } finally {
+      configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
+    }
+  }, 180000);
+
+  it('坏模型两次：unavailable 200（非 502），基线保留可编辑', async () => {
+    const url = serve(['not json at all', 'still not json']);
+    configureGatewayBaseUrl(url);
+    try {
+      const tmp = await writeTempPdf(syntheticTextTocPdf());
+      const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
+      expect(review.reviewStatus).toBe('unavailable');
+      expect(review.draft).toBeNull();
+      expect(review.reviewError?.code).toBe('E_TOC_REVIEW_PARSE');
+      expect(typeof review.reviewError?.userMessage).toBe('string');
+      expect(review.baseline.entries.length).toBe(2);
+      expect(review.baseline.verdict).toBe('usable');
+    } finally {
+      configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
+    }
+  }, 180000);
+
+  it('空白 PDF：extract empty + review 400 thin 拒绝（可读码）', async () => {
+    const url = serve(['{"entries":[],"warnings":[]}']);
+    configureGatewayBaseUrl(url);
+    try {
+      const tmp = await writeTempPdf(syntheticBlankPdf());
+      const baseline = await requestExtractTocBaseline('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
+      expect(baseline.verdict).toBe('empty');
+      expect(baseline.entries).toEqual([]);
+      const err = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 2 }).then(
+        () => null,
+        (e: unknown) => e
+      );
+      expect(err instanceof GatewayRequestError).toBe(true);
+      expect((err as GatewayRequestError).code).toBe('E_TOC_BASELINE_THIN');
+    } finally {
+      configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
+    }
+  }, 180000);
+});

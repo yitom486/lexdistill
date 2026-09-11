@@ -2,13 +2,16 @@ import { describe, expect, it } from 'bun:test';
 import {
   TOC_CONFIRM_MAX_PAGES,
   TOC_REVIEW_MAX_PAGES_UI,
+  blankEditableEntry,
   canRequestTocReview,
   decideExtractRequest,
   decideReviewRequest,
+  diffBaselineDraft,
   initialTocConfirmState,
   narrowTocBaseline,
   narrowTocDiscovery,
   narrowTocReview,
+  nextManualKey,
   summarizeConfirmedEntries,
   toEditableEntries,
   tocConfirmReducer,
@@ -232,5 +235,136 @@ describe('tocConfirmReducer（选择/采纳/编辑/确认全本地）', () => {
     expect(summary).toContain('2 条');
     expect(summary).toContain('1 课');
     expect(summary).toContain('OCR 基线');
+  });
+
+  it('手动摘要标注手动填写', () => {
+    const summary = summarizeConfirmedEntries('manual', { fromPage: 1, toPage: 2 }, [blankEditableEntry('toc-manual-0')]);
+    expect(summary).toContain('手动填写');
+  });
+});
+
+describe('P3.1B verdict/evidence/reviewStatus 收窄', () => {
+  const baselinePayload = {
+    status: 'ok',
+    verdict: 'thin',
+    range: { fromPage: 2, toPage: 4 },
+    pageCount: 100,
+    entries: [{ title: '第1課', printedPage: 12, level: 1, source: 'text', kind: 'lesson' }],
+    diagnostics: {
+      pagesRequested: 3,
+      pagesOcr: 3,
+      linesConsidered: 10,
+      linesDroppedWash: 1,
+      entriesAccepted: 1,
+      entriesRejected: 0,
+      badTitle: 2,
+    },
+    pageEvidence: [{ page: 2, excerpt: '第1課 12' }],
+    embedded: false,
+  };
+
+  it('verdict/badTitle/evidence 透传', () => {
+    const narrowed = narrowTocBaseline(baselinePayload);
+    expect(narrowed?.verdict).toBe('thin');
+    expect(narrowed?.diagnostics.badTitle).toBe(2);
+    expect(narrowed?.pageEvidence).toEqual([{ page: 2, excerpt: '第1課 12' }]);
+  });
+
+  it('缺席回填：verdict 按条数、badTitle 0、evidence []', () => {
+    const { verdict, diagnostics, pageEvidence, ...rest } = baselinePayload;
+    void verdict;
+    void diagnostics;
+    void pageEvidence;
+    const narrowed = narrowTocBaseline({
+      ...rest,
+      diagnostics: {
+        pagesRequested: 3,
+        pagesOcr: 3,
+        linesConsidered: 10,
+        linesDroppedWash: 1,
+        entriesAccepted: 1,
+        entriesRejected: 0,
+      },
+    });
+    expect(narrowed?.verdict).toBe('thin');
+    expect(narrowed?.diagnostics.badTitle).toBe(0);
+    expect(narrowed?.pageEvidence).toEqual([]);
+  });
+
+  it('evidence 非法（超长/坏页码）整包 null', () => {
+    expect(narrowTocBaseline({ ...baselinePayload, pageEvidence: [{ page: 0, excerpt: 'x' }] })).toBeNull();
+    expect(narrowTocBaseline({ ...baselinePayload, pageEvidence: [{ page: 2, excerpt: 'x'.repeat(5000) }] })).toBeNull();
+    expect(narrowTocBaseline({ ...baselinePayload, pageEvidence: 'nope' })).toBeNull();
+  });
+
+  it('reviewStatus/reviewError 透传与回填', () => {
+    const reviewPayload = {
+      embedded: false,
+      range: { fromPage: 2, toPage: 4 },
+      pageCount: 100,
+      baseline: baselinePayload,
+      draft: null,
+      reviewStatus: 'unavailable',
+      reviewError: { code: 'E_TOC_REVIEW_PARSE', userMessage: 'AI 审核草稿不是合法 JSON' },
+      diagnostics: { pagesRequested: 3, pagesRendered: 2, baselineEntries: 1, draftEntries: 0 },
+    };
+    const narrowed = narrowTocReview(reviewPayload);
+    expect(narrowed?.reviewStatus).toBe('unavailable');
+    expect(narrowed?.reviewError).toEqual({ code: 'E_TOC_REVIEW_PARSE', userMessage: 'AI 审核草稿不是合法 JSON' });
+    const { reviewStatus, reviewError, ...legacy } = reviewPayload;
+    void reviewStatus;
+    void reviewError;
+    // 旧网关非 embedded 必带 draft：回填 ok/null；无 draft 的非 embedded 仍非法
+    const legacyWithDraft = {
+      ...legacy,
+      draft: { entries: [{ title: '第1課', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' as const }], warnings: [] as string[] },
+    };
+    const backfilled = narrowTocReview(legacyWithDraft);
+    expect(backfilled?.reviewStatus).toBe('ok');
+    expect(backfilled?.reviewError).toBeNull();
+    expect(narrowTocReview(legacy)).toBeNull();
+  });
+});
+
+describe('P3.1B 手动建草稿 reducer', () => {
+  it('start-manual：空白行开始，不复制基线', () => {
+    const s = tocConfirmReducer(initialTocConfirmState, { type: 'start-manual' });
+    expect(s.adopted).toBe('manual');
+    expect(s.editing).toBe(true);
+    expect(s.editedEntries.length).toBe(1);
+    expect(s.editedEntries[0]?.title).toBe('');
+  });
+
+  it('add/remove 行：key 唯一，确认状态复位', () => {
+    let s = tocConfirmReducer(initialTocConfirmState, { type: 'start-manual' });
+    s = tocConfirmReducer(s, { type: 'add-entry' });
+    expect(s.editedEntries.length).toBe(2);
+    expect(new Set(s.editedEntries.map((e) => e.key)).size).toBe(2);
+    const key = s.editedEntries[0]?.key as string;
+    s = tocConfirmReducer(s, { type: 'remove-entry', key });
+    expect(s.editedEntries.length).toBe(1);
+    expect(s.editedEntries[0]?.key).toBe('toc-manual-1');
+    expect(nextManualKey(s.editedEntries)).toBe('toc-manual-2');
+  });
+
+  it('非编辑态 add/remove 忽略', () => {
+    const adopted = tocConfirmReducer(initialTocConfirmState, {
+      type: 'adopt',
+      source: 'ocr',
+      entries: toEditableEntries([{ title: '第1課', printedPage: 12, level: 1, kind: 'lesson' }]),
+    });
+    expect(tocConfirmReducer(adopted, { type: 'add-entry' })).toBe(adopted);
+  });
+});
+
+describe('P3.1B diffBaselineDraft', () => {
+  it('新增/删除/保留计数（含多重行）', () => {
+    expect(
+      diffBaselineDraft(
+        [{ title: '第1課', printedPage: 12 }, { title: '第2課', printedPage: 30 }],
+        [{ title: '第1課', printedPage: 12 }, { title: '第3課', printedPage: 40 }]
+      )
+    ).toEqual({ added: 1, removed: 1, kept: 1 });
+    expect(diffBaselineDraft([], [])).toEqual({ added: 0, removed: 0, kept: 0 });
   });
 });
