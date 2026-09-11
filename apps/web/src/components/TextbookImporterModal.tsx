@@ -31,6 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog.js';
+import { TocReviewPanel } from './TocReviewPanel.js';
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
 import {
@@ -952,6 +953,15 @@ export function TextbookImporterModal({
                 )}
               </div>
             )}
+            <div className="pt-1 mt-1 border-t border-amber-500/20 space-y-1.5">
+              <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200">
+                目录识别与人工确认（只读，不入库；用上方已选 PDF / 路径）
+              </p>
+              <TocReviewPanel
+                file={pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null}
+                filePath={stripPdfPathQuotes(pdfPath)}
+              />
+            </div>
           </div>
 
           <div className="p-3 rounded-2xl border border-dashed border-sky-500/40 bg-sky-500/5 space-y-1.5">

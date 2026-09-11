@@ -28,6 +28,14 @@ async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Respo
 }
 import type { TextbookBook } from '../models/textbook.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
+import {
+  narrowTocBaseline,
+  narrowTocDiscovery,
+  narrowTocReview,
+  type TocBaselineData,
+  type TocDiscoveryData,
+  type TocReviewData,
+} from '../lib/toc-confirm-flow.js';
 
 /** P1-2 拆分：教材 / 批注组（自 useLearnerQueries.ts 逐行平移，仅改 import）。 */
 
@@ -899,5 +907,118 @@ export function useDocumentStructureQuery(documentId: string | undefined, userId
       return payload as SavedStructure;
     },
     staleTime: 1000 * 60 * 5,
+  });
+}
+
+/** P4C 目录确认三专线入参（File 小文件上传 / filePath 本机直读二选一）。 */
+export type TocPdfSource = { file: File } | { filePath: string };
+
+async function postTocEndpoint(
+  userId: string,
+  endpoint: 'discover-toc' | 'extract-toc' | 'review-toc',
+  source: TocPdfSource,
+  range: { startPage: number; endPage: number } | undefined,
+  fallback: string
+): Promise<unknown> {
+  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${endpoint}`;
+  const res =
+    'filePath' in source
+      ? await fetchPdfGateway(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filePath: source.filePath,
+            ...(range ? { startPage: range.startPage, endPage: range.endPage } : {}),
+          }),
+        })
+      : await (async () => {
+          const form = new FormData();
+          form.append('file', source.file, source.file.name);
+          if (range) {
+            form.append('startPage', String(range.startPage));
+            form.append('endPage', String(range.endPage));
+          }
+          return fetchPdfGateway(url, { method: 'POST', body: form });
+        })();
+  const payload: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new GatewayRequestError(readGatewayUserMessage(payload, `${fallback}（HTTP ${res.status}）`), {
+      code: readGatewayErrorCode(payload),
+      details: readGatewayErrorDetails(payload),
+    });
+  }
+  return payload;
+}
+
+/**
+ * P4C-1：识别目录（discover-toc，只读）。返回 found/ambiguous/not-found + 候选范围；
+ * ambiguous 绝不替用户选（选择态只活在组件 reducer，初始 null）。
+ */
+export async function requestDiscoverToc(
+  userId: string,
+  source: TocPdfSource
+): Promise<TocDiscoveryData> {
+  const payload = await postTocEndpoint(userId, 'discover-toc', source, undefined, '识别目录失败');
+  const narrowed = narrowTocDiscovery(payload);
+  if (!narrowed) throw new Error('识别目录返回异常，请稍后重试');
+  return narrowed;
+}
+
+export function useDiscoverTocMutation(userId = DEFAULT_USER_ID) {
+  return useMutation({
+    mutationFn: (source: TocPdfSource) => requestDiscoverToc(userId, source),
+    onError: (e) => {
+      logger.debug('[useDiscoverTocMutation] discover failed', e);
+    },
+  });
+}
+
+/**
+ * P4C-2：提取目录基线（extract-toc，只读）。调用方必须先经 validateTocConfirmRange，
+ * 超 30 页请求到不了这里（组件守门；后端仍是最终事实源）。
+ */
+export async function requestExtractTocBaseline(
+  userId: string,
+  source: TocPdfSource,
+  range: { startPage: number; endPage: number }
+): Promise<TocBaselineData> {
+  const payload = await postTocEndpoint(userId, 'extract-toc', source, range, '提取目录基线失败');
+  const narrowed = narrowTocBaseline(payload);
+  if (!narrowed) throw new Error('目录基线返回异常，请稍后重试');
+  return narrowed;
+}
+
+export function useExtractTocBaselineMutation(userId = DEFAULT_USER_ID) {
+  return useMutation({
+    mutationFn: (vars: { source: TocPdfSource; range: { startPage: number; endPage: number } }) =>
+      requestExtractTocBaseline(userId, vars.source, vars.range),
+    onError: (e) => {
+      logger.debug('[useExtractTocBaselineMutation] extract failed', e);
+    },
+  });
+}
+
+/**
+ * P4C-3：AI 审核目录（review-toc，只读草稿）。仅在用户确认范围 + 已有基线后调用；
+ * embedded 返回时 draft 为 null（不需要 AI 审核），组件不得再触发 AI。
+ */
+export async function requestReviewToc(
+  userId: string,
+  source: TocPdfSource,
+  range: { startPage: number; endPage: number }
+): Promise<TocReviewData> {
+  const payload = await postTocEndpoint(userId, 'review-toc', source, range, 'AI 审核目录失败');
+  const narrowed = narrowTocReview(payload);
+  if (!narrowed) throw new Error('AI 审核返回异常，请稍后重试');
+  return narrowed;
+}
+
+export function useReviewTocMutation(userId = DEFAULT_USER_ID) {
+  return useMutation({
+    mutationFn: (vars: { source: TocPdfSource; range: { startPage: number; endPage: number } }) =>
+      requestReviewToc(userId, vars.source, vars.range),
+    onError: (e) => {
+      logger.debug('[useReviewTocMutation] review failed', e);
+    },
   });
 }

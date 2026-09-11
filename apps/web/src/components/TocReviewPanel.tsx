@@ -1,0 +1,694 @@
+import React, { useReducer } from 'react';
+import {
+  CheckCircle2,
+  ListChecks,
+  PencilLine,
+  ScanSearch,
+  Sparkles,
+} from 'lucide-react';
+import { Button } from './ui/button.js';
+import { Badge } from './ui/badge.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select.js';
+import {
+  useDiscoverTocMutation,
+  useExtractTocBaselineMutation,
+  useReviewTocMutation,
+  type TocPdfSource,
+} from '../queries/useLearnerQueries.js';
+import {
+  TOC_REVIEW_MAX_PAGES_UI,
+  canRequestTocReview,
+  decideExtractRequest,
+  decideReviewRequest,
+  initialTocConfirmState,
+  toEditableEntries,
+  tocConfirmReducer,
+  validateTocConfirmRange,
+  type EditableTocEntry,
+  type TocAdoptSource,
+  type TocBaselineData,
+  type TocDiscoveryData,
+  type TocReviewData,
+} from '../lib/toc-confirm-flow.js';
+
+/**
+ * CMD-LINGUA-P4C：目录识别 → 选范围 → OCR 基线 → AI 审核草稿 → 人工确认。
+ *
+ * 确认流程，不是导入落库流程：只调 discover/extract/review 三个只读端点，
+ * 不创建 document，不写 AST / textbook_* / SQLite，不自动采纳 AI draft；
+ * 确认结果只活在当前页面 state（useReducer），刷新即失，文案如实说明。
+ * 旧 PDF 导入链路一字未动；本面板不可用不阻塞旧流程。
+ */
+
+export interface TocReviewPanelProps {
+  /** <32MB 小文件（超大视为无，由调用方按既有守卫过滤） */
+  file: File | null;
+  /** 本机绝对路径直读（调用方已剥引号也可，面板内不再处理） */
+  filePath: string;
+}
+
+function messageOf(error: unknown): string | null {
+  if (!error) return null;
+  return error instanceof Error ? error.message : '请求失败，请稍后重试';
+}
+
+function kindLabel(kind: string): string {
+  return kind === 'lesson' ? '课' : '节';
+}
+
+function sourceLabel(source: string): string {
+  if (source === 'geometry') return '几何';
+  if (source === 'table') return '表格';
+  return '文本';
+}
+
+function confidenceBadge(confidence: string): 'emerald' | 'amber' | 'outline' {
+  if (confidence === 'high') return 'emerald';
+  if (confidence === 'medium') return 'amber';
+  return 'outline';
+}
+
+const inputClassName =
+  'h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 text-[11px]';
+
+export interface TocReviewPanelViewProps {
+  hasSource: boolean;
+  discovering: boolean;
+  discoverError: string | null;
+  discover: TocDiscoveryData | null;
+  selectedIndex: number | null;
+  startText: string;
+  endText: string;
+  rangeError: string | null;
+  extractDisabled: boolean;
+  extractDisabledReason: string | null;
+  extracting: boolean;
+  extractError: string | null;
+  baseline: TocBaselineData | null;
+  reviewDisabled: boolean;
+  reviewDisabledReason: string | null;
+  reviewSizeHint: string | null;
+  reviewing: boolean;
+  reviewError: string | null;
+  review: TocReviewData | null;
+  adopted: TocAdoptSource | null;
+  editing: boolean;
+  editedEntries: EditableTocEntry[];
+  confirmed: boolean;
+  confirmedSummary: string | null;
+  onDiscover(): void;
+  onSelectCandidate(index: number): void;
+  onStartChange(value: string): void;
+  onEndChange(value: string): void;
+  onExtract(): void;
+  onReview(): void;
+  onAdopt(source: TocAdoptSource): void;
+  onStartEdit(): void;
+  onUpdateEntry(key: string, patch: Partial<EditableTocEntry>): void;
+  onConfirm(): void;
+}
+
+/** 纯展示视图（无 hooks）：所有状态经 props 注入，供 SSR 单测直渲各态。 */
+export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactElement {
+  const {
+    hasSource,
+    discovering,
+    discoverError,
+    discover,
+    selectedIndex,
+    startText,
+    endText,
+    rangeError,
+    extractDisabled,
+    extractDisabledReason,
+    extracting,
+    extractError,
+    baseline,
+    reviewDisabled,
+    reviewDisabledReason,
+    reviewSizeHint,
+    reviewing,
+    reviewError,
+    review,
+    adopted,
+    editing,
+    editedEntries,
+    confirmed,
+    confirmedSummary,
+    onDiscover,
+    onSelectCandidate,
+    onStartChange,
+    onEndChange,
+    onExtract,
+    onReview,
+    onAdopt,
+    onStartEdit,
+    onUpdateEntry,
+    onConfirm,
+  } = props;
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] text-stone-500 dark:text-stone-400">
+        只读流程：只调识别 / 基线 / 审核接口，不创建文档、不入库；确认结果只保存在当前页面状态，尚未写入教材。
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="h-7 text-[11px] gap-1.5"
+          disabled={!hasSource || discovering}
+          onClick={onDiscover}
+          title={hasSource ? '用受限 OCR 找疑似目录页（只读）' : '先选择 PDF 文件或填写本机路径'}
+        >
+          <ScanSearch className="w-3.5 h-3.5 text-amber-600" />
+          <span>{discovering ? '识别中…' : '识别目录'}</span>
+        </Button>
+        {!hasSource && (
+          <span className="text-[11px] text-stone-400">先选择 PDF 文件或填写本机路径，再识别目录</span>
+        )}
+      </div>
+      {discoverError && (
+        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+          {discoverError}
+        </p>
+      )}
+      {discover && discover.embedded && (
+        <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300">
+          本书自带原生目录，无需 OCR 找目录页。请直接用上方「预览结构」的原生目录，本流程不再做基线与 AI 审核。
+        </div>
+      )}
+      {discover && !discover.embedded && discover.status === 'found' && (
+        <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+          <p className="font-bold">候选目录范围（仍需你手动确认，不会自动采用）：</p>
+          <div className="flex flex-wrap gap-1.5">
+            {discover.candidates.map((candidate, index) => (
+              <button
+                key={`${candidate.fromPage}-${candidate.toPage}`}
+                type="button"
+                aria-pressed={selectedIndex === index}
+                onClick={() => onSelectCandidate(index)}
+                className={`px-2 py-1 rounded-lg border text-[11px] font-semibold ${
+                  selectedIndex === index
+                    ? 'border-amber-600 bg-amber-600 text-white'
+                    : 'border-stone-200 dark:border-stone-700 hover:border-amber-500/50'
+                }`}
+              >
+                第 {candidate.fromPage}–{candidate.toPage} 页 · 得分 {candidate.score}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {discover && !discover.embedded && discover.status === 'ambiguous' && (
+        <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+          <p className="font-bold">
+            发现 {discover.candidates.length} 个候选范围（得分仅供参考），请手动选一个，不会自动选择：
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {discover.candidates.map((candidate, index) => (
+              <button
+                key={`${candidate.fromPage}-${candidate.toPage}`}
+                type="button"
+                aria-pressed={selectedIndex === index}
+                onClick={() => onSelectCandidate(index)}
+                className={`px-2 py-1 rounded-lg border text-[11px] font-semibold ${
+                  selectedIndex === index
+                    ? 'border-amber-600 bg-amber-600 text-white'
+                    : 'border-stone-200 dark:border-stone-700 hover:border-amber-500/50'
+                }`}
+              >
+                第 {candidate.fromPage}–{candidate.toPage} 页 · 得分 {candidate.score}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {discover && !discover.embedded && discover.status === 'not-found' && (
+        <div className="p-2 rounded-xl border border-stone-200 dark:border-stone-700 text-[11px] text-stone-600 dark:text-stone-300">
+          未找到可信目录页（已看前 {discover.pagesScannedCount} 页）。可以手工填写开始 / 结束页继续，不猜测页码。
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+        <span className="font-bold text-stone-700 dark:text-stone-200">确认范围：</span>
+        <input
+          type="number"
+          min={1}
+          placeholder="起始页"
+          aria-label="目录起始页"
+          value={startText}
+          onChange={(e) => onStartChange(e.target.value)}
+          className={`${inputClassName} w-20`}
+        />
+        <span>–</span>
+        <input
+          type="number"
+          min={1}
+          placeholder="结束页"
+          aria-label="目录结束页"
+          value={endText}
+          onChange={(e) => onEndChange(e.target.value)}
+          className={`${inputClassName} w-20`}
+        />
+        <span className="text-stone-400">正整数，含两端，一次最多 30 页</span>
+      </div>
+      {rangeError && (
+        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+          {rangeError}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="h-7 text-[11px] gap-1.5"
+          disabled={extractDisabled}
+          onClick={onExtract}
+          title={extractDisabledReason ?? '对确认范围做本地 OCR，产出目录基线（只读）'}
+        >
+          <ListChecks className="w-3.5 h-3.5 text-amber-600" />
+          <span>{extracting ? '提取中…' : '提取目录基线'}</span>
+        </Button>
+        {extractDisabledReason && <span className="text-[11px] text-stone-400">{extractDisabledReason}</span>}
+      </div>
+      {extractError && (
+        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+          {extractError}
+        </p>
+      )}
+      {baseline && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-2 space-y-1.5">
+          <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200">
+            OCR 基线：第 {baseline.range.fromPage}–{baseline.range.toPage} 页，共 {baseline.entries.length} 条
+            {baseline.embedded && <span>（原生目录可用，本次零 OCR）</span>}
+          </p>
+          <p className="text-[11px] text-stone-500 dark:text-stone-400">
+            printedPage 是教材印刷页，不等于 PDF 物理页，请勿直接当页码跳转。
+            {baseline.entries.length === 0 && '本次没有提取到可用条目，可以换一段页码重试。'}
+          </p>
+          {baseline.entries.length > 0 && (
+            <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
+              {baseline.entries.map((entry, index) => (
+                <div
+                  key={`${entry.printedPage}-${index}`}
+                  className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px]"
+                >
+                  <span className="truncate">
+                    {entry.title}
+                    <span className="ml-1 font-mono text-stone-400">印{entry.printedPage}页</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <Badge variant="outline" className="text-[10px]">
+                      {kindLabel(entry.kind)}
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {sourceLabel(entry.source)}
+                    </Badge>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] font-mono text-stone-400">
+            请求 {baseline.diagnostics.pagesRequested} 页 · OCR {baseline.diagnostics.pagesOcr} 页 · 接受{' '}
+            {baseline.diagnostics.entriesAccepted} · 拒绝 {baseline.diagnostics.entriesRejected}
+          </p>
+        </div>
+      )}
+
+      {baseline && !baseline.embedded && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            className="h-7 text-[11px] gap-1.5"
+            disabled={reviewDisabled}
+            onClick={onReview}
+            title={reviewDisabledReason ?? '把基线与目录页图一起送模型审一遍，只返回草稿'}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{reviewing ? '审核中…' : 'AI 审核目录'}</span>
+          </Button>
+          {(reviewDisabledReason ?? reviewSizeHint) && (
+            <span className="text-[11px] text-stone-400">{reviewDisabledReason ?? reviewSizeHint}</span>
+          )}
+        </div>
+      )}
+      {reviewError && (
+        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+          {reviewError}
+        </p>
+      )}
+      {review && !review.embedded && review.draft && (
+        <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-2 space-y-1.5">
+          <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
+            <Badge variant="amber" className="text-[10px]">
+              AI 草稿，需人工确认
+            </Badge>
+            <span>基线 {review.diagnostics.baselineEntries} 条 → 草稿 {review.diagnostics.draftEntries} 条</span>
+          </p>
+          <div className="grid md:grid-cols-2 gap-1.5">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-stone-500">OCR 基线</p>
+              <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
+                {review.baseline.entries.map((entry, index) => (
+                  <div
+                    key={`base-${entry.printedPage}-${index}`}
+                    className="px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px] truncate"
+                  >
+                    {entry.title}
+                    <span className="ml-1 font-mono text-stone-400">印{entry.printedPage}页</span>
+                  </div>
+                ))}
+                {review.baseline.entries.length === 0 && (
+                  <p className="text-[11px] text-stone-400">基线为空</p>
+                )}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-stone-500">AI 草稿（未保存）</p>
+              <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
+                {review.draft.entries.map((entry, index) => (
+                  <div
+                    key={`draft-${entry.printedPage}-${index}`}
+                    className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px]"
+                  >
+                    <span className="truncate">
+                      {entry.title}
+                      <span className="ml-1 font-mono text-stone-400">印{entry.printedPage}页</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <Badge variant="outline" className="text-[10px]">
+                        {kindLabel(entry.kind)}
+                      </Badge>
+                      <Badge variant={confidenceBadge(entry.confidence)} className="text-[10px]">
+                        {entry.confidence}
+                      </Badge>
+                    </span>
+                  </div>
+                ))}
+                {review.draft.entries.length === 0 && <p className="text-[11px] text-stone-400">草稿为空</p>}
+              </div>
+            </div>
+          </div>
+          {review.draft.warnings.length > 0 && (
+            <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-0.5">
+              <p className="font-bold">AI 存疑提醒：</p>
+              {review.draft.warnings.map((warning, index) => (
+                <p key={`warn-${index}`}>· {warning}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {review && review.embedded && (
+        <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300">
+          原生目录可用，本次没有触发 AI 审核（embedded=true），请直接用原生目录。
+        </div>
+      )}
+
+      {(baseline || (review && !review.embedded && review.draft)) && !confirmed && (
+        <div className="flex flex-wrap items-center gap-2">
+          {baseline && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px]"
+              disabled={extracting || reviewing}
+              onClick={() => onAdopt('ocr')}
+            >
+              采用 OCR 基线
+            </Button>
+          )}
+          {review && !review.embedded && review.draft && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px]"
+              disabled={extracting || reviewing}
+              onClick={() => onAdopt('ai')}
+            >
+              采用 AI 草稿
+            </Button>
+          )}
+          {adopted && !editing && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-7 text-[11px] gap-1.5"
+              onClick={onStartEdit}
+            >
+              <PencilLine className="w-3.5 h-3.5" />
+              继续编辑
+            </Button>
+          )}
+        </div>
+      )}
+      {adopted && (
+        <div className="rounded-xl border border-stone-200 dark:border-stone-700 p-2 space-y-1.5">
+          <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200">
+            待确认：{adopted === 'ocr' ? 'OCR 基线' : 'AI 草稿'}（{editedEntries.length} 条，只改本地状态）
+          </p>
+          <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
+            {editedEntries.map((entry) => (
+              <div key={entry.key} className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <input
+                  type="text"
+                  aria-label="条目标题"
+                  value={entry.title}
+                  disabled={!editing}
+                  onChange={(e) => onUpdateEntry(entry.key, { title: e.target.value })}
+                  className={`${inputClassName} flex-1 min-w-28`}
+                />
+                <input
+                  type="number"
+                  min={1}
+                  aria-label="印刷页码"
+                  value={entry.printedPage}
+                  disabled={!editing}
+                  onChange={(e) => onUpdateEntry(entry.key, { printedPage: e.target.value })}
+                  className={`${inputClassName} w-16`}
+                />
+                <Select
+                  value={entry.level === 1 ? '1' : '2'}
+                  disabled={!editing}
+                  onValueChange={(v) => {
+                    if (v === '1' || v === '2') onUpdateEntry(entry.key, { level: v === '1' ? 1 : 2 });
+                  }}
+                >
+                  <SelectTrigger className="h-7 w-16 text-[11px]" aria-label="层级">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1" className="text-[11px]">
+                      1·课
+                    </SelectItem>
+                    <SelectItem value="2" className="text-[11px]">
+                      2·节
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={entry.kind}
+                  disabled={!editing}
+                  onValueChange={(v) => {
+                    if (v === 'lesson' || v === 'section') onUpdateEntry(entry.key, { kind: v });
+                  }}
+                >
+                  <SelectTrigger className="h-7 w-16 text-[11px]" aria-label="类型">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lesson" className="text-[11px]">
+                      课
+                    </SelectItem>
+                    <SelectItem value="section" className="text-[11px]">
+                      节
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {entry.confidence && (
+                  <Badge variant={confidenceBadge(entry.confidence)} className="text-[10px]">
+                    {entry.confidence}
+                  </Badge>
+                )}
+              </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="h-7 text-[11px] gap-1.5"
+            disabled={editedEntries.length === 0}
+            onClick={onConfirm}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            确认目录
+          </Button>
+        </div>
+      )}
+      {confirmed && confirmedSummary && (
+        <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+          <p className="font-bold flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            {confirmedSummary}
+          </p>
+          <p>目录已在本次导入流程中确认；下一阶段才会生成教材结构。</p>
+          <p>尚未写入教材：没有创建文档，也没有调用任何保存接口。</p>
+          <p>刷新页面后需重新确认（本状态只保存在当前页面，没有持久化）。</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 容器：TanStack 异步 + reducer 本地状态；确认动作零写（只 dispatch，不调 mutation）。 */
+export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.ReactElement {
+  const [flow, dispatch] = useReducer(tocConfirmReducer, initialTocConfirmState);
+  const discover = useDiscoverTocMutation();
+  const extract = useExtractTocBaselineMutation();
+  const review = useReviewTocMutation();
+
+  const source: TocPdfSource | null = file
+    ? { file }
+    : filePath.trim()
+      ? { filePath: filePath.trim() }
+      : null;
+  const validation = validateTocConfirmRange(flow.startText, flow.endText);
+  const baseline: TocBaselineData | null = extract.data ?? null;
+  const reviewData: TocReviewData | null = review.data ?? null;
+
+  const reviewSizeOk = validation.ok && canRequestTocReview(validation.from, validation.to);
+
+  const handleDiscover = (): void => {
+    if (!source || discover.isPending) return;
+    discover.reset();
+    extract.reset();
+    review.reset();
+    dispatch({ type: 'reset-flow' });
+    discover.mutate(source);
+  };
+
+  const handleExtract = (): void => {
+    if (extract.isPending) return;
+    const decision = decideExtractRequest(source !== null, flow.startText, flow.endText);
+    if (!decision.ok) return;
+    if (!source) return;
+    extract.reset();
+    review.reset();
+    dispatch({ type: 'clear-results' });
+    extract.mutate({ source, range: { startPage: decision.from, endPage: decision.to } });
+  };
+
+  const handleReview = (): void => {
+    if (review.isPending) return;
+    const decision = decideReviewRequest(
+      source !== null,
+      flow.startText,
+      flow.endText,
+      baseline ? { embedded: baseline.embedded } : null
+    );
+    if (!decision.ok) return;
+    if (!source) return;
+    review.mutate({ source, range: { startPage: decision.from, endPage: decision.to } });
+  };
+
+  const handleAdopt = (adoptSource: TocAdoptSource): void => {
+    if (adoptSource === 'ocr') {
+      if (!baseline) return;
+      dispatch({ type: 'adopt', source: 'ocr', entries: toEditableEntries(baseline.entries) });
+      return;
+    }
+    if (!reviewData || reviewData.embedded || !reviewData.draft) return;
+    dispatch({
+      type: 'adopt',
+      source: 'ai',
+      entries: toEditableEntries(
+        reviewData.draft.entries,
+        reviewData.draft.entries.map((entry) => entry.confidence)
+      ),
+    });
+  };
+
+  const handleConfirm = (): void => {
+    if (!flow.adopted || flow.editedEntries.length === 0 || !validation.ok) return;
+    // 零写：只落本地 reducer，不调任何 mutation / 写接口。
+    dispatch({ type: 'confirm', range: { fromPage: validation.from, toPage: validation.to } });
+  };
+
+  const reviewDisabledReason = !baseline
+    ? '先提取目录基线'
+    : baseline.embedded
+      ? '原生目录可用，无需 AI 审核'
+      : !validation.ok
+        ? '请先填写合法确认范围'
+        : !reviewSizeOk
+          ? `AI 审核单次最多 ${TOC_REVIEW_MAX_PAGES_UI} 页，请缩小范围或只看基线`
+          : null;
+
+  return (
+    <TocReviewPanelView
+      hasSource={source !== null}
+      discovering={discover.isPending}
+      discoverError={messageOf(discover.error)}
+      discover={discover.data ?? null}
+      selectedIndex={flow.selectedIndex}
+      startText={flow.startText}
+      endText={flow.endText}
+      rangeError={
+        !validation.ok && (flow.startText !== '' || flow.endText !== '') ? validation.message : null
+      }
+      extractDisabled={source === null || extract.isPending || !validation.ok}
+      extractDisabledReason={source === null ? '先选择 PDF 文件或填写本机路径' : null}
+      extracting={extract.isPending}
+      extractError={messageOf(extract.error)}
+      baseline={baseline}
+      reviewDisabled={
+        baseline === null || baseline.embedded || review.isPending || !validation.ok || !reviewSizeOk
+      }
+      reviewDisabledReason={reviewDisabledReason}
+      reviewSizeHint={
+        baseline && !baseline.embedded && validation.ok && !reviewSizeOk
+          ? `当前 ${validation.to - validation.from + 1} 页超出 AI 单次上限`
+          : null
+      }
+      reviewing={review.isPending}
+      reviewError={messageOf(review.error)}
+      review={reviewData}
+      adopted={flow.adopted}
+      editing={flow.editing}
+      editedEntries={flow.editedEntries}
+      confirmed={flow.confirmed}
+      confirmedSummary={flow.confirmedSummary}
+      onDiscover={handleDiscover}
+      onSelectCandidate={(index) => {
+        const candidate = discover.data?.candidates[index];
+        if (!candidate) return;
+        dispatch({ type: 'select-candidate', index, candidate });
+      }}
+      onStartChange={(value) =>
+        dispatch({ type: 'set-range', start: value, end: flow.endText })
+      }
+      onEndChange={(value) =>
+        dispatch({ type: 'set-range', start: flow.startText, end: value })
+      }
+      onExtract={handleExtract}
+      onReview={handleReview}
+      onAdopt={handleAdopt}
+      onStartEdit={() => dispatch({ type: 'start-edit' })}
+      onUpdateEntry={(key, patch) => dispatch({ type: 'update-entry', key, patch })}
+      onConfirm={handleConfirm}
+    />
+  );
+}
