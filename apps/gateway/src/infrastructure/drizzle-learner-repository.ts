@@ -223,6 +223,14 @@ import {
   type ImportTaskStatus,
 } from '../modules/library/persistence/import-tasks.js';
 import {
+  prepareTocImportSession as prepareTocImportSessionDomain,
+  getTocImportSession as getTocImportSessionDomain,
+  type PrepareTocImportSessionInput,
+  type PreparedTocImportSession,
+  type TocImportSession,
+  type TocImportChunk,
+} from '../modules/library/persistence/toc-import-sessions.js';
+import {
   importDocument as importDocumentDomain,
   type DocumentImportInput,
   type DocumentImportOutput,
@@ -1105,6 +1113,23 @@ export class DrizzleLearnerRepository implements LearnerRepository {
 
   public async getImportTask(id: string): Promise<ImportTask | undefined> {
     return getImportTaskDomain(this.deps, id);
+  }
+
+  /**
+   * 整书目录导入 session：幂等创建或复用 + 按 key 读取。
+   * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
+   */
+  public async prepareTocImportSession(
+    input: PrepareTocImportSessionInput
+  ): Promise<Result<PreparedTocImportSession, BusinessError>> {
+    return prepareTocImportSessionDomain(this.deps, input);
+  }
+
+  public async getTocImportSession(
+    userId: string,
+    requestKey: string
+  ): Promise<{ session: TocImportSession; chunks: TocImportChunk[] } | undefined> {
+    return getTocImportSessionDomain(this.deps, userId, requestKey);
   }
 
   /**

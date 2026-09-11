@@ -8,6 +8,7 @@ import { reviewTocWithAgent } from '../application/pdf-import/toc-review-agent.j
 import { extractFolioCandidates } from '../application/pdf-import/toc-folio-candidates.js';
 import { planTocSegments } from '../application/pdf-import/toc-segment-plan.js';
 import { importTocLesson } from '../application/pdf-import/toc-lesson-import.js';
+import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
@@ -244,6 +245,50 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
         return c.json(res.value);
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'planTocSegments');
+      }
+    })
+    .post('/api/documents/:userId/prepare-toc-import', async (c) => {
+      // P5-D2A 整书导入准备（只建 session，不执行导入）：
+      // 探页数 → 重跑 preview → 指纹核验 → 全绿 gate → 幂等持久化 prepared chunks。
+      // 不调 OCR/Agent/render/convert，不建 document；重复同请求复用同一 session。
+      const input = await readPdfInput(c);
+      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+      try {
+        const userId = c.req.param('userId');
+        if (!userId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
+          );
+        }
+        if (
+          input.value.entries === undefined ||
+          input.value.anchors === undefined ||
+          input.value.fingerprint === undefined
+        ) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '请提供已确认条目、anchors 与预览指纹', 'VALIDATION')
+          );
+        }
+        const res = await prepareTocImport(
+          {
+            prepareSession: (prepared) => deps.repo.prepareTocImportSession(prepared),
+          },
+          {
+            userId,
+            filename: input.value.filename,
+            bytes: input.value.bytes,
+            entries: input.value.entries,
+            anchors: input.value.anchors,
+            fingerprint: input.value.fingerprint,
+            ...(input.value.docTitle !== undefined ? { docTitle: input.value.docTitle } : {}),
+          }
+        );
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'prepareTocImport');
+        return c.json(res.value);
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'prepareTocImport');
       }
     })
     .post('/api/documents/:userId/import-toc-lesson', async (c) => {

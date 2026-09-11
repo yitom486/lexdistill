@@ -66,9 +66,12 @@ describe('v18 发布闭环', () => {
     expect(v018.version).toBe(18);
     expect(v018.name).toBe('seed-materialization-state');
     expect(v018.sql).toBe(EXPECTED_V018_SQL);
-    const last = SCHEMA_MIGRATIONS[SCHEMA_MIGRATIONS.length - 1];
-    expect(last).toBe(v018);
     expect(SCHEMA_MIGRATIONS.map((m) => m.version)).toContain(18);
+    // v19 已发布：末尾为 v019，版本连续无跳号（下一次迁移需同步更新本行）
+    const versions = SCHEMA_MIGRATIONS.map((m) => m.version);
+    versions.forEach((v, i) => expect(v).toBe(i + 2));
+    const last = SCHEMA_MIGRATIONS[SCHEMA_MIGRATIONS.length - 1];
+    expect(last?.version).toBe(19);
   });
 
   it('schema.ts 表定义与迁移 SQL 对齐（列名/主键一致）', () => {

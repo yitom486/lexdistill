@@ -357,6 +357,38 @@ export function runDoctor(db: Database): DoctorReport {
     push('import:processing', stuck > 0 ? 'WARN' : 'PASS', stuck, stuck > 0 ? `${stuck} 个 processing（在跑或卡死，请结合网关日志看）` : '无卡住任务');
   }
 
+  // ---- 8b. 整书目录导入 session/chunk（P5-D2A；任一表缺席即跳过） ----
+  // 不加 FK（无 FK 架构）：悬空/越界/重复/计数不一致全由本节只读规则锁。
+  if (has('toc_import_sessions', 'toc_import_chunks')) {
+    const orphan = count(
+      `SELECT COUNT(*) AS n FROM toc_import_chunks c LEFT JOIN toc_import_sessions s ON s.id = c.session_id WHERE s.id IS NULL`
+    );
+    push('toc-import:chunk-orphan', orphan > 0 ? 'FAIL' : 'PASS', orphan, orphan > 0 ? `${orphan} 个 chunk 找不到 session（手写脏行/误删）` : '无悬空 chunk');
+    const badRange = count(
+      `SELECT COUNT(*) AS n FROM toc_import_chunks WHERE physical_start < 1 OR physical_end < physical_start OR (physical_end - physical_start + 1) > 30`
+    );
+    push('toc-import:chunk-range', badRange > 0 ? 'FAIL' : 'PASS', badRange, badRange > 0 ? `${badRange} 个 chunk 范围非法（起止/超 30 页）` : '范围合法');
+    const dup = count(
+      `SELECT COUNT(*) AS n FROM (SELECT session_id, ordinal FROM toc_import_chunks GROUP BY session_id, ordinal HAVING COUNT(*) > 1)`
+    );
+    push('toc-import:ordinal-dup', dup > 0 ? 'FAIL' : 'PASS', dup, dup > 0 ? `${dup} 组 (session, ordinal) 重复` : '序号唯一');
+    const sessions = db
+      .query('SELECT id AS id, chunk_count AS chunkCount FROM toc_import_sessions')
+      .all() as Array<{ id: string; chunkCount: number }>;
+    let mismatch = 0;
+    for (const s of sessions) {
+      const row = db
+        .query('SELECT COUNT(*) AS n FROM toc_import_chunks WHERE session_id = ?')
+        .get(s.id) as { n: number };
+      if (row.n !== s.chunkCount) mismatch++;
+    }
+    push('toc-import:session-count', mismatch > 0 ? 'FAIL' : 'PASS', mismatch, mismatch > 0 ? `${mismatch} 个 session 登记 chunk 数与实际行数不一致` : '计数一致');
+    const badStatus =
+      count(`SELECT COUNT(*) AS n FROM toc_import_sessions WHERE status NOT IN ('prepared','running','completed','failed','cancelled')`) +
+      count(`SELECT COUNT(*) AS n FROM toc_import_chunks WHERE status NOT IN ('prepared','running','completed','failed')`);
+    push('toc-import:status', badStatus > 0 ? 'FAIL' : 'PASS', badStatus, badStatus > 0 ? `${badStatus} 行非法状态（封闭枚举外）` : '状态合法');
+  }
+
   // ---- 9. locator JSON 有效性（reading_positions） ----
   if (has('reading_positions')) {
     const rows = db.query('SELECT locator AS l FROM reading_positions').all() as Array<{ l: string }>;

@@ -568,6 +568,62 @@ export const documentImports = sqliteTable('document_imports', {
 });
 
 /**
+ * 整书目录导入 session（v19；与 ddl.ts 建表 SQL 一字对齐，SSOT 是 ddl.ts）。
+ * - 一行 = 一次“用户确认的整书计划”，计划 immutable（无 entries/anchors 更新路径）；
+ * - request_key 由服务端重算（user + PDF SHA-256 + canonical plan fingerprint），
+ *   同 user/key 唯一，重试复用同一 session；
+ * - D2A 只写 prepared 行，不建 documents、不调 converter/shred；
+ * - 状态封闭枚举见 persistence/toc-import-sessions.ts，读侧收窄 + doctor 规则锁。
+ */
+export const tocImportSessions = sqliteTable(
+  'toc_import_sessions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    requestKey: text('request_key').notNull(),
+    planFingerprint: text('plan_fingerprint').notNull(),
+    pdfSha256: text('pdf_sha256').notNull(),
+    pageCount: integer('page_count').notNull(),
+    lessonCount: integer('lesson_count').notNull(),
+    chunkCount: integer('chunk_count').notNull(),
+    status: text('status').notNull().default('prepared'),
+    docTitle: text('doc_title').notNull().default(''),
+    error: text('error'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [uniqueIndex('idx_toc_import_sessions_user_key').on(table.userId, table.requestKey)]
+);
+
+/**
+ * session 的 chunk 计划行（v19；D2A 恒 prepared，执行与状态流转归 D2B）。
+ * - 主键 (session_id, ordinal) 即“同 session/ordinal 唯一”；
+ * - chunkFingerprint 绑定 (request_key, ordinal, lesson, range)，D2B 执行前重验；
+ * - document_id 在 D2A 恒 NULL（不建文档），D2B 成功后回填。
+ */
+export const tocImportChunks = sqliteTable(
+  'toc_import_chunks',
+  {
+    sessionId: text('session_id').notNull(),
+    ordinal: integer('ordinal').notNull(),
+    lessonIndex: integer('lesson_index').notNull(),
+    lessonTitle: text('lesson_title').notNull().default(''),
+    physicalStart: integer('physical_start').notNull(),
+    physicalEnd: integer('physical_end').notNull(),
+    chunkFingerprint: text('chunk_fingerprint').notNull(),
+    status: text('status').notNull().default('prepared'),
+    documentId: text('document_id'),
+    attempts: integer('attempts').notNull().default(0),
+    error: text('error'),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.ordinal] }),
+    index('idx_toc_import_chunks_session').on(table.sessionId, table.ordinal),
+  ]
+);
+
+/**
  * 教材 shred 行表（v14/v16/v17；与 ddl.ts 的建表 SQL 一字对齐，SSOT 是 ddl.ts）。
  * - 查询面：组卷/检索/统计读这里，不读 ast_json；
  * - 底稿 documents.ast_json 改后由 shredDocument 同事务全删全插重建；
