@@ -66,6 +66,18 @@ function syntheticBlankPdf(): Uint8Array {
   ]);
 }
 
+/** 内存 synthetic：1 页单行文本目录（thin 基线用），无私人内容。 */
+function syntheticSingleLineTocPdf(): Uint8Array {
+  const text = 'BT /F1 24 Tf 100 700 Td (Contents Lesson 1 Apple Pie 12) Tj ET\n';
+  return buildPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${Buffer.byteLength(text, 'latin1')} >>\nstream\n${text}endstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]);
+}
+
 /** 脚本队列假通道：按 send 顺序吐脚本（重试测试用）。 */
 function fakeAdapter(scripts: string[]) {
   let n = 0;
@@ -133,7 +145,7 @@ function serve(scripts: string[]): string {
 describe('P3.1B extract+review 真实 HTTP 集成', () => {
   it('文本目录：extract usable + 证据有界；fenced 草稿成功（200）', async () => {
     const url = serve([
-      '```json\n{"entries": [{"title": "Lesson 1 Apple", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}], "warnings": []}\n```',
+      '```json\n{"entries": [{"title": "Lesson 1 Apple", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}, {"title": "Lesson 2 Orange", "printedPage": 30, "level": 1, "kind": "lesson", "confidence": "medium"}], "warnings": []}\n```',
     ]);
     configureGatewayBaseUrl(url);
     try {
@@ -150,7 +162,7 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
       const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
       expect(review.reviewStatus).toBe('ok');
       expect(review.reviewError).toBeNull();
-      expect(review.draft?.entries.length).toBe(1);
+      expect(review.draft?.entries.length).toBe(2);
       expect(review.baseline.verdict).toBe('usable');
     } finally {
       configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
@@ -188,6 +200,52 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
       );
       expect(err instanceof GatewayRequestError).toBe(true);
       expect((err as GatewayRequestError).code).toBe('E_TOC_BASELINE_THIN');
+    } finally {
+      configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
+    }
+  }, 180000);
+
+  it('P3.2 thin 单行：extract thin → review 重建 ≥2 条草稿（200）', async () => {
+    const draft = JSON.stringify({
+      entries: [
+        { title: 'Lesson 1 Apple Pie', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
+        { title: 'Lesson 2 Orange', printedPage: 30, level: 1, kind: 'lesson', confidence: 'medium' },
+      ],
+      warnings: [],
+    });
+    const url = serve([draft]);
+    configureGatewayBaseUrl(url);
+    try {
+      const tmp = await writeTempPdf(syntheticSingleLineTocPdf());
+      const baseline = await requestExtractTocBaseline('u1', { filePath: tmp }, { startPage: 1, endPage: 1 });
+      expect(baseline.verdict).toBe('thin');
+      expect(baseline.entries.length).toBe(1);
+      const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 1 });
+      expect(review.reviewStatus).toBe('ok');
+      expect(review.draft?.entries.length).toBe(2);
+      expect(review.baseline.verdict).toBe('thin');
+    } finally {
+      configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
+    }
+  }, 180000);
+
+  it('P3.2 编造页码倒退：unavailable E_TOC_REVIEW_CONTENT（200，非 502）', async () => {
+    const regress = JSON.stringify({
+      entries: [
+        { title: 'Lesson 1 Apple', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
+        { title: 'Lesson 2 Orange', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
+      ],
+      warnings: [],
+    });
+    const url = serve([regress, regress]);
+    configureGatewayBaseUrl(url);
+    try {
+      const tmp = await writeTempPdf(syntheticTextTocPdf());
+      const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
+      expect(review.reviewStatus).toBe('unavailable');
+      expect(review.draft).toBeNull();
+      expect(review.reviewError?.code).toBe('E_TOC_REVIEW_CONTENT');
+      expect(review.baseline.entries.length).toBe(2);
     } finally {
       configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
     }

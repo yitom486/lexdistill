@@ -163,18 +163,20 @@ export function decideExtractRequest(
 }
 
 /**
- * 审核守门（纯函数）：无源 / 无基线 / embedded / 范围非法 / 超 8 页一律 ok:false。
+ * 审核守门（纯函数）：无源 / 无基线 / embedded / 空基线 / 范围非法 / 超 8 页一律 ok:false。
  * embedded=true 时明确拒绝触发 AI（不需要 AI 审核）。
+ * P3.2 thin 基线放行（证据是否充足由服务端 reviewable 门判定，前端不猜）。
  */
 export function decideReviewRequest(
   hasSource: boolean,
   startText: string,
   endText: string,
-  baseline: { embedded: boolean } | null
+  baseline: { embedded: boolean; verdict: TocBaselineData['verdict'] } | null
 ): TocRequestDecision {
   if (!hasSource) return { ok: false, message: '先选择 PDF 文件或填写本机路径' };
   if (!baseline) return { ok: false, message: '先提取目录基线' };
   if (baseline.embedded) return { ok: false, message: '原生目录可用，无需 AI 审核' };
+  if (baseline.verdict === 'empty') return { ok: false, message: '基线为空，请先换范围提取或手动填写' };
   const range = validateTocConfirmRange(startText, endText);
   if (!range.ok) return range;
   if (!canRequestTocReview(range.from, range.to)) {
@@ -428,6 +430,11 @@ export interface TocDraftDiff {
   added: number;
   removed: number;
   kept: number;
+  /**
+   * P3.2 修改行：键不同但标题或页码有一半对上的草稿行（去重计数，
+   * 已计入 kept 的不重复计；added 只剩完全无关联的新行）。
+   */
+  modified: number;
 }
 
 export function diffBaselineDraft(
@@ -436,25 +443,32 @@ export function diffBaselineDraft(
 ): TocDraftDiff {
   const keyOf = (e: { title: string; printedPage: number }): string => `${e.title}@@${e.printedPage}`;
   const baseCounts = new Map<string, number>();
+  const baseTitles = new Set<string>();
+  const basePages = new Set<number>();
   for (const entry of baseline) {
     const key = keyOf(entry);
     baseCounts.set(key, (baseCounts.get(key) ?? 0) + 1);
+    baseTitles.add(entry.title);
+    basePages.add(entry.printedPage);
   }
   let kept = 0;
   let added = 0;
+  let modified = 0;
   for (const entry of draft) {
     const key = keyOf(entry);
     const remaining = baseCounts.get(key) ?? 0;
     if (remaining > 0) {
       kept++;
       baseCounts.set(key, remaining - 1);
+    } else if (baseTitles.has(entry.title) || basePages.has(entry.printedPage)) {
+      modified++;
     } else {
       added++;
     }
   }
   let removed = 0;
   for (const remaining of baseCounts.values()) removed += remaining;
-  return { added, removed, kept };
+  return { added, removed, kept, modified };
 }
 
 export interface TocConfirmState {

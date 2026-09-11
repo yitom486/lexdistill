@@ -15,6 +15,7 @@ import {
   type TocBaselineEntry,
   type TocBaselineOutput,
 } from './toc-baseline.js';
+import { isSemanticOutlineTitle } from './embedded-outline-quality.js';
 import {
   TOC_REVIEW_MAX_PAGES,
   prepareTocReviewMaterial,
@@ -177,24 +178,131 @@ export function classifyReviewFailure(raw: string): 'schema' | 'parse' {
   return raw.trim().startsWith('{') || raw.trim().startsWith('[') ? 'schema' : 'parse';
 }
 
-/** 同一次 AgentInput 的文本部分（纯函数）：OCR 条目 + 页码范围 + 诊断计数；不含图片字节。 */
+/**
+ * CMD-LINGUA-P3.2 AI 输入证据总量上限（字符）：8 页 × 单页 1500，超出截断
+ * 并标注；证据只进 prompt，不入库不记日志。
+ */
+export const TOC_REVIEW_EVIDENCE_MAX_CHARS = 12000;
+
+/**
+ * CMD-LINGUA-P3.2 可重建证据下限（非空白字符）：低于此视为证据不足，
+ * 不调用 AI（省一次模型往返，直接可读拒绝）。
+ */
+export const TOC_REVIEW_MIN_EVIDENCE_CHARS = 20;
+
+export type ReviewableReason = 'ok' | 'empty-evidence' | 'range-too-large';
+
+export interface ReviewableReport {
+  reviewable: boolean;
+  reason: ReviewableReason;
+  /** 证据非空白字符数（计数，无原文）。 */
+  evidenceChars: number;
+}
+
+/**
+ * 重建证据独立门（纯函数）：thin 基线能否进 AI 的唯一判据。
+ * - 范围超 8 页 → range-too-large（ defense，范围校验本应在前）；
+ * - 证据空白/过短 → empty-evidence；
+ * - 只看证据量，不看条目数（thin 的定义已在基线侧）。
+ */
+export function assessReviewableEvidence(
+  pageEvidence: Array<{ page: number; excerpt: string }>,
+  fromPage: number,
+  toPage: number
+): ReviewableReport {
+  if (!Number.isInteger(fromPage) || !Number.isInteger(toPage) || toPage - fromPage + 1 > TOC_REVIEW_MAX_PAGES) {
+    return { reviewable: false, reason: 'range-too-large', evidenceChars: 0 };
+  }
+  let evidenceChars = 0;
+  if (Array.isArray(pageEvidence)) {
+    for (const row of pageEvidence) {
+      if (row && typeof row.excerpt === 'string') {
+        evidenceChars += row.excerpt.replace(/\s+/g, '').length;
+      }
+    }
+  }
+  if (evidenceChars < TOC_REVIEW_MIN_EVIDENCE_CHARS) {
+    return { reviewable: false, reason: 'empty-evidence', evidenceChars };
+  }
+  return { reviewable: true, reason: 'ok', evidenceChars };
+}
+
+export type DraftContentReason = 'ok' | 'too-few' | 'empty-title' | 'non-semantic-title' | 'page-regress';
+
+export interface DraftContentReport {
+  ok: boolean;
+  reason: DraftContentReason;
+  /** 语义标题条数（计数）。 */
+  semanticEntries: number;
+}
+
+/**
+ * 草稿内容门（纯函数）：AI 输出仅当可采用才返回。
+ * - 语义标题 ≥ 2（与 P2.2/基线门同等保守）；
+ * - 标题非空（去空白）且有语义内容（纯数字/符号残留拒绝）；
+ * - 页码单调不减（倒退即编造信号，拒绝）；
+ * - printedPage 正整数由 zod 保证，此处复核。
+ * 不读模型原文之外的任何东西，不抛。
+ */
+export function validateTocDraftContent(draft: TocReviewDraft): DraftContentReport {
+  let semanticEntries = 0;
+  let prevPage = 0;
+  for (const entry of draft.entries) {
+    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+    if (!title) return { ok: false, reason: 'empty-title', semanticEntries };
+    if (!isSemanticOutlineTitle(title)) return { ok: false, reason: 'non-semantic-title', semanticEntries };
+    // printedPage 正整数由 zod schema 保证（parse 阶段），此处只判单调。
+    if (entry.printedPage < prevPage) return { ok: false, reason: 'page-regress', semanticEntries };
+    prevPage = entry.printedPage;
+    semanticEntries++;
+  }
+  if (semanticEntries < 2) return { ok: false, reason: 'too-few', semanticEntries };
+  return { ok: true, reason: 'ok', semanticEntries };
+}
+
+/** 同一次 AgentInput 的文本部分（纯函数）：OCR 条目 + 页证据 + 拒绝计数；不含图片字节、路径、userId。 */
 export function buildTocReviewMessage(
   baseline: TocBaselineOutput,
   renderedPages: number
 ): string {
   const lines = [
     `目录页范围：第 ${baseline.range.fromPage}-${baseline.range.toPage} 页（PDF 物理页），共 ${renderedPages} 张目录页图片已作为本轮图片附件（只作视觉核对）。`,
-    `OCR 基线（${baseline.entries.length} 条，来源仅供参考）：`,
+    `OCR 基线（${baseline.entries.length} 条，质量 ${baseline.verdict}，来源仅供参考）：`,
   ];
   for (const entry of baseline.entries) {
     lines.push(formatBaselineLine(entry));
   }
   const d = baseline.diagnostics;
   lines.push(
-    `诊断计数：请求 ${d.pagesRequested} 页 / OCR ${d.pagesOcr} 页 / 候选行 ${d.linesConsidered} / 接受 ${d.entriesAccepted} / 拒绝 ${d.entriesRejected}。`
+    `诊断计数：请求 ${d.pagesRequested} 页 / OCR ${d.pagesOcr} 页 / 候选行 ${d.linesConsidered} / 接受 ${d.entriesAccepted} / 拒绝 ${d.entriesRejected} / 标题不合 ${d.badTitle}。`
   );
+  const evidenceText = formatReviewEvidence(baseline.pageEvidence);
+  if (evidenceText) {
+    lines.push('目录页 OCR 原文证据（逐页，只读参考；页码以图片与基线为准）：');
+    lines.push(evidenceText);
+  }
+  if (baseline.verdict !== 'usable') {
+    lines.push('注意：当前基线不足（thin），请根据原文证据与图片重建完整目录草稿，至少 2 条，页码单调；无法确认的行宁可跳过，绝不编造。');
+  }
   lines.push('请按系统要求只返回严格 JSON。');
   return lines.join('\n');
+}
+
+/**
+ * 证据块格式化（纯函数）：逐页 `--- PDF第N页 ---` + 摘录，总量超限截断并标注。
+ * 证据来自提取阶段已截断的行，只读，不回写。
+ */
+export function formatReviewEvidence(pageEvidence: TocBaselineOutput['pageEvidence']): string {
+  if (!Array.isArray(pageEvidence) || pageEvidence.length === 0) return '';
+  const blocks: string[] = [];
+  for (const row of pageEvidence) {
+    if (!row || typeof row.page !== 'number' || typeof row.excerpt !== 'string') continue;
+    if (!row.excerpt.trim()) continue;
+    blocks.push(`--- PDF第${row.page}页 ---\n${row.excerpt.trim()}`);
+  }
+  const joined = blocks.join('\n');
+  if (joined.length <= TOC_REVIEW_EVIDENCE_MAX_CHARS) return joined;
+  return `${joined.slice(0, TOC_REVIEW_EVIDENCE_MAX_CHARS)}\n…(证据过长已截断)`;
 }
 
 function formatBaselineLine(entry: TocBaselineEntry): string {
@@ -256,18 +364,32 @@ export async function reviewTocWithAgent(
     });
   }
 
-  // P3.1B 基线质量门（服务端强制）：thin/empty 不进模型，返回可读错误；
-  // 前端禁用只是辅助。基线本身仍在调用方手里可编辑（本函数只拒绝，不销毁）。
-  if (baseline.verdict !== 'usable') {
+  // P3.1B/P3.2 基线质量门（服务端强制）：
+  // - empty：无条目，直接可读拒绝（不进模型）；
+  // - thin：过独立 evidence 门才进 AI 重建（证据不足同样可读拒绝，零模型调用）；
+  // - usable：照常审核。前端禁用只是辅助。
+  if (baseline.verdict === 'empty') {
     return err(
       new BusinessError(
         'E_TOC_BASELINE_THIN',
-        baseline.verdict === 'empty'
-          ? '目录基线为空（没有提取到可用条目），请更换目录页范围后重试，或手动填写目录'
-          : `目录基线不足（仅 ${baseline.entries.length} 条有效条目，标题存疑 ${baseline.diagnostics.badTitle} 行），请更换目录页范围后重试，或手动填写目录`,
+        '目录基线为空（没有提取到可用条目），请更换目录页范围后重试，或手动填写目录',
         'VALIDATION'
       )
     );
+  }
+  if (baseline.verdict === 'thin') {
+    const gate = assessReviewableEvidence(baseline.pageEvidence, fromPage, toPage);
+    if (!gate.reviewable) {
+      return err(
+        new BusinessError(
+          gate.reason === 'range-too-large' ? 'E_INVALID_INPUT' : 'E_TOC_EVIDENCE_INSUFFICIENT',
+          gate.reason === 'range-too-large'
+            ? `确认范围共 ${toPage - fromPage + 1} 页（AI 审核单次上限 ${TOC_REVIEW_MAX_PAGES} 页），请缩小后重试`
+            : '目录页证据不足（有效文字过少），AI 无法重建，请更换目录页范围后重试，或手动填写目录',
+          'VALIDATION'
+        )
+      );
+    }
   }
 
   // capability 查询在渲染之前：不支持图片的 Adapter 明确拒绝，绝不丢图做纯文本审核。
@@ -360,23 +482,50 @@ export async function reviewTocWithAgent(
     await closeSession();
     return firstRes;
   }
-  let draft = parseTocReviewDraft(firstRes.value);
-  if (!draft) {
-    // P3.1B 同 session 最多重试一次：纯文本纠错轮，不新增 OCR、不重新渲染
+  // P3.2 解析 + 内容双门：parse 失败或内容不可采用（编造/过少）都走同一重试线。
+  const attempt = (
+    raw: string
+  ): { draft: TocReviewDraft } | { failKind: 'parse' | 'schema' | 'content' } => {
+    const draft = parseTocReviewDraft(raw);
+    if (!draft) return { failKind: classifyReviewFailure(raw) };
+    if (!validateTocDraftContent(draft).ok) return { failKind: 'content' };
+    return { draft };
+  };
+  const reviewErrorOf = (failKind: 'parse' | 'schema' | 'content'): { code: string; userMessage: string } => {
+    if (failKind === 'schema') {
+      return {
+        code: 'E_TOC_REVIEW_SCHEMA',
+        userMessage: 'AI 审核草稿格式不合要求（字段非法），已保留可编辑基线，可手动修正后继续',
+      };
+    }
+    if (failKind === 'content') {
+      return {
+        code: 'E_TOC_REVIEW_CONTENT',
+        userMessage: 'AI 草稿内容不合要求（页码倒退/空标题/无语义标题或不足 2 条），已保留可编辑基线，可手动修正后继续',
+      };
+    }
+    return {
+      code: 'E_TOC_REVIEW_PARSE',
+      userMessage: 'AI 审核草稿不是合法 JSON，已保留可编辑基线，可手动修正后继续',
+    };
+  };
+  let tried = attempt(firstRes.value);
+  if (!('draft' in tried)) {
+    // P3.1B/P3.2 同 session 最多重试一次：纯文本纠错轮，不新增 OCR、不重新渲染
     // （复用首轮上下文，图片仍在 thread 内；附件不再重发）。
     const retryRes = await runTurn(
-      '上一回复不是合法 JSON。请只返回严格 JSON：{"entries": [{"title": "条目标题", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}], "warnings": ["存疑说明"]}，除 JSON 外不输出任何文字。',
+      '上一回复不可用（非 JSON 或内容不合要求）。请只返回严格 JSON：{"entries": [{"title": "条目标题", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}], "warnings": ["存疑说明"]}，至少 2 条语义标题、页码单调，除 JSON 外不输出任何文字。',
       []
     );
     if (!isOk(retryRes)) {
       await closeSession();
       return retryRes;
     }
-    draft = parseTocReviewDraft(retryRes.value);
-    if (!draft) {
-      // 二次失败：正常的可读态（非 502），基线保留可编辑；不展示模型原文。
+    tried = attempt(retryRes.value);
+    if (!('draft' in tried)) {
+      // 二次失败：正常的可读态（非 502），基线与证据保留可编辑；不展示模型原文。
       await closeSession();
-      const kind = classifyReviewFailure(retryRes.value);
+      const reviewError = reviewErrorOf(tried.failKind);
       return ok({
         embedded: false,
         range: { fromPage, toPage },
@@ -384,13 +533,7 @@ export async function reviewTocWithAgent(
         baseline,
         draft: null,
         reviewStatus: 'unavailable',
-        reviewError: {
-          code: kind === 'schema' ? 'E_TOC_REVIEW_SCHEMA' : 'E_TOC_REVIEW_PARSE',
-          userMessage:
-            kind === 'schema'
-              ? 'AI 审核草稿格式不合要求（字段非法），已保留可编辑基线，可手动修正后继续'
-              : 'AI 审核草稿不是合法 JSON，已保留可编辑基线，可手动修正后继续',
-        },
+        reviewError,
         diagnostics: {
           pagesRequested: baseline.diagnostics.pagesRequested,
           pagesRendered: material.pages.length,
@@ -400,6 +543,7 @@ export async function reviewTocWithAgent(
       });
     }
   }
+  const draft = tried.draft;
   await closeSession();
 
   // 只记计数：不记标题、不记正文、不记图片、不记路径、不记用户、不记模型原文。

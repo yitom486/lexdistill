@@ -49,7 +49,7 @@ describe('validateTocConfirmRange', () => {
 describe('decideExtractRequest / decideReviewRequest（守门：ok:false 即零请求）', () => {
   it('无源直接拒绝', () => {
     expect(decideExtractRequest(false, '1', '2').ok).toBe(false);
-    expect(decideReviewRequest(false, '1', '2', { embedded: false }).ok).toBe(false);
+    expect(decideReviewRequest(false, '1', '2', { embedded: false, verdict: 'usable' }).ok).toBe(false);
   });
 
   it('31 页 extract 拒绝', () => {
@@ -59,13 +59,20 @@ describe('decideExtractRequest / decideReviewRequest（守门：ok:false 即零�
 
   it('review：无基线 / embedded / 超 8 页拒绝，合法通过', () => {
     expect(decideReviewRequest(true, '1', '2', null).ok).toBe(false);
-    const embedded = decideReviewRequest(true, '1', '2', { embedded: true });
+    const embedded = decideReviewRequest(true, '1', '2', { embedded: true, verdict: 'usable' });
     expect(embedded.ok).toBe(false);
     if (!embedded.ok) expect(embedded.message).toContain('无需 AI 审核');
-    const over = decideReviewRequest(true, '1', '9', { embedded: false });
+    const over = decideReviewRequest(true, '1', '9', { embedded: false, verdict: 'usable' });
     expect(over.ok).toBe(false);
     if (!over.ok) expect(over.message).toContain('8');
-    expect(decideReviewRequest(true, '1', '8', { embedded: false })).toEqual({ ok: true, from: 1, to: 8 });
+    expect(decideReviewRequest(true, '1', '8', { embedded: false, verdict: 'usable' })).toEqual({ ok: true, from: 1, to: 8 });
+  });
+
+  it('P3.2 review：thin 放行（服务端判证据），empty 拒绝', () => {
+    expect(decideReviewRequest(true, '1', '2', { embedded: false, verdict: 'thin' })).toEqual({ ok: true, from: 1, to: 2 });
+    const empty = decideReviewRequest(true, '1', '2', { embedded: false, verdict: 'empty' });
+    expect(empty.ok).toBe(false);
+    if (!empty.ok) expect(empty.message).toContain('基线为空');
   });
 
   it('canRequestTocReview 边界', () => {
@@ -364,7 +371,22 @@ describe('P3.1B diffBaselineDraft', () => {
         [{ title: '第1課', printedPage: 12 }, { title: '第2課', printedPage: 30 }],
         [{ title: '第1課', printedPage: 12 }, { title: '第3課', printedPage: 40 }]
       )
-    ).toEqual({ added: 1, removed: 1, kept: 1 });
-    expect(diffBaselineDraft([], [])).toEqual({ added: 0, removed: 0, kept: 0 });
+    ).toEqual({ added: 1, removed: 1, kept: 1, modified: 0 });
+    expect(diffBaselineDraft([], [])).toEqual({ added: 0, removed: 0, kept: 0, modified: 0 });
+  });
+
+  it('P3.2 修改行：标题对上页码变，或页码对上标题变', () => {
+    expect(
+      diffBaselineDraft(
+        [{ title: '第1課', printedPage: 12 }],
+        [{ title: '第1課', printedPage: 13 }]
+      )
+    ).toEqual({ added: 0, removed: 1, kept: 0, modified: 1 });
+    expect(
+      diffBaselineDraft(
+        [{ title: '第1課', printedPage: 12 }],
+        [{ title: '第一課', printedPage: 12 }]
+      )
+    ).toEqual({ added: 0, removed: 1, kept: 0, modified: 1 });
   });
 });

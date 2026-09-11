@@ -323,7 +323,11 @@ describe('P5D2A POST prepare-toc-import（真探针 + 自造 PDF）', () => {
     await Bun.write(tmp, syntheticBlankPdf());
     tempFiles.push(tmp);
     const docsBefore = countRows(repo, 'documents');
-    const entries = [{ title: '第1課', printedPage: 1, level: 1, kind: 'lesson' }];
+    // P3.2 thin 永不 preview/import：确认条目至少 2 条
+    const entries = [
+      { title: '第1課', printedPage: 1, level: 1, kind: 'lesson' },
+      { title: '第2課', printedPage: 2, level: 1, kind: 'lesson' },
+    ];
     const anchors = [
       { printedPage: 1, physicalPage: 1, evidence: 'human-confirmed' },
       { printedPage: 2, physicalPage: 2, evidence: 'human-confirmed' },

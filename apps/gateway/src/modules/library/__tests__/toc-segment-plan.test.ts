@@ -183,7 +183,7 @@ afterEach(async () => {
 });
 
 describe('P5C POST preview-toc-segments（真运行时探针 + 自造 PDF）', () => {
-  it('有效输入 200 映射；无效 400；DB 行数不变', async () => {
+  it('有效输入 200 映射；无效/单条目 400；DB 行数不变', async () => {
     pinProcessToTestRuntime();
     await ensurePdfTestRuntime();
     const repo = new DrizzleLearnerRepository(':memory:');
@@ -199,8 +199,14 @@ describe('P5C POST preview-toc-segments（真运行时探针 + 自造 PDF）', (
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         filePath: tmp,
-        entries: [{ title: '第1課', printedPage: 1, level: 1, kind: 'lesson' }],
-        anchors: [{ printedPage: 1, physicalPage: 1, evidence: 'human-confirmed' }],
+        entries: [
+          { title: '第1課', printedPage: 1, level: 1, kind: 'lesson' },
+          { title: '第2課', printedPage: 2, level: 1, kind: 'lesson' },
+        ],
+        anchors: [
+          { printedPage: 1, physicalPage: 1, evidence: 'human-confirmed' },
+          { printedPage: 2, physicalPage: 2, evidence: 'human-confirmed' },
+        ],
       }),
     });
     expect(okRes.status).toBe(200);
@@ -211,7 +217,19 @@ describe('P5C POST preview-toc-segments（真运行时探针 + 自造 PDF）', (
     };
     expect(body.pageCount).toBe(2);
     expect(body.lessons[0]).toMatchObject({ printedStart: 1, physicalStart: 1, status: 'mapped' });
-    expect(body.diagnostics.mappedCount).toBe(1);
+    expect(body.diagnostics.mappedCount).toBe(2);
+
+    // P3.2 thin 永不 preview：单条目 400
+    const single = await app.request('/api/documents/u1/preview-toc-segments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: tmp,
+        entries: [{ title: '第1課', printedPage: 1, level: 1, kind: 'lesson' }],
+        anchors: [{ printedPage: 1, physicalPage: 1, evidence: 'human-confirmed' }],
+      }),
+    });
+    expect(single.status).not.toBe(200);
 
     const bad = await app.request('/api/documents/u1/preview-toc-segments', {
       method: 'POST',

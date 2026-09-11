@@ -173,7 +173,7 @@ describe('P4B POST review-toc（真 native + 假 Agent）', () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const captured: CapturedCall[] = [];
-    const fenced = '```json\n{"entries": [{"title": "Lesson 1 Apple", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}], "warnings": []}\n```';
+    const fenced = '```json\n{"entries": [{"title": "Lesson 1 Apple", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}, {"title": "Lesson 2 Orange", "printedPage": 30, "level": 1, "kind": "lesson", "confidence": "medium"}], "warnings": []}\n```';
     const app = createApp({
       repo,
       server: { agentAdapter: makeFakeAdapter(fenced, captured) } as never,
@@ -195,7 +195,7 @@ describe('P4B POST review-toc（真 native + 假 Agent）', () => {
     expect(body.baseline.verdict).toBe('usable');
     expect(body.reviewStatus).toBe('ok');
     expect(body.reviewError).toBeNull();
-    expect(body.draft?.entries.length).toBe(1);
+    expect(body.draft?.entries.length).toBe(2);
     expect(body.diagnostics.pagesRendered).toBe(2);
     expect(captured.length).toBe(1);
     const attachments = captured[0]?.input.attachments ?? [];

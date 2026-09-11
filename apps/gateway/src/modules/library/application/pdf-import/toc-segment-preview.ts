@@ -20,6 +20,12 @@ import { isSemanticOutlineTitle } from './embedded-outline-quality.js';
 
 export const TOC_SEGMENT_CHUNK_PAGES = MAX_OCR_PAGES_PER_IMPORT;
 
+/**
+ * CMD-LINGUA-P3.2 确认条目下限：thin/empty 永不 preview/anchor/import。
+ * 单条目无法做区间验证与分段（P5 全链路至少需要两锚点语义），fail-closed。
+ */
+export const TOC_SEGMENT_MIN_ENTRIES = 2;
+
 /** anchor 证据来源（封闭联合；未知字符串 fail-closed，见下）。 */
 export type TocSegmentAnchorEvidence = 'embedded-outline' | 'human-confirmed' | 'verified-folio';
 
@@ -172,6 +178,10 @@ export function previewTocSegments(
   const { pageCount, entries, anchors } = input;
   if (!isPositiveInt(pageCount)) return invalid('pageCount 须为正整数');
   if (!Array.isArray(entries) || !Array.isArray(anchors)) return invalid('entries / anchors 须为数组');
+  // P3.2 thin/empty 永不 preview：确认条目不足 2 条直接拒绝（anchor/import 同漏斗）。
+  if (entries.length < TOC_SEGMENT_MIN_ENTRIES) {
+    return invalid(`确认目录条目不足 ${TOC_SEGMENT_MIN_ENTRIES} 条，无法分段，请先形成合格目录草稿`);
+  }
 
   const validAnchors: ValidAnchor[] = [];
   for (const anchor of anchors) {

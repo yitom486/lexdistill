@@ -117,13 +117,27 @@ describe('P5A previewTocSegments', () => {
   it('4. 前言导致非零 offset：anchor-exact 落点正确', () => {
     const res = preview({
       pageCount: 50,
-      entries: [lesson('第1課', 1)],
-      anchors: [{ printedPage: 1, physicalPage: 6, evidence: 'embedded-outline' }],
+      entries: [lesson('第1課', 1), lesson('第2課', 10)],
+      anchors: [
+        { printedPage: 1, physicalPage: 6, evidence: 'embedded-outline' },
+        { printedPage: 10, physicalPage: 15, evidence: 'embedded-outline' },
+      ],
     });
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.lessons[0]?.physicalStart).toBe(6);
     expect(res.value.lessons[0]?.reason).toBe('anchor-exact');
+  });
+
+  it('4b. P3.2 thin 永不 preview：单条目直接拒绝', () => {
+    const res = preview({
+      pageCount: 50,
+      entries: [lesson('第1課', 1)],
+      anchors: [{ printedPage: 1, physicalPage: 6, evidence: 'embedded-outline' }],
+    });
+    expect(isOk(res)).toBe(false);
+    if (isOk(res)) return;
+    expect(res.error.code).toBe('E_INVALID_INPUT');
   });
 
   it('5. 重复 / 倒序 TOC lesson：fail-closed', () => {

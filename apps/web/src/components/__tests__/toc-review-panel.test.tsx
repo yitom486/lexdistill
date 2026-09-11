@@ -302,6 +302,10 @@ describe('P3.1B verdict/证据/手动/降级视图（SSR）', () => {
   it('成功草稿显示与基线差异计数', () => {
     const html = render({ baseline: BASELINE, review: REVIEW });
     expect(html).toContain('新增 0');
+    expect(html).toContain('修改 0');
     expect(html).toContain('保留 1');
+    expect(html).toContain('OCR 原文证据');
+    expect(html).toContain('OCR 基线');
+    expect(html).toContain('AI 草稿');
   });
 });

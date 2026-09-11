@@ -444,11 +444,30 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
             const diff = diffBaselineDraft(review.baseline.entries, review.draft?.entries ?? []);
             return (
               <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                与基线差异：新增 {diff.added} · 删除 {diff.removed} · 保留 {diff.kept}（需人工确认后采用）。
+                与基线差异：新增 {diff.added} · 删除 {diff.removed} · 修改 {diff.modified} · 保留 {diff.kept}（需人工确认后采用）。
               </p>
             );
           })()}
-          <div className="grid md:grid-cols-2 gap-1.5">
+          <div className="grid md:grid-cols-3 gap-1.5">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-stone-500">OCR 原文证据（只读）</p>
+              <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
+                {review.baseline.pageEvidence.length === 0 && (
+                  <p className="text-[11px] text-stone-400">无证据行</p>
+                )}
+                {review.baseline.pageEvidence.map((evidence) => (
+                  <div
+                    key={`ev-${evidence.page}`}
+                    className="px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px]"
+                  >
+                    <p className="font-mono text-[10px] text-stone-400">PDF 第 {evidence.page} 页</p>
+                    <pre className="whitespace-pre-wrap break-words font-sans">
+                      {evidence.excerpt || '（本页无保留行）'}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-stone-500">OCR 基线</p>
               <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
@@ -778,7 +797,7 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       source !== null,
       flow.startText,
       flow.endText,
-      baseline ? { embedded: baseline.embedded } : null
+      baseline ? { embedded: baseline.embedded, verdict: baseline.verdict } : null
     );
     if (!decision.ok) return;
     if (!source) return;
@@ -824,8 +843,8 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
     ? '先提取目录基线'
     : baseline.embedded
       ? '原生目录可用，无需 AI 审核'
-      : baseline.verdict !== 'usable'
-        ? '基线不足（结果不可直接采用），请换范围重试或手动填写'
+      : baseline.verdict === 'empty'
+        ? '基线为空，请先换范围提取或手动填写'
         : !validation.ok
           ? '请先填写合法确认范围'
           : !reviewSizeOk
@@ -854,7 +873,7 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       reviewDisabled={
         baseline === null ||
         baseline.embedded ||
-        (!baseline.embedded && baseline.verdict !== 'usable') ||
+        (!baseline.embedded && baseline.verdict === 'empty') ||
         review.isPending ||
         !validation.ok ||
         !reviewSizeOk

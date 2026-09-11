@@ -9,9 +9,12 @@ import { BusinessError, isOk, logger, ok } from '@study-studio/shared';
 import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
 import {
   TOC_REVIEW_SYSTEM_PROMPT,
+  assessReviewableEvidence,
   buildTocReviewMessage,
+  formatReviewEvidence,
   parseTocReviewDraft,
   reviewTocWithAgent,
+  validateTocDraftContent,
 } from '../application/pdf-import/toc-review-agent.js';
 
 /**
@@ -460,7 +463,10 @@ function mockAdapterQueue(args: { calls: AgentCalls; scripts: string[]; capable?
 }
 
 const GOOD_DRAFT = JSON.stringify({
-  entries: [{ title: '第1課 会話', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' }],
+  entries: [
+    { title: '第1課 会話', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
+    { title: '第2課 文法', printedPage: 20, level: 1, kind: 'lesson', confidence: 'high' },
+  ],
   warnings: [],
 });
 
@@ -485,7 +491,7 @@ describe('P3.1B review 容错（同 session 单次重试 + unavailable）', () =
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.reviewStatus).toBe('ok');
-    expect(res.value.draft?.entries.length).toBe(1);
+    expect(res.value.draft?.entries.length).toBe(2);
     expect(res.value.reviewError).toBeNull();
     expect(agentCalls.create).toBe(1);
     expect(agentCalls.inputs.length).toBe(2);
@@ -553,5 +559,187 @@ describe('P3.1B review 容错（同 session 单次重试 + unavailable）', () =
     expect(res.error.code).toBe('E_TOC_BASELINE_THIN');
     expect(agentCalls.create).toBe(0);
     expect(agentCalls.inputs.length).toBe(0);
+  });
+});
+
+describe('P3.2 reviewable 门与草稿内容门', () => {
+  it('assessReviewableEvidence：空/过短/超范围拒绝，达标放行', () => {
+    expect(assessReviewableEvidence([], 1, 2).reviewable).toBe(false);
+    expect(assessReviewableEvidence([], 1, 2).reason).toBe('empty-evidence');
+    expect(
+      assessReviewableEvidence([{ page: 1, excerpt: '第1課 3' }], 1, 1).reviewable
+    ).toBe(false);
+    expect(assessReviewableEvidence([{ page: 1, excerpt: 'x'.repeat(100) }], 1, 9).reason).toBe(
+      'range-too-large'
+    );
+    const ok = assessReviewableEvidence(
+      [{ page: 1, excerpt: 'この本のもくじです\n第1課 はじめまして 3\nつづく' }],
+      1,
+      1
+    );
+    expect(ok.reviewable).toBe(true);
+    expect(ok.reason).toBe('ok');
+    expect(ok.evidenceChars).toBeGreaterThanOrEqual(20);
+  });
+
+  it('formatReviewEvidence：逐页标记 + 总量截断', () => {
+    expect(formatReviewEvidence([])).toBe('');
+    expect(formatReviewEvidence([{ page: 2, excerpt: '  第1課 12  ' }])).toContain('--- PDF第2页 ---');
+    const big = formatReviewEvidence([{ page: 1, excerpt: 'あ'.repeat(20000) }]);
+    expect(big.length).toBeLessThanOrEqual(12000 + 20);
+    expect(big.endsWith('…(证据过长已截断)')).toBe(true);
+  });
+
+  it('validateTocDraftContent：倒退/空标题/纯数字/不足拒绝，正常通过', () => {
+    const good = {
+      entries: [
+        { title: '第1課', printedPage: 12, level: 1 as const, kind: 'lesson' as const, confidence: 'high' as const },
+        { title: '第2課', printedPage: 30, level: 1 as const, kind: 'lesson' as const, confidence: 'high' as const },
+      ],
+      warnings: [],
+    };
+    expect(validateTocDraftContent(good)).toMatchObject({ ok: true, semanticEntries: 2 });
+    const single = {
+      entries: [
+        { title: '第1課', printedPage: 12, level: 1 as const, kind: 'lesson' as const, confidence: 'high' as const },
+      ],
+      warnings: [],
+    };
+    expect(validateTocDraftContent(single).reason).toBe('too-few');
+    expect(
+      validateTocDraftContent({
+        entries: [
+          { title: '第1課', printedPage: 30, level: 1 as const, kind: 'lesson' as const, confidence: 'high' as const },
+          { title: '第2課', printedPage: 12, level: 1 as const, kind: 'lesson' as const, confidence: 'high' as const },
+        ],
+        warnings: [],
+      }).reason
+    ).toBe('page-regress');
+    expect(
+      validateTocDraftContent({
+        entries: [
+          { title: '   ', printedPage: 12, level: 1 as const, kind: 'lesson' as const, confidence: 'high' as const },
+          { title: '第2課', printedPage: 30, level: 1 as const, kind: 'lesson' as const, confidence: 'high' as const },
+        ],
+        warnings: [],
+      }).reason
+    ).toBe('empty-title');
+    expect(
+      validateTocDraftContent({
+        entries: [
+          { title: '123', printedPage: 12, level: 1 as const, kind: 'lesson' as const, confidence: 'high' as const },
+          { title: '456', printedPage: 30, level: 1 as const, kind: 'lesson' as const, confidence: 'high' as const },
+        ],
+        warnings: [],
+      }).reason
+    ).toBe('non-semantic-title');
+  });
+
+  it('thin + 有效证据 → AI 重建 ≥2 条草稿（证据进输入，无新增 OCR）', async () => {
+    const inspectorCalls = newCalls();
+    const agentCalls: AgentCalls = { create: 0, inputs: [], systemPrompts: [] };
+    const res = await reviewTocWithAgent(
+      {
+        loadInspector: async () => {
+          inspectorCalls.load++;
+          return agentMock({
+            pageCount: 371,
+            calls: inspectorCalls,
+            ocrMarkdown: new Map([[1, 'この本のもくじです\n第1課 はじめまして 3\nつづく']]),
+          });
+        },
+        adapter: mockAdapterQueue({ calls: agentCalls, scripts: [GOOD_DRAFT] }),
+      },
+      { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 1 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.baseline.verdict).toBe('thin');
+    expect(res.value.reviewStatus).toBe('ok');
+    expect(res.value.draft?.entries.length).toBe(2);
+    expect(agentCalls.create).toBe(1);
+    expect(agentCalls.inputs.length).toBe(1);
+    const firstInput = agentCalls.inputs[0] as { message?: unknown } | undefined;
+    const message = typeof firstInput?.message === 'string' ? firstInput.message : '';
+    expect(message).toContain('--- PDF第1页 ---');
+    expect(message).toContain('thin');
+  });
+
+  it('thin 但证据不足 → 不调用 AI（E_TOC_EVIDENCE_INSUFFICIENT）', async () => {
+    const inspectorCalls = newCalls();
+    const agentCalls: AgentCalls = { create: 0, inputs: [], systemPrompts: [] };
+    const res = await reviewTocWithAgent(
+      {
+        loadInspector: async () => {
+          inspectorCalls.load++;
+          return agentMock({
+            pageCount: 371,
+            calls: inspectorCalls,
+            ocrMarkdown: new Map([[1, '第1課 3']]),
+          });
+        },
+        adapter: mockAdapterQueue({ calls: agentCalls, scripts: [GOOD_DRAFT] }),
+      },
+      { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 1 }
+    );
+    expect(isOk(res)).toBe(false);
+    if (isOk(res)) return;
+    expect(res.error.code).toBe('E_TOC_EVIDENCE_INSUFFICIENT');
+    expect(agentCalls.create).toBe(0);
+  });
+
+  it('编造内容两次 → unavailable E_TOC_REVIEW_CONTENT（页码倒退/空标题/纯数字）', async () => {
+    const cases: Array<{ script: string; reason: string }> = [
+      {
+        script: JSON.stringify({
+          entries: [
+            { title: '第1課', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
+            { title: '第2課', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
+          ],
+          warnings: [],
+        }),
+        reason: 'regress',
+      },
+      {
+        script: JSON.stringify({
+          entries: [
+            { title: '   ', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
+            { title: '第2課', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
+          ],
+          warnings: [],
+        }),
+        reason: 'empty',
+      },
+      {
+        script: JSON.stringify({
+          entries: [
+            { title: '123', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
+            { title: '456', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
+          ],
+          warnings: [],
+        }),
+        reason: 'digit',
+      },
+    ];
+    for (const item of cases) {
+      const inspectorCalls = newCalls();
+      const agentCalls: AgentCalls = { create: 0, inputs: [], systemPrompts: [] };
+      const res = await reviewTocWithAgent(
+        {
+          loadInspector: async () => {
+            inspectorCalls.load++;
+            return agentMock({ pageCount: 371, calls: inspectorCalls, ocrMarkdown: twoPageOcr() });
+          },
+          adapter: mockAdapterQueue({ calls: agentCalls, scripts: [item.script, item.script] }),
+        },
+        { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
+      );
+      expect(isOk(res)).toBe(true);
+      if (!isOk(res)) continue;
+      expect(res.value.reviewStatus).toBe('unavailable');
+      expect(res.value.reviewError?.code).toBe('E_TOC_REVIEW_CONTENT');
+      expect(res.value.draft).toBeNull();
+      expect(res.value.baseline.verdict).toBe('usable');
+    }
   });
 });
