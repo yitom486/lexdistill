@@ -31,6 +31,11 @@ export interface ThreadStartParams {
   sandbox?: CodexSandboxMode | null;
   dynamicTools?: DynamicToolSpec[] | null;
   ephemeral?: boolean | null;
+  /**
+   * 官方 v2 ThreadStartParams.developerInstructions（协议原生线程级指令通道）。
+   * CreateSessionOptions.systemPrompt 经此进入，不再静默丢弃。
+   */
+  developerInstructions?: string | null;
 }
 
 export interface ThreadStartResponse {

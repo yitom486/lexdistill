@@ -236,6 +236,7 @@ export class CodexAppServerConnection {
     sandbox?: string;
     approvalPolicy?: string;
     ephemeral?: boolean;
+    developerInstructions?: string;
   }): Promise<Result<{ threadId: string }, BusinessError>> {
     const ready = await this.connect();
     if (!isOk(ready)) return ready;
@@ -249,6 +250,7 @@ export class CodexAppServerConnection {
       ),
       ephemeral: params?.ephemeral ?? true,
       dynamicTools: params?.dynamicTools ?? null,
+      developerInstructions: params?.developerInstructions ?? null,
     };
 
     const res = await this.rpc.request<ThreadStartResponse>('thread/start', body);

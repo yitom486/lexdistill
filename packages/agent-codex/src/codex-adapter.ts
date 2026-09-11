@@ -17,6 +17,7 @@ import {
   translateToBusinessError,
 } from '@study-studio/shared';
 import { CodexAppServerConnection } from './app-server-client.js';
+import { unlink } from 'node:fs/promises';
 import { buildTurnInputItems, materializePngAttachments } from './image-attachments.js';
 import {
   toolsToDynamicSpecs,
@@ -117,6 +118,8 @@ export class CodexSession implements AgentSession {
     (decision: ApprovalDecision, reason?: 'user' | 'timeout' | 'interrupt') => void
   >();
   private eventSink: ((ev: AgentEvent) => void) | null = null;
+  /** 本会话累计物化的图片临时文件（会话级生命周期，close 时统一删除）。 */
+  private readonly attachmentPaths: string[] = [];
   /**
    * 本 turn 覆盖的审批策略（send() 从 turnOptions 写入；缺席回退创建时策略）。
    * sticky 到下一次 send 覆盖为止——同会话内串 turn 不串会话，跨会话隔离由路由保证。
@@ -225,12 +228,13 @@ export class CodexSession implements AgentSession {
       ping();
     };
 
-    // 图片附件（Gateway 已知事实）：内存 PNG → 本轮临时文件 → localImage。
-    // 物化失败直接报 ERROR，不发起 turn；临时文件在 finally 无条件删除
-    // （成功 / 失败 / 取消全覆盖），路径与内容永不记日志。
+    // 图片附件（Gateway 已知事实）：内存 PNG → 临时文件 → localImage。
+    // 物化失败直接报 ERROR，不发起 turn。
+    // 生命周期是会话级（非单轮）：同 thread 后续轮次仍会引用首轮图片
+    //（真机实测：次轮工具调用时引擎重读首轮图；轮末删图直接导致调用失败）。
+    // 全部临时文件在 close() 统一删除；路径与内容永不记日志。
     const attachments = input.attachments ?? [];
     let imagePaths: string[] = [];
-    let cleanupAttachments: (() => Promise<void>) | null = null;
     if (attachments.length > 0) {
       const materialized = await materializePngAttachments(attachments);
       if (!isOk(materialized)) {
@@ -240,7 +244,7 @@ export class CodexSession implements AgentSession {
         return;
       }
       imagePaths = materialized.value.paths;
-      cleanupAttachments = materialized.value.cleanup;
+      this.attachmentPaths.push(...imagePaths);
     }
 
     const turnOpts: {
@@ -308,13 +312,6 @@ export class CodexSession implements AgentSession {
     } finally {
       this.eventSink = null;
       this.abort = null;
-      if (cleanupAttachments) {
-        try {
-          await cleanupAttachments();
-        } catch {
-          // 临时文件删除失败不影响 turn 结果（且不得记路径）
-        }
-      }
     }
   }
 
@@ -441,6 +438,12 @@ export class CodexSession implements AgentSession {
   public async close(): Promise<Result<void, BusinessError>> {
     this.abort?.abort();
     this.cancelPendingApprovals('user');
+    // 会话级图片清理：同 thread 多轮共享首轮图片，轮末删图会导致后续调用失败；
+    // 只在 close 删（失败静默吞掉，不记路径）。
+    const paths = this.attachmentPaths.splice(0, this.attachmentPaths.length);
+    if (paths.length > 0) {
+      await Promise.allSettled(paths.map((p) => unlink(p)));
+    }
     try {
       this.onClose?.();
     } catch {
@@ -670,11 +673,16 @@ export class CodexAdapter implements AgentAdapter {
           model?: string;
           approvalPolicy?: string;
           ephemeral?: boolean;
+          developerInstructions?: string;
         } = {
           dynamicTools: bridge.specs,
         };
         if (options.model) threadParams.model = options.model;
         if (options.approvalPolicy) threadParams.approvalPolicy = options.approvalPolicy;
+        // P3.4B-FIX4：systemPrompt 经官方 developerInstructions 进线程。
+        // 此前该字段被静默丢弃（adapter 内零引用），模型只能从用户消息尾部
+        // 一句话得知工具契约——工具“可选”外观的主因。
+        if (options.systemPrompt?.trim()) threadParams.developerInstructions = options.systemPrompt;
         if (typeof options.ephemeral === 'boolean') {
           threadParams.ephemeral = options.ephemeral;
         }

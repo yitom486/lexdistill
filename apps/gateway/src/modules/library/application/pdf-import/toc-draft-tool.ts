@@ -188,8 +188,8 @@ export function isTocDraftSessionRegistered(sessionId: string): boolean {
 }
 
 /**
- * 读并删除会话暂存（review loop 终态唯一读取点；成功/unavailable/异常全调）。
- * 同时注销会话登记（同一会话不会有第二轮工具调用）。
+ * 读并删除会话暂存（review loop 所有轮次结束后的终态唯一读取点；
+ * 成功/unavailable/异常全调）。同时注销会话登记。
  * 返回 null = 本会话无工具调用或从未成功。
  */
 export function takeTocDraftToolResult(sessionId: string): TocDraftToolSessionRecord | null {
@@ -197,6 +197,14 @@ export function takeTocDraftToolResult(sessionId: string): TocDraftToolSessionRe
   draftSessions.delete(sessionId);
   draftToolSessions.delete(sessionId);
   return record;
+}
+
+/**
+ * 只读查看会话暂存（不删除、不注销；供多轮 loop 在终态前判断是否还值得
+ * 再开一轮：预算耗尽则不再浪费一次模型轮次）。
+ */
+export function peekTocDraftToolResult(sessionId: string): TocDraftToolSessionRecord | null {
+  return draftSessions.get(sessionId) ?? null;
 }
 
 /** 工具执行结果回模型负载（仅计数 + 接受态，无标题无原文）。 */

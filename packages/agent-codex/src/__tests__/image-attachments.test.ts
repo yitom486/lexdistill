@@ -130,11 +130,13 @@ describe('P4B 图片附件（agent-codex）', () => {
     expect(new Set(paths).size).toBe(2);
     for (const p of paths) expect(p.endsWith('.png')).toBe(true);
     expect(seen.some((e) => e.type === 'COMPLETED')).toBe(true);
-    // 成功后无条件删除
+    // 会话级生命周期：轮末不删（同线程后轮仍引用），close 时统一删除
+    for (const p of paths) expect(existsSync(p)).toBe(true);
+    await session.close();
     for (const p of paths) expect(existsSync(p)).toBe(false);
   });
 
-  it('turn 失败：ERROR 事件 + 临时文件仍删除', async () => {
+  it('turn 失败：ERROR 事件 + close 后删除（轮末保留）', async () => {
     const turns: FakeTurn[] = [];
     const session = new CodexSession(
       's1',
@@ -144,10 +146,12 @@ describe('P4B 图片附件（agent-codex）', () => {
     );
     const seen = await drain(session, { message: 'review', attachments: [{ png: PNG }] });
     expect(seen.some((e) => e.type === 'ERROR')).toBe(true);
+    for (const p of turns[0]?.imagePaths ?? []) expect(existsSync(p)).toBe(true);
+    await session.close();
     for (const p of turns[0]?.imagePaths ?? []) expect(existsSync(p)).toBe(false);
   });
 
-  it('取消：interrupt 后临时文件仍删除', async () => {
+  it('取消：interrupt 不删（会话可能继续），close 后统一删除', async () => {
     const turns: FakeTurn[] = [];
     const session = new CodexSession(
       's1',
@@ -162,6 +166,8 @@ describe('P4B 图片附件（agent-codex）', () => {
     while (!(await gen.next()).done) {
       // 排空
     }
+    for (const p of turns[0]?.imagePaths ?? []) expect(existsSync(p)).toBe(true);
+    await session.close();
     for (const p of turns[0]?.imagePaths ?? []) expect(existsSync(p)).toBe(false);
   });
 

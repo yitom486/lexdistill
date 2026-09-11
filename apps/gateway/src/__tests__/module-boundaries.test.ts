@@ -174,6 +174,14 @@ describe('gateway module boundaries (G5)', () => {
       if (fromModule && !isTest && normTarget.startsWith('transport/tools/') && !ref.typeOnly) {
         violations.push(`R6 ${rel} -> ${normTarget}（模块仅允许 type-only 引用 Tool）`);
       }
+
+      // R7：禁止绝对路径导入（盘符/UNC/file:// 裸 /）。
+      // 实测（P3.4B-FIX4）：Windows Bun 下绝对路径与相对引用解析为两个模块实例，
+      // 模块级状态（工具会话登记/暂存）直接分裂。测试文件同样禁（探针脚本放 Temp）。
+      const raw = ref.target;
+      if (/^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith('\\\\') || raw.startsWith('file:') || (raw.startsWith('/') && !raw.startsWith('//'))) {
+        violations.push(`R7 ${rel} -> ${raw}（禁止绝对路径导入，相对引用是唯一合法形状）`);
+      }
     }
   }
 

@@ -24,7 +24,9 @@ import {
   prepareTocReviewMaterial,
 } from './toc-review-material.js';
 import {
+  TOC_DRAFT_MAX_CALLS_PER_SESSION,
   TOC_DRAFT_TOOL_NAME,
+  peekTocDraftToolResult,
   registerTocDraftSession,
   takeTocDraftToolResult,
   tocDraftReplaceAllTool,
@@ -38,8 +40,8 @@ import type { PdfImportServiceDeps } from './pdf-import-service.js';
  *
  * 只读编排（无持久化）：
  * 范围纯校验 → P3 基线（embedded 命中即返回，零渲染零 Agent）→ capability 查询 →
- * P4A-2 PNG（1..8 页内存态）→ Codex Adapter 单轮（原生 `toc_draft_replace_all`
- * 工具收草稿，模型自然语言回复直接忽略）→ 工具暂存校验 → 内存返回。
+ * P4A-2 PNG（1..8 页内存态）→ Codex Adapter 最多两轮（首轮证据+指令；
+ * 首轮无可用草稿且预算有剩则同线程追问一轮，仍只认工具暂存）→ 工具暂存校验 → 内存返回。
  * 不写 documents / AST / textbook_* / cache；不合并、不回填；PNG 只走 attachments
  * 内存字节，永不 base64、不进快照、不落盘（Adapter 内临时物化除外）。
  */
@@ -239,6 +241,19 @@ export function assessReviewableEvidence(
   return { reviewable: true, reason: 'ok', evidenceChars, hasTocTitle, lessonTokenLines, titleLines };
 }
 
+/**
+ * P3.4B-FIX4 第二轮追问（纯函数）：只含失败原因码（计数口径），不含标题与原文。
+ * 图片已在 thread 内，不重发附件；仍只认工具暂存，不解析任何文本。
+ */
+export function buildTocReviewRetryMessage(errorCodes: string[]): string {
+  const codes = errorCodes.length > 0 ? `（工具校验失败码：${errorCodes.join('、')}）` : '（上一轮未收到工具调用）';
+  return [
+    `上一轮没有交付可用草稿${codes}。请现在调用 ${TOC_DRAFT_TOOL_NAME} 提交完整目录草稿`,
+    '（entries 至少 2 条语义标题、printedPage 单调不减，只取目录上印出的数字；无法确认的行跳过，绝不编造）。',
+    '除工具调用外不需要其他回复。',
+  ].join('');
+}
+
 /** 同一次 AgentInput 的文本部分（纯函数）：OCR 条目 + 页证据 + 拒绝计数；不含图片字节、路径、userId。 */
 export function buildTocReviewMessage(
   baseline: TocBaselineOutput,
@@ -430,7 +445,7 @@ export async function reviewTocWithAgent(
   observer.emit({ type: 'tool_offered', tool: TOC_DRAFT_TOOL_NAME });
 
   /**
-   * P3.4A 工具单轮（内部）：事件只看类型与计数，模型自然语言
+   * P3.4A 工具轮次（内部，可一或两轮）：事件只看类型与计数，模型自然语言
    * （TEXT_DELTA / finalOutput）一律不累积、不解析、不记录。
    * 工具执行由 Adapter 经全局 registry 调本工具 execute（校验 + 会话暂存），
    * 本 loop 只观察 + 终态读暂存；审批只接受本工具（名匹配），其余拒绝。
@@ -442,7 +457,10 @@ export async function reviewTocWithAgent(
       // 关闭失败不影响结果
     }
   };
-  const finishTurn = async (): Promise<Result<{ toolCalls: number }, BusinessError>> => {
+  const finishTurn = async (
+    message: string,
+    attachments: Array<{ png: Uint8Array; label: string }>
+  ): Promise<Result<{ toolCalls: number }, BusinessError>> => {
     let toolCalls = 0;
     // 思考等级/模型覆盖走 Turn 原生字段（与 createSession 的 model 互补：thread 默认 + 本轮覆盖）。
     const turnOptions =
@@ -454,8 +472,8 @@ export async function reviewTocWithAgent(
         : undefined;
     try {
       for await (const ev of session.send({
-        message: buildTocReviewMessage(baseline, material.pages.length),
-        attachments: material.pages.map((p) => ({ png: p.png, label: `toc-physical-page-${p.pageNumber}` })),
+        message,
+        attachments,
         ...(turnOptions ? { turnOptions } : {}),
       })) {
         if (ev.type === 'TOOL_CALL_REQUESTED') {
@@ -485,13 +503,29 @@ export async function reviewTocWithAgent(
     return ok({ toolCalls });
   };
 
-  const turnRes = await finishTurn();
-  // 暂存读取即删除（成功/unavailable/异常全走，零残留、零泄漏）。
-  const record = takeTocDraftToolResult(sessionId);
+  const turnRes = await finishTurn(
+    buildTocReviewMessage(baseline, material.pages.length),
+    material.pages.map((p) => ({ png: p.png, label: `toc-physical-page-${p.pageNumber}` }))
+  );
   if (!isOk(turnRes)) {
+    takeTocDraftToolResult(sessionId);
     await closeSession();
     return turnRes;
   }
+  // P3.4B-FIX4：首轮无可用草稿且工具预算还有剩余 → 同线程第二轮追问。
+  // 仍只认工具暂存（不解析任何文本）；预算耗尽则不再浪费一次模型轮次。
+  // 图片已在 thread 内，第二轮不重发附件。
+  const peeked = peekTocDraftToolResult(sessionId);
+  if (!peeked?.draft && (peeked?.calls ?? 0) < TOC_DRAFT_MAX_CALLS_PER_SESSION) {
+    const retryRes = await finishTurn(buildTocReviewRetryMessage(peeked?.errorCodes ?? []), []);
+    if (!isOk(retryRes)) {
+      takeTocDraftToolResult(sessionId);
+      await closeSession();
+      return retryRes;
+    }
+  }
+  // 暂存读取即删除（成功/unavailable/异常全走，零残留、零泄漏）。
+  const record = takeTocDraftToolResult(sessionId);
   const draft = record?.draft ?? null;
   const failures = record?.errorCodes ?? [];
   if (draft) {

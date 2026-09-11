@@ -265,8 +265,8 @@ describe('P3.4A POST review-toc（真 native + 假工具通道）', () => {
     expect(typeof body.reviewError?.userMessage).toBe('string');
     expect(body.baseline.verdict).toBe('usable');
     expect(body.baseline.entries.length).toBe(2);
-    // 工具通道单轮：一次 send，无文本纠错第二轮
-    expect(captured.length).toBe(1);
+    // P3.4B-FIX4：首轮无调用 → 同线程追问一轮 → 仍无调用才 unavailable（共两次 send）
+    expect(captured.length).toBe(2);
     expect(await documentCount(repo, 'u1')).toBe(before);
   }, 180000);
 
