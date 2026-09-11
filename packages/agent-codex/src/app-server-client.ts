@@ -38,6 +38,7 @@ import {
   type CodexRealtimeVoicesDto,
   type CodexRealtimeCapabilityDto,
   type CodexRealtimeTextRole,
+  type CodexApprovalPolicy,
   normalizeSandboxMode,
   normalizeApprovalPolicy,
 } from './app-server-protocol.js';
@@ -84,8 +85,12 @@ export class CodexAppServerConnection {
   public readonly config: CodexAppServerConfig;
   private toolCallHandler: ToolCallHandler | null = null;
   private approvalHandler: CodexApprovalHandler | null = null;
-  /** 当前 turn 的审批策略覆盖（never 则自动 accept） */
-  private activeApprovalPolicy: string;
+  /**
+   * 连接构造时 baked 的审批默认（env/配置）。
+   * 注意：这里不再保存“当前 turn 策略”可变槽——旧 activeApprovalPolicy
+   * 被每个 turn 改写，导致跨 session 串策略；策略一律按请求归属在
+   * adapter 路由层判定（P3.4B-FIX2），连接只做 fail-closed 转发。
+   */
   /** 正在流式中的 turn id（供 steer / interrupt） */
   private activeTurnId: string | null = null;
   /** 连接级通知（含 idle 时 queue/changed 等） */
@@ -96,7 +101,6 @@ export class CodexAppServerConnection {
 
   constructor(config?: CodexAppServerConfig) {
     this.config = { ...loadCodexConfigFromEnv(), ...config };
-    this.activeApprovalPolicy = normalizeApprovalPolicy(this.config.approvalPolicy);
   }
 
   /** 订阅 App Server 通知（不限于进行中的 turn） */
@@ -115,10 +119,12 @@ export class CodexAppServerConnection {
     this.approvalHandler = handler;
   }
 
-  public setActiveApprovalPolicy(policy?: string | null): void {
-    this.activeApprovalPolicy = normalizeApprovalPolicy(
-      policy ?? this.config.approvalPolicy
-    );
+  /**
+   * 连接构造时 baked 的审批默认（env/配置），供 adapter 路由在
+   * “turn 无覆盖、会话无声明”时回退。只读，不再运行时改写。
+   */
+  public getConfiguredApprovalPolicy(): CodexApprovalPolicy {
+    return normalizeApprovalPolicy(this.config.approvalPolicy);
   }
 
   public async connect(): Promise<Result<void, BusinessError>> {
@@ -164,7 +170,8 @@ export class CodexAppServerConnection {
         return await this.toolCallHandler(params);
       }
 
-      // 审批：never 自动放行；on-request / untrusted 交给 Gateway→前端
+      // 审批：一律经注册 handler 由归属会话判定（连接不再按全局策略短路；
+      // 会话缺席/路由失败由 handler 侧 fail-closed decline）。
       if (
         req.method === 'item/commandExecution/requestApproval' ||
         req.method === 'item/fileChange/requestApproval' ||
@@ -172,10 +179,6 @@ export class CodexAppServerConnection {
         req.method === 'applyPatchApproval' ||
         req.method === 'execCommandApproval'
       ) {
-        const policy = this.activeApprovalPolicy;
-        if (policy === 'never') {
-          return { decision: 'accept' satisfies CodexApprovalDecision };
-        }
         if (!this.approvalHandler) {
           return { decision: 'decline' satisfies CodexApprovalDecision };
         }
@@ -292,7 +295,6 @@ export class CodexAppServerConnection {
       return;
     }
 
-    this.setActiveApprovalPolicy(params.approvalPolicy ?? this.config.approvalPolicy);
     const turnBody: TurnStartParams = {
       threadId: params.threadId,
       input: buildTurnInputItems(params.message, params.imagePaths ?? []),
@@ -351,7 +353,6 @@ export class CodexAppServerConnection {
       return;
     }
 
-    this.setActiveApprovalPolicy(params.approvalPolicy ?? this.config.approvalPolicy);
     const body: Record<string, unknown> = { threadId: params.threadId };
     if (params.queuedSubmissionId) body.queuedSubmissionId = params.queuedSubmissionId;
 

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { isOk, ok } from '@study-studio/shared';
+import type { AgentEvent } from '@study-studio/agent-core';
 import type { ToolDefinition } from '@study-studio/tool-core';
 import { CodexAdapter } from '../codex-adapter.js';
 import type { CodexAppServerConnection } from '../app-server-client.js';
+import type { CodexApprovalRequest } from '../app-server-protocol.js';
 import type { DynamicToolCallParams } from '../app-server-protocol.js';
 
 /**
@@ -37,18 +39,24 @@ function toolDef(name: string): ToolDefinition {
 
 interface FakeConn {
   capturedHandler: ((params: DynamicToolCallParams) => Promise<unknown>) | null;
+  capturedApprovalHandler: ((req: CodexApprovalRequest) => Promise<unknown>) | null;
   handlerInstalls: number;
   threadSeq: number;
   connection: CodexAppServerConnection;
   calls: RecordedCall[];
+  approvalPolicyDefault: string;
+  turnGates: Map<string, () => void>;
 }
 
-function makeFakeConnection(): FakeConn {
+function makeFakeConnection(approvalPolicyDefault = 'never'): FakeConn {
   const fake: FakeConn = {
     capturedHandler: null,
+    capturedApprovalHandler: null,
     handlerInstalls: 0,
     threadSeq: 0,
     calls: [],
+    approvalPolicyDefault,
+    turnGates: new Map(),
     connection: undefined as never,
   };
   const conn = {
@@ -56,12 +64,23 @@ function makeFakeConnection(): FakeConn {
       fake.handlerInstalls++;
       fake.capturedHandler = handler;
     },
-    setApprovalHandler(): void {},
+    setApprovalHandler(handler: (req: CodexApprovalRequest) => Promise<unknown>): void {
+      fake.capturedApprovalHandler = handler;
+    },
+    getConfiguredApprovalPolicy(): string {
+      return fake.approvalPolicyDefault;
+    },
     startThread: async (): Promise<unknown> => {
       fake.threadSeq++;
       return ok({ threadId: `thread-${fake.threadSeq}` });
     },
     resumeThread: async (): Promise<unknown> => ok({ threadId: 'thread-resumed' }),
+    runTurn: async function* (params: { threadId: string }): AsyncGenerator<AgentEvent, void, unknown> {
+      yield { type: 'TEXT_DELTA', delta: 'partial' };
+      await new Promise<void>((resolve) => {
+        fake.turnGates.set(params.threadId, resolve);
+      });
+    },
   };
   // 与 image-attachments.test.ts 同口径：结构替身 + 精确类型断言（非 as any）。
   fake.connection = conn as unknown as CodexAppServerConnection;
@@ -157,14 +176,15 @@ describe('P3.4B-FIX 单连接并发工具路由', () => {
     expect(isOk(reviewRes)).toBe(true);
     if (!isOk(mainRes) || !isOk(reviewRes)) return;
 
-    // 主 lane 未声明目录工具：尝试以主会话身份执行 → 工具自带会话门拒绝。
-    // 关键断言有二：① success 为 false（没执行成）；② 这次尝试记在了主会话名下
-    //（路由正确——若错配到 review 身份，门就放行了，回归即抓包）。
+    // 主 lane 未声明目录工具：adapter 层直接拒绝，executeTool 零调用。
+    //（旧设计会把候选名逐个送进全局执行；P3.4B-FIX2 起归一后必须命中声明集。）
     const denied = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-mx', tool: 'toc_draft_replace_all' });
     expect(denied.success).toBe(false);
-    expect(fake.calls.filter((c) => c.sessionId === 'sess-main' && c.toolName === 'toc_draft_replace_all')).toEqual([
-      { toolName: 'toc_draft_replace_all', sessionId: 'sess-main', userId: 'u-main' },
-    ]);
+    expect(fake.calls.filter((c) => c.sessionId === 'sess-main' && c.toolName === 'toc_draft_replace_all')).toEqual([]);
+    // 主 lane 伪造调用任意未声明的全局 WRITE 工具：同样零调用
+    const deniedGlobal = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-my', tool: 'flashcards.collect' });
+    expect(deniedGlobal.success).toBe(false);
+    expect(fake.calls.filter((c) => c.sessionId === 'sess-main')).toEqual([]);
     // 目录工具不进主 lane：声明 allowlist 之外的调用在执行侧发不出来
     const allowed = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-rx', tool: 'toc_draft_replace_all' });
     expect(allowed.success).toBe(true);
@@ -201,8 +221,7 @@ describe('P3.4B-FIX 单连接并发工具路由', () => {
     await mainRes.value.close();
   });
 
-  it('turnId 次键：同 thread 学到的 turn，后续可凭 turn 找回；关闭后双键失效', async () => {
-    const fake = makeFakeConnection();
+  it('turnId 次键：同 thread 学到的 turn，后续可凭 turn 找回；关闭后双键失效', async () => {    const fake = makeFakeConnection();
     const adapter = makeAdapter(fake);
     const mainRes = await adapter.createSession({
       sessionId: 'sess-main',
@@ -246,5 +265,228 @@ describe('P3.4B-FIX 单连接并发工具路由', () => {
     });
 
     await mainRes.value.close();
+  });
+});
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 10));
+}
+
+async function waitFor(cond: () => boolean, timeoutMs = 2000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!cond()) {
+    if (Date.now() > deadline) throw new Error('waitFor 超时：条件未成立');
+    await tick();
+  }
+}
+
+async function drain(session: { send(input: { message: string }): AsyncIterable<AgentEvent> }): Promise<{ seen: AgentEvent[]; done: Promise<void> }> {
+  const seen: AgentEvent[] = [];
+  const done = (async () => {
+    for await (const ev of session.send({ message: 'hi' })) seen.push(ev);
+  })();
+  return { seen, done };
+}
+
+function approvalReq(over: Partial<CodexApprovalRequest> & { approvalId: string }): CodexApprovalRequest {
+  return {
+    method: 'item/permissions/requestApproval',
+    threadId: undefined,
+    turnId: undefined,
+    itemId: undefined,
+    action: 'read files',
+    description: 'read-only probe',
+    riskLevel: 'low',
+    ...over,
+  } as CodexApprovalRequest;
+}
+
+describe('P3.4B-FIX2 单连接审批路由', () => {
+  it('两会话交错 approval：事件、submitApproval、最终 decision 全归正确会话', async () => {
+    const fake = makeFakeConnection('never');
+    const adapter = makeAdapter(fake);
+    const mainRes = await adapter.createSession({
+      sessionId: 'sess-main',
+      userId: 'u-main',
+      tools: [toolDef('learning.content')],
+      approvalPolicy: 'on-request',
+      ephemeral: true,
+    });
+    const reviewRes = await adapter.createSession({
+      sessionId: 'sess-review',
+      userId: 'u-review',
+      tools: [toolDef('toc_draft_replace_all')],
+      approvalPolicy: 'on-request',
+      ephemeral: true,
+    });
+    expect(isOk(mainRes)).toBe(true);
+    expect(isOk(reviewRes)).toBe(true);
+    if (!isOk(mainRes) || !isOk(reviewRes)) return;
+    if (!fake.capturedApprovalHandler) throw new Error('approval router not installed');
+
+    const mainDrain = await drain(mainRes.value);
+    const reviewDrain = await drain(reviewRes.value);
+    await tick();
+
+    // 主会话审批：事件只进主会话流
+    const pMain = fake.capturedApprovalHandler(
+      approvalReq({ approvalId: 'appr-m1', threadId: 'thread-1', turnId: 'turn-m1' })
+    );
+    await waitFor(() => mainDrain.seen.some((e) => e.type === 'APPROVAL_REQUESTED'));
+    expect(reviewDrain.seen.some((e) => e.type === 'APPROVAL_REQUESTED')).toBe(false);
+    const mainEv = mainDrain.seen.find((e) => e.type === 'APPROVAL_REQUESTED');
+    expect(mainEv).toMatchObject({ approvalId: 'appr-m1' });
+    // 错会话 submit 不得解开：review 解 appr-m1 必须 NOT_FOUND
+    const wrongRes = await reviewRes.value.submitApproval('appr-m1', 'accept');
+    expect(isOk(wrongRes)).toBe(false);
+    if (isOk(wrongRes)) throw new Error('wrong-session submit must fail');
+    expect(wrongRes.error.code).toBe('E_APPROVAL_NOT_FOUND');
+    // 正确会话 submit 生效，最终 decision 回到 server 侧
+    const rightRes = await mainRes.value.submitApproval('appr-m1', 'accept');
+    expect(isOk(rightRes)).toBe(true);
+    expect(await pMain).toBe('accept');
+
+    // 审核会话审批：镜像验证 decline 路径
+    const pReview = fake.capturedApprovalHandler(
+      approvalReq({ approvalId: 'appr-r1', threadId: 'thread-2', turnId: 'turn-r1' })
+    );
+    await waitFor(() => reviewDrain.seen.some((e) => e.type === 'APPROVAL_REQUESTED'));
+    const reviewRight = await reviewRes.value.submitApproval('appr-r1', 'decline');
+    expect(isOk(reviewRight)).toBe(true);
+    expect(await pReview).toBe('decline');
+
+    fake.turnGates.get('thread-1')?.();
+    fake.turnGates.get('thread-2')?.();
+    await mainDrain.done;
+    await reviewDrain.done;
+    await mainRes.value.close();
+    await reviewRes.value.close();
+  });
+
+  it('未知 / 已关闭 / thread-turn 矛盾 approval 全部 decline，不注册不打扰', async () => {
+    const fake = makeFakeConnection('never');
+    const adapter = makeAdapter(fake);
+    const mainRes = await adapter.createSession({
+      sessionId: 'sess-main',
+      userId: 'u-main',
+      tools: [toolDef('learning.content')],
+      approvalPolicy: 'on-request',
+      ephemeral: true,
+    });
+    const reviewRes = await adapter.createSession({
+      sessionId: 'sess-review',
+      userId: 'u-review',
+      tools: [toolDef('toc_draft_replace_all')],
+      approvalPolicy: 'on-request',
+      ephemeral: true,
+    });
+    expect(isOk(mainRes)).toBe(true);
+    expect(isOk(reviewRes)).toBe(true);
+    if (!isOk(mainRes) || !isOk(reviewRes)) return;
+    if (!fake.capturedApprovalHandler) throw new Error('approval router not installed');
+    const handle = fake.capturedApprovalHandler;
+
+    // 未知 thread+turn
+    expect(await handle(approvalReq({ approvalId: 'a-u1', threadId: 'thread-ghost', turnId: 'turn-ghost' }))).toBe('decline');
+    // 学一个 turn 给 review，再用主 thread 配 review turn → 矛盾
+    const mainDrain = await drain(mainRes.value);
+    const reviewDrain = await drain(reviewRes.value);
+    await tick();
+    const pLearn = handle(approvalReq({ approvalId: 'a-l1', threadId: 'thread-2', turnId: 'turn-shared' }));
+    await waitFor(() => reviewDrain.seen.some((e) => e.type === 'APPROVAL_REQUESTED'));
+    const contra = await handle(approvalReq({ approvalId: 'a-c1', threadId: 'thread-1', turnId: 'turn-shared' }));
+    expect(contra).toBe('decline');
+    // 矛盾请求不得在任何会话流里留下事件
+    expect(mainDrain.seen.some((e) => e.type === 'APPROVAL_REQUESTED')).toBe(false);
+    await reviewRes.value.submitApproval('a-l1', 'decline');
+    expect(await pLearn).toBe('decline');
+    // 关闭审核会话：其 thread 与已学 turn 同时失效
+    await reviewRes.value.close();
+    expect(await handle(approvalReq({ approvalId: 'a-c2', threadId: 'thread-2', turnId: 'turn-r9' }))).toBe('decline');
+    expect(await handle(approvalReq({ approvalId: 'a-c3', threadId: 'thread-x', turnId: 'turn-shared' }))).toBe('decline');
+    // 主会话不受影响
+    const pOk = handle(approvalReq({ approvalId: 'a-ok', threadId: 'thread-1', turnId: 'turn-m9' }));
+    await waitFor(() => mainDrain.seen.some((e) => e.type === 'APPROVAL_REQUESTED'));
+    await mainRes.value.submitApproval('a-ok', 'accept');
+    expect(await pOk).toBe('accept');
+
+    fake.turnGates.get('thread-1')?.();
+    fake.turnGates.get('thread-2')?.();
+    await mainDrain.done;
+    await reviewDrain.done;
+    await mainRes.value.close();
+  });
+
+  it('策略分级：never 静默 accept；turn 覆盖优先于创建声明；连接默认兜底', async () => {
+    // never 会话：无事件直接 accept（默认不打扰用户）
+    const fakeNever = makeFakeConnection('never');
+    const adapterNever = makeAdapter(fakeNever);
+    const neverRes = await adapterNever.createSession({
+      sessionId: 'sess-quiet',
+      userId: 'u-quiet',
+      tools: [],
+      ephemeral: true,
+    });
+    expect(isOk(neverRes)).toBe(true);
+    if (!isOk(neverRes)) return;
+    if (!fakeNever.capturedApprovalHandler) throw new Error('approval router not installed');
+    const quietDrain = await drain(neverRes.value);
+    await tick();
+    expect(await fakeNever.capturedApprovalHandler(approvalReq({ approvalId: 'a-q1', threadId: 'thread-1' }))).toBe('accept');
+    await tick();
+    expect(quietDrain.seen.some((e) => e.type === 'APPROVAL_REQUESTED')).toBe(false);
+    fakeNever.turnGates.get('thread-1')?.();
+    await quietDrain.done;
+    await neverRes.value.close();
+
+    // turn 覆盖：创建 never + 本轮 on-request → 走事件（turn 优先于创建声明）
+    const fakeTurn = makeFakeConnection('never');
+    const adapterTurn = makeAdapter(fakeTurn);
+    const turnRes = await adapterTurn.createSession({
+      sessionId: 'sess-turn',
+      userId: 'u-turn',
+      tools: [],
+      ephemeral: true,
+    });
+    expect(isOk(turnRes)).toBe(true);
+    if (!isOk(turnRes)) return;
+    if (!fakeTurn.capturedApprovalHandler) throw new Error('approval router not installed');
+    const seen: AgentEvent[] = [];
+    const done = (async () => {
+      for await (const ev of turnRes.value.send({ message: 'hi', turnOptions: { approvalPolicy: 'on-request' } })) seen.push(ev);
+    })();
+    await tick();
+    const pTurn = fakeTurn.capturedApprovalHandler(approvalReq({ approvalId: 'a-t1', threadId: 'thread-1' }));
+    await waitFor(() => seen.some((e) => e.type === 'APPROVAL_REQUESTED'));
+    await turnRes.value.submitApproval('a-t1', 'accept');
+    expect(await pTurn).toBe('accept');
+    fakeTurn.turnGates.get('thread-1')?.();
+    await done;
+    await turnRes.value.close();
+
+    // 连接默认 on-request：无声明会话同样走事件（env 默认不断链）
+    const fakeConn = makeFakeConnection('on-request');
+    const adapterConn = makeAdapter(fakeConn);
+    const connRes = await adapterConn.createSession({
+      sessionId: 'sess-conn',
+      userId: 'u-conn',
+      tools: [],
+      ephemeral: true,
+    });
+    expect(isOk(connRes)).toBe(true);
+    if (!isOk(connRes)) return;
+    if (!fakeConn.capturedApprovalHandler) throw new Error('approval router not installed');
+    const seenConn: AgentEvent[] = [];
+    const doneConn = (async () => {
+      for await (const ev of connRes.value.send({ message: 'hi' })) seenConn.push(ev);
+    })();
+    await tick();
+    const pConn = fakeConn.capturedApprovalHandler(approvalReq({ approvalId: 'a-c1', threadId: 'thread-1' }));
+    await waitFor(() => seenConn.some((e) => e.type === 'APPROVAL_REQUESTED'));
+    await connRes.value.submitApproval('a-c1', 'decline');
+    expect(await pConn).toBe('decline');
+    fakeConn.turnGates.get('thread-1')?.();
+    await doneConn;
+    await connRes.value.close();
   });
 });

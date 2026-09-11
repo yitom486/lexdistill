@@ -39,9 +39,11 @@ import type {
   CodexRealtimeVoicesDto,
   CodexRealtimeCapabilityDto,
   CodexRealtimeTextRole,
+  CodexApprovalDecision,
   DynamicToolCallParams,
   DynamicToolCallResponse,
 } from './app-server-protocol.js';
+import { normalizeApprovalPolicy } from './app-server-protocol.js';
 
 export type ExternalToolExecutor = (
   toolName: string,
@@ -73,6 +75,16 @@ interface SessionToolRoute {
   toolNameMap?: Map<string, string> | undefined;
   executeTool?: ExternalToolExecutor | undefined;
   noteTurn?: ((turnId: string) => void) | undefined;
+  /** 创建时声明的审批策略（CreateSessionOptions.approvalPolicy；缺席走连接默认）。 */
+  createApprovalPolicy?: string | undefined;
+  /** 当前 turn 覆盖策略读取口（send variables 写入；缺席回退创建策略）。 */
+  turnPolicyOf?: (() => string | undefined) | undefined;
+  /** 归属会话的审批机械入口（事件进其 sink，pending 只记其名下）。 */
+  handleApproval?: (
+    req: { approvalId: string; action: string; description: string; riskLevel: string }
+  ) => Promise<ApprovalDecision>;
+  /** pending 审批清扫口（close/shutdown 用）。 */
+  cancelPending?: (() => void) | undefined;
   closed: boolean;
 }
 
@@ -102,6 +114,11 @@ export class CodexSession implements AgentSession {
     (decision: ApprovalDecision, reason?: 'user' | 'timeout' | 'interrupt') => void
   >();
   private eventSink: ((ev: AgentEvent) => void) | null = null;
+  /**
+   * 本 turn 覆盖的审批策略（send() 从 turnOptions 写入；缺席回退创建时策略）。
+   * sticky 到下一次 send 覆盖为止——同会话内串 turn 不串会话，跨会话隔离由路由保证。
+   */
+  private turnPolicy?: string | undefined;
 
   constructor(
     public readonly sessionId: string,
@@ -112,43 +129,9 @@ export class CodexSession implements AgentSession {
     private readonly toolNameMap?: Map<string, string>,
     private readonly onClose?: () => void
   ) {
-    // 注意：工具调用处理器由 CodexAdapter 在连接层统一安装一次（按 thread/turn
-    // 路由到归属会话），本构造不再逐会话覆盖——否则后创建会话赢得全部回调。
-    // 审批处理器保留逐会话安装（P3.4B-FIX 范围外；行为不变）。
-    this.connection.setApprovalHandler(async (req) => {
-      const expiresAt = Date.now() + APPROVAL_TIMEOUT_MS;
-      this.eventSink?.({
-        type: 'APPROVAL_REQUESTED',
-        approvalId: req.approvalId,
-        action: req.action,
-        description: req.description,
-        riskLevel: req.riskLevel,
-        expiresAt,
-      });
-      return await new Promise<ApprovalDecision>((resolve) => {
-        const timer = setTimeout(() => {
-          if (!this.pendingApprovals.has(req.approvalId)) return;
-          this.pendingApprovals.delete(req.approvalId);
-          this.eventSink?.({
-            type: 'APPROVAL_RESOLVED',
-            approvalId: req.approvalId,
-            decision: 'decline',
-            reason: 'timeout',
-          });
-          resolve('decline');
-        }, APPROVAL_TIMEOUT_MS);
-        this.pendingApprovals.set(req.approvalId, (decision, reason = 'user') => {
-          clearTimeout(timer);
-          this.eventSink?.({
-            type: 'APPROVAL_RESOLVED',
-            approvalId: req.approvalId,
-            decision,
-            reason,
-          });
-          resolve(decision);
-        });
-      });
-    });
+    // 注意：工具调用与审批处理器一律由 CodexAdapter 在连接层统一安装一次
+    //（按 thread/turn 路由到归属会话），本构造不再逐会话覆盖连接处理器——
+    // 否则后创建会话赢得全部回调（含审批）。
   }
 
   /**
@@ -159,8 +142,72 @@ export class CodexSession implements AgentSession {
     this.activeTurnId = turnId;
   }
 
+  /** @internal 本轮审批策略覆盖（send 进入时写入；缺席即清除回退创建策略）。 */
+  public setTurnPolicy(policy: string | undefined): void {
+    this.turnPolicy = policy;
+  }
+
+  /** @internal 当前 turn 有效策略（路由层读取；raw 透传由路由归一化）。 */
+  public currentTurnPolicy(): string | undefined {
+    return this.turnPolicy;
+  }
+
+  /**
+   * @internal 处理已路由到本会话的审批请求（原构造内 handler 主体，原样下沉）。
+   * 事件只进本会话的 sink，pending 只记本会话，超时自 decline。
+   */
+  public handleRoutedApproval(req: {
+    approvalId: string;
+    action: string;
+    description: string;
+    riskLevel: string;
+  }): Promise<ApprovalDecision> {
+    const expiresAt = Date.now() + APPROVAL_TIMEOUT_MS;
+    this.eventSink?.({
+      type: 'APPROVAL_REQUESTED',
+      approvalId: req.approvalId,
+      action: req.action,
+      description: req.description,
+      riskLevel: req.riskLevel,
+      expiresAt,
+    });
+    return new Promise<ApprovalDecision>((resolve) => {
+      const timer = setTimeout(() => {
+        if (!this.pendingApprovals.has(req.approvalId)) return;
+        this.pendingApprovals.delete(req.approvalId);
+        this.eventSink?.({
+          type: 'APPROVAL_RESOLVED',
+          approvalId: req.approvalId,
+          decision: 'decline',
+          reason: 'timeout',
+        });
+        resolve('decline');
+      }, APPROVAL_TIMEOUT_MS);
+      this.pendingApprovals.set(req.approvalId, (decision, reason = 'user') => {
+        clearTimeout(timer);
+        this.eventSink?.({
+          type: 'APPROVAL_RESOLVED',
+          approvalId: req.approvalId,
+          decision,
+          reason,
+        });
+        resolve(decision);
+      });
+    });
+  }
+
+  /** @internal 取消本会话全部 pending 审批（close/shutdown 清扫用）。 */
+  public cancelPendingApprovals(reason: 'user' | 'timeout' | 'interrupt' = 'interrupt'): void {
+    for (const [id, settle] of this.pendingApprovals) {
+      this.pendingApprovals.delete(id);
+      settle('cancel', reason);
+    }
+  }
+
   public async *send(input: AgentInput): AsyncIterable<AgentEvent> {
     this.abort = new AbortController();
+    // 本轮审批策略覆盖（缺席即清除，回退创建策略；只影响本会话各轮，不跨会话）。
+    this.setTurnPolicy(input.turnOptions?.approvalPolicy);
     const queue: AgentEvent[] = [];
     const waiter: { fn: (() => void) | null } = { fn: null };
     let turnDone = false;
@@ -381,10 +428,7 @@ export class CodexSession implements AgentSession {
 
   public async interrupt(): Promise<Result<void, BusinessError>> {
     this.abort?.abort();
-    for (const [id, settle] of this.pendingApprovals) {
-      this.pendingApprovals.delete(id);
-      settle('cancel', 'interrupt');
-    }
+    this.cancelPendingApprovals();
     if (this.activeTurnId) {
       return this.connection.interrupt(this.threadId, this.activeTurnId);
     }
@@ -393,10 +437,7 @@ export class CodexSession implements AgentSession {
 
   public async close(): Promise<Result<void, BusinessError>> {
     this.abort?.abort();
-    for (const [id, resolve] of this.pendingApprovals) {
-      resolve('cancel');
-      this.pendingApprovals.delete(id);
-    }
+    this.cancelPendingApprovals('user');
     try {
       this.onClose?.();
     } catch {
@@ -484,7 +525,16 @@ export class CodexAdapter implements AgentAdapter {
       if (!route.executeTool) {
         return failTool('Gateway 未注入工具执行器');
       }
-      const candidates = resolveToolName(toolName, route.toolNameMap);
+      // P3.4B-FIX2 allowlist 执行门：sanitize/别名归一可以走，但归一后的
+      // 最终名字必须属于本 route 创建时声明的集合（toolNameMap 值集）；
+      // 空 tools 会话、未声明的全局注册工具一律到不了 executeTool（零调用）。
+      const declared = new Set<string>(route.toolNameMap?.values() ?? []);
+      const candidates = resolveToolName(toolName, route.toolNameMap).filter((name) =>
+        declared.has(name)
+      );
+      if (candidates.length === 0) {
+        return failTool('tool not declared for this session');
+      }
       let lastErr = 'tool not found';
       for (const name of candidates) {
         try {
@@ -506,11 +556,61 @@ export class CodexAdapter implements AgentAdapter {
     }
   }
 
-  /** 连接上只装一次路由 handler（连接重建时重装）。 */
+  /** 连接上只装一次路由 handler（连接重建时重装）：工具 + 审批各一个单例。 */
   private ensureToolRouter(conn: CodexAppServerConnection): void {
     if (this.toolRouterConn === conn) return;
     conn.setToolCallHandler((params) => this.routeToolCall(params));
+    conn.setApprovalHandler((req) => this.routeApproval(req));
     this.toolRouterConn = conn;
+  }
+
+  /**
+   * 连接级审批单例路由：thread/turn 双键找归属会话，策略按“本轮覆盖 >
+   * 创建声明 > 连接默认”逐级判定（旧全局 activeApprovalPolicy 已删除）。
+   * - 找不到 / 已关闭 / thread 与 turn 指向不同记录 → decline，绝不猜测；
+   * - 策略 never → 直接 accept，不打扰用户、不注册 pending；
+   * - 其余 → 交归属会话的审批机械（事件进其 sink，pending 只记其名下）。
+   */
+  private async routeApproval(req: {    approvalId: string;
+    threadId?: string;
+    turnId?: string;
+    action: string;
+    description: string;
+    riskLevel: string;
+  }): Promise<CodexApprovalDecision> {
+    const byThread =
+      typeof req.threadId === 'string' && req.threadId
+        ? this.toolRouteByThread.get(req.threadId)
+        : undefined;
+    const byTurn =
+      typeof req.turnId === 'string' && req.turnId ? this.toolRouteByTurn.get(req.turnId) : undefined;
+    if (byThread && byTurn && byThread !== byTurn) return 'decline';
+    const route = byThread ?? byTurn;
+    if (!route || route.closed) return 'decline';
+    // 学到 turn 映射（与工具路径同语义；仍受 closed 门控）。
+    if (typeof req.turnId === 'string' && req.turnId) {
+      this.toolRouteByTurn.set(req.turnId, route);
+    }
+    const policy = normalizeApprovalPolicy(
+      route.turnPolicyOf?.() ?? route.createApprovalPolicy ?? this.defaultApprovalPolicy()
+    );
+    if (policy === 'never') return 'accept';
+    // 需要用户决定的审批却无会话机械可用 → fail-closed decline（绝不静默放行）。
+    if (!route.handleApproval) return 'decline';
+    try {
+      return await route.handleApproval(req);
+    } catch {
+      return 'decline';
+    }
+  }
+
+  /** 连接构造时 baked 的审批默认（env/配置），只读回退用。 */
+  private defaultApprovalPolicy(): string {
+    try {
+      return this.toolRouterConn?.getConfiguredApprovalPolicy() ?? 'never';
+    } catch {
+      return 'never';
+    }
   }
 
   /** 注册会话路由（create/resume 成功后调用；同 thread 后登记者覆盖先登记者）。 */
@@ -589,6 +689,7 @@ export class CodexAdapter implements AgentAdapter {
         threadId,
         toolNameMap: bridge.nameMap,
         executeTool: this.options.executeTool,
+        ...(options.approvalPolicy ? { createApprovalPolicy: options.approvalPolicy } : {}),
         closed: false,
       };
       const sess = new CodexSession(
@@ -601,6 +702,9 @@ export class CodexAdapter implements AgentAdapter {
         () => this.unregisterToolRoute(route)
       );
       route.noteTurn = (turnId: string) => sess.noteActiveTurn(turnId);
+      route.turnPolicyOf = () => sess.currentTurnPolicy();
+      route.handleApproval = (req) => sess.handleRoutedApproval(req);
+      route.cancelPending = () => sess.cancelPendingApprovals('interrupt');
       this.registerToolRoute(route);
       return ok(sess);
     } catch (raw) {
@@ -645,6 +749,9 @@ export class CodexAdapter implements AgentAdapter {
         () => this.unregisterToolRoute(route)
       );
       route.noteTurn = (turnId: string) => sess.noteActiveTurn(turnId);
+      route.turnPolicyOf = () => sess.currentTurnPolicy();
+      route.handleApproval = (req) => sess.handleRoutedApproval(req);
+      route.cancelPending = () => sess.cancelPendingApprovals('interrupt');
       this.registerToolRoute(route);
       return ok(sess);
     } catch (raw) {
@@ -853,6 +960,18 @@ export class CodexAdapter implements AgentAdapter {
     const c = this.connection;
     this.connection = null;
     this.threadBySession.clear();
+    // 清扫全部路由记录的 pending 审批（会话可能未来得及 close；取唯一集防重入）。
+    const seen = new Set<SessionToolRoute>();
+    for (const record of [...this.toolRouteByThread.values(), ...this.toolRouteByTurn.values()]) {
+      if (seen.has(record)) continue;
+      seen.add(record);
+      record.closed = true;
+      try {
+        record.cancelPending?.();
+      } catch {
+        // 清扫期错误忽略（连接即将关闭）
+      }
+    }
     this.toolRouteByThread.clear();
     this.toolRouteByTurn.clear();
     this.toolRouterConn = null;
