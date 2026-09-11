@@ -114,10 +114,7 @@ interface WashedLine {
   text: string;
 }
 
-interface WashedLine {
-  page: number;
-  text: string;
-}
+export type { WashedLine as TocWashedLine };
 
 export interface TocWashResult {
   kept: WashedLine[];
@@ -331,24 +328,7 @@ export async function extractTocBaseline(
   // P2.2 唯一质量门：usable 才短路；none/unusable 走 OCR（日志只记状态/reason/计数）。
   const outlineQuality = classifyEmbeddedOutline(inspector, input.bytes, pageCount);
   if (outlineQuality.quality === 'usable') {
-    return ok({
-      status: 'empty',
-      verdict: 'empty',
-      range: { fromPage, toPage },
-      pageCount,
-      entries: [],
-      diagnostics: {
-        pagesRequested: toPage - fromPage + 1,
-        pagesOcr: 0,
-        linesConsidered: 0,
-        linesDroppedWash: 0,
-        entriesAccepted: 0,
-        entriesRejected: 0,
-        badTitle: 0,
-      },
-      pageEvidence: [],
-      embedded: true,
-    });
+    return ok(embeddedBaselineResult(fromPage, toPage, pageCount));
   }
   const window = rangePages(fromPage, toPage);
   // 先窗分类看是否需要 OCR runtime（与 map/discovery 同口径，不多花一次模型下载）。
@@ -394,9 +374,6 @@ export async function extractTocBaseline(
   const washed = washRepeatedTocLines(
     window.map((p) => ({ page: p, lines: (markdownByPage.get(p) ?? '').split('\n') }))
   );
-  const entries: TocBaselineEntry[] = [];
-  let rejected = 0;
-  let badTitle = 0;
   const keptByPage = new Map<number, WashedLine[]>();
   for (const line of washed.kept) {
     const list = keptByPage.get(line.page) ?? [];
@@ -409,6 +386,57 @@ export async function extractTocBaseline(
     list.push(line.text);
     evidenceByPage.set(line.page, list);
   }
+  const assembled = assembleTocBaseline({
+    window,
+    keptByPage,
+    evidenceByPage,
+    spansByPage,
+    ocrPages,
+    washedKept: washed.kept.length,
+    washedDropped: washed.dropped,
+  });
+  // 只记计数：不记标题、不记正文、不记 spans、不记 evidence。
+  logger.warn('[toc-baseline] 完成', {
+    range: `${fromPage}-${toPage}`,
+    entries: assembled.entries.length,
+    rejected: assembled.diagnostics.entriesRejected,
+    badTitle: assembled.diagnostics.badTitle,
+    washed: washed.dropped,
+    ocrPages: ocrPages.length,
+  });
+  return ok({
+    status: assembled.status,
+    verdict: assembled.verdict,
+    range: { fromPage, toPage },
+    pageCount,
+    entries: assembled.entries,
+    diagnostics: assembled.diagnostics,
+    pageEvidence: assembled.pageEvidence,
+    embedded: false,
+  });
+}
+
+/**
+ * CMD-LINGUA-P3.3 基线组装（清洗→抽取→几何→verdict→证据）：JSON 与流式
+ * 共用同一函数，保证两端输出逐字节一致。只读，无日志无 IO。
+ */
+export interface BaselineAssemblyInput {
+  window: number[];
+  keptByPage: Map<number, WashedLine[]>;
+  evidenceByPage: Map<number, string[]>;
+  spansByPage: Map<number, TocGeometrySpan[]>;
+  ocrPages: number[];
+  washedKept: number;
+  washedDropped: number;
+}
+
+export function assembleTocBaseline(
+  input: BaselineAssemblyInput
+): Pick<TocBaselineOutput, 'status' | 'verdict' | 'entries' | 'diagnostics' | 'pageEvidence'> {
+  const { window, keptByPage, evidenceByPage, spansByPage, ocrPages, washedKept, washedDropped } = input;
+  const entries: TocBaselineEntry[] = [];
+  let rejected = 0;
+  let badTitle = 0;
   for (const page of window) {
     for (const line of keptByPage.get(page) ?? []) {
       const parsed = extractTocLineEntry(line.text);
@@ -430,15 +458,6 @@ export async function extractTocBaseline(
       });
     }
   }
-  // 只记计数：不记标题、不记正文、不记 spans、不记 evidence。
-  logger.warn('[toc-baseline] 完成', {
-    range: `${fromPage}-${toPage}`,
-    entries: entries.length,
-    rejected,
-    badTitle,
-    washed: washed.dropped,
-    ocrPages: ocrPages.length,
-  });
   const verdict: TocBaselineVerdict =
     entries.length === 0 ? 'empty' : entries.length < TOC_BASELINE_MIN_USABLE_ENTRIES ? 'thin' : 'usable';
   const pageEvidence = window.map((page) => {
@@ -451,21 +470,47 @@ export async function extractTocBaseline(
           : excerpt,
     };
   });
-  return ok({
-    status: entries.length > 0 ? 'ok' : 'empty', verdict,
-    range: { fromPage, toPage },
-    pageCount,
+  return {
+    status: entries.length > 0 ? 'ok' : 'empty',
+    verdict,
     entries,
     diagnostics: {
       pagesRequested: window.length,
       pagesOcr: ocrPages.length,
-      linesConsidered: washed.kept.length + washed.dropped,
-      linesDroppedWash: washed.dropped,
+      linesConsidered: washedKept + washedDropped,
+      linesDroppedWash: washedDropped,
       entriesAccepted: entries.length,
       entriesRejected: rejected,
       badTitle,
     },
     pageEvidence,
-    embedded: false,
-  });
+  };
+}
+
+/**
+ * CMD-LINGUA-P3.3 embedded 短路输出（JSON 与流式共用，逐字节一致）。
+ */
+export function embeddedBaselineResult(
+  fromPage: number,
+  toPage: number,
+  pageCount: number
+): TocBaselineOutput {
+  return {
+    status: 'empty',
+    verdict: 'empty',
+    range: { fromPage, toPage },
+    pageCount,
+    entries: [],
+    diagnostics: {
+      pagesRequested: toPage - fromPage + 1,
+      pagesOcr: 0,
+      linesConsidered: 0,
+      linesDroppedWash: 0,
+      entriesAccepted: 0,
+      entriesRejected: 0,
+      badTitle: 0,
+    },
+    pageEvidence: [],
+    embedded: true,
+  };
 }

@@ -22,6 +22,8 @@ function baseProps(overrides: Partial<TocReviewPanelViewProps> = {}): TocReviewP
     extractDisabled: true,
     extractDisabledReason: null,
     extracting: false,
+    extractProgress: null,
+    onCancelExtract: () => {},
     extractError: null,
     baseline: null,
     reviewDisabled: true,
@@ -307,5 +309,72 @@ describe('P3.1B verdict/证据/手动/降级视图（SSR）', () => {
     expect(html).toContain('OCR 原文证据');
     expect(html).toContain('OCR 基线');
     expect(html).toContain('AI 草稿');
+  });
+});
+
+describe('P3.3 基线流式进度视图（SSR）', () => {
+  it('ocr 进行中：真实页数 + 批次范围 + 取消提取按钮，无百分比', () => {
+    const html = render({
+      extracting: true,
+      extractProgress: {
+        started: true,
+        phase: 'ocr',
+        plannedPages: 6,
+        completedPages: 5,
+        batchFrom: 16,
+        batchTo: 20,
+        readBytes: 0,
+        totalBytes: null,
+        runtimeDownloading: false,
+        error: null,
+      },
+    });
+    expect(html).toContain('5/6');
+    expect(html).toContain('第 16–20 页批次完成');
+    expect(html).toContain('取消提取');
+    expect(html).not.toContain('%');
+  });
+
+  it('读取阶段：已读 MB + 取消提取', () => {
+    const html = render({
+      extracting: true,
+      extractProgress: {
+        started: true,
+        phase: 'input_read',
+        plannedPages: 0,
+        completedPages: 0,
+        batchFrom: null,
+        batchTo: null,
+        readBytes: 4194304,
+        totalBytes: 20971520,
+        runtimeDownloading: false,
+        error: null,
+      },
+    });
+    expect(html).toContain('正在读取本地 PDF');
+    expect(html).toContain('4.0 MB / 20.0 MB');
+    expect(html).toContain('取消提取');
+  });
+
+  it('空闲无进度：无取消提取按钮；已取消：中性文案无错误', () => {
+    expect(render()).not.toContain('取消提取');
+    const html = render({
+      extracting: false,
+      extractError: null,
+      extractProgress: {
+        started: true,
+        phase: 'cancelled',
+        plannedPages: 0,
+        completedPages: 0,
+        batchFrom: null,
+        batchTo: null,
+        readBytes: 0,
+        totalBytes: null,
+        runtimeDownloading: false,
+        error: null,
+      },
+    });
+    expect(html).toContain('已取消提取，未采纳任何结果');
+    expect(html).not.toContain('role="alert"');
   });
 });

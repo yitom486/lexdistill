@@ -41,6 +41,10 @@ import {
   type NarrowedTocStreamEvent,
 } from '../lib/toc-discovery-stream.js';
 import {
+  narrowTocBaselineStreamEvent,
+  type NarrowedTocBaselineStreamEvent,
+} from '../lib/toc-baseline-stream.js';
+import {
   narrowFolioResponse,
   narrowPreviewResponse,
   narrowTocLessonImport,
@@ -1120,6 +1124,117 @@ export function useExtractTocBaselineMutation(userId = DEFAULT_USER_ID) {
       logger.debug('[useExtractTocBaselineMutation] extract failed', e);
     },
   });
+}
+
+export interface StreamExtractTocResult {
+  /** true = 用户取消或服务端 cancelled：无结果、无错误，调用方直接解除 busy。 */
+  cancelled: boolean;
+  data: TocBaselineData | null;
+}
+
+/**
+ * CMD-LINGUA-P3.3：流式提取目录基线（extract-toc-stream，只读 NDJSON）。
+ * 与旧 JSON 端点同语义（同 verdict/证据/输出）；进度经 onEvent 逐行回调。
+ * - 用户 Abort → { cancelled: true }，不抛错（取消不是失败，不 toast）；
+ * - 服务端 cancelled 事件 → 同上；
+ * - 服务端 failed 事件 → 抛 GatewayRequestError（userMessage 透传）；
+ * - 流异常结束（无 completed）→ 抛中性错误，不静默挂起。
+ */
+export async function streamExtractTocBaseline(
+  userId: string,
+  source: TocPdfSource,
+  range: { startPage: number; endPage: number },
+  options: { signal?: AbortSignal; onEvent?: (event: NarrowedTocBaselineStreamEvent) => void } = {}
+): Promise<StreamExtractTocResult> {
+  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/extract-toc-stream`;
+  const init: RequestInit = { method: 'POST', ...(options.signal ? { signal: options.signal } : {}) };
+  let res: Response;
+  if ('filePath' in source) {
+    try {
+      res = await fetchPdfGateway(url, {
+        ...init,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: source.filePath,
+          startPage: range.startPage,
+          endPage: range.endPage,
+        }),
+      });
+    } catch (e) {
+      if (options.signal?.aborted) return { cancelled: true, data: null };
+      throw e;
+    }
+  } else {
+    const form = new FormData();
+    form.append('file', source.file, source.file.name);
+    form.append('startPage', String(range.startPage));
+    form.append('endPage', String(range.endPage));
+    try {
+      res = await fetchPdfGateway(url, { ...init, body: form });
+    } catch (e) {
+      if (options.signal?.aborted) return { cancelled: true, data: null };
+      throw e;
+    }
+  }
+  if (!res.ok) {
+    const payload: unknown = await res.json().catch(() => null);
+    throw new GatewayRequestError(readGatewayUserMessage(payload, `提取目录基线失败（HTTP ${res.status}）`), {
+      code: readGatewayErrorCode(payload),
+      details: readGatewayErrorDetails(payload),
+    });
+  }
+  if (!res.body) throw new Error('目录基线返回异常，请稍后重试');
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finished = false;
+  let result: TocBaselineData | null = null;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let newline = buffer.indexOf('\n');
+      while (newline >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (line) {
+          let parsed: unknown = null;
+          try {
+            parsed = JSON.parse(line) as unknown;
+          } catch {
+            parsed = null;
+          }
+          const event = narrowTocBaselineStreamEvent(parsed);
+          if (event) {
+            options.onEvent?.(event);
+            if (event.type === 'completed' && event.data) {
+              result = event.data;
+              finished = true;
+            } else if (event.type === 'cancelled') {
+              return { cancelled: true, data: null };
+            } else if (event.type === 'failed') {
+              throw new GatewayRequestError(event.userMessage ?? '提取目录基线失败，请稍后重试', {
+                code: event.code ?? 'E_PDF_PARSE',
+              });
+            }
+          }
+        }
+        newline = buffer.indexOf('\n');
+      }
+    }
+  } catch (e) {
+    if (options.signal?.aborted) return { cancelled: true, data: null };
+    throw e;
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // 释放失败可忽略（流已结束或已取消）。
+    }
+  }
+  if (!finished || !result) throw new Error('目录基线返回异常，请稍后重试');
+  return { cancelled: false, data: result };
 }
 
 /**

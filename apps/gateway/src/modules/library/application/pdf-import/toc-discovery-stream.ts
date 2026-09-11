@@ -120,8 +120,9 @@ export function isTocTraceEnabled(): boolean {
  * TOC 诊断白名单日志：只走项目 logger（warn 级，保证默认级别下终端可见，
  * 又不触全局 setLogLevel）；payload 只允许阶段、页数/字节数、批次范围、
  * 耗时、错误 code（均为固定枚举形短串/数字，无正文、无路径、无标识）。
+ * P3.3 起导出供基线流复用（同一 `[toc-trace]` 通道，同白名单原则）。
  */
-function tocTrace(stage: string, fields: Record<string, number | string>): void {
+export function tocTrace(stage: string, fields: Record<string, number | string>): void {
   if (!isTocTraceEnabled()) return;
   logger.warn('[toc-trace]', stage, fields);
 }

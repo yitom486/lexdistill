@@ -16,12 +16,21 @@ import {
   SelectValue,
 } from './ui/select.js';
 import {
-  useExtractTocBaselineMutation,
   useReviewTocMutation,
   streamDiscoverToc,
+  streamExtractTocBaseline,
   type TocPdfSource,
 } from '../queries/useLearnerQueries.js';
 import { DEFAULT_USER_ID } from '../queries/query-keys.js';
+import {
+  applyTocExtractStreamEvent,
+  cancelledTocExtractProgress,
+  initialTocExtractProgress,
+  isTocExtractPending,
+  shouldAcceptExtractStreamEvent,
+  tocExtractStageLabel,
+  type TocExtractProgress,
+} from '../lib/toc-baseline-stream.js';
 import { TocAnchorPanel } from './TocAnchorPanel.js';
 import {
   applyTocStreamEvent,
@@ -103,6 +112,9 @@ export interface TocReviewPanelViewProps {
   extractDisabled: boolean;
   extractDisabledReason: string | null;
   extracting: boolean;
+  /** 流式基线进度（null = 尚未开始；只含服务端上报的真实数字）。 */
+  extractProgress: TocExtractProgress | null;
+  onCancelExtract(): void;
   extractError: string | null;
   baseline: TocBaselineData | null;
   reviewDisabled: boolean;
@@ -152,6 +164,8 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
     extractDisabled,
     extractDisabledReason,
     extracting,
+    extractProgress,
+    onCancelExtract,
     extractError,
     baseline,
     reviewDisabled,
@@ -339,6 +353,30 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
         </Button>
         {extractDisabledReason && <span className="text-[11px] text-stone-400">{extractDisabledReason}</span>}
       </div>
+      {extractProgress && extractProgress.started && extracting && (
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-600 dark:text-stone-300">
+          <span aria-live="polite">{tocExtractStageLabel(extractProgress)}</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px]"
+            onClick={onCancelExtract}
+          >
+            取消提取
+          </Button>
+        </div>
+      )}
+      {extractProgress?.runtimeDownloading && extracting && (
+        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+          正在准备本地 OCR 运行时，首次可能下载约 80MB（一次性，之后不再下载）。
+        </p>
+      )}
+      {extractProgress?.phase === 'cancelled' && (
+        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+          已取消提取，未采纳任何结果；可重新提取，或直接手动填写范围。
+        </p>
+      )}
       {extractError && (
         <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
           {extractError}
@@ -712,7 +750,6 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
 /** 容器：流式识别进度（本地 state）+ TanStack 基线/审核 + reducer 确认状态；确认动作零写。 */
 export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.ReactElement {
   const [flow, dispatch] = useReducer(tocConfirmReducer, initialTocConfirmState);
-  const extract = useExtractTocBaselineMutation();
   const review = useReviewTocMutation();
   // P2.1 流式识别：进度只活本地 state；runId 换代丢弃迟到事件（取消后到达的
   // completed 不采纳）；取消只 abort + 置终态，不写错误（取消不是失败）。
@@ -722,6 +759,13 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
   const discoverRunRef = useRef(0);
   const discoverCtrlRef = useRef<AbortController | null>(null);
   const discovering = isTocDiscoverPending(discoverProgress);
+  // P3.3 流式基线：同 discover 的世代守门；取消即换代，迟到 completed 丢弃。
+  const [extractProgress, setExtractProgress] = useState<TocExtractProgress | null>(null);
+  const [extractData, setExtractData] = useState<TocBaselineData | null>(null);
+  const [extractErrorText, setExtractErrorText] = useState<string | null>(null);
+  const extractRunRef = useRef(0);
+  const extractCtrlRef = useRef<AbortController | null>(null);
+  const extracting = isTocExtractPending(extractProgress);
 
   const source: TocPdfSource | null = file
     ? { file }
@@ -729,8 +773,17 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       ? { filePath: filePath.trim() }
       : null;
   const validation = validateTocConfirmRange(flow.startText, flow.endText);
-  const baseline: TocBaselineData | null = extract.data ?? null;
+  const baseline: TocBaselineData | null = extractData;
   const reviewData: TocReviewData | null = review.data ?? null;
+
+  const resetExtractState = (): void => {
+    extractRunRef.current += 1;
+    extractCtrlRef.current?.abort();
+    extractCtrlRef.current = null;
+    setExtractProgress(null);
+    setExtractData(null);
+    setExtractErrorText(null);
+  };
 
   const reviewSizeOk = validation.ok && canRequestTocReview(validation.from, validation.to);
 
@@ -741,7 +794,7 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
     discoverCtrlRef.current?.abort();
     const controller = new AbortController();
     discoverCtrlRef.current = controller;
-    extract.reset();
+    resetExtractState();
     review.reset();
     dispatch({ type: 'reset-flow' });
     setDiscoverData(null);
@@ -781,14 +834,55 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
   };
 
   const handleExtract = (): void => {
-    if (extract.isPending) return;
+    if (!source || extracting) return;
     const decision = decideExtractRequest(source !== null, flow.startText, flow.endText);
     if (!decision.ok) return;
-    if (!source) return;
-    extract.reset();
+    const runId = extractRunRef.current + 1;
+    extractRunRef.current = runId;
+    extractCtrlRef.current?.abort();
+    const controller = new AbortController();
+    extractCtrlRef.current = controller;
     review.reset();
     dispatch({ type: 'clear-results' });
-    extract.mutate({ source, range: { startPage: decision.from, endPage: decision.to } });
+    setExtractData(null);
+    setExtractErrorText(null);
+    setExtractProgress({ ...initialTocExtractProgress, started: true });
+    void streamExtractTocBaseline(
+      DEFAULT_USER_ID,
+      source,
+      { startPage: decision.from, endPage: decision.to },
+      {
+        signal: controller.signal,
+        onEvent: (event) => {
+          if (!shouldAcceptExtractStreamEvent(runId, extractRunRef.current, false)) return;
+          setExtractProgress((prev) => applyTocExtractStreamEvent(prev ?? initialTocExtractProgress, event));
+          if (event.type === 'completed' && event.data) setExtractData(event.data);
+        },
+      }
+    )
+      .then(({ cancelled }) => {
+        if (!shouldAcceptExtractStreamEvent(runId, extractRunRef.current, false)) return;
+        if (cancelled) setExtractProgress(cancelledTocExtractProgress);
+      })
+      .catch((e: unknown) => {
+        if (!shouldAcceptExtractStreamEvent(runId, extractRunRef.current, false)) return;
+        const message = messageOf(e);
+        setExtractErrorText(message);
+        setExtractProgress((prev) => ({
+          ...(prev ?? initialTocExtractProgress),
+          started: true,
+          phase: 'failed',
+          error: message,
+        }));
+      });
+  };
+
+  const handleCancelExtract = (): void => {
+    extractRunRef.current += 1;
+    extractCtrlRef.current?.abort();
+    extractCtrlRef.current = null;
+    setExtractErrorText(null);
+    setExtractProgress(cancelledTocExtractProgress);
   };
 
   const handleReview = (): void => {
@@ -865,10 +959,12 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       rangeError={
         !validation.ok && (flow.startText !== '' || flow.endText !== '') ? validation.message : null
       }
-      extractDisabled={source === null || extract.isPending || !validation.ok}
+      extractDisabled={source === null || extracting || !validation.ok}
       extractDisabledReason={source === null ? '先选择 PDF 文件或填写本机路径' : null}
-      extracting={extract.isPending}
-      extractError={messageOf(extract.error)}
+      extracting={extracting}
+      extractProgress={extractProgress}
+      onCancelExtract={handleCancelExtract}
+      extractError={extractErrorText}
       baseline={baseline}
       reviewDisabled={
         baseline === null ||

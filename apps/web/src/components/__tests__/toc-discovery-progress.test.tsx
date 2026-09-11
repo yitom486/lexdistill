@@ -23,6 +23,8 @@ function baseProps(overrides: Partial<TocReviewPanelViewProps> = {}): TocReviewP
     extractDisabled: true,
     extractDisabledReason: null,
     extracting: false,
+    extractProgress: null,
+    onCancelExtract: () => {},
     extractError: null,
     baseline: null,
     reviewDisabled: true,
