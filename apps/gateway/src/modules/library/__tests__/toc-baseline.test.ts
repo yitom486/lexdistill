@@ -310,7 +310,14 @@ describe('P3 extractTocBaseline 编排', () => {
             mdByPage: { 2: PAGE2_MD },
             calls,
             outline: {
-              value: { items: [{ title: 'Alpha', level: 1, physicalPage: 5 }], unresolvedCount: 0, truncated: false },
+              value: {
+                items: [
+                  { title: '第1課', level: 1, physicalPage: 5 },
+                  { title: '第2課', level: 1, physicalPage: 9 },
+                ],
+                unresolvedCount: 0,
+                truncated: false,
+              },
             },
           }),
       },

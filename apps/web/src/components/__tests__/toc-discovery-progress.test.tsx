@@ -135,7 +135,7 @@ describe('P2.1 流式进度视图（SSR）', () => {
 
   it('found 回归：候选渲染不受流式改动影响', () => {
     const html = render({
-      discover: { status: 'found', candidates: [{ fromPage: 2, toPage: 4, score: 12 }], pageCount: 100, pagesScannedCount: 12, embedded: false },
+      discover: { status: 'found', candidates: [{ fromPage: 2, toPage: 4, score: 12 }], pageCount: 100, pagesScannedCount: 12, embedded: false, outlineQuality: 'none' },
     });
     expect(html).toContain('第 2–4 页');
     expect(html).toContain('得分 12');

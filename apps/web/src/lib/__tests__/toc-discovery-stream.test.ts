@@ -83,7 +83,7 @@ describe('applyTocStreamEvent', () => {
     const done = applyTocStreamEvent(initialTocDiscoverProgress, {
       type: 'completed', plannedPages: 30, completedPages: 30, batchFrom: null, batchTo: null,
       readBytes: null, totalBytes: null,
-      data: { status: 'not-found', candidates: [], pageCount: 12, pagesScannedCount: 12, embedded: false },
+      data: { status: 'not-found', candidates: [], pageCount: 12, pagesScannedCount: 12, embedded: false, outlineQuality: 'none' },
       code: null, userMessage: null,
     });
     expect(done.phase).toBe('done');

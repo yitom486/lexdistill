@@ -219,9 +219,14 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
           {discoverError}
         </p>
       )}
-      {discover && discover.embedded && (
+      {discover && discover.outlineQuality === 'usable' && (
         <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300">
-          本书自带原生目录，无需 OCR 找目录页。请直接用上方「预览结构」的原生目录，本流程不再做基线与 AI 审核。
+          本书自带可用的原生目录，已使用内嵌目录，无需 OCR 找目录页。请直接用上方「预览结构」的原生目录，本流程不再做基线与 AI 审核。
+        </div>
+      )}
+      {discover && discover.outlineQuality === 'unusable' && (
+        <div className="p-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-[11px] text-stone-600 dark:text-stone-300">
+          检测到 PDF 内嵌书签，但标题不足以构成教材目录；已改用 OCR 识别。请从下方候选或手动填写范围继续。
         </div>
       )}
       {discover && !discover.embedded && discover.status === 'found' && (

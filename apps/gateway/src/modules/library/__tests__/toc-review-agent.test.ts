@@ -207,7 +207,10 @@ describe('P4B reviewTocWithAgent（mock）', () => {
           return agentMock({
             pageCount: 371,
             calls: inspectorCalls,
-            outlineItems: [{ title: 'Alpha', level: 1, physicalPage: 5 }],
+            outlineItems: [
+              { title: '第1課', level: 1, physicalPage: 5 },
+              { title: '第2課', level: 1, physicalPage: 9 },
+            ],
           });
         },
         adapter: mockAdapter({ calls: agentCalls, script: '{"entries":[],"warnings":[]}' }),

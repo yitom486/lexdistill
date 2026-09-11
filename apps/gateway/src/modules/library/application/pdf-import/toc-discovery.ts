@@ -1,10 +1,10 @@
 import { BusinessError, err, logger, ok, type Result } from '@study-studio/shared';
 import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
+import { classifyEmbeddedOutline } from './embedded-outline-quality.js';
 import {
   MAX_OCR_PAGES_PER_IMPORT,
   probePdfPageCount,
   rangePages,
-  readEmbeddedOutlineEntries,
   validatePdfInput,
   type PdfImportInput,
   type PdfImportServiceDeps,
@@ -170,6 +170,11 @@ export interface TocDiscoveryOutput {
    * 调用方应直接用 map 的 embeddedOutline，而非 OCR 找目录）。
    */
   embedded: boolean;
+  /**
+   * CMD-LINGUA-P2.2 内嵌目录质量（none/usable/unusable）：unusable 表示
+   * “有书签但不足以构成教材目录，已回退 OCR”，UI 据此向用户解释。
+   */
+  outlineQuality: 'none' | 'usable' | 'unusable';
 }
 
 /**
@@ -202,8 +207,9 @@ export async function discoverTocPages(
   if (!Number.isFinite(pageCount) || pageCount < 1) {
     return err(new BusinessError('E_PDF_PARSE', 'PDF 页数识别失败，文件可能已损坏', 'TOOL_EXECUTION'));
   }
-  // P1 embedded 可用 → 零 OCR，直接返回（不伪造候选）。
-  if (readEmbeddedOutlineEntries(inspector, input.bytes, pageCount)) {
+  // P2.2 唯一质量门：usable 才短路；none/unusable 一律走 OCR 前窗。
+  const outlineQuality = classifyEmbeddedOutline(inspector, input.bytes, pageCount);
+  if (outlineQuality.quality === 'usable') {
     return ok({
       status: 'not-found',
       candidates: [],
@@ -211,6 +217,7 @@ export async function discoverTocPages(
       pagesScanned: [],
       ocrPages: [],
       embedded: true,
+      outlineQuality: 'usable',
     });
   }
   // 前部探测窗（恒非空，≤30）。
@@ -250,12 +257,14 @@ export async function discoverTocPages(
   const candidates = mergeTocCandidateRanges(scored);
   const status: TocDiscoveryStatus =
     candidates.length === 0 ? 'not-found' : candidates.length === 1 ? 'found' : 'ambiguous';
-  // 只记计数：不记标题、不记正文。
+  // 只记状态/reason/计数：不记标题、不记正文。
   logger.warn('[toc-discovery] 完成', {
     status,
     candidates: candidates.length,
     pagesScanned: window.length,
     ocrPages: ocrPages.length,
+    outlineQuality: outlineQuality.quality,
+    outlineReason: outlineQuality.reason,
   });
-  return ok({ status, candidates, pageCount, pagesScanned: window, ocrPages, embedded: false });
+  return ok({ status, candidates, pageCount, pagesScanned: window, ocrPages, embedded: false, outlineQuality: outlineQuality.quality });
 }

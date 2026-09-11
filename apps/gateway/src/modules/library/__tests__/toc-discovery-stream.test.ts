@@ -257,7 +257,14 @@ describe('P2.1 embedded 短路', () => {
   it('命中零 OCR：无批次事件，completed embedded=true', async () => {
     const calls = newCalls();
     const events = await collect({ 3: JA_TOC }, calls, {
-      outline: { items: [{ title: 'Alpha', level: 1, physicalPage: 5 }], unresolvedCount: 0, truncated: false },
+      outline: {
+        items: [
+          { title: '第1課', level: 1, physicalPage: 5 },
+          { title: '第2課', level: 1, physicalPage: 9 },
+        ],
+        unresolvedCount: 0,
+        truncated: false,
+      },
     });
     expect(types(events)).toEqual([
       'started',
@@ -271,7 +278,25 @@ describe('P2.1 embedded 短路', () => {
     if (done?.type !== 'completed') throw new Error('unexpected');
     expect(done.result.embedded).toBe(true);
     expect(done.result.candidates).toEqual([]);
+    expect(done.result.outlineQuality).toBe('usable');
     expect(calls.loadInspector).toBe(1);
+  });
+
+  it('P2.2 纯数字书签 unusable：回退 OCR，前窗照扫 6 批', async () => {
+    const calls = newCalls();
+    const numeric = {
+      items: Array.from({ length: 30 }, (_, i) => ({ title: String(i + 1), level: 1, physicalPage: i + 1 })),
+      unresolvedCount: 0,
+      truncated: false,
+    };
+    const events = await collect({ 3: JA_TOC }, calls, { outline: numeric });
+    const done = events.find((e) => e.type === 'completed');
+    if (done?.type !== 'completed') throw new Error('unexpected');
+    expect(done.result.outlineQuality).toBe('unusable');
+    expect(done.result.embedded).toBe(false);
+    expect(done.result.status).toBe('found');
+    expect(done.result.candidates).toEqual([{ fromPage: 3, toPage: 3, score: 28 }]);
+    expect(calls.ocr.length).toBe(6);
   });
 });
 
@@ -419,7 +444,7 @@ describe('P2.1 trace 日志白名单', () => {
     const firstBatch = warned.find((args) => String(args[1]) === 'ocr_batch_completed');
     expect(firstBatch?.[2]).toMatchObject({ batchFrom: 1, batchTo: 5, completedPages: 5 });
     // 所有日志 payload 只允许白名单键
-    const allowed = new Set(['plannedPages', 'completedPages', 'batchFrom', 'batchTo', 'elapsedMs', 'pageCount', 'candidates', 'needsOcr', 'downloaded', 'embeddedHit', 'batchMs', 'code']);
+    const allowed = new Set(['plannedPages', 'completedPages', 'batchFrom', 'batchTo', 'elapsedMs', 'pageCount', 'candidates', 'needsOcr', 'downloaded', 'quality', 'reason', 'validEntries', 'semanticEntries', 'batchMs', 'code']);
     for (const args of warned) {
       expect(String(args[0])).toBe('[toc-trace]');
       const fields = args[2] as Record<string, unknown>;

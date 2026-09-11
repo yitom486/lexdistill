@@ -48,11 +48,12 @@ function mockBytes(): Uint8Array {
 
 const USABLE = {
   items: [
-    { title: 'Alpha', level: 1, physicalPage: 2 },
-    { title: 'Beta', level: 2, physicalPage: 40 },
-    { title: 'Gamma' },
+    { title: '第1課', level: 1, physicalPage: 2 },
+    { title: '第2課', level: 1, physicalPage: 40 },
+    { title: '第3課' },
     { title: '  ', level: 1, physicalPage: 3 },
-    { title: 'Delta', level: 0, physicalPage: 3 },
+    { title: '第4課', level: 0, physicalPage: 3 },
+    { title: '第5課', level: 1, physicalPage: 5 },
   ],
   unresolvedCount: 2,
   truncated: false,
@@ -68,8 +69,12 @@ describe('P1A map embedded outline 优先', () => {
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.outlineSource).toBe('embedded');
-    // Beta 越界（40 > 35）、Gamma 缺页、空白标题、level 0 全部丢弃，只留 Alpha。
-    expect(res.value.embeddedOutline).toEqual([{ title: 'Alpha', level: 1, physicalPage: 2 }]);
+    // 第2課越界（40 > 35）、第3課缺页、空白标题、level 0 全部丢弃；
+    // 剩余第1課/第5課均为语义标题（2/2，达门槛），只留这两条。
+    expect(res.value.embeddedOutline).toEqual([
+      { title: '第1課', level: 1, physicalPage: 2 },
+      { title: '第5課', level: 1, physicalPage: 5 },
+    ]);
     expect(calls.ocr).toEqual([]);
     expect(res.value.window).toEqual([]);
     expect(res.value.headings).toEqual([]);

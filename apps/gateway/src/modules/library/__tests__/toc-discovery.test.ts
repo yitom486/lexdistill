@@ -223,7 +223,10 @@ describe('P2 discoverTocPages 编排（371 页文本 stub）', () => {
         loadInspector: async () =>
           textBook371Stub({ 3: JA_TOC }, calls, {
             outline: {
-              items: [{ title: 'Alpha', level: 1, physicalPage: 5 }],
+              items: [
+                { title: '第1課', level: 1, physicalPage: 5 },
+                { title: '第2課', level: 1, physicalPage: 9 },
+              ],
               unresolvedCount: 0,
               truncated: false,
             },
@@ -238,7 +241,32 @@ describe('P2 discoverTocPages 编排（371 页文本 stub）', () => {
     expect(res.value.candidates).toEqual([]);
     expect(res.value.pagesScanned).toEqual([]);
     expect(res.value.ocrPages).toEqual([]);
+    expect(res.value.outlineQuality).toBe('usable');
     expect(calls.ocr).toEqual([]);
+  });
+
+  it('P2.2 纯数字书签 unusable：旧 JSON 路径同样回退 OCR', async () => {
+    const calls = newCalls();
+    const res = await discoverTocPages(
+      {
+        loadInspector: async () =>
+          textBook371Stub({ 3: JA_TOC }, calls, {
+            outline: {
+              items: Array.from({ length: 30 }, (_, i) => ({ title: String(i + 1), level: 1, physicalPage: i + 1 })),
+              unresolvedCount: 0,
+              truncated: false,
+            },
+          }),
+      },
+      { userId: 'u1', filename: 'numbered.pdf', bytes: mockBytes() }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.outlineQuality).toBe('unusable');
+    expect(res.value.embedded).toBe(false);
+    expect(res.value.status).toBe('found');
+    expect(res.value.candidates).toEqual([{ fromPage: 3, toPage: 3, score: 28 }]);
+    expect(calls.ocr.length).toBe(1);
   });
 
   it('无 extractEmbeddedOutline 导出的老运行时：正常走 OCR discovery', async () => {

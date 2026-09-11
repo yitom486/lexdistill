@@ -76,7 +76,7 @@ describe('narrowTocDiscovery', () => {
   it('found 单候选通过', () => {
     expect(
       narrowTocDiscovery({ status: 'found', candidates: [{ fromPage: 2, toPage: 4, score: 12 }], pageCount: 100, pagesScanned: [1, 2, 3], embedded: false })
-    ).toEqual({ status: 'found', candidates: [{ fromPage: 2, toPage: 4, score: 12 }], pageCount: 100, pagesScannedCount: 3, embedded: false });
+    ).toEqual({ status: 'found', candidates: [{ fromPage: 2, toPage: 4, score: 12 }], pageCount: 100, pagesScannedCount: 3, embedded: false, outlineQuality: 'none' });
   });
 
   it('ambiguous 多候选通过；数量与状态不符判 null', () => {
@@ -99,7 +99,15 @@ describe('narrowTocDiscovery', () => {
   it('not-found 空候选 + embedded 透传', () => {
     expect(
       narrowTocDiscovery({ status: 'not-found', candidates: [], pageCount: 50, pagesScanned: [], ocrPages: [], embedded: true })
-    ).toEqual({ status: 'not-found', candidates: [], pageCount: 50, pagesScannedCount: 0, embedded: true });
+    ).toEqual({ status: 'not-found', candidates: [], pageCount: 50, pagesScannedCount: 0, embedded: true, outlineQuality: 'usable' });
+  });
+
+  it('P2.2 outlineQuality 透传；缺席按 embedded 回填；非法回填 none', () => {
+    const base = { status: 'found', candidates: [{ fromPage: 2, toPage: 4, score: 12 }], pageCount: 100, pagesScanned: [1, 2, 3], embedded: false };
+    expect(narrowTocDiscovery({ ...base, outlineQuality: 'unusable' })?.outlineQuality).toBe('unusable');
+    expect(narrowTocDiscovery({ ...base, outlineQuality: 'usable' })?.outlineQuality).toBe('usable');
+    expect(narrowTocDiscovery(base)?.outlineQuality).toBe('none');
+    expect(narrowTocDiscovery({ ...base, outlineQuality: 'garbage' })?.outlineQuality).toBe('none');
   });
 
   it('畸形一律 null', () => {

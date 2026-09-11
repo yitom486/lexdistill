@@ -1,6 +1,7 @@
 import { BusinessError, err, generateId, isOk, logger, ok, type Result } from '@study-studio/shared';
 import { parseTextbookAST, StructureClassSchema, type DocumentItem, type TextbookAST, type StructureClass } from '@study-studio/protocol';
-import { ensurePdfRuntime, type EmbeddedOutlineResult, type PdfInspectorLike } from './pdf-runtime.js';
+import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
+import { classifyEmbeddedOutline } from './embedded-outline-quality.js';
 import { detectDocScript, markdownToAst, promoteLessonHeadings } from './markdown-to-ast.js';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from './extract-headings.js';
 import { collectLayoutCandidates, layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from './layout-headings.js';
@@ -222,43 +223,11 @@ export interface EmbeddedOutlineEntry {
 }
 
 /**
- * CMD-LINGUA-P1A 内置目录读取 + 校验（纯判定逻辑；绝不猜页）。
- * 返回可用条目；以下情况返回 null（调用方走既有 none 路径，不伪造目录）：
- * 老运行时无该导出、调用抛错、truncated、空目录、全是不可用项。
+ * CMD-LINGUA-P2.2：旧内置目录读取已收归 `embedded-outline-quality.ts` 的
+ * `classifyEmbeddedOutline`（唯一判定：none/usable/unusable），本模块不再
+ * 保留旧函数。5 处 consumer（map/discover/stream/baseline/material）全部
+ * 显式走 classifier，日志统一只记状态/reason/计数。
  */
-export function readEmbeddedOutlineEntries(
-  inspector: PdfInspectorLike,
-  bytes: Uint8Array,
-  pageCount: number
-): EmbeddedOutlineEntry[] | null {
-  if (typeof inspector.extractEmbeddedOutline !== 'function') return null;
-  let result: EmbeddedOutlineResult;
-  try {
-    result = inspector.extractEmbeddedOutline(bytes);
-  } catch {
-    return null;
-  }
-  if (!result || typeof result !== 'object') return null;
-  if (result.truncated === true) return null;
-  if (!Array.isArray(result.items) || result.items.length === 0) return null;
-  const kept: EmbeddedOutlineEntry[] = [];
-  for (const entry of result.items) {
-    if (!entry || typeof entry !== 'object') continue;
-    const rec = entry as { title?: unknown; level?: unknown; physicalPage?: unknown };
-    if (typeof rec.title !== 'string' || !rec.title.trim()) continue;
-    if (typeof rec.level !== 'number' || !Number.isInteger(rec.level) || rec.level < 1) continue;
-    if (
-      typeof rec.physicalPage !== 'number' ||
-      !Number.isInteger(rec.physicalPage) ||
-      rec.physicalPage < 1 ||
-      rec.physicalPage > pageCount
-    ) {
-      continue;
-    }
-    kept.push({ title: rec.title.trim(), level: rec.level, physicalPage: rec.physicalPage });
-  }
-  return kept.length > 0 ? kept : null;
-}
 
 /**
  * 结构预览（目录感知导入第一步）：扫一个窗口页（默认前 30 页），
@@ -352,13 +321,18 @@ export async function mapPdfPages(
   const needing = Array.isArray(classification.pagesNeedingOcr)
     ? classification.pagesNeedingOcr.filter((n): n is number => typeof n === 'number')
     : [];
-  // CMD-LINGUA-P1A：内置目录优先——native 有可用且未截断的 embedded entries 时，
-  // 目录来源标 embedded，不触发 OCR（不扫目录页、不调 Azure、不混 tocEntries）。
-  // 校验用上面的诚实 pageCount；目录不可用时落到既有 none 路径。
-  const embedded = readEmbeddedOutlineEntries(inspector, input.bytes, pageCount);
-  if (embedded) {
+  // CMD-LINGUA-P1A/P2.2：内置目录走唯一质量门——usable 才标 embedded
+  // 并透传有效条目；none/unusable 落到既有 none 路径（照常 OCR）。
+  // 校验用上面的诚实 pageCount；日志只记状态/reason/计数，不记标题。
+  const outlineQuality = classifyEmbeddedOutline(inspector, input.bytes, pageCount);
+  if (outlineQuality.quality === 'usable') {
+    const embedded = outlineQuality.entries;
     // 只记条数，不记 title 原文。
-    logger.warn('[pdf-map] embedded outline 命中', { pageCount, entries: embedded.length });
+    logger.warn('[pdf-map] embedded outline 命中', {
+      pageCount,
+      entries: embedded.length,
+      reason: outlineQuality.reason,
+    });
     return ok({
       classification: {
         pdfType,

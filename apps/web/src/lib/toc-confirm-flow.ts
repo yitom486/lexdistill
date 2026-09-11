@@ -29,6 +29,11 @@ export interface TocDiscoveryData {
   /** 实际看过的前窗页数（展示用计数，不含页码明细）。 */
   pagesScannedCount: number;
   embedded: boolean;
+  /**
+   * CMD-LINGUA-P2.2 内嵌目录质量：unusable =“有书签但不足以构成教材目录，
+   * 已回退 OCR”，UI 据此解释（旧网关无此字段时按 embedded 回填）。
+   */
+  outlineQuality: 'none' | 'usable' | 'unusable';
 }
 
 export type TocBaselineEntryKind = 'lesson' | 'section';
@@ -197,7 +202,14 @@ export function narrowTocDiscovery(payload: unknown): TocDiscoveryData | null {
   if (status === 'found' && narrowed.length !== 1) return null;
   if (status === 'ambiguous' && narrowed.length < 2) return null;
   if (status === 'not-found' && narrowed.length !== 0) return null;
-  return { status, candidates: narrowed, pageCount, pagesScannedCount: pagesScanned.length, embedded: embedded === true };
+  const qualityRaw = (payload as { outlineQuality?: unknown }).outlineQuality;
+  const outlineQuality: TocDiscoveryData['outlineQuality'] =
+    qualityRaw === 'usable' || qualityRaw === 'unusable' || qualityRaw === 'none'
+      ? qualityRaw
+      : embedded === true
+        ? 'usable'
+        : 'none';
+  return { status, candidates: narrowed, pageCount, pagesScannedCount: pagesScanned.length, embedded: embedded === true, outlineQuality };
 }
 
 function narrowBaselineEntry(value: unknown): TocBaselineEntry | null {

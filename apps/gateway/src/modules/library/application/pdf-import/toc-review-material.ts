@@ -3,10 +3,10 @@ import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
 import {
   probePdfPageCount,
   rangePages,
-  readEmbeddedOutlineEntries,
   validatePdfInput,
   type PdfImportServiceDeps,
 } from './pdf-import-service.js';
+import { classifyEmbeddedOutline } from './embedded-outline-quality.js';
 
 /**
  * CMD-LINGUA-P4A-2：已确认目录页范围的 review material（只读，内部服务）。
@@ -102,8 +102,8 @@ export async function prepareTocReviewMaterial(
   if (toPage > pageCount) {
     return err(new BusinessError('E_INVALID_INPUT', `确认范围超出本书（本书共 ${pageCount} 页）`, 'VALIDATION'));
   }
-  // P1 embedded 可用 → 零渲染，直接返回可解释的空结果（不伪造图片）。
-  if (readEmbeddedOutlineEntries(inspector, input.bytes, pageCount)) {
+  // P2.2 唯一质量门：usable 才短路；none/unusable 走渲染（日志只记状态/reason/计数）。
+  if (classifyEmbeddedOutline(inspector, input.bytes, pageCount).quality === 'usable') {
     return ok({
       range: { fromPage, toPage },
       pageCount,

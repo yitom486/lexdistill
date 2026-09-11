@@ -162,8 +162,13 @@ export function createPdfImportRoutes(
       };
       const encoder = new TextEncoder();
       const serveStream = (produce: (emit: (event: TocDiscoveryStreamEvent) => void) => Promise<unknown>): Response => {
+        // P2.2 真实时交付：start 必须同步返回，producer 在后台 runner 跑。
+        // 若 start 为 async（返回 promise），流在 producer 完成前不交付任何
+        // 字节，浏览器只能干等——此前正是“准备 PDF…”卡死的传输层根因。
+        // runner 自带 try/catch + failed + finally close，无未处理 rejection；
+        // 不用 setTimeout 伪造异步。取消靠 request signal 贯穿 producer。
         const body = new ReadableStream<Uint8Array>({
-          async start(controller) {
+          start(controller) {
             const emit = (event: TocDiscoveryStreamEvent): void => {
               try {
                 controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
@@ -171,21 +176,30 @@ export function createPdfImportRoutes(
                 // 客户端已断开：写流失败即停，不抛回调用栈（取消由 signal 驱动停扫）。
               }
             };
-            try {
-              await produce(emit);
-            } catch (e) {
-              const biz =
-                e instanceof BusinessError
-                  ? e
-                  : new BusinessError('E_PDF_PARSE', '目录页探测失败，请稍后重试', 'TOOL_EXECUTION');
-              emit({ type: 'failed', elapsedMs: 0, code: biz.code, userMessage: biz.userMessage });
-            } finally {
+            const closeStream = (): void => {
               try {
                 controller.close();
               } catch {
                 // 客户端已断开，关闭失败可忽略。
               }
-            }
+            };
+            void (async () => {
+              try {
+                await produce(emit);
+              } catch (e) {
+                const biz =
+                  e instanceof BusinessError
+                    ? e
+                    : new BusinessError('E_PDF_PARSE', '目录页探测失败，请稍后重试', 'TOOL_EXECUTION');
+                emit({ type: 'failed', elapsedMs: 0, code: biz.code, userMessage: biz.userMessage });
+              } finally {
+                closeStream();
+              }
+            })();
+          },
+          cancel() {
+            // 浏览器 abort 即断开：request signal 已中止 producer，
+            // 后台 runner 在下一个检查点停扫；此处无需额外动作。
           },
         });
         return new Response(body, {

@@ -9,11 +9,11 @@ import {
 import {
   probePdfPageCount,
   rangePages,
-  readEmbeddedOutlineEntries,
   validatePdfInput,
   MAX_OCR_PAGES_PER_IMPORT,
   type PdfImportServiceDeps,
 } from './pdf-import-service.js';
+import { classifyEmbeddedOutline } from './embedded-outline-quality.js';
 
 /**
  * CMD-LINGUA-P3：已确认目录页范围的本地 OCR 目录基线（只读，后端）。
@@ -288,8 +288,9 @@ export async function extractTocBaseline(
       new BusinessError('E_INVALID_INPUT', `确认范围超出本书（本书共 ${pageCount} 页）`, 'VALIDATION')
     );
   }
-  // P1 embedded 可用 → 零 OCR，直接返回可解释的空结果（不伪造 OCR 条目）。
-  if (readEmbeddedOutlineEntries(inspector, input.bytes, pageCount)) {
+  // P2.2 唯一质量门：usable 才短路；none/unusable 走 OCR（日志只记状态/reason/计数）。
+  const outlineQuality = classifyEmbeddedOutline(inspector, input.bytes, pageCount);
+  if (outlineQuality.quality === 'usable') {
     return ok({
       status: 'empty',
       range: { fromPage, toPage },

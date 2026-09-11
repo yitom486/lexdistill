@@ -8,11 +8,11 @@ import {
 import {
   probePdfPageCount,
   rangePages,
-  readEmbeddedOutlineEntries,
   validatePdfInput,
   type PdfImportInput,
   type PdfImportServiceDeps,
 } from './pdf-import-service.js';
+import { classifyEmbeddedOutline } from './embedded-outline-quality.js';
 import {
   TOC_DISCOVERY_MAX_PAGES,
   mergeTocCandidateRanges,
@@ -47,6 +47,17 @@ import {
 
 /** OCR 批次大小（页）：恒 ≤ 探测窗且恒 ≤ OCR 总上限；调大必须重审取消粒度。 */
 export const TOC_DISCOVERY_BATCH_PAGES = 5;
+
+/**
+ * CMD-LINGUA-P2.2 读取进度采样（字节，真实已读值，不插值）：
+ * - 底层分块仍 64KB（见 local-file），取消粒度不变；
+ * - UI `input_read_progress` 每 4MB 一次（171MB ≈ 42 次 + ready，不刷屏）；
+ * - trace `input_read_progress` 每 16MB 一次（started/ready/cancelled/failed
+ *   恒在，取消与失败不采样）；
+ * - 小于阈值的文件可零 progress、直接 ready（不伪造）。
+ */
+export const TOC_READ_UI_SAMPLE_BYTES = 4 * 1024 * 1024;
+export const TOC_READ_TRACE_SAMPLE_BYTES = 16 * 1024 * 1024;
 
 export type TocDiscoveryStreamEvent =
   | { type: 'started'; elapsedMs: number }
@@ -193,11 +204,18 @@ async function runDiscoveryPhases(
   sink.emit({ type: 'page_count_ready', plannedPages: run.plannedPages, elapsedMs: elapsedMs() });
   tocTrace('page_count_ready', { pageCount, plannedPages: run.plannedPages, elapsedMs: elapsedMs() });
 
-  // P1 embedded 可用 → 零 OCR，直接完成（不伪造候选；与旧函数同输出）。
-  const embeddedHit = readEmbeddedOutlineEntries(lightInspector, input.bytes, pageCount);
+  // P2.2 唯一质量门：usable 才短路；none/unusable 一律走 OCR 前窗。
+  // unusable 会继续跑 OCR，并在 completed 里带回质量供 UI 解释。
+  const outlineQuality = classifyEmbeddedOutline(lightInspector, input.bytes, pageCount);
   sink.emit({ type: 'embedded_outline_checked', elapsedMs: elapsedMs() });
-  tocTrace('embedded_outline_checked', { embeddedHit: embeddedHit ? 1 : 0, elapsedMs: elapsedMs() });
-  if (embeddedHit) {
+  tocTrace('embedded_outline_checked', {
+    quality: outlineQuality.quality,
+    reason: outlineQuality.reason,
+    validEntries: outlineQuality.validEntries,
+    semanticEntries: outlineQuality.semanticEntries,
+    elapsedMs: elapsedMs(),
+  });
+  if (outlineQuality.quality === 'usable') {
     sink.emit({ type: 'scoring', plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMs() });
     const output: TocDiscoveryOutput = {
       status: 'not-found',
@@ -206,6 +224,7 @@ async function runDiscoveryPhases(
       pagesScanned: [],
       ocrPages: [],
       embedded: true,
+      outlineQuality: 'usable',
     };
     tocTrace('completed', { completedPages: run.completedPages, candidates: 0, elapsedMs: elapsedMs() });
     sink.emit({ type: 'completed', plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMs(), result: output });
@@ -327,6 +346,7 @@ async function runDiscoveryPhases(
     pagesScanned: window,
     ocrPages: [...ocrRouted].sort((a, b) => a - b),
     embedded: false,
+    outlineQuality: outlineQuality.quality,
   };
   tocTrace('completed', { completedPages: run.completedPages, candidates: candidates.length, elapsedMs: elapsedMs() });
   sink.emit({ type: 'completed', plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMs(), result: output });
@@ -375,22 +395,31 @@ export async function discoverTocPagesStreamFromFile(
   const reader = deps.readLocalFile ?? readLocalPdfFileStreamed;
   let read: LocalPdfStreamedOutcome;
   let totalBytes: number | null = null;
+  let lastUiSample = 0;
+  let lastTraceSample = 0;
   try {
     read = await reader(fileInput.filePath, {
       ...(sink.signal ? { signal: sink.signal } : {}),
       onProgress: (progress) => {
         totalBytes = progress.totalBytes;
-        sink.emit({
-          type: 'input_read_progress',
-          readBytes: progress.readBytes,
-          totalBytes: progress.totalBytes,
-          elapsedMs: elapsedMsOf(run),
-        });
-        tocTrace('input_read_progress', {
-          readBytes: progress.readBytes,
-          totalBytes: progress.totalBytes,
-          elapsedMs: elapsedMsOf(run),
-        });
+        // 采样：只转发跨过阈值的真实已读值；取消仍在 64KB 边界生效（reader 侧）。
+        if (progress.readBytes - lastUiSample >= TOC_READ_UI_SAMPLE_BYTES) {
+          lastUiSample = progress.readBytes;
+          sink.emit({
+            type: 'input_read_progress',
+            readBytes: progress.readBytes,
+            totalBytes: progress.totalBytes,
+            elapsedMs: elapsedMsOf(run),
+          });
+        }
+        if (progress.readBytes - lastTraceSample >= TOC_READ_TRACE_SAMPLE_BYTES) {
+          lastTraceSample = progress.readBytes;
+          tocTrace('input_read_progress', {
+            readBytes: progress.readBytes,
+            totalBytes: progress.totalBytes,
+            elapsedMs: elapsedMsOf(run),
+          });
+        }
       },
     });
   } catch {

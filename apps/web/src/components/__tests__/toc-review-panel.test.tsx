@@ -63,6 +63,7 @@ const AMBIGUOUS: TocDiscoveryData = {
   pageCount: 100,
   pagesScannedCount: 12,
   embedded: false,
+  outlineQuality: 'none',
 };
 
 const BASELINE: TocBaselineData = {
@@ -123,7 +124,7 @@ describe('P4C TocReviewPanelView（SSR）', () => {
 
   it('found 手选后：选中态精确一个', () => {
     const html = render({
-      discover: { status: 'found', candidates: [{ fromPage: 2, toPage: 4, score: 12 }], pageCount: 100, pagesScannedCount: 12, embedded: false },
+      discover: { status: 'found', candidates: [{ fromPage: 2, toPage: 4, score: 12 }], pageCount: 100, pagesScannedCount: 12, embedded: false, outlineQuality: 'none' },
       selectedIndex: 0,
       startText: '2',
       endText: '4',
@@ -134,7 +135,7 @@ describe('P4C TocReviewPanelView（SSR）', () => {
 
   it('not-found：中性说明 + 手工填写引导', () => {
     const html = render({
-      discover: { status: 'not-found', candidates: [], pageCount: 100, pagesScannedCount: 12, embedded: false },
+      discover: { status: 'not-found', candidates: [], pageCount: 100, pagesScannedCount: 12, embedded: false, outlineQuality: 'none' },
     });
     expect(html).toContain('未找到可信目录');
     expect(html).toContain('手工填写');
@@ -142,10 +143,20 @@ describe('P4C TocReviewPanelView（SSR）', () => {
 
   it('embedded：如实说明不触发 AI', () => {
     const html = render({
-      discover: { status: 'not-found', candidates: [], pageCount: 100, pagesScannedCount: 0, embedded: true },
+      discover: { status: 'not-found', candidates: [], pageCount: 100, pagesScannedCount: 0, embedded: true, outlineQuality: 'usable' },
     });
     expect(html).toContain('原生目录');
     expect(html).toContain('不再做基线与 AI 审核');
+  });
+
+  it('P2.2 unusable：书签不足以构成目录、已改用 OCR，不再说“无需 OCR”', () => {
+    const html = render({
+      discover: { status: 'found', candidates: [{ fromPage: 2, toPage: 4, score: 12 }], pageCount: 100, pagesScannedCount: 12, embedded: false, outlineQuality: 'unusable' },
+    });
+    expect(html).toContain('标题不足以构成教材目录；已改用 OCR 识别');
+    expect(html).not.toContain('无需 OCR');
+    // 候选照常展示（OCR 已跑完）
+    expect(html).toContain('第 2–4 页');
   });
 
   it('31 页：范围错误展示，提取禁用', () => {

@@ -182,24 +182,23 @@ describe('P2.1a 分块进度与读取中取消（chunked fake）', () => {
     const calls = newCalls();
     const events: TocDiscoveryStreamEvent[] = [];
     const outcome = await discoverTocPagesStreamFromFile(
-      { loadInspector: loadStub({ 3: JA_TOC }, calls), readLocalFile: chunkedReader(700 * 1024, 100 * 1024) },
+      { loadInspector: loadStub({ 3: JA_TOC }, calls), readLocalFile: chunkedReader(20 * 1024 * 1024, 1024 * 1024) },
       { userId: 'u1', filePath: '/tmp/c.pdf' },
       { emit: (e) => events.push(e) }
     );
     expect(outcome.cancelled).toBe(false);
     const head = types(events).slice(0, 2);
     expect(head).toEqual(['started', 'input_read_started']);
+    // P2.2 采样：UI progress 每 4MB 一次，值为真实已读字节
     const progresses = events.filter((e) => e.type === 'input_read_progress');
-    expect(progresses.length).toBeGreaterThanOrEqual(2);
-    const reads = progresses.map((e) => (e.type === 'input_read_progress' ? e.readBytes : -1));
+    expect(progresses.map((e) => (e.type === 'input_read_progress' ? e.readBytes : -1))).toEqual(
+      [4, 8, 12, 16, 20].map((mb) => mb * 1024 * 1024)
+    );
     const totals = progresses.map((e) => (e.type === 'input_read_progress' ? e.totalBytes : -1));
-    for (let i = 1; i < reads.length; i++) {
-      expect((reads[i] as number) > (reads[i - 1] as number)).toBe(true);
-    }
-    for (const t of totals) expect(t).toBe(700 * 1024);
+    for (const t of totals) expect(t).toBe(20 * 1024 * 1024);
     const ready = events.find((e) => e.type === 'input_read_ready');
     if (ready?.type !== 'input_read_ready') throw new Error('missing ready');
-    expect(ready.totalBytes).toBe(700 * 1024);
+    expect(ready.totalBytes).toBe(20 * 1024 * 1024);
     // 读完后 P2.1 语义不变
     expect(calls.ocr.length).toBe(6);
     const done = events[events.length - 1];
@@ -222,7 +221,8 @@ describe('P2.1a 分块进度与读取中取消（chunked fake）', () => {
       { emit: (e) => events.push(e), signal: ctrl.signal }
     );
     expect(outcome.cancelled).toBe(true);
-    expect(types(events)).toEqual(['started', 'input_read_started', 'input_read_progress', 'cancelled']);
+    // 200KB 即 abort（< 4MB 采样阈值）：零 progress、无伪造，只有 cancelled
+    expect(types(events)).toEqual(['started', 'input_read_started', 'cancelled']);
     expect(types(events)).not.toContain('runtime_check');
     expect(types(events)).not.toContain('completed');
     expect(calls.loadInspector).toBe(0);
@@ -262,9 +262,9 @@ describe('P2.1a 分块进度与读取中取消（chunked fake）', () => {
   });
 });
 
-describe('P2.1a 真临时文件读取（700KB 合成）', () => {
-  it('进度递增且总量 == stat，大文件不再卡首事件', async () => {
-    const { path, size } = await writeTempPdf(700 * 1024);
+describe('P2.1a 真临时文件读取（20MB 合成）', () => {
+  it('采样进度递增且总量 == stat，大文件不再卡首事件', async () => {
+    const { path, size } = await writeTempPdf(20 * 1024 * 1024);
     const calls = newCalls();
     const events: TocDiscoveryStreamEvent[] = [];
     const outcome = await discoverTocPagesStreamFromFile(
@@ -275,11 +275,9 @@ describe('P2.1a 真临时文件读取（700KB 合成）', () => {
     expect(outcome.cancelled).toBe(false);
     expect(types(events).slice(0, 2)).toEqual(['started', 'input_read_started']);
     const progresses = events.filter((e) => e.type === 'input_read_progress');
-    expect(progresses.length).toBeGreaterThanOrEqual(2);
-    const reads = progresses.map((e) => (e.type === 'input_read_progress' ? (e.readBytes as number) : -1));
-    for (let i = 1; i < reads.length; i++) {
-      expect(reads[i] as number).toBeGreaterThan(reads[i - 1] as number);
-    }
+    expect(progresses.map((e) => (e.type === 'input_read_progress' ? e.readBytes : -1))).toEqual(
+      [4, 8, 12, 16, 20].map((mb) => mb * 1024 * 1024)
+    );
     const ready = events.find((e) => e.type === 'input_read_ready');
     if (ready?.type !== 'input_read_ready') throw new Error('missing ready');
     expect(ready.readBytes).toBe(size);
@@ -297,7 +295,10 @@ describe('P2.1a 真临时文件读取（700KB 合成）', () => {
     const outcome = await discoverTocPagesStreamFromFile(
       {
         loadInspector: loadStub({}, calls, {
-          items: [{ title: 'Alpha', level: 1, physicalPage: 5 }],
+          items: [
+            { title: '第1課', level: 1, physicalPage: 5 },
+            { title: '第2課', level: 1, physicalPage: 9 },
+          ],
           unresolvedCount: 0,
           truncated: false,
         }),
@@ -516,7 +517,7 @@ describe('P2.1a trace 白名单（含读取阶段）', () => {
     const calls = newCalls();
     const events: TocDiscoveryStreamEvent[] = [];
     await discoverTocPagesStreamFromFile(
-      { loadInspector: loadStub({ 3: JA_TOC }, calls), readLocalFile: chunkedReader(300 * 1024, 100 * 1024) },
+      { loadInspector: loadStub({ 3: JA_TOC }, calls), readLocalFile: chunkedReader(40 * 1024 * 1024, 1024 * 1024) },
       { userId: 'u1', filePath: '/tmp/t.pdf' },
       { emit: (e) => events.push(e) }
     );
@@ -525,7 +526,7 @@ describe('P2.1a trace 白名单（含读取阶段）', () => {
     process.env.LINGUA_PDF_TRACE = '1';
     const calls2 = newCalls();
     await discoverTocPagesStreamFromFile(
-      { loadInspector: loadStub({ 3: JA_TOC }, calls2), readLocalFile: chunkedReader(300 * 1024, 100 * 1024) },
+      { loadInspector: loadStub({ 3: JA_TOC }, calls2), readLocalFile: chunkedReader(40 * 1024 * 1024, 1024 * 1024) },
       { userId: 'u1', filePath: '/tmp/t.pdf' },
       { emit: () => {} }
     );
@@ -533,9 +534,15 @@ describe('P2.1a trace 白名单（含读取阶段）', () => {
     for (const stage of ['started', 'input_read_started', 'input_read_progress', 'input_read_ready', 'page_count_ready', 'completed']) {
       expect(heads).toContain(stage);
     }
+    // trace 采样每 16MB：40MB 恰 2 次（16/32MB），值为真实字节
+    const progressTraces = warned.filter((args) => String(args[1]) === 'input_read_progress');
+    expect(progressTraces.map((args) => (args[2] as { readBytes: number }).readBytes)).toEqual(
+      [16, 32].map((mb) => mb * 1024 * 1024)
+    );
     const allowed = new Set([
       'plannedPages', 'completedPages', 'batchFrom', 'batchTo', 'elapsedMs',
-      'pageCount', 'candidates', 'needsOcr', 'downloaded', 'embeddedHit', 'batchMs',
+      'pageCount', 'candidates', 'needsOcr', 'downloaded', 'quality', 'reason',
+      'validEntries', 'semanticEntries', 'batchMs',
       'code', 'readBytes', 'totalBytes',
     ]);
     for (const args of warned) {
@@ -548,6 +555,68 @@ describe('P2.1a trace 白名单（含读取阶段）', () => {
     const dumped = JSON.stringify(warned);
     for (const token of FORBIDDEN_TOKENS) {
       expect(dumped.includes(token)).toBe(false);
+    }
+  });
+});
+
+describe('P2.2 171MB 等价采样预算（合成字节）', () => {
+  it('UI progress 42 次 + ready（≤45）；trace progress 10 次；读阶段 trace 13 行', async () => {
+    const MB = 1024 * 1024;
+    const total = 171 * MB;
+    const big = Buffer.alloc(total, 0x41);
+    big.write('%PDF-1.4 synthetic-171m', 0, 'latin1');
+    const reader: TocDiscoveryFileReader = async (_path, hooks) => {
+      let read = 0;
+      while (read < total) {
+        read = Math.min(total, read + MB);
+        hooks.onProgress?.({ readBytes: read, totalBytes: total });
+      }
+      return { cancelled: false, result: ok({ bytes: big, filename: 'big.pdf' }) };
+    };
+    const prevTrace = process.env.LINGUA_PDF_TRACE;
+    const prevWarn = console.warn;
+    const warned: unknown[][] = [];
+    console.warn = (...args: unknown[]) => {
+      warned.push(args);
+    };
+    process.env.LINGUA_PDF_TRACE = '1';
+    try {
+      const calls = newCalls();
+      const events: TocDiscoveryStreamEvent[] = [];
+      const outcome = await discoverTocPagesStreamFromFile(
+        { loadInspector: loadStub({ 3: JA_TOC }, calls), readLocalFile: reader },
+        { userId: 'u1', filePath: '/tmp/171m.pdf' },
+        { emit: (e) => events.push(e) }
+      );
+      expect(outcome.cancelled).toBe(false);
+      // UI：progress 恰在 4MB 倍数，共 42 次 + 最终 ready（43 次更新 ≤ 45）
+      const progresses = events.filter((e) => e.type === 'input_read_progress');
+      expect(progresses.length).toBe(42);
+      expect(progresses.map((e) => (e.type === 'input_read_progress' ? e.readBytes / MB : -1))).toEqual(
+        Array.from({ length: 42 }, (_, i) => (i + 1) * 4)
+      );
+      const ready = events.find((e) => e.type === 'input_read_ready');
+      if (ready?.type !== 'input_read_ready') throw new Error('missing ready');
+      expect(ready.readBytes).toBe(total);
+      // trace：progress 恰在 16MB 倍数，共 10 次
+      const progressTraces = warned.filter((args) => String(args[1]) === 'input_read_progress');
+      expect(progressTraces.length).toBe(10);
+      expect(progressTraces.map((args) => (args[2] as { readBytes: number }).readBytes / MB)).toEqual(
+        Array.from({ length: 10 }, (_, i) => (i + 1) * 16)
+      );
+      // 读阶段 trace 共 13 行（started + input_read_started + 10 progress + ready），
+      // 旧 256KB 间隔下是 ~650 行；全 run 25 行（另 12 行为既有固定生命周期 + 6 批次行）。
+      const readHeads = new Set(['started', 'input_read_started', 'input_read_progress', 'input_read_ready']);
+      const readTraces = warned.filter((args) => readHeads.has(String(args[1])));
+      expect(readTraces.length).toBe(13);
+      expect(warned.length).toBe(25);
+      const done = events[events.length - 1];
+      if (done?.type !== 'completed') throw new Error('missing completed');
+      expect(done.result.status).toBe('found');
+    } finally {
+      if (prevTrace === undefined) delete process.env.LINGUA_PDF_TRACE;
+      else process.env.LINGUA_PDF_TRACE = prevTrace;
+      console.warn = prevWarn;
     }
   });
 });
