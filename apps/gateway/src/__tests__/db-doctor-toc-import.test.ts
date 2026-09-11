@@ -1,6 +1,7 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runDoctor } from '../infrastructure/db/doctor.js';
+import { sha256HexText } from '../modules/library/persistence/toc-import-sessions.js';
 
 /**
  * CMD-LINGUA-P5D2A doctor 规则：toc_import_sessions / toc_import_chunks。
@@ -31,6 +32,7 @@ function createTables(db: Database): void {
       status TEXT NOT NULL DEFAULT 'prepared',
       doc_title TEXT NOT NULL DEFAULT '',
       document_id TEXT,
+      ast_fingerprint TEXT,
       error TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -57,7 +59,7 @@ function createTables(db: Database): void {
 
 function seedClean(db: Database): void {
   createTables(db);
-  db.run(`CREATE TABLE documents (id TEXT PRIMARY KEY)`);
+  db.run(`CREATE TABLE documents (id TEXT PRIMARY KEY, ast_json TEXT)`);
   db.run(
     `INSERT INTO toc_import_sessions (id, user_id, request_key, plan_fingerprint, pdf_sha256, page_count, lesson_count, chunk_count, status, created_at, updated_at) VALUES ('s1','u1','k1','fp','pdf',100,2,2,'prepared','t','t')`
   );
@@ -142,5 +144,34 @@ describe('db doctor toc-import', () => {
     const report = runDoctor(db);
     expect(report.findings.some((f) => f.rule.startsWith('toc-import:'))).toBe(false);
     expect(() => runDoctor(db)).not.toThrow();
+  });
+
+  it('running 缺 AST 指纹命中 FAIL', () => {
+    const db = mem();
+    seedClean(db);
+    db.run(`UPDATE toc_import_sessions SET status = 'running', document_id = 'd9' WHERE id = 's1'`);
+    const report = runDoctor(db);
+    expect(levelOf(report, 'toc-import:session-ast-fp')).toBe('FAIL');
+  });
+
+  it('completed 顺序 gap 命中 FAIL', () => {
+    const db = mem();
+    seedClean(db);
+    db.run(`UPDATE toc_import_chunks SET status = 'completed' WHERE session_id = 's1' AND ordinal = 1`);
+    const report = runDoctor(db);
+    expect(levelOf(report, 'toc-import:chunk-gap')).toBe('FAIL');
+  });
+
+  it('指纹与文档 AST 不一致命中 FAIL；一致 PASS', () => {
+    const db = mem();
+    seedClean(db);
+    db.run(`INSERT INTO documents VALUES ('d1','{"lessons":[]}')`);
+    db.run(`UPDATE toc_import_sessions SET document_id = 'd1', ast_fingerprint = 'mismatch' WHERE id = 's1'`);
+    const bad = runDoctor(db);
+    expect(levelOf(bad, 'toc-import:ast-drift')).toBe('FAIL');
+    // doctor 与持久化指纹同口径（任一改编码即此处变红）
+    db.run(`UPDATE toc_import_sessions SET ast_fingerprint = '${sha256HexText('{"lessons":[]}')}' WHERE id = 's1'`);
+    const good = runDoctor(db);
+    expect(levelOf(good, 'toc-import:ast-drift')).toBe('PASS');
   });
 });

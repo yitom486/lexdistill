@@ -119,6 +119,22 @@ invariant 恒 NULL，所有权只在 session 层，doctor 规则锁）、
 9. 首 chunk 的课恒为追加序第 0 位（D2B 按 chunk 序 append 的 invariant，
    幂等读档据此定位；后续 chunk 执行时同样按序）。
 
+### 6b. P5-D2C 后续 chunk 追加（已实现并锁定）
+
+端点 `POST /api/documents/:userId/toc-import-sessions/:sessionId/execute-next`
+（实现 `toc-import-execute-next.ts` + 持久化 `commitTocAppendChunk`）：
+
+- 只执行“最小 prepared 即上一个 completed 的直接后继”；全 completed 即读档返回
+  （零计算）；prepared 请走 execute-first，终态拒绝；legacy（无 AST 指纹）拒绝重备。
+- AST 链：首 chunk 提交同事务记录 canonical AST SHA-256（v21）；
+  每次 append 前重算当前 `ast_json` 比对，不一致（`E_TOC_AST_DRIFT`）即外部漂移、拒绝；
+  成功后同事务更新指纹。legacy session 不得静默补写。
+- append-only 合并：旧课数组逐字保留（id/顺序/内容），新课仅末尾，
+  lesson.id 撞车即拒；合并后重校验；写合并 AST + 全量 shred 同一事务。
+- chunk 废弃列恒不写；session 仍 running（无 prepared 剩余则 completed）；
+  converter/形状失败只记 chunk 计数，target 与已完成 chunk 不动。
+- 读档定位 invariant：首课=追加序第 0 位，后续按 chunk 序（D2B 按序执行的推论）。
+
 ## 7. Unresolved risk
 
 - bun 单线程：真并发只靠 UNIQUE 约束，压力竞态未实测（WAL 下写串行化是 SQLite 保证，

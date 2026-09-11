@@ -17,12 +17,13 @@ import { migration as v017 } from './v017-lesson-sort-order.js';
 import { migration as v018 } from './v018-seed-materialization-state.js';
 import { migration as v019 } from './v019-toc-import-sessions.js';
 import { migration as v020 } from './v020-toc-import-session-document.js';
+import { migration as v021 } from './v021-toc-import-session-ast-fp.js';
 import type { SchemaMigration } from './types.js';
 
 export type { SchemaMigration } from './types.js';
 
 /**
- * 已发布迁移目录（v2–v20）。v1 = runMigrations 写入的 legacy-baseline，无独立文件。
+ * 已发布迁移目录（v2–v21）。v1 = runMigrations 写入的 legacy-baseline，无独立文件。
  * 新增：加 vNNN-name.ts，并按 version 登记到本数组末尾。禁止改既有条目。
  * `ddl.ts` 的 runMigrations 从此数组调度。
  */
@@ -46,5 +47,6 @@ export const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
   v018,
   v019,
   v020,
+  v021,
 ];
 

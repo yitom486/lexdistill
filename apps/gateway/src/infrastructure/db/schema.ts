@@ -568,7 +568,8 @@ export const documentImports = sqliteTable('document_imports', {
 });
 
 /**
- * 整书目录导入 session（v19 建表，v20 加 document_id；与 ddl.ts 建表 SQL 一字对齐，SSOT 是 ddl.ts）。
+ * 整书目录导入 session（v19 建表，v20 加 document_id，v21 加 ast_fingerprint；
+ * 与 ddl.ts 建表 SQL 一字对齐，SSOT 是 ddl.ts）。
  * - 一行 = 一次“用户确认的整书计划”，计划 immutable（无 entries/anchors 更新路径）；
  * - request_key 由服务端重算（user + PDF SHA-256 + canonical plan fingerprint），
  *   同 user/key 唯一，重试复用同一 session；
@@ -576,6 +577,9 @@ export const documentImports = sqliteTable('document_imports', {
  * - target document 关系在 session 层（v20 document_id，可空）：
  *   D2B 首个成功 chunk 在同一事务创建文档并绑定；后续 chunk 只更新同一文档；
  *   chunk 层 document_id 已废弃（invariant 恒 NULL，见 doctor 规则）；
+ * - AST 链指纹在 session 层（v21 ast_fingerprint，可空）：
+ *   首 chunk 提交时同事务记录 canonical AST SHA-256；每次 append 前重算比对，
+ *   不一致即外部漂移、拒绝追加；缺指纹的旧 session 不得静默补写（legacy 拒绝重备）；
  * - 删除 target document → session 进 `target_deleted` 终态（审计保留 document_id 快照，
  *   永不再 resume），删文档不删计划行；
  * - 状态封闭枚举见 persistence/toc-import-sessions.ts，读侧收窄 + doctor 规则锁。
@@ -594,6 +598,7 @@ export const tocImportSessions = sqliteTable(
     status: text('status').notNull().default('prepared'),
     docTitle: text('doc_title').notNull().default(''),
     documentId: text('document_id'),
+    astFingerprint: text('ast_fingerprint'),
     error: text('error'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),

@@ -228,9 +228,11 @@ import {
   getTocImportSessionById as getTocImportSessionByIdDomain,
   bindTocImportSessionDocument as bindTocImportSessionDocumentDomain,
   commitTocFirstChunk as commitTocFirstChunkDomain,
+  commitTocAppendChunk as commitTocAppendChunkDomain,
   recordTocChunkFailure as recordTocChunkFailureDomain,
   type PrepareTocImportSessionInput,
   type PreparedTocImportSession,
+  type TocAppendChunkResult,
   type TocFirstChunkResult,
   type TocImportSession,
   type TocImportChunk,
@@ -1168,6 +1170,20 @@ export class DrizzleLearnerRepository implements LearnerRepository {
     range: { fromPage: number; toPage: number };
   }): Promise<Result<TocFirstChunkResult, BusinessError>> {
     return commitTocFirstChunkDomain(this.deps, input);
+  }
+
+  /**
+   * 后续 chunk 追加提交（单事务：合并 AST + shred + 指纹 + 状态；已完成即幂等返回）。
+   * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
+   */
+  public async commitTocAppendChunk(input: {
+    sessionId: string;
+    userId: string;
+    ordinal: number;
+    book: TextbookAST;
+    range: { fromPage: number; toPage: number };
+  }): Promise<Result<TocAppendChunkResult, BusinessError>> {
+    return commitTocAppendChunkDomain(this.deps, input);
   }
 
   /**

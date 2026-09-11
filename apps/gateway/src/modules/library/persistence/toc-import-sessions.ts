@@ -16,6 +16,11 @@ import type { ShredTx } from './textbook-shred.js';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
 import { shredIntoTransaction } from './textbook-shred.js';
 
+/** 文本摘要（确定性，无 IO；与指纹函数同口径，均为 UTF-8 字节）。 */
+export function sha256HexText(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
 /**
  * CMD-LINGUA-P5D2A：整书目录导入 session/chunk 持久化。
  *
@@ -71,6 +76,12 @@ export interface TocImportSession {
    * 缺席 = 尚未绑定（D2A 恒缺席）；删除目标后保留快照做审计，但 session 已终态、永不再 resume。
    */
   documentId?: string | undefined;
+  /**
+   * session 层 canonical AST 指纹（v21；canonical AST JSON 的 SHA-256 hex）。
+   * 缺席 = 旧 session（首 chunk 提交前或 D2A 时代行）：append 路径不得静默补写，
+   * 必须明确拒绝为 legacy，要求用户重新准备 session。
+   */
+  astFingerprint?: string | undefined;
   error?: string | undefined;
   createdAt: string;
   updatedAt: string;
@@ -118,6 +129,7 @@ function toSession(row: SessionRow): TocImportSession {
     updatedAt: row.updatedAt,
   };
   if (row.documentId) session.documentId = row.documentId;
+  if (row.astFingerprint) session.astFingerprint = row.astFingerprint;
   if (row.error) session.error = row.error;
   return session;
 }
@@ -537,6 +549,7 @@ export async function commitTocFirstChunk(
       }
       const now = nowIso();
       const docId = generateId('doc');
+      const astJson = JSON.stringify(canonical);
       tx.insert(documents)
         .values({
           id: docId,
@@ -545,14 +558,14 @@ export async function commitTocFirstChunk(
           sourceKind: 'user_import',
           language: mapBookLanguage(canonical.language),
           content: `单课导入 · 物理${input.range.fromPage}–${input.range.toPage}页`,
-          astJson: JSON.stringify(canonical),
+          astJson,
           createdAt: now,
           updatedAt: now,
         })
         .run();
       shredIntoTransaction(tx, docId, canonical);
       tx.update(tocImportSessions)
-        .set({ documentId: docId, status: 'running', error: null, updatedAt: now })
+        .set({ documentId: docId, astFingerprint: sha256HexText(astJson), status: 'running', error: null, updatedAt: now })
         .where(eq(tocImportSessions.id, input.sessionId))
         .run();
       tx.update(tocImportChunks)
@@ -609,5 +622,163 @@ export async function recordTocChunkFailure(
   } catch (e) {
     if (e instanceof BusinessError) return err(e);
     return err(translateToBusinessError(e, 'recordTocChunkFailure'));
+  }
+}
+
+export interface TocAppendChunkResult {
+  documentId: string;
+  lessonId: string;
+  lessonTitle: string;
+  range: { fromPage: number; toPage: number };
+  stats: { lessons: number; dialogues: number; chunks: number };
+  sessionStatus: TocImportSessionStatus;
+  /** true = 本次提交生效；false = 已是 completed，幂等返回（零新写）。 */
+  committed: boolean;
+}
+
+/**
+ * 后续 chunk 追加提交（单事务，原子）：
+ * 重读 session/chunk/doc → 已 completed 即读档返回；
+ * 否则校验 AST 链（当前 hash == session 记录）→ 合并（append-only：旧数组逐字保留、
+ * 新课仅末尾）→ 写合并 AST + 全量 shred → 更新 AST 指纹 → chunk completed →
+ * 无 prepared 剩余则 session completed，否则 running。
+ * 任一步失败整体回滚；chunk 的废弃 document_id 列恒不写。
+ */
+export async function commitTocAppendChunk(
+  deps: RepoDeps,
+  input: {
+    sessionId: string;
+    userId: string;
+    ordinal: number;
+    book: TextbookAST;
+    range: { fromPage: number; toPage: number };
+  }
+): Promise<Result<TocAppendChunkResult, BusinessError>> {
+  const checked = parseTextbookAST(JSON.parse(JSON.stringify(input.book)));
+  if (!checked.ok) return err(checked.error);
+  const canonical = checked.value;
+  if (canonical.lessons.length !== 1) {
+    return err(new BusinessError('E_TOC_LESSON_SHAPE', '待追加课程不是恰一课，已取消提交', 'TOOL_EXECUTION'));
+  }
+  const only = canonical.lessons[0];
+  if (!only) {
+    return err(new BusinessError('E_TOC_LESSON_SHAPE', '待追加课程缺失，已取消提交', 'TOOL_EXECUTION'));
+  }
+  try {
+    const done = deps.db.transaction((tx) => {
+      const sessions = tx.select().from(tocImportSessions).where(eq(tocImportSessions.id, input.sessionId)).all();
+      const session = sessions[0];
+      if (!session || session.userId !== input.userId) {
+        throw new BusinessError('E_NOT_FOUND', '未找到指定的导入会话', 'LEARNER_STATE');
+      }
+      const rows = tx
+        .select()
+        .from(tocImportChunks)
+        .where(eq(tocImportChunks.sessionId, input.sessionId))
+        .all()
+        .sort((a, b) => a.ordinal - b.ordinal);
+      const target = rows.find((r) => r.ordinal === input.ordinal);
+      if (!target) {
+        throw new BusinessError('E_NOT_FOUND', '未找到指定的分段', 'LEARNER_STATE');
+      }
+      if (target.status === 'completed' && session.documentId) {
+        const docs = tx.select().from(documents).where(eq(documents.id, session.documentId)).all();
+        const doc = docs[0];
+        if (!doc || !doc.astJson) {
+          throw new BusinessError('E_INTERNAL', '已完成分段的教材缺失（数据异常）', 'INTERNAL');
+        }
+        return {
+          documentId: session.documentId,
+          lessonId: only.id,
+          lessonTitle: only.title,
+          range: input.range,
+          stats: { lessons: 1, dialogues: only.dialogues.length, chunks: 1 },
+          sessionStatus: toSessionStatus(session.status),
+          committed: false as const,
+        };
+      }
+      if (session.status !== 'running' || !session.documentId) {
+        throw new BusinessError('E_INVALID_INPUT', '该导入会话当前不可追加', 'VALIDATION');
+      }
+      if (target.status !== 'prepared') {
+        throw new BusinessError('E_INVALID_INPUT', '该分段当前不可执行', 'VALIDATION');
+      }
+      if (!session.astFingerprint) {
+        throw new BusinessError(
+          'E_TOC_LEGACY_SESSION',
+          '该会话缺 AST 指纹（旧计划），请重新准备 session 后再追加',
+          'VALIDATION'
+        );
+      }
+      const docs = tx.select().from(documents).where(eq(documents.id, session.documentId)).all();
+      const doc = docs[0];
+      if (!doc || doc.userId !== input.userId || !doc.astJson) {
+        throw new BusinessError('E_INTERNAL', '目标教材缺失（数据异常）', 'INTERNAL');
+      }
+      // AST 链校验：当前 hash 必须等于 session 记录（外部改过即拒绝，不向漂移文档追加）。
+      if (sha256HexText(doc.astJson) !== session.astFingerprint) {
+        throw new BusinessError(
+          'E_TOC_AST_DRIFT',
+          '目标教材已被外部修改，拒绝追加（请检查后重新准备 session）',
+          'TOOL_EXECUTION'
+        );
+      }
+      let existing: TextbookAST;
+      try {
+        const parsed = parseTextbookAST(JSON.parse(doc.astJson));
+        if (!parsed.ok) throw parsed.error;
+        existing = parsed.value;
+      } catch {
+        throw new BusinessError('E_INTERNAL', '目标教材结构损坏（数据异常）', 'INTERNAL');
+      }
+      // append-only 合并：旧课逐字保留（id/顺序/内容），新课仅末尾；id 撞车即拒。
+      if (existing.lessons.some((l) => l.id === only.id)) {
+        throw new BusinessError(
+          'E_TOC_LESSON_SHAPE',
+          `课程 ${only.id} 已存在于目标教材，拒绝重复追加`,
+          'VALIDATION'
+        );
+      }
+      const merged: TextbookAST = { ...existing, lessons: [...existing.lessons, only] };
+      const rechecked = parseTextbookAST(JSON.parse(JSON.stringify(merged)));
+      if (!rechecked.ok) {
+        throw new BusinessError('E_INTERNAL', '合并后教材校验失败（数据异常）', 'INTERNAL');
+      }
+      const mergedCanonical = rechecked.value;
+      const mergedJson = JSON.stringify(mergedCanonical);
+      const now = nowIso();
+      tx.update(documents)
+        .set({ astJson: mergedJson, updatedAt: now })
+        .where(eq(documents.id, session.documentId))
+        .run();
+      shredIntoTransaction(tx, session.documentId, mergedCanonical);
+      const remaining = rows.filter((r) => r.ordinal !== input.ordinal && r.status !== 'completed').length;
+      tx.update(tocImportSessions)
+        .set({
+          astFingerprint: sha256HexText(mergedJson),
+          status: remaining === 0 ? 'completed' : 'running',
+          error: null,
+          updatedAt: now,
+        })
+        .where(eq(tocImportSessions.id, input.sessionId))
+        .run();
+      tx.update(tocImportChunks)
+        .set({ status: 'completed', attempts: target.attempts + 1, error: null, updatedAt: now })
+        .where(and(eq(tocImportChunks.sessionId, input.sessionId), eq(tocImportChunks.ordinal, input.ordinal)))
+        .run();
+      return {
+        documentId: session.documentId,
+        lessonId: only.id,
+        lessonTitle: only.title,
+        range: input.range,
+        stats: { lessons: 1, dialogues: only.dialogues.length, chunks: 1 },
+        sessionStatus: (remaining === 0 ? 'completed' : 'running') as TocImportSessionStatus,
+        committed: true as const,
+      };
+    });
+    return ok(done);
+  } catch (e) {
+    if (e instanceof BusinessError) return err(e);
+    return err(translateToBusinessError(e, 'commitTocAppendChunk'));
   }
 }

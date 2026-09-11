@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Database } from 'bun:sqlite';
 
 export interface DoctorFinding {
@@ -42,6 +43,9 @@ export function runDoctor(db: Database): DoctorReport {
     const row = db.query(sql).get() as { n: number } | null;
     return row ? row.n : 0;
   };
+
+  /** 与持久化指纹同口径（UTF-8 字节 SHA-256 hex），避免跨层 import。 */
+  const sha256HexTextLocal = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
 
   const push = (rule: string, level: DoctorFinding['level'], n: number, detail: string) => {
     findings.push({ rule, level, count: n, detail });
@@ -398,6 +402,54 @@ export function runDoctor(db: Database): DoctorReport {
         `SELECT COUNT(*) AS n FROM toc_import_sessions s LEFT JOIN documents d ON d.id = s.document_id WHERE s.status IN ('prepared','running','failed') AND s.document_id IS NOT NULL AND d.id IS NULL`
       );
       push('toc-import:active-doc', activeDoc > 0 ? 'FAIL' : 'PASS', activeDoc, activeDoc > 0 ? `${activeDoc} 个可恢复 session 指向缺失文档` : '绑定齐全');
+    }
+    // running session 缺 AST 指纹（旧计划）：append 路径必须拒绝，doctor 先行告警。
+    // v21 前旧形表无此列即跳过（升级后覆盖）。
+    if (hasColumn('toc_import_sessions', 'ast_fingerprint')) {
+      const noFp = count(
+        `SELECT COUNT(*) AS n FROM toc_import_sessions WHERE status = 'running' AND (ast_fingerprint IS NULL OR ast_fingerprint = '')`
+      );
+      push('toc-import:session-ast-fp', noFp > 0 ? 'FAIL' : 'PASS', noFp, noFp > 0 ? `${noFp} 个 running session 缺 AST 指纹（旧计划，需重备）` : '指纹齐全');
+    }
+    // completed 顺序 gap：已完成 ordinal 必须是从 0 起的连续前缀（跳号即执行错位）。
+    const gapRows = db
+      .query('SELECT session_id AS sid, ordinal AS ord FROM toc_import_chunks WHERE status = ? ORDER BY session_id, ordinal')
+      .all('completed') as Array<{ sid: string; ord: number }>;
+    const bySession = new Map<string, number[]>();
+    for (const r of gapRows) {
+      const list = bySession.get(r.sid) ?? [];
+      list.push(r.ord);
+      bySession.set(r.sid, list);
+    }
+    let gap = 0;
+    for (const ordinals of bySession.values()) {
+      const sorted = [...ordinals].sort((a, b) => a - b);
+      for (let i = 0; i < sorted.length; i++) {
+        if (sorted[i] !== i) {
+          gap++;
+          break;
+        }
+      }
+    }
+    push('toc-import:chunk-gap', gap > 0 ? 'FAIL' : 'PASS', gap, gap > 0 ? `${gap} 个 session 的 completed 顺序有 gap` : '顺序连续');
+    // session 指纹 vs 文档 AST 漂移：绑定文档的当前 AST hash 必须等于 session 记录；
+    // 不一致即外部改过，append 路径会拒绝，doctor 先行告警。终态/未绑定跳过。
+    if (has('documents') && hasColumn('toc_import_sessions', 'ast_fingerprint') && hasColumn('documents', 'ast_json')) {
+      const bound = db
+        .query(
+          'SELECT s.id AS id, s.ast_fingerprint AS fp, d.ast_json AS ast FROM toc_import_sessions s JOIN documents d ON d.id = s.document_id WHERE s.document_id IS NOT NULL AND s.ast_fingerprint IS NOT NULL AND s.ast_fingerprint != ? AND d.ast_json IS NOT NULL'
+        )
+        .all('') as Array<{ id: string; fp: string; ast: string }>;
+      let drift = 0;
+      for (const row of bound) {
+        try {
+          const digest = sha256HexTextLocal(row.ast);
+          if (digest !== row.fp) drift++;
+        } catch {
+          drift++;
+        }
+      }
+      push('toc-import:ast-drift', drift > 0 ? 'FAIL' : 'PASS', drift, drift > 0 ? `${drift} 个 session 的文档 AST 与记录指纹不一致（外部漂移）` : '指纹一致');
     }
   }
 

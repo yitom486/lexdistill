@@ -10,6 +10,7 @@ import { planTocSegments } from '../application/pdf-import/toc-segment-plan.js';
 import { importTocLesson } from '../application/pdf-import/toc-lesson-import.js';
 import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
 import { executeTocImportFirst } from '../application/pdf-import/toc-import-execute.js';
+import { executeTocImportNext } from '../application/pdf-import/toc-import-execute-next.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
@@ -343,6 +344,58 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
         return c.json(res.value);
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'executeTocImportFirst');
+      }
+    })
+    .post('/api/documents/:userId/toc-import-sessions/:sessionId/execute-next', async (c) => {
+      // P5-D2C 下一个 chunk 追加（只许最小 prepared 即上一个 completed 的直接后继）：
+      // 重验 gate → 精确窗 convert → 单事务提交（合并 AST + shred + 指纹 + 状态）。
+      // 禁止整书循环、禁止跳过、禁止长课跨 chunk；失败零残留（converter 失败只记计数）。
+      const input = await readPdfInput(c);
+      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+      try {
+        const userId = c.req.param('userId');
+        const sessionId = c.req.param('sessionId');
+        if (!userId || !sessionId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户或会话标识', 'VALIDATION')
+          );
+        }
+        if (
+          input.value.entries === undefined ||
+          input.value.anchors === undefined ||
+          input.value.fingerprint === undefined
+        ) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '请提供已确认条目、anchors 与预览指纹', 'VALIDATION')
+          );
+        }
+        const res = await executeTocImportNext(
+          {
+            getSession: async (uid, sid) => {
+              const found = await deps.repo.getTocImportSessionById(sid);
+              if (!found || found.session.userId !== uid) return undefined;
+              return found;
+            },
+            getDocument: (id) => deps.repo.getDocumentById(id),
+            commitAppendChunk: (committed) => deps.repo.commitTocAppendChunk(committed),
+            recordChunkFailure: (failure) => deps.repo.recordTocChunkFailure(failure),
+          },
+          {
+            userId,
+            sessionId,
+            filename: input.value.filename,
+            bytes: input.value.bytes,
+            entries: input.value.entries,
+            anchors: input.value.anchors,
+            fingerprint: input.value.fingerprint,
+          }
+        );
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'executeTocImportNext');
+        return c.json(res.value);
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'executeTocImportNext');
       }
     })
     .post('/api/documents/:userId/import-toc-lesson', async (c) => {
