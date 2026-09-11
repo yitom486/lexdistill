@@ -1,11 +1,14 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import {
   requestDiscoverToc,
+  requestExecuteSessionChunk,
   requestExtractTocBaseline,
   requestFolioCandidates,
   requestImportTocLesson,
+  requestPrepareSession,
   requestPreviewTocSegments,
   requestReviewToc,
+  requestSessionStatus,
 } from '../textbooks-annotations.js';
 
 /**
@@ -315,6 +318,95 @@ describe('P5D1 import 请求层', () => {
       anchors: [],
       lessonIndex: 0,
       fingerprint: 'stale',
+    }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect((err as Error).message).toBe('分段预览已过期');
+  });
+});
+
+const SESSION_STATUS_PAYLOAD = {
+  sessionId: 's1',
+  status: 'running',
+  documentId: 'doc_1',
+  totalChunks: 2,
+  completedChunks: 1,
+  chunks: [
+    { ordinal: 0, lessonIndex: 0, lessonTitle: '第1課', range: { fromPage: 17, toPage: 30 }, status: 'completed', attempts: 1 },
+    { ordinal: 1, lessonIndex: 1, lessonTitle: '第2課', range: { fromPage: 36, toPage: 40 }, status: 'prepared', attempts: 0 },
+  ],
+  next: { ordinal: 1, lessonIndex: 1, lessonTitle: '第2課', range: { fromPage: 36, toPage: 40 } },
+};
+
+describe('P5D2D session 请求层', () => {
+  it('prepare：entries/anchors/fingerprint 发出，无页范围', async () => {
+    installFetchStub();
+    nextResponse = { status: 200, payload: { session: { id: 's1', status: 'prepared' }, chunks: [], reused: false, pageCount: 100 } };
+    const res = await requestPrepareSession('u1', {
+      source: { filePath: 'C:\\book\\a.pdf' },
+      entries: [{ title: '第1課', printedPage: 12, level: 1, kind: 'lesson' }],
+      anchors: [{ printedPage: 12, physicalPage: 17, evidence: 'human-confirmed' }],
+      fingerprint: 'fp-1',
+      docTitle: '试书',
+    });
+    expect(res.sessionId).toBe('s1');
+    expect(res.reused).toBe(false);
+    expect(calls.length).toBe(1);
+    expect(calls[0]?.url).toContain('/prepare-toc-import');
+    const sent = calls[0]?.jsonBody as Record<string, unknown>;
+    expect(sent.fingerprint).toBe('fp-1');
+    expect(sent.docTitle).toBe('试书');
+    expect(sent).not.toHaveProperty('pages');
+    expect(sent).not.toHaveProperty('lessonIndex');
+  });
+
+  it('status：GET 无请求体', async () => {
+    installFetchStub();
+    nextResponse = { status: 200, payload: SESSION_STATUS_PAYLOAD };
+    const res = await requestSessionStatus('u1', 's1');
+    expect(res.next?.ordinal).toBe(1);
+    expect(calls.length).toBe(1);
+    expect(calls[0]?.url).toContain('/toc-import-sessions/s1');
+    expect(calls[0]?.method).toBe('GET');
+    expect(calls[0]?.jsonBody).toBeNull();
+  });
+
+  it('execute-first/next：按 first 选端点，entries 透传、无页范围', async () => {
+    installFetchStub();
+    const execPayload = {
+      documentId: 'doc_1', lessonId: 'l1', lessonTitle: '第1課',
+      range: { fromPage: 17, toPage: 30 }, pageCount: 100, stats: { lessons: 1, dialogues: 2, chunks: 1 },
+    };
+    const vars = {
+      sessionId: 's1',
+      source: { filePath: 'C:\\book\\a.pdf' } as const,
+      entries: [{ title: '第1課', printedPage: 12, level: 1, kind: 'lesson' as const }],
+      anchors: [{ printedPage: 12, physicalPage: 17, evidence: 'human-confirmed' as const }],
+      fingerprint: 'fp-1',
+    };
+    nextResponse = { status: 200, payload: execPayload };
+    await requestExecuteSessionChunk('u1', vars, true);
+    expect(calls[0]?.url).toContain('/execute-first');
+    nextResponse = { status: 200, payload: execPayload };
+    await requestExecuteSessionChunk('u1', vars, false);
+    expect(calls[1]?.url).toContain('/execute-next');
+    expect(calls.length).toBe(2);
+    for (const call of calls) {
+      const sent = call.jsonBody as Record<string, unknown>;
+      expect(sent).not.toHaveProperty('pages');
+      expect(sent).not.toHaveProperty('lessonIndex');
+    }
+  });
+
+  it('错误 userMessage 透传', async () => {
+    installFetchStub();
+    nextResponse = {
+      status: 400,
+      payload: { success: false, error: { code: 'E_TOC_PLAN_STALE', userMessage: '分段预览已过期', category: 'VALIDATION', retryable: false } },
+    };
+    const err = await requestPrepareSession('u1', {
+      source: { filePath: 'C:\\x.pdf' }, entries: [], anchors: [], fingerprint: 'stale',
     }).then(
       () => null,
       (e: unknown) => e

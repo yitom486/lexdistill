@@ -142,3 +142,22 @@ invariant 恒 NULL，所有权只在 session 层，doctor 规则锁）、
 - chunk 窗转换的内容正确性仍依赖 P5-D1 的 convert 行为（0/多课即停，单测已锁）。
 - 会话 GC：长期堆积的 prepared 僵尸 session 无 TTL（设计决策：审计优先；
   需要时由 D2B 加显式清理 API + doctor 年龄规则，不静默删除）。
+
+## 8. P5-D2D 会话 UI 与只读状态（已实现并锁定）
+
+- 只读端点 `GET /api/documents/:userId/toc-import-sessions/:sessionId`：
+  纯 DB 读，白名单字段（sessionId/status/documentId/totalChunks/completedChunks/
+  chunks[ordinal/lessonIndex/lessonTitle/range/status/attempts]/next），
+  无 PDF/AST/folio/anchor/指纹原文；owner 不符即 `E_NOT_FOUND`。
+- UI（`TocImportSessionPanel`，挂在 P4C 确认之后）：preview 全部可执行才显示准备；
+  准备 Dialog 明示“只建计划不导内容”；同 key 重试显示 reused；
+  会话块显示状态中性解释、完成数、目标、逐 chunk 行与服务端指定的 next；
+  执行按钮只出现在 next 行（终态/长课/多段只有原因文案）；
+  执行 Dialog 明示“仅导入这一课”；成功刷新 status 并显示 documentId；
+  无 documentId 调 execute-first，否则 execute-next；pending 禁重复；
+  失败只显 userMessage；取消零请求。
+- 恢复语义：sessionId 只活在组件 state（无 localStorage）；
+  刷新后用同一 PDF + 同一确认结果重走 preview + prepare，
+  同 key 即回同一 session 并展示进度；plan 不同即新会话，不猜测复用。
+- 禁止项（测试锁定）：无一键整书/连续/后台/重试按钮；
+  无整书导入与 append UI；旧导入链路不动。

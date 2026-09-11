@@ -11,6 +11,7 @@ import { importTocLesson } from '../application/pdf-import/toc-lesson-import.js'
 import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
 import { executeTocImportFirst } from '../application/pdf-import/toc-import-execute.js';
 import { executeTocImportNext } from '../application/pdf-import/toc-import-execute-next.js';
+import { toTocImportSessionView } from '../persistence/toc-import-sessions.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
@@ -291,6 +292,30 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
         return c.json(res.value);
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'prepareTocImport');
+      }
+    })
+    .get('/api/documents/:userId/toc-import-sessions/:sessionId', async (c) => {
+      // P5-D2D 会话只读摘要：纯 DB 读，不碰 PDF/运行时/Agent/写路径。
+      // 白名单字段（无 PDF/AST/folio/anchor/指纹原文）；owner 不符即 E_NOT_FOUND。
+      try {
+        const userId = c.req.param('userId');
+        const sessionId = c.req.param('sessionId');
+        if (!userId || !sessionId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户或会话标识', 'VALIDATION')
+          );
+        }
+        const found = await deps.repo.getTocImportSessionById(sessionId);
+        if (!found || found.session.userId !== userId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_NOT_FOUND', '未找到指定的导入会话', 'LEARNER_STATE')
+          );
+        }
+        return c.json(toTocImportSessionView(found.session, found.chunks));
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'getTocImportSession');
       }
     })
     .post('/api/documents/:userId/toc-import-sessions/:sessionId/execute-first', async (c) => {

@@ -8,10 +8,11 @@ import {
 } from './ui/dialog.js';
 import {
   useFolioCandidatesMutation,
-  useImportTocLessonMutation,
   usePreviewTocSegmentsMutation,
+  useImportTocLessonMutation,
   type TocPdfSource,
 } from '../queries/useLearnerQueries.js';
+import { TocImportSessionPanel } from './TocImportSessionPanel.js';
 import {
   anchorFlowReducer,
   buildPreviewEntries,
@@ -587,7 +588,8 @@ export function TocAnchorPanel({ file, filePath, entries }: TocAnchorPanelProps)
   })();
 
   return (
-    <TocAnchorPanelView
+    <>
+      <TocAnchorPanelView
       hasSource={source !== null}
       checkText={flow.checkText}
       checkError={!checkValidation.ok && flow.checkText !== '' ? checkValidation.message : null}
@@ -617,6 +619,17 @@ export function TocAnchorPanel({ file, filePath, entries }: TocAnchorPanelProps)
         setImportTarget((prev) => (prev ? { ...prev, docTitle: value } : prev))
       }
       onConfirmImport={handleConfirmImport}
-    />
+      />
+      {preview.data && previewValid && (
+        <TocImportSessionPanel
+          file={file}
+          filePath={filePath}
+          entries={entries}
+          anchors={flow.anchors}
+          preview={preview.data}
+          previewValid={previewValid}
+        />
+      )}
+    </>
   );
 }

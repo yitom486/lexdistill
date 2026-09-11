@@ -782,3 +782,59 @@ export async function commitTocAppendChunk(
     return err(translateToBusinessError(e, 'commitTocAppendChunk'));
   }
 }
+
+export interface TocImportChunkView {
+  ordinal: number;
+  lessonIndex: number;
+  lessonTitle: string;
+  range: { fromPage: number; toPage: number };
+  status: TocImportChunkStatus;
+  attempts: number;
+}
+
+export interface TocImportSessionView {
+  sessionId: string;
+  status: TocImportSessionStatus;
+  documentId: string | null;
+  totalChunks: number;
+  completedChunks: number;
+  chunks: TocImportChunkView[];
+  /** 最小 prepared ordinal（服务端指定的 next executable），无则 null。 */
+  next: { ordinal: number; lessonIndex: number; lessonTitle: string; range: { fromPage: number; toPage: number } } | null;
+}
+
+/**
+ * 只读会话摘要（纯函数）：白名单字段，无 PDF/AST/folio/anchor/指纹原文。
+ * next 按“最小 prepared”指定；终态/全完成即 null（调用方展示原因，不猜）。
+ */
+export function toTocImportSessionView(
+  session: TocImportSession,
+  chunks: TocImportChunk[]
+): TocImportSessionView {
+  const ordered = [...chunks].sort((a, b) => a.ordinal - b.ordinal);
+  const completed = ordered.filter((c) => c.status === 'completed').length;
+  const nextPrepared = ordered.find((c) => c.status === 'prepared');
+  return {
+    sessionId: session.id,
+    status: session.status,
+    documentId: session.documentId ?? null,
+    totalChunks: ordered.length,
+    completedChunks: completed,
+    chunks: ordered.map((c) => ({
+      ordinal: c.ordinal,
+      lessonIndex: c.lessonIndex,
+      lessonTitle: c.lessonTitle,
+      range: { fromPage: c.physicalStart, toPage: c.physicalEnd },
+      status: c.status,
+      attempts: c.attempts,
+    })),
+    next: nextPrepared
+      ? {
+          ordinal: nextPrepared.ordinal,
+          lessonIndex: nextPrepared.lessonIndex,
+          lessonTitle: nextPrepared.lessonTitle,
+          range: { fromPage: nextPrepared.physicalStart, toPage: nextPrepared.physicalEnd },
+        }
+      : null,
+  };
+}
