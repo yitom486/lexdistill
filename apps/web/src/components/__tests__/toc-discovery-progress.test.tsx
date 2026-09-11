@@ -140,4 +140,24 @@ describe('P2.1 流式进度视图（SSR）', () => {
     expect(html).toContain('第 2–4 页');
     expect(html).toContain('得分 12');
   });
+
+  it('P2.1a 读取阶段：X / Y MB + 取消按钮，无百分比', () => {
+    const html = render({
+      discovering: true,
+      discoverProgress: { ...initialTocDiscoverProgress, started: true, phase: 'input_read', readBytes: 524288, totalBytes: 1048576 },
+    });
+    expect(html).toContain('正在读取本地 PDF');
+    expect(html).toContain('0.5 MB / 1.0 MB');
+    expect(html).toContain('取消识别');
+    expect(html).not.toContain('%');
+  });
+
+  it('P2.1a 总量未知：只显示已读量，不编造分母', () => {
+    const html = render({
+      discovering: true,
+      discoverProgress: { ...initialTocDiscoverProgress, started: true, phase: 'input_read', readBytes: 524288, totalBytes: null },
+    });
+    expect(html).toContain('已读 0.5 MB');
+    expect(html).not.toContain('%');
+  });
 });

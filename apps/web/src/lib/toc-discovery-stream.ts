@@ -14,6 +14,9 @@ import { narrowTocDiscovery, type TocDiscoveryData } from './toc-confirm-flow.js
 
 export type TocStreamEventType =
   | 'started'
+  | 'input_read_started'
+  | 'input_read_progress'
+  | 'input_read_ready'
   | 'page_count_ready'
   | 'embedded_outline_checked'
   | 'runtime_check'
@@ -27,6 +30,9 @@ export type TocStreamEventType =
 
 const STREAM_TYPES: ReadonlySet<string> = new Set([
   'started',
+  'input_read_started',
+  'input_read_progress',
+  'input_read_ready',
   'page_count_ready',
   'embedded_outline_checked',
   'runtime_check',
@@ -44,6 +50,7 @@ const FORBIDDEN_STREAM_KEYS: ReadonlySet<string> = new Set([
   'filePath',
   'filename',
   'fileName',
+  'path',
   'userId',
   'markdown',
   'text',
@@ -68,6 +75,10 @@ export interface NarrowedTocStreamEvent {
   completedPages: number | null;
   batchFrom: number | null;
   batchTo: number | null;
+  /** 本地读取已读字节（input_read_* 事件）。 */
+  readBytes: number | null;
+  /** 本地文件总量（stat；不可靠时为 null，此时只显示已读量）。 */
+  totalBytes: number | null;
   /** completed 的探测结果（窄化失败即整行 null）。 */
   data: TocDiscoveryData | null;
   /** failed 的错误码 / 用户可读信息。 */
@@ -104,10 +115,25 @@ export function narrowTocStreamEvent(payload: unknown): NarrowedTocStreamEvent |
     'completedPages' in payload ? asNonNegativeInt(payload.completedPages) : null;
   const batchFrom = 'batchFrom' in payload ? asPositiveInt(payload.batchFrom) : null;
   const batchTo = 'batchTo' in payload ? asPositiveInt(payload.batchTo) : null;
+  const readBytes = 'readBytes' in payload ? asNonNegativeInt(payload.readBytes) : null;
+  // totalBytes 可靠时为数字，不可靠时服务端发 null（只显示已读量，不编造）。
+  const totalBytes =
+    !('totalBytes' in payload) || payload.totalBytes === null
+      ? null
+      : asNonNegativeInt(payload.totalBytes);
   if ('plannedPages' in payload && plannedPages === null) return null;
   if ('completedPages' in payload && completedPages === null) return null;
   if ('batchFrom' in payload && batchFrom === null) return null;
   if ('batchTo' in payload && batchTo === null) return null;
+  if ('readBytes' in payload && readBytes === null) return null;
+  if ('totalBytes' in payload && payload.totalBytes !== null && totalBytes === null) return null;
+  if (eventType === 'input_read_progress') {
+    if (readBytes === null) return null;
+    if (totalBytes !== null && readBytes > totalBytes) return null;
+  }
+  if (eventType === 'input_read_ready') {
+    if (readBytes === null) return null;
+  }
   if (eventType === 'ocr_batch_completed') {
     if (plannedPages === null || completedPages === null || batchFrom === null || batchTo === null) return null;
     if (completedPages > plannedPages || batchTo < batchFrom) return null;
@@ -117,18 +143,19 @@ export function narrowTocStreamEvent(payload: unknown): NarrowedTocStreamEvent |
     if (!('result' in payload)) return null;
     const data = narrowTocDiscovery(payload.result);
     if (!data) return null;
-    return { type: eventType, plannedPages, completedPages, batchFrom, batchTo, data, code: null, userMessage: null };
+    return { type: eventType, plannedPages, completedPages, batchFrom, batchTo, readBytes, totalBytes, data, code: null, userMessage: null };
   }
   if (eventType === 'failed') {
     const { code, userMessage } = payload;
     if (typeof code !== 'string' || !code || typeof userMessage !== 'string' || !userMessage) return null;
-    return { type: eventType, plannedPages, completedPages, batchFrom, batchTo, data: null, code, userMessage };
+    return { type: eventType, plannedPages, completedPages, batchFrom, batchTo, readBytes, totalBytes, data: null, code, userMessage };
   }
-  return { type: eventType, plannedPages, completedPages, batchFrom, batchTo, data: null, code: null, userMessage: null };
+  return { type: eventType, plannedPages, completedPages, batchFrom, batchTo, readBytes, totalBytes, data: null, code: null, userMessage: null };
 }
 
 export type TocDiscoverPhase =
   | 'preparing'
+  | 'input_read'
   | 'page_count'
   | 'embedded'
   | 'runtime'
@@ -147,6 +174,10 @@ export interface TocDiscoverProgress {
   completedPages: number;
   batchFrom: number | null;
   batchTo: number | null;
+  /** 本地读取已读字节（仅 input_read 阶段推进）。 */
+  readBytes: number;
+  /** 本地文件总量（null = 不可靠，只显示已读量）。 */
+  totalBytes: number | null;
   /** 服务端声明开始下载运行时后置 true（首次 80MB 提示用）。 */
   runtimeDownloading: boolean;
   error: string | null;
@@ -159,6 +190,8 @@ export const initialTocDiscoverProgress: TocDiscoverProgress = {
   completedPages: 0,
   batchFrom: null,
   batchTo: null,
+  readBytes: 0,
+  totalBytes: null,
   runtimeDownloading: false,
   error: null,
 };
@@ -179,7 +212,26 @@ export function applyTocStreamEvent(
   switch (event.type) {
     case 'started':
       return { ...state, started: true, phase: 'preparing' };
+    case 'input_read_started':
+      return { ...state, started: true, phase: 'input_read' };
+    case 'input_read_progress':
+      return {
+        ...state,
+        started: true,
+        phase: 'input_read',
+        readBytes: event.readBytes ?? state.readBytes,
+        totalBytes: event.totalBytes,
+      };
+    case 'input_read_ready':
+      return {
+        ...state,
+        started: true,
+        phase: 'input_read',
+        readBytes: event.readBytes ?? state.readBytes,
+        totalBytes: event.totalBytes,
+      };
     case 'page_count_ready':
+      return { ...state, started: true, phase: 'page_count', plannedPages: event.plannedPages ?? state.plannedPages };
       return { ...state, started: true, phase: 'page_count', plannedPages: event.plannedPages ?? state.plannedPages };
     case 'embedded_outline_checked':
       return { ...state, started: true, phase: 'embedded' };
@@ -236,6 +288,8 @@ function phaseLabel(phase: TocDiscoverPhase): string {
   switch (phase) {
     case 'preparing':
       return '准备 PDF…';
+    case 'input_read':
+      return '正在读取本地 PDF';
     case 'page_count':
       return '已探页数，检查内置目录…';
     case 'embedded':
@@ -257,12 +311,22 @@ function phaseLabel(phase: TocDiscoverPhase): string {
   }
 }
 
+/** 字节 → MB 文案（1 位小数；显示用，不参与任何判定）。 */
+function formatMegabytes(bytes: number): string {
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
 /**
- * 进度文案（纯函数）：页数只用服务端上报的真实数字；
- * planned 未知时不编造分母，只给阶段名。
+ * 进度文案（纯函数）：页数/字节只用服务端上报的真实数字；
+ * planned 未知时不编造分母，只给阶段名；从不输出百分比。
  */
 export function tocDiscoverStageLabel(progress: TocDiscoverProgress): string {
   const base = phaseLabel(progress.phase);
+  if (progress.phase === 'input_read') {
+    const read = formatMegabytes(progress.readBytes);
+    if (progress.totalBytes === null) return `${base}：已读 ${read}`;
+    return `${base}：${read} / ${formatMegabytes(progress.totalBytes)}`;
+  }
   if (progress.phase === 'ocr' && progress.plannedPages > 0) {
     const batch =
       progress.batchFrom !== null && progress.batchTo !== null

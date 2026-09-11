@@ -5,6 +5,8 @@ import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from
 import { discoverTocPages } from '../application/pdf-import/toc-discovery.js';
 import {
   discoverTocPagesStream,
+  discoverTocPagesStreamFromFile,
+  type TocDiscoveryFileReader,
   type TocDiscoveryStreamEvent,
 } from '../application/pdf-import/toc-discovery-stream.js';
 import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
@@ -36,6 +38,7 @@ export function createPdfImportRoutes(
   pdfOverrides?: {
     loadInspector?: () => Promise<PdfInspectorLike>;
     runtimeDir?: string;
+    readLocalFile?: TocDiscoveryFileReader;
   }
 ) {
   return new Hono()
@@ -135,13 +138,15 @@ export function createPdfImportRoutes(
       }
     })
     .post('/api/documents/:userId/discover-toc-stream', async (c) => {
-      // CMD-LINGUA-P2.1 目录探测流式版（只读 NDJSON）：与 discover-toc 同语义、
-      // 同评分、同只读铁律，差别只是把前窗 OCR 拆成 5 页批次逐批上报真实进度。
-      // 旧 JSON 端点原样保留；取消靠浏览器 AbortController → request signal，
-      // 批间停扫，只发 cancelled 永不补 completed。事件白名单见
-      // TocDiscoveryStreamEvent（阶段/页数/批次范围/耗时/错误码，无任何正文与标识）。
-      const input = await readPdfInput(c);
-      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+      // CMD-LINGUA-P2.1/P2.1a 目录探测流式版（只读 NDJSON）：与 discover-toc
+      // 同语义、同评分、同只读铁律，差别只是把前窗 OCR 拆成 5 页批次逐批上报
+      // 真实进度。旧 JSON 端点原样保留；取消靠浏览器 AbortController →
+      // request signal，批间停扫，只发 cancelled 永不补 completed。
+      // P2.1a：JSON filePath 只解析小 JSON 与 path 形状即建流，真正的文件 IO
+      // 在 producer 内分块进行（首事件先于读取，abort 在分块间停读）；
+      // multipart 上传体到达网关前无读取进度可言，不伪造 input_read 事件。
+      // 事件白名单见 TocDiscoveryStreamEvent（阶段/页数·字节数/批次范围/
+      // 耗时/错误码，无任何正文与标识）。
       const userId = c.req.param('userId');
       if (!userId) {
         return formatBusinessErrorResponse(
@@ -150,46 +155,68 @@ export function createPdfImportRoutes(
         );
       }
       const signal = c.req.raw.signal;
-      const filename = input.value.filename;
-      const bytes = input.value.bytes;
       const streamDeps = {
         ...(pdfOverrides?.loadInspector ? { loadInspector: pdfOverrides.loadInspector } : {}),
         ...(pdfOverrides?.runtimeDir ? { runtimeDir: pdfOverrides.runtimeDir } : {}),
+        ...(pdfOverrides?.readLocalFile ? { readLocalFile: pdfOverrides.readLocalFile } : {}),
       };
       const encoder = new TextEncoder();
-      const body = new ReadableStream<Uint8Array>({
-        async start(controller) {
-          const emit = (event: TocDiscoveryStreamEvent): void => {
+      const serveStream = (produce: (emit: (event: TocDiscoveryStreamEvent) => void) => Promise<unknown>): Response => {
+        const body = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const emit = (event: TocDiscoveryStreamEvent): void => {
+              try {
+                controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+              } catch {
+                // 客户端已断开：写流失败即停，不抛回调用栈（取消由 signal 驱动停扫）。
+              }
+            };
             try {
-              controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
-            } catch {
-              // 客户端已断开：写流失败即停，不抛回调用栈（取消由 signal 驱动停扫）。
+              await produce(emit);
+            } catch (e) {
+              const biz =
+                e instanceof BusinessError
+                  ? e
+                  : new BusinessError('E_PDF_PARSE', '目录页探测失败，请稍后重试', 'TOOL_EXECUTION');
+              emit({ type: 'failed', elapsedMs: 0, code: biz.code, userMessage: biz.userMessage });
+            } finally {
+              try {
+                controller.close();
+              } catch {
+                // 客户端已断开，关闭失败可忽略。
+              }
             }
-          };
-          try {
-            await discoverTocPagesStream(streamDeps, { userId, filename, bytes }, { emit, signal });
-          } catch (e) {
-            const biz =
-              e instanceof BusinessError
-                ? e
-                : new BusinessError('E_PDF_PARSE', '目录页探测失败，请稍后重试', 'TOOL_EXECUTION');
-            emit({ type: 'failed', elapsedMs: 0, code: biz.code, userMessage: biz.userMessage });
-          } finally {
-            try {
-              controller.close();
-            } catch {
-              // 客户端已断开，关闭失败可忽略。
-            }
-          }
-        },
-      });
-      return new Response(body, {
-        headers: {
-          'Content-Type': 'application/x-ndjson; charset=utf-8',
-          'Cache-Control': 'no-store',
-          'X-Accel-Buffering': 'no',
-        },
-      });
+          },
+        });
+        return new Response(body, {
+          headers: {
+            'Content-Type': 'application/x-ndjson; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'X-Accel-Buffering': 'no',
+          },
+        });
+      };
+      const contentType = c.req.header('content-type') ?? '';
+      if (contentType.includes('application/json')) {
+        const body = (await c.req.json().catch(() => null)) as { filePath?: unknown } | null;
+        const filePath = typeof body?.filePath === 'string' && body.filePath ? body.filePath : undefined;
+        if (!filePath) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', 'JSON 模式请提供 filePath（本机 PDF 绝对路径）', 'VALIDATION')
+          );
+        }
+        return serveStream((emit) =>
+          discoverTocPagesStreamFromFile(streamDeps, { userId, filePath }, { emit, signal })
+        );
+      }
+      const input = await readPdfInput(c);
+      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+      const filename = input.value.filename;
+      const bytes = input.value.bytes;
+      return serveStream((emit) =>
+        discoverTocPagesStream(streamDeps, { userId, filename, bytes }, { emit, signal })
+      );
     })
         .post('/api/documents/:userId/extract-toc', async (c) => {
       // 目录基线 OCR（只读草稿）：调用方已确认 fromPage/toPage（经 startPage/endPage 传入），

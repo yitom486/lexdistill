@@ -146,4 +146,30 @@ describe('streamDiscoverToc', () => {
     );
     expect((err as Error).message).toBe('未收到 PDF 文件');
   });
+
+  it('P2.1a input_read 事件透传回调且不影响完成', async () => {
+    installStreamStub([
+      ndjson([
+        { type: 'started', elapsedMs: 1 },
+        { type: 'input_read_started', elapsedMs: 2 },
+        { type: 'input_read_progress', readBytes: 262144, totalBytes: 1048576, elapsedMs: 3 },
+        { type: 'input_read_ready', readBytes: 1048576, totalBytes: 1048576, elapsedMs: 4 },
+        { type: 'completed', plannedPages: 3, completedPages: 3, elapsedMs: 5, result: FOUND_RESULT },
+      ]),
+    ]);
+    const seen: Array<{ type: string; readBytes: number | null; totalBytes: number | null }> = [];
+    const out = await streamDiscoverToc('u1', { filePath: 'C:\\x.pdf' }, {
+      onEvent: (e) => seen.push({ type: e.type, readBytes: e.readBytes, totalBytes: e.totalBytes }),
+    });
+    expect(out.cancelled).toBe(false);
+    expect(out.data?.status).toBe('found');
+    expect(seen.map((e) => e.type)).toEqual([
+      'started',
+      'input_read_started',
+      'input_read_progress',
+      'input_read_ready',
+      'completed',
+    ]);
+    expect(seen[2]).toMatchObject({ readBytes: 262144, totalBytes: 1048576 });
+  });
 });

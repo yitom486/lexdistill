@@ -1,5 +1,10 @@
-import { BusinessError, err, ok, logger, type Result } from '@study-studio/shared';
+import { BusinessError, err, isOk, ok, logger, type Result } from '@study-studio/shared';
 import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
+import {
+  readLocalPdfFileStreamed,
+  type LocalPdfStreamedOutcome,
+  type LocalPdfStreamedHooks,
+} from './local-file.js';
 import {
   probePdfPageCount,
   rangePages,
@@ -16,7 +21,7 @@ import {
 } from './toc-discovery.js';
 
 /**
- * CMD-LINGUA-P2.1：目录探测流式编排（只读，NDJSON 事件）。
+ * CMD-LINGUA-P2.1 / P2.1a：目录探测流式编排（只读，NDJSON 事件）。
  *
  * 旧 `discoverTocPages` 对前窗一次 `processPdfWithOcr(30页)`，UI 只能干等；
  * 本模块把同一窗口拆成固定小批次（每批 5 页），每批完成后才上报真实
@@ -24,13 +29,17 @@ import {
  * not-found 语义与旧函数逐行一致（同纯函数、同合并判定），只改“怎么跑”，
  * 不改“怎么判”；不提前停扫（最坏仍看满 30 页）。
  *
+ * P2.1a：JSON `filePath` 路径的文件 IO 也在流内——`started` 先于读取发出，
+ * 分块读取上报真实字节进度（`input_read_*`），abort 在分块间停读。
+ * multipart 上传体到达网关前无读取进度可言，不伪造（无 input_read 事件）。
+ *
  * 只读铁律：不写 DB/AST/缓存；OCR 原文不出本函数；事件与日志只含白名单
- * 字段（阶段、页数、批次范围、耗时、错误 code），绝无路径/文件名/正文/
- * 标题/userId/模型输出/下载 URL。
+ * 字段（阶段、页数/字节数、批次范围、耗时、错误 code），绝无路径/文件名/
+ * 正文/标题/userId/模型输出/下载 URL。
  *
  * 取消：调用方传 request AbortSignal；native OCR 当前批不可中断时如实处理——
  * 当前批可跑完，但批之间/评分前必查 signal，abort 后只发 cancelled，永不
- * 再发 completed，后续批次一个都不跑。
+ * 再发 completed，后续批次一个都不跑。读取阶段 abort 则连运行时都不碰。
  *
  * 运行时准备：轻量 inspector（探页数/embedded/分类）与 OCR 运行时各准备
  * 最多一次，批次循环内零准备、零下载；注入桩（单测）时只准备一次。
@@ -41,6 +50,9 @@ export const TOC_DISCOVERY_BATCH_PAGES = 5;
 
 export type TocDiscoveryStreamEvent =
   | { type: 'started'; elapsedMs: number }
+  | { type: 'input_read_started'; elapsedMs: number }
+  | { type: 'input_read_progress'; readBytes: number; totalBytes: number | null; elapsedMs: number }
+  | { type: 'input_read_ready'; readBytes: number; totalBytes: number | null; elapsedMs: number }
   | { type: 'page_count_ready'; plannedPages: number; elapsedMs: number }
   | { type: 'embedded_outline_checked'; elapsedMs: number }
   | { type: 'runtime_check'; elapsedMs: number }
@@ -78,6 +90,16 @@ export type TocDiscoveryStreamDeps = Pick<PdfImportServiceDeps, 'loadInspector' 
   fetchImpl?: typeof fetch;
 };
 
+/** P2.1a：文件读取器注入点（默认真机分块读取；单测注入慢速/可门控 fake）。 */
+export type TocDiscoveryFileReader = (
+  filePath: string,
+  hooks: LocalPdfStreamedHooks
+) => Promise<LocalPdfStreamedOutcome>;
+
+export type TocDiscoveryFileDeps = TocDiscoveryStreamDeps & {
+  readLocalFile?: TocDiscoveryFileReader;
+};
+
 /** 开发诊断总开关（显式 opt-in，不改全局日志级别，不影响其他模块）。 */
 export function isTocTraceEnabled(): boolean {
   return process.env.LINGUA_PDF_TRACE === '1';
@@ -85,8 +107,8 @@ export function isTocTraceEnabled(): boolean {
 
 /**
  * TOC 诊断白名单日志：只走项目 logger（warn 级，保证默认级别下终端可见，
- * 又不触全局 setLogLevel）；payload 只允许阶段、页数、批次范围、耗时、
- * 错误 code（均为固定枚举形短串/数字，无正文、无路径、无标识）。
+ * 又不触全局 setLogLevel）；payload 只允许阶段、页数/字节数、批次范围、
+ * 耗时、错误 code（均为固定枚举形短串/数字，无正文、无路径、无标识）。
  */
 function tocTrace(stage: string, fields: Record<string, number | string>): void {
   if (!isTocTraceEnabled()) return;
@@ -101,37 +123,40 @@ function aborted(signal: AbortSignal | undefined): boolean {
   }
 }
 
+interface StreamRun {
+  sink: TocDiscoveryStreamSink;
+  startedAt: number;
+  plannedPages: number;
+  completedPages: number;
+}
+
+function elapsedMsOf(run: StreamRun): number {
+  return Date.now() - run.startedAt;
+}
+
+function failRun(run: StreamRun, error: BusinessError): TocDiscoveryStreamOutcome {
+  tocTrace('failed', { code: error.code, elapsedMs: elapsedMsOf(run) });
+  run.sink.emit({ type: 'failed', elapsedMs: elapsedMsOf(run), code: error.code, userMessage: error.userMessage });
+  return { cancelled: false, result: err(error) };
+}
+
+function cancelRun(run: StreamRun): TocDiscoveryStreamOutcome {
+  tocTrace('cancelled', { plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMsOf(run) });
+  run.sink.emit({ type: 'cancelled', plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMsOf(run) });
+  return { cancelled: true };
+}
+
 /**
- * 目录探测流式编排：探页数 → embedded 短路 → 单次 OCR 运行时准备 →
- * 固定 5 页批次 OCR（批间可取消）→ 评分 → completed/cancelled/failed。
+ * 共享探测 core：运行时准备 → 探页数 → embedded 短路 → 批次 OCR → 评分。
+ * 调用方（内存字节 / 流内文件读取）均先发 `started` 再进此函数。
  */
-export async function discoverTocPagesStream(
+async function runDiscoveryPhases(
   deps: TocDiscoveryStreamDeps,
   input: PdfImportInput,
-  sink: TocDiscoveryStreamSink
+  run: StreamRun
 ): Promise<TocDiscoveryStreamOutcome> {
-  const startedAt = Date.now();
-  const elapsedMs = (): number => Date.now() - startedAt;
-  let plannedPages = 0;
-  let completedPages = 0;
-
-  const fail = (error: BusinessError): TocDiscoveryStreamOutcome => {
-    tocTrace('failed', { code: error.code, elapsedMs: elapsedMs() });
-    sink.emit({ type: 'failed', elapsedMs: elapsedMs(), code: error.code, userMessage: error.userMessage });
-    return { cancelled: false, result: err(error) };
-  };
-  const cancel = (): TocDiscoveryStreamOutcome => {
-    tocTrace('cancelled', { plannedPages, completedPages, elapsedMs: elapsedMs() });
-    sink.emit({ type: 'cancelled', plannedPages, completedPages, elapsedMs: elapsedMs() });
-    return { cancelled: true };
-  };
-
-  const valid = validatePdfInput(input);
-  if (!valid.ok) return fail(valid.error);
-  if (aborted(sink.signal)) return cancel();
-
-  sink.emit({ type: 'started', elapsedMs: elapsedMs() });
-  tocTrace('started', { elapsedMs: elapsedMs() });
+  const { sink } = run;
+  const elapsedMs = (): number => elapsedMsOf(run);
 
   // 轻量运行时（探页数/embedded/分类用；注入桩时即测试桩，无下载）。
   let lightInspector: PdfInspectorLike;
@@ -150,8 +175,9 @@ export async function discoverTocPagesStream(
     });
     lightInspector = runtime.inspector;
   } catch (e) {
-    if (aborted(sink.signal)) return cancel();
-    return fail(
+    if (aborted(sink.signal)) return cancelRun(run);
+    return failRun(
+      run,
       e instanceof BusinessError
         ? e
         : new BusinessError('E_RUNTIME_LOAD', 'PDF 解析运行时准备失败，请检查网络后重试', 'NETWORK')
@@ -161,18 +187,18 @@ export async function discoverTocPagesStream(
   // 诚实页数（[1] 轻探针，不扫全书）。
   const pageCount = probePdfPageCount(lightInspector, input.bytes);
   if (!Number.isFinite(pageCount) || pageCount < 1) {
-    return fail(new BusinessError('E_PDF_PARSE', 'PDF 页数识别失败，文件可能已损坏', 'TOOL_EXECUTION'));
+    return failRun(run, new BusinessError('E_PDF_PARSE', 'PDF 页数识别失败，文件可能已损坏', 'TOOL_EXECUTION'));
   }
-  plannedPages = Math.min(pageCount, TOC_DISCOVERY_MAX_PAGES);
-  sink.emit({ type: 'page_count_ready', plannedPages, elapsedMs: elapsedMs() });
-  tocTrace('page_count_ready', { pageCount, plannedPages, elapsedMs: elapsedMs() });
+  run.plannedPages = Math.min(pageCount, TOC_DISCOVERY_MAX_PAGES);
+  sink.emit({ type: 'page_count_ready', plannedPages: run.plannedPages, elapsedMs: elapsedMs() });
+  tocTrace('page_count_ready', { pageCount, plannedPages: run.plannedPages, elapsedMs: elapsedMs() });
 
   // P1 embedded 可用 → 零 OCR，直接完成（不伪造候选；与旧函数同输出）。
   const embeddedHit = readEmbeddedOutlineEntries(lightInspector, input.bytes, pageCount);
   sink.emit({ type: 'embedded_outline_checked', elapsedMs: elapsedMs() });
   tocTrace('embedded_outline_checked', { embeddedHit: embeddedHit ? 1 : 0, elapsedMs: elapsedMs() });
   if (embeddedHit) {
-    sink.emit({ type: 'scoring', plannedPages, completedPages, elapsedMs: elapsedMs() });
+    sink.emit({ type: 'scoring', plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMs() });
     const output: TocDiscoveryOutput = {
       status: 'not-found',
       candidates: [],
@@ -181,18 +207,18 @@ export async function discoverTocPagesStream(
       ocrPages: [],
       embedded: true,
     };
-    tocTrace('completed', { completedPages, candidates: 0, elapsedMs: elapsedMs() });
-    sink.emit({ type: 'completed', plannedPages, completedPages, elapsedMs: elapsedMs(), result: output });
+    tocTrace('completed', { completedPages: run.completedPages, candidates: 0, elapsedMs: elapsedMs() });
+    sink.emit({ type: 'completed', plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMs(), result: output });
     return { cancelled: false, result: ok(output) };
   }
 
   // 前部探测窗（恒非空，≤30），与旧函数同口径。
-  const window = rangePages(1, plannedPages);
+  const window = rangePages(1, run.plannedPages);
   let cls: { pagesNeedingOcr?: unknown };
   try {
     cls = lightInspector.processPdf(input.bytes, window);
   } catch {
-    return fail(new BusinessError('E_PDF_PARSE', '目录页探测失败，请稍后重试', 'TOOL_EXECUTION'));
+    return failRun(run, new BusinessError('E_PDF_PARSE', '目录页探测失败，请稍后重试', 'TOOL_EXECUTION'));
   }
   const rawNeeding = Array.isArray(cls.pagesNeedingOcr) ? cls.pagesNeedingOcr : [];
   const windowNeeding = rawNeeding.filter((n): n is number => typeof n === 'number');
@@ -220,8 +246,9 @@ export async function discoverTocPagesStream(
       });
       ocrInspector = runtime.inspector;
     } catch (e) {
-      if (aborted(sink.signal)) return cancel();
-      return fail(
+      if (aborted(sink.signal)) return cancelRun(run);
+      return failRun(
+        run,
         e instanceof BusinessError
           ? e
           : new BusinessError('E_PDF_PARSE', '目录页探测失败，请稍后重试', 'TOOL_EXECUTION')
@@ -237,7 +264,7 @@ export async function discoverTocPagesStream(
   const ocrMarkdownByPage = new Map<number, string>();
   const ocrRouted = new Set<number>();
   for (let i = 0; i < window.length; i += TOC_DISCOVERY_BATCH_PAGES) {
-    if (aborted(sink.signal)) return cancel();
+    if (aborted(sink.signal)) return cancelRun(run);
     const batch = window.slice(i, i + TOC_DISCOVERY_BATCH_PAGES);
     const batchStart = Date.now();
     let perPage: Array<{ pageNumber?: unknown; markdown?: unknown }>;
@@ -247,8 +274,9 @@ export async function discoverTocPagesStream(
       perPage = Array.isArray(ocr.pages) ? ocr.pages : [];
       routed = ocr.pagesRoutedToOcr;
     } catch (e) {
-      if (aborted(sink.signal)) return cancel();
-      return fail(
+      if (aborted(sink.signal)) return cancelRun(run);
+      return failRun(
+        run,
         e instanceof BusinessError
           ? e
           : new BusinessError('E_PDF_PARSE', '目录页探测失败，请稍后重试', 'TOOL_EXECUTION')
@@ -264,13 +292,13 @@ export async function discoverTocPagesStream(
         if (typeof n === 'number') ocrRouted.add(n);
       }
     }
-    completedPages += batch.length;
+    run.completedPages += batch.length;
     const batchFrom = batch[0] as number;
     const batchTo = batch[batch.length - 1] as number;
     sink.emit({
       type: 'ocr_batch_completed',
-      plannedPages,
-      completedPages,
+      plannedPages: run.plannedPages,
+      completedPages: run.completedPages,
       batchFrom,
       batchTo,
       elapsedMs: elapsedMs(),
@@ -278,16 +306,16 @@ export async function discoverTocPagesStream(
     tocTrace('ocr_batch_completed', {
       batchFrom,
       batchTo,
-      completedPages,
-      plannedPages,
+      completedPages: run.completedPages,
+      plannedPages: run.plannedPages,
       batchMs: Date.now() - batchStart,
     });
   }
 
   // 评分前最后一次取消检查：abort 落在末批内时，本批已计入，但不再评分、不发 completed。
-  if (aborted(sink.signal)) return cancel();
-  sink.emit({ type: 'scoring', plannedPages, completedPages, elapsedMs: elapsedMs() });
-  tocTrace('scoring', { plannedPages, completedPages, elapsedMs: elapsedMs() });
+  if (aborted(sink.signal)) return cancelRun(run);
+  sink.emit({ type: 'scoring', plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMs() });
+  tocTrace('scoring', { plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMs() });
 
   const scored = window.map((p) => scoreTocDiscoveryPage(p, ocrMarkdownByPage.get(p) ?? ''));
   const candidates = mergeTocCandidateRanges(scored);
@@ -300,7 +328,85 @@ export async function discoverTocPagesStream(
     ocrPages: [...ocrRouted].sort((a, b) => a - b),
     embedded: false,
   };
-  tocTrace('completed', { completedPages, candidates: candidates.length, elapsedMs: elapsedMs() });
-  sink.emit({ type: 'completed', plannedPages, completedPages, elapsedMs: elapsedMs(), result: output });
+  tocTrace('completed', { completedPages: run.completedPages, candidates: candidates.length, elapsedMs: elapsedMs() });
+  sink.emit({ type: 'completed', plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMs(), result: output });
   return { cancelled: false, result: ok(output) };
+}
+
+/**
+ * 目录探测流式编排（内存字节输入：multipart 上传 / 旧 JSON 全量读取路径）。
+ * 字节已在手，无读取进度可言，不发 input_read 事件（不伪造）。
+ */
+export async function discoverTocPagesStream(
+  deps: TocDiscoveryStreamDeps,
+  input: PdfImportInput,
+  sink: TocDiscoveryStreamSink
+): Promise<TocDiscoveryStreamOutcome> {
+  const run: StreamRun = { sink, startedAt: Date.now(), plannedPages: 0, completedPages: 0 };
+  const valid = validatePdfInput(input);
+  if (!valid.ok) return failRun(run, valid.error);
+  if (aborted(sink.signal)) return cancelRun(run);
+  sink.emit({ type: 'started', elapsedMs: elapsedMsOf(run) });
+  tocTrace('started', { elapsedMs: elapsedMsOf(run) });
+  return runDiscoveryPhases(deps, input, run);
+}
+
+/**
+ * P2.1a：目录探测流式编排（JSON `filePath` 输入：读取也在流内）。
+ * `started` 先于文件 IO 发出；分块读取上报真实字节进度；abort 在分块间
+ * 停读（只发 cancelled，不碰运行时/OCR）；读完后走同一 core（同 200MB
+ * 内容校验、同批次、同评分，语义与字节路径完全一致）。
+ */
+export async function discoverTocPagesStreamFromFile(
+  deps: TocDiscoveryFileDeps,
+  fileInput: { userId: string; filePath: string },
+  sink: TocDiscoveryStreamSink
+): Promise<TocDiscoveryStreamOutcome> {
+  const run: StreamRun = { sink, startedAt: Date.now(), plannedPages: 0, completedPages: 0 };
+  if (!fileInput.userId) {
+    return failRun(run, new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION'));
+  }
+  if (aborted(sink.signal)) return cancelRun(run);
+  sink.emit({ type: 'started', elapsedMs: elapsedMsOf(run) });
+  tocTrace('started', { elapsedMs: elapsedMsOf(run) });
+
+  sink.emit({ type: 'input_read_started', elapsedMs: elapsedMsOf(run) });
+  tocTrace('input_read_started', { elapsedMs: elapsedMsOf(run) });
+  const reader = deps.readLocalFile ?? readLocalPdfFileStreamed;
+  let read: LocalPdfStreamedOutcome;
+  let totalBytes: number | null = null;
+  try {
+    read = await reader(fileInput.filePath, {
+      ...(sink.signal ? { signal: sink.signal } : {}),
+      onProgress: (progress) => {
+        totalBytes = progress.totalBytes;
+        sink.emit({
+          type: 'input_read_progress',
+          readBytes: progress.readBytes,
+          totalBytes: progress.totalBytes,
+          elapsedMs: elapsedMsOf(run),
+        });
+        tocTrace('input_read_progress', {
+          readBytes: progress.readBytes,
+          totalBytes: progress.totalBytes,
+          elapsedMs: elapsedMsOf(run),
+        });
+      },
+    });
+  } catch {
+    return failRun(run, new BusinessError('E_INVALID_INPUT', '本地文件读取失败', 'VALIDATION'));
+  }
+  if (read.cancelled || aborted(sink.signal)) return cancelRun(run);
+  if (!isOk(read.result)) return failRun(run, read.result.error);
+  const { bytes, filename } = read.result.value;
+  sink.emit({ type: 'input_read_ready', readBytes: bytes.length, totalBytes, elapsedMs: elapsedMsOf(run) });
+  tocTrace('input_read_ready', {
+    readBytes: bytes.length,
+    ...(totalBytes === null ? {} : { totalBytes }),
+    elapsedMs: elapsedMsOf(run),
+  });
+
+  const valid = validatePdfInput({ userId: fileInput.userId, filename, bytes });
+  if (!valid.ok) return failRun(run, valid.error);
+  return runDiscoveryPhases(deps, { userId: fileInput.userId, filename, bytes }, run);
 }

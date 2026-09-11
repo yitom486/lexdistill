@@ -16,7 +16,11 @@ import {
  */
 
 function batch(completed: number, planned = 30, from = 1, to = 5): NarrowedTocStreamEvent {
-  return { type: 'ocr_batch_completed', plannedPages: planned, completedPages: completed, batchFrom: from, batchTo: to, data: null, code: null, userMessage: null };
+  return { type: 'ocr_batch_completed', plannedPages: planned, completedPages: completed, batchFrom: from, batchTo: to, readBytes: null, totalBytes: null, data: null, code: null, userMessage: null };
+}
+
+function simple(type: NarrowedTocStreamEvent['type'], extra: Partial<NarrowedTocStreamEvent> = {}): NarrowedTocStreamEvent {
+  return { type, plannedPages: null, completedPages: null, batchFrom: null, batchTo: null, readBytes: null, totalBytes: null, data: null, code: null, userMessage: null, ...extra };
 }
 
 describe('narrowTocStreamEvent', () => {
@@ -53,8 +57,8 @@ describe('narrowTocStreamEvent', () => {
 describe('applyTocStreamEvent', () => {
   it('真实累计：5→10，不插值不估算', () => {
     let s = initialTocDiscoverProgress;
-    s = applyTocStreamEvent(s, { type: 'started', plannedPages: null, completedPages: null, batchFrom: null, batchTo: null, data: null, code: null, userMessage: null });
-    s = applyTocStreamEvent(s, { type: 'page_count_ready', plannedPages: 30, completedPages: null, batchFrom: null, batchTo: null, data: null, code: null, userMessage: null });
+    s = applyTocStreamEvent(s, simple('started'));
+    s = applyTocStreamEvent(s, simple('page_count_ready', { plannedPages: 30 }));
     expect(s.plannedPages).toBe(30);
     expect(s.completedPages).toBe(0);
     s = applyTocStreamEvent(s, batch(5));
@@ -69,15 +73,16 @@ describe('applyTocStreamEvent', () => {
   it('runtime 下载标志只由服务端事件置位', () => {
     let s = initialTocDiscoverProgress;
     expect(s.runtimeDownloading).toBe(false);
-    s = applyTocStreamEvent(s, { type: 'runtime_check', plannedPages: null, completedPages: null, batchFrom: null, batchTo: null, data: null, code: null, userMessage: null });
+    s = applyTocStreamEvent(s, simple('runtime_check'));
     expect(s.runtimeDownloading).toBe(false);
-    s = applyTocStreamEvent(s, { type: 'runtime_download_started', plannedPages: null, completedPages: null, batchFrom: null, batchTo: null, data: null, code: null, userMessage: null });
+    s = applyTocStreamEvent(s, simple('runtime_download_started'));
     expect(s.runtimeDownloading).toBe(true);
   });
 
   it('终态后忽略后续事件（迟到 completed 不推进）', () => {
     const done = applyTocStreamEvent(initialTocDiscoverProgress, {
       type: 'completed', plannedPages: 30, completedPages: 30, batchFrom: null, batchTo: null,
+      readBytes: null, totalBytes: null,
       data: { status: 'not-found', candidates: [], pageCount: 12, pagesScannedCount: 12, embedded: false },
       code: null, userMessage: null,
     });
@@ -116,5 +121,55 @@ describe('shouldAcceptStreamEvent', () => {
     expect(shouldAcceptStreamEvent(1, 1, false)).toBe(true);
     expect(shouldAcceptStreamEvent(1, 2, false)).toBe(false);
     expect(shouldAcceptStreamEvent(1, 1, true)).toBe(false);
+  });
+});
+
+describe('P2.1a input_read 事件', () => {
+  it('收窄：progress/ready 通过，缺 readBytes 或倒挂拒绝', () => {
+    const p = narrowTocStreamEvent({ type: 'input_read_progress', readBytes: 262144, totalBytes: 1048576, elapsedMs: 5 });
+    expect(p?.readBytes).toBe(262144);
+    expect(p?.totalBytes).toBe(1048576);
+    expect(narrowTocStreamEvent({ type: 'input_read_started', elapsedMs: 1 })?.type).toBe('input_read_started');
+    const ready = narrowTocStreamEvent({ type: 'input_read_ready', readBytes: 1048576, totalBytes: 1048576, elapsedMs: 9 });
+    expect(ready?.type).toBe('input_read_ready');
+    // totalBytes 不可靠时允许 null（只显示已读量）
+    expect(narrowTocStreamEvent({ type: 'input_read_ready', readBytes: 100, totalBytes: null })?.totalBytes).toBeNull();
+    expect(narrowTocStreamEvent({ type: 'input_read_progress', totalBytes: 100 })).toBeNull();
+    expect(narrowTocStreamEvent({ type: 'input_read_progress', readBytes: 200, totalBytes: 100 })).toBeNull();
+    expect(narrowTocStreamEvent({ type: 'input_read_progress', readBytes: -1, totalBytes: 100 })).toBeNull();
+  });
+
+  it('禁用键：filePath/path/filename 整行丢弃', () => {
+    expect(narrowTocStreamEvent({ type: 'input_read_started', filePath: 'C:\\x.pdf' })).toBeNull();
+    expect(narrowTocStreamEvent({ type: 'input_read_progress', readBytes: 1, totalBytes: 2, path: '/x' })).toBeNull();
+    expect(narrowTocStreamEvent({ type: 'input_read_ready', readBytes: 2, totalBytes: 2, filename: 'a.pdf' })).toBeNull();
+  });
+
+  it('reducer：读取阶段推进字节，ready 后进入后续阶段', () => {
+    let s = applyTocStreamEvent(initialTocDiscoverProgress, simple('started'));
+    s = applyTocStreamEvent(s, simple('input_read_started'));
+    expect(s.phase).toBe('input_read');
+    expect(s.readBytes).toBe(0);
+    s = applyTocStreamEvent(s, simple('input_read_progress', { readBytes: 262144, totalBytes: 1048576 }));
+    expect(s.readBytes).toBe(262144);
+    expect(s.totalBytes).toBe(1048576);
+    s = applyTocStreamEvent(s, simple('input_read_progress', { readBytes: 524288, totalBytes: 1048576 }));
+    expect(s.readBytes).toBe(524288);
+    s = applyTocStreamEvent(s, simple('page_count_ready', { plannedPages: 30 }));
+    expect(s.phase).toBe('page_count');
+  });
+
+  it('文案：X / Y MB 真实数字；总量未知只显示已读；永无百分比', () => {
+    const full = tocDiscoverStageLabel({ ...initialTocDiscoverProgress, started: true, phase: 'input_read', readBytes: 524288, totalBytes: 1048576 });
+    expect(full).toContain('正在读取本地 PDF');
+    expect(full).toContain('0.5 MB / 1.0 MB');
+    expect(full).not.toContain('%');
+    const unknown = tocDiscoverStageLabel({ ...initialTocDiscoverProgress, started: true, phase: 'input_read', readBytes: 524288, totalBytes: null });
+    expect(unknown).toContain('已读 0.5 MB');
+    expect(unknown).not.toContain('%');
+  });
+
+  it('读取阶段属于 pending（取消按钮可见）', () => {
+    expect(isTocDiscoverPending({ ...initialTocDiscoverProgress, started: true, phase: 'input_read' })).toBe(true);
   });
 });
