@@ -7,6 +7,7 @@ import { extractTocBaseline } from '../application/pdf-import/toc-baseline.js';
 import { reviewTocWithAgent } from '../application/pdf-import/toc-review-agent.js';
 import { extractFolioCandidates } from '../application/pdf-import/toc-folio-candidates.js';
 import { planTocSegments } from '../application/pdf-import/toc-segment-plan.js';
+import { importTocLesson } from '../application/pdf-import/toc-lesson-import.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
@@ -245,6 +246,53 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
         return formatBusinessErrorResponse(c, e, 'planTocSegments');
       }
     })
+    .post('/api/documents/:userId/import-toc-lesson', async (c) => {
+      // P5-D1 单课导入（本轮唯一写入口）：用户选定一课 + 指纹一致 + 最终确认后，
+      // 把该课完整 verified range 交给既有 convert 路径，恰一课才 canonical 落库。
+      // 禁止整书/多课/append/任意页范围；失败零残留。
+      const input = await readPdfInput(c);
+      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+      try {
+        const userId = c.req.param('userId');
+        if (!userId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
+          );
+        }
+        if (
+          input.value.entries === undefined ||
+          input.value.anchors === undefined ||
+          input.value.lessonIndex === undefined ||
+          input.value.fingerprint === undefined
+        ) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '请提供已确认条目、anchors、所选课与预览指纹', 'VALIDATION')
+          );
+        }
+        const res = await importTocLesson(
+          {
+            // 唯一写能力：canonical 入口（id 服务端生成，不读他人文档，不调普通保存）。
+            saveCanonicalAst: (docBase, book) => deps.repo.saveCanonicalAst(docBase, book),
+          },
+          {
+            userId,
+            filename: input.value.filename,
+            bytes: input.value.bytes,
+            entries: input.value.entries,
+            anchors: input.value.anchors,
+            lessonIndex: input.value.lessonIndex,
+            fingerprint: input.value.fingerprint,
+            ...(input.value.docTitle !== undefined ? { docTitle: input.value.docTitle } : {}),
+          }
+        );
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'importTocLesson');
+        return c.json(res.value);
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'importTocLesson');
+      }
+    })
     .post('/api/documents/:userId/:documentId/append-pdf', async (c) => {      // 接力追加：新页段的课接在已有教材后面（大书分段导入）。
       const input = await readPdfInput(c);
       if (!input.ok) return formatBusinessErrorResponse(c, input.error);
@@ -295,10 +343,32 @@ interface PdfRouteInput {
   /** P5-C：已确认目录条目 + 用户确认 anchors（preview-toc-segments 专用，原样透传，服务侧严格校验）。 */
   entries?: unknown;
   anchors?: unknown;
+  /** P5-D1：所选课下标 + 预览指纹 + 新文档标题（import-toc-lesson 专用）。 */
+  lessonIndex?: number;
+  fingerprint?: string;
+  docTitle?: string;
   /** CMD-01：已确认结构分类（原样透传，convert 侧 zod 校验后驱动切课） */
   classes?: unknown;
   /** Azure 云 OCR 凭据（内存态透传，网关不落盘） */
   azure?: { endpoint: string; apiKey: string };
+}
+
+/**
+ * P5-D1：所选课下标解析（纯函数）。
+ * - 缺席 → undefined（import 端点会报“请提供”）；
+ * - 数字非负整数 → 原样；数字字符串（multipart）→ 转换；
+ * - 其余一律 'invalid'（fail-closed）。
+ */
+export function parseLessonIndexField(raw: unknown): number | undefined | 'invalid' {
+  if (raw === undefined) return undefined;
+  if (typeof raw === 'number') {
+    return Number.isSafeInteger(raw) && raw >= 0 ? raw : 'invalid';
+  }
+  if (typeof raw === 'string' && /^\d+$/.test(raw.trim())) {
+    const value = Number(raw.trim());
+    return Number.isSafeInteger(value) ? value : 'invalid';
+  }
+  return 'invalid';
 }
 
 /** 字符串字段收窄（Key/endpoint 随请求来，用完即弃）。 */
@@ -437,6 +507,12 @@ async function readPdfInput(
     }
     const entries = extractStructuredField(body as Record<string, unknown>, 'entries');
     const anchors = extractStructuredField(body as Record<string, unknown>, 'anchors');
+    const lessonIndex = parseLessonIndexField((body as Record<string, unknown>)['lessonIndex']);
+    if (lessonIndex === 'invalid') {
+      return fail('lessonIndex 须为非负整数（所选课下标）');
+    }
+    const fingerprint = strField((body as Record<string, unknown>)['fingerprint']);
+    const docTitle = strField((body as Record<string, unknown>)['docTitle']);
     return {
       ok: true,
       value: {
@@ -446,6 +522,9 @@ async function readPdfInput(
         ...(pageNumbers ? { pageNumbers } : {}),
         ...(entries !== undefined ? { entries } : {}),
         ...(anchors !== undefined ? { anchors } : {}),
+        ...(lessonIndex !== undefined ? { lessonIndex } : {}),
+        ...(fingerprint ? { fingerprint } : {}),
+        ...(docTitle ? { docTitle } : {}),
         ...(azure ? { azure } : {}),
         ...(classes !== undefined ? { classes } : {}),
       },
@@ -459,6 +538,9 @@ async function readPdfInput(
   let pagesRaw: unknown;
   let entriesRaw: unknown;
   let anchorsRaw: unknown;
+  let lessonIndexRaw: unknown;
+  let fingerprintRaw: unknown;
+  let docTitleRaw: unknown;
   try {
     const body = await c.req.parseBody();
     const candidate = body['file'];
@@ -470,6 +552,9 @@ async function readPdfInput(
     pagesRaw = body['pages'];
     entriesRaw = body['entries'];
     anchorsRaw = body['anchors'];
+    lessonIndexRaw = body['lessonIndex'];
+    fingerprintRaw = body['fingerprint'];
+    docTitleRaw = body['docTitle'];
   } catch {
     return fail('上传体不是合法 multipart，请用 file 字段上传 PDF');
   }
@@ -486,6 +571,12 @@ async function readPdfInput(
   }
   const entries = entriesRaw === undefined ? undefined : extractStructuredField({ entries: entriesRaw }, 'entries');
   const anchors = anchorsRaw === undefined ? undefined : extractStructuredField({ anchors: anchorsRaw }, 'anchors');
+  const lessonIndex = lessonIndexRaw === undefined ? undefined : parseLessonIndexField(lessonIndexRaw);
+  if (lessonIndex === 'invalid') {
+    return fail('lessonIndex 须为非负整数（所选课下标）');
+  }
+  const fingerprint = fingerprintRaw === undefined ? undefined : strField(fingerprintRaw);
+  const docTitle = docTitleRaw === undefined ? undefined : strField(docTitleRaw);
   return {
     ok: true,
     value: {
@@ -495,6 +586,9 @@ async function readPdfInput(
       ...(pageNumbers ? { pageNumbers } : {}),
       ...(entries !== undefined ? { entries } : {}),
       ...(anchors !== undefined ? { anchors } : {}),
+      ...(lessonIndex !== undefined ? { lessonIndex } : {}),
+      ...(fingerprint ? { fingerprint } : {}),
+      ...(docTitle ? { docTitle } : {}),
       ...(azure ? { azure } : {}),
       ...(classes !== undefined ? { classes } : {}),
     },

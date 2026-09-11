@@ -4,14 +4,17 @@ import {
   anchorFlowReducer,
   buildPreviewEntries,
   decideAnchorConfirm,
+  decideLessonImport,
   findCorroboratedFolios,
   fingerprintAnchors,
   initialAnchorFlowState,
   narrowFolioResponse,
   narrowPreviewResponse,
+  narrowTocLessonImport,
   parseAnchorCheckPages,
   type FolioCandidateData,
   type LocalAnchor,
+  type PreviewResponseData,
 } from '../toc-anchor-flow.js';
 
 /** CMD-LINGUA-P5C：anchor 确认与预览纯逻辑（无 React、无网络、无存储）。 */
@@ -134,11 +137,80 @@ describe('narrowFolioResponse / narrowPreviewResponse', () => {
       lessons: [{ lessonIndex: 0, title: '第1課', printedStart: 12, physicalStart: 17, physicalEnd: 30, status: 'mapped', reason: 'verified-interval', regionId: 'verified:5:12-30', offsetUsed: 5 }],
       regions: [{ id: 'verified:5:12-30', offset: 5, printedFrom: 12, printedTo: 30, verified: true, anchorCount: 2 }],
       chunks: [{ lessonIndex: 0, title: '第1課', chunkIndex: 0, physicalFrom: 17, physicalTo: 30 }],
-      diagnostics: { lessonCount: 1, mappedCount: 1, unresolvedCount: 0, regionCount: 1, chunksPlanned: 1 },
+      diagnostics: { lessonCount: 1, mappedCount: 1, unresolvedCount: 0, regionCount: 1, chunksPlanned: 1, lessonsWithoutEnd: 0 },
+      fingerprint: 'fp-1',
     };
     const narrowed = narrowPreviewResponse(payload);
     expect(narrowed?.lessons.length).toBe(1);
     expect(narrowed?.chunks.length).toBe(1);
+    expect(narrowed?.fingerprint).toBe('fp-1');
     expect(narrowPreviewResponse({ lessons: [] })).toBeNull();
+    const { fingerprint: _drop, ...noFp } = payload;
+    void _drop;
+    expect(narrowPreviewResponse(noFp)).toBeNull();
+  });
+});
+
+function greenPreview(): PreviewResponseData {
+  return {
+    pageCount: 100,
+    lessons: [
+      { lessonIndex: 0, title: '第1課', printedStart: 12, physicalStart: 17, physicalEnd: 30, status: 'mapped', reason: 'verified-interval', regionId: 'verified:5:12-30', offsetUsed: 5 },
+    ],
+    regions: [{ id: 'verified:5:12-30', offset: 5, printedFrom: 12, printedTo: 30, verified: true, anchorCount: 2 }],
+    chunks: [{ lessonIndex: 0, title: '第1課', chunkIndex: 0, physicalFrom: 17, physicalTo: 30 }],
+    diagnostics: { lessonCount: 1, mappedCount: 1, unresolvedCount: 0, regionCount: 1, chunksPlanned: 1, lessonsWithoutEnd: 0 },
+    fingerprint: 'fp-green',
+  };
+}
+
+describe('decideLessonImport（单课试导入守门）', () => {
+  it('全绿通过并带回课与 chunk', () => {
+    const res = decideLessonImport(greenPreview(), true, 0);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.lesson.title).toBe('第1課');
+    expect(res.chunk.physicalFrom).toBe(17);
+  });
+
+  it('无效预览/缺指纹/未映射/坏下标全拒绝', () => {
+    expect(decideLessonImport(null, true, 0).ok).toBe(false);
+    expect(decideLessonImport(greenPreview(), false, 0).ok).toBe(false);
+    expect(decideLessonImport({ ...greenPreview(), fingerprint: '' }, true, 0).ok).toBe(false);
+    expect(decideLessonImport(greenPreview(), true, 9).ok).toBe(false);
+    const unresolved = greenPreview();
+    unresolved.diagnostics.unresolvedCount = 1;
+    expect(decideLessonImport(unresolved, true, 0).ok).toBe(false);
+    const noEnd = greenPreview();
+    noEnd.diagnostics.lessonsWithoutEnd = 1;
+    expect(decideLessonImport(noEnd, true, 0).ok).toBe(false);
+  });
+
+  it('超 30 页 / 非完整 chunk 拒绝', () => {
+    const big = greenPreview();
+    big.lessons[0] = { ...big.lessons[0]!, printedStart: 1, physicalStart: 1, physicalEnd: 31, status: 'mapped', reason: 'verified-interval', regionId: 'verified:0:1-100', offsetUsed: 0 };
+    big.chunks = [
+      { lessonIndex: 0, title: '第1課', chunkIndex: 0, physicalFrom: 1, physicalTo: 30 },
+      { lessonIndex: 0, title: '第1課', chunkIndex: 1, physicalFrom: 31, physicalTo: 31 },
+    ];
+    const res = decideLessonImport(big, true, 0);
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.message).toContain('31');
+  });
+});
+
+describe('narrowTocLessonImport', () => {
+  it('合法通过；畸形 null', () => {
+    const payload = {
+      documentId: 'doc_1',
+      lessonId: 'l1',
+      lessonTitle: '第1課',
+      range: { fromPage: 17, toPage: 30 },
+      pageCount: 100,
+      stats: { lessons: 1, dialogues: 2, chunks: 1 },
+    };
+    expect(narrowTocLessonImport(payload)?.lessonId).toBe('l1');
+    expect(narrowTocLessonImport({ bogus: 1 })).toBeNull();
   });
 });

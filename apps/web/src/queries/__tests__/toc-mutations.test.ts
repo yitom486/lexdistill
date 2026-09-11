@@ -3,6 +3,7 @@ import {
   requestDiscoverToc,
   requestExtractTocBaseline,
   requestFolioCandidates,
+  requestImportTocLesson,
   requestPreviewTocSegments,
   requestReviewToc,
 } from '../textbooks-annotations.js';
@@ -197,7 +198,8 @@ const PREVIEW_PAYLOAD = {
   ],
   regions: [{ id: 'verified:5:12-30', offset: 5, printedFrom: 12, printedTo: 30, verified: true, anchorCount: 2 }],
   chunks: [{ lessonIndex: 0, title: '第1課', chunkIndex: 0, physicalFrom: 17, physicalTo: 30 }],
-  diagnostics: { lessonCount: 1, mappedCount: 1, unresolvedCount: 0, regionCount: 1, chunksPlanned: 1 },
+  diagnostics: { lessonCount: 1, mappedCount: 1, unresolvedCount: 0, regionCount: 1, chunksPlanned: 1, lessonsWithoutEnd: 0 },
+  fingerprint: 'fp-mutation-test',
 };
 
 describe('P5C folio/preview 请求层', () => {
@@ -264,5 +266,59 @@ describe('P5C folio/preview 请求层', () => {
       expect(call.url).not.toContain('/append');
       expect(call.url).not.toContain('/save');
     }
+  });
+});
+
+const IMPORT_PAYLOAD = {
+  documentId: 'doc_abc',
+  lessonId: 'l1',
+  lessonTitle: '第1課',
+  range: { fromPage: 17, toPage: 30 },
+  pageCount: 100,
+  stats: { lessons: 1, dialogues: 2, chunks: 1 },
+};
+
+describe('P5D1 import 请求层', () => {
+  it('只发 entries/anchors/lessonIndex/fingerprint/docTitle，不发页范围', async () => {
+    installFetchStub();
+    nextResponse = { status: 200, payload: IMPORT_PAYLOAD };
+    const res = await requestImportTocLesson('u1', {
+      source: { filePath: 'C:\\book\\a.pdf' },
+      entries: [{ title: '第1課', printedPage: 12, level: 1, kind: 'lesson' }],
+      anchors: [{ printedPage: 12, physicalPage: 17, evidence: 'human-confirmed' }],
+      lessonIndex: 0,
+      fingerprint: 'fp-1',
+      docTitle: '试导入课',
+    });
+    expect(res.documentId).toBe('doc_abc');
+    expect(calls.length).toBe(1);
+    expect(calls[0]?.url).toContain('/import-toc-lesson');
+    expect(calls[0]?.url).not.toContain('/append');
+    const sent = calls[0]?.jsonBody as Record<string, unknown>;
+    expect(sent.lessonIndex).toBe(0);
+    expect(sent.fingerprint).toBe('fp-1');
+    expect(sent.docTitle).toBe('试导入课');
+    expect(sent).not.toHaveProperty('pages');
+    expect(sent).not.toHaveProperty('startPage');
+    expect(sent).not.toHaveProperty('endPage');
+  });
+
+  it('后端错误 userMessage 透传', async () => {
+    installFetchStub();
+    nextResponse = {
+      status: 400,
+      payload: { success: false, error: { code: 'E_TOC_PLAN_STALE', userMessage: '分段预览已过期', category: 'VALIDATION', retryable: false } },
+    };
+    const err = await requestImportTocLesson('u1', {
+      source: { filePath: 'C:\\x.pdf' },
+      entries: [],
+      anchors: [],
+      lessonIndex: 0,
+      fingerprint: 'stale',
+    }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect((err as Error).message).toBe('分段预览已过期');
   });
 });

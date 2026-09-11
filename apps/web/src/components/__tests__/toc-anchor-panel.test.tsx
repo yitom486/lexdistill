@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { TocAnchorPanelView, type TocAnchorPanelViewProps } from '../TocAnchorPanel.js';
+import { TocAnchorPanelView, LessonImportDialogContent, type TocAnchorPanelViewProps } from '../TocAnchorPanel.js';
 import type { FolioResponseData, PreviewResponseData } from '../../lib/toc-anchor-flow.js';
 
 /**
@@ -23,11 +23,20 @@ function baseProps(overrides: Partial<TocAnchorPanelViewProps> = {}): TocAnchorP
     previewError: null,
     preview: null,
     previewValid: false,
+    importGates: [],
+    importDialog: null,
+    importing: false,
+    importError: null,
+    importResult: null,
     onCheckTextChange: () => {},
     onCheckFolio: () => {},
     onConfirmAnchor: () => {},
     onRemoveAnchor: () => {},
     onRequestPreview: () => {},
+    onSelectLessonImport: () => {},
+    onCloseImportDialog: () => {},
+    onDocTitleChange: () => {},
+    onConfirmImport: () => {},
     ...overrides,
   };
 }
@@ -62,7 +71,8 @@ const PREVIEW_MAPPED: PreviewResponseData = {
   ],
   regions: [{ id: 'verified:5:12-30', offset: 5, printedFrom: 12, printedTo: 30, verified: true, anchorCount: 2 }],
   chunks: [{ lessonIndex: 0, title: '第1課', chunkIndex: 0, physicalFrom: 17, physicalTo: 30 }],
-  diagnostics: { lessonCount: 1, mappedCount: 1, unresolvedCount: 0, regionCount: 1, chunksPlanned: 1 },
+  diagnostics: { lessonCount: 1, mappedCount: 1, unresolvedCount: 0, regionCount: 1, chunksPlanned: 1, lessonsWithoutEnd: 0 },
+  fingerprint: 'fp-test-mapped',
 };
 
 const PREVIEW_UNRESOLVED: PreviewResponseData = {
@@ -73,7 +83,8 @@ const PREVIEW_UNRESOLVED: PreviewResponseData = {
   ],
   regions: [],
   chunks: [],
-  diagnostics: { lessonCount: 2, mappedCount: 1, unresolvedCount: 1, regionCount: 0, chunksPlanned: 0 },
+  diagnostics: { lessonCount: 2, mappedCount: 1, unresolvedCount: 1, regionCount: 0, chunksPlanned: 0, lessonsWithoutEnd: 1 },
+  fingerprint: 'fp-test-unresolved',
 };
 
 const ANCHORS = [{ printedPage: 18, physicalPage: 26, evidence: 'human-confirmed' as const, label: '印18 ↔ 物26' }];
@@ -149,5 +160,92 @@ describe('P5C TocAnchorPanelView（SSR）', () => {
   it('预览错误展示 userMessage', () => {
     const html = render({ anchors: ANCHORS, previewError: 'anchor 超出本书（本书共 100 页）' });
     expect(html).toContain('anchor 超出本书（本书共 100 页）');
+  });
+
+  it('gate 未满足：无试导入按钮', () => {
+    const html = render({
+      anchors: ANCHORS,
+      preview: PREVIEW_UNRESOLVED,
+      previewValid: true,
+      importGates: [
+        { lessonIndex: 0, ok: false },
+        { lessonIndex: 1, ok: false },
+      ],
+    });
+    expect(html).not.toContain('试导入这一课');
+    expect(html).toContain('当前目录不能自动导入');
+  });
+
+  it('gate 全绿：课行出现试导入按钮，无整书/接力 UI', () => {
+    const html = render({
+      anchors: ANCHORS,
+      preview: PREVIEW_MAPPED,
+      previewValid: true,
+      importGates: [{ lessonIndex: 0, ok: true }],
+    });
+    expect(html).toContain('试导入这一课');
+    expect(html).not.toContain('整书导入');
+    expect(html).not.toContain('接力');
+    expect(html).not.toContain('开始导入');
+  });
+
+  it('最终确认 Dialog 内容：文案准确，无整书按钮（Dialog 壳需 DOM，内容直渲）', () => {
+    const html = renderToStaticMarkup(
+      LessonImportDialogContent({
+        dialog: {
+          lessonIndex: 0,
+          lessonTitle: '第1課',
+          printedStart: 12,
+          physicalFrom: 17,
+          physicalTo: 30,
+          pages: 14,
+          docTitle: '第1課',
+        },
+        importing: false,
+        onClose: () => {},
+        onDocTitleChange: () => {},
+        onConfirm: () => {},
+      })
+    );
+    expect(html).toContain('确认导入这一课');
+    expect(html).toContain('将导入这一课；这会创建教材数据');
+    expect(html).toContain('第1課');
+    expect(html).toContain('不会继续接力导入后续章节');
+    expect(html).toContain('新教材标题');
+    expect(html).toContain('取消');
+    expect(html).toContain('确认导入');
+    expect(html).not.toContain('整书导入');
+    expect(html).not.toContain('开始导入');
+  });
+
+  it('成功摘要：documentId 与范围，无整书文案', () => {
+    const html = render({
+      anchors: ANCHORS,
+      preview: PREVIEW_MAPPED,
+      previewValid: true,
+      importGates: [{ lessonIndex: 0, ok: true }],
+      importResult: {
+        documentId: 'doc_abc',
+        lessonId: 'l1',
+        lessonTitle: '第1課',
+        range: { fromPage: 17, toPage: 30 },
+        pageCount: 100,
+        stats: { lessons: 1, dialogues: 2, chunks: 1 },
+      },
+    });
+    expect(html).toContain('已创建新教材 document');
+    expect(html).toContain('doc_abc');
+    expect(html).toContain('不是整本教材导入');
+  });
+
+  it('导入失败：userMessage 展示', () => {
+    const html = render({
+      anchors: ANCHORS,
+      preview: PREVIEW_MAPPED,
+      previewValid: true,
+      importGates: [{ lessonIndex: 0, ok: true }],
+      importError: '分段预览已过期，请重新请求预览后再导入',
+    });
+    expect(html).toContain('分段预览已过期，请重新请求预览后再导入');
   });
 });

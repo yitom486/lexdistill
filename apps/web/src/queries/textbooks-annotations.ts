@@ -39,8 +39,10 @@ import {
 import {
   narrowFolioResponse,
   narrowPreviewResponse,
+  narrowTocLessonImport,
   type FolioResponseData,
   type PreviewResponseData,
+  type TocLessonImportResult,
 } from '../lib/toc-anchor-flow.js';
 
 /** P1-2 拆分：教材 / 批注组（自 useLearnerQueries.ts 逐行平移，仅改 import）。 */
@@ -1124,6 +1126,71 @@ export function usePreviewTocSegmentsMutation(userId = DEFAULT_USER_ID) {
     mutationFn: (vars: PreviewTocSegmentsVars) => requestPreviewTocSegments(userId, vars),
     onError: (e) => {
       logger.debug('[usePreviewTocSegmentsMutation] preview failed', e);
+    },
+  });
+}
+
+export interface ImportTocLessonVars {
+  source: TocPdfSource;
+  entries: Array<{ title: string; printedPage: number; level: number; kind: 'lesson' | 'section' }>;
+  anchors: Array<{ printedPage: number; physicalPage: number; evidence: 'human-confirmed' }>;
+  lessonIndex: number;
+  fingerprint: string;
+  docTitle?: string;
+}
+
+/**
+ * P5-D1：单课试导入（import-toc-lesson，本轮唯一写请求）。
+ * 只发 entries/anchors/lessonIndex/fingerprint/docTitle，绝不发任意页范围；
+ * 页范围由服务端按指纹核验后的 preview 确定。失败只透传 userMessage。
+ */
+export async function requestImportTocLesson(
+  userId: string,
+  vars: ImportTocLessonVars
+): Promise<TocLessonImportResult> {
+  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/import-toc-lesson`;
+  const body = {
+    entries: vars.entries,
+    anchors: vars.anchors,
+    lessonIndex: vars.lessonIndex,
+    fingerprint: vars.fingerprint,
+    ...(vars.docTitle ? { docTitle: vars.docTitle } : {}),
+  };
+  const src: TocPdfSource = vars.source;
+  const hasPath = 'filePath' in src;
+  const res = hasPath
+    ? await fetchPdfGateway(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: src.filePath, ...body }),
+      })
+    : await (async () => {
+        const form = new FormData();
+        form.append('file', src.file, src.file.name);
+        form.append('entries', JSON.stringify(body.entries));
+        form.append('anchors', JSON.stringify(body.anchors));
+        form.append('lessonIndex', String(body.lessonIndex));
+        form.append('fingerprint', body.fingerprint);
+        if (body.docTitle) form.append('docTitle', body.docTitle);
+        return fetchPdfGateway(url, { method: 'POST', body: form });
+      })();
+  const payload: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new GatewayRequestError(readGatewayUserMessage(payload, `单课导入失败（HTTP ${res.status}）`), {
+      code: readGatewayErrorCode(payload),
+      details: readGatewayErrorDetails(payload),
+    });
+  }
+  const narrowed = narrowTocLessonImport(payload);
+  if (!narrowed) throw new Error('单课导入返回异常，请稍后重试');
+  return narrowed;
+}
+
+export function useImportTocLessonMutation(userId = DEFAULT_USER_ID) {
+  return useMutation({
+    mutationFn: (vars: ImportTocLessonVars) => requestImportTocLesson(userId, vars),
+    onError: (e) => {
+      logger.debug('[useImportTocLessonMutation] import failed', e);
     },
   });
 }

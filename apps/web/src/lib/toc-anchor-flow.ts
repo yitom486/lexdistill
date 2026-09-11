@@ -69,7 +69,10 @@ export interface PreviewResponseData {
     unresolvedCount: number;
     regionCount: number;
     chunksPlanned: number;
+    lessonsWithoutEnd: number;
   };
+  /** P5-D1 计划指纹（服务端计算；导入时原样带回核验）。 */
+  fingerprint: string;
 }
 
 export type AnchorPagesValidation = { ok: true; pages: number[] } | { ok: false; message: string };
@@ -357,9 +360,10 @@ export function narrowPreviewResponse(payload: unknown): PreviewResponseData | n
     });
   }
   const diag = diagnostics as Record<string, unknown>;
-  for (const key of ['lessonCount', 'mappedCount', 'unresolvedCount', 'regionCount', 'chunksPlanned']) {
+  for (const key of ['lessonCount', 'mappedCount', 'unresolvedCount', 'regionCount', 'chunksPlanned', 'lessonsWithoutEnd']) {
     if (typeof diag[key] !== 'number') return null;
   }
+  if (typeof (payload as Record<string, unknown>).fingerprint !== 'string') return null;
   return {
     pageCount,
     lessons: narrowedLessons,
@@ -371,6 +375,88 @@ export function narrowPreviewResponse(payload: unknown): PreviewResponseData | n
       unresolvedCount: diag.unresolvedCount as number,
       regionCount: diag.regionCount as number,
       chunksPlanned: diag.chunksPlanned as number,
+      lessonsWithoutEnd: diag.lessonsWithoutEnd as number,
     },
+    fingerprint: (payload as Record<string, unknown>).fingerprint as string,
   };
+}
+
+export interface TocLessonImportResult {
+  documentId: string;
+  lessonId: string;
+  lessonTitle: string;
+  range: { fromPage: number; toPage: number };
+  pageCount: number;
+  stats: { lessons: number; dialogues: number; chunks: number };
+}
+
+/** import-toc-lesson 负载收窄（纯函数）。 */
+export function narrowTocLessonImport(payload: unknown): TocLessonImportResult | null {
+  if (!isRecord(payload)) return null;
+  const { documentId, lessonId, lessonTitle, range, pageCount, stats } = payload;
+  if (typeof documentId !== 'string' || !documentId) return null;
+  if (typeof lessonId !== 'string' || !lessonId) return null;
+  if (typeof lessonTitle !== 'string' || !lessonTitle) return null;
+  if (!isRecord(range) || typeof range.fromPage !== 'number' || typeof range.toPage !== 'number') return null;
+  if (typeof pageCount !== 'number' || !Number.isSafeInteger(pageCount)) return null;
+  if (!isRecord(stats)) return null;
+  const counts = stats as Record<string, unknown>;
+  if (typeof counts.lessons !== 'number' || typeof counts.dialogues !== 'number' || typeof counts.chunks !== 'number') {
+    return null;
+  }
+  return {
+    documentId,
+    lessonId,
+    lessonTitle,
+    range: { fromPage: range.fromPage, toPage: range.toPage },
+    pageCount,
+    stats: { lessons: counts.lessons, dialogues: counts.dialogues, chunks: counts.chunks },
+  };
+}
+
+export const TOC_LESSON_IMPORT_MAX_PAGES = 30;
+
+export type LessonImportDecision =
+  | { ok: true; lesson: PreviewLessonData; chunk: PreviewChunkData }
+  | { ok: false; message: string };
+
+/**
+ * 单课试导入守门（纯函数）：P5-D1 七门 gate 的客户端可判子集
+ *（指纹一致性由服务端终审；此处只判形状与范围）。
+ * ok:false 时调用方不得显示导入按钮 / 不得发请求。
+ */
+export function decideLessonImport(
+  preview: PreviewResponseData | null,
+  previewValid: boolean,
+  lessonIndex: number
+): LessonImportDecision {
+  if (!preview || !previewValid) {
+    return { ok: false, message: '请先请求有效的分段预览' };
+  }
+  if (!preview.fingerprint) {
+    return { ok: false, message: '预览指纹缺失，请重新请求分段预览' };
+  }
+  if (preview.diagnostics.unresolvedCount !== 0) {
+    return { ok: false, message: '当前目录不能自动导入；请补充或修正 anchor' };
+  }
+  if (preview.diagnostics.lessonsWithoutEnd !== 0) {
+    return { ok: false, message: '存在没有终点的课，不能确定导入范围' };
+  }
+  const lesson = preview.lessons.find((l) => l.lessonIndex === lessonIndex);
+  if (!lesson) {
+    return { ok: false, message: '所选条目不存在或不是可导入课' };
+  }
+  if (lesson.status !== 'mapped' || lesson.physicalStart === null || lesson.physicalEnd === null) {
+    return { ok: false, message: '所选课尚未映射到确定物理范围' };
+  }
+  const pages = lesson.physicalEnd - lesson.physicalStart + 1;
+  if (pages < 1 || pages > TOC_LESSON_IMPORT_MAX_PAGES) {
+    return { ok: false, message: `该课共 ${pages} 页（单次导入上限 ${TOC_LESSON_IMPORT_MAX_PAGES} 页）` };
+  }
+  const chunks = preview.chunks.filter((c) => c.lessonIndex === lesson.lessonIndex);
+  const only = chunks[0];
+  if (chunks.length !== 1 || !only || only.physicalFrom !== lesson.physicalStart || only.physicalTo !== lesson.physicalEnd) {
+    return { ok: false, message: '所选课不是一个完整 chunk，不能导入' };
+  }
+  return { ok: true, lesson, chunk: only };
 }

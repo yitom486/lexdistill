@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import { MAX_OCR_PAGES_PER_IMPORT } from './pdf-import-service.js';
 
@@ -111,6 +112,37 @@ export interface TocSegmentPreviewOutput {
   regions: TocMappingRegion[];
   chunks: TocSegmentChunk[];
   diagnostics: TocSegmentDiagnostics;
+}
+
+export interface TocPlanFingerprintInput {
+  pageCount: number;
+  /** PDF 字节 sha256 hex（服务端每次从当前字节重算；客户端只透传比对）。 */
+  pdfHashHex: string;
+  entries: TocSegmentTocEntry[];
+  anchors: TocSegmentAnchor[];
+}
+
+/** PDF 字节摘要（确定性，无 IO；与 pdf-runtime 的校验口径一致）。 */
+export function sha256HexBytes(bytes: Uint8Array): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+/**
+ * P5-D1 计划指纹（纯函数，确定性）：pageCount + PDF 字节哈希 +
+ * 确认条目 + anchors 的规范 JSON → sha256 hex。
+ * 条目顺序即目录顺序（顺序本身是计划的一部分，不排序）。
+ * 导入时服务端用当前 PDF/entries/anchors 重算并逐字比对，
+ * 任一变化（换文件、改条目、增删 anchor）都导致 mismatch 而 fail-closed。
+ */
+export function fingerprintTocPlan(input: TocPlanFingerprintInput): string {
+  const canonical = JSON.stringify({
+    v: 1,
+    pageCount: input.pageCount,
+    pdf: input.pdfHashHex,
+    entries: input.entries.map((e) => [e.title, e.printedPage, e.level, e.kind]),
+    anchors: input.anchors.map((a) => [a.printedPage, a.physicalPage, a.evidence]),
+  });
+  return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
 interface ValidAnchor {

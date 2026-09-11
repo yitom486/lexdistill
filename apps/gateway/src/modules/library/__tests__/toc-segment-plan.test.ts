@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { unlink } from 'node:fs/promises';
 import { isOk, logger } from '@study-studio/shared';
 import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
-import { previewTocSegments } from '../application/pdf-import/toc-segment-preview.js';
+import { previewTocSegments, fingerprintTocPlan, sha256HexBytes } from '../application/pdf-import/toc-segment-preview.js';
 import { planTocSegments } from '../application/pdf-import/toc-segment-plan.js';
 import { createApp } from '../../../transport/http/create-app.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
@@ -67,11 +67,18 @@ describe('P5C planTocSegments（mock）', () => {
     );
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
-    // 与纯函数同输入同输出（服务只是探页数 + 透传）
+    // 与纯函数同输入同输出（服务只是探页数 + 透传 + 指纹）
     const pure = previewTocSegments({ pageCount: 100, entries: ENTRIES, anchors: ANCHORS });
     expect(isOk(pure)).toBe(true);
     if (!isOk(pure)) return;
-    expect(res.value).toEqual(pure.value);
+    const { fingerprint: _fp, ...pureRest } = pure.value as unknown as Record<string, unknown>;
+    void _fp;
+    const { fingerprint, ...rest } = res.value as unknown as Record<string, unknown>;
+    expect(rest).toEqual(pureRest);
+    // 指纹即规范重算（P5-D1 导入核验同一函数）
+    expect(fingerprint).toBe(
+      fingerprintTocPlan({ pageCount: 100, pdfHashHex: sha256HexBytes(mockBytes()), entries: ENTRIES, anchors: ANCHORS })
+    );
     expect(res.value.lessons[0]).toMatchObject({ printedStart: 12, physicalStart: 17, physicalEnd: 34 });
     expect(calls.classify).toEqual([[1]]);
     expect(calls.ocr).toBe(0);

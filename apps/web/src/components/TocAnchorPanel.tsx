@@ -1,9 +1,14 @@
-import React, { useReducer } from 'react';
+import React, { useReducer, useState } from 'react';
 import { Anchor, Eye, FileSearch, X } from 'lucide-react';
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
 import {
+  Dialog,
+  DialogContent,
+} from './ui/dialog.js';
+import {
   useFolioCandidatesMutation,
+  useImportTocLessonMutation,
   usePreviewTocSegmentsMutation,
   type TocPdfSource,
 } from '../queries/useLearnerQueries.js';
@@ -11,6 +16,7 @@ import {
   anchorFlowReducer,
   buildPreviewEntries,
   decideAnchorConfirm,
+  decideLessonImport,
   findCorroboratedFolios,
   fingerprintAnchors,
   initialAnchorFlowState,
@@ -19,6 +25,7 @@ import {
   type FolioResponseData,
   type LocalAnchor,
   type PreviewResponseData,
+  type TocLessonImportResult,
 } from '../lib/toc-anchor-flow.js';
 import type { EditableTocEntry } from '../lib/toc-confirm-flow.js';
 
@@ -69,6 +76,21 @@ function reasonLabel(reason: string): string {
 const inputClassName =
   'h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 text-[11px]';
 
+export interface LessonImportGateView {
+  lessonIndex: number;
+  ok: boolean;
+}
+
+export interface ImportDialogView {
+  lessonIndex: number;
+  lessonTitle: string;
+  printedStart: number;
+  physicalFrom: number;
+  physicalTo: number;
+  pages: number;
+  docTitle: string;
+}
+
 export interface TocAnchorPanelViewProps {
   hasSource: boolean;
   checkText: string;
@@ -83,11 +105,20 @@ export interface TocAnchorPanelViewProps {
   previewError: string | null;
   preview: PreviewResponseData | null;
   previewValid: boolean;
+  importGates: LessonImportGateView[];
+  importDialog: ImportDialogView | null;
+  importing: boolean;
+  importError: string | null;
+  importResult: TocLessonImportResult | null;
   onCheckTextChange(value: string): void;
   onCheckFolio(): void;
   onConfirmAnchor(physicalPage: number, candidateIndex: number): void;
   onRemoveAnchor(printedPage: number): void;
   onRequestPreview(): void;
+  onSelectLessonImport(lessonIndex: number): void;
+  onCloseImportDialog(): void;
+  onDocTitleChange(value: string): void;
+  onConfirmImport(): void;
 }
 
 /** 纯展示视图（无 hooks）：anchor/预览各态经 props 注入，供 SSR 单测直渲。 */
@@ -106,11 +137,20 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
     previewError,
     preview,
     previewValid,
+    importGates,
+    importDialog,
+    importing,
+    importError,
+    importResult,
     onCheckTextChange,
     onCheckFolio,
     onConfirmAnchor,
     onRemoveAnchor,
     onRequestPreview,
+    onSelectLessonImport,
+    onCloseImportDialog,
+    onDocTitleChange,
+    onConfirmImport,
   } = props;
   const corroboratedKey = (physicalPage: number, value: number): boolean =>
     corroborated.some((c) => c.physicalPage === physicalPage && c.value === value);
@@ -307,6 +347,17 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
                   {lesson.regionId && ` · 区${lesson.regionId}`} ·{' '}
                   {lesson.offsetUsed === null ? 'offset –' : `offset ${lesson.offsetUsed >= 0 ? '+' : ''}${lesson.offsetUsed}`}
                 </p>
+                {importGates.some((g) => g.lessonIndex === lesson.lessonIndex && g.ok) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-[10px]"
+                    onClick={() => onSelectLessonImport(lesson.lessonIndex)}
+                  >
+                    试导入这一课
+                  </Button>
+                )}
               </div>
             ))}
           </div>
@@ -331,15 +382,97 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
           )}
         </div>
       )}
+      {importError && (
+        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+          {importError}
+        </p>
+      )}
+      {importResult && (
+        <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+          <p className="font-bold">已创建新教材 document：{importResult.lessonTitle}</p>
+          <p className="font-mono text-[10px]">
+            document {importResult.documentId} · lesson {importResult.lessonId} · 物理{' '}
+            {importResult.range.fromPage}–{importResult.range.toPage} 页 · 对话{' '}
+            {importResult.stats.dialogues} 句
+          </p>
+          <p>不是整本教材导入；不会继续接力导入后续章节。</p>
+        </div>
+      )}
+      <Dialog open={importDialog !== null} onOpenChange={(open) => !open && onCloseImportDialog()}>
+        <DialogContent className="max-w-md" showCloseButton>
+          {importDialog && (
+            <LessonImportDialogContent
+              dialog={importDialog}
+              importing={importing}
+              onClose={onCloseImportDialog}
+              onDocTitleChange={onDocTitleChange}
+              onConfirm={onConfirmImport}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-/** 容器：TanStack 异步 + 本地 anchor 状态；确认/预览外无任何写路径。 */
+/** 最终确认 Dialog 内容（纯展示；不依赖 Dialog context，可直测；外层壳仍是 shadcn Dialog）。 */
+export function LessonImportDialogContent(props: {
+  dialog: ImportDialogView;
+  importing: boolean;
+  onClose(): void;
+  onDocTitleChange(value: string): void;
+  onConfirm(): void;
+}): React.ReactElement {
+  const { dialog, importing, onClose, onDocTitleChange, onConfirm } = props;
+  return (
+    <div className="space-y-2">
+      <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100">确认导入这一课</h2>
+      <p className="text-[11px] text-stone-500 dark:text-stone-400">
+        将导入这一课；这会创建教材数据。不是整本教材导入；不会继续接力导入后续章节。
+      </p>
+      <div className="space-y-1.5 text-[11px] text-stone-600 dark:text-stone-300">
+        <p className="font-bold text-stone-800 dark:text-stone-100">{dialog.lessonTitle}</p>
+        <p>
+          印刷 {dialog.printedStart} 页 · PDF 物理 {dialog.physicalFrom}–
+          {dialog.physicalTo} 页（共 {dialog.pages} 页）
+        </p>
+        <p>将创建新教材 document（单课本，含 1 课）。</p>
+        <label className="block space-y-1">
+          <span className="font-bold">新教材标题</span>
+          <input
+            type="text"
+            aria-label="新教材标题"
+            value={dialog.docTitle}
+            onChange={(e) => onDocTitleChange(e.target.value)}
+            className={`${inputClassName} w-full`}
+          />
+        </label>
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button type="button" variant="ghost" size="sm" className="h-7 text-[11px]" onClick={onClose}>
+          取消
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          className="h-7 text-[11px]"
+          disabled={importing}
+          onClick={onConfirm}
+        >
+          {importing ? '导入中…' : '确认导入'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** 容器：TanStack 异步 + 本地 anchor 状态；确认/预览外唯一的写路径是单课导入确认。 */
 export function TocAnchorPanel({ file, filePath, entries }: TocAnchorPanelProps): React.ReactElement {
   const [flow, dispatch] = useReducer(anchorFlowReducer, initialAnchorFlowState);
+  const [importTarget, setImportTarget] = useState<{ lessonIndex: number; docTitle: string } | null>(null);
   const folio = useFolioCandidatesMutation();
   const preview = usePreviewTocSegmentsMutation();
+  const lessonImport = useImportTocLessonMutation();
 
   const source: TocPdfSource | null = file
     ? { file }
@@ -356,6 +489,13 @@ export function TocAnchorPanel({ file, filePath, entries }: TocAnchorPanelProps)
     flow.previewSig !== null &&
     flow.previewSig === fingerprintAnchors(flow.anchors) &&
     preview.data !== undefined;
+  const importGates: LessonImportGateView[] = (preview.data && previewValid
+    ? preview.data.lessons
+    : []
+  ).map((lesson) => ({
+    lessonIndex: lesson.lessonIndex,
+    ok: decideLessonImport(preview.data ?? null, previewValid, lesson.lessonIndex).ok,
+  }));
 
   const handleCheck = (): void => {
     if (!source || folio.isPending) return;
@@ -398,6 +538,54 @@ export function TocAnchorPanel({ file, filePath, entries }: TocAnchorPanelProps)
     });
   };
 
+  const handleSelectLessonImport = (lessonIndex: number): void => {
+    const decision = decideLessonImport(preview.data ?? null, previewValid, lessonIndex);
+    if (!decision.ok) return;
+    lessonImport.reset();
+    setImportTarget({ lessonIndex, docTitle: decision.lesson.title });
+  };
+
+  const handleCloseImportDialog = (): void => {
+    // 取消只关弹窗，不发任何请求。
+    setImportTarget(null);
+  };
+
+  const handleConfirmImport = (): void => {
+    if (!source || lessonImport.isPending || !importTarget || !preview.data) return;
+    if (!buildValidation.ok) return;
+    const decision = decideLessonImport(preview.data, previewValid, importTarget.lessonIndex);
+    if (!decision.ok) return;
+    lessonImport.mutate({
+      source,
+      entries: buildValidation.entries,
+      anchors: flow.anchors.map((a) => ({
+        printedPage: a.printedPage,
+        physicalPage: a.physicalPage,
+        evidence: a.evidence,
+      })),
+      lessonIndex: importTarget.lessonIndex,
+      fingerprint: preview.data.fingerprint,
+      ...(importTarget.docTitle.trim() ? { docTitle: importTarget.docTitle.trim() } : {}),
+    });
+  };
+
+  const importDialog: ImportDialogView | null = (() => {
+    if (!importTarget || !preview.data) return null;
+    const decision = decideLessonImport(preview.data, previewValid, importTarget.lessonIndex);
+    if (!decision.ok) return null;
+    const { lesson } = decision;
+    if (lesson.physicalStart === null || lesson.physicalEnd === null) return null;
+    return {
+      lessonIndex: lesson.lessonIndex,
+      lessonTitle: lesson.title,
+      printedStart: lesson.printedStart,
+      physicalFrom: lesson.physicalStart,
+      physicalTo: lesson.physicalEnd,
+      pages: lesson.physicalEnd - lesson.physicalStart + 1,
+      docTitle: importTarget.docTitle,
+    };
+  })();
+
   return (
     <TocAnchorPanelView
       hasSource={source !== null}
@@ -413,11 +601,22 @@ export function TocAnchorPanel({ file, filePath, entries }: TocAnchorPanelProps)
       previewError={messageOf(preview.error)}
       preview={preview.data ?? null}
       previewValid={previewValid}
+      importGates={importGates}
+      importDialog={importDialog}
+      importing={lessonImport.isPending}
+      importError={messageOf(lessonImport.error)}
+      importResult={lessonImport.data ?? null}
       onCheckTextChange={(value) => dispatch({ type: 'set-check-text', text: value })}
       onCheckFolio={handleCheck}
       onConfirmAnchor={handleConfirmAnchor}
       onRemoveAnchor={handleRemoveAnchor}
       onRequestPreview={handleRequestPreview}
+      onSelectLessonImport={handleSelectLessonImport}
+      onCloseImportDialog={handleCloseImportDialog}
+      onDocTitleChange={(value) =>
+        setImportTarget((prev) => (prev ? { ...prev, docTitle: value } : prev))
+      }
+      onConfirmImport={handleConfirmImport}
     />
   );
 }

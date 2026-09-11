@@ -215,3 +215,60 @@ P5-C 的 anchor 一律 `evidence: 'human-confirmed'`（P5-A 白名单既有成�
 4. 首次写入前必须有独立的、显式的“我已知这是写入操作”确认（与预览确认分开）；
 5. 本文档 §4.3 回归铁律持续有效；任何静默转正、自动 anchor、自动修复一经发现，
    按架构违规回滚。
+
+---
+
+## 8. P5-D1：导入一课已验证完整 lesson（已实现，首个写入口）
+
+实现：网关 `toc-lesson-import.ts`（`importTocLesson`）+ 端点
+`POST /api/documents/:userId/import-toc-lesson`；
+前端 `TocAnchorPanel` 内单课试导入（守门 `decideLessonImport` + shadcn Dialog 最终确认）。
+
+### 8.1 写 gate（服务端逐项执行，任一失败 fail-closed，零残留）
+
+1. P5-C preview 重跑后 `unresolvedCount === 0`；
+2. `lessonsWithoutEnd === 0`；
+3. 所选 `lessonIndex` 存在（lessons 数组只含 kind=lesson，存在即 kind 成立）；
+4. 该课 `physicalStart/End` 双全；
+5. range 长 1..30 页；
+6. 该课恰为**一个完整** chunk（起止与 chunk 逐值相等）；
+7. 客户端指纹与服务端重算**逐字一致**（§8.2）；
+8. 用户在最终确认 Dialog 明确确认（客户端门；服务端不认“静默调用”——
+   每次调用都独立走全部门）。
+
+### 8.2 指纹语义（`fingerprintTocPlan`，纯函数）
+
+- 规范输入：`{ v:1, pageCount, pdf: sha256(当前 PDF 字节), entries[title/printed/level/kind…],
+  anchors[printed/physical/evidence…] }` → sha256 hex；顺序即目录顺序，不排序。
+- preview 端点随包返回指纹；客户端**只透传、不计算**；
+  导入时服务端用当前字节/条目/anchor 重算并逐字比对。
+- 换文件、改条目、增删 anchor、页数变化任一即 mismatch →
+  `E_TOC_PLAN_STALE`（“请重新请求预览后再导入”）。
+- 条目顺序变化同样改变指纹（顺序是计划的一部分）。
+
+### 8.3 事务与回滚证据
+
+- 转换前置断言：convert 结果 `lessons.length !== 1`（0 或多）即拒，
+  此时**尚未发生任何写操作**；
+- 写操作整单恰一次：`saveCanonicalAst`（documents + AST + shred 同一事务，
+  任一步失败整体回滚并 err；实现见 `documents-annotations.ts:120`）；
+- 服务端 id 生成（`generateId('doc')`），不接受客户端 id——
+  覆盖他人文档在构造上不可能；owner恒为路径 userId；
+- 服务只被授予 `saveCanonicalAst` 一个写能力（路由层取证）：
+  不读他人文档，不调普通保存，不碰 append；
+- 日志只记计数（页数/对话数/chunk 数），标题/folio/anchor/路径/userId 全禁。
+
+### 8.4 UI 确认证据
+
+- 导入按钮只出现在 gate 全绿的课行（`decideLessonImport` 逐课预判）；
+- 最终确认走 shadcn Dialog：课名/印刷页/物理范围/页数/将创建 document/
+  非整本非接力声明 + 可改新教材标题；取消只关弹窗（零请求）；
+- 成功显示 documentId/lessonId/范围/统计；失败只展示 userMessage；
+- 无整书导入、无 append、无自动重试入口；旧导入流程一字未动。
+
+### 8.5 P5-D2 前提（多课/接力若要做，必须先有）
+
+1. chunk 级幂等键与断点续跑（当前单课无状态，重试即重跑全部门）；
+2. 跨课 offset 漂移的逐 chunk 指纹（单指纹覆盖全书计划，多课执行需更细粒度）；
+3. 整书 `unresolved === 0` 的整单 gate（当前只验单课）；
+4. 写入配额与Chunk执行审计（谁、何时、哪段、指纹）。

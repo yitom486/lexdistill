@@ -14,7 +14,9 @@ import {
   type PdfImportServiceDeps,
 } from './pdf-import-service.js';
 import {
+  fingerprintTocPlan,
   previewTocSegments,
+  sha256HexBytes,
   type TocSegmentAnchor,
   type TocSegmentPreviewOutput,
   type TocSegmentTocEntry,
@@ -37,7 +39,8 @@ export interface TocSegmentPlanInput {
   anchors: unknown;
 }
 
-function narrowEntries(raw: unknown): TocSegmentTocEntry[] | null {
+/** 确认条目形状收窄（P5-D1 复用；业务校验仍由 P5-A 纯函数终审）。 */
+export function narrowPlanEntries(raw: unknown): TocSegmentTocEntry[] | null {
   if (!Array.isArray(raw)) return null;
   const out: TocSegmentTocEntry[] = [];
   for (const item of raw) {
@@ -52,7 +55,8 @@ function narrowEntries(raw: unknown): TocSegmentTocEntry[] | null {
   return out;
 }
 
-function narrowAnchors(raw: unknown): TocSegmentAnchor[] | null {
+/** anchor 形状收窄（P5-D1 复用；证据白名单由 P5-A 终审）。 */
+export function narrowPlanAnchors(raw: unknown): TocSegmentAnchor[] | null {
   if (!Array.isArray(raw)) return null;
   const out: TocSegmentAnchor[] = [];
   for (const item of raw) {
@@ -72,20 +76,20 @@ function narrowAnchors(raw: unknown): TocSegmentAnchor[] | null {
 }
 
 /**
- * 分段预览编排（只读）：PDF 输入校验 → `[1]` 探页数 → P5-A 纯函数。
+ * 分段预览编排（只读）：PDF 输入校验 → `[1]` 探页数 → P5-A 纯函数 → 计划指纹。
  * entries/anchors 的业务校验（单调/越界/证据白名单）全部由纯函数执行。
  */
 export async function planTocSegments(
   deps: Pick<PdfImportServiceDeps, 'loadInspector' | 'runtimeDir'>,
   input: TocSegmentPlanInput
-): Promise<Result<TocSegmentPreviewOutput, BusinessError>> {
+): Promise<Result<TocSegmentPreviewOutput & { fingerprint: string }, BusinessError>> {
   const valid = validatePdfInput({ userId: input.userId, filename: input.filename, bytes: input.bytes });
   if (!valid.ok) return err(valid.error);
-  const entries = narrowEntries(input.entries);
+  const entries = narrowPlanEntries(input.entries);
   if (!entries) {
     return err(new BusinessError('E_INVALID_INPUT', '已确认目录条目缺失或形状不正确', 'VALIDATION'));
   }
-  const anchors = narrowAnchors(input.anchors);
+  const anchors = narrowPlanAnchors(input.anchors);
   if (!anchors) {
     return err(new BusinessError('E_INVALID_INPUT', 'anchor 缺失或形状不正确', 'VALIDATION'));
   }
@@ -123,5 +127,12 @@ export async function planTocSegments(
     unresolved: preview.diagnostics.unresolvedCount,
     chunks: preview.diagnostics.chunksPlanned,
   });
-  return ok(preview);
+  // P5-D1 计划指纹：客户端透传比对，服务端导入时重算核验。
+  const fingerprint = fingerprintTocPlan({
+    pageCount,
+    pdfHashHex: sha256HexBytes(input.bytes),
+    entries,
+    anchors,
+  });
+  return ok({ ...preview, fingerprint });
 }
