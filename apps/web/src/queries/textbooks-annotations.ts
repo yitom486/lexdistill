@@ -1014,12 +1014,22 @@ export async function streamDiscoverToc(
 ): Promise<StreamDiscoverTocResult> {
   const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/discover-toc-stream`;
   const init: RequestInit = { method: 'POST', ...(options.signal ? { signal: options.signal } : {}) };
+  // TEMP-DIAGNOSTIC P2.3R（诊断后整块删除）：随机单次关联 id，仅用于把浏览器
+  // 真实点击与网关到达日志对应起来。不含文件名/userId/正文/任何业务数据。
+  // 旧 bundle 从不发此头——线上有它即证明页签跑的是新前端代码。
+  let tocRunId: string | undefined;
+  try {
+    tocRunId = crypto.randomUUID();
+  } catch {
+    tocRunId = undefined;
+  }
+  const traceHeaders = tocRunId ? { 'x-toc-run': tocRunId } : {};
   let res: Response;
   if ('filePath' in source) {
     try {
       res = await fetchPdfGateway(url, {
         ...init,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...traceHeaders },
         body: JSON.stringify({ filePath: source.filePath }),
       });
     } catch (e) {
@@ -1030,7 +1040,11 @@ export async function streamDiscoverToc(
     const form = new FormData();
     form.append('file', source.file, source.file.name);
     try {
-      res = await fetchPdfGateway(url, { ...init, body: form });
+      res = await fetchPdfGateway(url, {
+        ...init,
+        ...(tocRunId ? { headers: { 'x-toc-run': tocRunId } } : {}),
+        body: form,
+      });
     } catch (e) {
       if (options.signal?.aborted) return { cancelled: true, data: null };
       throw e;

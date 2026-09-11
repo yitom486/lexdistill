@@ -36,7 +36,8 @@ export function createApp(deps: GatewayDeps) {
       cors({
         origin: '*',
         allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowHeaders: ['Content-Type', 'Authorization'],
+        // TEMP-DIAGNOSTIC P2.3R：x-toc-run 为真实点击关联头（诊断后删除本行改动）。
+        allowHeaders: ['Content-Type', 'Authorization', 'x-toc-run'],
       }),
     )
     .onError((err, c) => {

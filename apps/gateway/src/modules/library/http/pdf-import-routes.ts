@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { BusinessError, isOk } from '@study-studio/shared';
+import { BusinessError, isOk, logger } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
 import { discoverTocPages } from '../application/pdf-import/toc-discovery.js';
@@ -21,6 +21,57 @@ import { executeTocImportNext } from '../application/pdf-import/toc-import-execu
 import { toTocImportSessionView } from '../persistence/toc-import-sessions.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
+
+/**
+ * TEMP-DIAGNOSTIC P2.3R（诊断后整块删除，含本文件内所有 `toc-run` 相关代码、
+ * CORS 头、`GET /api/debug/toc-arrivals`）。
+ * 真实浏览器点击关联：前端发随机 `x-toc-run` 头，本文件只记
+ * {runId, 到达时刻, 输入形态, body 字节数, 首事件时刻, 终态}，
+ * 绝不记路径/文件名/userId/正文/标题。内存环形缓冲（20 条），无 DB、无文件。
+ */
+interface TocArrivalRecord {
+  runId: string;
+  source: 'json' | 'multipart';
+  /** 请求 Content-Length 原值（量级参考，不读 body）。 */
+  contentLength: string | null;
+  receivedAt: number;
+  firstByteAt: number | null;
+  terminal: string | null;
+  terminalAt: number | null;
+}
+
+const TOC_ARRIVALS: TocArrivalRecord[] = [];
+
+function sanitizeTocRunId(raw: string | undefined): string | undefined {
+  if (!raw || !/^[A-Za-z0-9-]{8,64}$/.test(raw)) return undefined;
+  return raw;
+}
+
+function recordTocArrival(record: TocArrivalRecord): void {
+  TOC_ARRIVALS.push(record);
+  while (TOC_ARRIVALS.length > 20) TOC_ARRIVALS.shift();
+  logger.warn('[toc-arrival]', { runId: record.runId, source: record.source });
+}
+
+function stampTocFirstByte(runId: string | undefined, receivedAt: number): void {
+  if (!runId) return;
+  const found = TOC_ARRIVALS.find((r) => r.runId === runId);
+  if (found && found.firstByteAt === null) {
+    found.firstByteAt = Date.now();
+    logger.warn('[toc-arrival]', { runId, stage: 'first-byte', elapsedMs: found.firstByteAt - receivedAt });
+  }
+}
+
+function stampTocTerminal(runId: string | undefined, receivedAt: number, terminal: string): void {
+  if (!runId) return;
+  const found = TOC_ARRIVALS.find((r) => r.runId === runId);
+  if (found && found.terminal === null) {
+    const now = Date.now();
+    found.terminal = terminal;
+    found.terminalAt = now;
+    logger.warn('[toc-arrival]', { runId, stage: terminal, elapsedMs: now - receivedAt });
+  }
+}
 
 /**
  * PDF 导入路由：前端上传 PDF → 网关分类/提取/结构化 → 返回 TextbookAST。
@@ -161,7 +212,11 @@ export function createPdfImportRoutes(
         ...(pdfOverrides?.readLocalFile ? { readLocalFile: pdfOverrides.readLocalFile } : {}),
       };
       const encoder = new TextEncoder();
-      const serveStream = (produce: (emit: (event: TocDiscoveryStreamEvent) => void) => Promise<unknown>): Response => {
+      const serveStream = (
+        produce: (emit: (event: TocDiscoveryStreamEvent) => void) => Promise<unknown>,
+        // TEMP-DIAGNOSTIC P2.3R：关联追踪（诊断后删除参数）。
+        trace?: { runId: string; receivedAt: number }
+      ): Response => {
         // P2.2 真实时交付：start 必须同步返回，producer 在后台 runner 跑。
         // 若 start 为 async（返回 promise），流在 producer 完成前不交付任何
         // 字节，浏览器只能干等——此前正是“准备 PDF…”卡死的传输层根因。
@@ -174,6 +229,12 @@ export function createPdfImportRoutes(
                 controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
               } catch {
                 // 客户端已断开：写流失败即停，不抛回调用栈（取消由 signal 驱动停扫）。
+              }
+              if (trace) {
+                stampTocFirstByte(trace.runId, trace.receivedAt);
+                if (event.type === 'completed' || event.type === 'cancelled' || event.type === 'failed') {
+                  stampTocTerminal(trace.runId, trace.receivedAt, event.type);
+                }
               }
             };
             const closeStream = (): void => {
@@ -211,6 +272,22 @@ export function createPdfImportRoutes(
         });
       };
       const contentType = c.req.header('content-type') ?? '';
+      // TEMP-DIAGNOSTIC P2.3R：到达记录（诊断后删除）。只记随机 runId +
+      // 输入形态 + body 量级，不记路径/文件名/userId/正文。
+      const tocRunId = sanitizeTocRunId(c.req.header('x-toc-run'));
+      const receivedAt = Date.now();
+      if (tocRunId) {
+        recordTocArrival({
+          runId: tocRunId,
+          source: contentType.includes('application/json') ? 'json' : 'multipart',
+          contentLength: c.req.header('content-length') ?? null,
+          receivedAt,
+          firstByteAt: null,
+          terminal: null,
+          terminalAt: null,
+        });
+      }
+      const streamTrace = tocRunId ? { runId: tocRunId, receivedAt } : undefined;
       if (contentType.includes('application/json')) {
         const body = (await c.req.json().catch(() => null)) as { filePath?: unknown } | null;
         const filePath = typeof body?.filePath === 'string' && body.filePath ? body.filePath : undefined;
@@ -220,17 +297,38 @@ export function createPdfImportRoutes(
             new BusinessError('E_INVALID_INPUT', 'JSON 模式请提供 filePath（本机 PDF 绝对路径）', 'VALIDATION')
           );
         }
-        return serveStream((emit) =>
-          discoverTocPagesStreamFromFile(streamDeps, { userId, filePath }, { emit, signal })
+        return serveStream(
+          (emit) => discoverTocPagesStreamFromFile(streamDeps, { userId, filePath }, { emit, signal }),
+          ...(streamTrace ? [streamTrace] : [])
         );
       }
       const input = await readPdfInput(c);
       if (!input.ok) return formatBusinessErrorResponse(c, input.error);
       const filename = input.value.filename;
       const bytes = input.value.bytes;
-      return serveStream((emit) =>
-        discoverTocPagesStream(streamDeps, { userId, filename, bytes }, { emit, signal })
+      return serveStream(
+        (emit) => discoverTocPagesStream(streamDeps, { userId, filename, bytes }, { emit, signal }),
+        ...(streamTrace ? [streamTrace] : [])
       );
+    })
+    .get('/api/debug/toc-arrivals', async (c) => {
+      // TEMP-DIAGNOSTIC P2.3R：只读到达缓冲（诊断后删除整个端点）。
+      // 返回随机 runId + 时刻 + 阶段，无任何业务内容。
+      try {
+        return c.json(
+          TOC_ARRIVALS.map((r) => ({
+            runId: r.runId,
+            source: r.source,
+            contentLength: r.contentLength,
+            receivedAt: new Date(r.receivedAt).toISOString(),
+            firstByteMs: r.firstByteAt === null ? null : r.firstByteAt - r.receivedAt,
+            terminal: r.terminal,
+            terminalMs: r.terminalAt === null ? null : r.terminalAt - r.receivedAt,
+          }))
+        );
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'tocArrivals');
+      }
     })
         .post('/api/documents/:userId/extract-toc', async (c) => {
       // 目录基线 OCR（只读草稿）：调用方已确认 fromPage/toPage（经 startPage/endPage 传入），
