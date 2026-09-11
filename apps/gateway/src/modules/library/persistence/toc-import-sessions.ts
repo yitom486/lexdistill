@@ -13,6 +13,8 @@ import { tocImportChunks, tocImportSessions } from '../../../infrastructure/db/i
 import { documents } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { ShredTx } from './textbook-shred.js';
+import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
+import { shredIntoTransaction } from './textbook-shred.js';
 
 /**
  * CMD-LINGUA-P5D2A：整书目录导入 session/chunk 持久化。
@@ -315,6 +317,25 @@ export async function prepareTocImportSession(
   }
 }
 
+/** 按 id 取 session + chunks（读侧永不抛；不存在返回 undefined；归属由调用方校验）。 */
+export async function getTocImportSessionById(
+  deps: RepoDeps,
+  sessionId: string
+): Promise<{ session: TocImportSession; chunks: TocImportChunk[] } | undefined> {
+  try {
+    const rows = await deps.db.select().from(tocImportSessions).where(eq(tocImportSessions.id, sessionId));
+    const hit = rows[0];
+    if (!hit) return undefined;
+    const chunks = await deps.db.select().from(tocImportChunks).where(eq(tocImportChunks.sessionId, hit.id));
+    return {
+      session: toSession(hit),
+      chunks: chunks.sort((a, b) => a.ordinal - b.ordinal).map(toChunk),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 /** 按 key 取 session + chunks（读侧永不抛；不存在返回 undefined）。 */
 export async function getTocImportSession(
   deps: RepoDeps,
@@ -415,4 +436,178 @@ export function markSessionsTargetDeletedInTx(
     .where(and(eq(tocImportSessions.documentId, input.documentId), eq(tocImportSessions.userId, input.userId)))
     .run();
   return bound.length;
+}
+
+export interface TocFirstChunkResult {
+  documentId: string;
+  lessonId: string;
+  lessonTitle: string;
+  range: { fromPage: number; toPage: number };
+  stats: { lessons: number; dialogues: number; chunks: number };
+  /** true = 本次提交生效；false = 已是 completed，幂等返回（零新写）。 */
+  committed: boolean;
+}
+
+function mapBookLanguage(language: string): string {
+  if (language === 'EN') return 'en';
+  if (language === 'KO') return 'ko';
+  return 'ja';
+}
+
+/**
+ * 首 chunk 成功提交（单事务，原子）：
+ * 重读 session/chunk → 已 completed 即读档返回（零新写）；
+ * 否则一次写入：documents 行 + shredIntoTransaction 全 derived 投影 +
+ * session 绑定并转 running + chunk completed。任一步失败整体回滚。
+ * chunk 的废弃 document_id 列恒不写（NULL）。
+ */
+export async function commitTocFirstChunk(
+  deps: RepoDeps,
+  input: {
+    sessionId: string;
+    userId: string;
+    docTitle: string;
+    book: TextbookAST;
+    range: { fromPage: number; toPage: number };
+  }
+): Promise<Result<TocFirstChunkResult, BusinessError>> {
+  const checked = parseTextbookAST(JSON.parse(JSON.stringify(input.book)));
+  if (!checked.ok) return err(checked.error);
+  const canonical = checked.value;
+  if (canonical.lessons.length !== 1) {
+    return err(
+      new BusinessError('E_TOC_LESSON_SHAPE', '待提交课程不是恰一课，已取消提交', 'TOOL_EXECUTION')
+    );
+  }
+  const only = canonical.lessons[0];
+  if (!only) {
+    return err(new BusinessError('E_TOC_LESSON_SHAPE', '待提交课程缺失，已取消提交', 'TOOL_EXECUTION'));
+  }
+  try {
+    const done = deps.db.transaction((tx) => {
+      const sessions = tx.select().from(tocImportSessions).where(eq(tocImportSessions.id, input.sessionId)).all();
+      const session = sessions[0];
+      if (!session || session.userId !== input.userId) {
+        throw new BusinessError('E_NOT_FOUND', '未找到指定的导入会话', 'LEARNER_STATE');
+      }
+      const rows = tx
+        .select()
+        .from(tocImportChunks)
+        .where(eq(tocImportChunks.sessionId, input.sessionId))
+        .all()
+        .sort((a, b) => a.ordinal - b.ordinal);
+      const first = rows.find((r) => r.ordinal === 0);
+      if (!first) {
+        throw new BusinessError('E_INVALID_INPUT', '该会话没有可执行首 chunk', 'VALIDATION');
+      }
+      // 幂等：已 completed 即读档返回（不 convert、不 save、不改行）。
+      // 首 chunk 的课恒为追加序第 0 位（D2B 按 chunk 序 append，此 invariant 由执行顺序保证）。
+      if (first.status === 'completed' && session.documentId) {
+        const docs = tx.select().from(documents).where(eq(documents.id, session.documentId)).all();
+        const doc = docs[0];
+        if (!doc || !doc.astJson) {
+          throw new BusinessError('E_INTERNAL', '已完成 chunk 的教材缺失（数据异常）', 'INTERNAL');
+        }
+        let lessonId = only.id;
+        let lessonTitle = only.title;
+        let dialogues = only.dialogues.length;
+        try {
+          const saved = JSON.parse(doc.astJson) as { lessons?: Array<{ id?: unknown; title?: unknown; dialogues?: unknown[] }> };
+          const savedLesson = Array.isArray(saved.lessons) ? saved.lessons[0] : undefined;
+          if (savedLesson && typeof savedLesson.id === 'string') lessonId = savedLesson.id;
+          if (savedLesson && typeof savedLesson.title === 'string') lessonTitle = savedLesson.title;
+          if (savedLesson && Array.isArray(savedLesson.dialogues)) dialogues = savedLesson.dialogues.length;
+        } catch {
+          // 坏 AST 不归本路径（doctor 报漂移）；回退用本次 book
+        }
+        return {
+          documentId: session.documentId,
+          lessonId,
+          lessonTitle,
+          range: input.range,
+          stats: { lessons: 1, dialogues, chunks: 1 },
+          committed: false as const,
+        };
+      }
+      if (session.status !== 'prepared' || session.documentId) {
+        throw new BusinessError('E_INVALID_INPUT', '该导入会话当前不可执行', 'VALIDATION');
+      }
+      if (first.status !== 'prepared') {
+        throw new BusinessError('E_INVALID_INPUT', '该 chunk 当前不可执行', 'VALIDATION');
+      }
+      const now = nowIso();
+      const docId = generateId('doc');
+      tx.insert(documents)
+        .values({
+          id: docId,
+          userId: input.userId,
+          title: input.docTitle.trim() ? input.docTitle.trim().slice(0, 120) : only.title,
+          sourceKind: 'user_import',
+          language: mapBookLanguage(canonical.language),
+          content: `单课导入 · 物理${input.range.fromPage}–${input.range.toPage}页`,
+          astJson: JSON.stringify(canonical),
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+      shredIntoTransaction(tx, docId, canonical);
+      tx.update(tocImportSessions)
+        .set({ documentId: docId, status: 'running', error: null, updatedAt: now })
+        .where(eq(tocImportSessions.id, input.sessionId))
+        .run();
+      tx.update(tocImportChunks)
+        .set({ status: 'completed', attempts: first.attempts + 1, error: null, updatedAt: now })
+        .where(and(eq(tocImportChunks.sessionId, input.sessionId), eq(tocImportChunks.ordinal, 0)))
+        .run();
+      return {
+        documentId: docId,
+        lessonId: only.id,
+        lessonTitle: only.title,
+        range: input.range,
+        stats: { lessons: 1, dialogues: only.dialogues.length, chunks: 1 },
+        committed: true as const,
+      };
+    });
+    return ok(done);
+  } catch (e) {
+    if (e instanceof BusinessError) return err(e);
+    return err(translateToBusinessError(e, 'commitTocFirstChunk'));
+  }
+}
+
+/**
+ * 记录 chunk 执行失败（converter 失败 / 0 课 / 多课时调用）：
+ * 仅 attempts+1 与中性错误码；session 一律不动（保持可恢复 prepared）。
+ * 归属不符即 E_NOT_FOUND，无任何写。
+ */
+export async function recordTocChunkFailure(
+  deps: RepoDeps,
+  input: { sessionId: string; userId: string; ordinal: number; errorCode: string }
+): Promise<Result<void, BusinessError>> {
+  try {
+    deps.db.transaction((tx) => {
+      const sessions = tx.select({ id: tocImportSessions.id, userId: tocImportSessions.userId }).from(tocImportSessions).where(eq(tocImportSessions.id, input.sessionId)).all();
+      const session = sessions[0];
+      if (!session || session.userId !== input.userId) {
+        throw new BusinessError('E_NOT_FOUND', '未找到指定的导入会话', 'LEARNER_STATE');
+      }
+      const rows = tx
+        .select()
+        .from(tocImportChunks)
+        .where(and(eq(tocImportChunks.sessionId, input.sessionId), eq(tocImportChunks.ordinal, input.ordinal)))
+        .all();
+      const hit = rows[0];
+      if (!hit) {
+        throw new BusinessError('E_NOT_FOUND', '未找到指定的分段', 'LEARNER_STATE');
+      }
+      tx.update(tocImportChunks)
+        .set({ attempts: hit.attempts + 1, error: input.errorCode.slice(0, 64), updatedAt: nowIso() })
+        .where(and(eq(tocImportChunks.sessionId, input.sessionId), eq(tocImportChunks.ordinal, input.ordinal)))
+        .run();
+    });
+    return ok(undefined);
+  } catch (e) {
+    if (e instanceof BusinessError) return err(e);
+    return err(translateToBusinessError(e, 'recordTocChunkFailure'));
+  }
 }

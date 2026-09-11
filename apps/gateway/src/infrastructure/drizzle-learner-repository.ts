@@ -225,9 +225,13 @@ import {
 import {
   prepareTocImportSession as prepareTocImportSessionDomain,
   getTocImportSession as getTocImportSessionDomain,
+  getTocImportSessionById as getTocImportSessionByIdDomain,
   bindTocImportSessionDocument as bindTocImportSessionDocumentDomain,
+  commitTocFirstChunk as commitTocFirstChunkDomain,
+  recordTocChunkFailure as recordTocChunkFailureDomain,
   type PrepareTocImportSessionInput,
   type PreparedTocImportSession,
+  type TocFirstChunkResult,
   type TocImportSession,
   type TocImportChunk,
 } from '../modules/library/persistence/toc-import-sessions.js';
@@ -1133,6 +1137,13 @@ export class DrizzleLearnerRepository implements LearnerRepository {
     return getTocImportSessionDomain(this.deps, userId, requestKey);
   }
 
+  /** 按 id 取导入 session + chunks（读侧永不抛；归属由调用方校验）。 */
+  public async getTocImportSessionById(
+    sessionId: string
+  ): Promise<{ session: TocImportSession; chunks: TocImportChunk[] } | undefined> {
+    return getTocImportSessionByIdDomain(this.deps, sessionId);
+  }
+
   /**
    * 绑定 session → target document（D2B 首 chunk 成功后调用，唯一绑定入口）。
    * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
@@ -1143,6 +1154,33 @@ export class DrizzleLearnerRepository implements LearnerRepository {
     documentId: string;
   }): Promise<Result<TocImportSession, BusinessError>> {
     return bindTocImportSessionDocumentDomain(this.deps, input);
+  }
+
+  /**
+   * 首 chunk 成功提交（单事务：建文档 + shred + 绑定 + 状态流转；已完成即幂等返回）。
+   * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
+   */
+  public async commitTocFirstChunk(input: {
+    sessionId: string;
+    userId: string;
+    docTitle: string;
+    book: TextbookAST;
+    range: { fromPage: number; toPage: number };
+  }): Promise<Result<TocFirstChunkResult, BusinessError>> {
+    return commitTocFirstChunkDomain(this.deps, input);
+  }
+
+  /**
+   * 记录 chunk 执行失败（仅 attempts + 中性错误码；session 不动）。
+   * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
+   */
+  public async recordTocChunkFailure(input: {
+    sessionId: string;
+    userId: string;
+    ordinal: number;
+    errorCode: string;
+  }): Promise<Result<void, BusinessError>> {
+    return recordTocChunkFailureDomain(this.deps, input);
   }
 
   /**

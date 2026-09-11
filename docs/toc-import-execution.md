@@ -99,17 +99,25 @@ invariant 恒 NULL，所有权只在 session 层，doctor 规则锁）、
   后续 chunk 只更新**同一个** session target document（取 session.document_id，
   不接受客户端传 document）。
 
-## 6. D2B 精确执行 gate（D2B 实现时逐项打勾）
+## 6. D2B 精确执行 gate（首 chunk 已实现并锁定）
 
-1. 按 `(user, request_key)` 读 session；`cancelled/failed`/`target_deleted` 拒绝执行；
-2. 按 `(session, ordinal)` 取 chunk；非 `prepared` 拒绝重复执行；
-3. 重算 `chunkFingerprint` 并与行比对，不一致拒绝（计划漂移）；
-4. 重跑 P5-A preview 确认该课仍 mapped 且 range 与 chunk 一致；
-5. 仅执行该 chunk 的物理窗 convert；结果非恰一课即 chunk 置 `failed` 并停；
-6. `saveCanonicalAst` + chunk 置 `completed` + `document_id` 回填**同一事务**；
-7. 任一步失败：chunk 置 `failed`（+ attempts++ + error），session 不置 completed，
-   已有 document/shred 行保持最近一次成功事务的完整状态（无半写）；
-8. 本文档 §5 的 `completed` 判定与放弃语义由 D2B 测试锁定。
+端点 `POST /api/documents/:userId/toc-import-sessions/:sessionId/execute-first`
+（实现 `toc-import-execute.ts` + 持久化 `commitTocFirstChunk`）：
+
+1. 按 id 读 session 并验 owner（不存在/他人一律 `E_NOT_FOUND`，零写）；
+2. 幂等快道：chunk0 已 completed 即读档返回（不探页数、不 convert、不 save）；
+   否则要求 session `prepared` 且未绑定、chunk0 `prepared`（终态/运行中一律拒绝）；
+3. `[1]` 探页数 → 重跑 preview → 指纹核验 → request_key/plan/chunk 行全比对；
+4. chunk0 所属 lesson 单完整 chunk、range 1..30（多 chunk lesson 即停）；
+5. 精确窗 convert（站外，零写）；结果非恰一课 → 只记 chunk attempts+错误码，
+   session 保持 prepared（不置 failed）；
+6. 单事务提交：重读（completed 即读档返回）→ 建文档 → canonical AST + shred →
+   session 绑定并转 running → chunk completed；任一步失败整体回滚；
+7. `chunk.document_id` 恒不写（废弃列，doctor 锁 NULL）；
+8. 无 persistent running lease：并发重复计算允许，SQLite 写串行化 + 事务内重读
+   保证至多 commit 一次，竞争方读到 completed 返回同一结果（单测锁定）；
+9. 首 chunk 的课恒为追加序第 0 位（D2B 按 chunk 序 append 的 invariant，
+   幂等读档据此定位；后续 chunk 执行时同样按序）。
 
 ## 7. Unresolved risk
 
