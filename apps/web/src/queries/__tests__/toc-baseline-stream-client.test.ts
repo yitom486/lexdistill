@@ -20,10 +20,10 @@ const BASELINE_RESULT = {
   range: { fromPage: 16, toPage: 21 },
   pageCount: 371,
   entries: [
-    { title: '第1課', printedPage: 12, level: 1, source: 'text', kind: 'lesson' },
-    { title: '第2課', printedPage: 30, level: 1, source: 'text', kind: 'lesson' },
+    { title: '第1課', printedPage: 12, level: 1, source: 'text-fallback', kind: 'lesson' },
+    { title: '第2課', printedPage: 30, level: 1, source: 'text-fallback', kind: 'lesson' },
   ],
-  diagnostics: { pagesRequested: 6, pagesOcr: 6, linesConsidered: 8, linesDroppedWash: 0, entriesAccepted: 2, entriesRejected: 0, badTitle: 0 },
+  diagnostics: { pagesRequested: 6, pagesOcr: 6, linesConsidered: 8, linesDroppedWash: 0, entriesAccepted: 2, entriesRejected: 0, badTitle: 0, entriesFromBlocks: 0, unresolvedBlocks: 0 },
   pageEvidence: [{ page: 16, excerpt: '第1課 12' }],
   embedded: false,
 };

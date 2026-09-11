@@ -90,7 +90,7 @@ describe('applyTocExtractStreamEvent', () => {
   it('终态后忽略后续事件', () => {
     const done = applyTocExtractStreamEvent(initialTocExtractProgress, {
       type: 'completed', plannedPages: 6, completedPages: 6, batchFrom: null, batchTo: null, readBytes: null, totalBytes: null,
-      data: { status: 'empty', verdict: 'empty', range: { fromPage: 16, toPage: 21 }, pageCount: 371, entries: [], diagnostics: { pagesRequested: 6, pagesOcr: 0, linesConsidered: 0, linesDroppedWash: 0, entriesAccepted: 0, entriesRejected: 0, badTitle: 0 }, pageEvidence: [], embedded: false },
+      data: { status: 'empty', verdict: 'empty', range: { fromPage: 16, toPage: 21 }, pageCount: 371, entries: [], diagnostics: { pagesRequested: 6, pagesOcr: 0, linesConsidered: 0, linesDroppedWash: 0, entriesAccepted: 0, entriesRejected: 0, badTitle: 0, entriesFromBlocks: 0, unresolvedBlocks: 0 }, pageEvidence: [], embedded: false },
       code: null, userMessage: null,
     });
     expect(done.phase).toBe('done');

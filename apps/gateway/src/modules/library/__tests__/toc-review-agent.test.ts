@@ -404,7 +404,7 @@ describe('P4B reviewTocWithAgent（mock）', () => {
       range: { fromPage: 3, toPage: 4 },
       pageCount: 100,
       entries: [
-        { title: '第2課', printedPage: 20, level: 1, source: 'text' as const, kind: 'lesson' as const },
+        { title: '第2課', printedPage: 20, level: 1, source: 'text-fallback' as const, kind: 'lesson' as const },
       ],
       diagnostics: {
         pagesRequested: 2,
@@ -414,6 +414,8 @@ describe('P4B reviewTocWithAgent（mock）', () => {
         entriesAccepted: 1,
         entriesRejected: 0,
         badTitle: 0,
+        entriesFromBlocks: 0,
+        unresolvedBlocks: 0,
       },
       pageEvidence: [{ page: 3, excerpt: '第2課 20' }],
       embedded: false,

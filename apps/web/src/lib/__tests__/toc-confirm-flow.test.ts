@@ -293,6 +293,19 @@ describe('P3.1B verdict/evidence/reviewStatus 收窄', () => {
     expect(narrowed?.verdict).toBe('thin');
     expect(narrowed?.diagnostics.badTitle).toBe(0);
     expect(narrowed?.pageEvidence).toEqual([]);
+    expect(narrowed?.diagnostics.entriesFromBlocks).toBe(0);
+    expect(narrowed?.diagnostics.unresolvedBlocks).toBe(0);
+  });
+
+  it('P3.2B 旧网关来源映射：geometry→geometry-block、table→text-fallback', () => {
+    const withLegacy = (source: string): unknown =>
+      narrowTocBaseline({ ...baselinePayload, entries: [{ title: '第1課', printedPage: 12, level: 1, source, kind: 'lesson' }] });
+    expect((withLegacy('geometry-block') as { entries: Array<{ source: string }> }).entries[0]?.source).toBe('geometry-block');
+    expect((withLegacy('text-fallback') as { entries: Array<{ source: string }> }).entries[0]?.source).toBe('text-fallback');
+    expect((withLegacy('geometry') as { entries: Array<{ source: string }> }).entries[0]?.source).toBe('geometry-block');
+    expect((withLegacy('table') as { entries: Array<{ source: string }> }).entries[0]?.source).toBe('text-fallback');
+    expect((withLegacy('text') as { entries: Array<{ source: string }> }).entries[0]?.source).toBe('text-fallback');
+    expect(withLegacy('nope')).toBeNull();
   });
 
   it('evidence 非法（超长/坏页码）整包 null', () => {

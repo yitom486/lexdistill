@@ -84,7 +84,9 @@ function kindLabel(kind: string): string {
 }
 
 function sourceLabel(source: string): string {
-  if (source === 'geometry') return '几何';
+  if (source === 'geometry-block') return '几何块';
+  // 旧网关兼容（收窄层已映射，此处兜底展示不断线）。
+  if (source === 'geometry') return '几何块';
   if (source === 'table') return '表格';
   return '文本';
 }
@@ -410,13 +412,15 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
                 >
                   <span className="truncate">
                     {entry.title}
-                    <span className="ml-1 font-mono text-stone-400">印{entry.printedPage}页</span>
+                    <span className="ml-1 font-mono text-stone-400" title="教材印刷页（书内页码），不是 PDF 物理页">
+                      印{entry.printedPage}页
+                    </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-1">
                     <Badge variant="outline" className="text-[10px]">
                       {kindLabel(entry.kind)}
                     </Badge>
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-[10px]" title="geometry-block=版式坐标证据 · text-fallback=纯文本">
                       {sourceLabel(entry.source)}
                     </Badge>
                   </span>
@@ -428,6 +432,9 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
             请求 {baseline.diagnostics.pagesRequested} 页 · OCR {baseline.diagnostics.pagesOcr} 页 · 接受{' '}
             {baseline.diagnostics.entriesAccepted} · 拒绝 {baseline.diagnostics.entriesRejected}
             {baseline.diagnostics.badTitle > 0 && ` · 标题不合 ${baseline.diagnostics.badTitle}`}
+            {baseline.diagnostics.entriesFromBlocks > 0 && ` · 版式 ${baseline.diagnostics.entriesFromBlocks}`}
+            {baseline.diagnostics.unresolvedBlocks > 0 &&
+              ` · ${baseline.diagnostics.unresolvedBlocks} 个标题未定位页码（待定，不猜）`}
           </p>
           {baseline.pageEvidence.length > 0 && (
             <details className="text-[11px] text-stone-500 dark:text-stone-400">
@@ -533,11 +540,16 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
                   >
                     <span className="truncate">
                       {entry.title}
-                      <span className="ml-1 font-mono text-stone-400">印{entry.printedPage}页</span>
+                      <span className="ml-1 font-mono text-stone-400" title="教材印刷页（书内页码），不是 PDF 物理页">
+                        印{entry.printedPage}页
+                      </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-1">
                       <Badge variant="outline" className="text-[10px]">
                         {kindLabel(entry.kind)}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px]" title="ai-draft=AI 按证据重建，需人工确认">
+                        AI草稿
                       </Badge>
                       <Badge variant={confidenceBadge(entry.confidence)} className="text-[10px]">
                         {entry.confidence}

@@ -5,6 +5,7 @@ import {
   LESSON_TOKEN_RE,
   TABLE_ROW_RE,
   TRAILING_PAGE_RE,
+  stripMarkdownLineMarkers,
 } from './toc-discovery.js';
 import {
   probePdfPageCount,
@@ -14,6 +15,7 @@ import {
   type PdfImportServiceDeps,
 } from './pdf-import-service.js';
 import { classifyEmbeddedOutline, isSemanticOutlineTitle } from './embedded-outline-quality.js';
+import { matchTocLayoutBlocks, normalizeTocBlockText } from './toc-layout-blocks.js';
 
 /**
  * CMD-LINGUA-P3：已确认目录页范围的本地 OCR 目录基线（只读，后端）。
@@ -42,7 +44,13 @@ export const TOC_BASELINE_SOUP_NUMBERS = 3;
 const HEAD_TAIL_EDGE = 2;
 
 export type TocBaselineEntryKind = 'lesson' | 'section';
-export type TocBaselineEntrySource = 'geometry' | 'text' | 'table';
+/**
+ * CMD-LINGUA-P3.2B 条目来源三态（UI 直接展示）：
+ * - geometry-block：坐标版式证据（跨行关联/同行 span 验证/黏连拆分），确定性规则；
+ * - text-fallback：无坐标时的 markdown 单行文本路径；
+ * - ai-draft：仅前端展示 AI 草稿列的标签（网关永不产出）。
+ */
+export type TocBaselineEntrySource = 'geometry-block' | 'text-fallback';
 
 export interface TocBaselineEntry {
   title: string;
@@ -78,6 +86,10 @@ export interface TocBaselineDiagnostics {
   entriesRejected: number;
   /** 标题无语义内容被拒的行数（符号-only/Markdown 残留/纯数字形，不记原文）。 */
   badTitle: number;
+  /** 版式块匹配产出的条目数（坐标证据，确定性规则）。 */
+  entriesFromBlocks: number;
+  /** 版式块未定位的标题数（只记数，不猜页码）。 */
+  unresolvedBlocks: number;
 }
 
 export interface TocBaselineOutput {
@@ -173,16 +185,9 @@ export function washRepeatedTocLines(pages: Array<{ page: number; lines: string[
 type LineEntry = { title: string; printedPage: number; tableRow: boolean } | { refused: string } | null;
 
 /**
- * Markdown 行标记剥离（纯函数）：OCR markdown 常把大号文字变成 `#` 标题、
- * 列表变成 `- `，这些残留不属于目录标题内容，先剥再做语义判定。
- * 剥后仍无语义才拒绝；判定用 P2.2 唯一语义规则（不复制第二套）。
+ * Markdown 行标记剥离（re-export：实现已迁 toc-discovery，版式块与行抽取共用同一口径）。
  */
-export function stripMarkdownLineMarkers(title: string): string {
-  return title
-    .replace(/^[#>\-*+\s]+/, '')
-    .replace(/[#*]+$/, '')
-    .trim();
-}
+export { stripMarkdownLineMarkers } from './toc-discovery.js';
 
 /**
  * 单行目录候选抽取（纯函数）：表格行取末格数字为页、余格为题；
@@ -374,6 +379,8 @@ export async function extractTocBaseline(
   const washed = washRepeatedTocLines(
     window.map((p) => ({ page: p, lines: (markdownByPage.get(p) ?? '').split('\n') }))
   );
+  // P3.2B：OCR 无 spans 的页回填 native 定位（不占 OCR 预算；失败即文本降级）。
+  const positioned = fillPositionedSpans(inspector, input.bytes, window, spansByPage);
   const keptByPage = new Map<number, WashedLine[]>();
   for (const line of washed.kept) {
     const list = keptByPage.get(line.page) ?? [];
@@ -403,6 +410,7 @@ export async function extractTocBaseline(
     badTitle: assembled.diagnostics.badTitle,
     washed: washed.dropped,
     ocrPages: ocrPages.length,
+    positioned,
   });
   return ok({
     status: assembled.status,
@@ -414,6 +422,60 @@ export async function extractTocBaseline(
     pageEvidence: assembled.pageEvidence,
     embedded: false,
   });
+}
+
+/**
+ * CMD-LINGUA-P3.2B native 坐标回填（只读）：OCR 未给 spans 的页，用
+ * `extractTextWithPositions` 原生定位条目补齐（同坐标系；纯 native 解析，
+ * 不占 OCR 预算、不新增模型下载）。OCR spans 优先，只填空页；失败即降级
+ * （该页走文本路径）。无坐标方法时静默返回 0，不抛。
+ */
+export function fillPositionedSpans(
+  inspector: PdfInspectorLike,
+  bytes: Uint8Array,
+  window: number[],
+  spansByPage: Map<number, TocGeometrySpan[]>
+): number {
+  if (typeof inspector.extractTextWithPositions !== 'function') return 0;
+  const missing = window.filter((p) => (spansByPage.get(p) ?? []).length === 0);
+  if (missing.length === 0) return 0;
+  let raw: unknown[];
+  try {
+    const out = inspector.extractTextWithPositions(bytes, missing);
+    raw = Array.isArray(out) ? out : [];
+  } catch {
+    return 0;
+  }
+  const wanted = new Set(missing);
+  // OCR spans 优先：调用前已有 spans 的页整页跳过（OCR 与 native 同页不混用）。
+  for (const p of [...wanted]) {
+    if ((spansByPage.get(p) ?? []).length > 0) wanted.delete(p);
+  }
+  if (wanted.size === 0) return 0;
+  let filled = 0;
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    if (typeof rec.text !== 'string' || !rec.text.trim()) continue;
+    if (typeof rec.page !== 'number' || !wanted.has(Math.trunc(rec.page))) continue;
+    let coordsOk = true;
+    for (const key of ['x', 'y', 'width', 'height'] as const) {
+      if (typeof rec[key] !== 'number' || !Number.isFinite(rec[key] as number)) coordsOk = false;
+    }
+    if (!coordsOk) continue;
+    const page = Math.trunc(rec.page as number);
+    const list = spansByPage.get(page) ?? [];
+    list.push({
+      text: rec.text as string,
+      x: rec.x as number,
+      y: rec.y as number,
+      width: rec.width as number,
+      height: rec.height as number,
+    });
+    spansByPage.set(page, list);
+    filled++;
+  }
+  return filled;
 }
 
 /**
@@ -437,7 +499,15 @@ export function assembleTocBaseline(
   const entries: TocBaselineEntry[] = [];
   let rejected = 0;
   let badTitle = 0;
+  let entriesFromBlocks = 0;
+  let unresolvedBlocks = 0;
+  // P3.2B：文本路径先行（行为与旧版逐字节一致），版式块只补缺口：
+  // 同页内文本条目在前、块条目在后；块侧经 satisfied 集合跳过文本已认领标题
+  // （不产出、不计 unresolved）；文本键同样归一化，双计不可能。
+  // 无坐标页 matcher 即返回空，旧行为自然保留（降级）。
+  const normTitle = (s: string): string => normalizeTocBlockText(s);
   for (const page of window) {
+    const satisfied = new Set<string>();
     for (const line of keptByPage.get(page) ?? []) {
       const parsed = extractTocLineEntry(line.text);
       if (parsed === null) continue;
@@ -453,9 +523,27 @@ export function assembleTocBaseline(
         title: parsed.title,
         printedPage: parsed.printedPage,
         level: kind === 'lesson' ? 1 : 2,
-        source: geometry ? 'geometry' : parsed.tableRow ? 'table' : 'text',
+        source: geometry ? 'geometry-block' : 'text-fallback',
         kind,
       });
+      satisfied.add(normTitle(parsed.title));
+    }
+    const blockRes = matchTocLayoutBlocks(spansByPage.get(page) ?? [], satisfied);
+    unresolvedBlocks += blockRes.unresolved;
+    const seenBlock = new Set<string>();
+    for (const block of blockRes.entries) {
+      const key = `${normTitle(block.title)}｜${block.printedPage}`;
+      if (satisfied.has(normTitle(block.title)) || seenBlock.has(key)) continue;
+      seenBlock.add(key);
+      const kind = classifyTocEntryKind(block.title);
+      entries.push({
+        title: block.title,
+        printedPage: block.printedPage,
+        level: 1,
+        source: 'geometry-block',
+        kind,
+      });
+      entriesFromBlocks++;
     }
   }
   const verdict: TocBaselineVerdict =
@@ -482,6 +570,8 @@ export function assembleTocBaseline(
       entriesAccepted: entries.length,
       entriesRejected: rejected,
       badTitle,
+      entriesFromBlocks,
+      unresolvedBlocks,
     },
     pageEvidence,
   };
@@ -509,6 +599,8 @@ export function embeddedBaselineResult(
       entriesAccepted: 0,
       entriesRejected: 0,
       badTitle: 0,
+      entriesFromBlocks: 0,
+      unresolvedBlocks: 0,
     },
     pageEvidence: [],
     embedded: true,

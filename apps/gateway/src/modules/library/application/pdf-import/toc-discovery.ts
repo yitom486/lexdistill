@@ -64,6 +64,19 @@ export const TABLE_ROW_RE = /[|｜]/;
 /** 习题行：问号题号/练习字样 + 数字（P3 基线复用，拒绝习题正文）。 */
 export const EXERCISE_RE = /^(問|问)\s*\d+|^Q\s*\d+[\.\)]?|^(練習|练习|EXERCISE)\s*\d+/i;
 
+/**
+ * CMD-LINGUA-P3.2B：Markdown 行标记剥离（纯函数）：OCR markdown 常把大号文字变成 `#` 标题、
+ * 列表变成 `- `，这些残留不属于目录标题内容，先剥再做语义判定。
+ * 剥后仍无语义才拒绝；判定用 P2.2 唯一语义规则（不复制第二套）。
+ * （原居 toc-baseline，版式块匹配亦需同一口径，遂迁此；toc-baseline  re-export 保持导入面。）
+ */
+export function stripMarkdownLineMarkers(title: string): string {
+  return title
+    .replace(/^[#>\-*+\s]+/, '')
+    .replace(/[#*]+$/, '')
+    .trim();
+}
+
 export interface TocPageFeatures {
   hasTocTitle: boolean;
   lessonTokenLines: number;

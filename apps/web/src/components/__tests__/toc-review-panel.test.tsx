@@ -78,7 +78,7 @@ const BASELINE: TocBaselineData = {
   verdict: 'thin',
   range: { fromPage: 2, toPage: 4 },
   pageCount: 100,
-  entries: [{ title: '第1課', printedPage: 12, level: 1, source: 'text', kind: 'lesson' }],
+  entries: [{ title: '第1課', printedPage: 12, level: 1, source: 'text-fallback', kind: 'lesson' }],
   diagnostics: {
     pagesRequested: 3,
     pagesOcr: 3,
@@ -87,6 +87,8 @@ const BASELINE: TocBaselineData = {
     entriesAccepted: 1,
     entriesRejected: 0,
     badTitle: 0,
+    entriesFromBlocks: 0,
+    unresolvedBlocks: 0,
   },
   pageEvidence: [{ page: 2, excerpt: '第1課 12' }],
   embedded: false,
@@ -272,6 +274,28 @@ describe('P3.1B verdict/证据/手动/降级视图（SSR）', () => {
     const html = render({ baseline: { ...BASELINE, verdict: 'usable' }, adoptDisabled: false });
     expect(html).not.toContain('结果不足');
     expect(html).toContain('采用 OCR 基线');
+  });
+
+  it('P3.2B 来源三态：几何块/文本/AI草稿 + 印刷非物理 title + 未定位计数', () => {
+    const html = render({
+      baseline: {
+        ...BASELINE,
+        verdict: 'usable',
+        entries: [
+          { title: '第3課', printedPage: 30, level: 1, source: 'geometry-block', kind: 'lesson' },
+          { title: '第1課', printedPage: 12, level: 1, source: 'text-fallback', kind: 'lesson' },
+        ],
+        diagnostics: { ...BASELINE.diagnostics, entriesFromBlocks: 1, unresolvedBlocks: 2 },
+      },
+      adoptDisabled: false,
+      review: REVIEW,
+    });
+    expect(html).toContain('几何块');
+    expect(html).toContain('文本');
+    expect(html).toContain('AI草稿');
+    expect(html).toContain('不是 PDF 物理页');
+    expect(html).toContain('2 个标题未定位页码（待定，不猜）');
+    expect(html).toContain('版式 1');
   });
 
   it('编辑态有增删行按钮；空标题确认禁用', () => {

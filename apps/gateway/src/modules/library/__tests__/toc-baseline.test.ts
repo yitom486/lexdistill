@@ -112,6 +112,16 @@ interface SpanInit {
 interface BaselineCalls {
   classify: Array<readonly number[] | undefined>;
   ocr: Array<number[] | undefined>;
+  positioned: Array<readonly number[] | undefined>;
+}
+
+interface NativeItemInit {
+  text: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 function baselineMock(args: {
@@ -119,6 +129,7 @@ function baselineMock(args: {
   needing?: number[];
   mdByPage?: Record<number, string>;
   spansByPage?: Record<number, SpanInit[]>;
+  nativeByPage?: Record<number, NativeItemInit[]>;
   routed?: number[];
   outline?: { value: unknown };
   calls: BaselineCalls;
@@ -126,6 +137,7 @@ function baselineMock(args: {
   const needing = args.needing ?? [];
   const md = args.mdByPage ?? {};
   const spans = args.spansByPage ?? {};
+  const natives = args.nativeByPage ?? {};
   const base: PdfInspectorLike = {
     processPdf: (_pdf, pages) => {
       args.calls.classify.push(pages);
@@ -140,6 +152,15 @@ function baselineMock(args: {
         pagesRoutedToOcr: args.routed ?? window,
       };
     },
+    extractTextWithPositions: (_pdf, pages) => {
+      args.calls.positioned.push(pages);
+      const wanted = new Set(Array.isArray(pages) ? pages : []);
+      const out: NativeItemInit[] = [];
+      for (const [key, items] of Object.entries(natives)) {
+        if (wanted.has(Number(key))) out.push(...items);
+      }
+      return out as never;
+    },
   };
   if (!args.outline) return base;
   return {
@@ -153,7 +174,7 @@ function baselineMock(args: {
 }
 
 function newCalls(): BaselineCalls {
-  return { classify: [], ocr: [] };
+  return { classify: [], ocr: [], positioned: [] };
 }
 
 function mockBytes(): Uint8Array {
@@ -195,12 +216,12 @@ describe('P3 extractTocBaseline 编排', () => {
     expect(res.value.pageCount).toBe(371);
     expect(res.value.embedded).toBe(false);
     expect(res.value.entries).toEqual([
-      { title: '第1課 はじめまして …………………', printedPage: 3, level: 1, source: 'geometry', kind: 'lesson' },
-      { title: '第2課 これは本です …………………', printedPage: 7, level: 1, source: 'geometry', kind: 'lesson' },
-      { title: '第3課 さんぽ …………………', printedPage: 11, level: 1, source: 'text', kind: 'lesson' },
-      { title: '復習A …………………', printedPage: 15, level: 1, source: 'text', kind: 'lesson' },
-      { title: '会話 …………………', printedPage: 4, level: 2, source: 'text', kind: 'section' },
-      { title: '練習A …………………', printedPage: 6, level: 2, source: 'text', kind: 'section' },
+      { title: '第1課 はじめまして …………………', printedPage: 3, level: 1, source: 'geometry-block', kind: 'lesson' },
+      { title: '第2課 これは本です …………………', printedPage: 7, level: 1, source: 'geometry-block', kind: 'lesson' },
+      { title: '第3課 さんぽ …………………', printedPage: 11, level: 1, source: 'text-fallback', kind: 'lesson' },
+      { title: '復習A …………………', printedPage: 15, level: 1, source: 'text-fallback', kind: 'lesson' },
+      { title: '会話 …………………', printedPage: 4, level: 2, source: 'text-fallback', kind: 'section' },
+      { title: '練習A …………………', printedPage: 6, level: 2, source: 'text-fallback', kind: 'section' },
     ]);
     expect(res.value.diagnostics).toEqual({
       pagesRequested: 2,
@@ -210,6 +231,8 @@ describe('P3 extractTocBaseline 编排', () => {
       entriesAccepted: 6,
       entriesRejected: 0,
       badTitle: 0,
+      entriesFromBlocks: 0,
+      unresolvedBlocks: 0,
     });
     expect(res.value.verdict).toBe('usable');
     expect(res.value.pageEvidence.map((e) => e.page)).toEqual([2, 3]);
@@ -235,7 +258,7 @@ describe('P3 extractTocBaseline 编排', () => {
     expect(isOk(withSpan)).toBe(true);
     if (!isOk(withSpan)) return;
     expect(withSpan.value.entries).toEqual([
-      { title: '第3課 さんぽ', printedPage: 11, level: 1, source: 'geometry', kind: 'lesson' },
+      { title: '第3課 さんぽ', printedPage: 11, level: 1, source: 'geometry-block', kind: 'lesson' },
     ]);
     const calls2 = newCalls();
     const withoutSpan = await extractTocBaseline(
@@ -247,7 +270,7 @@ describe('P3 extractTocBaseline 编排', () => {
     expect(isOk(withoutSpan)).toBe(true);
     if (!isOk(withoutSpan)) return;
     expect(withoutSpan.value.entries).toEqual([
-      { title: '第3課 さんぽ', printedPage: 11, level: 1, source: 'table', kind: 'lesson' },
+      { title: '第3課 さんぽ', printedPage: 11, level: 1, source: 'text-fallback', kind: 'lesson' },
     ]);
   });
 
@@ -267,7 +290,7 @@ describe('P3 extractTocBaseline 编排', () => {
     );
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
-    expect(res.value.entries).toEqual([{ title: '第1課 …', printedPage: 3, level: 1, source: 'text', kind: 'lesson' }]);
+    expect(res.value.entries).toEqual([{ title: '第1課 …', printedPage: 3, level: 1, source: 'text-fallback', kind: 'lesson' }]);
   });
 
   it('范围错误在 OCR 前拒绝：超 30/越界/空范围零 OCR', async () => {
@@ -306,8 +329,7 @@ describe('P3 extractTocBaseline 编排', () => {
     expect(emptyCalls.ocr).toEqual([]);
   });
 
-  it('embedded 命中时 OCR 为 0（不伪造条目）', async () => {
-    const calls = newCalls();
+  it('embedded 命中时 OCR 为 0（不伪造条目）', async () => {    const calls = newCalls();
     const res = await extractTocBaseline(
       {
         loadInspector: async () =>
@@ -363,7 +385,7 @@ describe('P3.1B 基线质量 verdict（无语义标题拒绝）', () => {
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.entries).toEqual([
-      { title: '第1課 はじめまして', printedPage: 3, level: 1, source: 'text', kind: 'lesson' },
+      { title: '第1課 はじめまして', printedPage: 3, level: 1, source: 'text-fallback', kind: 'lesson' },
     ]);
     expect(res.value.status).toBe('ok');
     expect(res.value.verdict).toBe('thin');
@@ -439,5 +461,106 @@ describe('P3.1B 基线质量 verdict（无语义标题拒绝）', () => {
     const excerpt = res.value.pageEvidence[0]?.excerpt as string;
     expect(excerpt.length).toBeLessThanOrEqual(1506);
     expect(excerpt.endsWith('…(已截断)')).toBe(true);
+  });
+});
+
+describe('P3.2B 版式块编排（坐标补缺口）', () => {
+  const J1_MD = ['目次', '第3課 さんぽ …………………', '30', '本文つづき'].join('\n');
+  const J1_SPANS: SpanInit[] = [
+    { text: '目次', x: 50, y: 730, width: 40, height: 12, confidence: 0.9 },
+    { text: '第3課 さんぽ …………………', x: 50, y: 642, width: 220, height: 12, confidence: 0.9 },
+    { text: '30', x: 50, y: 620, width: 14, height: 12, confidence: 0.9 },
+    { text: '本文つづき', x: 50, y: 500, width: 100, height: 12, confidence: 0.9 },
+  ];
+
+  it('J1 断行：markdown 零条目 → 块按坐标补 1 条 geometry-block（不猜第二条）', async () => {
+    const calls = newCalls();
+    const res = await extractTocBaseline(
+      {
+        loadInspector: async () =>
+          baselineMock({ pageCount: 371, needing: [16], mdByPage: { 16: J1_MD }, spansByPage: { 16: J1_SPANS }, routed: [16], calls }),
+      },
+      { userId: 'u1', filename: 'big.pdf', bytes: mockBytes(), fromPage: 16, toPage: 16 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.entries).toEqual([
+      { title: '第3課 さんぽ', printedPage: 30, level: 1, source: 'geometry-block', kind: 'lesson' },
+    ]);
+    expect(res.value.verdict).toBe('thin');
+    expect(res.value.diagnostics.entriesFromBlocks).toBe(1);
+    expect(res.value.diagnostics.unresolvedBlocks).toBe(0);
+  });
+
+  it('OCR 无 spans 时回填 native 定位：同 J1 形状同样补条目', async () => {
+    const calls = newCalls();
+    const res = await extractTocBaseline(
+      {
+        loadInspector: async () =>
+          baselineMock({
+            pageCount: 371,
+            needing: [],
+            mdByPage: { 16: J1_MD },
+            routed: [],
+            nativeByPage: {
+              16: J1_SPANS.map((s) => ({ text: s.text, page: 16, x: s.x, y: s.y, width: s.width, height: s.height })),
+            },
+            calls,
+          }),
+      },
+      { userId: 'u1', filename: 'big.pdf', bytes: mockBytes(), fromPage: 16, toPage: 16 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.entries).toEqual([
+      { title: '第3課 さんぽ', printedPage: 30, level: 1, source: 'geometry-block', kind: 'lesson' },
+    ]);
+    expect(calls.positioned).toEqual([[16]]);
+    expect(res.value.diagnostics.entriesFromBlocks).toBe(1);
+  });
+
+  it('OCR 有 spans 的页不调 native（只填空页）；无坐标方法时静默降级', async () => {
+    const calls = newCalls();
+    const res = await extractTocBaseline(
+      {
+        loadInspector: async () =>
+          baselineMock({ pageCount: 371, needing: [16], mdByPage: { 16: J1_MD }, spansByPage: { 16: J1_SPANS }, routed: [16], calls }),
+      },
+      { userId: 'u1', filename: 'big.pdf', bytes: mockBytes(), fromPage: 16, toPage: 16 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(calls.positioned).toEqual([]);
+    expect(res.value.diagnostics.entriesFromBlocks).toBe(1);
+  });
+
+  it('heading 无候选 → unresolved 计数，条目为 empty（绝不猜页码）', async () => {
+    const calls = newCalls();
+    const md = ['目次', '第7課 まち', '本文つづき'].join('\n');
+    const res = await extractTocBaseline(
+      {
+        loadInspector: async () =>
+          baselineMock({
+            pageCount: 371,
+            needing: [16],
+            mdByPage: { 16: md },
+            spansByPage: {
+              16: [
+                { text: '目次', x: 50, y: 730, width: 40, height: 12, confidence: 0.9 },
+                { text: '第7課 まち', x: 50, y: 640, width: 150, height: 12, confidence: 0.9 },
+                { text: '本文つづき', x: 50, y: 500, width: 100, height: 12, confidence: 0.9 },
+              ],
+            },
+            routed: [16],
+            calls,
+          }),
+      },
+      { userId: 'u1', filename: 'big.pdf', bytes: mockBytes(), fromPage: 16, toPage: 16 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.entries).toEqual([]);
+    expect(res.value.verdict).toBe('empty');
+    expect(res.value.diagnostics.unresolvedBlocks).toBe(1);
   });
 });

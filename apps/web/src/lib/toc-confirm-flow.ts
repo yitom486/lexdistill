@@ -37,7 +37,8 @@ export interface TocDiscoveryData {
 }
 
 export type TocBaselineEntryKind = 'lesson' | 'section';
-export type TocBaselineEntrySource = 'geometry' | 'text' | 'table';
+/** P3.2B 条目来源三态（与网关一致；旧网关 geometry/table 在收窄时映射）。 */
+export type TocBaselineEntrySource = 'geometry-block' | 'text-fallback';
 
 export interface TocBaselineEntry {
   title: string;
@@ -63,6 +64,10 @@ export interface TocBaselineData {
     entriesRejected: number;
     /** 无语义标题被拒行数（缺席回填 0）。 */
     badTitle: number;
+    /** 版式块产出条目数（旧网关缺席回填 0）。 */
+    entriesFromBlocks: number;
+    /** 版式块未定位标题数（旧网关缺席回填 0）。 */
+    unresolvedBlocks: number;
   };
   /** 每页受限 OCR 证据（只读展示；缺席回填 []）。 */
   pageEvidence: Array<{ page: number; excerpt: string }>;
@@ -230,9 +235,16 @@ function narrowBaselineEntry(value: unknown): TocBaselineEntry | null {
   if (typeof title !== 'string' || !title) return null;
   if (typeof printedPage !== 'number' || !Number.isSafeInteger(printedPage) || printedPage < 1) return null;
   if (typeof level !== 'number' || !Number.isSafeInteger(level) || level < 1) return null;
-  if (source !== 'geometry' && source !== 'text' && source !== 'table') return null;
+  // 旧网关兼容：geometry→geometry-block、text/table→text-fallback（混合部署不断线）。
+  const mappedSource =
+    source === 'geometry' || source === 'geometry-block'
+      ? 'geometry-block'
+      : source === 'text' || source === 'table' || source === 'text-fallback'
+        ? 'text-fallback'
+        : null;
+  if (!mappedSource) return null;
   if (kind !== 'lesson' && kind !== 'section') return null;
-  return { title, printedPage, level, source, kind };
+  return { title, printedPage, level, source: mappedSource, kind };
 }
 
 function narrowRange(value: unknown): { fromPage: number; toPage: number } | null {
@@ -267,6 +279,13 @@ export function narrowTocBaseline(payload: unknown): TocBaselineData | null {
   ];
   const badTitleRaw = (diagnostics as Record<string, unknown>).badTitle;
   const badTitle = typeof badTitleRaw === 'number' && Number.isSafeInteger(badTitleRaw) && badTitleRaw >= 0 ? badTitleRaw : 0;
+  // P3.2B 新增计数缺席（旧网关）回填 0；非法值同样回填 0（只读展示，不影响守门）。
+  const extra = (key: 'entriesFromBlocks' | 'unresolvedBlocks'): number => {
+    const raw = (diagnostics as Record<string, unknown>)[key];
+    return typeof raw === 'number' && Number.isSafeInteger(raw) && raw >= 0 ? raw : 0;
+  };
+  const entriesFromBlocks = extra('entriesFromBlocks');
+  const unresolvedBlocks = extra('unresolvedBlocks');
   // verdict 缺席（旧网关）按条数回填；非法值回填 none→按规则重算
   const verdictRaw = (payload as Record<string, unknown>).verdict;
   const verdict: TocBaselineData['verdict'] =
@@ -296,7 +315,7 @@ export function narrowTocBaseline(payload: unknown): TocBaselineData | null {
     range: narrowedRange,
     pageCount,
     entries: narrowedEntries,
-    diagnostics: { pagesRequested, pagesOcr, linesConsidered, linesDroppedWash, entriesAccepted, entriesRejected, badTitle },
+    diagnostics: { pagesRequested, pagesOcr, linesConsidered, linesDroppedWash, entriesAccepted, entriesRejected, badTitle, entriesFromBlocks, unresolvedBlocks },
     pageEvidence,
     embedded: embedded === true,
   };

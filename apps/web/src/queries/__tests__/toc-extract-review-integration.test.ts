@@ -118,6 +118,51 @@ function syntheticProsePdf(): Uint8Array {
   ]);
 }
 
+/** 版式块双栏目录页内容：标题左（x=50）、页码右（x=450）同行，无私人内容。 */
+function twoColumnPageContent(heading: string, page: string): string {
+  return (
+    `BT /F1 24 Tf 50 700 Td (${heading}) Tj ET\n` + `BT /F1 24 Tf 450 700 Td (${page}) Tj ET\n`
+  );
+}
+
+/** 内存 synthetic：2 页双栏目录（标题与页码分列，无同行尾数），无私人内容。 */
+function syntheticTwoColumnTocPdf(): Uint8Array {
+  const pageObj = (contentRef: number): string =>
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentRef} 0 R /Resources << /Font << /F1 8 0 R >> >> >>`;
+  const streamObj = (text: string): string =>
+    `<< /Length ${Buffer.byteLength(text, 'latin1')} >>\nstream\n${text}endstream`;
+  return buildPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    pageObj(5),
+    pageObj(6),
+    streamObj(twoColumnPageContent('Lesson 1 Apple', '12')),
+    streamObj(twoColumnPageContent('Lesson 2 Orange', '30')),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]);
+}
+
+/** 内存 synthetic：2 页跨行目录（标题行 + 独立页码行，无同行尾数），无私人内容。 */
+function syntheticSplitLineTocPdf(): Uint8Array {
+  // y-gap 取 50pt（探针实测：fork markdown 在 gap≥45 时不再合并数字行，
+  // 块容差 2.2×24=52.8pt 仍覆盖——文本零条目、块必须命中）。
+  const pageContent = (heading: string, page: string): string =>
+    `BT /F1 24 Tf 50 700 Td (${heading}) Tj ET\n` + `BT /F1 24 Tf 50 650 Td (${page}) Tj ET\n`;
+  const pageObj = (contentRef: number): string =>
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentRef} 0 R /Resources << /Font << /F1 8 0 R >> >> >>`;
+  const streamObj = (text: string): string =>
+    `<< /Length ${Buffer.byteLength(text, 'latin1')} >>\nstream\n${text}endstream`;
+  return buildPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    pageObj(5),
+    pageObj(6),
+    streamObj(pageContent('Lesson 3 Banana', '44')),
+    streamObj(pageContent('Lesson 4 Grape', '58')),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]);
+}
+
 /** 脚本队列假通道：按 send 顺序吐脚本（重试测试用）。 */
 function fakeAdapter(scripts: string[]) {
   let n = 0;
@@ -328,6 +373,52 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
       );
       expect(err instanceof GatewayRequestError).toBe(true);
       expect((err as GatewayRequestError).code).toBe('E_TOC_EVIDENCE_INSUFFICIENT');
+    } finally {
+      configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
+    }
+  }, 180000);
+
+  it('P3.2B 双栏目录：标题页码分列 → extract usable 且条目正确', async () => {
+    // 探针实测：fork 会把同行两列合并成一行 markdown（`## Lesson 1 Apple 12`，
+    // `##` 前缀为既有行为，旧测试亦不断言标题原文），故走文本路径
+    // （text-fallback）；本用例锁定端到端正确性，块归因由跨行用例锁定。
+    const url = serve([]);
+    configureGatewayBaseUrl(url);
+    try {
+      const tmp = await writeTempPdf(syntheticTwoColumnTocPdf());
+      const baseline = await requestExtractTocBaseline('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
+      expect(baseline.verdict).toBe('usable');
+      expect(baseline.entries).toHaveLength(2);
+      for (const entry of baseline.entries) {
+        expect(entry.kind).toBe('lesson');
+      }
+      const byTitle = new Map(
+        baseline.entries.map((e) => [e.title.replace(/^#+\s*/, ''), e.printedPage])
+      );
+      expect(byTitle.get('Lesson 1 Apple')).toBe(12);
+      expect(byTitle.get('Lesson 2 Orange')).toBe(30);
+      expect(baseline.diagnostics.entriesFromBlocks).toBe(0);
+    } finally {
+      configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
+    }
+  }, 180000);
+
+  it('P3.2B 跨行目录：标题行+独立页码行 → 文本零条目、块补 2 条 geometry-block', async () => {
+    const url = serve([]);
+    configureGatewayBaseUrl(url);
+    try {
+      const tmp = await writeTempPdf(syntheticSplitLineTocPdf());
+      const baseline = await requestExtractTocBaseline('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
+      expect(baseline.verdict).toBe('usable');
+      expect(baseline.entries).toHaveLength(2);
+      const byTitle = new Map(baseline.entries.map((e) => [e.title, e.printedPage]));
+      expect(byTitle.get('Lesson 3 Banana')).toBe(44);
+      expect(byTitle.get('Lesson 4 Grape')).toBe(58);
+      for (const entry of baseline.entries) {
+        expect(entry.source).toBe('geometry-block');
+      }
+      expect(baseline.diagnostics.entriesFromBlocks).toBe(2);
+      expect(baseline.diagnostics.unresolvedBlocks).toBe(0);
     } finally {
       configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
     }

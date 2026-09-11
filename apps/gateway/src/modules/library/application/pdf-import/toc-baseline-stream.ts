@@ -9,6 +9,7 @@ import {
   TOC_BASELINE_MAX_PAGES,
   assembleTocBaseline,
   embeddedBaselineResult,
+  fillPositionedSpans,
   washRepeatedTocLines,
   type TocBaselineOutput,
   type TocGeometrySpan,
@@ -350,6 +351,8 @@ async function runBaselinePhases(
 
   // 解析前最后一次取消检查：abort 落在末批内时不再解析、不发 completed。
   if (aborted(sink.signal)) return cancelRun(run);
+  // P3.2B：OCR 无 spans 的页回填 native 定位（与 JSON 路径同一函数，结果一致）。
+  fillPositionedSpans(ocrInspector, input.bytes, window, spansByPage);
   sink.emit({ type: 'parsing', plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMs() });
   tocTrace('parsing', { plannedPages: run.plannedPages, completedPages: run.completedPages, elapsedMs: elapsedMs() });
 

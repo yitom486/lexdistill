@@ -77,7 +77,7 @@ const BASELINE_PAYLOAD = {
   status: 'ok',
   range: { fromPage: 2, toPage: 4 },
   pageCount: 100,
-  entries: [{ title: '第1課', printedPage: 12, level: 1, source: 'text', kind: 'lesson' }],
+  entries: [{ title: '第1課', printedPage: 12, level: 1, source: 'text-fallback', kind: 'lesson' }],
   diagnostics: {
     pagesRequested: 3,
     pagesOcr: 3,
