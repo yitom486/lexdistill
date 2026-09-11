@@ -490,3 +490,62 @@ describe('P3.4B-FIX2 单连接审批路由', () => {
     await connRes.value.close();
   });
 });
+
+describe('P3.4B-FIX3 工具 thread/turn 矛盾 fail-closed', () => {
+  it('review 学到 turn 后，主 thread 配 review turn 的调用被拒且零副作用', async () => {
+    const fake = makeFakeConnection('never');
+    const adapter = makeAdapter(fake);
+    const mainRes = await adapter.createSession({
+      sessionId: 'sess-main',
+      userId: 'u-main',
+      tools: [toolDef('learning.content')],
+      ephemeral: true,
+    });
+    const reviewRes = await adapter.createSession({
+      sessionId: 'sess-review',
+      userId: 'u-review',
+      tools: [toolDef('toc_draft_replace_all')],
+      ephemeral: true,
+    });
+    expect(isOk(mainRes)).toBe(true);
+    expect(isOk(reviewRes)).toBe(true);
+    if (!isOk(mainRes) || !isOk(reviewRes)) return;
+
+    // 先让 review 学到 turn-r7（合法调用，成功）
+    const learned = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r7', tool: 'toc_draft_replace_all' });
+    expect(learned.success).toBe(true);
+    const callsBefore = fake.calls.length;
+    expect(callsBefore).toBeGreaterThan(0);
+
+    // 矛盾调用：main 的 thread + review 的 turn
+    const conflict = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-r7', tool: 'learning.content' });
+    expect(conflict.success).toBe(false);
+    const payload = JSON.parse(conflict.text) as { error?: string };
+    expect(payload.error).toBe('Conflicting thread/turn ownership for this tool call (fail-closed)');
+    // 静态文案：不含任何 id 与参数内容
+    for (const secret of ['thread-1', 'thread-2', 'turn-r7', 'sess-main', 'sess-review', 'u-main', 'u-review', 'learning.content']) {
+      expect(conflict.text).not.toContain(secret);
+    }
+    // executeTool 零调用：两个会话的调用记录都未变化
+    expect(fake.calls.length).toBe(callsBefore);
+
+    // 双会话功能不受影响：之后各自合法调用依然成功
+    const mainOk = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-m9', tool: 'learning.content' });
+    expect(mainOk.success).toBe(true);
+    const reviewOk = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r7', tool: 'toc_draft_replace_all' });
+    expect(reviewOk.success).toBe(true);
+    expect(fake.calls[fake.calls.length - 2]).toEqual({
+      toolName: 'learning.content',
+      sessionId: 'sess-main',
+      userId: 'u-main',
+    });
+    expect(fake.calls[fake.calls.length - 1]).toEqual({
+      toolName: 'toc_draft_replace_all',
+      sessionId: 'sess-review',
+      userId: 'u-review',
+    });
+
+    await mainRes.value.close();
+    await reviewRes.value.close();
+  });
+});

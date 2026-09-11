@@ -91,6 +91,9 @@ interface SessionToolRoute {
 /** 归属不明时的 fail-closed 回执（静态文案，不回显任何 id/原文）。 */
 const ORPHAN_TOOL_CALL_MESSAGE = 'No owning session for this tool call (fail-closed)';
 
+/** thread/turn 指向不同会话时的 fail-closed 回执（静态文案，不回显任何 id/原文）。 */
+const CONFLICT_TOOL_CALL_MESSAGE = 'Conflicting thread/turn ownership for this tool call (fail-closed)';
+
 /** 用户未操作时自动 decline，避免 App Server 审批请求挂死 */
 const APPROVAL_TIMEOUT_MS = 120_000;
 
@@ -496,6 +499,11 @@ export class CodexAdapter implements AgentAdapter {
       typeof params.turnId === 'string' && params.turnId
         ? this.toolRouteByTurn.get(params.turnId)
         : undefined;
+    // P3.4B-FIX3：thread 与已学 turn 分属不同会话 → 立即 fail-closed。
+    // 该分支不学映射、不 noteTurn、不执行（与审批矛盾分支同语义）。
+    if (byThread && byTurn && byThread !== byTurn) {
+      return failTool(CONFLICT_TOOL_CALL_MESSAGE);
+    }
     const route = byThread ?? byTurn;
     if (!route || route.closed) {
       return failTool(ORPHAN_TOOL_CALL_MESSAGE);
