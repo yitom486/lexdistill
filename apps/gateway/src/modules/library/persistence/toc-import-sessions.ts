@@ -10,7 +10,9 @@ import {
   nowIso,
 } from '@study-studio/shared';
 import { tocImportChunks, tocImportSessions } from '../../../infrastructure/db/index.js';
+import { documents } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+import type { ShredTx } from './textbook-shred.js';
 
 /**
  * CMD-LINGUA-P5D2A：整书目录导入 session/chunk 持久化。
@@ -23,7 +25,13 @@ import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.
  * - 不建 documents、不调 converter/shred（deps 里就没有这些能力）。
  */
 
-export type TocImportSessionStatus = 'prepared' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type TocImportSessionStatus =
+  | 'prepared'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'target_deleted';
 
 export type TocImportChunkStatus = 'prepared' | 'running' | 'completed' | 'failed';
 
@@ -33,7 +41,15 @@ const SESSION_STATUSES: ReadonlySet<string> = new Set([
   'completed',
   'failed',
   'cancelled',
+  'target_deleted',
 ]);
+
+/**
+ * 可恢复状态（仅这些要求 target document 存在；终态 exempt，见 doctor 规则）。
+ * `completed` 不在此列：完成后文档被删同样进终态（由删除生命周期置位），
+ * 不视为“可恢复执行中”。导出供 doctor/服务复用同一口径。
+ */
+export const RESUMABLE_SESSION_STATUSES: ReadonlySet<string> = new Set(['prepared', 'running', 'failed']);
 
 const CHUNK_STATUSES: ReadonlySet<string> = new Set(['prepared', 'running', 'completed', 'failed']);
 
@@ -48,6 +64,11 @@ export interface TocImportSession {
   chunkCount: number;
   status: TocImportSessionStatus;
   docTitle: string;
+  /**
+   * session 层 target document（v20；一个 session 最多对应一个教材 document）。
+   * 缺席 = 尚未绑定（D2A 恒缺席）；删除目标后保留快照做审计，但 session 已终态、永不再 resume。
+   */
+  documentId?: string | undefined;
   error?: string | undefined;
   createdAt: string;
   updatedAt: string;
@@ -94,6 +115,7 @@ function toSession(row: SessionRow): TocImportSession {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+  if (row.documentId) session.documentId = row.documentId;
   if (row.error) session.error = row.error;
   return session;
 }
@@ -317,4 +339,80 @@ export async function getTocImportSession(
   } catch {
     return undefined;
   }
+}
+
+/**
+ * 绑定 session → target document（D2B 首个成功 chunk 在同一事务创建文档后调用，
+ * 后续 chunk 只更新同一文档，本函数是唯一的绑定入口）。
+ * - session 必须存在且归属调用方（否则 E_NOT_FOUND，不泄漏他人存在性）；
+ * - session 必须尚未绑定（同 session 不得绑定第二个 document）；
+ * - session 必须可恢复（prepared/running/failed），终态不可绑定；
+ * - 目标 document 必须存在且归属调用方；
+ * - 单事务内校验 + 写入。
+ */
+export async function bindTocImportSessionDocument(
+  deps: RepoDeps,
+  input: { sessionId: string; userId: string; documentId: string }
+): Promise<Result<TocImportSession, BusinessError>> {
+  try {
+    const bound = deps.db.transaction((tx) => {
+      const rows = tx.select().from(tocImportSessions).where(eq(tocImportSessions.id, input.sessionId)).all();
+      const hit = rows[0];
+      if (!hit || hit.userId !== input.userId) {
+        throw new BusinessError('E_NOT_FOUND', '未找到指定的导入会话', 'LEARNER_STATE');
+      }
+      if (hit.documentId) {
+        throw new BusinessError('E_INVALID_INPUT', '该导入会话已绑定教材，不可重复绑定', 'VALIDATION');
+      }
+      if (!RESUMABLE_SESSION_STATUSES.has(hit.status)) {
+        throw new BusinessError('E_INVALID_INPUT', '该导入会话已终结，不可绑定', 'VALIDATION');
+      }
+      const docs = tx
+        .select({ id: documents.id })
+        .from(documents)
+        .where(and(eq(documents.id, input.documentId), eq(documents.userId, input.userId)))
+        .all();
+      if (docs.length === 0) {
+        throw new BusinessError('E_NOT_FOUND', '未找到指定的教材或文档', 'LEARNER_STATE');
+      }
+      tx.update(tocImportSessions)
+        .set({ documentId: input.documentId, updatedAt: nowIso() })
+        .where(eq(tocImportSessions.id, input.sessionId))
+        .run();
+      const reread = tx.select().from(tocImportSessions).where(eq(tocImportSessions.id, input.sessionId)).all();
+      const done = reread[0];
+      if (!done) {
+        throw new BusinessError('E_INTERNAL', '导入会话绑定后读取失败', 'INTERNAL');
+      }
+      return toSession(done);
+    });
+    return ok(bound);
+  } catch (e) {
+    if (e instanceof BusinessError) return err(e);
+    return err(translateToBusinessError(e, 'bindTocImportSessionDocument'));
+  }
+}
+
+/**
+ * 同事务内置：目标 document 被删时，把其绑定的 session 置不可恢复终态。
+ * - 由 deleteDocument 在同一事务内调用（与删文档/清 shred 同成功同回滚）；
+ * - `document_id` 快照保留做审计（不清除），但 `target_deleted` 永不再 resume；
+ * - 双条件（document_id + user_id）防越权清理；不删计划行；
+ * - 返回受影响 session 数（0 = 无关联，最常见）。
+ */
+export function markSessionsTargetDeletedInTx(
+  tx: ShredTx,
+  input: { documentId: string; userId: string }
+): number {
+  const bound = tx
+    .select({ id: tocImportSessions.id })
+    .from(tocImportSessions)
+    .where(and(eq(tocImportSessions.documentId, input.documentId), eq(tocImportSessions.userId, input.userId)))
+    .all();
+  if (bound.length === 0) return 0;
+  tx.update(tocImportSessions)
+    .set({ status: 'target_deleted', error: '目标教材已删除，会话不可恢复', updatedAt: nowIso() })
+    .where(and(eq(tocImportSessions.documentId, input.documentId), eq(tocImportSessions.userId, input.userId)))
+    .run();
+  return bound.length;
 }

@@ -21,6 +21,7 @@ import {
 import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, textbookTermMap, documentStructures, readingPositions } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { shredIntoTransaction } from './textbook-shred.js';
+import { markSessionsTargetDeletedInTx } from './toc-import-sessions.js';
 import { recordTermExposure } from '../../dictionary/persistence/encountered-terms.js';
 
 /**
@@ -277,6 +278,8 @@ export async function deleteDocument(
 ): Promise<Result<void, BusinessError>> {
   // 删除生命周期（见 docs/database-architecture.md §8）：
   // - 随删（同事务）：annotations + shred 六表 + textbook_fts + document_structure + reading_positions；
+  // - 目标为整书导入 session 的 target document 时：关联 session 同事务进 `target_deleted`
+  //   终态（document_id 快照保留审计，永不再 resume；计划行不删）；
   // - 保留（审计/历史）：document_imports、作答事件、草稿（含 source_ref 出处文本）、相遇审计；
   // - 单事务：中途失败整体回滚，不留半删除。
   try {
@@ -299,6 +302,8 @@ export async function deleteDocument(
       tx.run(sql`DELETE FROM textbook_fts WHERE document_id = ${id}`);
       tx.delete(documentStructures).where(eq(documentStructures.documentId, id)).run();
       tx.delete(readingPositions).where(eq(readingPositions.documentId, id)).run();
+      // 整书导入 session 终态（同事务；双条件已验归属；无关联即 0，不影响其它 session）。
+      markSessionsTargetDeletedInTx(tx, { documentId: id, userId });
       tx.delete(documents)
         .where(and(eq(documents.id, id), eq(documents.userId, userId)))
         .run();

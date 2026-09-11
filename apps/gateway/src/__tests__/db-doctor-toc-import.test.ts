@@ -30,6 +30,7 @@ function createTables(db: Database): void {
       chunk_count INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'prepared',
       doc_title TEXT NOT NULL DEFAULT '',
+      document_id TEXT,
       error TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -56,6 +57,7 @@ function createTables(db: Database): void {
 
 function seedClean(db: Database): void {
   createTables(db);
+  db.run(`CREATE TABLE documents (id TEXT PRIMARY KEY)`);
   db.run(
     `INSERT INTO toc_import_sessions (id, user_id, request_key, plan_fingerprint, pdf_sha256, page_count, lesson_count, chunk_count, status, created_at, updated_at) VALUES ('s1','u1','k1','fp','pdf',100,2,2,'prepared','t','t')`
   );
@@ -108,10 +110,10 @@ describe('db doctor toc-import', () => {
 
   it('ordinal 重复命中 FAIL（无 PK 影子表模拟脏数据）', () => {
     const db = mem();
-    db.run(`CREATE TABLE toc_import_sessions (id TEXT PRIMARY KEY, chunk_count INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'prepared')`);
-    db.run(`CREATE TABLE toc_import_chunks (session_id TEXT, ordinal INTEGER, physical_start INTEGER, physical_end INTEGER, status TEXT)`);
-    db.run(`INSERT INTO toc_import_sessions VALUES ('s1',2,'prepared')`);
-    db.run(`INSERT INTO toc_import_chunks VALUES ('s1',0,1,2,'prepared'),('s1',0,1,2,'prepared')`);
+    db.run(`CREATE TABLE toc_import_sessions (id TEXT PRIMARY KEY, chunk_count INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'prepared', document_id TEXT)`);
+    db.run(`CREATE TABLE toc_import_chunks (session_id TEXT, ordinal INTEGER, physical_start INTEGER, physical_end INTEGER, status TEXT, document_id TEXT)`);
+    db.run(`INSERT INTO toc_import_sessions VALUES ('s1',2,'prepared',NULL)`);
+    db.run(`INSERT INTO toc_import_chunks VALUES ('s1',0,1,2,'prepared',NULL),('s1',0,1,2,'prepared',NULL)`);
     const report = runDoctor(db);
     expect(levelOf(report, 'toc-import:ordinal-dup')).toBe('FAIL');
   });

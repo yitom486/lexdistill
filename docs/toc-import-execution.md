@@ -29,26 +29,33 @@
 设计决策：新建两张静态表（固定表名、行表达动态，符合 AGENTS.md §1.8），
 `document_imports` 原样保留、互不干扰。
 
-## 2. 数据模型（Verified fact：以 `schema.ts` / `ddl.ts` / v019 为准）
+## 2. 数据模型（Verified fact：以 `schema.ts` / `ddl.ts` / v019+v020 为准）
 
 `toc_import_sessions`：`id`（`tocimport_*`，服务端生成）、`user_id`、
 `request_key`（§3）、`plan_fingerprint`、`pdf_sha256`、`page_count`、
-`lesson_count`、`chunk_count`、`status`（prepared/running/completed/failed/cancelled）、
-`doc_title`（展示）、`error`、`created_at/updated_at`；
+`lesson_count`、`chunk_count`、`status`（prepared/running/completed/failed/cancelled/
+`target_deleted`）、`doc_title`（展示）、`document_id`（v20，session 层 target，可空）、
+`error`、`created_at/updated_at`；
 `UNIQUE(user_id, request_key)`。
 
 `toc_import_chunks`：`session_id`、`ordinal`（0-based 执行序）、`lesson_index`、
 `lesson_title`（展示）、`physical_start/end`、`chunk_fingerprint`（§3）、
-`status`（prepared/running/completed/failed）、`document_id`（D2A 恒 NULL）、
+`status`（prepared/running/completed/failed）、`document_id`（**已废弃**，
+invariant 恒 NULL，所有权只在 session 层，doctor 规则锁）、
 `attempts`、`error`；主键 `(session_id, ordinal)` 即“同 session/ordinal 唯一”。
 
-- 计划 immutable：本模块**不提供** entries/anchors/status 更新路径；
+- one session → one document：`document_id` 只在 session 层；
+  绑定唯一入口 `bindTocImportSessionDocument`（已绑定/终态/跨用户全拒绝）；
+  chunk 永不拥有独立 document。
+- 计划 immutable：本模块**不提供** entries/anchors 更新路径；
   改计划只能产生新 `request_key` → 新 session（设计决策）。
 - 状态封闭枚举：TS 联合 + 读侧收窄（非法值回退 `prepared`，读侧永不抛）+
   doctor `toc-import:status` FAIL 规则锁。不加 FK（无 FK 架构，见 doctor §8b 注释）。
-- 删除语义：删 document **不碰** session/chunk（计划审计，随 `document_imports`
-  同例保留）；D2A 不提供删除 API；用户放弃未完成 session 的显式取消接口归 D2B
-  （`cancelled` 枚举已预留）；孤儿 chunk（session 缺失）即数据异常，由 doctor 报 FAIL。
+- 删除语义（D2A.1）：删 target document **同事务**置关联 session `target_deleted`
+  （`document_id` 快照保留审计，永不再 resume；计划行不删）；
+  删不相关 document 不影响任何 session；归属校验先行，无越权清理洞。
+  用户放弃未完成 session 的显式取消接口归 D2B（`cancelled` 已预留）；
+  孤儿 chunk（session 缺失）即数据异常，由 doctor 报 FAIL。
 
 ## 3. 幂等协议（Verified fact：单测锁定）
 
@@ -73,7 +80,7 @@
 不调 OCR/Agent/render/convert/append/saveCanonicalAst/shred；不建 document
 （单测：documents/textbook_lessons 行数不变）。
 
-## 5. Session 生命周期（设计决策，D2B 落实）
+## 5. Session 生命周期（设计决策，D2B 落实；删除终态 D2A.1 已实现）
 
 - `prepared`：D2A 终点；可被同 key 重试复用；可被用户放弃（D2B 取消接口 → `cancelled`）。
 - `running`：D2B 成功 claim 第一个 chunk 后置位；执行中进程崩溃即停留 running，
@@ -81,12 +88,20 @@
 - `completed`：全部 chunk completed 后置位（D2B 原子更新）。
 - `failed`：chunk 不可恢复失败或执行器异常时置位（D2B），`error` 记原因；
   用户改计划重提即新 session，旧 failed 行保留审计。
+- `target_deleted`（D2A.1）：target document 被删时同事务置位，
+  `document_id` 快照保留、`error` 记因，**永不再 resume**；
+  doctor 对其豁免 orphan 检查（审计保留≠悬空）。
 - 重试语义只有一种：**同 request_key 重发**（返回同一 session）；改任何输入即新 session，
   不存在“覆盖旧计划”操作。
+- D2B 使用 target 的两步法（本轮已备好地基，执行归 D2B）：
+  首个成功 chunk 在**同一事务**创建 document → 绑定 session（唯一入口，
+  同 session 绑定第 2 个 document 直接拒绝）→ 写 AST/shred → 完成 chunk；
+  后续 chunk 只更新**同一个** session target document（取 session.document_id，
+  不接受客户端传 document）。
 
 ## 6. D2B 精确执行 gate（D2B 实现时逐项打勾）
 
-1. 按 `(user, request_key)` 读 session；`cancelled/failed` 拒绝执行；
+1. 按 `(user, request_key)` 读 session；`cancelled/failed`/`target_deleted` 拒绝执行；
 2. 按 `(session, ordinal)` 取 chunk；非 `prepared` 拒绝重复执行；
 3. 重算 `chunkFingerprint` 并与行比对，不一致拒绝（计划漂移）；
 4. 重跑 P5-A preview 确认该课仍 mapped 且 range 与 chunk 一致；

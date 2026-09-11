@@ -384,9 +384,21 @@ export function runDoctor(db: Database): DoctorReport {
     }
     push('toc-import:session-count', mismatch > 0 ? 'FAIL' : 'PASS', mismatch, mismatch > 0 ? `${mismatch} 个 session 登记 chunk 数与实际行数不一致` : '计数一致');
     const badStatus =
-      count(`SELECT COUNT(*) AS n FROM toc_import_sessions WHERE status NOT IN ('prepared','running','completed','failed','cancelled')`) +
+      count(`SELECT COUNT(*) AS n FROM toc_import_sessions WHERE status NOT IN ('prepared','running','completed','failed','cancelled','target_deleted')`) +
       count(`SELECT COUNT(*) AS n FROM toc_import_chunks WHERE status NOT IN ('prepared','running','completed','failed')`);
     push('toc-import:status', badStatus > 0 ? 'FAIL' : 'PASS', badStatus, badStatus > 0 ? `${badStatus} 行非法状态（封闭枚举外）` : '状态合法');
+    // chunk 的 document_id 已废弃（invariant 恒 NULL；所有权只在 session 层）。
+    const chunkDoc = count(`SELECT COUNT(*) AS n FROM toc_import_chunks WHERE document_id IS NOT NULL`);
+    push('toc-import:chunk-doc', chunkDoc > 0 ? 'FAIL' : 'PASS', chunkDoc, chunkDoc > 0 ? `${chunkDoc} 个 chunk 持有 document（已废弃，必须为 NULL）` : 'chunk 无持有');
+    // 可恢复 session（prepared/running/failed）绑定的 target 必须存在；
+    // target_deleted 等终态保留快照做审计，不在此报 orphan。
+    // documents 表缺席即跳过（部分库，见缺列跳过惯例）。
+    if (has('documents')) {
+      const activeDoc = count(
+        `SELECT COUNT(*) AS n FROM toc_import_sessions s LEFT JOIN documents d ON d.id = s.document_id WHERE s.status IN ('prepared','running','failed') AND s.document_id IS NOT NULL AND d.id IS NULL`
+      );
+      push('toc-import:active-doc', activeDoc > 0 ? 'FAIL' : 'PASS', activeDoc, activeDoc > 0 ? `${activeDoc} 个可恢复 session 指向缺失文档` : '绑定齐全');
+    }
   }
 
   // ---- 9. locator JSON 有效性（reading_positions） ----

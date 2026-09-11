@@ -568,11 +568,16 @@ export const documentImports = sqliteTable('document_imports', {
 });
 
 /**
- * 整书目录导入 session（v19；与 ddl.ts 建表 SQL 一字对齐，SSOT 是 ddl.ts）。
+ * 整书目录导入 session（v19 建表，v20 加 document_id；与 ddl.ts 建表 SQL 一字对齐，SSOT 是 ddl.ts）。
  * - 一行 = 一次“用户确认的整书计划”，计划 immutable（无 entries/anchors 更新路径）；
  * - request_key 由服务端重算（user + PDF SHA-256 + canonical plan fingerprint），
  *   同 user/key 唯一，重试复用同一 session；
  * - D2A 只写 prepared 行，不建 documents、不调 converter/shred；
+ * - target document 关系在 session 层（v20 document_id，可空）：
+ *   D2B 首个成功 chunk 在同一事务创建文档并绑定；后续 chunk 只更新同一文档；
+ *   chunk 层 document_id 已废弃（invariant 恒 NULL，见 doctor 规则）；
+ * - 删除 target document → session 进 `target_deleted` 终态（审计保留 document_id 快照，
+ *   永不再 resume），删文档不删计划行；
  * - 状态封闭枚举见 persistence/toc-import-sessions.ts，读侧收窄 + doctor 规则锁。
  */
 export const tocImportSessions = sqliteTable(
@@ -588,6 +593,7 @@ export const tocImportSessions = sqliteTable(
     chunkCount: integer('chunk_count').notNull(),
     status: text('status').notNull().default('prepared'),
     docTitle: text('doc_title').notNull().default(''),
+    documentId: text('document_id'),
     error: text('error'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
@@ -599,7 +605,9 @@ export const tocImportSessions = sqliteTable(
  * session 的 chunk 计划行（v19；D2A 恒 prepared，执行与状态流转归 D2B）。
  * - 主键 (session_id, ordinal) 即“同 session/ordinal 唯一”；
  * - chunkFingerprint 绑定 (request_key, ordinal, lesson, range)，D2B 执行前重验；
- * - document_id 在 D2A 恒 NULL（不建文档），D2B 成功后回填。
+ * - document_id 已废弃：chunk 永不拥有独立 document（invariant 恒 NULL，
+ *   D2B 不得使用它做所有权；doctor 规则锁）；不做破坏性删列；
+ * - D2B 成功后回填的是 session 层 document_id（v20），不是这里。
  */
 export const tocImportChunks = sqliteTable(
   'toc_import_chunks',

@@ -225,6 +225,7 @@ import {
 import {
   prepareTocImportSession as prepareTocImportSessionDomain,
   getTocImportSession as getTocImportSessionDomain,
+  bindTocImportSessionDocument as bindTocImportSessionDocumentDomain,
   type PrepareTocImportSessionInput,
   type PreparedTocImportSession,
   type TocImportSession,
@@ -1130,6 +1131,18 @@ export class DrizzleLearnerRepository implements LearnerRepository {
     requestKey: string
   ): Promise<{ session: TocImportSession; chunks: TocImportChunk[] } | undefined> {
     return getTocImportSessionDomain(this.deps, userId, requestKey);
+  }
+
+  /**
+   * 绑定 session → target document（D2B 首 chunk 成功后调用，唯一绑定入口）。
+   * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
+   */
+  public async bindTocImportSessionDocument(input: {
+    sessionId: string;
+    userId: string;
+    documentId: string;
+  }): Promise<Result<TocImportSession, BusinessError>> {
+    return bindTocImportSessionDocumentDomain(this.deps, input);
   }
 
   /**
