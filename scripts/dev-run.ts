@@ -61,12 +61,60 @@ async function main(): Promise<number> {
   const checkOnly = args.includes('--check');
   const wantPorts = only === 'web' ? [WEB_PORT] : only === 'gateway' ? [GATEWAY_PORT] : [WEB_PORT, GATEWAY_PORT];
 
-  // 1) 启动前核对：脏房间拒绝开工（§7.1）。
+  // 1) 启动前核对：脏房间先自动收孤儿，收不动才拒绝开工（§7.1）。
+  // 自动清理谓词（缺一不可，宁可拒启不盲杀）：
+  //   ① 父进程已死（孤儿）；② 命令行命中 dev 形状；
+  //   ③ 归属明确：命令行含本仓库根路径，或端口+角色对得上（300x↔vite / 808x↔gateway）。
+  // 父活着的、非 dev 的、归属不明的 → 一律拒绝，人工 dev:clean 处理。
   const holders = listWatchedListeners().filter((l) => wantPorts.includes(l.port));
+  const holderVerdict = (
+    info: { cmd: string; parentAlive: boolean } | undefined,
+    port: number
+  ): 'auto' | 'manual' => {
+    if (!info || info.parentAlive || !isDevProcess(info.cmd)) return 'manual';
+    const cmdLower = info.cmd.toLowerCase();
+    const rootLower = ROOT.toLowerCase();
+    if (cmdLower.includes(rootLower)) return 'auto';
+    if (port === GATEWAY_PORT && /--watch.*index\.ts|gateway/i.test(info.cmd)) return 'auto';
+    if (port >= 3000 && port <= 3010 && /vite/i.test(info.cmd)) return 'auto';
+    return 'manual';
+  };
   if (holders.length > 0) {
     const infos = procInfos(holders.map((h) => h.pid));
-    if (force) {
-      console.log('[dev-run] --force：先清理 dev-verified 占位者…');
+    const autoKillable = holders.filter((h) => holderVerdict(infos.get(h.pid), h.port) === 'auto');
+    const manualOnly = holders.filter((h) => holderVerdict(infos.get(h.pid), h.port) !== 'auto');
+    if (checkOnly) {
+      for (const h of holders) {
+        const info = infos.get(h.pid);
+        const verdict = holderVerdict(info, h.port);
+        console.log(
+          `  端口 ${h.port} ← PID ${h.pid}：${verdict === 'auto' ? '可自动清理（孤儿+dev+归属明确）' : '需手动处理'}${info ? ` ${shortCmd(info.cmd)}` : '（不可读）'}`
+        );
+      }
+      return holders.length === 0 ? 0 : 1;
+    }
+    // --force：把“父活着的 dev 进程”也纳入可杀（同样大声记录；非 dev 照样拒绝）。
+    const killable = force
+      ? holders.filter((h) => {
+          const info = infos.get(h.pid);
+          return !!info && isDevProcess(info.cmd);
+        })
+      : autoKillable;
+    const unkillable = holders.filter((h) => !killable.includes(h));
+    if (unkillable.length > 0) {
+      for (const h of unkillable) {
+        const info = infos.get(h.pid);
+        console.error(
+          `  端口 ${h.port} ← PID ${h.pid}：不可自动清理（${!info ? '进程不可读' : info.parentAlive ? '父进程还活着，疑似有人在用（加 --force 可覆盖 dev 进程）' : !isDevProcess(info.cmd) ? '非 dev 进程' : '归属不明'}）${info ? shortCmd(info.cmd) : ''}`
+        );
+      }
+      console.error('[dev-run] 拒绝启动：以上占位者需人工核对（bun run dev:clean）。本次未启动任何进程。');
+      return 1;
+    }
+    if (killable.length > 0) {
+      // 默认即自动清理孤儿（大声记录）；--force 只是把“父活着的 dev 进程”也纳入（同样大声）。
+      // 注意：被清理进程服务的页面会一起死——先关掉旧标签页再启动。
+      console.log(`[dev-run] 自动清理 ${killable.length} 个占位者…`);
       for (const h of holders) {
         const info = infos.get(h.pid);
         if (!info || !isDevProcess(info.cmd)) {
@@ -75,7 +123,7 @@ async function main(): Promise<number> {
           return 1;
         }
         const done = killPid(h.pid);
-        console.log(`[dev-run] 已杀 PID ${h.pid}（端口 ${h.port}）：${done ? 'ok' : '失败'}`);
+        console.log(`[dev-run] 已杀 PID ${h.pid}（端口 ${h.port}，生于 ${info.born}）：${done ? 'ok' : '失败'}`);
         if (!done) return 1;
       }
       const again = listWatchedListeners().filter((l) => wantPorts.includes(l.port));
@@ -83,16 +131,6 @@ async function main(): Promise<number> {
         console.error('[dev-run] 清理后端口仍被占，拒绝启动。请用 dev:clean 核对。');
         return 1;
       }
-    } else {
-      console.error(`[dev-run] 拒绝启动：端口 ${holders.map((h) => h.port).join('/')} 已被占用（疑似旧实例未退出）。`);
-      for (const h of holders) {
-        const info = infos.get(h.pid);
-        console.error(
-          `  端口 ${h.port} ← PID ${h.pid}${info ? (info.parentAlive ? '' : ' ORPHAN（父已死）') : '（不可读）'} ${info ? shortCmd(info.cmd) : ''}`
-        );
-      }
-      console.error('[dev-run] 先跑 bun run dev:clean 核对清理，或本次加 --force（只杀 dev-verified 进程）。本次未启动任何进程。');
-      return 1;
     }
   }
   console.log(`[dev-run] 端口核对通过（${wantPorts.join('/')} 空闲）。`);

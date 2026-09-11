@@ -201,7 +201,7 @@
 - **网关入口必须处理 `SIGTERM` / `SIGINT`**：停止接受新连接 → 关闭监听 → 通知并关闭 WS/SSE 长连接 → 存量 Turn 走已有 signal 检查点停扫 → 超时后退出并留下可观测退出码。
 - 当前 dev 进程树深达 4 层（`run dev:web` → `--parallel` → `exec` → `--watch` → child），Windows 下关终端 / Ctrl+C **带不走整棵树**（已实测 orphan）。必须提供一键清理脚本并文档化，禁止要求用户逐个杀进程。
   - 一键清理：`bun run dev:clean`（只读列出 3000-3010 / 8080-8090 监听者：端口/PID/年龄/父存活/命令行）；确认后 `bun run dev:clean -- --kill <pid>`（仅名单 PID + 命令行命中 dev 特征才杀，非 dev 进程拒绝）。
-  - 默认启动入口必须是监督器 `bun run dev:web`（`scripts/dev-run.ts`）：启动前核对 3000/8080，脏房间拒绝开工（`--force` 只杀 dev-verified 占位者）；web/gateway 作为其直属子进程，任一退出或收到信号即杀整棵树。禁止绕过监督器直调 `dev:web:parallel` 常驻（保留仅作排障对比）。
+  - 默认启动入口必须是监督器 `bun run dev:web`（`scripts/dev-run.ts`）：启动前核对 3000/8080——占位者若同时满足「父已死＋命令行命中 dev＋归属明确（含本仓库路径或端口角色对上）」则自动清理并大声记录，否则脏房间拒绝开工（`--force` 把父活着的 dev 进程也纳入，同样大声；`--check` 只核对不启动）；web/gateway 作为其直属子进程，任一退出或收到信号即杀整棵树。禁止绕过监督器直调 `dev:web:parallel` 常驻（保留仅作排障对比）。
 - 后台任务（OCR 批、enrich jobs）在关机时必须可中断、可恢复：已有检查点的不得重跑，重复投递必须幂等（验收：grep `SIGTERM` 在网关入口存在；关机路径有单测或集成断言）。
 
 ### 7.3 前端必须验证服务端身份 (Server Identity Handshake)
