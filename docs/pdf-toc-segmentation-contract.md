@@ -113,3 +113,65 @@ folio（页眉页脚印刷码）抽取、罗马数字页码识别、anchor 人�
 
 真实导入、AST 写入、shred、DB migration、P5 映射之外的任何映射逻辑、
 Web UI 改动（本轮禁止改 Web）、anchor 自动获取（P5-B）、plan 落库与执行（P5-C）。
+
+---
+
+## 6. P5-B：folio 候选抽取（candidate ≠ anchor）
+
+实现：`apps/gateway/src/modules/library/application/pdf-import/toc-folio-candidates.ts`
+（纯函数 `detectFolioCandidates` + 只读编排 `extractFolioCandidates`），
+端点 `POST /api/documents/:userId/folio-candidates`（显式 `pages` 页号集），
+单测：`apps/gateway/src/modules/library/__tests__/toc-folio-candidates.test.ts`
+（含真机位：pdf-lib 自造单页 + pinned 测试运行时）。
+
+### 6.1 一句话
+
+本模块只回答“PDF 第 N 页的页眉/页脚位置可能看见了什么印刷页码”，
+**不能**回答“这就是 anchor / 全书 offset / 该导哪一课”。
+输出的 candidate 只是弱证据：P5-C 必须经**双源一致或人工明确确认**
+（candidate ↔ 某个 printedPage 的对应关系），才能写入 P5-A anchor；
+任何 candidate **不得**直接传入 `previewTocSegments` 的 `anchors` 参数
+（形状上就不兼容：candidate 没有 printed↔physical 映射字段）。
+
+### 6.2 能力证据（Verified fact vs proposed heuristic）
+
+- **Verified fact**：fork 原生 `extractTextWithPositions` 可用（1.18.2 实测），
+  返回逐条文本 + x/y/宽高（`pdf-runtime.ts:29`，`collectLayoutCandidates` 已消费）；
+  OCR spans 与其**同坐标系**（P3 注释口径一致）。
+- **Verified fact**：原生 y 轴**向上**（bottom-origin）。探针方法：
+  pdf-lib 建页（612×792，origin 左下），页顶 y=750 写 `TOPMARK`、页底 y=50 写
+  `BOTMARK`，`extractTextWithPositions` 回报 y=750 / y=50（见本文件单测
+  `native y 轴向上`，fp 升级翻转即红）。因此 header = 高 y 边带，footer = 低 y 边带。
+- **Verified fact**：OCR 仅在 native 缺失/无命中时对**相同选择页** fallback；
+  所有 native/OCR/inspector 调用恒带非空页窗（单测锁定调用参数，绝无单参 `processPdf`）；
+  OCR 上限 30 未动；不调 Agent/渲染/模型；不写 DB/AST/cache；日志只记计数。
+- **Proposed heuristic**（合理但可调，全部有单测锁定当前行为）：
+  1. 边带按本页 y 跨度的上下各 12% 划分（无页尺寸 API，只能相对；内容稀疏页<3 条直接无候选）；
+  2. 同行按 y 容差合并后**整行恰好一个 token**才受理（目录行/表格行/正文行天然多词被弃）；
+  3. 装饰符只剥两端（`-–—·•.。,、()（）[]`），行内连字符/空格不断言（如电话号码）；
+  4. Arabic 只收 1–1500（年份 19xx–20xx 与超大号一并排除；千页以上巨著的真 folio 是已知误伤，见下）；
+  5. Roman 只收严格罗马形并转大写原形，**类型层面就没有转数字的位置**；
+  6. native 置信度 medium、OCR 一律 low，OCR span 置信度 <0.5 直接弃；
+  7. 同页 header/footer 冲突并列保留、绝不仲裁；同位置同归一值去重。
+
+### 6.3 仍是 unresolved 的风险（P5-C 不得依赖这些）
+
+- 边带标签依赖“y-up 即视觉上下”：探针只证数值方向，**未证**“首个文本块即视觉页眉”
+  （双栏/横排/旋转页可能错位；旋转/横向页面无真机覆盖）。
+- 相对边带在内容稀疏页失效（<3 条即放弃，宁可漏检；封面/空白页天然无候选）。
+- 原生条目粒度未知（行级假设）：若某版本切分为逐字条目，单数字 token 会误升 folio
+  （当前以“单 token 行”近似，逐字粒度下此假设崩，单测未覆盖，fork 升级需重验）。
+- 中央水印/印章数字若恰落边带且形如孤立小数字，仍可能误升（位置是唯一防线）。
+- 1500 上限会误杀巨著真 folio；前言罗马码与正文阿拉伯码并存的书需要 P5-C 显式选边。
+- 页码重启、漏扫页、扫描污渍：与 §3 同，candidate 只能“看见”，不能“断定”。
+
+### 6.4 P5-C 前置条件（更新 §4）
+
+1. P5-C 的确认 UX 必须展示每条 candidate 的 `raw / normalized / location / source /
+   confidence`，并让用户显式把它**钉到某一个 printedPage**（或拒绝）；
+2. 钉选规则：同一对应关系至少有两项独立证据（例如 native folio 与 OCR folio 在同页一致；
+   folio 候选与 embedded-outline 物理页互相吻合；或其中一项加人工明确确认），
+   方可生成 P5-A anchor（`embedded-outline / human-confirmed /
+   verified-folio`）；单 OCR-low 候选**永不**自动成 anchor；
+3. `unresolvedCount > 0` 的 plan 禁止整书自动导入（§4 原文继续有效）；
+4. P5-C 若新增 anchor 来源，沿用 §4.3 回归铁律：只许增 mapped，不许静默转正。
