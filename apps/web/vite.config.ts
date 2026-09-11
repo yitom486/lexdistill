@@ -19,6 +19,11 @@ export default defineConfig({
     // §7.1 红线：禁止静默漂移端口。冲突必须大声失败（旧实例未退出的信号），
     // 绝不自动往后挪——漂移会掩盖僵尸进程，让页面绑错服务器。
     strictPort: true,
+    // §7.2 纵深防御：构建产物不进 chokidar（dev 期间跑 build 也不应惊动 dev server）。
+    // 注：网关侧已探针验证 bun --watch 只跟 import graph；Vite 侧保留此忽略为保险。
+    watch: {
+      ignored: ['**/dist/**', '**/*.tsbuildinfo'],
+    },
   },
   build: {
     // 纯静态输出目录，未来直接作为 Tauri 的 frontendDist

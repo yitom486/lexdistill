@@ -210,4 +210,8 @@
 
 ### 7.4 Agent 与运行中服务的互斥 (Agent/Dev Mutual Exclusion)
 - Agent（含人类工程师）在用户 live dev（`bun --watch` / Vite HMR）运行时**落盘改文件前必须先声明**：watch 重载会掐断用户正在点的请求流，HMR 会重置前端世代守门（`runId` 失配导致迟到结算被丢弃）。能暂停 dev 则暂停；不能暂停则分批小步保存，并在任务报告里写明保存时间窗。
+- **产构建命令与 live dev 互斥（已按探针证据收敛，禁猜）**：
+  - 经三探针验证（新建/修改 `dist` 文件、`package.json` mtime 触碰，12s 窗口，birth 比对）：`bun --watch` 在本仓只跟 import graph，`dist/` 与 `package.json` 的触碰**不触发**重载。因此 `tsc -b` 的 emit 本身不杀流——此前“22:04 emit 引发约 20 次重载”的写法已被证伪，已删除。
+  - 真正必然掐流的是**保存被 import 的源文件**（每次存档一次重载，正在跑的流被掐断变快速失败）：任何人（含 Agent）在 live dev 运行时存 `apps/*/src/**` 必须先声明，或等无请求时再存。
+  - `emitting` 构建仍建议错峰（CPU/IO 抖动），但不再列为杀流 embargo。网关 `dev` 的 cwd 下移（`src/`）与 Web `server.watch.ignored` 保留为纵深防御（把 `dist`/`tsbuildinfo` 移出一切 cwd 口径监视），禁止以“简化”为由挪回。
 - Agent 自己的常驻命令（`test:all`、大体积 E2E、探针脚本）跑完必须确认进程退出，**禁止留下 detached runner**（本次已抓到一个存活 22 小时、累计 218 秒 CPU 的 `bun test` 孤儿；验收：任务收尾含进程存活检查）。
