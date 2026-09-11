@@ -322,12 +322,12 @@ describe('P3.1B verdict/evidence/reviewStatus 收窄', () => {
       baseline: baselinePayload,
       draft: null,
       reviewStatus: 'unavailable',
-      reviewError: { code: 'E_TOC_REVIEW_PARSE', userMessage: 'AI 审核草稿不是合法 JSON' },
+      reviewError: { code: 'E_TOC_REVIEW_TOOL_INVALID', userMessage: 'AI 工具参数两次校验失败' },
       diagnostics: { pagesRequested: 3, pagesRendered: 2, baselineEntries: 1, draftEntries: 0 },
     };
     const narrowed = narrowTocReview(reviewPayload);
     expect(narrowed?.reviewStatus).toBe('unavailable');
-    expect(narrowed?.reviewError).toEqual({ code: 'E_TOC_REVIEW_PARSE', userMessage: 'AI 审核草稿不是合法 JSON' });
+    expect(narrowed?.reviewError).toEqual({ code: 'E_TOC_REVIEW_TOOL_INVALID', userMessage: 'AI 工具参数两次校验失败' });
     const { reviewStatus, reviewError, ...legacy } = reviewPayload;
     void reviewStatus;
     void reviewError;

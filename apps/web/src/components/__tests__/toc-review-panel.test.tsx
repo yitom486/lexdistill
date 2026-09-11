@@ -319,11 +319,11 @@ describe('P3.1B verdict/证据/手动/降级视图（SSR）', () => {
     const html = render({
       baseline: { ...BASELINE, verdict: 'usable' },
       adoptDisabled: false,
-      review: { ...REVIEW, draft: null, reviewStatus: 'unavailable', reviewError: { code: 'E_TOC_REVIEW_PARSE', userMessage: 'AI 审核草稿不是合法 JSON，已保留可编辑基线' } },
+      review: { ...REVIEW, draft: null, reviewStatus: 'unavailable', reviewError: { code: 'E_TOC_REVIEW_TOOL_INVALID', userMessage: 'AI 工具参数两次校验失败，已保留可编辑基线' } },
     });
     expect(html).toContain('AI 审核暂不可用');
     expect(html).toContain('已保留可编辑基线');
-    expect(html).toContain('E_TOC_REVIEW_PARSE');
+    expect(html).toContain('E_TOC_REVIEW_TOOL_INVALID');
     expect(html).not.toContain('AI 草稿，需人工确认');
     expect(html).toContain('手动填写');
   });

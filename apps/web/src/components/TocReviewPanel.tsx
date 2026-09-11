@@ -579,7 +579,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
       {review && !review.embedded && review.reviewStatus === 'unavailable' && (
         <div className="p-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
           <p className="font-bold">AI 审核暂不可用：{review.reviewError?.userMessage ?? '模型输出不合要求，已保留基线'}</p>
-          <p>基线仍在上方，可直接采用基线，或手动填写后确认（错误码 {review.reviewError?.code ?? 'E_TOC_REVIEW_PARSE'}，未记录模型原文）。</p>
+          <p>基线仍在上方，可直接采用基线，或手动填写后确认（错误码 {review.reviewError?.code ?? 'E_TOC_REVIEW_TOOL_INVALID'}，未记录模型原文）。</p>
         </div>
       )}
 

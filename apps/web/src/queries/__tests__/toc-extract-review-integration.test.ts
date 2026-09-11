@@ -4,8 +4,13 @@ import { join } from 'node:path';
 import { unlink } from 'node:fs/promises';
 import { BusinessError, err, ok } from '@study-studio/shared';
 import { createPdfImportRoutes } from '../../../../gateway/src/modules/library/http/pdf-import-routes.js';
+import {
+  TOC_DRAFT_TOOL_NAME,
+  tocDraftReplaceAllTool,
+} from '../../../../gateway/src/modules/library/application/pdf-import/toc-draft-tool.js';
 import { pinProcessToTestRuntime, ensurePdfTestRuntime } from '../../../../gateway/src/modules/library/__tests__/pdf-test-runtime.js';
 import { DEFAULT_GATEWAY_BASE_URL, configureGatewayBaseUrl } from '../../lib/api-client.js';
+import type { TocReviewDraftEntry } from '../../lib/toc-confirm-flow.js';
 import { GatewayRequestError } from '../../lib/gateway-error.js';
 import { requestExtractTocBaseline, requestReviewToc } from '../textbooks-annotations.js';
 
@@ -163,19 +168,29 @@ function syntheticSplitLineTocPdf(): Uint8Array {
   ]);
 }
 
-/** 脚本队列假通道：按 send 顺序吐脚本（重试测试用）。 */
-function fakeAdapter(scripts: string[]) {
-  let n = 0;
+/** 工具通道脚本：text=自然语言（忽略）；tool=真实工具执行（生产 adapter 行为）。 */
+type ToolStep = { kind: 'text'; text: string } | { kind: 'tool'; input: unknown };
+
+/** 脚本队列假通道：按步骤吐事件，tool 步骤同步跑真实工具 execute。 */
+function fakeAdapter(steps: ToolStep[]) {
   const session = {
     sessionId: 'sess-it',
     threadId: 'thread-it',
     send: async function* (input: unknown) {
       void input;
-      const script = scripts[Math.min(n, scripts.length - 1)] as string;
-      n++;
-      yield { type: 'TEXT_DELTA', delta: script };
-      yield { type: 'COMPLETED', finalOutput: script };
-    },
+      let callSeq = 0;
+      for (const step of steps) {
+        if (step.kind === 'text') {
+          yield { type: 'TEXT_DELTA', delta: step.text };
+        } else {
+          callSeq++;
+          const callId = `call-it-${callSeq}`;
+          yield { type: 'TOOL_CALL_REQUESTED', callId, toolName: TOC_DRAFT_TOOL_NAME, input: step.input as Record<string, unknown> };
+          await tocDraftReplaceAllTool.execute(step.input, { userId: 'u1', sessionId: 'sess-it' });
+          yield { type: 'TOOL_CALL_COMPLETED', callId, result: { status: 'completed', success: true } };
+        }
+      }
+      yield { type: 'COMPLETED' };    },
     submitToolResult: async () => ok(undefined),
     submitApproval: async () => ok(undefined),
     steer: async () => ok(undefined),
@@ -218,19 +233,28 @@ async function writeTempPdf(bytes: Uint8Array): Promise<string> {
   return tmp;
 }
 
-function serve(scripts: string[]): string {
+function serve(steps: ToolStep[]): string {
   const app = createPdfImportRoutes(
-    { repo: {} as never, server: { agentAdapter: fakeAdapter(scripts) } as never, port: 0 },
+    { repo: {} as never, server: { agentAdapter: fakeAdapter(steps) } as never, port: 0 },
   );
   const server = Bun.serve({ port: 0, fetch: (req) => app.fetch(req) });
   servers.push(server);
   return `http://localhost:${server.port}`;
 }
 
-describe('P3.1B extract+review 真实 HTTP 集成', () => {
-  it('文本目录：extract usable + 证据有界；fenced 草稿成功（200）', async () => {
+const TOOL_DRAFT_OK: { entries: TocReviewDraftEntry[]; warnings: string[] } = {
+  entries: [
+    { title: 'Lesson 1 Apple', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
+    { title: 'Lesson 2 Orange', printedPage: 30, level: 1, kind: 'lesson', confidence: 'medium' },
+  ],
+  warnings: [],
+};
+
+describe('P3.4A extract+review 真实 HTTP 集成', () => {
+  it('文本目录：extract usable + 证据有界；乱说 + 合法工具调用 → 草稿成功（200）', async () => {
     const url = serve([
-      '```json\n{"entries": [{"title": "Lesson 1 Apple", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}, {"title": "Lesson 2 Orange", "printedPage": 30, "level": 1, "kind": "lesson", "confidence": "medium"}], "warnings": []}\n```',
+      { kind: 'text', text: '这是目录：{"entries": [{"title": "编造课", "printedPage": 999}], "warnings": []}' },
+      { kind: 'tool', input: TOOL_DRAFT_OK },
     ]);
     configureGatewayBaseUrl(url);
     try {
@@ -247,22 +271,23 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
       const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
       expect(review.reviewStatus).toBe('ok');
       expect(review.reviewError).toBeNull();
-      expect(review.draft?.entries.length).toBe(2);
+      expect(review.draft?.entries).toEqual(TOOL_DRAFT_OK.entries);
+      expect(JSON.stringify(review)).not.toContain('编造课');
       expect(review.baseline.verdict).toBe('usable');
     } finally {
       configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
     }
   }, 180000);
 
-  it('坏模型两次：unavailable 200（非 502），基线保留可编辑', async () => {
-    const url = serve(['not json at all', 'still not json']);
+  it('无工具调用：unavailable E_TOC_REVIEW_NO_TOOL_CALL（200，非 502），基线保留', async () => {
+    const url = serve([{ kind: 'text', text: '我不知道，你自己看图吧' }]);
     configureGatewayBaseUrl(url);
     try {
       const tmp = await writeTempPdf(syntheticTextTocPdf());
       const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
       expect(review.reviewStatus).toBe('unavailable');
       expect(review.draft).toBeNull();
-      expect(review.reviewError?.code).toBe('E_TOC_REVIEW_PARSE');
+      expect(review.reviewError?.code).toBe('E_TOC_REVIEW_NO_TOOL_CALL');
       expect(typeof review.reviewError?.userMessage).toBe('string');
       expect(review.baseline.entries.length).toBe(2);
       expect(review.baseline.verdict).toBe('usable');
@@ -272,7 +297,7 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
   }, 180000);
 
   it('空白 PDF：extract empty + review 400 thin 拒绝（可读码）', async () => {
-    const url = serve(['{"entries":[],"warnings":[]}']);
+    const url = serve([]);
     configureGatewayBaseUrl(url);
     try {
       const tmp = await writeTempPdf(syntheticBlankPdf());
@@ -290,15 +315,15 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
     }
   }, 180000);
 
-  it('P3.2 thin 单行：extract thin → review 重建 ≥2 条草稿（200）', async () => {
-    const draft = JSON.stringify({
+  it('P3.2 thin 单行：extract thin → 工具重建 ≥2 条草稿（200）', async () => {
+    const toolInput = {
       entries: [
         { title: 'Lesson 1 Apple Pie', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
         { title: 'Lesson 2 Orange', printedPage: 30, level: 1, kind: 'lesson', confidence: 'medium' },
       ],
       warnings: [],
-    });
-    const url = serve([draft]);
+    };
+    const url = serve([{ kind: 'tool', input: toolInput }]);
     configureGatewayBaseUrl(url);
     try {
       const tmp = await writeTempPdf(syntheticSingleLineTocPdf());
@@ -314,37 +339,37 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
     }
   }, 180000);
 
-  it('P3.2 编造页码倒退：unavailable E_TOC_REVIEW_CONTENT（200，非 502）', async () => {
-    const regress = JSON.stringify({
+  it('P3.4A 两次非法工具参数：unavailable E_TOC_REVIEW_TOOL_INVALID（200，非 502）', async () => {
+    const regress = {
       entries: [
         { title: 'Lesson 1 Apple', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
         { title: 'Lesson 2 Orange', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
       ],
       warnings: [],
-    });
-    const url = serve([regress, regress]);
+    };
+    const url = serve([{ kind: 'tool', input: regress }, { kind: 'tool', input: regress }]);
     configureGatewayBaseUrl(url);
     try {
       const tmp = await writeTempPdf(syntheticTextTocPdf());
       const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 2 });
       expect(review.reviewStatus).toBe('unavailable');
       expect(review.draft).toBeNull();
-      expect(review.reviewError?.code).toBe('E_TOC_REVIEW_CONTENT');
+      expect(review.reviewError?.code).toBe('E_TOC_REVIEW_TOOL_INVALID');
       expect(review.baseline.entries.length).toBe(2);
     } finally {
       configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
     }
   }, 180000);
 
-  it('P3.2A 无页码目录：extract empty → review 重建 ≥2 条（200）', async () => {
-    const draft = JSON.stringify({
+  it('P3.2A 无页码目录：extract empty → 工具重建 ≥2 条（200）', async () => {
+    const toolInput = {
       entries: [
         { title: 'Lesson 1 Apple', printedPage: 5, level: 1, kind: 'lesson', confidence: 'medium' },
         { title: 'Lesson 2 Orange', printedPage: 9, level: 1, kind: 'lesson', confidence: 'medium' },
       ],
       warnings: ['页码来自图片核对'],
-    });
-    const url = serve([draft]);
+    };
+    const url = serve([{ kind: 'tool', input: toolInput }]);
     configureGatewayBaseUrl(url);
     try {
       const tmp = await writeTempPdf(syntheticUnnumberedTocPdf());
@@ -361,7 +386,7 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
   }, 180000);
 
   it('P3.2A 普通正文：empty 且无信号 → review 400，零 Agent 调用等价（可读码）', async () => {
-    const url = serve(['{"entries":[],"warnings":[]}']);
+    const url = serve([]);
     configureGatewayBaseUrl(url);
     try {
       const tmp = await writeTempPdf(syntheticProsePdf());

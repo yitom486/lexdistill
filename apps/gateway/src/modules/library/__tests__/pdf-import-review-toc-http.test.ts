@@ -11,13 +11,18 @@ import type {
 import { BusinessError, isOk, ok } from '@study-studio/shared';
 import { createApp } from '../../../transport/http/create-app.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import {
+  TOC_DRAFT_TOOL_NAME,
+  tocDraftReplaceAllTool,
+} from '../application/pdf-import/toc-draft-tool.js';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 
 /**
- * CMD-LINGUA-P4B review-toc HTTP 集成（真 native + 假 Agent，不调付费模型）。
+ * CMD-LINGUA-P3.4A review-toc HTTP 集成（真 native + 假工具通道，不调付费模型）。
  *
- * - PDF 为内存 synthetic 空白 2 页（无私人内容），经 filePath 直读；
- * - Agent 由 fake adapter 扮演：捕获 AgentInput、回固定 JSON；
+ * - PDF 为内存 synthetic（无私人内容），经 filePath 直读；
+ * - Agent 由 fake adapter 扮演：脚本出现 tool 步骤即同步跑**真实**工具
+ *   execute（生产 adapter 内自执行行为），review loop 只观察 + 读暂存；
  * - 零写证明：调用前后 listDocuments 行数不变。
  */
 pinProcessToTestRuntime();
@@ -41,13 +46,25 @@ interface CapturedCall {
   input: AgentInput;
 }
 
-function makeFakeAdapter(script: string, captured: CapturedCall[]): AgentAdapter {
+function makeFakeAdapter(steps: Array<{ kind: 'text'; text: string } | { kind: 'tool'; input: unknown }>, captured: CapturedCall[]): AgentAdapter {
+  const sessionId = 'sess-http-mock';
+  let callSeq = 0;
   const session: AgentSession = {
-    sessionId: 'sess-http-mock',
+    sessionId,
     threadId: 'thread-http-mock',
     send: async function* (input: AgentInput): AsyncGenerator<AgentEvent, void, unknown> {
-      yield { type: 'TEXT_DELTA', delta: script };
-      yield { type: 'COMPLETED', finalOutput: script };
+      for (const step of steps) {
+        if (step.kind === 'text') {
+          yield { type: 'TEXT_DELTA', delta: step.text };
+        } else {
+          callSeq++;
+          const callId = `call-http-${callSeq}`;
+          yield { type: 'TOOL_CALL_REQUESTED', callId, toolName: TOC_DRAFT_TOOL_NAME, input: step.input as Record<string, unknown> };
+          await tocDraftReplaceAllTool.execute(step.input, { userId: 'u1', sessionId });
+          yield { type: 'TOOL_CALL_COMPLETED', callId, result: { status: 'completed', success: true } };
+        }
+      }
+      yield { type: 'COMPLETED' };
     },
     submitToolResult: async () => ok(undefined),
     submitApproval: async () => ok(undefined),
@@ -149,14 +166,14 @@ async function documentCount(repo: DrizzleLearnerRepository, userId: string): Pr
   return res.value.length;
 }
 
-describe('P4B POST review-toc（真 native + 假 Agent）', () => {
+describe('P3.4A POST review-toc（真 native + 假工具通道）', () => {
   it('P3.2A 空白 synthetic：证据不足拒绝（E_TOC_EVIDENCE_INSUFFICIENT），Agent 零调用、DB 行数不变', async () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const captured: CapturedCall[] = [];
     const app = createApp({
       repo,
-      server: { agentAdapter: makeFakeAdapter('{"entries":[],"warnings":["空白页，无目录"]}', captured) } as never,
+      server: { agentAdapter: makeFakeAdapter([], captured) } as never,
       port: 0,
     });
     const tmp = await writeTempPdf(syntheticBlankPdf());
@@ -169,14 +186,28 @@ describe('P4B POST review-toc（真 native + 假 Agent）', () => {
     expect(after).toBe(before);
   }, 180000);
 
-  it('P3.1B 文本目录 synthetic：围栏 JSON 成功进草稿，同一次 AgentInput 附件为真 PNG', async () => {
+  it('P3.4A 文本目录 synthetic：自然语言乱说 + 合法工具调用 → 工具草稿成功，同一次输入附件为真 PNG', async () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const captured: CapturedCall[] = [];
-    const fenced = '```json\n{"entries": [{"title": "Lesson 1 Apple", "printedPage": 12, "level": 1, "kind": "lesson", "confidence": "high"}, {"title": "Lesson 2 Orange", "printedPage": 30, "level": 1, "kind": "lesson", "confidence": "medium"}], "warnings": []}\n```';
+    const toolInput = {
+      entries: [
+        { title: 'Lesson 1 Apple', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
+        { title: 'Lesson 2 Orange', printedPage: 30, level: 1, kind: 'lesson', confidence: 'medium' },
+      ],
+      warnings: [],
+    };
     const app = createApp({
       repo,
-      server: { agentAdapter: makeFakeAdapter(fenced, captured) } as never,
+      server: {
+        agentAdapter: makeFakeAdapter(
+          [
+            { kind: 'text', text: '这是目录：{"entries": [{"title": "编造课", "printedPage": 999}], "warnings": []}' },
+            { kind: 'tool', input: toolInput },
+          ],
+          captured
+        ),
+      } as never,
       port: 0,
     });
     const tmp = await writeTempPdf(syntheticTextTocPdf());
@@ -195,7 +226,9 @@ describe('P4B POST review-toc（真 native + 假 Agent）', () => {
     expect(body.baseline.verdict).toBe('usable');
     expect(body.reviewStatus).toBe('ok');
     expect(body.reviewError).toBeNull();
-    expect(body.draft?.entries.length).toBe(2);
+    // draft 唯一来自工具入参，自然语言里的编造 JSON 无踪
+    expect(body.draft?.entries).toEqual(toolInput.entries);
+    expect(JSON.stringify(body)).not.toContain('编造课');
     expect(body.diagnostics.pagesRendered).toBe(2);
     expect(captured.length).toBe(1);
     const attachments = captured[0]?.input.attachments ?? [];
@@ -205,13 +238,15 @@ describe('P4B POST review-toc（真 native + 假 Agent）', () => {
     expect(after).toBe(before);
   }, 180000);
 
-  it('P3.1B 模型坏 JSON：重试后 unavailable 200（非 502），基线保留、零写', async () => {
+  it('P3.4A 无工具调用：unavailable E_TOC_REVIEW_NO_TOOL_CALL（200，非 502），基线保留、零写', async () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const captured: CapturedCall[] = [];
     const app = createApp({
       repo,
-      server: { agentAdapter: makeFakeAdapter('garbage {{{', captured) } as never,
+      server: {
+        agentAdapter: makeFakeAdapter([{ kind: 'text', text: '我不知道，你自己看图吧' }], captured),
+      } as never,
       port: 0,
     });
     const tmp = await writeTempPdf(syntheticTextTocPdf());
@@ -226,12 +261,12 @@ describe('P4B POST review-toc（真 native + 假 Agent）', () => {
     };
     expect(body.reviewStatus).toBe('unavailable');
     expect(body.draft).toBeNull();
-    expect(body.reviewError?.code).toBe('E_TOC_REVIEW_PARSE');
+    expect(body.reviewError?.code).toBe('E_TOC_REVIEW_NO_TOOL_CALL');
     expect(typeof body.reviewError?.userMessage).toBe('string');
     expect(body.baseline.verdict).toBe('usable');
     expect(body.baseline.entries.length).toBe(2);
-    // 同 session 重试一次：两次 send，一次 create
-    expect(captured.length).toBe(2);
+    // 工具通道单轮：一次 send，无文本纠错第二轮
+    expect(captured.length).toBe(1);
     expect(await documentCount(repo, 'u1')).toBe(before);
   }, 180000);
 
@@ -241,7 +276,7 @@ describe('P4B POST review-toc（真 native + 假 Agent）', () => {
     const captured: CapturedCall[] = [];
     const app = createApp({
       repo,
-      server: { agentAdapter: makeFakeAdapter('{"entries":[],"warnings":[]}', captured) } as never,
+      server: { agentAdapter: makeFakeAdapter([], captured) } as never,
       port: 0,
     });
     const tmp = await writeTempPdf(syntheticBlankPdf());
