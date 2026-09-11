@@ -59,3 +59,23 @@ describe('selectTurnTools', () => {
     expect(tools.indexOf('learning.content') < tools.indexOf('mistakes.list')).toBe(true);
   });
 });
+
+describe('P3.4B-ISO 目录工具隔离：主 lane 永不声明 toc 工具', () => {
+  it('全意图 × 目录相关提示词都不含 toc_draft_replace_all', () => {
+    const intents = ['FREE_COACH', 'EXPLAIN', 'GENERATE_QUIZ', 'GRADE', 'REVIEW_MISTAKES', 'SOME_FUTURE_INTENT', ''];
+    const prompts = [
+      '随便聊聊',
+      '帮我看看这本书的目录',
+      '审核一下目录草稿',
+      'toc_draft_replace_all',
+      '把目录导出来',
+      '第1課 12',
+    ];
+    for (const intent of intents) {
+      for (const userPrompt of prompts) {
+        const tools = selectTurnTools({ intent, userPrompt });
+        expect(tools.includes('toc_draft_replace_all')).toBe(false);
+      }
+    }
+  });
+});

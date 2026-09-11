@@ -42,8 +42,7 @@
   3. Gateway 按路由策略选择 `codex` 或 `acp`，**不得**在 `apps/web`、`learner-core`、`tool-core` 中 `import` 任何 `acp-*` SDK；
   4. ACP 仅作为**可选兼容通道**，不得反向削弱 Codex 原生通路，也不得成为默认学习闭环依赖。
 
-### 1.6 原生工具调用优先于 MCP (Native Tools First, MCP Last)
-- **一等公民：引擎原生 Tool / Dynamic Tools + 本系统 `tool-core` Registry**。
+### 1.6 原生工具调用优先于 MCP (Native Tools First, MCP Last)- **一等公民：引擎原生 Tool / Dynamic Tools + 本系统 `tool-core` Registry**。
   - 学习闭环内的出题、批改、词典、错题入库、熟练度回写等，必须注册为 Gateway **Server/Client Tool**，并由 Adapter 注入为运行时**原生 tool_call**（如 Codex `dynamic_tools`）。
   - 工具执行走 `ToolRouter` 进程内调度，结果经 `submitToolResult` 回填 Agent，**禁止**为同一能力再包一层 MCP 中转。
 - **MCP 仅限外部异构系统的可选桥接**（如 Anki / Notion 同步），落在 `ToolLocation.EXTERNAL`：
@@ -51,6 +50,11 @@
   - 不得把 MCP 当作默认 Agent 工具总线，或要求每个 Turn 多跳一次 MCP Server；
   - 引入任何 MCP 依赖时，必须证明「目标系统无等价原生 API / 无本仓库内工具可覆盖」，并保持与 `agent-core` 契约隔离。
 - **违反判定**：凡学习域工具仅因“图省事”改走 MCP、导致额外进程/协议往返的，一律视为架构违规。
+
+### 1.6b 专精会话的工具隔离 (Per-Agent Tool Isolation)
+- **工具按会话 allowlist 声明**：专精 agent（如目录审核）只声明自有工具，不声明其他任何工具；主 lane 按意图点名，永不顺带声明专精工具。
+- **执行侧对会话设防**：会话级工具有第二道门——未登记会话的调用直接拒绝（预算不扣，错误码为安全码），宣言之外的调用在执行侧也发不出来。
+- **专精模型可配**：专精会话的模型与思考等级（effort）走显式配置 > 环境变量 > 缺席三级，透传引擎原生字段，不在业务包绑定厂商枚举。
 
 ### 1.7 领域能力与 UI 组合解耦 (Composable Domain Capabilities)
 - **领域命令先于界面**：学习域能力（查词、收藏生词、建卡、复习、学习记录、AI 分析）必须先定义为 Gateway / Repository / `learner-core` 可调用的命令与数据契约；不得把核心流程藏在某个 React 组件、按钮回调或页面状态中。

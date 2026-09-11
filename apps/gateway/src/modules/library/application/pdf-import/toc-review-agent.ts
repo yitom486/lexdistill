@@ -25,6 +25,7 @@ import {
 } from './toc-review-material.js';
 import {
   TOC_DRAFT_TOOL_NAME,
+  registerTocDraftSession,
   takeTocDraftToolResult,
   tocDraftReplaceAllTool,
   type TocReviewToolEvent,
@@ -71,6 +72,43 @@ export interface TocReviewAgentDeps
   adapter: AgentAdapter;
   /** 可观测接收器（缺席走默认日志实现；只收固定枚举 + 计数）。 */
   toolObserver?: TocReviewToolObserver;
+  /** 专精模型配置（缺席走环境变量默认；双缺席用适配器默认）。 */
+  modelOptions?: TocReviewModelOptions;
+}
+
+/**
+ * CMD-LINGUA-P3.4B-ISO 目录专精 agent 模型配置（显式传入 > 环境变量 > 缺席）。
+ * model/effort 均为透传字符串（不绑定厂商枚举，由 Adapter 映射到引擎原生字段；
+ * 非法值由引擎侧拒绝，本层只做去空白与长度上限）。
+ */
+export interface TocReviewModelOptions {
+  model?: string;
+  effort?: string;
+}
+
+/** 环境变量默认（运维配置，无则缺席；值只做卫生截断）。 */
+export const TOC_REVIEW_MODEL_ENV = 'STUDY_STUDIO_TOC_REVIEW_MODEL';
+export const TOC_REVIEW_EFFORT_ENV = 'STUDY_STUDIO_TOC_REVIEW_EFFORT';
+const TOC_REVIEW_OPTION_MAX_CHARS = 128;
+
+function cleanModelOption(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, TOC_REVIEW_OPTION_MAX_CHARS);
+}
+
+export function resolveTocReviewModelOptions(
+  overrides?: TocReviewModelOptions
+): TocReviewModelOptions {
+  const model =
+    cleanModelOption(overrides?.model) ?? cleanModelOption(process.env[TOC_REVIEW_MODEL_ENV]);
+  const effort =
+    cleanModelOption(overrides?.effort) ?? cleanModelOption(process.env[TOC_REVIEW_EFFORT_ENV]);
+  return {
+    ...(model ? { model } : {}),
+    ...(effort ? { effort } : {}),
+  };
 }
 
 function defaultToolObserver(): TocReviewToolObserver {
@@ -371,16 +409,22 @@ export async function reviewTocWithAgent(
     });
   }
 
+  // P3.4B-ISO 专精模型配置：显式传入 > 环境变量 > 缺席（适配器默认）。
+  const modelOptions = resolveTocReviewModelOptions(deps.modelOptions);
   const sessionRes = await deps.adapter.createSession({
     sessionId: generateId('toc-review'),
     userId: input.userId,
     systemPrompt: TOC_REVIEW_SYSTEM_PROMPT,
+    // P3.4B-ISO 工具隔离：目录专精会话只声明目录工具，不声明其他任何工具。
     tools: [tocDraftReplaceAllTool],
+    ...(modelOptions.model ? { model: modelOptions.model } : {}),
     ephemeral: true,
   });
   if (!isOk(sessionRes)) return sessionRes;
   const session: AgentSession = sessionRes.value;
   const sessionId = session.sessionId;
+  // 执行侧登记（工具第二道门；终态 take 时自动注销）。
+  registerTocDraftSession(sessionId);
   const observer = deps.toolObserver ?? defaultToolObserver();
   observer.emit({ type: 'agent_session_ready' });
   observer.emit({ type: 'tool_offered', tool: TOC_DRAFT_TOOL_NAME });
@@ -400,10 +444,19 @@ export async function reviewTocWithAgent(
   };
   const finishTurn = async (): Promise<Result<{ toolCalls: number }, BusinessError>> => {
     let toolCalls = 0;
+    // 思考等级/模型覆盖走 Turn 原生字段（与 createSession 的 model 互补：thread 默认 + 本轮覆盖）。
+    const turnOptions =
+      modelOptions.model || modelOptions.effort
+        ? {
+            ...(modelOptions.model ? { model: modelOptions.model } : {}),
+            ...(modelOptions.effort ? { effort: modelOptions.effort } : {}),
+          }
+        : undefined;
     try {
       for await (const ev of session.send({
         message: buildTocReviewMessage(baseline, material.pages.length),
         attachments: material.pages.map((p) => ({ png: p.png, label: `toc-physical-page-${p.pageNumber}` })),
+        ...(turnOptions ? { turnOptions } : {}),
       })) {
         if (ev.type === 'TOOL_CALL_REQUESTED') {
           if (isTocDraftToolCall(ev.toolName)) {

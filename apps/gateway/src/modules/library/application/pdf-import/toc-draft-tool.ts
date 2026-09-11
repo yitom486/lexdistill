@@ -171,12 +171,31 @@ function newRecord(): TocDraftToolSessionRecord {
 const draftSessions = new Map<string, TocDraftToolSessionRecord>();
 
 /**
+ * P3.4B-ISO 工具隔离第二道门（第一道是 Codex 侧“只放行已声明 dynamicTools”）。
+ * review 会话在 createSession 成功后登记；执行只认登记会话，未登记一律拒绝
+ * （预算不扣、暂存不建）。宣言之外的调用在执行侧也发不出来。
+ */
+const draftToolSessions = new Set<string>();
+
+/** 登记目录审核会话（review loop 在 createSession 成功后调用；幂等）。 */
+export function registerTocDraftSession(sessionId: string): void {
+  if (typeof sessionId === 'string' && sessionId) draftToolSessions.add(sessionId);
+}
+
+/** 登记是否有效（纯查询，供单测锁定隔离语义）。 */
+export function isTocDraftSessionRegistered(sessionId: string): boolean {
+  return draftToolSessions.has(sessionId);
+}
+
+/**
  * 读并删除会话暂存（review loop 终态唯一读取点；成功/unavailable/异常全调）。
+ * 同时注销会话登记（同一会话不会有第二轮工具调用）。
  * 返回 null = 本会话无工具调用或从未成功。
  */
 export function takeTocDraftToolResult(sessionId: string): TocDraftToolSessionRecord | null {
   const record = draftSessions.get(sessionId) ?? null;
   draftSessions.delete(sessionId);
+  draftToolSessions.delete(sessionId);
   return record;
 }
 
@@ -208,6 +227,12 @@ export class TocDraftReplaceAllTool
     input: unknown,
     context: ToolExecutionContext
   ): Promise<Result<TocDraftToolResult, BusinessError>> {
+    // 隔离门：未登记会话拒绝（静态文案，无原文回显；预算不扣）。
+    if (!draftToolSessions.has(context.sessionId)) {
+      return err(
+        new BusinessError('E_TOC_DRAFT_SESSION', '目录工具仅限目录审核会话调用', 'SECURITY', false)
+      );
+    }
     const record = draftSessions.get(context.sessionId) ?? newRecord();
     draftSessions.set(context.sessionId, record);
     record.calls++;

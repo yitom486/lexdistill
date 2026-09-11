@@ -8,11 +8,14 @@ import type {
 import { BusinessError, isOk, logger, ok } from '@study-studio/shared';
 import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
 import {
+  TOC_REVIEW_EFFORT_ENV,
+  TOC_REVIEW_MODEL_ENV,
   TOC_REVIEW_SYSTEM_PROMPT,
   assessReviewableEvidence,
   buildTocReviewMessage,
   formatReviewEvidence,
   isTocDraftToolCall,
+  resolveTocReviewModelOptions,
   reviewTocWithAgent,
   type TocReviewDraftEntry,
 } from '../application/pdf-import/toc-review-agent.js';
@@ -103,10 +106,11 @@ interface AgentCalls {
   systemPrompts: Array<string | undefined>;
   toolsOffered: string[][];
   approvals: Array<{ approvalId: string; decision: unknown }>;
+  sessionModels: Array<string | undefined>;
 }
 
 function newAgentCalls(): AgentCalls {
-  return { create: 0, inputs: [], systemPrompts: [], toolsOffered: [], approvals: [] };
+  return { create: 0, inputs: [], systemPrompts: [], toolsOffered: [], approvals: [], sessionModels: [] };
 }
 
 function mockToolAdapter(args: {
@@ -175,6 +179,7 @@ function mockToolAdapter(args: {
       args.calls.create++;
       args.calls.systemPrompts.push(options.systemPrompt);
       args.calls.toolsOffered.push((options.tools ?? []).map((t) => t.name));
+      args.calls.sessionModels.push(options.model);
       if (args.failCreate) return { ok: false as const, error: args.failCreate };
       const capturing: AgentSession = {
         ...session,
@@ -539,6 +544,55 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
     expect(isTocDraftToolCall('toc.draft.replace.all')).toBe(true);
     expect(isTocDraftToolCall('other_tool')).toBe(false);
     expect(isTocDraftToolCall('')).toBe(false);
+  });
+
+  it('P3.4B-ISO 专精模型配置：显式 > 环境变量 > 缺席；透传到会话与 Turn', async () => {
+    // 纯函数：去空白/截断/优先级
+    expect(resolveTocReviewModelOptions()).toEqual({});
+    expect(resolveTocReviewModelOptions({ model: '  ', effort: '' })).toEqual({});
+    expect(resolveTocReviewModelOptions({ model: 'm1', effort: 'high' })).toEqual({ model: 'm1', effort: 'high' });
+    const savedModel = process.env[TOC_REVIEW_MODEL_ENV];
+    const savedEffort = process.env[TOC_REVIEW_EFFORT_ENV];
+    try {
+      process.env[TOC_REVIEW_MODEL_ENV] = 'env-model';
+      process.env[TOC_REVIEW_EFFORT_ENV] = 'env-effort';
+      expect(resolveTocReviewModelOptions()).toEqual({ model: 'env-model', effort: 'env-effort' });
+      expect(resolveTocReviewModelOptions({ model: 'm1' })).toEqual({ model: 'm1', effort: 'env-effort' });
+    } finally {
+      if (savedModel === undefined) delete process.env[TOC_REVIEW_MODEL_ENV];
+      else process.env[TOC_REVIEW_MODEL_ENV] = savedModel;
+      if (savedEffort === undefined) delete process.env[TOC_REVIEW_EFFORT_ENV];
+      else process.env[TOC_REVIEW_EFFORT_ENV] = savedEffort;
+    }
+    // 透传：createSession model + send turnOptions
+    const inspectorCalls = newCalls();
+    const agentCalls = newAgentCalls();
+    const res = await reviewTocWithAgent(
+      reviewDeps(inspectorCalls, agentCalls, [{ kind: 'tool', input: GOOD_TOOL_INPUT }], {
+        modelOptions: { model: 'toc-model', effort: 'high' },
+      }),
+      { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.reviewStatus).toBe('ok');
+    expect(agentCalls.sessionModels).toEqual(['toc-model']);
+    const sent = agentCalls.inputs[0] as { turnOptions?: unknown } | undefined;
+    expect(sent?.turnOptions).toEqual({ model: 'toc-model', effort: 'high' });
+  });
+
+  it('缺席模型配置：createSession 无 model，send 无 turnOptions', async () => {
+    const inspectorCalls = newCalls();
+    const agentCalls = newAgentCalls();
+    const res = await reviewTocWithAgent(
+      reviewDeps(inspectorCalls, agentCalls, [{ kind: 'tool', input: GOOD_TOOL_INPUT }]),
+      { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(agentCalls.sessionModels).toEqual([undefined]);
+    const sent = agentCalls.inputs[0] as { turnOptions?: unknown } | undefined;
+    expect(sent?.turnOptions).toBeUndefined();
   });
 });
 
