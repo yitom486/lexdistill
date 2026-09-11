@@ -7,7 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:web": "bun --parallel --filter @study-studio/web --filter @study-studio/gateway dev",
+    "dev:web": "bun scripts/dev-run.ts",
+    "dev:web:parallel": "bun --parallel --filter @study-studio/web --filter @study-studio/gateway dev",
+    "dev:clean": "bun scripts/dev-clean.ts",
     "dev:gateway": "bun --filter @study-studio/gateway dev",
     "dev:desktop": "bun --filter @study-studio/desktop dev",
     "build": "bun --filter \"*\" build",

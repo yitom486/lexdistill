@@ -16,6 +16,9 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // §7.1 红线：禁止静默漂移端口。冲突必须大声失败（旧实例未退出的信号），
+    // 绝不自动往后挪——漂移会掩盖僵尸进程，让页面绑错服务器。
+    strictPort: true,
   },
   build: {
     // 纯静态输出目录，未来直接作为 Tauri 的 frontendDist

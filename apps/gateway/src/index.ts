@@ -33,5 +33,28 @@ export function startGatewayServer(port = PORT) {
 
 // 如果作为主入口直接运行，则启动服务器
 if (import.meta.main) {
-  startGatewayServer();
+  let listener: ReturnType<typeof startGatewayServer>;
+  try {
+    listener = startGatewayServer();
+  } catch (e) {
+    // §7.1：端口冲突等启动失败大声退出（非零码 + 可读文案），禁止静默漂移。
+    // CLI 启停日志走 console（§2.3 运维日志保留项），不经 BusinessError 信封。
+    console.error(`[gateway] 启动失败：${e instanceof Error ? e.message : String(e)}`);
+    process.exit(1);
+  }
+  // §7.2 红线：信号必须处理。Ctrl+C / taskkill（不带 /F）进这里：
+  // 关监听 → 掐长连接（含 WS/流式）→ 退出。存量 Turn 走已有 signal 检查点停扫。
+  // 限制：Windows 直接关终端窗口不投递任何信号，仍会留孤儿——必须配合
+  // `bun run dev:clean` 定期核对，禁止要求用户逐个杀进程。
+  const shutdown = (signal: string): void => {
+    console.log(`[gateway] 收到 ${signal}，正在关闭监听并退出…`);
+    try {
+      listener.stop(true);
+    } catch {
+      // 关闭期错误不掩盖退出意图
+    }
+    process.exit(0);
+  };
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
 }

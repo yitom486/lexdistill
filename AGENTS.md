@@ -77,6 +77,7 @@
 - **drizzle builder 是惰性的**：同步事务里必须显式 `.run()`（或 `await`），光 `tx.insert(...).values(...)` 不执行也不报错——静默零写是最阴的 bug，写完必须有行数断言的单测覆盖。
 - **原生 sql 查询只用 `db.all(...)[0]`**：`db.get(sql`…`)` 在 bun-sqlite 会话上返回形状不对（实测回 `[0]`），COUNT 查出来是 0——静默误报，同样要单测锁。
 - **禁止新的双源漂移**：新增表必须同时落 `ddl.ts`（最新建表）、`schema.ts`（类型）和 `migrations/vNNN-*.ts`（旧库升级），缺一边即视为未完成。
+- **`sqliteTable` 第三参数只许返回数组**（Drizzle 0.45）：`(table) => ({ pk: primaryKey(...) })` 命中已废弃的 `SQLiteTableExtraConfig` 对象签名，IDE 会报 deprecated。正确写法是 `(table) => [primaryKey({ columns: [...] }), index('idx_...').on(...)]`。对象键名没有运行时意义；约束/索引名写在 `primaryKey` / `index()` / `uniqueIndex()` 里。全仓库表定义只许在 `apps/gateway/src/infrastructure/db/schema.ts`；无复合主键/索引的表不要硬加第三参数。本条只约束 TypeScript schema，不改 `ddl.ts`。
 
 ---
 
@@ -181,3 +182,32 @@
 - **客户端偏好与本地状态 (Client State) 归 Zustand + `persist`**：
   - TTS 语音参数（男女声、语速、音色、自定义外挂端点）、主题明暗（Light/Dark）、盲听遮罩开关、假名注音开关、UI 导航状态，以及**阅读双栏宽度比（splitPaneRatio）**等布局偏好，统一使用 **Zustand 并启用 `persist` 中间件**；
   - 彻底杜绝在各个组件中到处分散编写 `localStorage.getItem/setItem` 胶水代码，保证多组件、跨标签页与未来 Tauri 桌面端的响应式自动持久化。
+
+---
+
+## 7. 进程生命周期与端口归属红线 (Process Lifecycle & Port Ownership)
+
+> 背景（2026-09-11 实测定案）：昨日 `bun test` 孤儿进程存活 22 小时仍在烧 CPU；
+> Vite 缺 `strictPort` 静默漂移端口；网关零信号处理；前端写死 `:8080` 且无握手。
+> 四者叠加的后果就是线上所见：页面绑死僵尸网关、识别永久停在“准备 PDF…”、重启一次漂一个端口。
+> 本节每一条都是红线，违反即视为架构违规（验收口径见各条末尾）。
+
+### 7.1 单实例与端口归属 (No Silent Port Drift)
+- **禁止静默换端口**：Vite 必须 `strictPort: true`；网关 `Bun.serve` 必须捕获 `EADDRINUSE` 并大声失败（非零退出 + 明确文案，告知占位 PID 与启动时间），**禁止回退到其他端口**。
+- “端口被占就往后挪”（代码、脚本、框架默认行为一视同仁）属于**掩盖僵尸进程**的红线行为：漂移的当时爽，绑死的页面随后就去跟僵尸说话。
+- 启动 dev 前必须确认旧实例已死：按端口查 PID → 核对命令行与启动时间 → 只杀确认的僵尸，**禁止盲 kill**（验收：`apps/web/vite.config.ts` 有 `strictPort: true`；`start-gateway.ts` 有 EADDRINUSE 分支）。
+
+### 7.2 信号与优雅关闭 (Graceful Shutdown)
+- **网关入口必须处理 `SIGTERM` / `SIGINT`**：停止接受新连接 → 关闭监听 → 通知并关闭 WS/SSE 长连接 → 存量 Turn 走已有 signal 检查点停扫 → 超时后退出并留下可观测退出码。
+- 当前 dev 进程树深达 4 层（`run dev:web` → `--parallel` → `exec` → `--watch` → child），Windows 下关终端 / Ctrl+C **带不走整棵树**（已实测 orphan）。必须提供一键清理脚本并文档化，禁止要求用户逐个杀进程。
+  - 一键清理：`bun run dev:clean`（只读列出 3000-3010 / 8080-8090 监听者：端口/PID/年龄/父存活/命令行）；确认后 `bun run dev:clean -- --kill <pid>`（仅名单 PID + 命令行命中 dev 特征才杀，非 dev 进程拒绝）。
+  - 默认启动入口必须是监督器 `bun run dev:web`（`scripts/dev-run.ts`）：启动前核对 3000/8080，脏房间拒绝开工（`--force` 只杀 dev-verified 占位者）；web/gateway 作为其直属子进程，任一退出或收到信号即杀整棵树。禁止绕过监督器直调 `dev:web:parallel` 常驻（保留仅作排障对比）。
+- 后台任务（OCR 批、enrich jobs）在关机时必须可中断、可恢复：已有检查点的不得重跑，重复投递必须幂等（验收：grep `SIGTERM` 在网关入口存在；关机路径有单测或集成断言）。
+
+### 7.3 前端必须验证服务端身份 (Server Identity Handshake)
+- **禁止写死单端口、无探测、无握手**：Web 启动后必须先调 `/api/health`（响应必须携带 `bootId` + 进程启动时间 + 版本号），关键 Turn 前核对 `bootId`；变化必须显式提示用户刷新/重连，**禁止静默绑僵尸**。
+- **所有流式请求必须有首字节超时与 stall 超时**：超时统一转为可读 `BusinessError` 并退出 busy。只靠用户点“取消”等于无容错——本次“准备 PDF…”永久卡死即此缺失的直接后果（验收：`textbooks-annotations.ts` 流式函数含 `AbortSignal.timeout` 或等效首字节计时；grep `timeout` 非零命中）。
+
+### 7.4 Agent 与运行中服务的互斥 (Agent/Dev Mutual Exclusion)
+- Agent（含人类工程师）在用户 live dev（`bun --watch` / Vite HMR）运行时**落盘改文件前必须先声明**：watch 重载会掐断用户正在点的请求流，HMR 会重置前端世代守门（`runId` 失配导致迟到结算被丢弃）。能暂停 dev 则暂停；不能暂停则分批小步保存，并在任务报告里写明保存时间窗。
+- Agent 自己的常驻命令（`test:all`、大体积 E2E、探针脚本）跑完必须确认进程退出，**禁止留下 detached runner**（本次已抓到一个存活 22 小时、累计 218 秒 CPU 的 `bun test` 孤儿；验收：任务收尾含进程存活检查）。
