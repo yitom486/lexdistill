@@ -39,6 +39,7 @@ import type {
   CodexRealtimeVoicesDto,
   CodexRealtimeCapabilityDto,
   CodexRealtimeTextRole,
+  DynamicToolCallParams,
   DynamicToolCallResponse,
 } from './app-server-protocol.js';
 
@@ -54,7 +55,29 @@ export interface CodexAdapterOptions {
   executeTool?: ExternalToolExecutor;
   /** Gateway 注入：转发 App Server 旁路通知（queue/changed 等） */
   onNotification?: (method: string, params: unknown) => void;
+  /**
+   * 测试注入：直接使用既有连接（跳过 codex 二进制 spawn）。
+   * 生产缺席，走正常 ensureConnection。
+   */
+  connection?: CodexAppServerConnection;
 }
+
+/**
+ * 会话工具路由记录：一次工具回调必须且只能用归属会话的四件套执行。
+ * closed 为 true 的记录一律 fail-closed（防关闭后旧身份复活）。
+ */
+interface SessionToolRoute {
+  sessionId: string;
+  userId: string;
+  threadId: string;
+  toolNameMap?: Map<string, string> | undefined;
+  executeTool?: ExternalToolExecutor | undefined;
+  noteTurn?: ((turnId: string) => void) | undefined;
+  closed: boolean;
+}
+
+/** 归属不明时的 fail-closed 回执（静态文案，不回显任何 id/原文）。 */
+const ORPHAN_TOOL_CALL_MESSAGE = 'No owning session for this tool call (fail-closed)';
 
 /** 用户未操作时自动 decline，避免 App Server 审批请求挂死 */
 const APPROVAL_TIMEOUT_MS = 120_000;
@@ -86,41 +109,12 @@ export class CodexSession implements AgentSession {
     public readonly userId: string,
     private readonly connection: CodexAppServerConnection,
     private readonly executeTool?: ExternalToolExecutor,
-    private readonly toolNameMap?: Map<string, string>
+    private readonly toolNameMap?: Map<string, string>,
+    private readonly onClose?: () => void
   ) {
-    this.connection.setToolCallHandler(async (params) => {
-      this.activeTurnId = params.turnId;
-      const toolName = params.tool;
-      const args =
-        params.arguments && typeof params.arguments === 'object'
-          ? (params.arguments as Record<string, unknown>)
-          : {};
-      try {
-        if (!this.executeTool) {
-          return failTool('Gateway 未注入工具执行器');
-        }
-        const candidates = resolveToolName(toolName, this.toolNameMap);
-        let lastErr = 'tool not found';
-        for (const name of candidates) {
-          try {
-            const result = await this.executeTool(name, args, {
-              sessionId: this.sessionId,
-              userId: this.userId,
-            });
-            return {
-              contentItems: [{ type: 'inputText', text: JSON.stringify(result ?? null) }],
-              success: true,
-            } satisfies DynamicToolCallResponse;
-          } catch (e) {
-            lastErr = e instanceof Error ? e.message : String(e);
-          }
-        }
-        return failTool(lastErr);
-      } catch (e) {
-        return failTool(e instanceof Error ? e.message : String(e));
-      }
-    });
-
+    // 注意：工具调用处理器由 CodexAdapter 在连接层统一安装一次（按 thread/turn
+    // 路由到归属会话），本构造不再逐会话覆盖——否则后创建会话赢得全部回调。
+    // 审批处理器保留逐会话安装（P3.4B-FIX 范围外；行为不变）。
     this.connection.setApprovalHandler(async (req) => {
       const expiresAt = Date.now() + APPROVAL_TIMEOUT_MS;
       this.eventSink?.({
@@ -155,6 +149,14 @@ export class CodexSession implements AgentSession {
         });
       });
     });
+  }
+
+  /**
+   * @internal 路由回填本 turn（替代旧写法里 handler 闭包直接写 activeTurnId）。
+   * 只由归属会话的回调触发，不再跨会话串扰 steer/interrupt 目标。
+   */
+  public noteActiveTurn(turnId: string): void {
+    this.activeTurnId = turnId;
   }
 
   public async *send(input: AgentInput): AsyncIterable<AgentEvent> {
@@ -395,6 +397,11 @@ export class CodexSession implements AgentSession {
       resolve('cancel');
       this.pendingApprovals.delete(id);
     }
+    try {
+      this.onClose?.();
+    } catch {
+      // 注销失败不影响关闭（路由表以 closed 标记兜底 fail-closed）
+    }
     return ok(undefined);
   }
 }
@@ -414,6 +421,14 @@ export class CodexAdapter implements AgentAdapter {
     string,
     { threadId: string; userId: string; toolNameMap?: Map<string, string> }
   >();
+  /**
+   * 连接级工具路由表（单例 handler + thread/turn 双键）。
+   * 旧设计在每个 CodexSession 构造里覆盖 setToolCallHandler，后创建会话
+   * 赢得全部回调；现改为连接只装一次，按归属会话路由。
+   */
+  private readonly toolRouteByThread = new Map<string, SessionToolRoute>();
+  private readonly toolRouteByTurn = new Map<string, SessionToolRoute>();
+  private toolRouterConn: CodexAppServerConnection | null = null;
   private notificationUnsub: (() => void) | null = null;
   private notificationHandler:
     | ((method: string, params: unknown) => void)
@@ -421,9 +436,100 @@ export class CodexAdapter implements AgentAdapter {
 
   constructor(options: CodexAdapterOptions = {}) {
     this.options = options;
+    if (options.connection) this.connection = options.connection;
     if (options.onNotification) {
       this.notificationHandler = options.onNotification;
     }
+  }
+
+  /**
+   * 连接级工具调用单例路由：threadId 主键，turnId 为已学习到的次键。
+   * 查不到归属或记录已关闭 → fail-closed，绝不猜测 session/user。
+   */
+  private routeToolCall(
+    params: DynamicToolCallParams
+  ): Promise<DynamicToolCallResponse> | DynamicToolCallResponse {
+    const byThread =
+      typeof params.threadId === 'string' ? this.toolRouteByThread.get(params.threadId) : undefined;
+    const byTurn =
+      typeof params.turnId === 'string' && params.turnId
+        ? this.toolRouteByTurn.get(params.turnId)
+        : undefined;
+    const route = byThread ?? byTurn;
+    if (!route || route.closed) {
+      return failTool(ORPHAN_TOOL_CALL_MESSAGE);
+    }
+    // 学到 turn 映射：同 thread 后续只带 turnId 也能找回（仍受 closed 门控）。
+    if (typeof params.turnId === 'string' && params.turnId) {
+      this.toolRouteByTurn.set(params.turnId, route);
+    }
+    try {
+      route.noteTurn?.(params.turnId);
+    } catch {
+      // 回填失败不影响执行（steer 中断目标缺席即回退连接级）
+    }
+    return this.executeRoutedTool(route, params);
+  }
+
+  private async executeRoutedTool(
+    route: SessionToolRoute,
+    params: DynamicToolCallParams
+  ): Promise<DynamicToolCallResponse> {
+    const toolName = params.tool;
+    const args =
+      params.arguments && typeof params.arguments === 'object'
+        ? (params.arguments as Record<string, unknown>)
+        : {};
+    try {
+      if (!route.executeTool) {
+        return failTool('Gateway 未注入工具执行器');
+      }
+      const candidates = resolveToolName(toolName, route.toolNameMap);
+      let lastErr = 'tool not found';
+      for (const name of candidates) {
+        try {
+          const result = await route.executeTool(name, args, {
+            sessionId: route.sessionId,
+            userId: route.userId,
+          });
+          return {
+            contentItems: [{ type: 'inputText', text: JSON.stringify(result ?? null) }],
+            success: true,
+          } satisfies DynamicToolCallResponse;
+        } catch (e) {
+          lastErr = e instanceof Error ? e.message : String(e);
+        }
+      }
+      return failTool(lastErr);
+    } catch (e) {
+      return failTool(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /** 连接上只装一次路由 handler（连接重建时重装）。 */
+  private ensureToolRouter(conn: CodexAppServerConnection): void {
+    if (this.toolRouterConn === conn) return;
+    conn.setToolCallHandler((params) => this.routeToolCall(params));
+    this.toolRouterConn = conn;
+  }
+
+  /** 注册会话路由（create/resume 成功后调用；同 thread 后登记者覆盖先登记者）。 */
+  private registerToolRoute(record: SessionToolRoute): void {
+    this.toolRouteByThread.set(record.threadId, record);
+  }
+
+  /**
+   * 注销会话路由（session.close 时调用）：compare-and-delete + turn 映射清扫。
+   * 后关闭者不得注销先注册的新记录（同 thread 换代场景）。
+   */
+  private unregisterToolRoute(record: SessionToolRoute): void {
+    if (this.toolRouteByThread.get(record.threadId) === record) {
+      this.toolRouteByThread.delete(record.threadId);
+    }
+    for (const [turnId, current] of this.toolRouteByTurn) {
+      if (current === record) this.toolRouteByTurn.delete(turnId);
+    }
+    record.closed = true;
   }
 
   public setNotificationHandler(
@@ -476,16 +582,27 @@ export class CodexAdapter implements AgentAdapter {
         toolNameMap: bridge.nameMap,
       });
 
-      return ok(
-        new CodexSession(
-          options.sessionId,
-          threadId,
-          options.userId,
-          conn.value,
-          this.options.executeTool,
-          bridge.nameMap
-        )
+      this.ensureToolRouter(conn.value);
+      const route: SessionToolRoute = {
+        sessionId: options.sessionId,
+        userId: options.userId,
+        threadId,
+        toolNameMap: bridge.nameMap,
+        executeTool: this.options.executeTool,
+        closed: false,
+      };
+      const sess = new CodexSession(
+        options.sessionId,
+        threadId,
+        options.userId,
+        conn.value,
+        this.options.executeTool,
+        bridge.nameMap,
+        () => this.unregisterToolRoute(route)
       );
+      route.noteTurn = (turnId: string) => sess.noteActiveTurn(turnId);
+      this.registerToolRoute(route);
+      return ok(sess);
     } catch (raw) {
       return err(translateToBusinessError(raw, 'CODEX:createSession'));
     }
@@ -509,16 +626,27 @@ export class CodexAdapter implements AgentAdapter {
       if (!isOk(conn)) return conn;
       const resumed = await conn.value.resumeThread(meta.threadId);
       if (!isOk(resumed)) return resumed;
-      return ok(
-        new CodexSession(
-          sessionId,
-          meta.threadId,
-          meta.userId,
-          conn.value,
-          this.options.executeTool,
-          meta.toolNameMap
-        )
+      this.ensureToolRouter(conn.value);
+      const route: SessionToolRoute = {
+        sessionId,
+        userId: meta.userId,
+        threadId: meta.threadId,
+        toolNameMap: meta.toolNameMap,
+        executeTool: this.options.executeTool,
+        closed: false,
+      };
+      const sess = new CodexSession(
+        sessionId,
+        meta.threadId,
+        meta.userId,
+        conn.value,
+        this.options.executeTool,
+        meta.toolNameMap,
+        () => this.unregisterToolRoute(route)
       );
+      route.noteTurn = (turnId: string) => sess.noteActiveTurn(turnId);
+      this.registerToolRoute(route);
+      return ok(sess);
     } catch (raw) {
       return err(translateToBusinessError(raw, 'CODEX:resumeSession'));
     }
@@ -725,6 +853,9 @@ export class CodexAdapter implements AgentAdapter {
     const c = this.connection;
     this.connection = null;
     this.threadBySession.clear();
+    this.toolRouteByThread.clear();
+    this.toolRouteByTurn.clear();
+    this.toolRouterConn = null;
     this.notificationUnsub?.();
     this.notificationUnsub = null;
     if (!c) return ok(undefined);

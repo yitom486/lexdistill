@@ -42,7 +42,8 @@
   3. Gateway 按路由策略选择 `codex` 或 `acp`，**不得**在 `apps/web`、`learner-core`、`tool-core` 中 `import` 任何 `acp-*` SDK；
   4. ACP 仅作为**可选兼容通道**，不得反向削弱 Codex 原生通路，也不得成为默认学习闭环依赖。
 
-### 1.6 原生工具调用优先于 MCP (Native Tools First, MCP Last)- **一等公民：引擎原生 Tool / Dynamic Tools + 本系统 `tool-core` Registry**。
+### 1.6 原生工具调用优先于 MCP (Native Tools First, MCP Last)
+- **一等公民：引擎原生 Tool / Dynamic Tools + 本系统 `tool-core` Registry**。
   - 学习闭环内的出题、批改、词典、错题入库、熟练度回写等，必须注册为 Gateway **Server/Client Tool**，并由 Adapter 注入为运行时**原生 tool_call**（如 Codex `dynamic_tools`）。
   - 工具执行走 `ToolRouter` 进程内调度，结果经 `submitToolResult` 回填 Agent，**禁止**为同一能力再包一层 MCP 中转。
 - **MCP 仅限外部异构系统的可选桥接**（如 Anki / Notion 同步），落在 `ToolLocation.EXTERNAL`：

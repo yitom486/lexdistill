@@ -202,14 +202,20 @@ export function takeTocDraftToolResult(sessionId: string): TocDraftToolSessionRe
 /** 工具执行结果回模型负载（仅计数 + 接受态，无标题无原文）。 */
 export interface TocDraftToolResult {
   accepted: boolean;
-  entries: number;
-  warnings: number;
+  entryCount: number;
+  warningCount: number;
 }
 
 /**
- * `toc_draft_replace_all` Server Tool（READ：会话内存暂存，零持久副作用）。
- * 全局 registry 注册（adapter 执行链要求），但仅 review 会话在 createSession
- * 时声明，未声明的会话模型调不到（Codex 只放行已声明 dynamicTools）。
+ * `toc_draft_replace_all` Server Tool（WRITE：替换本次 review 会话的内存草稿）。
+ *
+ * 权限语义（对齐 tool-core 四级体系）：
+ * - 不是 READ：它会改变本次会话的暂存草稿（session-local staged write），
+ *   是有副作用的写——尽管作用域只在内存、不持久化；
+ * - 不是 DESTRUCTIVE/SENSITIVE：不删数据、不碰隐私与外部系统；
+ * - 因此是常规 WRITE。审批 UX 不变：review 会话默认 approvalPolicy never
+ *   （连接级自动放行），且 review loop 对本工具审批程序化 accept——
+ *   改权限不引入任何面向用户的确认弹窗。
  */
 export class TocDraftReplaceAllTool
   implements ToolDefinition<TocDraftToolRawInput, TocDraftToolResult>
@@ -218,7 +224,7 @@ export class TocDraftReplaceAllTool
   public readonly description =
     '整体替换本轮目录草稿：entries（≥2 条：语义标题 + 印刷页码单调 + level 1|2 + kind lesson|section）+ warnings。自然语言回复会被忽略，草稿只认本次调用。';
   public readonly location = ToolLocations.SERVER;
-  public readonly permission = ToolPermissions.READ;
+  public readonly permission = ToolPermissions.WRITE;
   public readonly schema = TocDraftToolInputSchema;
 
   public async execute(
@@ -249,7 +255,7 @@ export class TocDraftReplaceAllTool
     }
     record.successes++;
     record.draft = checked.draft;
-    return ok({ accepted: true, entries: checked.draft.entries.length, warnings: checked.draft.warnings.length });
+    return ok({ accepted: true, entryCount: checked.draft.entries.length, warningCount: checked.draft.warnings.length });
   }
 }
 

@@ -110,7 +110,7 @@ describe('P3.4A 会话暂存语义', () => {
     );
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
-    expect(res.value).toEqual({ accepted: true, entries: 2, warnings: 1 });
+    expect(res.value).toEqual({ accepted: true, entryCount: 2, warningCount: 1 });
     // 另一会话未调用 → 无暂存
     expect(takeTocDraftToolResult(s2)).toBeNull();
     const record = takeTocDraftToolResult(s1);
@@ -181,6 +181,7 @@ describe('P3.4A 会话暂存语义', () => {
     expect(tocDraftReplaceAllTool.name).toBe(TOC_DRAFT_TOOL_NAME);
     expect(tocDraftReplaceAllTool.name).toBe('toc_draft_replace_all');
     expect(tocDraftReplaceAllTool.location).toBe('SERVER');
-    expect(tocDraftReplaceAllTool.permission).toBe('READ');
+    // P3.4B-FIX：替换会话内存草稿是有副作用的写，不是零副作用 READ
+    expect(tocDraftReplaceAllTool.permission).toBe('WRITE');
   });
 });
