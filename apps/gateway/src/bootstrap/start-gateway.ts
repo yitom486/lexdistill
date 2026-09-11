@@ -15,6 +15,11 @@ export function startGateway(app: CreatedApp, server: GatewayServer, port = PORT
     started = Bun.serve<{ sessionId?: string | undefined }>({
       hostname: '127.0.0.1',
       port,
+      // §7.3：Bun 默认 idleTimeout 仅 10 秒——已实测会掐断合法慢请求
+      //（大文件 OCR 批、80MB 运行时下载、分钟级 AI 审核轮次），客户端只看到
+      // socket 被意外关闭。服务端永不掐健康但慢的工作；超时策略收归应用层
+      //（客户端首字节/stall 超时转可读错误），此处直接关掉空闲掐断。
+      idleTimeout: 0,
       // 大书上传：Bun 默认请求体上限接不住百 MB 级 PDF（实测 100MB+ 被秒断），显式放开。
       maxRequestBodySize: 512 * 1024 * 1024,
       async fetch(req, upgradeServer) {
