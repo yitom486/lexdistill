@@ -175,3 +175,43 @@ Web UI 改动（本轮禁止改 Web）、anchor 自动获取（P5-B）、plan �
    verified-folio`）；单 OCR-low 候选**永不**自动成 anchor；
 3. `unresolvedCount > 0` 的 plan 禁止整书自动导入（§4 原文继续有效）；
 4. P5-C 若新增 anchor 来源，沿用 §4.3 回归铁律：只许增 mapped，不许静默转正。
+
+---
+
+## 7. P5-C：人工确认 anchor 与只读分段预览（已实现）
+
+实现：网关 `toc-segment-plan.ts`（`planTocSegments`：`[1]` 探页数 + 调 P5-A 纯函数，
+零 OCR/Agent/render/DB/AST/shred）+ 端点 `POST /api/documents/:userId/preview-toc-segments`；
+前端 `TocAnchorPanel`（挂在 P4C 确认之后）+ 纯逻辑 `lib/toc-anchor-flow.ts`。
+
+### 7.1 决议：不新增证据类型
+
+P5-C 的 anchor 一律 `evidence: 'human-confirmed'`（P5-A 白名单既有成员）。
+理由：UI 动作本身就是“用户明确确认”，语义与该枚举项完全一致；
+新增枚举只会稀释 fail-closed 白名单的审计性。本条为长期决议，
+未来新证据来源必须走 §4.3 回归铁律并更新本文档。
+
+### 7.2 UI 契约（长期有效）
+
+- 初始零 anchor；候选永不自动选中；Roman 永无确认按钮（仅“前言证据”徽标）；
+- Arabic 候选逐条显式点击才成 anchor（重复印刷页按钮禁用）；
+- OCR-low 不降级阻断、也不自动通过——同样走点击确认；
+- 双源一致（同页 native+OCR 同值）只显示辅助徽标，不改变确认规则；
+- anchor 增删即致旧预览失效（指纹比对，视图明示“请重新请求”）；
+- 预览只展示表格与文案：课字段、chunk（恒标“仅预览，尚未 OCR/导入”）、
+  `unresolved>0` 显示“当前目录不能自动导入；请补充或修正 anchor”，
+  `unresolved=0` 只显示“分段计划已验证；下一阶段才可能执行导入”；
+- 全面板不存在“开始导入 / 写入教材 / 自动修复”按钮；
+- anchor/preview 只存组件 state，不用 localStorage/Zustand persist，刷新即失。
+
+### 7.3 下一阶段（真实导入）的精确 gate
+
+在 P5-C 全部绿的前提下，真实导入阶段必须**额外**满足（缺一不可）：
+
+1. 用户在 P5-C 面板完成“确认目录 → 确认 anchor → 有效预览”全链路，
+   且最终预览 `unresolvedCount === 0`、`lessonsWithoutEnd === 0`；
+2. 导入一次只执行**一个** chunk（≤30 页），走既有 convert/append 链路与额度；
+3. 每个 chunk 执行前重算预览并比对指纹：anchor/条目/pageCount 任一变化即停；
+4. 首次写入前必须有独立的、显式的“我已知这是写入操作”确认（与预览确认分开）；
+5. 本文档 §4.3 回归铁律持续有效；任何静默转正、自动 anchor、自动修复一经发现，
+   按架构违规回滚。

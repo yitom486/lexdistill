@@ -6,6 +6,7 @@ import { discoverTocPages } from '../application/pdf-import/toc-discovery.js';
 import { extractTocBaseline } from '../application/pdf-import/toc-baseline.js';
 import { reviewTocWithAgent } from '../application/pdf-import/toc-review-agent.js';
 import { extractFolioCandidates } from '../application/pdf-import/toc-folio-candidates.js';
+import { planTocSegments } from '../application/pdf-import/toc-segment-plan.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
@@ -208,6 +209,42 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
         return formatBusinessErrorResponse(c, e, 'extractFolioCandidates');
       }
     })
+    .post('/api/documents/:userId/preview-toc-segments', async (c) => {
+      // P5-C 分段预览（只读）：P4C 已确认条目 + 用户显式确认 anchors，
+      // 仅以 [1] 探 pageCount 后调 P5-A 纯函数。不调 OCR/Agent/render，
+      // 不写 DB/AST/cache；无效输入走 BusinessError.userMessage。
+      const input = await readPdfInput(c);
+      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+      try {
+        const userId = c.req.param('userId');
+        if (!userId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
+          );
+        }
+        if (input.value.entries === undefined || input.value.anchors === undefined) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '请提供已确认目录条目（entries）与用户确认 anchors（anchors）', 'VALIDATION')
+          );
+        }
+        const res = await planTocSegments(
+          {},
+          {
+            userId,
+            filename: input.value.filename,
+            bytes: input.value.bytes,
+            entries: input.value.entries,
+            anchors: input.value.anchors,
+          }
+        );
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
+        return c.json(res.value);
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'planTocSegments');
+      }
+    })
     .post('/api/documents/:userId/:documentId/append-pdf', async (c) => {      // 接力追加：新页段的课接在已有教材后面（大书分段导入）。
       const input = await readPdfInput(c);
       if (!input.ok) return formatBusinessErrorResponse(c, input.error);
@@ -255,6 +292,9 @@ interface PdfRouteInput {
   pages?: number[];
   /** P5-B：显式物理页号集（folio-candidates 专用；与起止范围互斥使用）。 */
   pageNumbers?: number[];
+  /** P5-C：已确认目录条目 + 用户确认 anchors（preview-toc-segments 专用，原样透传，服务侧严格校验）。 */
+  entries?: unknown;
+  anchors?: unknown;
   /** CMD-01：已确认结构分类（原样透传，convert 侧 zod 校验后驱动切课） */
   classes?: unknown;
   /** Azure 云 OCR 凭据（内存态透传，网关不落盘） */
@@ -309,6 +349,25 @@ export function explicitPageNumbers(source: Record<string, unknown>): number[] |
   }
   pages.sort((a, b) => a - b);
   return pages;
+}
+
+/**
+ * P5-C：结构化负载透传（entries/anchors；纯函数，与 classes 同口径）。
+ * - 缺席 → undefined（preview 端点会报“请提供”）；
+ * - 字符串 → 尝试 JSON 解析，失败原样透传（服务侧报友好错）；
+ * - 其他 → 原样透传（服务侧严格校验）。
+ */
+export function extractStructuredField(source: Record<string, unknown>, key: string): unknown {
+  const raw = source[key];
+  if (raw === undefined) return undefined;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
 }
 
 function parsePagesField(raw: string): unknown {
@@ -376,6 +435,8 @@ async function readPdfInput(
     if (pageNumbers === 'invalid') {
       return fail('pages 须为正整数页号数组（如 [3,5,7]）');
     }
+    const entries = extractStructuredField(body as Record<string, unknown>, 'entries');
+    const anchors = extractStructuredField(body as Record<string, unknown>, 'anchors');
     return {
       ok: true,
       value: {
@@ -383,6 +444,8 @@ async function readPdfInput(
         bytes: read.value.bytes,
         ...(pages ? { pages } : {}),
         ...(pageNumbers ? { pageNumbers } : {}),
+        ...(entries !== undefined ? { entries } : {}),
+        ...(anchors !== undefined ? { anchors } : {}),
         ...(azure ? { azure } : {}),
         ...(classes !== undefined ? { classes } : {}),
       },
@@ -394,6 +457,8 @@ async function readPdfInput(
   let azure: { endpoint: string; apiKey: string } | undefined;
   let classesRaw: unknown;
   let pagesRaw: unknown;
+  let entriesRaw: unknown;
+  let anchorsRaw: unknown;
   try {
     const body = await c.req.parseBody();
     const candidate = body['file'];
@@ -403,6 +468,8 @@ async function readPdfInput(
     azure = azureField(body as Record<string, unknown>);
     classesRaw = body['classes'];
     pagesRaw = body['pages'];
+    entriesRaw = body['entries'];
+    anchorsRaw = body['anchors'];
   } catch {
     return fail('上传体不是合法 multipart，请用 file 字段上传 PDF');
   }
@@ -417,6 +484,8 @@ async function readPdfInput(
   if (pageNumbers === 'invalid') {
     return fail('pages 须为正整数页号数组（如 [3,5,7]）');
   }
+  const entries = entriesRaw === undefined ? undefined : extractStructuredField({ entries: entriesRaw }, 'entries');
+  const anchors = anchorsRaw === undefined ? undefined : extractStructuredField({ anchors: anchorsRaw }, 'anchors');
   return {
     ok: true,
     value: {
@@ -424,6 +493,8 @@ async function readPdfInput(
       bytes,
       ...(pages ? { pages } : {}),
       ...(pageNumbers ? { pageNumbers } : {}),
+      ...(entries !== undefined ? { entries } : {}),
+      ...(anchors !== undefined ? { anchors } : {}),
       ...(azure ? { azure } : {}),
       ...(classes !== undefined ? { classes } : {}),
     },

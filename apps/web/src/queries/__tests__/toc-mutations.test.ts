@@ -2,6 +2,8 @@ import { describe, expect, it, afterEach } from 'bun:test';
 import {
   requestDiscoverToc,
   requestExtractTocBaseline,
+  requestFolioCandidates,
+  requestPreviewTocSegments,
   requestReviewToc,
 } from '../textbooks-annotations.js';
 
@@ -172,5 +174,95 @@ describe('P4C 只读三专线请求层', () => {
     const bodies = JSON.stringify(calls.map((c) => c.jsonBody));
     expect(bodies).not.toContain('base64');
     expect(bodies).not.toContain('data:image');
+  });
+});
+
+const FOLIO_PAYLOAD = {
+  pageCount: 100,
+  pages: [
+    {
+      physicalPage: 26,
+      candidates: [
+        { raw: '18', normalized: { kind: 'arabic', value: 18 }, location: 'footer', source: 'native', confidence: 'medium' },
+      ],
+    },
+  ],
+  diagnostics: { pagesRequested: 1, nativePages: 1, ocrPages: 0, candidatesFound: 1 },
+};
+
+const PREVIEW_PAYLOAD = {
+  pageCount: 100,
+  lessons: [
+    { lessonIndex: 0, title: '第1課', printedStart: 12, physicalStart: 17, physicalEnd: 30, status: 'mapped', reason: 'verified-interval', regionId: 'verified:5:12-30', offsetUsed: 5 },
+  ],
+  regions: [{ id: 'verified:5:12-30', offset: 5, printedFrom: 12, printedTo: 30, verified: true, anchorCount: 2 }],
+  chunks: [{ lessonIndex: 0, title: '第1課', chunkIndex: 0, physicalFrom: 17, physicalTo: 30 }],
+  diagnostics: { lessonCount: 1, mappedCount: 1, unresolvedCount: 0, regionCount: 1, chunksPlanned: 1 },
+};
+
+describe('P5C folio/preview 请求层', () => {
+  it('folio：pages 数组随请求发出，一次请求', async () => {
+    installFetchStub();
+    nextResponse = { status: 200, payload: FOLIO_PAYLOAD };
+    const res = await requestFolioCandidates('u1', { filePath: 'C:\\book\\a.pdf' }, [26, 31]);
+    expect(res.pages.length).toBe(1);
+    expect(calls.length).toBe(1);
+    expect(calls[0]?.url).toContain('/folio-candidates');
+    expect(calls[0]?.jsonBody).toMatchObject({ filePath: 'C:\\book\\a.pdf', pages: [26, 31] });
+  });
+
+  it('preview：entries + anchors 随请求发出', async () => {
+    installFetchStub();
+    nextResponse = { status: 200, payload: PREVIEW_PAYLOAD };
+    const vars = {
+      source: { filePath: 'C:\\book\\a.pdf' } as const,
+      entries: [{ title: '第1課', printedPage: 12, level: 1, kind: 'lesson' as const }],
+      anchors: [{ printedPage: 12, physicalPage: 17, evidence: 'human-confirmed' as const }],
+    };
+    const res = await requestPreviewTocSegments('u1', vars);
+    expect(res.lessons.length).toBe(1);
+    expect(calls.length).toBe(1);
+    expect(calls[0]?.url).toContain('/preview-toc-segments');
+    const sent = calls[0]?.jsonBody as { entries?: unknown[]; anchors?: unknown[] } | null;
+    expect(sent?.entries?.length).toBe(1);
+    expect(sent?.anchors).toEqual([{ printedPage: 12, physicalPage: 17, evidence: 'human-confirmed' }]);
+  });
+
+  it('后端错误 userMessage 透传；畸形负载中性错误', async () => {
+    installFetchStub();
+    nextResponse = {
+      status: 400,
+      payload: { success: false, error: { code: 'E_INVALID_INPUT', userMessage: 'anchor 超出本书（本书共 100 页）', category: 'VALIDATION', retryable: false } },
+    };
+    const err = await requestPreviewTocSegments('u1', {
+      source: { filePath: 'C:\\x.pdf' },
+      entries: [],
+      anchors: [],
+    }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect((err as Error).message).toBe('anchor 超出本书（本书共 100 页）');
+
+    nextResponse = { status: 200, payload: { bogus: 1 } };
+    const malformed = await requestFolioCandidates('u1', { filePath: 'C:\\x.pdf' }, [1]).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect((malformed as Error).message).toBe('folio 候选返回异常，请稍后重试');
+  });
+
+  it('零写 URL：不含写端点', async () => {
+    installFetchStub();
+    nextResponse = { status: 200, payload: FOLIO_PAYLOAD };
+    await requestFolioCandidates('u1', { filePath: 'C:\\x.pdf' }, [1]);
+    nextResponse = { status: 200, payload: PREVIEW_PAYLOAD };
+    await requestPreviewTocSegments('u1', { source: { filePath: 'C:\\x.pdf' }, entries: [], anchors: [] });
+    expect(calls.length).toBe(2);
+    for (const call of calls) {
+      expect(call.url).not.toContain('/import');
+      expect(call.url).not.toContain('/append');
+      expect(call.url).not.toContain('/save');
+    }
   });
 });

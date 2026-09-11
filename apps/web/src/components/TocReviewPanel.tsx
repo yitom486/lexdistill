@@ -21,6 +21,7 @@ import {
   useReviewTocMutation,
   type TocPdfSource,
 } from '../queries/useLearnerQueries.js';
+import { TocAnchorPanel } from './TocAnchorPanel.js';
 import {
   TOC_REVIEW_MAX_PAGES_UI,
   canRequestTocReview,
@@ -638,7 +639,8 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
           : null;
 
   return (
-    <TocReviewPanelView
+    <>
+      <TocReviewPanelView
       hasSource={source !== null}
       discovering={discover.isPending}
       discoverError={messageOf(discover.error)}
@@ -689,6 +691,10 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       onStartEdit={() => dispatch({ type: 'start-edit' })}
       onUpdateEntry={(key, patch) => dispatch({ type: 'update-entry', key, patch })}
       onConfirm={handleConfirm}
-    />
+      />
+      {flow.confirmed && (
+        <TocAnchorPanel file={file} filePath={filePath} entries={flow.editedEntries} />
+      )}
+    </>
   );
 }

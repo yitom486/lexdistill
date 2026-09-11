@@ -36,6 +36,12 @@ import {
   type TocDiscoveryData,
   type TocReviewData,
 } from '../lib/toc-confirm-flow.js';
+import {
+  narrowFolioResponse,
+  narrowPreviewResponse,
+  type FolioResponseData,
+  type PreviewResponseData,
+} from '../lib/toc-anchor-flow.js';
 
 /** P1-2 拆分：教材 / 批注组（自 useLearnerQueries.ts 逐行平移，仅改 import）。 */
 
@@ -1019,6 +1025,105 @@ export function useReviewTocMutation(userId = DEFAULT_USER_ID) {
       requestReviewToc(userId, vars.source, vars.range),
     onError: (e) => {
       logger.debug('[useReviewTocMutation] review failed', e);
+    },
+  });
+}
+
+/**
+ * P5-C-1：folio 候选（folio-candidates，只读弱证据）。
+ * 调用方必须先经 parseAnchorCheckPages（超 8 页到不了这里；后端仍是最终事实源）。
+ */
+export async function requestFolioCandidates(
+  userId: string,
+  source: TocPdfSource,
+  pageNumbers: number[]
+): Promise<FolioResponseData> {
+  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/folio-candidates`;
+  const src: TocPdfSource = source;
+  const hasPath = 'filePath' in src;
+  const res = hasPath
+    ? await fetchPdfGateway(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: src.filePath, pages: pageNumbers }),
+      })
+    : await (async () => {
+        const form = new FormData();
+        form.append('file', src.file, src.file.name);
+        form.append('pages', JSON.stringify(pageNumbers));
+        return fetchPdfGateway(url, { method: 'POST', body: form });
+      })();
+  const payload: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new GatewayRequestError(readGatewayUserMessage(payload, `folio 候选失败（HTTP ${res.status}）`), {
+      code: readGatewayErrorCode(payload),
+      details: readGatewayErrorDetails(payload),
+    });
+  }
+  const narrowed = narrowFolioResponse(payload);
+  if (!narrowed) throw new Error('folio 候选返回异常，请稍后重试');
+  return narrowed;
+}
+
+export function useFolioCandidatesMutation(userId = DEFAULT_USER_ID) {
+  return useMutation({
+    mutationFn: (vars: { source: TocPdfSource; pageNumbers: number[] }) =>
+      requestFolioCandidates(userId, vars.source, vars.pageNumbers),
+    onError: (e) => {
+      logger.debug('[useFolioCandidatesMutation] folio failed', e);
+    },
+  });
+}
+
+export interface PreviewTocSegmentsVars {
+  source: TocPdfSource;
+  entries: Array<{ title: string; printedPage: number; level: number; kind: 'lesson' | 'section' }>;
+  anchors: Array<{ printedPage: number; physicalPage: number; evidence: 'human-confirmed' }>;
+}
+
+/**
+ * P5-C-2：分段预览（preview-toc-segments，只读计划）。
+ * entries 须是 P4C 已确认条目，anchors 须是用户显式确认（human-confirmed）；
+ * 服务侧 P5-A 严格校验，非法即 userMessage。
+ */
+export async function requestPreviewTocSegments(
+  userId: string,
+  vars: PreviewTocSegmentsVars
+): Promise<PreviewResponseData> {
+  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/preview-toc-segments`;
+  const body = { entries: vars.entries, anchors: vars.anchors };
+  const src: TocPdfSource = vars.source;
+  const hasPath = 'filePath' in src;
+  const res = hasPath
+    ? await fetchPdfGateway(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: src.filePath, ...body }),
+      })
+    : await (async () => {
+        const form = new FormData();
+        form.append('file', src.file, src.file.name);
+        form.append('entries', JSON.stringify(body.entries));
+        form.append('anchors', JSON.stringify(body.anchors));
+        return fetchPdfGateway(url, { method: 'POST', body: form });
+      })();
+  const payload: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new GatewayRequestError(readGatewayUserMessage(payload, `分段预览失败（HTTP ${res.status}）`), {
+      code: readGatewayErrorCode(payload),
+      details: readGatewayErrorDetails(payload),
+    });
+  }
+  const narrowed = narrowPreviewResponse(payload);
+  if (!narrowed) throw new Error('分段预览返回异常，请稍后重试');
+  return narrowed;
+}
+
+export function usePreviewTocSegmentsMutation(userId = DEFAULT_USER_ID) {
+  return useMutation({
+    mutationFn: (vars: PreviewTocSegmentsVars) => requestPreviewTocSegments(userId, vars),
+    onError: (e) => {
+      logger.debug('[usePreviewTocSegmentsMutation] preview failed', e);
     },
   });
 }
