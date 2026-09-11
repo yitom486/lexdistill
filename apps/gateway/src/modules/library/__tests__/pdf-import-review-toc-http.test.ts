@@ -150,7 +150,7 @@ async function documentCount(repo: DrizzleLearnerRepository, userId: string): Pr
 }
 
 describe('P4B POST review-toc（真 native + 假 Agent）', () => {
-  it('P3.1B 空白 synthetic：空基线服务端拒绝（E_TOC_BASELINE_THIN），Agent 零调用、DB 行数不变', async () => {
+  it('P3.2A 空白 synthetic：证据不足拒绝（E_TOC_EVIDENCE_INSUFFICIENT），Agent 零调用、DB 行数不变', async () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const captured: CapturedCall[] = [];
@@ -163,7 +163,7 @@ describe('P4B POST review-toc（真 native + 假 Agent）', () => {
     const before = await documentCount(repo, 'u1');
     const res = await postReviewToc(app, 'u1', { filePath: tmp, startPage: 1, endPage: 2 });
     expect(res.status).not.toBe(200);
-    expect((res.json.error as { code?: string } | undefined)?.code).toBe('E_TOC_BASELINE_THIN');
+    expect((res.json.error as { code?: string } | undefined)?.code).toBe('E_TOC_EVIDENCE_INSUFFICIENT');
     expect(captured.length).toBe(0);
     const after = await documentCount(repo, 'u1');
     expect(after).toBe(before);

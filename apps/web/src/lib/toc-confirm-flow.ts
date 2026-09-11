@@ -163,20 +163,20 @@ export function decideExtractRequest(
 }
 
 /**
- * 审核守门（纯函数）：无源 / 无基线 / embedded / 空基线 / 范围非法 / 超 8 页一律 ok:false。
+ * 审核守门（纯函数）：无源 / 无基线 / embedded / 范围非法 / 超 8 页一律 ok:false。
  * embedded=true 时明确拒绝触发 AI（不需要 AI 审核）。
- * P3.2 thin 基线放行（证据是否充足由服务端 reviewable 门判定，前端不猜）。
+ * P3.2A thin/empty 一律放行：证据是否充足由服务端 reviewable 门判定，前端不猜
+ * （证据不足服务端会返回可读错误，零模型调用）。
  */
 export function decideReviewRequest(
   hasSource: boolean,
   startText: string,
   endText: string,
-  baseline: { embedded: boolean; verdict: TocBaselineData['verdict'] } | null
+  baseline: { embedded: boolean } | null
 ): TocRequestDecision {
   if (!hasSource) return { ok: false, message: '先选择 PDF 文件或填写本机路径' };
   if (!baseline) return { ok: false, message: '先提取目录基线' };
   if (baseline.embedded) return { ok: false, message: '原生目录可用，无需 AI 审核' };
-  if (baseline.verdict === 'empty') return { ok: false, message: '基线为空，请先换范围提取或手动填写' };
   const range = validateTocConfirmRange(startText, endText);
   if (!range.ok) return range;
   if (!canRequestTocReview(range.from, range.to)) {

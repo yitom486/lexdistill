@@ -66,9 +66,49 @@ function syntheticBlankPdf(): Uint8Array {
   ]);
 }
 
-/** 内存 synthetic：1 页单行文本目录（thin 基线用），无私人内容。 */
+/** 内存 synthetic：3 页目录（仅 1 条同行页码 → thin，但证据有信号），无私人内容。 */
 function syntheticSingleLineTocPdf(): Uint8Array {
-  const text = 'BT /F1 24 Tf 100 700 Td (Contents Lesson 1 Apple Pie 12) Tj ET\n';
+  const line = (text: string): string => `BT /F1 24 Tf 100 700 Td (${text}) Tj ET\n`;
+  const pageObj = (contentRef: number): string =>
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentRef} 0 R /Resources << /Font << /F1 8 0 R >> >> >>`;
+  const streamObj = (text: string): string =>
+    `<< /Length ${Buffer.byteLength(text, 'latin1')} >>\nstream\n${text}endstream`;
+  return buildPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >>',
+    pageObj(6),
+    pageObj(7),
+    pageObj(8),
+    streamObj(line('Contents')),
+    streamObj(line('Lesson 1 Apple Pie 12')),
+    streamObj(line('Lesson 2 Orange')),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]);
+}
+
+/** 内存 synthetic：3 页无页码目录（empty 可重建用），无私人内容。 */
+function syntheticUnnumberedTocPdf(): Uint8Array {
+  const line = (text: string): string => `BT /F1 24 Tf 100 700 Td (${text}) Tj ET\n`;
+  const pageObj = (contentRef: number): string =>
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentRef} 0 R /Resources << /Font << /F1 8 0 R >> >> >>`;
+  const streamObj = (text: string): string =>
+    `<< /Length ${Buffer.byteLength(text, 'latin1')} >>\nstream\n${text}endstream`;
+  return buildPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >>',
+    pageObj(6),
+    pageObj(7),
+    pageObj(8),
+    streamObj(line('Contents')),
+    streamObj(line('Lesson 1 Apple')),
+    streamObj(line('Lesson 2 Orange')),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]);
+}
+
+/** 内存 synthetic：1 页普通正文（证据不足用），无私人内容。 */
+function syntheticProsePdf(): Uint8Array {
+  const text = 'BT /F1 24 Tf 100 700 Td (This is body text for testing.) Tj ET\n';
   return buildPdf([
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
@@ -199,7 +239,7 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
         (e: unknown) => e
       );
       expect(err instanceof GatewayRequestError).toBe(true);
-      expect((err as GatewayRequestError).code).toBe('E_TOC_BASELINE_THIN');
+      expect((err as GatewayRequestError).code).toBe('E_TOC_EVIDENCE_INSUFFICIENT');
     } finally {
       configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
     }
@@ -217,10 +257,10 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
     configureGatewayBaseUrl(url);
     try {
       const tmp = await writeTempPdf(syntheticSingleLineTocPdf());
-      const baseline = await requestExtractTocBaseline('u1', { filePath: tmp }, { startPage: 1, endPage: 1 });
+      const baseline = await requestExtractTocBaseline('u1', { filePath: tmp }, { startPage: 1, endPage: 3 });
       expect(baseline.verdict).toBe('thin');
       expect(baseline.entries.length).toBe(1);
-      const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 1 });
+      const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 3 });
       expect(review.reviewStatus).toBe('ok');
       expect(review.draft?.entries.length).toBe(2);
       expect(review.baseline.verdict).toBe('thin');
@@ -246,6 +286,48 @@ describe('P3.1B extract+review 真实 HTTP 集成', () => {
       expect(review.draft).toBeNull();
       expect(review.reviewError?.code).toBe('E_TOC_REVIEW_CONTENT');
       expect(review.baseline.entries.length).toBe(2);
+    } finally {
+      configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
+    }
+  }, 180000);
+
+  it('P3.2A 无页码目录：extract empty → review 重建 ≥2 条（200）', async () => {
+    const draft = JSON.stringify({
+      entries: [
+        { title: 'Lesson 1 Apple', printedPage: 5, level: 1, kind: 'lesson', confidence: 'medium' },
+        { title: 'Lesson 2 Orange', printedPage: 9, level: 1, kind: 'lesson', confidence: 'medium' },
+      ],
+      warnings: ['页码来自图片核对'],
+    });
+    const url = serve([draft]);
+    configureGatewayBaseUrl(url);
+    try {
+      const tmp = await writeTempPdf(syntheticUnnumberedTocPdf());
+      const baseline = await requestExtractTocBaseline('u1', { filePath: tmp }, { startPage: 1, endPage: 3 });
+      expect(baseline.verdict).toBe('empty');
+      expect(baseline.entries).toEqual([]);
+      const review = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 3 });
+      expect(review.reviewStatus).toBe('ok');
+      expect(review.draft?.entries.length).toBe(2);
+      expect(review.baseline.verdict).toBe('empty');
+    } finally {
+      configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
+    }
+  }, 180000);
+
+  it('P3.2A 普通正文：empty 且无信号 → review 400，零 Agent 调用等价（可读码）', async () => {
+    const url = serve(['{"entries":[],"warnings":[]}']);
+    configureGatewayBaseUrl(url);
+    try {
+      const tmp = await writeTempPdf(syntheticProsePdf());
+      const baseline = await requestExtractTocBaseline('u1', { filePath: tmp }, { startPage: 1, endPage: 1 });
+      expect(baseline.verdict).toBe('empty');
+      const err = await requestReviewToc('u1', { filePath: tmp }, { startPage: 1, endPage: 1 }).then(
+        () => null,
+        (e: unknown) => e
+      );
+      expect(err instanceof GatewayRequestError).toBe(true);
+      expect((err as GatewayRequestError).code).toBe('E_TOC_EVIDENCE_INSUFFICIENT');
     } finally {
       configureGatewayBaseUrl(DEFAULT_GATEWAY_BASE_URL);
     }

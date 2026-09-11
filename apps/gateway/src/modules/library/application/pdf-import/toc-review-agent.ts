@@ -17,6 +17,10 @@ import {
 } from './toc-baseline.js';
 import { isSemanticOutlineTitle } from './embedded-outline-quality.js';
 import {
+  LESSON_TOKEN_RE,
+  TOC_TITLE_RE,
+} from './toc-discovery.js';
+import {
   TOC_REVIEW_MAX_PAGES,
   prepareTocReviewMaterial,
 } from './toc-review-material.js';
@@ -185,25 +189,39 @@ export function classifyReviewFailure(raw: string): 'schema' | 'parse' {
 export const TOC_REVIEW_EVIDENCE_MAX_CHARS = 12000;
 
 /**
- * CMD-LINGUA-P3.2 可重建证据下限（非空白字符）：低于此视为证据不足，
- * 不调用 AI（省一次模型往返，直接可读拒绝）。
+ * CMD-LINGUA-P3.2A 可重建证据下限：有目录语义信号的行数下限（标题候选行）。
+ * 与字符数无关——普通正文再长，没有目次/课号/标题信号也不放行。
  */
-export const TOC_REVIEW_MIN_EVIDENCE_CHARS = 20;
+export const TOC_REVIEW_MIN_SIGNAL_TITLES = 3;
 
-export type ReviewableReason = 'ok' | 'empty-evidence' | 'range-too-large';
+/**
+ * CMD-LINGUA-P3.2A 可重建证据下限：课号/章节号命中行数下限。
+ */
+export const TOC_REVIEW_MIN_SIGNAL_LESSONS = 2;
+
+export type ReviewableReason = 'ok' | 'empty-evidence' | 'no-toc-signal' | 'range-too-large';
 
 export interface ReviewableReport {
   reviewable: boolean;
   reason: ReviewableReason;
-  /** 证据非空白字符数（计数，无原文）。 */
+  /** 证据非空白字符数（计数，无原文，仅诊断用）。 */
   evidenceChars: number;
+  /** 目录/目次标题信号（0/1）。 */
+  hasTocTitle: boolean;
+  /** 课号/章节号命中行数。 */
+  lessonTokenLines: number;
+  /** 候选标题行数（有语义内容的行）。 */
+  titleLines: number;
 }
 
 /**
- * 重建证据独立门（纯函数）：thin 基线能否进 AI 的唯一判据。
- * - 范围超 8 页 → range-too-large（ defense，范围校验本应在前）；
- * - 证据空白/过短 → empty-evidence；
- * - 只看证据量，不看条目数（thin 的定义已在基线侧）。
+ * 重建证据独立门（纯函数）：thin/empty 基线能否进 AI 的唯一判据。
+ * - 范围超 8 页 → range-too-large（defense，范围校验本应在前）；
+ * - 证据全空 → empty-evidence；
+ * - 有文字但无目录语义信号（目录/目次 + ≥2 课号行 + ≥3 候选标题行缺一）
+ *   → no-toc-signal：普通正文再长也不放行；
+ * - 只看信号，不看条目数（thin/empty 的定义已在基线侧）。
+ * 标题语义用 P2.2 唯一规则，课号/目录标题用 P2 发现同款正则，不复制第三套。
  */
 export function assessReviewableEvidence(
   pageEvidence: Array<{ page: number; excerpt: string }>,
@@ -211,20 +229,32 @@ export function assessReviewableEvidence(
   toPage: number
 ): ReviewableReport {
   if (!Number.isInteger(fromPage) || !Number.isInteger(toPage) || toPage - fromPage + 1 > TOC_REVIEW_MAX_PAGES) {
-    return { reviewable: false, reason: 'range-too-large', evidenceChars: 0 };
+    return { reviewable: false, reason: 'range-too-large', evidenceChars: 0, hasTocTitle: false, lessonTokenLines: 0, titleLines: 0 };
   }
   let evidenceChars = 0;
+  let hasTocTitle = false;
+  let lessonTokenLines = 0;
+  let titleLines = 0;
   if (Array.isArray(pageEvidence)) {
     for (const row of pageEvidence) {
-      if (row && typeof row.excerpt === 'string') {
-        evidenceChars += row.excerpt.replace(/\s+/g, '').length;
+      if (!row || typeof row.excerpt !== 'string') continue;
+      for (const raw of row.excerpt.split('\n')) {
+        const line = raw.trim();
+        if (!line) continue;
+        evidenceChars += line.replace(/\s+/g, '').length;
+        if (!hasTocTitle && TOC_TITLE_RE.test(line)) hasTocTitle = true;
+        if (LESSON_TOKEN_RE.test(line)) lessonTokenLines++;
+        if (isSemanticOutlineTitle(line)) titleLines++;
       }
     }
   }
-  if (evidenceChars < TOC_REVIEW_MIN_EVIDENCE_CHARS) {
-    return { reviewable: false, reason: 'empty-evidence', evidenceChars };
+  if (evidenceChars === 0) {
+    return { reviewable: false, reason: 'empty-evidence', evidenceChars, hasTocTitle, lessonTokenLines, titleLines };
   }
-  return { reviewable: true, reason: 'ok', evidenceChars };
+  if (!hasTocTitle || lessonTokenLines < TOC_REVIEW_MIN_SIGNAL_LESSONS || titleLines < TOC_REVIEW_MIN_SIGNAL_TITLES) {
+    return { reviewable: false, reason: 'no-toc-signal', evidenceChars, hasTocTitle, lessonTokenLines, titleLines };
+  }
+  return { reviewable: true, reason: 'ok', evidenceChars, hasTocTitle, lessonTokenLines, titleLines };
 }
 
 export type DraftContentReason = 'ok' | 'too-few' | 'empty-title' | 'non-semantic-title' | 'page-regress';
@@ -282,7 +312,11 @@ export function buildTocReviewMessage(
     lines.push(evidenceText);
   }
   if (baseline.verdict !== 'usable') {
-    lines.push('注意：当前基线不足（thin），请根据原文证据与图片重建完整目录草稿，至少 2 条，页码单调；无法确认的行宁可跳过，绝不编造。');
+    lines.push(
+      baseline.verdict === 'empty'
+        ? '注意：当前基线为空，没有可用条目；请完全根据原文证据与页面图重建完整目录草稿，至少 2 条语义标题、页码单调，印刷页只取目录上印出的数字；无法确认的行宁可跳过，绝不编造。'
+        : '注意：当前基线不足（thin），请根据原文证据与图片重建完整目录草稿，至少 2 条，页码单调；无法确认的行宁可跳过，绝不编造。'
+    );
   }
   lines.push('请按系统要求只返回严格 JSON。');
   return lines.join('\n');
@@ -364,28 +398,24 @@ export async function reviewTocWithAgent(
     });
   }
 
-  // P3.1B/P3.2 基线质量门（服务端强制）：
-  // - empty：无条目，直接可读拒绝（不进模型）；
-  // - thin：过独立 evidence 门才进 AI 重建（证据不足同样可读拒绝，零模型调用）；
-  // - usable：照常审核。前端禁用只是辅助。
-  if (baseline.verdict === 'empty') {
-    return err(
-      new BusinessError(
-        'E_TOC_BASELINE_THIN',
-        '目录基线为空（没有提取到可用条目），请更换目录页范围后重试，或手动填写目录',
-        'VALIDATION'
-      )
-    );
-  }
-  if (baseline.verdict === 'thin') {
+  // P3.1B/P3.2/P3.2A 基线质量门（服务端强制）：
+  // - usable：照常审核；
+  // - thin/empty：过独立 evidence 门才进 AI 重建（目录语义信号不足同样可读拒绝，
+  //   零模型调用；普通正文再长也不放行）；
+  // - 前端禁用只是辅助。基线与证据仍在调用方手里可编辑（本函数只拒绝，不销毁）。
+  if (baseline.verdict !== 'usable') {
     const gate = assessReviewableEvidence(baseline.pageEvidence, fromPage, toPage);
     if (!gate.reviewable) {
+      const thinNote =
+        baseline.verdict === 'thin'
+          ? `目录基线不足（仅 ${baseline.entries.length} 条有效条目），且`
+          : '目录基线为空，且';
       return err(
         new BusinessError(
-          gate.reason === 'range-too-large' ? 'E_INVALID_INPUT' : 'E_TOC_EVIDENCE_INSUFFICIENT',
+          'E_TOC_EVIDENCE_INSUFFICIENT',
           gate.reason === 'range-too-large'
             ? `确认范围共 ${toPage - fromPage + 1} 页（AI 审核单次上限 ${TOC_REVIEW_MAX_PAGES} 页），请缩小后重试`
-            : '目录页证据不足（有效文字过少），AI 无法重建，请更换目录页范围后重试，或手动填写目录',
+            : `${thinNote}目录页证据不足以重建（缺目录/课号/标题信号），请更换目录页范围后重试，或手动填写目录`,
           'VALIDATION'
         )
       );

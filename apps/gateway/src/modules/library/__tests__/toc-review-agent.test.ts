@@ -537,7 +537,7 @@ describe('P3.1B review 容错（同 session 单次重试 + unavailable）', () =
     expect(res.value.reviewError?.code).toBe('E_TOC_REVIEW_SCHEMA');
   });
 
-  it('thin 基线服务端拒绝（E_TOC_BASELINE_THIN），零 Agent 调用', async () => {
+  it('thin 但证据不足 → 不调用 AI（E_TOC_EVIDENCE_INSUFFICIENT）', async () => {
     const inspectorCalls = newCalls();
     const agentCalls: AgentCalls = { create: 0, inputs: [], systemPrompts: [] };
     const res = await reviewTocWithAgent(
@@ -556,30 +556,38 @@ describe('P3.1B review 容错（同 session 单次重试 + unavailable）', () =
     );
     expect(isOk(res)).toBe(false);
     if (isOk(res)) return;
-    expect(res.error.code).toBe('E_TOC_BASELINE_THIN');
+    expect(res.error.code).toBe('E_TOC_EVIDENCE_INSUFFICIENT');
     expect(agentCalls.create).toBe(0);
     expect(agentCalls.inputs.length).toBe(0);
   });
 });
 
 describe('P3.2 reviewable 门与草稿内容门', () => {
-  it('assessReviewableEvidence：空/过短/超范围拒绝，达标放行', () => {
-    expect(assessReviewableEvidence([], 1, 2).reviewable).toBe(false);
-    expect(assessReviewableEvidence([], 1, 2).reason).toBe('empty-evidence');
-    expect(
-      assessReviewableEvidence([{ page: 1, excerpt: '第1課 3' }], 1, 1).reviewable
-    ).toBe(false);
+  it('assessReviewableEvidence：空/无信号/超范围拒绝，信号齐放行', () => {
+    expect(assessReviewableEvidence([], 1, 2)).toMatchObject({ reviewable: false, reason: 'empty-evidence' });
+    // 有文字但无目录信号（普通正文再长也不放行）
+    const prose = assessReviewableEvidence(
+      [{ page: 1, excerpt: '本文です。これはテストです。よろしくおねがいします。' }],
+      1,
+      1
+    );
+    expect(prose).toMatchObject({ reviewable: false, reason: 'no-toc-signal' });
+    expect(prose.hasTocTitle).toBe(false);
+    expect(prose.lessonTokenLines).toBe(0);
+    // 缺课号 pillar
+    const noLessons = assessReviewableEvidence([{ page: 1, excerpt: '目次\nはじめに\nおわりに' }], 1, 1);
+    expect(noLessons).toMatchObject({ reviewable: false, reason: 'no-toc-signal' });
     expect(assessReviewableEvidence([{ page: 1, excerpt: 'x'.repeat(100) }], 1, 9).reason).toBe(
       'range-too-large'
     );
     const ok = assessReviewableEvidence(
-      [{ page: 1, excerpt: 'この本のもくじです\n第1課 はじめまして 3\nつづく' }],
+      [{ page: 1, excerpt: '目次\n第1課 はじめまして\n第2課 これは本です' }],
       1,
       1
     );
-    expect(ok.reviewable).toBe(true);
-    expect(ok.reason).toBe('ok');
-    expect(ok.evidenceChars).toBeGreaterThanOrEqual(20);
+    expect(ok).toMatchObject({ reviewable: true, reason: 'ok', hasTocTitle: true });
+    expect(ok.lessonTokenLines).toBe(2);
+    expect(ok.titleLines).toBeGreaterThanOrEqual(3);
   });
 
   it('formatReviewEvidence：逐页标记 + 总量截断', () => {
@@ -642,10 +650,11 @@ describe('P3.2 reviewable 门与草稿内容门', () => {
       {
         loadInspector: async () => {
           inspectorCalls.load++;
+          // 第2課 无同行页码 → 不成条目（thin），但仍是证据信号
           return agentMock({
             pageCount: 371,
             calls: inspectorCalls,
-            ocrMarkdown: new Map([[1, 'この本のもくじです\n第1課 はじめまして 3\nつづく']]),
+            ocrMarkdown: new Map([[1, '目次\n第1課 はじめまして 3\n第2課']]),
           });
         },
         adapter: mockAdapterQueue({ calls: agentCalls, scripts: [GOOD_DRAFT] }),
@@ -672,6 +681,7 @@ describe('P3.2 reviewable 门与草稿内容门', () => {
       {
         loadInspector: async () => {
           inspectorCalls.load++;
+          // 有 1 条有效但无目录信号 → 门禁拦截
           return agentMock({
             pageCount: 371,
             calls: inspectorCalls,
@@ -741,5 +751,56 @@ describe('P3.2 reviewable 门与草稿内容门', () => {
       expect(res.value.draft).toBeNull();
       expect(res.value.baseline.verdict).toBe('usable');
     }
+  });
+
+  it('P3.2A empty 但证据有目录信号 → AI 重建 ≥2 条（无同行页码行）', async () => {
+    const inspectorCalls = newCalls();
+    const agentCalls: AgentCalls = { create: 0, inputs: [], systemPrompts: [] };
+    const res = await reviewTocWithAgent(
+      {
+        loadInspector: async () => {
+          inspectorCalls.load++;
+          // 有目次/课号/标题但无同行末页码 → baseline empty，证据可重建
+          return agentMock({
+            pageCount: 371,
+            calls: inspectorCalls,
+            ocrMarkdown: new Map([[1, '目次\n第1課 はじめまして\n第2課 これは本です']]),
+          });
+        },
+        adapter: mockAdapterQueue({ calls: agentCalls, scripts: [GOOD_DRAFT] }),
+      },
+      { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 1 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.baseline.verdict).toBe('empty');
+    expect(res.value.baseline.entries).toEqual([]);
+    expect(res.value.reviewStatus).toBe('ok');
+    expect(res.value.draft?.entries.length).toBe(2);
+    expect(agentCalls.create).toBe(1);
+    expect(agentCalls.inputs.length).toBe(1);
+  });
+
+  it('P3.2A 普通正文 → empty 且无信号，零 Agent 调用', async () => {
+    const inspectorCalls = newCalls();
+    const agentCalls: AgentCalls = { create: 0, inputs: [], systemPrompts: [] };
+    const res = await reviewTocWithAgent(
+      {
+        loadInspector: async () => {
+          inspectorCalls.load++;
+          return agentMock({
+            pageCount: 371,
+            calls: inspectorCalls,
+            ocrMarkdown: new Map([[1, '本文です。これはテストです。よろしくおねがいします。']]),
+          });
+        },
+        adapter: mockAdapterQueue({ calls: agentCalls, scripts: [GOOD_DRAFT] }),
+      },
+      { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 1 }
+    );
+    expect(isOk(res)).toBe(false);
+    if (isOk(res)) return;
+    expect(res.error.code).toBe('E_TOC_EVIDENCE_INSUFFICIENT');
+    expect(agentCalls.create).toBe(0);
   });
 });

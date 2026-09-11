@@ -395,10 +395,10 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
           {!baseline.embedded && baseline.verdict !== 'usable' && (
             <div className="p-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-[11px] text-stone-600 dark:text-stone-300">
               {baseline.verdict === 'empty'
-                ? '没有提取到可用条目，结果不足，不能采用。可以换一段页码重试，或在下方手动填写。'
+                ? '规则未形成目录条目，但如目录原文证据足够，可让 AI 根据原文与页面图重建草稿（点 AI 审核；证据不足时会明确提示）。结果不足，不能直接采用；也可以换一段页码重试，或在下方手动填写。'
                 : `结果不足，不能直接采用（仅 ${baseline.entries.length} 条有效条目${
                     baseline.diagnostics.badTitle > 0 ? `，${baseline.diagnostics.badTitle} 行标题存疑已剔除` : ''
-                  }）。印刷页码（如 322）是书内页码，不是错误。可以换一段页码重试，或在下方手动填写。`}
+                  }）。印刷页码（如 322）是书内页码，不是错误。可以换一段页码重试、点 AI 审核按证据重建，或在下方手动填写。`}
             </div>
           )}
           {baseline.entries.length > 0 && (
@@ -891,7 +891,7 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       source !== null,
       flow.startText,
       flow.endText,
-      baseline ? { embedded: baseline.embedded, verdict: baseline.verdict } : null
+      baseline ? { embedded: baseline.embedded } : null
     );
     if (!decision.ok) return;
     if (!source) return;
@@ -937,13 +937,11 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
     ? '先提取目录基线'
     : baseline.embedded
       ? '原生目录可用，无需 AI 审核'
-      : baseline.verdict === 'empty'
-        ? '基线为空，请先换范围提取或手动填写'
-        : !validation.ok
-          ? '请先填写合法确认范围'
-          : !reviewSizeOk
-            ? `AI 审核单次最多 ${TOC_REVIEW_MAX_PAGES_UI} 页，请缩小范围或只看基线`
-            : null;
+      : !validation.ok
+        ? '请先填写合法确认范围'
+        : !reviewSizeOk
+          ? `AI 审核单次最多 ${TOC_REVIEW_MAX_PAGES_UI} 页，请缩小范围或只看基线`
+          : null;
 
   return (
     <>
@@ -969,7 +967,6 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       reviewDisabled={
         baseline === null ||
         baseline.embedded ||
-        (!baseline.embedded && baseline.verdict === 'empty') ||
         review.isPending ||
         !validation.ok ||
         !reviewSizeOk

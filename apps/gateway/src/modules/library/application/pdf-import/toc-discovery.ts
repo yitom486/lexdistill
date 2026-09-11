@@ -53,8 +53,8 @@ export const TOC_DISCOVERY_SCORE = {
 
 /** 课号 token：日语教材形 + 通用拉丁形（P3 基线复用，不含中文章节正则）。 */
 export const LESSON_TOKEN_RE = /(第\s*\d+\s*課|復習\s*[AB]|LESSON\s*\d+|UNIT\s*\d+)/i;
-/** 目录标题：日语形 + 通用词（TABLE OF CONTENTS 含 CONTENTS，一并命中）。 */
-const TOC_TITLE_RE = /(目次|もくじ|目录|CONTENTS)/i;
+/** 目录标题：日语形 + 通用词（TABLE OF CONTENTS 含 CONTENTS，一并命中）。P3.2 证据门复用同一条。 */
+export const TOC_TITLE_RE = /(目次|もくじ|目录|CONTENTS)/i;
 /** 点线：省略号/三点以上圆点/中点/全角点。 */
 const DOT_LEADER_RE = /…{2,}|(\.\s?){3,}|・{2,}|．{2,}/;
 /** 行尾页码：标题 + 空白 + 1–4 位数字（P3 基线复用；纯数字行不命中）。 */

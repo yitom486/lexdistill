@@ -263,7 +263,9 @@ describe('P3.1B verdict/证据/手动/降级视图（SSR）', () => {
       baseline: { ...BASELINE, status: 'empty', verdict: 'empty', entries: [], pageEvidence: [] },
       adoptDisabled: true,
     });
-    expect(html).toContain('没有提取到可用条目，结果不足，不能采用');
+    expect(html).toContain('规则未形成目录条目');
+    expect(html).toContain('可让 AI 根据原文与页面图重建草稿');
+    expect(html).toContain('手动填写');
   });
 
   it('usable：无不足横幅（向后兼容旧断言）', () => {
@@ -299,6 +301,7 @@ describe('P3.1B verdict/证据/手动/降级视图（SSR）', () => {
     expect(html).toContain('已保留可编辑基线');
     expect(html).toContain('E_TOC_REVIEW_PARSE');
     expect(html).not.toContain('AI 草稿，需人工确认');
+    expect(html).toContain('手动填写');
   });
 
   it('成功草稿显示与基线差异计数', () => {

@@ -49,7 +49,7 @@ describe('validateTocConfirmRange', () => {
 describe('decideExtractRequest / decideReviewRequest（守门：ok:false 即零请求）', () => {
   it('无源直接拒绝', () => {
     expect(decideExtractRequest(false, '1', '2').ok).toBe(false);
-    expect(decideReviewRequest(false, '1', '2', { embedded: false, verdict: 'usable' }).ok).toBe(false);
+    expect(decideReviewRequest(false, '1', '2', { embedded: false }).ok).toBe(false);
   });
 
   it('31 页 extract 拒绝', () => {
@@ -59,20 +59,17 @@ describe('decideExtractRequest / decideReviewRequest（守门：ok:false 即零�
 
   it('review：无基线 / embedded / 超 8 页拒绝，合法通过', () => {
     expect(decideReviewRequest(true, '1', '2', null).ok).toBe(false);
-    const embedded = decideReviewRequest(true, '1', '2', { embedded: true, verdict: 'usable' });
+    const embedded = decideReviewRequest(true, '1', '2', { embedded: true });
     expect(embedded.ok).toBe(false);
     if (!embedded.ok) expect(embedded.message).toContain('无需 AI 审核');
-    const over = decideReviewRequest(true, '1', '9', { embedded: false, verdict: 'usable' });
+    const over = decideReviewRequest(true, '1', '9', { embedded: false });
     expect(over.ok).toBe(false);
     if (!over.ok) expect(over.message).toContain('8');
-    expect(decideReviewRequest(true, '1', '8', { embedded: false, verdict: 'usable' })).toEqual({ ok: true, from: 1, to: 8 });
+    expect(decideReviewRequest(true, '1', '8', { embedded: false })).toEqual({ ok: true, from: 1, to: 8 });
   });
 
-  it('P3.2 review：thin 放行（服务端判证据），empty 拒绝', () => {
-    expect(decideReviewRequest(true, '1', '2', { embedded: false, verdict: 'thin' })).toEqual({ ok: true, from: 1, to: 2 });
-    const empty = decideReviewRequest(true, '1', '2', { embedded: false, verdict: 'empty' });
-    expect(empty.ok).toBe(false);
-    if (!empty.ok) expect(empty.message).toContain('基线为空');
+  it('P3.2A review：thin/empty 一律放行（证据门由服务端判定）', () => {
+    expect(decideReviewRequest(true, '1', '2', { embedded: false })).toEqual({ ok: true, from: 1, to: 2 });
   });
 
   it('canRequestTocReview 边界', () => {
