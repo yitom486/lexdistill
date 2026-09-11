@@ -3,6 +3,11 @@ import { BusinessError, isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
 import { discoverTocPages } from '../application/pdf-import/toc-discovery.js';
+import {
+  discoverTocPagesStream,
+  type TocDiscoveryStreamEvent,
+} from '../application/pdf-import/toc-discovery-stream.js';
+import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
 import { extractTocBaseline } from '../application/pdf-import/toc-baseline.js';
 import { reviewTocWithAgent } from '../application/pdf-import/toc-review-agent.js';
 import { extractFolioCandidates } from '../application/pdf-import/toc-folio-candidates.js';
@@ -26,7 +31,13 @@ import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
  *   百 MB 级 PDF 走 multipart 会把网关进程 OOM 干崩（Hono parseBody 常驻缓冲，真机复现），
  *   同机网关（本机 dev / Tauri sidecar）请用 filePath 直读，零 HTTP 拷贝。
  */
-export function createPdfImportRoutes(deps: GatewayDeps) {
+export function createPdfImportRoutes(
+  deps: GatewayDeps,
+  pdfOverrides?: {
+    loadInspector?: () => Promise<PdfInspectorLike>;
+    runtimeDir?: string;
+  }
+) {
   return new Hono()
     .post('/api/documents/:userId/import-pdf', async (c) => {
       const input = await readPdfInput(c);
@@ -111,7 +122,10 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
           );
         }
         const res = await discoverTocPages(
-          {},
+          {
+            ...(pdfOverrides?.loadInspector ? { loadInspector: pdfOverrides.loadInspector } : {}),
+            ...(pdfOverrides?.runtimeDir ? { runtimeDir: pdfOverrides.runtimeDir } : {}),
+          },
           { userId, filename: input.value.filename, bytes: input.value.bytes }
         );
         if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
@@ -119,6 +133,63 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'discoverTocPages');
       }
+    })
+    .post('/api/documents/:userId/discover-toc-stream', async (c) => {
+      // CMD-LINGUA-P2.1 目录探测流式版（只读 NDJSON）：与 discover-toc 同语义、
+      // 同评分、同只读铁律，差别只是把前窗 OCR 拆成 5 页批次逐批上报真实进度。
+      // 旧 JSON 端点原样保留；取消靠浏览器 AbortController → request signal，
+      // 批间停扫，只发 cancelled 永不补 completed。事件白名单见
+      // TocDiscoveryStreamEvent（阶段/页数/批次范围/耗时/错误码，无任何正文与标识）。
+      const input = await readPdfInput(c);
+      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+      const userId = c.req.param('userId');
+      if (!userId) {
+        return formatBusinessErrorResponse(
+          c,
+          new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
+        );
+      }
+      const signal = c.req.raw.signal;
+      const filename = input.value.filename;
+      const bytes = input.value.bytes;
+      const streamDeps = {
+        ...(pdfOverrides?.loadInspector ? { loadInspector: pdfOverrides.loadInspector } : {}),
+        ...(pdfOverrides?.runtimeDir ? { runtimeDir: pdfOverrides.runtimeDir } : {}),
+      };
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const emit = (event: TocDiscoveryStreamEvent): void => {
+            try {
+              controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+            } catch {
+              // 客户端已断开：写流失败即停，不抛回调用栈（取消由 signal 驱动停扫）。
+            }
+          };
+          try {
+            await discoverTocPagesStream(streamDeps, { userId, filename, bytes }, { emit, signal });
+          } catch (e) {
+            const biz =
+              e instanceof BusinessError
+                ? e
+                : new BusinessError('E_PDF_PARSE', '目录页探测失败，请稍后重试', 'TOOL_EXECUTION');
+            emit({ type: 'failed', elapsedMs: 0, code: biz.code, userMessage: biz.userMessage });
+          } finally {
+            try {
+              controller.close();
+            } catch {
+              // 客户端已断开，关闭失败可忽略。
+            }
+          }
+        },
+      });
+      return new Response(body, {
+        headers: {
+          'Content-Type': 'application/x-ndjson; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'X-Accel-Buffering': 'no',
+        },
+      });
     })
         .post('/api/documents/:userId/extract-toc', async (c) => {
       // 目录基线 OCR（只读草稿）：调用方已确认 fromPage/toPage（经 startPage/endPage 传入），

@@ -12,6 +12,7 @@ function baseProps(overrides: Partial<TocReviewPanelViewProps> = {}): TocReviewP
   return {
     hasSource: true,
     discovering: false,
+    discoverProgress: null,
     discoverError: null,
     discover: null,
     selectedIndex: null,
@@ -35,6 +36,7 @@ function baseProps(overrides: Partial<TocReviewPanelViewProps> = {}): TocReviewP
     confirmed: false,
     confirmedSummary: null,
     onDiscover: () => {},
+    onCancelDiscover: () => {},
     onSelectCandidate: () => {},
     onStartChange: () => {},
     onEndChange: () => {},

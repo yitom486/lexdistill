@@ -159,6 +159,30 @@ export interface EnsureRuntimeOptions {
    */
   needPdfium?: boolean;
   platform?: PdfRuntimePlatform;
+  /**
+   * CMD-LINGUA-P2.1：调用方取消信号（如下游 HTTP 请求 abort）。
+   * 仅透传给构件下载 fetch；native 解包/加载阶段仍不可中断，
+   * 调用方须在 await 前后自行检查 signal（流式编排已做）。
+   */
+  signal?: AbortSignal;
+  /**
+   * CMD-LINGUA-P2.1：运行时阶段钩子（可选；只报告“是否命中缓存/是否下载”，
+   * 无路径、无 URL、无体积以外的任何信息）。缺省不打扰任何调用方。
+   */
+  onRuntimeEvent?: (event: PdfRuntimeStageEvent) => void;
+}
+
+/**
+ * CMD-LINGUA-P2.1 运行时阶段（缓存命中 vs 真实下载的诚实区分，
+ * 供流式进度与开发诊断消费；字段仅阶段名，无敏感信息）。
+ */
+export interface PdfRuntimeStageEvent {
+  stage:
+    | 'inspector_cached'
+    | 'inspector_downloaded'
+    | 'ocr_cached'
+    | 'ocr_downloading'
+    | 'ocr_ready';
 }
 
 /** napi 包名（带 scope）→ node_modules/@firecrawl 下的目录名（去 scope）。 */
@@ -180,6 +204,35 @@ function sha256Hex(data: Uint8Array): string {
   return createHash('sha256').update(data).digest('hex');
 }
 
+type AbortSignalWithAny = typeof AbortSignal & {
+  any?: (signals: AbortSignal[]) => AbortSignal;
+};
+
+/**
+ * CMD-LINGUA-P2.1：下载超时与调用方取消二合一信号。
+ * 调用方已 abort 时直接返回其 signal（fetch 立刻以 AbortError 失败，
+ * 调用方按 signal.aborted 判取消而非失败）；AbortSignal.any 缺席时
+ * 退化为纯超时（旧行为，不改变既有调用方语义）。
+ */
+function downloadSignal(timeoutMs: number, external?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  if (!external) return timeout;
+  try {
+    if (external.aborted) return external;
+  } catch {
+    return timeout;
+  }
+  const anyFn = (AbortSignal as AbortSignalWithAny).any;
+  if (typeof anyFn === 'function') {
+    try {
+      return anyFn([timeout, external]);
+    } catch {
+      return timeout;
+    }
+  }
+  return timeout;
+}
+
 async function downloadArtifact(
   url: string,
   fetchImpl: typeof fetch,
@@ -187,7 +240,8 @@ async function downloadArtifact(
   sha256?: string,
   // 仅用于上游不提供单文件摘要的构件（当前仅 ONNX Runtime）：
   // 仍受域名白名单 + TLS + 体积上限保护，缺 pin 的事实在调用处注释说明。
-  allowUnpinned = false
+  allowUnpinned = false,
+  signal?: AbortSignal
 ): Promise<Uint8Array> {
   assertArtifactUrlAllowed(url);
   if (!integrity && !sha256 && !allowUnpinned) {
@@ -200,7 +254,7 @@ async function downloadArtifact(
   let res: Response;
   try {
     // data: URL 不走网络，不挂超时信号（Bun 下 data: + signal 会直接抛错）
-    const init = url.startsWith('data:') ? undefined : { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) };
+    const init = url.startsWith('data:') ? undefined : { signal: downloadSignal(DOWNLOAD_TIMEOUT_MS, signal) };
     res = await fetchImpl(url, init);
   } catch {
     throw new BusinessError('E_RUNTIME_DOWNLOAD', '构件下载超时或网络不可达，请检查网络后重试', 'NETWORK');
@@ -356,11 +410,12 @@ async function ensurePdfRuntimeInner(
     manifest.platform === platform &&
     (await fileExists(inspectorIndex));
   let inspectorInstalled = false;
+  const notify = options.onRuntimeEvent;
   if (!extractorReady) {
     logger.info('[pdf-runtime] 首次使用：按需下载 PDF 解析运行时（约 10MB，一次性）');
     const [mainPkg, napiPkg] = await Promise.all([
-      downloadArtifact(PDF_INSPECTOR_MAIN.url, fetchImpl, PDF_INSPECTOR_MAIN.integrity, PDF_INSPECTOR_MAIN.sha256),
-      downloadArtifact(pins.napi.url, fetchImpl, pins.napi.integrity, pins.napi.sha256),
+      downloadArtifact(PDF_INSPECTOR_MAIN.url, fetchImpl, PDF_INSPECTOR_MAIN.integrity, PDF_INSPECTOR_MAIN.sha256, false, options.signal),
+      downloadArtifact(pins.napi.url, fetchImpl, pins.napi.integrity, pins.napi.sha256, false, options.signal),
     ]);
     const napiShortName = napiDirName(pins.napiPkg);
     await writeEntries(nodeModulesDir, [
@@ -374,6 +429,9 @@ async function ensurePdfRuntimeInner(
       })),
     ]);
     inspectorInstalled = true;
+    notify?.({ stage: 'inspector_downloaded' });
+  } else {
+    notify?.({ stage: 'inspector_cached' });
   }
 
   let pdfiumLib: string | null = null;
@@ -388,10 +446,11 @@ async function ensurePdfRuntimeInner(
     const ortDir = path.join(runtimeDir, 'onnxruntime');
     if (!ocrReady) {
       logger.info('[pdf-runtime] 检测到扫描页：按需下载 OCR 运行时（PDFium + ONNX Runtime，约 80MB，一次性）');
+      notify?.({ stage: 'ocr_downloading' });
       const [pdfiumPkg, ortPkg] = await Promise.all([
-        downloadArtifact(pins.pdfiumUrl, fetchImpl, undefined, pins.pdfiumSha256),
+        downloadArtifact(pins.pdfiumUrl, fetchImpl, undefined, pins.pdfiumSha256, false, options.signal),
         // ONNX Runtime 上游未发布单文件摘要：白名单 + TLS + 体积上限，无哈希 pin（见 pdf-artifacts.ts）。
-        downloadArtifact(pins.ortUrl, fetchImpl, undefined, undefined, true),
+        downloadArtifact(pins.ortUrl, fetchImpl, undefined, undefined, true, options.signal),
       ]);
       await writeEntries(pdfiumDir, extractTarGz(pdfiumPkg));
       await writeEntries(
@@ -400,6 +459,8 @@ async function ensurePdfRuntimeInner(
         // pdb 永不被加载，跳过。见 archive.ExtractOptions）。
         (pins.ortUrl.endsWith('.zip') ? extractZip(ortPkg, { skipEntry: (p) => /\.pdb$/i.test(p) }) : extractTarGz(ortPkg))
       );
+    } else {
+      notify?.({ stage: 'ocr_cached' });
     }
     pdfiumLib = await findFileByName(pdfiumDir, pins.pdfiumLibName);
     ortLib = await findFileByName(ortDir, pins.ortLibName);
@@ -408,6 +469,7 @@ async function ensurePdfRuntimeInner(
     }
     if (!process.env.PDFIUM_LIB_PATH) process.env.PDFIUM_LIB_PATH = pdfiumLib;
     if (!process.env.ORT_DYLIB_PATH) process.env.ORT_DYLIB_PATH = ortLib;
+    notify?.({ stage: 'ocr_ready' });
   } else if (options.needPdfium) {
     // CMD-LINGUA-P4A-2：页面渲染只要 PDFium——版本对上 + 文件在即用，
     // 不下载 ORT/模型；版本对不上或文件缺失才下载 pdfium 包（SHA 照常校验）。
@@ -418,7 +480,7 @@ async function ensurePdfRuntimeInner(
       (await findFileByName(pdfiumDir, pins.pdfiumLibName)) !== null;
     if (!pdfiumReady) {
       logger.info('[pdf-runtime] 目录页渲染：按需准备 PDFium（仅渲染库，不含 OCR 模型）');
-      const pdfiumPkg = await downloadArtifact(pins.pdfiumUrl, fetchImpl, undefined, pins.pdfiumSha256);
+      const pdfiumPkg = await downloadArtifact(pins.pdfiumUrl, fetchImpl, undefined, pins.pdfiumSha256, false, options.signal);
       await writeEntries(pdfiumDir, extractTarGz(pdfiumPkg));
     }
     pdfiumLib = await findFileByName(pdfiumDir, pins.pdfiumLibName);

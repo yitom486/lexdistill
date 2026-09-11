@@ -1,4 +1,4 @@
-import React, { useReducer } from 'react';
+import React, { useReducer, useRef, useState } from 'react';
 import {
   CheckCircle2,
   ListChecks,
@@ -16,12 +16,22 @@ import {
   SelectValue,
 } from './ui/select.js';
 import {
-  useDiscoverTocMutation,
   useExtractTocBaselineMutation,
   useReviewTocMutation,
+  streamDiscoverToc,
   type TocPdfSource,
 } from '../queries/useLearnerQueries.js';
+import { DEFAULT_USER_ID } from '../queries/query-keys.js';
 import { TocAnchorPanel } from './TocAnchorPanel.js';
+import {
+  applyTocStreamEvent,
+  cancelledTocDiscoverProgress,
+  initialTocDiscoverProgress,
+  isTocDiscoverPending,
+  shouldAcceptStreamEvent,
+  tocDiscoverStageLabel,
+  type TocDiscoverProgress,
+} from '../lib/toc-discovery-stream.js';
 import {
   TOC_REVIEW_MAX_PAGES_UI,
   canRequestTocReview,
@@ -81,6 +91,8 @@ const inputClassName =
 export interface TocReviewPanelViewProps {
   hasSource: boolean;
   discovering: boolean;
+  /** 流式进度（null = 尚未开始；只含服务端上报的真实数字）。 */
+  discoverProgress: TocDiscoverProgress | null;
   discoverError: string | null;
   discover: TocDiscoveryData | null;
   selectedIndex: number | null;
@@ -104,6 +116,7 @@ export interface TocReviewPanelViewProps {
   confirmed: boolean;
   confirmedSummary: string | null;
   onDiscover(): void;
+  onCancelDiscover(): void;
   onSelectCandidate(index: number): void;
   onStartChange(value: string): void;
   onEndChange(value: string): void;
@@ -120,6 +133,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
   const {
     hasSource,
     discovering,
+    discoverProgress,
     discoverError,
     discover,
     selectedIndex,
@@ -143,6 +157,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
     confirmed,
     confirmedSummary,
     onDiscover,
+    onCancelDiscover,
     onSelectCandidate,
     onStartChange,
     onEndChange,
@@ -175,6 +190,30 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
           <span className="text-[11px] text-stone-400">先选择 PDF 文件或填写本机路径，再识别目录</span>
         )}
       </div>
+      {discoverProgress && discoverProgress.started && discovering && (
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-600 dark:text-stone-300">
+          <span aria-live="polite">{tocDiscoverStageLabel(discoverProgress)}</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px]"
+            onClick={onCancelDiscover}
+          >
+            取消识别
+          </Button>
+        </div>
+      )}
+      {discoverProgress?.runtimeDownloading && discovering && (
+        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+          正在准备本地 OCR 运行时，首次可能下载约 80MB（一次性，之后不再下载）。
+        </p>
+      )}
+      {discoverProgress?.phase === 'cancelled' && (
+        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+          已取消识别，未采纳任何结果；可重新识别，或直接在下方手动填写范围。
+        </p>
+      )}
       {discoverError && (
         <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
           {discoverError}
@@ -239,6 +278,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
 
       <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
         <span className="font-bold text-stone-700 dark:text-stone-200">确认范围：</span>
+        <span className="text-stone-400">熟悉教材可直接填写，跳过自动识别（不发识别请求）</span>
         <input
           type="number"
           min={1}
@@ -554,12 +594,19 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
   );
 }
 
-/** 容器：TanStack 异步 + reducer 本地状态；确认动作零写（只 dispatch，不调 mutation）。 */
+/** 容器：流式识别进度（本地 state）+ TanStack 基线/审核 + reducer 确认状态；确认动作零写。 */
 export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.ReactElement {
   const [flow, dispatch] = useReducer(tocConfirmReducer, initialTocConfirmState);
-  const discover = useDiscoverTocMutation();
   const extract = useExtractTocBaselineMutation();
   const review = useReviewTocMutation();
+  // P2.1 流式识别：进度只活本地 state；runId 换代丢弃迟到事件（取消后到达的
+  // completed 不采纳）；取消只 abort + 置终态，不写错误（取消不是失败）。
+  const [discoverProgress, setDiscoverProgress] = useState<TocDiscoverProgress | null>(null);
+  const [discoverData, setDiscoverData] = useState<TocDiscoveryData | null>(null);
+  const [discoverErrorText, setDiscoverErrorText] = useState<string | null>(null);
+  const discoverRunRef = useRef(0);
+  const discoverCtrlRef = useRef<AbortController | null>(null);
+  const discovering = isTocDiscoverPending(discoverProgress);
 
   const source: TocPdfSource | null = file
     ? { file }
@@ -573,12 +620,49 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
   const reviewSizeOk = validation.ok && canRequestTocReview(validation.from, validation.to);
 
   const handleDiscover = (): void => {
-    if (!source || discover.isPending) return;
-    discover.reset();
+    if (!source || discovering) return;
+    const runId = discoverRunRef.current + 1;
+    discoverRunRef.current = runId;
+    discoverCtrlRef.current?.abort();
+    const controller = new AbortController();
+    discoverCtrlRef.current = controller;
     extract.reset();
     review.reset();
     dispatch({ type: 'reset-flow' });
-    discover.mutate(source);
+    setDiscoverData(null);
+    setDiscoverErrorText(null);
+    setDiscoverProgress({ ...initialTocDiscoverProgress, started: true });
+    void streamDiscoverToc(DEFAULT_USER_ID, source, {
+      signal: controller.signal,
+      onEvent: (event) => {
+        if (!shouldAcceptStreamEvent(runId, discoverRunRef.current, false)) return;
+        setDiscoverProgress((prev) => applyTocStreamEvent(prev ?? initialTocDiscoverProgress, event));
+        if (event.type === 'completed' && event.data) setDiscoverData(event.data);
+      },
+    })
+      .then(({ cancelled }) => {
+        if (!shouldAcceptStreamEvent(runId, discoverRunRef.current, false)) return;
+        if (cancelled) setDiscoverProgress(cancelledTocDiscoverProgress);
+      })
+      .catch((e: unknown) => {
+        if (!shouldAcceptStreamEvent(runId, discoverRunRef.current, false)) return;
+        const message = messageOf(e);
+        setDiscoverErrorText(message);
+        setDiscoverProgress((prev) => ({
+          ...(prev ?? initialTocDiscoverProgress),
+          started: true,
+          phase: 'failed',
+          error: message,
+        }));
+      });
+  };
+
+  const handleCancelDiscover = (): void => {
+    discoverRunRef.current += 1;
+    discoverCtrlRef.current?.abort();
+    discoverCtrlRef.current = null;
+    setDiscoverErrorText(null);
+    setDiscoverProgress(cancelledTocDiscoverProgress);
   };
 
   const handleExtract = (): void => {
@@ -642,9 +726,10 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
     <>
       <TocReviewPanelView
       hasSource={source !== null}
-      discovering={discover.isPending}
-      discoverError={messageOf(discover.error)}
-      discover={discover.data ?? null}
+      discovering={discovering}
+      discoverProgress={discoverProgress}
+      discoverError={discoverErrorText}
+      discover={discoverData}
       selectedIndex={flow.selectedIndex}
       startText={flow.startText}
       endText={flow.endText}
@@ -674,8 +759,9 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       confirmed={flow.confirmed}
       confirmedSummary={flow.confirmedSummary}
       onDiscover={handleDiscover}
+      onCancelDiscover={handleCancelDiscover}
       onSelectCandidate={(index) => {
-        const candidate = discover.data?.candidates[index];
+        const candidate = discoverData?.candidates[index];
         if (!candidate) return;
         dispatch({ type: 'select-candidate', index, candidate });
       }}
