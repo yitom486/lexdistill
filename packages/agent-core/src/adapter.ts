@@ -21,6 +21,13 @@ export interface AgentAdapter {
   readonly id: string;
   readonly name: string;
 
+  /**
+   * 图片输入能力查询（可选；缺席 = 不支持）。
+   * Gateway 在发送带 attachments 的 Turn 前必须查询：不支持时明确拒绝
+   * （E_AGENT_CAPABILITY），禁止静默丢图或退化成纯文本。
+   */
+  supportsImageInput?(): boolean;
+
   createSession(
     options: CreateSessionOptions
   ): Promise<Result<AgentSession, BusinessError>>;

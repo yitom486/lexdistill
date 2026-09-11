@@ -42,6 +42,7 @@ import {
   normalizeApprovalPolicy,
 } from './app-server-protocol.js';
 import { mapAppServerNotificationToEvents } from './event-mapper.js';
+import { buildTurnInputItems } from './image-attachments.js';
 import {
   listModels,
   listThreads,
@@ -274,6 +275,8 @@ export class CodexAppServerConnection {
     threadId: string;
     message: string;
     signal?: AbortSignal;
+    /** 本轮临时图片绝对路径（Adapter 已物化；按序转为 localImage 输入）。 */
+    imagePaths?: string[];
     model?: string;
     effort?: string;
     approvalPolicy?: string;
@@ -292,7 +295,7 @@ export class CodexAppServerConnection {
     this.setActiveApprovalPolicy(params.approvalPolicy ?? this.config.approvalPolicy);
     const turnBody: TurnStartParams = {
       threadId: params.threadId,
-      input: [{ type: 'text', text: params.message }],
+      input: buildTurnInputItems(params.message, params.imagePaths ?? []),
     };
     if (params.additionalContext) {
       turnBody.additionalContext = params.additionalContext;

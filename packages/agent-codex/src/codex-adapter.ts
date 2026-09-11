@@ -17,6 +17,7 @@ import {
   translateToBusinessError,
 } from '@study-studio/shared';
 import { CodexAppServerConnection } from './app-server-client.js';
+import { buildTurnInputItems, materializePngAttachments } from './image-attachments.js';
 import {
   toolsToDynamicSpecs,
   resolveToolName,
@@ -172,10 +173,29 @@ export class CodexSession implements AgentSession {
       ping();
     };
 
+    // 图片附件（Gateway 已知事实）：内存 PNG → 本轮临时文件 → localImage。
+    // 物化失败直接报 ERROR，不发起 turn；临时文件在 finally 无条件删除
+    // （成功 / 失败 / 取消全覆盖），路径与内容永不记日志。
+    const attachments = input.attachments ?? [];
+    let imagePaths: string[] = [];
+    let cleanupAttachments: (() => Promise<void>) | null = null;
+    if (attachments.length > 0) {
+      const materialized = await materializePngAttachments(attachments);
+      if (!isOk(materialized)) {
+        yield { type: 'ERROR', error: materialized.error };
+        this.eventSink = null;
+        this.abort = null;
+        return;
+      }
+      imagePaths = materialized.value.paths;
+      cleanupAttachments = materialized.value.cleanup;
+    }
+
     const turnOpts: {
       threadId: string;
       message: string;
       signal: AbortSignal;
+      imagePaths?: string[];
       model?: string;
       effort?: string;
       approvalPolicy?: string;
@@ -189,6 +209,7 @@ export class CodexSession implements AgentSession {
       message: resolveTurnUserText(input),
       signal: this.abort.signal,
     };
+    if (imagePaths.length > 0) turnOpts.imagePaths = imagePaths;
     const learnerCtx = buildLearnerContextEntry(input.contextSnapshot);
     if (learnerCtx) turnOpts.additionalContext = { 'study-studio': learnerCtx };
     if (input.turnOptions?.model) turnOpts.model = input.turnOptions.model;
@@ -235,6 +256,13 @@ export class CodexSession implements AgentSession {
     } finally {
       this.eventSink = null;
       this.abort = null;
+      if (cleanupAttachments) {
+        try {
+          await cleanupAttachments();
+        } catch {
+          // 临时文件删除失败不影响 turn 结果（且不得记路径）
+        }
+      }
     }
   }
 
@@ -374,6 +402,11 @@ export class CodexSession implements AgentSession {
 export class CodexAdapter implements AgentAdapter {
   public readonly id = 'codex-app-server';
   public readonly name = 'Codex App Server Adapter';
+
+  /** 本 Adapter 支持 AgentInput.attachments 内存图片输入（转 localImage）。 */
+  public supportsImageInput(): boolean {
+    return true;
+  }
 
   private connection: CodexAppServerConnection | null = null;
   private readonly options: CodexAdapterOptions;

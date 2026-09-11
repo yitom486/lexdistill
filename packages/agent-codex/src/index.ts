@@ -5,4 +5,5 @@ export * from './jsonrpc-stdio.js';
 export * from './app-server-protocol.js';
 export * from './app-server-client.js';
 export * from './tools-bridge.js';
+export * from './image-attachments.js';
 export * from './codex-adapter.js';

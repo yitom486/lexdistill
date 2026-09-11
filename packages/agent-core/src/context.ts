@@ -83,9 +83,26 @@ export interface ContextSnapshot {
   metadata?: Record<string, unknown> | undefined;
 }
 
+/**
+ * 内存态 PNG 附件（provider-neutral：只有字节与可读标签，无路径、无 base64、无厂商细节）。
+ * 物化为本地文件是各 Adapter 的内部实现细节，不得泄漏到本契约之外。
+ */
+export interface AgentImageAttachment {
+  /** PNG 编码字节（内存态，调用方用完即弃）。 */
+  png: Uint8Array;
+  /** 调用方可读标签（仅定位，如目录页码；不含正文与用户信息）。 */
+  label?: string | undefined;
+}
+
 export interface AgentInput {
   message: string;
   contextSnapshot?: ContextSnapshot | undefined;
+  /**
+   * 内存态 PNG 附件（Gateway 已知事实，非 Tool，Agent 不得反向读取）。
+   * 只许透传原始字节：禁止 base64 化后塞进快照 / metadata / prompt / 数据库；
+   * 临时物化只许在支持图片的 Adapter 内进行，且限于本轮生命周期。
+   */
+  attachments?: AgentImageAttachment[] | undefined;
   /** 本轮覆盖：模型 / 思考等级 / 审批策略 / 协作模式（由 Adapter 映射到引擎原生字段） */
   turnOptions?:
     | {

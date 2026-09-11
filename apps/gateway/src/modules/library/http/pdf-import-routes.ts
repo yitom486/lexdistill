@@ -4,6 +4,7 @@ import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
 import { discoverTocPages } from '../application/pdf-import/toc-discovery.js';
 import { extractTocBaseline } from '../application/pdf-import/toc-baseline.js';
+import { reviewTocWithAgent } from '../application/pdf-import/toc-review-agent.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
@@ -142,6 +143,38 @@ export function createPdfImportRoutes(deps: GatewayDeps) {
         return c.json(res.value);
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'extractTocBaseline');
+      }
+    })
+    .post('/api/documents/:userId/review-toc', async (c) => {
+      // AI 目录审核草稿（只读）：P3 OCR 基线 + P4A-2 目录页 PNG，同一次 AgentInput。
+      // embedded 命中时零 Agent；结果只经 HTTP 返回，绝不写 documents/AST/textbook_*/cache。
+      const input = await readPdfInput(c);
+      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+      try {
+        const userId = c.req.param('userId');
+        if (!userId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
+          );
+        }
+        const pages = input.value.pages;
+        const fromPage = pages?.[0];
+        const toPage = pages?.[pages.length - 1];
+        if (fromPage === undefined || toPage === undefined) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '请提供已确认的目录页范围（startPage/endPage）', 'VALIDATION')
+          );
+        }
+        const res = await reviewTocWithAgent(
+          { adapter: deps.server.agentAdapter },
+          { userId, filename: input.value.filename, bytes: input.value.bytes, fromPage, toPage }
+        );
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
+        return c.json(res.value);
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'reviewTocWithAgent');
       }
     })
     .post('/api/documents/:userId/:documentId/append-pdf', async (c) => {      // 接力追加：新页段的课接在已有教材后面（大书分段导入）。

@@ -40,7 +40,7 @@ export interface ThreadStartResponse {
 
 export interface TurnStartParams {
   threadId: string;
-  input: Array<{ type: 'text'; text: string } | Record<string, unknown>>;
+  input: CodexTurnInputItem[];
   model?: string | null;
   effort?: CodexReasoningEffort | null;
   approvalPolicy?: CodexApprovalPolicy | null;
@@ -58,6 +58,24 @@ export interface TurnStartParams {
   } | null;
 }
 
+/** turn/start 与 turn/steer 的用户输入项：纯文本 + 本地图片（精确并集，不用 any）。 */
+export type CodexTurnInputItem = CodexTextInput | CodexLocalImageInput;
+
+export interface CodexTextInput {
+  type: 'text';
+  text: string;
+}
+
+/**
+ * 本地图片输入（App Server 读取本机路径）。
+ * 路径只许由 Adapter 在本轮内临时物化（随机命名、用后删除），
+ * 绝不来自外部 HTTP、长期缓存或调用方传入。
+ */
+export interface CodexLocalImageInput {
+  type: 'localImage';
+  path: string;
+}
+
 export interface TurnStartResponse {
   turn: { id: string; status?: string };
 }
@@ -70,7 +88,7 @@ export interface TurnInterruptParams {
 export interface TurnSteerParams {
   threadId: string;
   expectedTurnId: string;
-  input: Array<{ type: 'text'; text: string } | Record<string, unknown>>;
+  input: CodexTurnInputItem[];
   clientUserMessageId?: string | null;
 }
 
