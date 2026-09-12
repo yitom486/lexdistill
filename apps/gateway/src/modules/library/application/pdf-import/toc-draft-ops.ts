@@ -271,8 +271,12 @@ const TocDraftAddInputSchema = z
     needsReview: z.boolean().optional().default(false),
     reason: z.string().min(1).max(TOC_DRAFT_MAX_REASON_CHARS),
     afterEntryId: z.string().min(1).max(32).optional(),
+    beforeEntryId: z.string().min(1).max(32).optional(),
   })
-  .strict();
+  .strict()
+  .refine((v) => !(v.afterEntryId !== undefined && v.beforeEntryId !== undefined), {
+    message: 'afterEntryId 与 beforeEntryId 二选一',
+  });
 
 export type TocDraftAddInput = z.infer<typeof TocDraftAddInputSchema>;
 export type TocDraftAddRawInput = z.input<typeof TocDraftAddInputSchema>;
@@ -328,6 +332,20 @@ export interface TocDraftOpResult {
   entryCount: number;
 }
 
+/**
+ * 当前可用的插入锚点（纯读）：存活条目中页码 ≤ 给定页码的记为 `id@页码`，
+ * 按目录顺序取末尾若干。模型按此选 afterEntryId 即满足单调，无需猜测。
+ */
+function validAnchorsFor(state: TocDraftSessionState, printedPage: number, limit = 5): string[] {
+  const anchors: string[] = [];
+  for (const id of state.order) {
+    const entry = state.entries.get(id);
+    if (!entry || entry.change === 'remove') continue;
+    if (entry.printedPage <= printedPage) anchors.push(`${id}@${entry.printedPage}`);
+  }
+  return anchors.slice(-limit);
+}
+
 function matchExpectedBefore(
   entry: TocStagedEntry,
   expected: { title?: string | undefined; printedPage?: number | undefined; level?: (1 | 2) | undefined; kind?: ('lesson' | 'section') | undefined }
@@ -364,6 +382,11 @@ function applyAdd(state: TocDraftSessionState, raw: unknown): TocDraftOpResult |
     const anchor = anchorIndex >= 0 ? state.entries.get(input.afterEntryId) : undefined;
     if (!anchor || anchor.change === 'remove') return rejectOp(state, 'args', 'afterEntryId');
     insertAt = anchorIndex + 1;
+  } else if (input.beforeEntryId !== undefined) {
+    const anchorIndex = state.order.indexOf(input.beforeEntryId);
+    const anchor = anchorIndex >= 0 ? state.entries.get(input.beforeEntryId) : undefined;
+    if (!anchor || anchor.change === 'remove') return rejectOp(state, 'args', 'beforeEntryId');
+    insertAt = anchorIndex;
   }
   const entryId = `n${state.addCounter++}`;
   const entry: TocStagedEntry = {
@@ -384,7 +407,32 @@ function applyAdd(state: TocDraftSessionState, raw: unknown): TocDraftOpResult |
   const nextEntries = new Map(state.entries);
   nextEntries.set(entryId, entry);
   const badId = checkMonotonic(nextOrder, nextEntries);
-  if (badId !== null) return rejectOp(state, 'order', badId === entryId ? 'printedPage/afterEntryId' : badId);
+  if (badId !== null) {
+    // 顺序被拒必须给出可插入位置（相邻条目反馈），不让模型猜锚点。
+    // 特例：页码小于当前第一条（如第1課@6 插到第2課@18 之前）——页码正确，
+    // 直接指引 beforeEntryId 插到最前，绝不能误导"修正页码"。
+    const firstLiveId = state.order.find((id) => {
+      const entry = state.entries.get(id);
+      return entry !== undefined && entry.change !== 'remove';
+    });
+    const firstLive = firstLiveId !== undefined ? state.entries.get(firstLiveId) : undefined;
+    if (firstLive && printedPage < firstLive.printedPage) {
+      return rejectOp(
+        state,
+        'order',
+        `页码正确但位置不对：${printedPage} 小于当前第一条 ${firstLiveId}@${firstLive.printedPage}，请用 beforeEntryId: "${firstLiveId}" 插到最前（不要改页码）`
+      );
+    }
+    const anchors = validAnchorsFor(state, printedPage);
+    const hint = badId === entryId ? 'printedPage/afterEntryId' : badId;
+    return rejectOp(
+      state,
+      'order',
+      anchors.length > 0
+        ? `${hint}；可用的 afterEntryId（页码≤${printedPage}）：${anchors.join('、')}`
+        : `${hint}；当前无页码≤${printedPage} 的条目，请修正页码`
+    );
+  }
   state.order = nextOrder;
   state.entries = nextEntries;
   state.successes++;
@@ -594,7 +642,7 @@ const TOOL_DESCRIPTION_SUFFIX =
 export class TocDraftAddEntryTool implements ToolDefinition<TocDraftAddRawInput, TocDraftOpResult> {
   public readonly name = TOC_DRAFT_ADD_ENTRY_TOOL;
   public readonly description =
-    '目录草稿新增一条：语义标题 + 印刷页码（只取目录上印出的数字）+ level 1|2 + kind + evidence reason；可选 afterEntryId 插到指定条目之后（缺席追加末尾）。' +
+    '目录草稿新增一条：语义标题 + 印刷页码（只取目录上印出的数字）+ level 1|2 + kind + evidence reason；可选 afterEntryId 插到指定条目之后（缺席追加末尾；顺序被拒时会给出可用锚点，直接照抄即可）；页码小于当前第一条时用 beforeEntryId 插到最前。' +
     TOOL_DESCRIPTION_SUFFIX;
   public readonly location = ToolLocations.SERVER;
   public readonly permission = ToolPermissions.WRITE;

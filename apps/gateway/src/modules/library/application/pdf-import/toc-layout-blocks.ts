@@ -12,7 +12,7 @@ import type { TocGeometrySpan } from './toc-baseline.js';
  * 直接降级旧文本路径（本模块不对空输入编造任何条目）。
  *
  * Block-matching contract（调用方与单测共同锁定）：
- * - heading：含课号 token（第N課/復習A-B/LESSON/UNIT n）+ 语义标题 + 非习题 +
+ * - heading：含课号 token（第N課/復習A-Z/LESSON/UNIT n）+ 语义标题 + 非习题 +
  *   全行数字 run < 3 + 自身不带尾页码（带尾页码的完整行归文本路径，避免双计）；
  * - page 候选：剥离点线装饰后为独立 `1–1500` 数字的单行（年份/超大值天然排除）；
  * - 关联（1:1 消费）：同行（|Δy| ≤ 0.6×字高且页码中心在右）优先，再邻行

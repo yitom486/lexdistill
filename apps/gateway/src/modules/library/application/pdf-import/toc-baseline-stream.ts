@@ -318,6 +318,7 @@ async function runBaselinePhases(
             y: rec.y as number,
             width: rec.width as number,
             height: rec.height as number,
+            source: 'ocr',
             ...(typeof rec.confidence === 'number' ? { confidence: rec.confidence } : {}),
           });
         }
@@ -387,6 +388,7 @@ async function runBaselinePhases(
     range: { fromPage, toPage },
     pageCount,
     entries: assembled.entries,
+    unresolvedCandidates: assembled.unresolvedCandidates,
     diagnostics: assembled.diagnostics,
     pageEvidence: assembled.pageEvidence,
     embedded: false,

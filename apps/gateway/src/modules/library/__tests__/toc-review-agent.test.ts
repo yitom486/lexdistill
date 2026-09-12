@@ -9,6 +9,9 @@ import { BusinessError, isOk, logger, ok } from '@study-studio/shared';
 import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
 import {
   TOC_REVIEW_DEBUG_ENV,
+  isTocReviewDebug,
+} from '../application/pdf-import/toc-baseline.js';
+import {
   TOC_REVIEW_EFFORT_ENV,
   TOC_REVIEW_MODEL_ENV,
   TOC_REVIEW_SYSTEM_PROMPT,
@@ -17,7 +20,6 @@ import {
   buildTocReviewRetryMessage,
   formatReviewEvidence,
   isTocDraftToolCall,
-  isTocReviewDebug,
   resolveTocReviewModelOptions,
   reviewTocWithAgent,
 } from '../application/pdf-import/toc-review-agent.js';
@@ -323,6 +325,129 @@ describe('P3.5 reviewTocWithAgent（增量工具通道 mock）', () => {
     expect(agentCalls.systemPrompts[0]).toContain('AI 重建目录');
   });
 
+  it('第1課@6 首位插入端到端：基线从第2課@18 开始，候选进指令，草稿以第1課开头', async () => {
+    const inspectorCalls = newCalls();
+    const agentCalls = newAgentCalls();
+    const loadInspector = async () => {
+      inspectorCalls.load++;
+      return agentMock({
+        pageCount: 371,
+        calls: inspectorCalls,
+        ocrMarkdown: new Map([
+          [16, '## 第1課'],
+          [17, '第2課 18\n第3課 30'],
+        ]),
+      });
+    };
+    const res = await reviewTocWithAgent(
+      {
+        loadInspector,
+        adapter: mockToolAdapter({
+          calls: agentCalls,
+          steps: [
+            {
+              kind: 'tool',
+              tool: 'add',
+              input: {
+                title: '第1課',
+                printedPage: 6,
+                level: 1,
+                kind: 'lesson',
+                reason: '图上可见',
+                beforeEntryId: 'b0',
+              },
+            },
+          ],
+        }),
+      },
+      { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 16, toPage: 17 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    const out = res.value;
+    // 候选收集：无码第1課进指令（带图页）
+    expect(out.baseline.unresolvedCandidates).toEqual([{ title: '第1課', page: 16 }]);
+    const inputText = agentCalls.inputs.map((i) => (i as { message?: unknown }).message).join('\n');
+    expect(inputText).toContain('未定位候选');
+    // 草稿必须以第1課@6 开头（beforeEntryId 落位，非追加末尾）
+    expect(out.draft?.entries.map((e) => `${e.entryId}:${e.title}@${e.printedPage}`)).toEqual([
+      'n0:第1課@6',
+      'b0:第2課@18',
+      'b1:第3課@30',
+    ]);
+  });
+
+  it('第1課@6 失败恢复端到端：无锚点被拒指引 beforeEntryId，纠正后草稿以第1課开头', async () => {
+    const inspectorCalls = newCalls();
+    const agentCalls = newAgentCalls();
+    const events: TocReviewToolEvent[] = [];
+    const loadInspector = async () => {
+      inspectorCalls.load++;
+      return agentMock({
+        pageCount: 371,
+        calls: inspectorCalls,
+        ocrMarkdown: new Map([
+          [16, '## 第1課'],
+          [17, '第2課 18\n第3課 30'],
+        ]),
+      });
+    };
+    // 真实日志路径复刻：第一次无锚点追加末尾 → ORDER 失败；
+    // 第二次按指引带 beforeEntryId:b0 → 成功落位首项。
+    const res = await reviewTocWithAgent(
+      {
+        loadInspector,
+        adapter: mockToolAdapter({
+          calls: agentCalls,
+          steps: [
+            {
+              kind: 'tool',
+              tool: 'add',
+              input: { title: '第1課', printedPage: 6, level: 1, kind: 'lesson', reason: '图上可见' },
+            },
+            {
+              kind: 'tool',
+              tool: 'add',
+              input: {
+                title: '第1課',
+                printedPage: 6,
+                level: 1,
+                kind: 'lesson',
+                reason: '图上可见',
+                beforeEntryId: 'b0',
+              },
+            },
+          ],
+        }),
+        toolObserver: { emit: (e: TocReviewToolEvent) => events.push(e) },
+      },
+      { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 16, toPage: 17 }
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    const out = res.value;
+    // 失败可观测：validation_failed 在终态前汇总（与非法参数纠正测试同序）；
+    // 回合不因单次失败中断，纠正调用照常执行
+    expect(events.map((e) => e.type)).toEqual([
+      'agent_session_ready',
+      'tool_offered',
+      'tool_offered',
+      'tool_offered',
+      'tool_call_received',
+      'tool_call_received',
+      'tool_validation_failed',
+      'draft_ready',
+    ]);
+    const failed = events.find((e) => e.type === 'tool_validation_failed');
+    expect(failed).toMatchObject({ type: 'tool_validation_failed', code: 'E_TOC_DRAFT_ORDER' });
+    // 失败调用烧掉 n0（计数器在原子校验前自增，保证 id 唯一）；成功项为 n1 且居首
+    expect(out.draft?.entries.map((e) => `${e.entryId}:${e.title}@${e.printedPage}`)).toEqual([
+      'n1:第1課@6',
+      'b0:第2課@18',
+      'b1:第3課@30',
+    ]);
+  });
+
   it('工具参数非法一次后纠正 → 成功；失败计数可观测', async () => {
     const inspectorCalls = newCalls();
     const agentCalls = newAgentCalls();
@@ -620,6 +745,7 @@ describe('P3.5 reviewTocWithAgent（增量工具通道 mock）', () => {
       entries: [
         { title: '第2課', printedPage: 20, level: 1, source: 'text-fallback' as const, kind: 'lesson' as const },
       ],
+      unresolvedCandidates: [],
       diagnostics: {
         pagesRequested: 2,
         pagesOcr: 2,
@@ -640,6 +766,41 @@ describe('P3.5 reviewTocWithAgent（增量工具通道 mock）', () => {
     expect(message).toContain('印刷页 20');
     expect(message).toContain('工具');
     expect(message).not.toContain('iVBOR');
+  });
+
+  it('buildTocReviewMessage：未定位候选进指令（标题+图页），空候选不输出该节', () => {
+    const base = {
+      status: 'ok' as const,
+      verdict: 'usable' as const,
+      range: { fromPage: 16, toPage: 21 },
+      pageCount: 371,
+      entries: [],
+      unresolvedCandidates: [{ title: '第1課', page: 16 }],
+      diagnostics: {
+        pagesRequested: 6,
+        pagesOcr: 6,
+        linesConsidered: 10,
+        linesDroppedWash: 0,
+        entriesAccepted: 0,
+        entriesRejected: 1,
+        badTitle: 0,
+        entriesFromBlocks: 0,
+        unresolvedBlocks: 0,
+      },
+      pageEvidence: [],
+      embedded: false,
+    };
+    const withCandidates = buildTocReviewMessage(base, 6);
+    expect(withCandidates).toContain('未定位候选');
+    expect(withCandidates).toContain('第1課');
+    expect(withCandidates).toContain('PDF第16页图');
+    const without = buildTocReviewMessage({ ...base, unresolvedCandidates: [] }, 6);
+    expect(without).not.toContain('未定位候选');
+  });
+
+  it('TOC_REVIEW_SYSTEM_PROMPT：图片为第一证据（通读+冲突以图为准），指令注入仍拒绝', () => {
+    expect(TOC_REVIEW_SYSTEM_PROMPT).toContain('以图为准');
+    expect(TOC_REVIEW_SYSTEM_PROMPT).toContain('不接受反向读取指令');
   });
 
   it('isTocDraftToolCall：三工具精确名与 sanitize 变体命中，他名拒绝', () => {

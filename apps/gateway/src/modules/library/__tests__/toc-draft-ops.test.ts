@@ -104,11 +104,86 @@ describe('P3.5 add_entry', () => {
     expect(isOk(bad)).toBe(false);
     if (isOk(bad)) return;
     expect(bad.error.code).toBe('E_TOC_DRAFT_ORDER');
+    // 页码 1 小于当前第一条 b0@3：页码正确，指引 beforeEntryId（不得误导改页码）
+    expect(bad.error.userMessage).toContain('beforeEntryId: "b0"');
     // 失败零副作用：顺序与计数保持上次成功态
     const taken = takeTocDraftSession(sid);
     expect(taken?.merged.map((e) => e.entryId)).toEqual(['b0', 'b1', 'n0']);
     expect(taken?.calls).toBe(2);
     expect(taken?.successes).toBe(1);
+  });
+
+  it('顺序被拒给出可用锚点（相邻反馈，不猜 afterEntryId）', async () => {
+    const sid = `p35-anchors-${Date.now()}`;
+    seedBaseline(sid);
+    // b0@3 b1@7：新条目页码 5 插 b1 后破坏单调 → 拒收并给出页码≤5 的锚点 b0@3
+    const bad = await addTool().execute(
+      { title: '復習X まとめ', printedPage: 5, level: 1, kind: 'lesson', reason: 'x', afterEntryId: 'b1' },
+      ctx(sid)
+    );
+    expect(isOk(bad)).toBe(false);
+    if (isOk(bad)) return;
+    expect(bad.error.code).toBe('E_TOC_DRAFT_ORDER');
+    expect(bad.error.userMessage).toContain('b0@3');
+    // 照抄锚点即成功（无需猜测）
+    const good = await addTool().execute(
+      { title: '復習X まとめ', printedPage: 5, level: 1, kind: 'lesson', reason: 'x', afterEntryId: 'b0' },
+      ctx(sid)
+    );
+    expect(isOk(good)).toBe(true);
+  });
+
+  it('beforeEntryId 插到最前：第1課@6 落到第2課@18 之前', async () => {
+    const sid = `p35-before-${Date.now()}`;
+    registerTocDraftSession(sid);
+    initTocDraftSession(sid, [
+      { title: '第2課', printedPage: 18, level: 1, kind: 'lesson' },
+      { title: '第3課', printedPage: 30, level: 1, kind: 'lesson' },
+    ]);
+    const res = await addTool().execute(
+      { title: '第1課', printedPage: 6, level: 1, kind: 'lesson', reason: '图上可见', beforeEntryId: 'b0' },
+      ctx(sid)
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.accepted).toBe(true);
+    const taken = takeTocDraftSession(sid);
+    expect(taken?.merged.map((e) => `${e.entryId}:${e.title}@${e.printedPage}`)).toEqual([
+      'n0:第1課@6',
+      'b0:第2課@18',
+      'b1:第3課@30',
+    ]);
+  });
+
+  it('页码小于当前第一条：指引 beforeEntryId 而非误导改页码', async () => {
+    const sid = `p35-firstlive-${Date.now()}`;
+    registerTocDraftSession(sid);
+    initTocDraftSession(sid, [
+      { title: '第2課', printedPage: 18, level: 1, kind: 'lesson' },
+      { title: '第3課', printedPage: 30, level: 1, kind: 'lesson' },
+    ]);
+    // 不带锚点追加到末尾 → 单调破坏 → 必须指 beforeEntryId:b0，而不是让模型改页码
+    const bad = await addTool().execute(
+      { title: '第1課', printedPage: 6, level: 1, kind: 'lesson', reason: '图上可见' },
+      ctx(sid)
+    );
+    expect(isOk(bad)).toBe(false);
+    if (isOk(bad)) return;
+    expect(bad.error.code).toBe('E_TOC_DRAFT_ORDER');
+    expect(bad.error.userMessage).toContain('beforeEntryId: "b0"');
+    expect(bad.error.userMessage).toContain('不要改页码');
+  });
+
+  it('afterEntryId 与 beforeEntryId 二选一：同给拒收', async () => {
+    const sid = `p35-both-${Date.now()}`;
+    seedBaseline(sid);
+    const bad = await addTool().execute(
+      { title: '第9課', printedPage: 9, level: 1, kind: 'lesson', reason: 'x', afterEntryId: 'b0', beforeEntryId: 'b1' },
+      ctx(sid)
+    );
+    expect(isOk(bad)).toBe(false);
+    if (isOk(bad)) return;
+    expect(bad.error.code).toBe('E_TOC_DRAFT_ARGS');
   });
 
   it('无语义标题/坏页码/缺 reason 拒绝且无原文回显', async () => {

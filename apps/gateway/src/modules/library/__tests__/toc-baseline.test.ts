@@ -6,9 +6,14 @@ import {
   TOC_BASELINE_MAX_PAGES,
   TOC_BASELINE_MIN_CONFIDENCE,
   TOC_BASELINE_SOUP_NUMBERS,
+  assembleTocBaseline,
   classifyTocEntryKind,
+  countRawDigits,
   extractTocBaseline,
   extractTocLineEntry,
+  maybeUnresolvedCandidate,
+  resolveDigitLossStage,
+  summarizePageStage,
   verifyTocGeometry,
   washRepeatedTocLines,
 } from '../application/pdf-import/toc-baseline.js';
@@ -22,6 +27,10 @@ describe('P3 行抽取与 kind', () => {
     expect(classifyTocEntryKind('第12課 はじめまして')).toBe('lesson');
     expect(classifyTocEntryKind('復習A')).toBe('lesson');
     expect(classifyTocEntryKind('復習B')).toBe('lesson');
+    // 本书復習到 G：C–G 同为 lesson（課号 token 不止 A/B；練習C 仍是 section）
+    expect(classifyTocEntryKind('復習C')).toBe('lesson');
+    expect(classifyTocEntryKind('復習G')).toBe('lesson');
+    expect(classifyTocEntryKind('練習C')).toBe('section');
     expect(classifyTocEntryKind('会話')).toBe('section');
     expect(classifyTocEntryKind('練習A')).toBe('section');
     expect(classifyTocEntryKind('はじめに')).toBe('section');
@@ -79,7 +88,7 @@ describe('P3 保守清洗', () => {
 });
 
 describe('P3 几何验证', () => {
-  const span = { text: '第1課 はじめまして ………………… 3', x: 10, y: 100, width: 300, height: 12, confidence: 0.9 };
+  const span = { text: '第1課 はじめまして ………………… 3', x: 10, y: 100, width: 300, height: 12, confidence: 0.9, source: 'ocr' as const };
   it('同行含标题且以页码结尾即几何成立', () => {
     expect(verifyTocGeometry([span], '第1課 はじめまして …………………', 3)).toBe(true);
   });
@@ -562,5 +571,221 @@ describe('P3.2B 版式块编排（坐标补缺口）', () => {
     expect(res.value.entries).toEqual([]);
     expect(res.value.verdict).toBe('empty');
     expect(res.value.diagnostics.unresolvedBlocks).toBe(1);
+  });
+});
+
+describe('P3.5-FIX 未定位候选（无码有效标题不静默丢）', () => {
+  it('maybeUnresolvedCandidate：课号/语义标题成候选，正文/空行/超长/非法页不是', () => {
+    expect(maybeUnresolvedCandidate('## 第1課', 16)).toEqual({ title: '第1課', page: 16 });
+    expect(maybeUnresolvedCandidate('復習A', 16)).toMatchObject({ title: '復習A', page: 16 });
+    // 復習C–G 同为候选（课号 token 不止 A/B）；練習C 不是课号，不进候选
+    expect(maybeUnresolvedCandidate('復習C', 16)).toMatchObject({ title: '復習C', page: 16 });
+    expect(maybeUnresolvedCandidate('復習G', 16)).toMatchObject({ title: '復習G', page: 16 });
+    expect(maybeUnresolvedCandidate('練習C', 16)).toBeNull();
+    expect(maybeUnresolvedCandidate('わたしは　マイクです。', 16)).toBeNull();
+    expect(maybeUnresolvedCandidate('   ', 16)).toBeNull();
+    expect(maybeUnresolvedCandidate('第1課', 0)).toBeNull();
+    expect(maybeUnresolvedCandidate(`${'あ'.repeat(201)}`, 16)).toBeNull();
+  });
+
+  it('assemble：无码课号行进候选，已转正标题不进候选，同标题同页去重', () => {
+    const out = assembleTocBaseline({
+      window: [16],
+      keptByPage: new Map([
+        [16, [
+          { page: 16, text: '## 第1課' },
+          { page: 16, text: '第2課 18' },
+          { page: 16, text: '## 第1課' },
+          { page: 16, text: '## 第2課' },
+          { page: 16, text: 'わたしは　マイクです。' },
+        ]],
+      ]),
+      evidenceByPage: new Map([[16, ['## 第1課', '第2課 18']]]),
+      spansByPage: new Map(),
+      ocrPages: [16],
+      washedKept: 5,
+      washedDropped: 0,
+    });
+    expect(out.entries.map((e) => e.title)).toEqual(['第2課']);
+    // 第1課：重复光杆行去重后仅一条；第2課已转正不再候选；正文行不污染
+    expect(out.unresolvedCandidates).toEqual([{ title: '第1課', page: 16 }]);
+  });
+
+  it('summarizePageStage：只记形状计数不记文本；ocr/native 右栏数字分开计数', () => {
+    const summary = summarizePageStage(
+      16,
+      10,
+      { total: 4, validCoords: 3, rightDigits: 3, trailingDigits: 0 },
+      [
+        { text: '第1課', x: 50, y: 300, width: 60, height: 14, source: 'ocr' },
+        { text: '6', x: 500, y: 300, width: 12, height: 14, source: 'ocr' },
+        { text: '18', x: 505, y: 400, width: 20, height: 14, source: 'ocr' },
+        { text: '3', x: 60, y: 500, width: 10, height: 12, source: 'ocr' },
+        { text: '9', x: 502, y: 600, width: 11, height: 13, source: 'native-fallback' },
+      ],
+      '## 第1課\n第2課 18\n3. something',
+      3
+    );
+    expect(summary.page).toBe(16);
+    expect(summary.rawSpans).toBe(10);
+    expect(summary.rawDigitTexts).toBe(4);
+    expect(summary.rawDigitValidCoords).toBe(3);
+    expect(summary.rawRightDigitTexts).toBe(3);
+    expect(summary.rawTrailingPageSpans).toBe(0);
+    expect(summary.narrowedSpans).toBe(5);
+    // raw 4 > valid 3：有数字死在坐标门，优先级压住一切，verdict 未定
+    expect(summary.verdict).toBe('coord-gate-undecided');
+    // 右栏：6@500 与 18@505 记 ocr（最大右端 525 的 85% 以右）；
+    // 9@502 来自 native 回填，另计不合并；左侧 3 不算
+    expect(summary.ocrRightDigitSpans).toBe(2);
+    expect(summary.nativeRightDigitSpans).toBe(1);
+    expect(summary.ocrRightDigitBoxes).toHaveLength(2);
+    expect(summary.ocrRightDigitBoxes[0]).toEqual([500, 300, 12, 14, 1, true]);
+    expect(summary.nativeRightDigitBoxes).toHaveLength(1);
+    // 摘要无文本原文
+    expect(JSON.stringify(summary)).not.toContain('第1課');
+    expect(summary.markdownTrailingDigits).toBe(1);
+    // token 计数含课序号数字（第1課的 1、第2課的 2）+ 页码 18 + 序号 3 = 4；
+    // 定责看行尾数，token 数仅作水位参考
+    expect(summary.markdownDigitTokens).toBe(4);
+    expect(summary.keptLines).toBe(3);
+  });
+
+  it('防误判：左侧题号存在、右栏页码不存在 → rawRightDigitTexts 为 0（不得判规范化丢失）', () => {
+    // 陷阱：整页有 4 个纯数字（题号 1/2/3/4 全在左侧），右栏一个数字没有。
+    // 旧整页口径 rawDigitTexts=4 会误报规范化丢失；右栏口径必须为 0。
+    const raw = countRawDigits([
+      { text: '1', x: 60, y: 100, width: 10, height: 12 },
+      { text: '2', x: 60, y: 200, width: 10, height: 12 },
+      { text: '3', x: 60, y: 300, width: 10, height: 12 },
+      { text: '4', x: 60, y: 400, width: 10, height: 12 },
+      { text: '第1課', x: 50, y: 500, width: 60, height: 14 },
+      { text: '目录页标题栏很宽很宽很宽很宽', x: 50, y: 50, width: 400, height: 14 },
+    ]);
+    expect(raw).toEqual({ total: 4, validCoords: 4, rightDigits: 0, trailingDigits: 0 });
+    const summary = summarizePageStage(
+      16,
+      6,
+      raw,
+      [
+        { text: '1', x: 60, y: 100, width: 10, height: 12, source: 'ocr' },
+        { text: '2', x: 60, y: 200, width: 10, height: 12, source: 'ocr' },
+        { text: '3', x: 60, y: 300, width: 10, height: 12, source: 'ocr' },
+        { text: '4', x: 60, y: 400, width: 10, height: 12, source: 'ocr' },
+        { text: '第1課', x: 50, y: 500, width: 60, height: 14, source: 'ocr' },
+      ],
+      '## 第1課\n1. xxx\n2. xxx',
+      3
+    );
+    expect(summary.rawRightDigitTexts).toBe(0);
+    expect(summary.ocrRightDigitSpans).toBe(0);
+    // Markdown 同样无行尾数字：判据对齐"目标右栏数字未从 OCR 出来"，而非规范化丢失
+    expect(summary.markdownTrailingDigits).toBe(0);
+    expect(summary.verdict).toBe('no-locatable-right-digits');
+  });
+
+  it('优先级冲突锁定：原始6存在但坐标非法 → 未定，不得落入无右栏数', () => {
+    // 用户指定的必备回归：OCR 给了 6 但无合法坐标（进 total 差值），
+    // 右栏计数为零且 Markdown 无行尾数——此时判"无右栏数"就是误判。
+    const raw = countRawDigits([
+      { text: '6', y: 300 },
+      { text: '目录页标题栏很宽很宽很宽很宽', x: 50, y: 50, width: 400, height: 14 },
+    ]);
+    expect(raw).toEqual({ total: 1, validCoords: 0, rightDigits: 0, trailingDigits: 0 });
+    const summary = summarizePageStage(16, 2, raw, [], '## 第1課', 1);
+    expect(summary.rawRightDigitTexts).toBe(0);
+    expect(summary.markdownTrailingDigits).toBe(0);
+    expect(summary.verdict).not.toBe('no-right-digits');
+    expect(summary.verdict).toBe('coord-gate-undecided');
+  });
+
+  it('resolveDigitLossStage：优先级不可调换（坐标门 > 右栏两口径 > Markdown）', () => {
+    const v = (o: { t: number; c: number; r: number; g: number; m: number }) =>
+      resolveDigitLossStage({
+        rawDigitTexts: o.t,
+        rawDigitValidCoords: o.c,
+        rawRightDigitTexts: o.r,
+        rawTrailingPageSpans: o.g,
+        markdownTrailingDigits: o.m,
+      });
+    // 右栏有数、Markdown 无数，但同时有数字死在坐标门 → 仍未定（不得判规范化丢失）
+    expect(v({ t: 3, c: 2, r: 2, g: 0, m: 0 })).toBe('coord-gate-undecided');
+    // 坐标齐：两口径皆零 → 未观察到可定位右栏数字（不是"引擎没识别"）
+    expect(v({ t: 2, c: 2, r: 0, g: 0, m: 0 })).toBe('no-locatable-right-digits');
+    // 坐标齐：行内嵌有数、Markdown 无数 → 规范化丢失（独立列为零也不影响）
+    expect(v({ t: 1, c: 1, r: 0, g: 1, m: 0 })).toBe('normalization-loss');
+    // 坐标齐：独立列有数、Markdown 无数 → 规范化丢失
+    expect(v({ t: 2, c: 2, r: 2, g: 0, m: 0 })).toBe('normalization-loss');
+    // 坐标齐：右栏有数、Markdown 有数 → 数字链到达 Markdown（成条另看 entries）
+    expect(v({ t: 2, c: 2, r: 2, g: 0, m: 2 })).toBe('digits-reached-markdown');
+    // 全零 → 无数字可定，归为未观察到
+    expect(v({ t: 0, c: 0, r: 0, g: 0, m: 0 })).toBe('no-locatable-right-digits');
+  });
+
+  it('countRawDigits：收窄前统计纯数字、合法坐标、右栏与行内嵌子集', () => {
+    expect(
+      countRawDigits([
+        { text: '6', x: 1, y: 2, width: 3, height: 4 },
+        { text: '18', x: 1, y: 2, width: 3, height: NaN },
+        { text: '第1課', x: 1, y: 2, width: 3, height: 4 },
+        null,
+        'junk',
+      ])
+    ).toEqual({ total: 2, validCoords: 1, rightDigits: 1, trailingDigits: 0 });
+    expect(countRawDigits(undefined)).toEqual({ total: 0, validCoords: 0, rightDigits: 0, trailingDigits: 0 });
+  });
+
+  it('countRawDigits：行尾数字行单记 trailing，不进右栏列', () => {
+    expect(
+      countRawDigits([
+        { text: '第1課……6', x: 50, y: 300, width: 460, height: 14 },
+        { text: '復習A42', x: 50, y: 400, width: 200, height: 14 },
+        { text: '会話：初めまして', x: 50, y: 500, width: 200, height: 14 },
+      ])
+    ).toEqual({ total: 2, validCoords: 2, rightDigits: 0, trailingDigits: 2 });
+  });
+
+  it('回归：第1課……6行span在、Markdown丢尾数 → normalization-loss（不得判无右栏数）', () => {
+    const raw = countRawDigits([
+      { text: '第1課……6', x: 50, y: 300, width: 460, height: 14 },
+      { text: '第2課', x: 50, y: 400, width: 60, height: 14 },
+    ]);
+    expect(raw).toEqual({ total: 1, validCoords: 1, rightDigits: 0, trailingDigits: 1 });
+    const summary = summarizePageStage(
+      16,
+      2,
+      raw,
+      [{ text: '第1課……6', x: 50, y: 300, width: 460, height: 14, source: 'ocr' }],
+      '## 第1課',
+      1
+    );
+    expect(summary.rawTrailingPageSpans).toBe(1);
+    expect(summary.markdownTrailingDigits).toBe(0);
+    expect(summary.verdict).toBe('normalization-loss');
+    expect(summary.verdict).not.toBe('no-locatable-right-digits');
+  });
+
+  it('summarizePageStage：空 spans 不崩，右栏判据退化为 0', () => {
+    const summary = summarizePageStage(
+      16,
+      0,
+      { total: 0, validCoords: 0, rightDigits: 0, trailingDigits: 0 },
+      [],
+      '',
+      0
+    );
+    expect(summary).toMatchObject({
+      page: 16,
+      rawSpans: 0,
+      rawDigitTexts: 0,
+      rawDigitValidCoords: 0,
+      rawRightDigitTexts: 0,
+      narrowedSpans: 0,
+      ocrRightDigitSpans: 0,
+      nativeRightDigitSpans: 0,
+      ocrRightDigitBoxes: [],
+      nativeRightDigitBoxes: [],
+      keptLines: 0,
+    });
   });
 });

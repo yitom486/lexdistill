@@ -13,7 +13,7 @@ import type { TocGeometrySpan } from '../application/pdf-import/toc-baseline.js'
  * 坐标系与探针一致：y-up（大 y 在页顶），字高 11–12pt、行距 22pt。
  */
 function span(text: string, x: number, y: number, width: number, height = 12, confidence = 0.9): TocGeometrySpan {
-  return { text, x, y, width, height, confidence };
+  return { text, x, y, width, height, confidence, source: 'ocr' };
 }
 
 describe('P3.2B 常量锁定', () => {
