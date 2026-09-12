@@ -17,6 +17,56 @@
 @theme inline {
   --default-transition-duration: var(--theme-transition-duration);
   --default-transition-timing-function: var(--theme-transition-timing-function);
+  /* P3.5 目录结果语义色板：组件只用 toc 语义工具类（bg/text/border 前缀），
+     禁止色值字面量（静态门禁锁定）；亮暗两套值是同一 token 的两副面孔。 */
+  --color-toc-surface: var(--toc-surface);
+  --color-toc-border: var(--toc-border);
+  --color-toc-muted: var(--toc-muted);
+  --color-toc-strong: var(--toc-strong);
+  --color-toc-add-bg: var(--toc-add-bg);
+  --color-toc-add-fg: var(--toc-add-fg);
+  --color-toc-add-border: var(--toc-add-border);
+  --color-toc-update-bg: var(--toc-update-bg);
+  --color-toc-update-fg: var(--toc-update-fg);
+  --color-toc-update-border: var(--toc-update-border);
+  --color-toc-remove-bg: var(--toc-remove-bg);
+  --color-toc-remove-fg: var(--toc-remove-fg);
+  --color-toc-remove-border: var(--toc-remove-border);
+  --color-toc-review-fg: var(--toc-review-fg);
+}
+
+:root {
+  --toc-surface: #ffffff;
+  --toc-border: #e7e2d9;
+  --toc-muted: #78716c;
+  --toc-strong: #1c1917;
+  --toc-add-bg: #ecfdf5;
+  --toc-add-fg: #047857;
+  --toc-add-border: #a7f3d0;
+  --toc-update-bg: #fffbeb;
+  --toc-update-fg: #b45309;
+  --toc-update-border: #fde68a;
+  --toc-remove-bg: #fef2f2;
+  --toc-remove-fg: #b91c1c;
+  --toc-remove-border: #fecaca;
+  --toc-review-fg: #7c3aed;
+}
+
+.dark {
+  --toc-surface: #1c1917;
+  --toc-border: #44403c;
+  --toc-muted: #a8a29e;
+  --toc-strong: #f5f5f4;
+  --toc-add-bg: #064e3b;
+  --toc-add-fg: #6ee7b7;
+  --toc-add-border: #065f46;
+  --toc-update-bg: #451a03;
+  --toc-update-fg: #fbbf24;
+  --toc-update-border: #92400e;
+  --toc-remove-bg: #450a0a;
+  --toc-remove-fg: #fca5a5;
+  --toc-remove-border: #7f1d1d;
+  --toc-review-fg: #c4b5fd;
 }
 
 /*

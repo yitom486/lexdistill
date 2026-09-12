@@ -50,6 +50,7 @@ function baseProps(overrides: Partial<TocReviewPanelViewProps> = {}): TocReviewP
     onEndChange: () => {},
     onExtract: () => {},
     onReview: () => {},
+    onOpenResult: () => {},
     onAdopt: () => {},
     onStartEdit: () => {},
     onUpdateEntry: () => {},

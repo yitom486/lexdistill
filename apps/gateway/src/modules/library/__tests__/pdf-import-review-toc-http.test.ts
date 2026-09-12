@@ -12,9 +12,11 @@ import { BusinessError, isOk, ok } from '@study-studio/shared';
 import { createApp } from '../../../transport/http/create-app.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import {
-  TOC_DRAFT_TOOL_NAME,
-  tocDraftReplaceAllTool,
-} from '../application/pdf-import/toc-draft-tool.js';
+  TOC_DRAFT_ADD_ENTRY_TOOL,
+  TOC_DRAFT_REMOVE_ENTRY_TOOL,
+  TOC_DRAFT_UPDATE_ENTRY_TOOL,
+  tocDraftOpTools,
+} from '../application/pdf-import/toc-draft-ops.js';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 
 /**
@@ -46,7 +48,13 @@ interface CapturedCall {
   input: AgentInput;
 }
 
-function makeFakeAdapter(steps: Array<{ kind: 'text'; text: string } | { kind: 'tool'; input: unknown }>, captured: CapturedCall[]): AgentAdapter {
+const TOOL_BY_KIND = {
+  add: TOC_DRAFT_ADD_ENTRY_TOOL,
+  update: TOC_DRAFT_UPDATE_ENTRY_TOOL,
+  remove: TOC_DRAFT_REMOVE_ENTRY_TOOL,
+} as const;
+
+function makeFakeAdapter(steps: Array<{ kind: 'text'; text: string } | { kind: 'tool'; tool: 'add' | 'update' | 'remove'; input: unknown }>, captured: CapturedCall[]): AgentAdapter {
   const sessionId = 'sess-http-mock';
   let callSeq = 0;
   const session: AgentSession = {
@@ -59,8 +67,10 @@ function makeFakeAdapter(steps: Array<{ kind: 'text'; text: string } | { kind: '
         } else {
           callSeq++;
           const callId = `call-http-${callSeq}`;
-          yield { type: 'TOOL_CALL_REQUESTED', callId, toolName: TOC_DRAFT_TOOL_NAME, input: step.input as Record<string, unknown> };
-          await tocDraftReplaceAllTool.execute(step.input, { userId: 'u1', sessionId });
+          const toolName = TOOL_BY_KIND[step.tool];
+          yield { type: 'TOOL_CALL_REQUESTED', callId, toolName, input: step.input as Record<string, unknown> };
+          const tool = tocDraftOpTools.find((t) => t.name === toolName);
+          if (tool) await tool.execute(step.input, { userId: 'u1', sessionId });
           yield { type: 'TOOL_CALL_COMPLETED', callId, result: { status: 'completed', success: true } };
         }
       }
@@ -190,12 +200,19 @@ describe('P3.4A POST review-toc（真 native + 假工具通道）', () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const captured: CapturedCall[] = [];
-    const toolInput = {
-      entries: [
-        { title: 'Lesson 1 Apple', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
-        { title: 'Lesson 2 Orange', printedPage: 30, level: 1, kind: 'lesson', confidence: 'medium' },
-      ],
-      warnings: [],
+    const toolAdd = {
+      title: 'Lesson 1 Supplement',
+      printedPage: 20,
+      level: 2,
+      kind: 'section',
+      reason: '图片可见漏项',
+      afterEntryId: 'b0',
+    };
+    const toolUpdate = {
+      entryId: 'b1',
+      expectedBefore: { title: 'Lesson 2 Orange' },
+      patch: { confidence: 'high' },
+      reason: '图片确认标题',
     };
     const app = createApp({
       repo,
@@ -203,7 +220,8 @@ describe('P3.4A POST review-toc（真 native + 假工具通道）', () => {
         agentAdapter: makeFakeAdapter(
           [
             { kind: 'text', text: '这是目录：{"entries": [{"title": "编造课", "printedPage": 999}], "warnings": []}' },
-            { kind: 'tool', input: toolInput },
+            { kind: 'tool', tool: 'add', input: toolAdd },
+            { kind: 'tool', tool: 'update', input: toolUpdate },
           ],
           captured
         ),
@@ -217,7 +235,7 @@ describe('P3.4A POST review-toc（真 native + 假工具通道）', () => {
     const body = res.json as {
       embedded: boolean;
       baseline: { status: string; verdict: string; entries: unknown[] };
-      draft: { entries: unknown[]; warnings: string[] } | null;
+      draft: { entries: Array<{ entryId: string; title: string }>; warnings: string[]; diff: Array<{ entryId: string; change: string }> } | null;
       reviewStatus: string;
       reviewError: unknown;
       diagnostics: { pagesRendered: number };
@@ -226,8 +244,9 @@ describe('P3.4A POST review-toc（真 native + 假工具通道）', () => {
     expect(body.baseline.verdict).toBe('usable');
     expect(body.reviewStatus).toBe('ok');
     expect(body.reviewError).toBeNull();
-    // draft 唯一来自工具入参，自然语言里的编造 JSON 无踪
-    expect(body.draft?.entries).toEqual(toolInput.entries);
+    // 合并三条 + diff 对齐，自然语言里的编造 JSON 无踪
+    expect(body.draft?.entries.map((e) => e.entryId)).toEqual(['b0', 'n0', 'b1']);
+    expect(body.draft?.diff.map((d) => `${d.entryId}:${d.change}`).join(',')).toBe('b0:keep,n0:add,b1:update');
     expect(JSON.stringify(body)).not.toContain('编造课');
     expect(body.diagnostics.pagesRendered).toBe(2);
     expect(captured.length).toBe(1);

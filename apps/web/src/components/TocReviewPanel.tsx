@@ -46,7 +46,6 @@ import {
   canRequestTocReview,
   decideExtractRequest,
   decideReviewRequest,
-  diffBaselineDraft,
   initialTocConfirmState,
   toEditableEntries,
   tocConfirmReducer,
@@ -57,6 +56,8 @@ import {
   type TocDiscoveryData,
   type TocReviewData,
 } from '../lib/toc-confirm-flow.js';
+import { TocReviewConfigDialog, TocReviewProgressDialog } from './toc/TocReviewDialogs.js';
+import { TocResultDialog } from './toc/TocResultDialog.js';
 
 /**
  * CMD-LINGUA-P4C：目录识别 → 选范围 → OCR 基线 → AI 审核草稿 → 人工确认。
@@ -145,6 +146,8 @@ export interface TocReviewPanelViewProps {
   onEndChange(value: string): void;
   onExtract(): void;
   onReview(): void;
+  /** 打开 AI 重建结果大 Dialog（有草稿时才启用）。 */
+  onOpenResult(): void;
   onAdopt(source: TocAdoptSource): void;
   onStartEdit(): void;
   onUpdateEntry(key: string, patch: Partial<EditableTocEntry>): void;
@@ -193,6 +196,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
     onEndChange,
     onExtract,
     onReview,
+    onOpenResult,
     onAdopt,
     onStartEdit,
     onUpdateEntry,
@@ -462,114 +466,33 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
             className="h-7 text-[11px] gap-1.5"
             disabled={reviewDisabled}
             onClick={onReview}
-            title={reviewDisabledReason ?? '把基线与目录页图一起送模型审一遍，只返回草稿'}
+            title={reviewDisabledReason ?? '打开 AI 重建目录配置（只读流程，不入库）'}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{reviewing ? '审核中…' : 'AI 审核目录'}</span>
+            <span>{reviewing ? '审核中…' : 'AI 重建目录…'}</span>
           </Button>
           {(reviewDisabledReason ?? reviewSizeHint) && (
             <span className="text-[11px] text-stone-400">{reviewDisabledReason ?? reviewSizeHint}</span>
           )}
         </div>
       )}
+      {review && !review.embedded && review.draft && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/5 p-2">
+          <p className="text-[11px] text-stone-600 dark:text-stone-300">
+            AI 草稿已就绪：基线 {review.diagnostics.baselineEntries} 条 → 合并 {review.diagnostics.draftEntries} 条
+            {review.draft.diff.filter((d) => d.change !== 'keep').length > 0 &&
+              `（含 ${review.draft.diff.filter((d) => d.change !== 'keep').length} 项变更）`}
+            ，需人工确认后采用。
+          </p>
+          <Button type="button" size="sm" className="h-7 text-[11px]" onClick={onOpenResult}>
+            打开 AI 草稿大结果
+          </Button>
+        </div>
+      )}
       {reviewError && (
         <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
           {reviewError}
         </p>
-      )}
-      {review && !review.embedded && review.draft && (
-        <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-2 space-y-1.5">
-          <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
-            <Badge variant="amber" className="text-[10px]">
-              AI 草稿，需人工确认
-            </Badge>
-            <span>基线 {review.diagnostics.baselineEntries} 条 → 草稿 {review.diagnostics.draftEntries} 条</span>
-          </p>
-          {(() => {
-            const diff = diffBaselineDraft(review.baseline.entries, review.draft?.entries ?? []);
-            return (
-              <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                与基线差异：新增 {diff.added} · 删除 {diff.removed} · 修改 {diff.modified} · 保留 {diff.kept}（需人工确认后采用）。
-              </p>
-            );
-          })()}
-          <div className="grid md:grid-cols-3 gap-1.5">
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-stone-500">OCR 原文证据（只读）</p>
-              <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
-                {review.baseline.pageEvidence.length === 0 && (
-                  <p className="text-[11px] text-stone-400">无证据行</p>
-                )}
-                {review.baseline.pageEvidence.map((evidence) => (
-                  <div
-                    key={`ev-${evidence.page}`}
-                    className="px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px]"
-                  >
-                    <p className="font-mono text-[10px] text-stone-400">PDF 第 {evidence.page} 页</p>
-                    <pre className="whitespace-pre-wrap break-words font-sans">
-                      {evidence.excerpt || '（本页无保留行）'}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-stone-500">OCR 基线</p>
-              <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
-                {review.baseline.entries.map((entry, index) => (
-                  <div
-                    key={`base-${entry.printedPage}-${index}`}
-                    className="px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px] truncate"
-                  >
-                    {entry.title}
-                    <span className="ml-1 font-mono text-stone-400">印{entry.printedPage}页</span>
-                  </div>
-                ))}
-                {review.baseline.entries.length === 0 && (
-                  <p className="text-[11px] text-stone-400">基线为空</p>
-                )}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-stone-500">AI 草稿（未保存）</p>
-              <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
-                {review.draft.entries.map((entry, index) => (
-                  <div
-                    key={`draft-${entry.printedPage}-${index}`}
-                    className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px]"
-                  >
-                    <span className="truncate">
-                      {entry.title}
-                      <span className="ml-1 font-mono text-stone-400" title="教材印刷页（书内页码），不是 PDF 物理页">
-                        印{entry.printedPage}页
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 items-center gap-1">
-                      <Badge variant="outline" className="text-[10px]">
-                        {kindLabel(entry.kind)}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px]" title="ai-draft=AI 按证据重建，需人工确认">
-                        AI草稿
-                      </Badge>
-                      <Badge variant={confidenceBadge(entry.confidence)} className="text-[10px]">
-                        {entry.confidence}
-                      </Badge>
-                    </span>
-                  </div>
-                ))}
-                {review.draft.entries.length === 0 && <p className="text-[11px] text-stone-400">草稿为空</p>}
-              </div>
-            </div>
-          </div>
-          {review.draft.warnings.length > 0 && (
-            <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-0.5">
-              <p className="font-bold">AI 存疑提醒：</p>
-              {review.draft.warnings.map((warning, index) => (
-                <p key={`warn-${index}`}>· {warning}</p>
-              ))}
-            </div>
-          )}
-        </div>
       )}
       {review && review.embedded && (
         <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300">
@@ -599,16 +522,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
             </Button>
           )}
           {review && !review.embedded && review.draft && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 text-[11px]"
-              disabled={extracting || reviewing}
-              onClick={() => onAdopt('ai')}
-            >
-              采用 AI 草稿
-            </Button>
+            <span className="text-[11px] text-stone-400">AI 草稿请在结果大 Dialog 内逐条确认采用（上方按钮打开）。</span>
           )}
           {baseline && !baseline.embedded && (
             <Button
@@ -897,7 +811,23 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
     setExtractProgress(cancelledTocExtractProgress);
   };
 
+  const [configOpen, setConfigOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
+
   const handleReview = (): void => {
+    // P3.5：按钮只打开配置 Dialog，真正的 mutate 由配置确认触发。
+    if (review.isPending) return;
+    const decision = decideReviewRequest(
+      source !== null,
+      flow.startText,
+      flow.endText,
+      baseline ? { embedded: baseline.embedded } : null
+    );
+    if (!decision.ok) return;
+    setConfigOpen(true);
+  };
+
+  const handleStartReview = (): void => {
     if (review.isPending) return;
     const decision = decideReviewRequest(
       source !== null,
@@ -907,8 +837,22 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
     );
     if (!decision.ok) return;
     if (!source) return;
-    review.mutate({ source, range: { startPage: decision.from, endPage: decision.to } });
+    setConfigOpen(false);
+    review.mutate(
+      { source, range: { startPage: decision.from, endPage: decision.to } },
+      {
+        onSuccess: (data) => {
+          if (!data.embedded && data.draft) setResultOpen(true);
+        },
+      }
+    );
   };
+
+  const rangeText = validation.ok
+    ? `${validation.from}–${validation.to}`
+    : baseline
+      ? `${baseline.range.fromPage}–${baseline.range.toPage}`
+      : '—';
 
   const handleAdopt = (adoptSource: TocAdoptSource): void => {
     if (adoptSource === 'ocr') {
@@ -917,16 +861,7 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       dispatch({ type: 'adopt', source: 'ocr', entries: toEditableEntries(baseline.entries) });
       return;
     }
-    if (adoptSource === 'manual') return;
-    if (!reviewData || reviewData.embedded || !reviewData.draft) return;
-    dispatch({
-      type: 'adopt',
-      source: 'ai',
-      entries: toEditableEntries(
-        reviewData.draft.entries,
-        reviewData.draft.entries.map((entry) => entry.confidence)
-      ),
-    });
+    // P3.5：AI 草稿采用只在结果大 Dialog 内逐条确认（页面临时状态），此处不再处理。
   };
 
   const handleStartManual = (): void => {
@@ -1012,6 +947,7 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       }
       onExtract={handleExtract}
       onReview={handleReview}
+      onOpenResult={() => setResultOpen(true)}
       onAdopt={handleAdopt}
       adoptDisabled={adoptDisabled}
       onStartManual={handleStartManual}
@@ -1022,6 +958,34 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       onUpdateEntry={(key, patch) => dispatch({ type: 'update-entry', key, patch })}
       onConfirm={handleConfirm}
       />
+      {baseline && !baseline.embedded && (
+        <TocReviewConfigDialog
+          open={configOpen}
+          onOpenChange={setConfigOpen}
+          rangeText={rangeText}
+          baseline={baseline}
+          evidencePages={baseline.pageEvidence.length}
+          sizeHint={
+            baseline && !baseline.embedded && validation.ok && !reviewSizeOk
+              ? `当前 ${validation.to - validation.from + 1} 页超出 AI 单次上限`
+              : null
+          }
+          reviewDisabledReason={reviewDisabledReason}
+          starting={review.isPending}
+          onStart={handleStartReview}
+          onClose={() => setConfigOpen(false)}
+        />
+      )}
+      <TocReviewProgressDialog open={review.isPending} onOpenChange={() => {}} rangeText={rangeText} />
+      {reviewData && !reviewData.embedded && reviewData.draft && (
+        <TocResultDialog
+          open={resultOpen}
+          onOpenChange={setResultOpen}
+          rangeText={rangeText}
+          baselineCount={reviewData.baseline.entries.length}
+          draft={reviewData.draft}
+        />
+      )}
       {flow.confirmed && (
         <TocAnchorPanel file={file} filePath={filePath} entries={flow.editedEntries} />
       )}

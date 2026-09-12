@@ -49,6 +49,7 @@ function baseProps(overrides: Partial<TocReviewPanelViewProps> = {}): TocReviewP
     onEndChange: () => {},
     onExtract: () => {},
     onReview: () => {},
+    onOpenResult: () => {},
     onAdopt: () => {},
     onStartEdit: () => {},
     onUpdateEntry: () => {},
@@ -100,8 +101,18 @@ const REVIEW: TocReviewData = {
   pageCount: 100,
   baseline: BASELINE,
   draft: {
-    entries: [{ title: '第1課', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' }],
+    entries: [{ entryId: 'b0', title: '第1課', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high', needsReview: false }],
     warnings: ['第3页有污渍'],
+    diff: [
+      {
+        entryId: 'b0',
+        change: 'keep',
+        before: { title: '第1課', printedPage: 12, level: 1, kind: 'lesson', confidence: null },
+        after: { title: '第1課', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
+        reason: null,
+        needsReview: false,
+      },
+    ],
   },
   reviewStatus: 'ok',
   reviewError: null,
@@ -192,13 +203,14 @@ describe('P4C TocReviewPanelView（SSR）', () => {
     expect(html).toContain('接受');
   });
 
-  it('审核结果：基线与草稿并排 + warnings + confidence + 需确认标注', () => {
+  it('审核结果： opener 行 + 计数，不再内嵌三栏', () => {
     const html = render({ baseline: BASELINE, review: REVIEW, reviewDisabled: false, reviewDisabledReason: null });
-    expect(html).toContain('OCR 基线');
-    expect(html).toContain('AI 草稿');
-    expect(html).toContain('需人工确认');
-    expect(html).toContain('high');
-    expect(html).toContain('第3页有污渍');
+    expect(html).toContain('AI 草稿已就绪');
+    expect(html).toContain('打开 AI 草稿大结果');
+    expect(html).toContain('合并 1 条');
+    expect(html).not.toContain('AI 草稿，需人工确认');
+    expect(html).not.toContain('与基线差异');
+    expect(html).not.toContain('AI 草稿（未保存）');
     expect(html).not.toContain('已保存');
   });
 
@@ -276,7 +288,7 @@ describe('P3.1B verdict/证据/手动/降级视图（SSR）', () => {
     expect(html).toContain('采用 OCR 基线');
   });
 
-  it('P3.2B 来源三态：几何块/文本/AI草稿 + 印刷非物理 title + 未定位计数', () => {
+  it('P3.2B 来源二态 + 未定位计数 + 结果入口（草稿明细只在 Dialog）', () => {
     const html = render({
       baseline: {
         ...BASELINE,
@@ -292,10 +304,10 @@ describe('P3.1B verdict/证据/手动/降级视图（SSR）', () => {
     });
     expect(html).toContain('几何块');
     expect(html).toContain('文本');
-    expect(html).toContain('AI草稿');
     expect(html).toContain('不是 PDF 物理页');
     expect(html).toContain('2 个标题未定位页码（待定，不猜）');
     expect(html).toContain('版式 1');
+    expect(html).toContain('打开 AI 草稿大结果');
   });
 
   it('编辑态有增删行按钮；空标题确认禁用', () => {
@@ -328,14 +340,12 @@ describe('P3.1B verdict/证据/手动/降级视图（SSR）', () => {
     expect(html).toContain('手动填写');
   });
 
-  it('成功草稿显示与基线差异计数', () => {
+  it('成功草稿只露出行入口与计数，明细在 Dialog', () => {
     const html = render({ baseline: BASELINE, review: REVIEW });
-    expect(html).toContain('新增 0');
-    expect(html).toContain('修改 0');
-    expect(html).toContain('保留 1');
-    expect(html).toContain('OCR 原文证据');
-    expect(html).toContain('OCR 基线');
-    expect(html).toContain('AI 草稿');
+    expect(html).toContain('AI 草稿已就绪');
+    expect(html).toContain('打开 AI 草稿大结果');
+    expect(html).not.toContain('与基线差异');
+    expect(html).not.toContain('AI 草稿（未保存）');
   });
 });
 

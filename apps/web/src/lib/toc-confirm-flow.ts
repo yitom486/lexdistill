@@ -77,16 +77,41 @@ export interface TocBaselineData {
 export type TocDraftConfidence = 'high' | 'medium' | 'low';
 
 export interface TocReviewDraftEntry {
+  /** 条目 id（基线 b{index} / 新增 n{counter}；旧网关缺席时按下标回填）。 */
+  entryId: string;
   title: string;
   printedPage: number;
   level: 1 | 2;
   kind: TocBaselineEntryKind;
-  confidence: TocDraftConfidence;
+  /** AI 置信度；null = OCR 原文保留、未经 AI 判定（展示为“—”）。 */
+  confidence: TocDraftConfidence | null;
+  needsReview: boolean;
+}
+
+export interface TocReviewDiffSide {
+  title: string;
+  printedPage: number;
+  level: 1 | 2;
+  kind: TocBaselineEntryKind;
+  confidence: TocDraftConfidence | null;
+}
+
+export type TocReviewDiffChange = 'keep' | 'add' | 'update' | 'remove';
+
+export interface TocReviewDiffRow {
+  entryId: string;
+  change: TocReviewDiffChange;
+  before: TocReviewDiffSide | null;
+  after: TocReviewDiffSide | null;
+  reason: string | null;
+  needsReview: boolean;
 }
 
 export interface TocReviewDraft {
   entries: TocReviewDraftEntry[];
   warnings: string[];
+  /** 按 entryId 对齐的 diff（旧网关缺席回填 []）。 */
+  diff: TocReviewDiffRow[];
 }
 
 export interface TocReviewData {
@@ -321,15 +346,66 @@ export function narrowTocBaseline(payload: unknown): TocBaselineData | null {
   };
 }
 
-function narrowDraftEntry(value: unknown): TocReviewDraftEntry | null {
+function narrowDraftEntry(value: unknown, fallbackId: string): TocReviewDraftEntry | null {
+  if (!isRecord(value)) return null;
+  const { entryId, title, printedPage, level, kind, confidence, needsReview } = value;
+  if (typeof title !== 'string' || !title) return null;
+  if (typeof printedPage !== 'number' || !Number.isSafeInteger(printedPage) || printedPage < 1) return null;
+  if (level !== 1 && level !== 2) return null;
+  if (kind !== 'lesson' && kind !== 'section') return null;
+  // confidence：新契约可为 null（OCR 保留行）；旧网关恒有值；非法值收敛为 null 不整包丢弃。
+  const narrowedConfidence: TocDraftConfidence | null =
+    confidence === 'high' || confidence === 'medium' || confidence === 'low' ? confidence : null;
+  return {
+    entryId: typeof entryId === 'string' && entryId ? entryId : fallbackId,
+    title,
+    printedPage,
+    level,
+    kind,
+    confidence: narrowedConfidence,
+    needsReview: needsReview === true,
+  };
+}
+
+function narrowDiffSide(value: unknown): TocReviewDiffSide | null {
   if (!isRecord(value)) return null;
   const { title, printedPage, level, kind, confidence } = value;
   if (typeof title !== 'string' || !title) return null;
   if (typeof printedPage !== 'number' || !Number.isSafeInteger(printedPage) || printedPage < 1) return null;
   if (level !== 1 && level !== 2) return null;
   if (kind !== 'lesson' && kind !== 'section') return null;
-  if (confidence !== 'high' && confidence !== 'medium' && confidence !== 'low') return null;
-  return { title, printedPage, level, kind, confidence };
+  return {
+    title,
+    printedPage,
+    level,
+    kind,
+    confidence: confidence === 'high' || confidence === 'medium' || confidence === 'low' ? confidence : null,
+  };
+}
+
+function narrowDiffRow(value: unknown): TocReviewDiffRow | null {
+  if (!isRecord(value)) return null;
+  const { entryId, change, before, after, reason, needsReview } = value;
+  if (typeof entryId !== 'string' || !entryId) return null;
+  if (change !== 'keep' && change !== 'add' && change !== 'update' && change !== 'remove') return null;
+  let narrowedBefore: TocReviewDiffSide | null = null;
+  if (before !== null && before !== undefined) {
+    narrowedBefore = narrowDiffSide(before);
+    if (!narrowedBefore) return null;
+  }
+  let narrowedAfter: TocReviewDiffSide | null = null;
+  if (after !== null && after !== undefined) {
+    narrowedAfter = narrowDiffSide(after);
+    if (!narrowedAfter) return null;
+  }
+  return {
+    entryId,
+    change,
+    before: narrowedBefore,
+    after: narrowedAfter,
+    reason: typeof reason === 'string' && reason ? reason : null,
+    needsReview: needsReview === true,
+  };
 }
 
 /** review-toc 负载收窄（纯函数；draft 为 null 仅 embedded 时合法）。 */
@@ -384,8 +460,8 @@ export function narrowTocReview(payload: unknown): TocReviewData | null {
     };
   }
   if (!isRecord(draft) || !Array.isArray(draft.entries) || !Array.isArray(draft.warnings)) return null;  const entries: TocReviewDraftEntry[] = [];
-  for (const item of draft.entries) {
-    const entry = narrowDraftEntry(item);
+  for (let index = 0; index < draft.entries.length; index++) {
+    const entry = narrowDraftEntry(draft.entries[index], `draft-${index}`);
     if (!entry) return null;
     entries.push(entry);
   }
@@ -394,12 +470,23 @@ export function narrowTocReview(payload: unknown): TocReviewData | null {
     if (typeof item !== 'string') return null;
     warnings.push(item);
   }
+  // diff 缺席（旧网关）回填 []；存在则逐行收窄（坏行整包拒绝，与条目同口径）。
+  const diff: TocReviewDiffRow[] = [];
+  const diffRaw = (draft as Record<string, unknown>).diff;
+  if (diffRaw !== undefined) {
+    if (!Array.isArray(diffRaw)) return null;
+    for (const item of diffRaw) {
+      const row = narrowDiffRow(item);
+      if (!row) return null;
+      diff.push(row);
+    }
+  }
   return {
     embedded: false,
     range: narrowedRange,
     pageCount,
     baseline: narrowedBaseline,
-    draft: { entries, warnings },
+    draft: { entries, warnings, diff },
     reviewStatus,
     reviewError,
     diagnostics: { pagesRequested, pagesRendered, baselineEntries, draftEntries },
@@ -442,52 +529,6 @@ export function summarizeConfirmedEntries(
   const sections = entries.length - lessons;
   const sourceLabel = source === 'ocr' ? 'OCR 基线' : source === 'ai' ? 'AI 草稿' : '手动填写';
   return `已确认${entries.length} 条（${lessons} 课 · ${sections} 节），来源：${sourceLabel}，目录页第 ${range.fromPage}–${range.toPage} 页。`;
-}
-
-/** 基线 vs 草稿差异计数（纯函数）：按标题+印刷页匹配，多重行按多重集结算。 */
-export interface TocDraftDiff {
-  added: number;
-  removed: number;
-  kept: number;
-  /**
-   * P3.2 修改行：键不同但标题或页码有一半对上的草稿行（去重计数，
-   * 已计入 kept 的不重复计；added 只剩完全无关联的新行）。
-   */
-  modified: number;
-}
-
-export function diffBaselineDraft(
-  baseline: Array<{ title: string; printedPage: number }>,
-  draft: Array<{ title: string; printedPage: number }>
-): TocDraftDiff {
-  const keyOf = (e: { title: string; printedPage: number }): string => `${e.title}@@${e.printedPage}`;
-  const baseCounts = new Map<string, number>();
-  const baseTitles = new Set<string>();
-  const basePages = new Set<number>();
-  for (const entry of baseline) {
-    const key = keyOf(entry);
-    baseCounts.set(key, (baseCounts.get(key) ?? 0) + 1);
-    baseTitles.add(entry.title);
-    basePages.add(entry.printedPage);
-  }
-  let kept = 0;
-  let added = 0;
-  let modified = 0;
-  for (const entry of draft) {
-    const key = keyOf(entry);
-    const remaining = baseCounts.get(key) ?? 0;
-    if (remaining > 0) {
-      kept++;
-      baseCounts.set(key, remaining - 1);
-    } else if (baseTitles.has(entry.title) || basePages.has(entry.printedPage)) {
-      modified++;
-    } else {
-      added++;
-    }
-  }
-  let removed = 0;
-  for (const remaining of baseCounts.values()) removed += remaining;
-  return { added, removed, kept, modified };
 }
 
 export interface TocConfirmState {

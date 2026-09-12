@@ -18,16 +18,19 @@ import {
   isTocDraftToolCall,
   resolveTocReviewModelOptions,
   reviewTocWithAgent,
-  type TocReviewDraftEntry,
 } from '../application/pdf-import/toc-review-agent.js';
 import {
-  TOC_DRAFT_TOOL_NAME,
-  tocDraftReplaceAllTool,
+  TOC_DRAFT_ADD_ENTRY_TOOL,
+  TOC_DRAFT_REMOVE_ENTRY_TOOL,
+  TOC_DRAFT_UPDATE_ENTRY_TOOL,
+  tocDraftOpTools,
   type TocReviewToolEvent,
-} from '../application/pdf-import/toc-draft-tool.js';
+} from '../application/pdf-import/toc-draft-ops.js';
 
 /**
- * CMD-LINGUA-P3.4A reviewTocWithAgent 单测（全内存 mock，不调真实模型）。
+ * CMD-LINGUA-P3.5 reviewTocWithAgent 单测（全内存 mock，不调真实模型）。
+ * 假通道按工具名执行真实增量工具（生产 adapter 内自执行行为）；基线暂存
+ * 由被测 reviewTocWithAgent 经 initTocDraftSession 初始化（b{index}）。
  *
  * 假通道建模生产 adapter 的固定行为（codex-adapter 内自执行，不由 review
  * loop 执行）：脚本出现 tool 步骤即同步跑**真实**工具 execute（校验 + 会话
@@ -94,12 +97,18 @@ function agentMock(args: {
   };
 }
 
-/** 工具通道脚本步骤（假通道用真实工具 execute，见文件头）。 */
+/** 工具通道脚本步骤（假通道按名执行真实增量工具，见文件头）。 */
 type ToolScriptStep =
   | { kind: 'text'; text: string }
-  | { kind: 'tool'; input: unknown }
+  | { kind: 'tool'; tool: 'add' | 'update' | 'remove'; input: unknown }
   | { kind: 'approval'; action: string; description: string }
   | { kind: 'error'; error: BusinessError };
+
+const TOOL_BY_KIND = {
+  add: TOC_DRAFT_ADD_ENTRY_TOOL,
+  update: TOC_DRAFT_UPDATE_ENTRY_TOOL,
+  remove: TOC_DRAFT_REMOVE_ENTRY_TOOL,
+} as const;
 
 interface AgentCalls {
   create: number;
@@ -138,17 +147,18 @@ function mockToolAdapter(args: {
           yield { type: 'TEXT_DELTA', delta: step.text };
         } else if (step.kind === 'tool') {
           const callId = `call-${n++}`;
+          const toolName = TOOL_BY_KIND[step.tool];
           yield {
             type: 'TOOL_CALL_REQUESTED',
             callId,
-            toolName: TOC_DRAFT_TOOL_NAME,
+            toolName,
             input: step.input as Record<string, unknown>,
           };
-          // 生产行为：adapter 内自执行（全局 registry → 本工具 execute）。
-          const execRes = await tocDraftReplaceAllTool.execute(step.input, {
-            userId: 'u1',
-            sessionId,
-          });
+          // 生产行为：adapter 内自执行（全局 registry → 对应增量工具 execute）。
+          const tool = tocDraftOpTools.find((t) => t.name === toolName);
+          const execRes = tool
+            ? await tool.execute(step.input, { userId: 'u1', sessionId })
+            : { ok: false as const, error: new BusinessError('E_TOOL_NOT_FOUND', '未知工具', 'TOOL_EXECUTION') };
           yield {
             type: 'TOOL_CALL_COMPLETED',
             callId,
@@ -216,12 +226,21 @@ function twoPageOcr(): Map<number, string> {
   ]);
 }
 
-const GOOD_TOOL_INPUT: { entries: TocReviewDraftEntry[]; warnings: string[] } = {
-  entries: [
-    { title: '第1課 会話', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
-    { title: '第2課 文法', printedPage: 20, level: 1, kind: 'lesson', confidence: 'high' },
-  ],
-  warnings: [],
+/** 混合变更夹具（add + update + keep）：基线 b0/b1，新增插中间，b1 标置信度。 */
+const GOOD_ADD = {
+  title: '第2課 文法',
+  printedPage: 20,
+  level: 1,
+  kind: 'lesson',
+  confidence: 'high',
+  reason: '图片可见漏项',
+  afterEntryId: 'b0',
+};
+const GOOD_UPDATE = {
+  entryId: 'b1',
+  expectedBefore: { title: '文法 まとめ' },
+  patch: { confidence: 'high' },
+  reason: '图片确认标题无误',
 };
 
 function reviewDeps(inspectorCalls: InspectorCalls, calls: AgentCalls, steps: ToolScriptStep[], extra?: Record<string, unknown>) {
@@ -235,16 +254,25 @@ function reviewDeps(inspectorCalls: InspectorCalls, calls: AgentCalls, steps: To
   };
 }
 
-describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
-  it('P3 基线 + 两张 PNG 进入同一次 AgentInput；工具声明且自然语言被忽略', async () => {
+describe('P3.5 reviewTocWithAgent（增量工具通道 mock）', () => {
+  it('P3 基线 + 两张 PNG 进入同一次 AgentInput；增量变更且自然语言被忽略', async () => {
     const inspectorCalls = newCalls();
     const agentCalls = newAgentCalls();
     const chatter = '好的，这是整理结果：{"entries": [{"title": "编造课", "printedPage": 999, "level": 1, "kind": "lesson", "confidence": "high"}], "warnings": []}请核对。';
     const events: TocReviewToolEvent[] = [];
     const res = await reviewTocWithAgent(
-      reviewDeps(inspectorCalls, agentCalls, [{ kind: 'text', text: chatter }, { kind: 'tool', input: GOOD_TOOL_INPUT }], {
-        toolObserver: { emit: (e: TocReviewToolEvent) => events.push(e) },
-      }),
+      reviewDeps(
+        inspectorCalls,
+        agentCalls,
+        [
+          { kind: 'text', text: chatter },
+          { kind: 'tool', tool: 'add', input: GOOD_ADD },
+          { kind: 'tool', tool: 'update', input: GOOD_UPDATE },
+        ],
+        {
+          toolObserver: { emit: (e: TocReviewToolEvent) => events.push(e) },
+        }
+      ),
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
     );
     expect(isOk(res)).toBe(true);
@@ -253,16 +281,22 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
     expect(out.embedded).toBe(false);
     expect(out.reviewStatus).toBe('ok');
     expect(out.reviewError).toBeNull();
-    // draft 唯一来自工具入参：自然语言里的 JSON（编造课/999）必须无踪
-    expect(out.draft?.entries).toEqual(GOOD_TOOL_INPUT.entries);
+    // 合并三条：b0 keep + n0 add + b1 update；自然语言里的 JSON（编造课/999）必须无踪
+    expect(out.draft?.entries.map((e) => e.entryId)).toEqual(['b0', 'n0', 'b1']);
+    expect(out.draft?.entries[1]).toMatchObject({ title: '第2課 文法', printedPage: 20, confidence: 'high' });
+    expect(out.draft?.entries[2]).toMatchObject({ title: '文法 まとめ', confidence: 'high' });
+    expect(out.draft?.diff.map((d) => `${d.entryId}:${d.change}`).join(',')).toBe('b0:keep,n0:add,b1:update');
+    expect(out.draft?.diff.find((d) => d.entryId === 'n0')?.reason).toBe('图片可见漏项');
     expect(out.draft?.warnings).toEqual([]);
     expect(JSON.stringify(out)).not.toContain('编造课');
     expect(JSON.stringify(out)).not.toContain('999');
-    expect(out.diagnostics).toMatchObject({ pagesRendered: 2, baselineEntries: 2, draftEntries: 2 });
+    expect(out.diagnostics).toMatchObject({ pagesRendered: 2, baselineEntries: 2, draftEntries: 3 });
     // 基线未被草稿合并
     expect(out.baseline.entries.length).toBe(2);
-    // 工具声明进 createSession
-    expect(agentCalls.toolsOffered).toEqual([[TOC_DRAFT_TOOL_NAME]]);
+    // 工具声明进 createSession（三工具，无其他）
+    expect(agentCalls.toolsOffered).toEqual([
+      [TOC_DRAFT_ADD_ENTRY_TOOL, TOC_DRAFT_UPDATE_ENTRY_TOOL, TOC_DRAFT_REMOVE_ENTRY_TOOL],
+    ]);
     // 单轮：附件一次，OCR/渲染各一次（无文本纠错第二轮）
     expect(agentCalls.create).toBe(1);
     expect(agentCalls.inputs.length).toBe(1);
@@ -271,43 +305,50 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
     expect(agentInput.attachments?.length).toBe(2);
     expect(inspectorCalls.ocr).toBe(1);
     expect(inspectorCalls.render).toBe(1);
-    // 可观测序列：ready → offered → received → draft_ready（计数，无原文）
+    // 可观测序列：ready → offered×3 → received×2 → draft_ready（计数，无原文）
     expect(events.map((e) => e.type)).toEqual([
       'agent_session_ready',
       'tool_offered',
+      'tool_offered',
+      'tool_offered',
+      'tool_call_received',
       'tool_call_received',
       'draft_ready',
     ]);
     expect(JSON.stringify(events)).not.toContain('编造课');
-    // systemPrompt 要求工具提交、不再要求回复 JSON
-    expect(agentCalls.systemPrompts[0]).toContain(TOC_DRAFT_TOOL_NAME);
-    expect(agentCalls.systemPrompts[0]).toContain('printedPage');
+    // systemPrompt 要求增量工具、不再要求回复 JSON
+    expect(agentCalls.systemPrompts[0]).toContain(TOC_DRAFT_ADD_ENTRY_TOOL);
+    expect(agentCalls.systemPrompts[0]).toContain('AI 重建目录');
   });
 
   it('工具参数非法一次后纠正 → 成功；失败计数可观测', async () => {
     const inspectorCalls = newCalls();
     const agentCalls = newAgentCalls();
     const events: TocReviewToolEvent[] = [];
-    const badInput = {
-      entries: [
-        { title: '第1課 会話', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
-        { title: '第2課 文法', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
-      ],
-      warnings: [],
-    };
+    const badAdd = { title: '第9課 あ', printedPage: 0, level: 1, kind: 'lesson', reason: 'x' };
     const res = await reviewTocWithAgent(
-      reviewDeps(inspectorCalls, agentCalls, [{ kind: 'tool', input: badInput }, { kind: 'tool', input: GOOD_TOOL_INPUT }], {
-        toolObserver: { emit: (e: TocReviewToolEvent) => events.push(e) },
-      }),
+      reviewDeps(
+        inspectorCalls,
+        agentCalls,
+        [
+          { kind: 'tool', tool: 'add', input: badAdd },
+          { kind: 'tool', tool: 'add', input: GOOD_ADD },
+        ],
+        {
+          toolObserver: { emit: (e: TocReviewToolEvent) => events.push(e) },
+        }
+      ),
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
     );
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.reviewStatus).toBe('ok');
-    expect(res.value.draft?.entries.length).toBe(2);
+    expect(res.value.draft?.entries.length).toBe(3);
     expect(agentCalls.inputs.length).toBe(1);
     expect(events.map((e) => e.type)).toEqual([
       'agent_session_ready',
+      'tool_offered',
+      'tool_offered',
       'tool_offered',
       'tool_call_received',
       'tool_call_received',
@@ -315,24 +356,26 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
       'draft_ready',
     ]);
     const failed = events.find((e) => e.type === 'tool_validation_failed');
-    expect(failed).toMatchObject({ type: 'tool_validation_failed', code: 'E_TOC_DRAFT_ORDER' });
+    expect(failed).toMatchObject({ type: 'tool_validation_failed', code: 'E_TOC_DRAFT_PAGE' });
   });
 
   it('两次非法 → unavailable E_TOC_REVIEW_TOOL_INVALID，基线保留', async () => {
     const inspectorCalls = newCalls();
     const agentCalls = newAgentCalls();
     const events: TocReviewToolEvent[] = [];
-    const badInput = {
-      entries: [
-        { title: '   ', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
-        { title: '第2課 文法', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
-      ],
-      warnings: [],
-    };
+    const badAdd = { title: '   ', printedPage: 12, level: 1, kind: 'lesson', reason: 'x' };
     const res = await reviewTocWithAgent(
-      reviewDeps(inspectorCalls, agentCalls, [{ kind: 'tool', input: badInput }, { kind: 'tool', input: badInput }], {
-        toolObserver: { emit: (e: TocReviewToolEvent) => events.push(e) },
-      }),
+      reviewDeps(
+        inspectorCalls,
+        agentCalls,
+        [
+          { kind: 'tool', tool: 'add', input: badAdd },
+          { kind: 'tool', tool: 'add', input: badAdd },
+        ],
+        {
+          toolObserver: { emit: (e: TocReviewToolEvent) => events.push(e) },
+        }
+      ),
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
     );
     expect(isOk(res)).toBe(true);
@@ -369,9 +412,9 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
     const agentCalls = newAgentCalls();
     const res = await reviewTocWithAgent(
       reviewDeps(inspectorCalls, agentCalls, [
-        { kind: 'approval', action: 'call toc_draft_replace_all', description: '提交目录草稿 toc_draft_replace_all' },
+        { kind: 'approval', action: 'call toc_draft_add_entry', description: '新增目录条目 toc_draft_add_entry' },
         { kind: 'approval', action: 'delete everything', description: '无关审批' },
-        { kind: 'tool', input: GOOD_TOOL_INPUT },
+        { kind: 'tool', tool: 'add', input: GOOD_ADD },
       ]),
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
     );
@@ -495,7 +538,7 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
             agentMock({ pageCount: 371, calls: newCalls(), ocrMarkdown: twoPageOcr() }),
           adapter: mockToolAdapter({
             calls: newAgentCalls(),
-            steps: [{ kind: 'tool', input: GOOD_TOOL_INPUT }],
+            steps: [{ kind: 'tool', tool: 'add', input: GOOD_ADD }],
           }),
         },
         { userId: PROBE_USER, filename: 'secret-path-toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
@@ -545,9 +588,10 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
     expect(message).not.toContain('iVBOR');
   });
 
-  it('isTocDraftToolCall：精确名与 sanitize 变体命中，他名拒绝', () => {
-    expect(isTocDraftToolCall('toc_draft_replace_all')).toBe(true);
-    expect(isTocDraftToolCall('toc.draft.replace.all')).toBe(true);
+  it('isTocDraftToolCall：三工具精确名与 sanitize 变体命中，他名拒绝', () => {
+    expect(isTocDraftToolCall('toc_draft_add_entry')).toBe(true);
+    expect(isTocDraftToolCall('toc.draft.update.entry')).toBe(true);
+    expect(isTocDraftToolCall('toc_draft_replace_all')).toBe(false);
     expect(isTocDraftToolCall('other_tool')).toBe(false);
     expect(isTocDraftToolCall('')).toBe(false);
   });
@@ -574,7 +618,7 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
     const inspectorCalls = newCalls();
     const agentCalls = newAgentCalls();
     const res = await reviewTocWithAgent(
-      reviewDeps(inspectorCalls, agentCalls, [{ kind: 'tool', input: GOOD_TOOL_INPUT }], {
+      reviewDeps(inspectorCalls, agentCalls, [{ kind: 'tool', tool: 'add', input: GOOD_ADD }], {
         modelOptions: { model: 'toc-model', effort: 'high' },
       }),
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
@@ -591,7 +635,7 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
     const inspectorCalls = newCalls();
     const agentCalls = newAgentCalls();
     const res = await reviewTocWithAgent(
-      reviewDeps(inspectorCalls, agentCalls, [{ kind: 'tool', input: GOOD_TOOL_INPUT }]),
+      reviewDeps(inspectorCalls, agentCalls, [{ kind: 'tool', tool: 'add', input: GOOD_ADD }]),
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
     );
     expect(isOk(res)).toBe(true);
@@ -603,7 +647,7 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
 
   it('buildTocReviewRetryMessage 纯函数：只含原因码，不含标题原文', () => {
     const empty = buildTocReviewRetryMessage([]);
-    expect(empty).toContain('toc_draft_replace_all');
+    expect(empty).toContain('目录工具');
     expect(empty).toContain('未收到工具调用');
     const withCodes = buildTocReviewRetryMessage(['E_TOC_DRAFT_ORDER']);
     expect(withCodes).toContain('E_TOC_DRAFT_ORDER');
@@ -623,7 +667,7 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
         adapter: mockToolAdapter({
           calls: agentCalls,
           steps: [{ kind: 'text', text: '稍等，我看看' }],
-          turns: [[{ kind: 'text', text: '稍等，我看看' }], [{ kind: 'tool', input: GOOD_TOOL_INPUT }]],
+          turns: [[{ kind: 'text', text: '稍等，我看看' }], [{ kind: 'tool', tool: 'add', input: GOOD_ADD }]],
         }),
         toolObserver: { emit: (e: TocReviewToolEvent) => events.push(e) },
       },
@@ -632,14 +676,16 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.reviewStatus).toBe('ok');
-    expect(res.value.draft?.entries.length).toBe(2);
+    expect(res.value.draft?.entries.length).toBe(3);
     expect(agentCalls.inputs.length).toBe(2);
-    // 次轮消息点名工具且不带附件（图片已在 thread 内）
+    // 次轮消息点名目录工具且不带附件（图片已在 thread 内）
     const second = agentCalls.inputs[1] as { message?: unknown; attachments?: unknown[] } | undefined;
-    expect(typeof second?.message === 'string' && second.message.includes('toc_draft_replace_all')).toBe(true);
+    expect(typeof second?.message === 'string' && second.message.includes('目录工具')).toBe(true);
     expect(second?.attachments).toEqual([]);
     expect(events.map((e) => e.type)).toEqual([
       'agent_session_ready',
+      'tool_offered',
+      'tool_offered',
       'tool_offered',
       'tool_call_received',
       'draft_ready',
@@ -649,13 +695,7 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
   it('P3.4B-FIX4 首轮一次非法 + 次轮纠正 → 成功（预算跨轮累计）', async () => {
     const inspectorCalls = newCalls();
     const agentCalls = newAgentCalls();
-    const badInput = {
-      entries: [
-        { title: '第1課 会話', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
-        { title: '第2課 文法', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
-      ],
-      warnings: [],
-    };
+    const badAdd = { title: '第9課 あ', printedPage: 0, level: 1, kind: 'lesson', reason: 'x' };
     const res = await reviewTocWithAgent(
       {
         loadInspector: async () => {
@@ -664,8 +704,8 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
         },
         adapter: mockToolAdapter({
           calls: agentCalls,
-          steps: [{ kind: 'tool', input: badInput }],
-          turns: [[{ kind: 'tool', input: badInput }], [{ kind: 'tool', input: GOOD_TOOL_INPUT }]],
+          steps: [{ kind: 'tool', tool: 'add', input: badAdd }],
+          turns: [[{ kind: 'tool', tool: 'add', input: badAdd }], [{ kind: 'tool', tool: 'add', input: GOOD_ADD }]],
         }),
       },
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
@@ -673,20 +713,15 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.reviewStatus).toBe('ok');
-    expect(res.value.draft?.entries.length).toBe(2);
+    expect(res.value.draft?.entries.length).toBe(3);
     expect(agentCalls.inputs.length).toBe(2);
   });
 
-  it('P3.4B-FIX4 首轮已耗尽预算 → 不开第二轮（不浪费模型轮次）', async () => {
+  it('P3.4B-FIX4 预算耗尽 → 不开第二轮（不浪费模型轮次）', async () => {
     const inspectorCalls = newCalls();
     const agentCalls = newAgentCalls();
-    const badInput = {
-      entries: [
-        { title: '   ', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
-        { title: '第2課 文法', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
-      ],
-      warnings: [],
-    };
+    const badAdd = { title: '··· 15', printedPage: 9, level: 1, kind: 'lesson', reason: 'x' };
+    const badSteps = Array.from({ length: 32 }, () => ({ kind: 'tool', tool: 'add', input: badAdd }) as const);
     const res = await reviewTocWithAgent(
       {
         loadInspector: async () => {
@@ -695,8 +730,8 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
         },
         adapter: mockToolAdapter({
           calls: agentCalls,
-          steps: [{ kind: 'tool', input: badInput }],
-          turns: [[{ kind: 'tool', input: badInput }, { kind: 'tool', input: badInput }]],
+          steps: [{ kind: 'tool', tool: 'add', input: badAdd }],
+          turns: [badSteps.map((s) => ({ ...s }))],
         }),
       },
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
@@ -705,6 +740,7 @@ describe('P3.4A reviewTocWithAgent（工具通道 mock）', () => {
     if (!isOk(res)) return;
     expect(res.value.reviewStatus).toBe('unavailable');
     expect(res.value.reviewError?.code).toBe('E_TOC_REVIEW_TOOL_INVALID');
+    // 32 次调用后预算耗尽：只跑首轮
     expect(agentCalls.inputs.length).toBe(1);
   });
 });
@@ -745,7 +781,7 @@ describe('P3.2 reviewable 门与证据格式化', () => {
     expect(big.endsWith('…(证据过长已截断)')).toBe(true);
   });
 
-  it('thin + 有效证据 → 工具重建 ≥2 条草稿（证据进输入，无新增 OCR）', async () => {
+  it('thin + 有效证据 → 增量重建 ≥2 条草稿（证据进输入，无新增 OCR）', async () => {
     const inspectorCalls = newCalls();
     const agentCalls = newAgentCalls();
     const res = await reviewTocWithAgent(
@@ -759,7 +795,16 @@ describe('P3.2 reviewable 门与证据格式化', () => {
             ocrMarkdown: new Map([[1, '目次\n第1課 はじめまして 3\n第2課']]),
           });
         },
-        adapter: mockToolAdapter({ calls: agentCalls, steps: [{ kind: 'tool', input: GOOD_TOOL_INPUT }] }),
+        adapter: mockToolAdapter({
+          calls: agentCalls,
+          steps: [
+            {
+              kind: 'tool',
+              tool: 'add',
+              input: { title: '第2課 つづき', printedPage: 9, level: 1, kind: 'lesson', reason: '证据行', afterEntryId: 'b0' },
+            },
+          ],
+        }),
       },
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 1 }
     );
@@ -768,12 +813,14 @@ describe('P3.2 reviewable 门与证据格式化', () => {
     expect(res.value.baseline.verdict).toBe('thin');
     expect(res.value.reviewStatus).toBe('ok');
     expect(res.value.draft?.entries.length).toBe(2);
+    expect(res.value.draft?.diff.map((d) => d.change)).toEqual(['keep', 'add']);
     expect(agentCalls.create).toBe(1);
     expect(agentCalls.inputs.length).toBe(1);
     const firstInput = agentCalls.inputs[0] as { message?: unknown } | undefined;
     const message = typeof firstInput?.message === 'string' ? firstInput.message : '';
     expect(message).toContain('--- PDF第1页 ---');
     expect(message).toContain('thin');
+    expect(message).toContain('[b0]');
   });
 
   it('thin 但证据不足 → 不调用 AI（E_TOC_EVIDENCE_INSUFFICIENT）', async () => {
@@ -790,7 +837,7 @@ describe('P3.2 reviewable 门与证据格式化', () => {
             ocrMarkdown: new Map([[1, '第1課 3']]),
           });
         },
-        adapter: mockToolAdapter({ calls: agentCalls, steps: [{ kind: 'tool', input: GOOD_TOOL_INPUT }] }),
+        adapter: mockToolAdapter({ calls: agentCalls, steps: [{ kind: 'tool', tool: 'add', input: GOOD_ADD }] }),
       },
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 1 }
     );
@@ -800,37 +847,24 @@ describe('P3.2 reviewable 门与证据格式化', () => {
     expect(agentCalls.create).toBe(0);
   });
 
-  it('工具参数两次非法 → unavailable E_TOC_REVIEW_TOOL_INVALID（倒退/空标题/纯数字）', async () => {
-    const cases: Array<{ input: unknown; code: string }> = [
+  it('工具参数非法 → unavailable E_TOC_REVIEW_TOOL_INVALID（TITLE/PAGE/STALE）', async () => {
+    const cases: Array<{ tool: 'add' | 'update' | 'remove'; input: unknown }> = [
       {
-        input: {
-          entries: [
-            { title: '第1課', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
-            { title: '第2課', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
-          ],
-          warnings: [],
-        },
-        code: 'E_TOC_DRAFT_ORDER',
+        tool: 'add',
+        input: { title: '   ', printedPage: 40, level: 1, kind: 'lesson', reason: 'x' },
       },
       {
-        input: {
-          entries: [
-            { title: '   ', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
-            { title: '第2課', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
-          ],
-          warnings: [],
-        },
-        code: 'E_TOC_DRAFT_TITLE',
+        tool: 'add',
+        input: { title: '第9課 あ', printedPage: 0, level: 1, kind: 'lesson', reason: 'x' },
       },
       {
+        tool: 'update',
         input: {
-          entries: [
-            { title: '123', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' },
-            { title: '456', printedPage: 30, level: 1, kind: 'lesson', confidence: 'high' },
-          ],
-          warnings: [],
+          entryId: 'b0',
+          expectedBefore: { printedPage: 999 },
+          patch: { title: '第1課 X' },
+          reason: 'x',
         },
-        code: 'E_TOC_DRAFT_TITLE',
       },
     ];
     for (const item of cases) {
@@ -843,7 +877,20 @@ describe('P3.2 reviewable 门与证据格式化', () => {
             inspectorCalls.load++;
             return agentMock({ pageCount: 371, calls: inspectorCalls, ocrMarkdown: twoPageOcr() });
           },
-          adapter: mockToolAdapter({ calls: agentCalls, steps: [{ kind: 'tool', input: item.input }, { kind: 'tool', input: item.input }] }),
+          adapter: mockToolAdapter({
+            calls: agentCalls,
+            steps: [
+              { kind: 'tool', tool: item.tool, input: item.input },
+              { kind: 'tool', tool: item.tool, input: item.input },
+            ],
+            turns: [
+              [
+                { kind: 'tool', tool: item.tool, input: item.input },
+                { kind: 'tool', tool: item.tool, input: item.input },
+              ],
+              [],
+            ],
+          }),
           toolObserver: { emit: (e: TocReviewToolEvent) => events.push(e) },
         },
         { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
@@ -858,7 +905,7 @@ describe('P3.2 reviewable 门与证据格式化', () => {
     }
   });
 
-  it('P3.2A empty 但证据有目录信号 → 工具重建 ≥2 条（无同行页码行）', async () => {
+  it('P3.2A empty 但证据有目录信号 → 增量重建 ≥2 条（无同行页码行）', async () => {
     const inspectorCalls = newCalls();
     const agentCalls = newAgentCalls();
     const res = await reviewTocWithAgent(
@@ -872,7 +919,13 @@ describe('P3.2 reviewable 门与证据格式化', () => {
             ocrMarkdown: new Map([[1, '目次\n第1課 はじめまして\n第2課 これは本です']]),
           });
         },
-        adapter: mockToolAdapter({ calls: agentCalls, steps: [{ kind: 'tool', input: GOOD_TOOL_INPUT }] }),
+        adapter: mockToolAdapter({
+          calls: agentCalls,
+          steps: [
+            { kind: 'tool', tool: 'add', input: { title: '第1課 はじめまして', printedPage: 5, level: 1, kind: 'lesson', reason: '证据行' } },
+            { kind: 'tool', tool: 'add', input: { title: '第2課 これは本です', printedPage: 9, level: 1, kind: 'lesson', reason: '证据行' } },
+          ],
+        }),
       },
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 1 }
     );
@@ -881,7 +934,8 @@ describe('P3.2 reviewable 门与证据格式化', () => {
     expect(res.value.baseline.verdict).toBe('empty');
     expect(res.value.baseline.entries).toEqual([]);
     expect(res.value.reviewStatus).toBe('ok');
-    expect(res.value.draft?.entries.length).toBe(2);
+    expect(res.value.draft?.entries.map((e) => e.entryId)).toEqual(['n0', 'n1']);
+    expect(res.value.draft?.diff.map((d) => d.change)).toEqual(['add', 'add']);
     expect(agentCalls.create).toBe(1);
     expect(agentCalls.inputs.length).toBe(1);
   });
@@ -899,7 +953,7 @@ describe('P3.2 reviewable 门与证据格式化', () => {
             ocrMarkdown: new Map([[1, '本文です。これはテストです。よろしくおねがいします。']]),
           });
         },
-        adapter: mockToolAdapter({ calls: agentCalls, steps: [{ kind: 'tool', input: GOOD_TOOL_INPUT }] }),
+        adapter: mockToolAdapter({ calls: agentCalls, steps: [{ kind: 'tool', tool: 'add', input: GOOD_ADD }] }),
       },
       { userId: 'u1', filename: 'toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 1 }
     );

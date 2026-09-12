@@ -6,7 +6,6 @@ import {
   canRequestTocReview,
   decideExtractRequest,
   decideReviewRequest,
-  diffBaselineDraft,
   initialTocConfirmState,
   narrowTocBaseline,
   narrowTocDiscovery,
@@ -159,10 +158,11 @@ describe('narrowTocBaseline / narrowTocReview', () => {
       diagnostics: { pagesRequested: 2, pagesRendered: 2, baselineEntries: 1, draftEntries: 1 },
     };
     expect(narrowTocReview(payload)?.draft?.warnings).toEqual(['存疑']);
+    expect(narrowTocReview(payload)?.draft?.diff).toEqual([]);
     // 前端收窄容忍多余键（只保形状不崩溃）；字段非法才判 null
     expect(
       narrowTocReview({ ...payload, draft: { entries: [], warnings: [], physicalPage: 5 } })?.draft
-    ).toEqual({ entries: [], warnings: [] });
+    ).toEqual({ entries: [], warnings: [], diff: [] });
     expect(
       narrowTocReview({
         ...payload,
@@ -374,29 +374,54 @@ describe('P3.1B 手动建草稿 reducer', () => {
   });
 });
 
-describe('P3.1B diffBaselineDraft', () => {
-  it('新增/删除/保留计数（含多重行）', () => {
-    expect(
-      diffBaselineDraft(
-        [{ title: '第1課', printedPage: 12 }, { title: '第2課', printedPage: 30 }],
-        [{ title: '第1課', printedPage: 12 }, { title: '第3課', printedPage: 40 }]
-      )
-    ).toEqual({ added: 1, removed: 1, kept: 1, modified: 0 });
-    expect(diffBaselineDraft([], [])).toEqual({ added: 0, removed: 0, kept: 0, modified: 0 });
-  });
-
-  it('P3.2 修改行：标题对上页码变，或页码对上标题变', () => {
-    expect(
-      diffBaselineDraft(
-        [{ title: '第1課', printedPage: 12 }],
-        [{ title: '第1課', printedPage: 13 }]
-      )
-    ).toEqual({ added: 0, removed: 1, kept: 0, modified: 1 });
-    expect(
-      diffBaselineDraft(
-        [{ title: '第1課', printedPage: 12 }],
-        [{ title: '第一課', printedPage: 12 }]
-      )
-    ).toEqual({ added: 0, removed: 1, kept: 0, modified: 1 });
+describe('P3.5 服务端 diff 收窄（旧网关兼容）', () => {
+  it('新负载透传 diff；缺席回填 []；坏行整包拒绝', () => {
+    const base = {
+      embedded: false,
+      range: { fromPage: 1, toPage: 2 },
+      pageCount: 100,
+      baseline: {
+        status: 'ok',
+        range: { fromPage: 1, toPage: 2 },
+        pageCount: 100,
+        entries: [],
+        diagnostics: {
+          pagesRequested: 1, pagesOcr: 1, linesConsidered: 1, linesDroppedWash: 0,
+          entriesAccepted: 0, entriesRejected: 0, badTitle: 0, entriesFromBlocks: 0, unresolvedBlocks: 0,
+        },
+        pageEvidence: [],
+        embedded: false,
+      },
+      diagnostics: { pagesRequested: 1, pagesRendered: 1, baselineEntries: 0, draftEntries: 1 },
+    };
+    const row = {
+      entryId: 'n0',
+      change: 'add' as const,
+      before: null,
+      after: { title: '第1課', printedPage: 5, level: 1 as const, kind: 'lesson' as const, confidence: 'high' as const },
+      reason: '证据行',
+      needsReview: false,
+    };
+    const withDiff = narrowTocReview({
+      ...base,
+      draft: {
+        entries: [{ entryId: 'n0', title: '第1課', printedPage: 5, level: 1, kind: 'lesson', confidence: 'high' as const, needsReview: false }],
+        warnings: [],
+        diff: [row],
+      },
+    });
+    expect(withDiff?.draft?.diff).toEqual([row]);
+    // 旧网关：无 diff 回填 []；entryId 缺席按下标回填；confidence 非法收敛 null
+    const legacy = narrowTocReview({
+      ...base,
+      draft: {
+        entries: [{ title: '第1課', printedPage: 5, level: 1, kind: 'lesson', confidence: 'bogus' }],
+        warnings: [],
+      },
+    });
+    expect(legacy?.draft?.diff).toEqual([]);
+    expect(legacy?.draft?.entries[0]).toMatchObject({ entryId: 'draft-0', confidence: null, needsReview: false });
+    // 坏 diff 行整包拒绝
+    expect(narrowTocReview({ ...base, draft: { entries: [], warnings: [], diff: [{ entryId: '', change: 'add' }] } })).toBeNull();
   });
 });
