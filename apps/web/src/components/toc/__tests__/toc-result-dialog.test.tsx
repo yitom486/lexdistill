@@ -73,7 +73,8 @@ describe('P3.5 结果 Dialog 内容（SSR）', () => {
     const html = renderContent();
     expect(html).toContain('line-through');
     expect(html).toContain('删前：旧付録');
-    expect(html).toContain('采用 3 项变更');
+    expect(html).toContain('采用已确认 0 项');
+    expect(html).toContain('确认全部并采用');
     expect(html).toContain('只存本页，未入库');
     expect(html).toContain('稍后处理');
   });
@@ -135,7 +136,9 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
         savedModel: '',
         savedEffort: '',
         sessionModel: '',
+        sessionModelMode: 'inherit',
         sessionEffort: '',
+        sessionEffortMode: 'inherit',
         onStart: () => {},
         onClose: () => {},
       })
@@ -154,7 +157,9 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
         savedModel: 'm-saved',
         savedEffort: 'high',
         sessionModel: '',
+        sessionModelMode: 'inherit',
         sessionEffort: '',
+        sessionEffortMode: 'inherit',
         onStart: () => {},
         onClose: () => {},
       })
@@ -162,7 +167,7 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
     expect(disabled).toContain('disabled');
   });
 
-  it('配置 Dialog：模型使用默认/指定 + effort + 记住偏好 + 生效来源行', () => {
+  it('配置 Dialog：模型三态 + effort 三态 + 记住偏好 + 生效来源行', () => {
     const html = renderToStaticMarkup(
       React.createElement(TocReviewConfigDialogContent, {
         rangeText: '16–21',
@@ -174,16 +179,19 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
         savedModel: 'm-saved',
         savedEffort: 'high',
         sessionModel: '',
+        sessionModelMode: 'inherit',
         sessionEffort: '',
+        sessionEffortMode: 'inherit',
         onStart: () => {},
         onClose: () => {},
       })
     );
+    expect(html).toContain('跟随偏好');
     expect(html).toContain('使用默认');
     expect(html).toContain('指定模型');
     expect(html).toContain('思考等级');
     expect(html).toContain('记住为偏好');
-    // 已保存偏好回显：指定模型被选中且来源行展示偏好值
+    // 跟随偏好回显已保存值
     expect(html).toContain('m-saved');
   });
 

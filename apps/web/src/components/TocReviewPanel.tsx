@@ -57,6 +57,8 @@ import {
   type TocBaselineData,
   type TocDiscoveryData,
   type TocReviewData,
+  type TocReviewModelMode,
+  type TocReviewModelSession,
 } from '../lib/toc-confirm-flow.js';
 import type { TocAdoptReport } from '../lib/toc-result-view.js';
 import { TocReviewConfigDialog, TocReviewProgressDialog } from './toc/TocReviewDialogs.js';
@@ -818,13 +820,18 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
 
   const [configOpen, setConfigOpen] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
-  // P3.5-FIX：本次模型覆盖只活页面 state；持久偏好走 zustand persist。
+  // P3.5-FIX2 审核批次：每次 review 成功递增；结果 Dialog 以 key 重挂，
+  // 新批次清空旧 rows/selected/filter/编辑，同批次关闭重开靠 aiAdoption 回显。
+  const [reviewRunId, setReviewRunId] = useState(0);
+  // P3.5-FIX2：本次模型覆盖只活页面 state（模式 + 值）；持久偏好走 zustand persist。
   const savedTocModel = usePreferencesStore((s) => s.tocReviewModel);
   const savedTocEffort = usePreferencesStore((s) => s.tocReviewEffort);
   const setSavedTocModel = usePreferencesStore((s) => s.setTocReviewModel);
   const setSavedTocEffort = usePreferencesStore((s) => s.setTocReviewEffort);
   const [sessionTocModel, setSessionTocModel] = useState('');
+  const [sessionTocModelMode, setSessionTocModelMode] = useState<TocReviewModelMode>('inherit');
   const [sessionTocEffort, setSessionTocEffort] = useState('');
+  const [sessionTocEffortMode, setSessionTocEffortMode] = useState<TocReviewModelMode>('inherit');
   // P3.5-FIX：AI 采用回执只活页面 state（选中 id + 编辑）；Dialog 关闭再打开按此回显。
   const [aiAdoption, setAiAdoption] = useState<{
     ids: string[];
@@ -854,16 +861,20 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
     );
     if (!decision.ok) return;
     if (!source) return;
-    // P3.5-FIX：本次显式 > 已保存偏好 > 缺席（缺席不传，后端走环境 > 适配器默认）。
-    const session = config
-      ? { model: config.model, effort: config.effort }
-      : { model: sessionTocModel, effort: sessionTocEffort };
+    // P3.5-FIX2：inherit-saved / force-default / explicit。
+    // 本次无配置回执（旧入口）沿用 panel 已存的本次覆盖；有回执则更新覆盖。
+    const session: TocReviewModelSession = config
+      ? { model: config.model, modelMode: config.modelMode, effort: config.effort, effortMode: config.effortMode }
+      : { model: sessionTocModel, modelMode: sessionTocModelMode, effort: sessionTocEffort, effortMode: sessionTocEffortMode };
     if (config) {
       setSessionTocModel(config.model);
+      setSessionTocModelMode(config.modelMode);
       setSessionTocEffort(config.effort);
+      setSessionTocEffortMode(config.effortMode);
       if (config.remember) {
-        setSavedTocModel(config.model);
-        setSavedTocEffort(config.effort);
+        // 记住本次生效值；选默认即清空已保存（下次走服务端默认）。
+        setSavedTocModel(config.modelMode === 'explicit' ? config.model : '');
+        setSavedTocEffort(config.effortMode === 'explicit' ? config.effort : '');
       }
     }
     const modelOptions = resolveTocReviewModelRequest({
@@ -879,6 +890,9 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       },
       {
         onSuccess: (data) => {
+          // P3.5-FIX2：新审核结果隔离旧 state（批次递增 + 清空旧采用回执）。
+          setAiAdoption(null);
+          setReviewRunId((id) => id + 1);
           if (!data.embedded && data.draft) setResultOpen(true);
         },
       }
@@ -1032,7 +1046,9 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
           savedModel={savedTocModel}
           savedEffort={savedTocEffort}
           sessionModel={sessionTocModel}
+          sessionModelMode={sessionTocModelMode}
           sessionEffort={sessionTocEffort}
+          sessionEffortMode={sessionTocEffortMode}
           onStart={handleStartReview}
           onClose={() => setConfigOpen(false)}
         />
@@ -1040,6 +1056,7 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       <TocReviewProgressDialog open={review.isPending} onOpenChange={() => {}} rangeText={rangeText} />
       {reviewData && !reviewData.embedded && reviewData.draft && (
         <TocResultDialog
+          key={`toc-review-${reviewRunId}`}
           open={resultOpen}
           onOpenChange={setResultOpen}
           rangeText={rangeText}

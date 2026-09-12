@@ -527,6 +527,7 @@
   --tint-orange-600: oklch(64.6% 0.222 41.116);
 
   /* wash（50 token，hits 128） */
+  --wash-amber-500o4: color-mix(in oklab, oklch(76.9% 0.188 70.08) 4%, transparent);
   --wash-amber-500o5: color-mix(in oklab, oklch(76.9% 0.188 70.08) 5%, transparent);
   --wash-amber-500o10: color-mix(in oklab, oklch(76.9% 0.188 70.08) 10%, transparent);
   --wash-amber-500o15: color-mix(in oklab, oklch(76.9% 0.188 70.08) 15%, transparent);
@@ -931,6 +932,7 @@
   --tint-orange-600: oklch(64.6% 0.222 41.116);
 
   /* wash */
+  --wash-amber-500o4: color-mix(in oklab, oklch(76.9% 0.188 70.08) 4%, transparent);
   --wash-amber-500o5: color-mix(in oklab, oklch(76.9% 0.188 70.08) 5%, transparent);
   --wash-amber-500o10: color-mix(in oklab, oklch(76.9% 0.188 70.08) 10%, transparent);
   --wash-amber-500o15: color-mix(in oklab, oklch(76.9% 0.188 70.08) 15%, transparent);
@@ -1319,6 +1321,7 @@
   --color-tint-sky-700: var(--tint-sky-700);
   --color-tint-orange-500: var(--tint-orange-500);
   --color-tint-orange-600: var(--tint-orange-600);
+  --color-wash-amber-500o4: var(--wash-amber-500o4);
   --color-wash-amber-500o5: var(--wash-amber-500o5);
   --color-wash-amber-500o10: var(--wash-amber-500o10);
   --color-wash-amber-500o15: var(--wash-amber-500o15);

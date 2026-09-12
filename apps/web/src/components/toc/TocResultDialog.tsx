@@ -113,6 +113,23 @@ export function TocResultDialogContent(props: TocResultDialogContentProps): Reac
   const [adopted, setAdopted] = React.useState<ReadonlySet<string>>(
     () => new Set(initialAdoption?.ids ?? [])
   );
+  // P3.5-FIX2：初始行快照（脏检查用；编辑即自动标记，绝不静默丢编辑）。
+  // 首挂载一次性快照；新批次靠父级 key 重挂，旧快照随组件销毁。
+  const initialRowsRef = React.useRef<Map<string, EditableTocEntry> | null>(null);
+  if (initialRowsRef.current === null) {
+    initialRowsRef.current = new Map(rows.map((row) => [row.key, { ...row }]));
+  }
+  const isDirty = (key: string): boolean => {
+    const initial = initialRowsRef.current?.get(key);
+    const current = rows.find((row) => row.key === key);
+    if (!initial || !current) return false;
+    return (
+      current.title !== initial.title ||
+      current.printedPage !== initial.printedPage ||
+      current.level !== initial.level ||
+      current.kind !== initial.kind
+    );
+  };
 
   const visibleDiff = filterDiffRows(draft.diff, filter);
   const visibleRows = React.useMemo(() => {
@@ -125,6 +142,13 @@ export function TocResultDialogContent(props: TocResultDialogContentProps): Reac
 
   const updateRow = (key: string, patch: Partial<EditableTocEntry>): void => {
     setRows((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+    // P3.5-FIX2：任何编辑自动标记为已确认（keep 脏行转为人工 update，不静默丢失）。
+    setAdopted((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
   };
 
   const adoptRows = (ids: string[]): void => {
@@ -137,10 +161,21 @@ export function TocResultDialogContent(props: TocResultDialogContentProps): Reac
 
   const changedIds = visibleRows.filter((item) => item.diff.change !== 'keep').map((item) => item.diff.entryId);
 
-  const handleAdoptAll = (): void => {
-    const report = buildAdoptReport(rows, new Set([...adopted, ...changedIds]));
-    setAdopted(new Set(report.selectedIds));
+  /**
+   * P3.5-FIX2 真实部分采用：
+   * - 确认本条只标记（adoptRows）；
+   * - 采用已确认只提交已标记项；
+   * - 确认全部并采用才全选变更。
+   */
+  const handleAdoptMarked = (): void => {
+    const report = buildAdoptReport(rows, adopted);
     if (onAdopt) onAdopt(report);
+  };
+
+  const handleAdoptAll = (): void => {
+    const all = new Set([...adopted, ...changedIds]);
+    setAdopted(all);
+    if (onAdopt) onAdopt(buildAdoptReport(rows, all));
   };
 
   return (
@@ -205,12 +240,15 @@ export function TocResultDialogContent(props: TocResultDialogContentProps): Reac
               const struck = diff.change === 'remove' ? 'line-through' : '';
               // remove 行展示的是删除快照（entries 已无此条），输入框只读，确认=确认删除。
               const readOnly = diff.change === 'remove';
+              // P3.5-FIX2：keep 脏行显式转为人工 update（徽标/底色同步翻转，不静默）。
+              const dirtyKeep = diff.change === 'keep' && isDirty(diff.entryId);
+              const effectiveChange = dirtyKeep ? 'update' : diff.change;
               return (
-                <tr key={diff.entryId} className={`border-t border-toc-border ${rowTone(diff.change)}`}>
+                <tr key={diff.entryId} className={`border-t border-toc-border ${rowTone(effectiveChange)}`}>
                   <td className="px-2 py-1 align-top">
                     <span className="flex flex-col items-start gap-1">
-                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-bold ${statusTone(diff.change)}`}>
-                        {changeLabel(diff.change, diff.needsReview)}
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-bold ${statusTone(effectiveChange)}`}>
+                        {dirtyKeep ? '修改（人工）' : changeLabel(diff.change, diff.needsReview)}
                       </span>
                       {isAdopted && (
                         <Badge variant="outline" className="text-[10px]">
@@ -228,7 +266,8 @@ export function TocResultDialogContent(props: TocResultDialogContentProps): Reac
                       onChange={(e) => updateRow(edited.key, { title: e.target.value })}
                       className={`h-9 min-h-[36px] w-full rounded-lg border border-toc-border bg-toc-surface px-2 text-toc-strong outline-none ${struck}`}
                     />
-                    {diff.change === 'update' && diff.before && diff.before.title !== edited.title && (
+                    {((diff.change === 'update' && diff.before && diff.before.title !== edited.title) ||
+                      (dirtyKeep && diff.before && diff.before.title !== edited.title)) && (
                       <p className="mt-0.5 truncate text-[12px] text-toc-muted">原：{diff.before.title}</p>
                     )}
                     {diff.change === 'remove' && diff.before && (
@@ -305,12 +344,22 @@ export function TocResultDialogContent(props: TocResultDialogContentProps): Reac
           </Button>
           <Button
             type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px]"
+            disabled={adopted.size === 0}
+            onClick={handleAdoptMarked}
+          >
+            采用已确认 {adopted.size} 项
+          </Button>
+          <Button
+            type="button"
             size="sm"
             className="h-7 text-[11px]"
             disabled={adoptableCount === 0}
             onClick={handleAdoptAll}
           >
-            采用 {adoptableCount} 项变更
+            确认全部并采用
           </Button>
         </span>
       </div>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { arbitraryColorUtility, styleContextColor, utilityColorLiteral } from '../../../lib/color-gate.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC_ROOT = join(HERE, '..', '..', '..');
@@ -10,20 +11,17 @@ const CSS_PATH = join(SRC_ROOT, 'index.css');
 /**
  * P3.5-FIX 全仓颜色门禁（apps/web/src 全覆盖，无白名单文件）。
  *
- * 规则：
- * - TSX（非测试）禁止直接 Tailwind 色值工具类（含 white/black/stone/gray/amber/
- *   rose/emerald 等全色板，light 与 dark: 一视同仁）；
- * - 禁止 arbitrary 颜色（bg-[#...]/text-[rgb(...)] 等；var(--toc-*) 等语义引用除外）；
+ * 规则（匹配器见 lib/color-gate.ts，可单测）：
+ * - TS/TSX（非测试）禁止直接 Tailwind 色值工具类（含 white/black/stone/gray/amber/
+ *   rose/emerald 等全色板，light 与 dark:/hover: 等 variant 一视同仁；
+ *   opacity 含小数与 bracket 形式）；
+ * - 禁止 arbitrary 颜色（bg-[#...]/text-[rgb(...)] 等，可带 /opacity；
+ *   var(--toc-*) 等语义引用除外）；
  * - 禁止 className / inline style 上下文中的 hex/rgb（JS 纯逻辑颜色如 confetti
  *   调色不在此限，但不得出现在 class/style 上下文）；
  * - transparent / currentColor / inherit 永远放行；
  * - 所有颜色只许引用 index.css 语义变量（:root 与 .dark 双块定义，@theme 导出工具类）。
  */
-
-const PALETTE =
-  'white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
-const UTILITY =
-  'bg|text|border|ring|ring-offset|shadow|divide|placeholder|stroke|fill|from|via|to|outline|decoration|accent|caret';
 
 function listSrc(dir: string): string[] {
   const out: string[] = [];
@@ -38,52 +36,6 @@ function listSrc(dir: string): string[] {
     }
   }
   return out;
-}
-
-function utilityColorLiteral(source: string): string[] {
-  const hits: string[] = [];
-  const re = new RegExp(`(?:^|["'\\s:(\`])(?:${UTILITY})-(?:${PALETTE})(?:-\\d{2,3})?(?:\\/\\d+)?(?=["'\\s\`])`, 'g');
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(source))) {
-    const hit = m[0].trim();
-    if (/-toc-/.test(hit)) continue;
-    if (/(transparent|current|inherit)/.test(hit)) continue;
-    hits.push(hit);
-  }
-  return hits;
-}
-
-function arbitraryColorUtility(source: string): string[] {
-  const hits: string[] = [];
-  const re = new RegExp(`(?:${UTILITY})-\\[([^\\]]+)\\]`, 'g');
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(source))) {
-    const inner = (m[1] ?? '').trim();
-    // 尺寸/布局类 arbitrary（text-[10px] 等）不是颜色，放行
-    if (!/^#/.test(inner) && !/^rgba?\(/.test(inner) && !/^hsla?\(/.test(inner)) continue;
-    if (/^var\(--(toc|background|foreground|muted|border|primary|secondary|accent|card|popover|destructive|ring|input|chart)-/.test(inner)) continue;
-    if (/^var\(--toc-/.test(inner)) continue;
-    if (/^(transparent|currentColor|inherit)$/.test(inner)) continue;
-    hits.push(m[0]);
-  }
-  return hits;
-}
-
-function styleContextColor(source: string): string[] {
-  const hits: string[] = [];
-  // className="..." 双引号字面量内的 hex
-  for (const m of source.matchAll(/className="([^"]*)"/g)) {
-    const inner = m[1] ?? '';
-    for (const h of inner.matchAll(/#[0-9a-fA-F]{3,8}\b/g)) hits.push(`className hex ${h[0]}`);
-    for (const h of inner.matchAll(/\brgba?\(/g)) hits.push(`className rgb ${h[0]}`);
-  }
-  // style={{ ... }} 单层对象内的 hex（多行，非贪婪到首个 }}）
-  for (const m of source.matchAll(/style=\{\{([\s\S]*?)\}\}/g)) {
-    const inner = m[1] ?? '';
-    for (const h of inner.matchAll(/#[0-9a-fA-F]{3,8}\b/g)) hits.push(`style hex ${h[0]}`);
-    for (const h of inner.matchAll(/\brgba?\(/g)) hits.push(`style rgb ${h[0]}`);
-  }
-  return hits;
 }
 
 describe('P3.5-FIX 全仓颜色门禁', () => {

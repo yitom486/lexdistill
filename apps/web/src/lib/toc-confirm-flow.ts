@@ -526,6 +526,20 @@ function baselineEntryToEditable(entryId: string, entry: TocBaselineEntry): Edit
   };
 }
 
+/**
+ * P3.5-FIX2：编辑行是否实质偏离基线（标题/印刷页/层级/类型任一不同即脏）。
+ * 纯函数：父级据此把“已选中但值未变”的 keep 当无操作，把“选中且变脏”的 keep
+ * 当人工 update（Dialog 侧编辑即自动标记，此处双保险，绝不静默丢编辑）。
+ */
+export function isEditedAgainstBaseline(edited: EditableTocEntry, baseline: TocBaselineEntry): boolean {
+  return (
+    edited.title !== baseline.title ||
+    edited.printedPage !== String(baseline.printedPage) ||
+    edited.level !== (baseline.level === 1 ? 1 : 2) ||
+    edited.kind !== baseline.kind
+  );
+}
+
 export interface AiAdoptBuildInput {
   baselineEntries: TocBaselineEntry[];
   diff: TocReviewDiffRow[];
@@ -552,7 +566,15 @@ export function buildAiAdoptedEntries(input: AiAdoptBuildInput): EditableTocEntr
       baselineMatch === null ? undefined : input.baselineEntries[Number(baselineMatch[1])];
     const isSelected = selected.has(row.entryId);
     if (row.change === 'keep') {
-      if (baselineEntry) out.push(baselineEntryToEditable(row.entryId, baselineEntry));
+      if (!baselineEntry) continue;
+      const edited = input.editedById[row.entryId];
+      // P3.5-FIX2：选中且变脏的 keep 视为人工 update（编辑即标记，值进最终 entries）；
+      // 选中但未变脏 = 无操作；未选中 = 基线原值。三种情况都不丢编辑、不捏造。
+      if (isSelected && edited && isEditedAgainstBaseline(edited, baselineEntry)) {
+        out.push({ ...edited, key: row.entryId });
+        continue;
+      }
+      out.push(baselineEntryToEditable(row.entryId, baselineEntry));
       continue;
     }
     if (row.change === 'update') {
@@ -596,22 +618,42 @@ export interface TocReviewModelRequest {
   effort?: string;
 }
 
+/** P3.5-FIX2 模型取值模式：跟随已保存偏好 / 强制默认 / 本次显式指定。 */
+export type TocReviewModelMode = 'inherit' | 'default' | 'explicit';
+
+export interface TocReviewModelSession {
+  model: string;
+  modelMode: TocReviewModelMode;
+  effort: string;
+  effortMode: TocReviewModelMode;
+}
+
 /**
- * P3.5-FIX 配置优先级（纯函数）：本次显式 > 已保存偏好 > 缺席。
- * 空串视为缺席；双缺席返回 {}（调用方不传，后端走环境变量 > 适配器默认）。
+ * P3.5-FIX2 配置优先级（纯函数）：inherit-saved / force-default / explicit。
+ * - inherit → 用已保存偏好（空则缺席）；
+ * - default → 强制默认：绝不回退已保存值，直接缺席；
+ * - explicit → 用本次值（空白视为未填，按默认处理，同样缺席）。
+ * 双缺席返回 {}（调用方不传，后端走环境变量 > 适配器默认）。
  */
 export function resolveTocReviewModelRequest(options: {
-  session: TocReviewModelRequest;
+  session: TocReviewModelSession;
   saved: TocReviewModelRequest;
 }): TocReviewModelRequest {
-  const pick = (sessionValue: string | undefined, savedValue: string | undefined): string | undefined => {
-    const session = sessionValue?.trim() ? sessionValue.trim() : undefined;
-    if (session) return session;
-    const saved = savedValue?.trim() ? savedValue.trim() : undefined;
-    return saved;
+  const pick = (
+    mode: TocReviewModelMode,
+    sessionValue: string | undefined,
+    savedValue: string | undefined
+  ): string | undefined => {
+    if (mode === 'default') return undefined;
+    if (mode === 'explicit') {
+      const text = sessionValue?.trim();
+      return text ? text : undefined;
+    }
+    const saved = savedValue?.trim();
+    return saved ? saved : undefined;
   };
-  const model = pick(options.session.model, options.saved.model);
-  const effort = pick(options.session.effort, options.saved.effort);
+  const model = pick(options.session.modelMode, options.session.model, options.saved.model);
+  const effort = pick(options.session.effortMode, options.session.effort, options.saved.effort);
   return {
     ...(model ? { model } : {}),
     ...(effort ? { effort } : {}),

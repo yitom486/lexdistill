@@ -138,4 +138,35 @@ describe('P3.5-FIX buildAiAdoptedEntries', () => {
     expect(out.map((e) => e.key)).toEqual(['b0', 'b1', 'b2']);
     expect(out.find((e) => e.key === 'b1')?.title).toBe('第2課 文法まとめ');
   });
+
+  it('选中且变脏的 keep 视为人工 update（编辑值进最终 entries）', () => {
+    const out = buildAiAdoptedEntries({
+      baselineEntries: baseline(),
+      diff: diff(),
+      selectedIds: ['b0'],
+      editedById: { b0: edited('b0', { title: '第1課 会話（订正）', printedPage: '12' }) },
+    });
+    expect(out.find((e) => e.key === 'b0')?.title).toBe('第1課 会話（订正）');
+    expect(out.map((e) => e.key)).toEqual(['b0', 'b1', 'b2']);
+  });
+
+  it('选中但未变脏的 keep 仍是基线原值（误标记无害）', () => {
+    const out = buildAiAdoptedEntries({
+      baselineEntries: baseline(),
+      diff: diff(),
+      selectedIds: ['b0'],
+      editedById: { b0: edited('b0', { title: '第1課 会話', printedPage: '12', level: 1, kind: 'lesson' }) },
+    });
+    expect(out.find((e) => e.key === 'b0')?.title).toBe('第1課 会話');
+  });
+
+  it('未选中的 keep 纵使有编辑值也不生效（以选中为准）', () => {
+    const out = buildAiAdoptedEntries({
+      baselineEntries: baseline(),
+      diff: diff(),
+      selectedIds: [],
+      editedById: { b0: edited('b0', { title: '不该出现' }) },
+    });
+    expect(out.find((e) => e.key === 'b0')?.title).toBe('第1課 会話');
+  });
 });

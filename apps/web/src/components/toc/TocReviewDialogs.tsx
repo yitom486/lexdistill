@@ -7,7 +7,7 @@ import {
   DialogFooter,
   DialogHeader,
 } from '../ui/dialog.js';
-import type { TocBaselineData } from '../../lib/toc-confirm-flow.js';
+import type { TocBaselineData, TocReviewModelMode } from '../../lib/toc-confirm-flow.js';
 
 /**
  * CMD-LINGUA-P3.5 AI 重建目录的配置 Dialog 与进度 Dialog（小尺寸；结果另见 TocResultDialog）。
@@ -17,10 +17,13 @@ import type { TocBaselineData } from '../../lib/toc-confirm-flow.js';
  */
 
 export interface TocModelConfig {
-  /** 本次模型 id（空=使用默认）。 */
+  /** 本次模型 id（mode=explicit 时有效；空=未填按默认）。 */
   model: string;
-  /** 本次 effort（空=使用默认；low/medium/high）。 */
+  /** 本次 effort（mode=explicit 时有效；low/medium/high）。 */
   effort: string;
+  /** 取值模式（inherit-saved / force-default / explicit，模型与 effort 各自独立）。 */
+  modelMode: TocReviewModelMode;
+  effortMode: TocReviewModelMode;
   /** 是否把本次选择记为持久偏好（zustand persist）。 */
   remember: boolean;
 }
@@ -37,36 +40,50 @@ export interface TocReviewConfigDialogContentProps {
   /** 已保存偏好（zustand persist；空=未设）。 */
   savedModel: string;
   savedEffort: string;
-  /** 本次已设覆盖（panel state；空=未覆盖）。 */
+  /** 本次已设覆盖（panel state；模式 + 值）。 */
   sessionModel: string;
+  sessionModelMode: TocReviewModelMode;
   sessionEffort: string;
+  sessionEffortMode: TocReviewModelMode;
   onStart(config: TocModelConfig): void;
   onClose(): void;
+}
+
+function savedLabel(value: string): string {
+  const text = value.trim();
+  return text ? text : '未设（走服务端默认）';
 }
 
 export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContentProps): React.ReactElement {
   const {
     rangeText, baseline, evidencePages, sizeHint, reviewDisabledReason, starting,
-    savedModel, savedEffort, sessionModel, sessionEffort, onStart, onClose,
+    savedModel, savedEffort, sessionModel, sessionModelMode, sessionEffort, sessionEffortMode,
+    onStart, onClose,
   } = props;
-  const [useCustomModel, setUseCustomModel] = React.useState<boolean>(() =>
-    Boolean((sessionModel || savedModel).trim())
-  );
+  const [modelMode, setModelMode] = React.useState<TocReviewModelMode>(() => sessionModelMode);
   const [modelText, setModelText] = React.useState<string>(() => sessionModel || savedModel);
+  const [effortMode, setEffortMode] = React.useState<TocReviewModelMode>(() => sessionEffortMode);
   const [effort, setEffort] = React.useState<string>(() => {
-    const current = (sessionEffort || savedEffort).trim();
+    const current = (sessionEffortMode === 'explicit' ? sessionEffort : savedEffort).trim();
     return (TOC_EFFORT_CHOICES as readonly string[]).includes(current) ? current : '';
   });
   const [remember, setRemember] = React.useState<boolean>(false);
-  const effectiveModel = useCustomModel ? modelText.trim() : '';
-  const effectiveEffort = effort;
-  const sourceLine = useCustomModel
-    ? modelText.trim()
-      ? `本次指定：${modelText.trim()}${remember ? '（将记住为偏好）' : '（仅本次）'}`
-      : '已选指定模型但未填写 → 本次使用默认'
-    : savedModel.trim()
-      ? `使用已保存偏好：${savedModel.trim()}`
-      : '使用默认（服务端环境变量 > 适配器默认）';
+  const effectiveModel = modelMode === 'explicit' ? modelText.trim() : '';
+  const effectiveEffort = effortMode === 'explicit' ? effort : '';
+  const modelSourceLine =
+    modelMode === 'explicit'
+      ? modelText.trim()
+        ? `本次指定：${modelText.trim()}${remember ? '（将记住为偏好）' : '（仅本次）'}`
+        : '已选指定模型但未填写 → 本次使用默认'
+      : modelMode === 'default'
+        ? '本次强制使用默认（不回退已保存偏好）'
+        : `跟随已保存偏好：${savedLabel(savedModel)}`;
+  const effortSourceLine =
+    effortMode === 'explicit'
+      ? `本次指定：${effort || '（未选，按默认）'}${remember ? '（将记住为偏好）' : '（仅本次）'}`
+      : effortMode === 'default'
+        ? '本次强制使用默认（不回退已保存偏好）'
+        : `跟随已保存偏好：${savedLabel(savedEffort)}`;
   return (
     <div className="space-y-2">
       <DialogHeader>
@@ -86,29 +103,39 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
       </div>
       <fieldset className="space-y-1.5 rounded-xl border border-toc-border bg-toc-surface p-2 text-[11px] text-toc-strong">
         <legend className="px-1 text-[11px] font-bold text-toc-muted">模型配置（本次生效）</legend>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-1" role="radiogroup" aria-label="模型取值">
+          <label className="flex items-center gap-1">
+            <input
+              type="radio"
+              name="toc-review-model-mode"
+              aria-label="跟随已保存偏好"
+              checked={modelMode === 'inherit'}
+              onChange={() => setModelMode('inherit')}
+            />
+            跟随偏好（当前：{savedLabel(savedModel)}）
+          </label>
           <label className="flex items-center gap-1">
             <input
               type="radio"
               name="toc-review-model-mode"
               aria-label="使用默认模型"
-              checked={!useCustomModel}
-              onChange={() => setUseCustomModel(false)}
+              checked={modelMode === 'default'}
+              onChange={() => setModelMode('default')}
             />
-            使用默认
+            使用默认（不回退已保存偏好）
           </label>
           <label className="flex items-center gap-1">
             <input
               type="radio"
               name="toc-review-model-mode"
               aria-label="指定模型"
-              checked={useCustomModel}
-              onChange={() => setUseCustomModel(true)}
+              checked={modelMode === 'explicit'}
+              onChange={() => setModelMode('explicit')}
             />
             指定模型
           </label>
         </div>
-        {useCustomModel && (
+        {modelMode === 'explicit' && (
           <input
             type="text"
             aria-label="模型 id"
@@ -120,11 +147,29 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
         )}
         <div className="flex items-center gap-2">
           <label htmlFor="toc-review-effort">思考等级</label>
-          <Select value={effort || 'default'} onValueChange={(v) => setEffort(v === 'default' || v === null ? '' : v)}>
+          <Select
+            value={effortMode === 'inherit' ? 'saved' : effortMode === 'default' ? 'default' : effort || 'default'}
+            onValueChange={(v) => {
+              if (v === 'saved') {
+                setEffortMode('inherit');
+                return;
+              }
+              if (v === 'default' || v === null) {
+                setEffortMode('default');
+                setEffort('');
+                return;
+              }
+              setEffortMode('explicit');
+              setEffort(v);
+            }}
+          >
             <SelectTrigger id="toc-review-effort" className="h-7 w-36 text-[11px]" aria-label="思考等级">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="saved" className="text-[11px]">
+                跟随偏好（{savedLabel(savedEffort)}）
+              </SelectItem>
               <SelectItem value="default" className="text-[11px]">
                 默认
               </SelectItem>
@@ -143,9 +188,10 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
           />
-          记住为偏好（下次默认使用）
+          记住为偏好（下次默认使用；选默认则清空已保存）
         </label>
-        <p className="text-toc-muted" aria-live="polite">{sourceLine}</p>
+        <p className="text-toc-muted" aria-live="polite">{modelSourceLine}</p>
+        <p className="text-toc-muted" aria-live="polite">{effortSourceLine}</p>
       </fieldset>
       <DialogFooter>
         <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]" onClick={onClose}>
@@ -156,7 +202,7 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
           size="sm"
           className="h-7 text-[11px]"
           disabled={starting || reviewDisabledReason !== null}
-          onClick={() => onStart({ model: effectiveModel, effort: effectiveEffort, remember })}
+          onClick={() => onStart({ model: effectiveModel, effort: effectiveEffort, modelMode, effortMode, remember })}
         >
           {starting ? '已开始…' : '开始重建'}
         </Button>

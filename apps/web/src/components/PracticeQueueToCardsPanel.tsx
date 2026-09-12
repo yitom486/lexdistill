@@ -65,7 +65,7 @@ export function PracticeQueueToCardsPanel() {
   };
 
   return (
-    <section className="rounded-xl border border-line-amber-900o15-amber-500o20 bg-amber-500/[0.04] p-4 space-y-3">
+    <section className="rounded-xl border border-line-amber-900o15-amber-500o20 bg-wash-amber-500o4 p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2">
