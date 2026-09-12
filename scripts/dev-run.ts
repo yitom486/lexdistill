@@ -28,7 +28,7 @@ import {
  *   拒绝开工挡住 + dev:clean 清理，堆积不可能再发生。
  */
 
-const ROOT = dirname(fileURLToPath(new URL('..', import.meta.url)));
+const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const WEB_PORT = 3000;
 const GATEWAY_PORT = 8080;
 
@@ -137,11 +137,16 @@ async function main(): Promise<number> {
   if (checkOnly) return 0;
 
   // 2) 直属子进程启动（stdio 继承；unix 独立进程组以便整组杀）。
-  // 注意：子进程经 `bun run --filter` 启动，Bun 默认 --elide-lines=10 会吞掉超长
-  // 输出（[N lines elided]）；调试需要全量日志，此处显式关掉（0 = 全显示）。
+  // 网关不用 `bun run --filter` 起：--filter 把 cwd 钉在包目录，workspace 包
+  // （packages/*，symlink 到包目录外）全部落到监视范围外，每次启动刷 ~65 行
+  // will-not-be-watched 噪音，且改包代码不重载（静默跑旧代码）。
+  // 此处以仓库根为 cwd 直接 `bun --watch apps/gateway/src/index.ts`：
+  // 监视是 import 图语义（只跟被 import 的文件），packages/* 进图即被监视，
+  // dist/tsbuildinfo/db 从未被 import，仍不在监视内；且无 --filter 就无
+  // --elide-lines 省略，日志天然全量。web 仍走 --filter（Vite 自带监视）。
   const specs: Array<{ name: string; argv: string[] }> = [];
   if (only !== 'gateway') specs.push({ name: 'web', argv: ['run', '--elide-lines=0', '--filter', '@study-studio/web', 'dev'] });
-  if (only !== 'web') specs.push({ name: 'gateway', argv: ['run', '--elide-lines=0', '--filter', '@study-studio/gateway', 'dev'] });
+  if (only !== 'web') specs.push({ name: 'gateway', argv: ['--watch', 'apps/gateway/src/index.ts'] });
   const children = new Map<ChildProcess, string>();
   for (const spec of specs) {
     const child = spawn('bun', spec.argv, {
