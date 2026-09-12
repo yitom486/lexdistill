@@ -1,7 +1,13 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test, afterEach } from 'bun:test';
 import {
+  GATEWAY_INTERRUPTED_CODE,
+  GATEWAY_INTERRUPTED_MESSAGE,
   GATEWAY_NO_RESPONSE_MESSAGE,
+  GATEWAY_UNREACHABLE_CODE,
+  GatewayRequestError,
   isGatewayNoResponseError,
+  mapTransportInterruption,
+  probeGatewayBootId,
   readGatewayErrorCode,
   readGatewayErrorDetails,
   readGatewayUserMessage,
@@ -73,5 +79,70 @@ describe('isGatewayNoResponseError（无响应转中文，不再 Failed to fetch
     expect(GATEWAY_NO_RESPONSE_MESSAGE).toContain('重启网关');
     expect(GATEWAY_NO_RESPONSE_MESSAGE).toContain('指定页码');
     expect(GATEWAY_NO_RESPONSE_MESSAGE).not.toContain('Failed to fetch');
+  });
+});
+
+describe('probeGatewayBootId / mapTransportInterruption（重启中断显式化）', () => {
+  const originalFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function stubHealth(payload: unknown, status = 200): string[] {
+    const seen: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request): Promise<Response> => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      seen.push(url);
+      return new Response(JSON.stringify(payload), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as typeof fetch;
+    return seen;
+  }
+
+  function stubDead(): void {
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      void input;
+      void init;
+      throw new TypeError('Failed to fetch');
+    }) as typeof fetch;
+  }
+
+  test('网关存活返回 bootId；不可达/非 ok/缺字段一律 null 且不抛', async () => {
+    const seen = stubHealth({ status: 'ok', bootId: 'boot-1' });
+    await expect(probeGatewayBootId('http://localhost:8080')).resolves.toBe('boot-1');
+    expect(seen[0]).toContain('/api/health');
+
+    stubHealth({ status: 'ok' });
+    await expect(probeGatewayBootId('http://localhost:8080')).resolves.toBeNull();
+
+    stubHealth({ status: 'ok', bootId: 'boot-1' }, 500);
+    await expect(probeGatewayBootId('http://localhost:8080')).resolves.toBeNull();
+
+    stubDead();
+    await expect(probeGatewayBootId('http://localhost:8080')).resolves.toBeNull();
+  });
+
+  test('无响应失败 + 网关存活 → 中断错误；网关仍死 → 原样；业务错误透传', async () => {
+    stubHealth({ status: 'ok', bootId: 'boot-2' });
+    const interrupted = await mapTransportInterruption(
+      'http://localhost:8080',
+      new GatewayRequestError(GATEWAY_NO_RESPONSE_MESSAGE, { code: GATEWAY_UNREACHABLE_CODE })
+    );
+    expect(interrupted).toBeInstanceOf(GatewayRequestError);
+    const err = interrupted as GatewayRequestError;
+    expect(err.code).toBe(GATEWAY_INTERRUPTED_CODE);
+    expect(err.message).toBe(GATEWAY_INTERRUPTED_MESSAGE);
+
+    stubDead();
+    const original = new GatewayRequestError(GATEWAY_NO_RESPONSE_MESSAGE, {
+      code: GATEWAY_UNREACHABLE_CODE,
+    });
+    await expect(mapTransportInterruption('http://localhost:8080', original)).resolves.toBe(original);
+
+    stubHealth({ status: 'ok', bootId: 'boot-3' });
+    const business = new GatewayRequestError('范围非法', { code: 'E_INVALID_INPUT' });
+    await expect(mapTransportInterruption('http://localhost:8080', business)).resolves.toBe(business);
   });
 });

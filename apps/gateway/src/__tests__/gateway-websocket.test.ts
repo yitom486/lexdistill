@@ -22,9 +22,24 @@ describe('Gateway WebSocket Server E2E', () => {
   it('should respond to HTTP health check', async () => {
     const res = await fetch(`http://localhost:${TEST_PORT}/health`);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as {
+      status?: unknown;
+      service?: unknown;
+      bootId?: unknown;
+      startedAt?: unknown;
+      version?: unknown;
+    };
     expect(body.status).toBe('ok');
     expect(body.service).toBe('Lingua Studio Agent Gateway');
+    // AGENTS §7.3 身份握手：bootId + 启动时间 + 版本号；同一进程两次握手 bootId 稳定。
+    expect(typeof body.bootId).toBe('string');
+    expect((body.bootId as string).length).toBeGreaterThan(0);
+    expect(typeof body.startedAt).toBe('string');
+    expect(typeof body.version).toBe('string');
+    const res2 = await fetch(`http://localhost:${TEST_PORT}/api/health`);
+    expect(res2.status).toBe(200);
+    const body2 = (await res2.json()) as { bootId?: unknown };
+    expect(body2.bootId).toBe(body.bootId);
   });
 
   it('should establish WebSocket connection and handle session init + ping + quiz submit', async () => {

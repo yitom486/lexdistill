@@ -5,7 +5,9 @@ import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,
   GATEWAY_NO_RESPONSE_MESSAGE,
+  GATEWAY_UNREACHABLE_CODE,
   isGatewayNoResponseError,
+  mapTransportInterruption,
   readGatewayErrorCode,
   readGatewayErrorDetails,
   readGatewayUserMessage,
@@ -21,7 +23,7 @@ async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Respo
     return await fetch(input, init);
   } catch (e) {
     if (isGatewayNoResponseError(e)) {
-      throw new GatewayRequestError(GATEWAY_NO_RESPONSE_MESSAGE, { code: 'E_GATEWAY_UNREACHABLE' });
+      throw new GatewayRequestError(GATEWAY_NO_RESPONSE_MESSAGE, { code: GATEWAY_UNREACHABLE_CODE });
     }
     throw e instanceof Error ? e : new Error('网络请求失败，请稍后重试');
   }
@@ -953,28 +955,35 @@ async function postTocEndpoint(
           ...(extra?.effort?.trim() ? { effort: extra.effort.trim() } : {}),
         }
       : {};
-  const res =
-    'filePath' in source
-      ? await fetchPdfGateway(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            filePath: source.filePath,
-            ...(range ? { startPage: range.startPage, endPage: range.endPage } : {}),
-            ...modelOptions,
-          }),
-        })
-      : await (async () => {
-          const form = new FormData();
-          form.append('file', source.file, source.file.name);
-          if (range) {
-            form.append('startPage', String(range.startPage));
-            form.append('endPage', String(range.endPage));
-          }
-          if (modelOptions.model) form.append('model', modelOptions.model);
-          if (modelOptions.effort) form.append('effort', modelOptions.effort);
-          return fetchPdfGateway(url, { method: 'POST', body: form });
-        })();
+  // 重启中断显式化：fetch 层抛错（连接被重启掐断）先经握手探测再定罪；
+  // 真实 HTTP 信封错误（res.ok 为 false）是业务失败，走原样透传，不探测。
+  let res: Response;
+  try {
+    res =
+      'filePath' in source
+        ? await fetchPdfGateway(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filePath: source.filePath,
+              ...(range ? { startPage: range.startPage, endPage: range.endPage } : {}),
+              ...modelOptions,
+            }),
+          })
+        : await (async () => {
+            const form = new FormData();
+            form.append('file', source.file, source.file.name);
+            if (range) {
+              form.append('startPage', String(range.startPage));
+              form.append('endPage', String(range.endPage));
+            }
+            if (modelOptions.model) form.append('model', modelOptions.model);
+            if (modelOptions.effort) form.append('effort', modelOptions.effort);
+            return fetchPdfGateway(url, { method: 'POST', body: form });
+          })();
+  } catch (e) {
+    throw await mapTransportInterruption(GATEWAY_BASE_URL, e);
+  }
   const payload: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     throw new GatewayRequestError(readGatewayUserMessage(payload, `${fallback}（HTTP ${res.status}）`), {

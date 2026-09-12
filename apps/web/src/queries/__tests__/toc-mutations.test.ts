@@ -437,4 +437,36 @@ describe('P5D2D session 请求层', () => {
     );
     expect((err as Error).message).toBe('分段预览已过期');
   });
+
+  it('review-toc 传输中断 + 网关存活 → 中断中文（重启误诊修复）', async () => {
+    globalThis.fetch = (async (input: string | URL | Request): Promise<Response> => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/api/health')) {
+        return new Response(JSON.stringify({ status: 'ok', bootId: 'boot-9' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new TypeError('Failed to fetch');
+    }) as typeof fetch;
+    const err = await requestReviewToc('u1', { filePath: 'C:\\book\\a.pdf' }, { startPage: 2, endPage: 4 }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect((err as Error).message).toBe('网关连接中断（可能刚刚重启），本次请求没有完成，请重新发起。');
+    expect((err as { code?: unknown }).code).toBe('E_GATEWAY_RESTARTED');
+  });
+
+  it('review-toc 传输中断 + 网关仍死 → 保持不可达原文', async () => {
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      void input;
+      void init;
+      throw new TypeError('Failed to fetch');
+    }) as typeof fetch;
+    const err = await requestReviewToc('u1', { filePath: 'C:\\book\\a.pdf' }, { startPage: 2, endPage: 4 }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect((err as Error).message).toContain('网关没有响应');
+  });
 });
