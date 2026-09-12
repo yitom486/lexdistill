@@ -107,6 +107,35 @@ export const TOC_REVIEW_MODEL_ENV = 'STUDY_STUDIO_TOC_REVIEW_MODEL';
 export const TOC_REVIEW_EFFORT_ENV = 'STUDY_STUDIO_TOC_REVIEW_EFFORT';
 const TOC_REVIEW_OPTION_MAX_CHARS = 128;
 
+/**
+ * 目录审核排障开关（默认关闭）：`STUDY_STUDIO_TOC_DEBUG=1` 时才在网关终端
+ * 打印 AI 请求全文、工具调用参数/回执与合并 diff 明细（含基线标题，便于定位
+ * 漏项/错页）。输出只到本地控制台，不入库、不随 HTTP 返回、不进测试断言；
+ * 日常保持关闭，避免课文标题进日志。
+ */
+export const TOC_REVIEW_DEBUG_ENV = 'STUDY_STUDIO_TOC_DEBUG';
+
+export function isTocReviewDebug(): boolean {
+  const raw = process.env[TOC_REVIEW_DEBUG_ENV];
+  return raw === '1' || raw === 'true';
+}
+
+/** 调试载荷截断（终端可读；完整结构仍在内存返回体内，不丢信息）。 */
+const TOC_DEBUG_MAX_CHARS = 8000;
+
+function truncDebug(text: string): string {
+  if (text.length <= TOC_DEBUG_MAX_CHARS) return text;
+  return `${text.slice(0, TOC_DEBUG_MAX_CHARS)}\n…(调试输出截断 ${text.length - TOC_DEBUG_MAX_CHARS} 字)`;
+}
+
+function stringifyDebug(value: unknown): string {
+  try {
+    return truncDebug(JSON.stringify(value) ?? 'unserializable');
+  } catch {
+    return 'unserializable';
+  }
+}
+
 function cleanModelOption(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined;
   const trimmed = raw.trim();
@@ -358,6 +387,21 @@ export async function reviewTocWithAgent(
   });
   if (!isOk(baselineRes)) return baselineRes;
   const baseline = baselineRes.value;
+  const tocDebug = isTocReviewDebug();
+  logger.warn('[toc-review-agent] 基线', {
+    range: `${fromPage}-${toPage}`,
+    verdict: baseline.verdict,
+    embedded: baseline.embedded,
+    baselineEntries: baseline.entries.length,
+    pageCount: baseline.pageCount,
+    evidenceChars: baseline.pageEvidence.reduce((sum, row) => sum + row.excerpt.length, 0),
+  });
+  if (tocDebug) {
+    logger.warn(
+      '[toc-review-debug] 基线条目\n' +
+        baseline.entries.map((entry, index) => `- [${baselineEntryId(index)}] ${formatBaselineLine(entry)}`).join('\n')
+    );
+  }
 
   // embedded 命中：不需要 AI 审核——零渲染、零 Agent 调用，直接返回可解释结果。
   if (baseline.embedded) {
@@ -505,9 +549,12 @@ export async function reviewTocWithAgent(
         ...(turnOptions ? { turnOptions } : {}),
       })) {
         if (ev.type === 'TOOL_CALL_REQUESTED') {
-          if (isTocDraftToolCall(ev.toolName)) {
+          if (isTocDraftOpCall(ev.toolName)) {
             toolCalls++;
             observer.emit({ type: 'tool_call_received', tool: ev.toolName });
+            if (tocDebug) {
+              logger.warn('[toc-review-debug] 工具调用', { tool: ev.toolName, input: stringifyDebug(ev.input) });
+            }
           }
         } else if (ev.type === 'APPROVAL_REQUESTED') {
           const text = `${ev.action} ${ev.description}`;
@@ -523,6 +570,12 @@ export async function reviewTocWithAgent(
         } else if (ev.type === 'ERROR') {
           return err(ev.error);
         } else if (ev.type === 'COMPLETED') {
+          if (tocDebug) {
+            logger.warn('[toc-review-debug] 本轮结束', {
+              finalOutputChars: typeof ev.finalOutput === 'string' ? ev.finalOutput.length : 0,
+              tokenTotal: ev.tokenUsage?.total ?? null,
+            });
+          }
           break;
         }
       }
@@ -532,10 +585,16 @@ export async function reviewTocWithAgent(
     return ok({ toolCalls });
   };
 
-  const turnRes = await finishTurn(
-    buildTocReviewMessage(baseline, material.pages.length),
-    material.pages.map((p) => ({ png: p.png, label: `toc-physical-page-${p.pageNumber}` }))
-  );
+  const outboundMessage = buildTocReviewMessage(baseline, material.pages.length);
+  const outboundAttachments = material.pages.map((p) => ({ png: p.png, label: `toc-physical-page-${p.pageNumber}` }));
+  if (tocDebug) {
+    logger.warn('[toc-review-debug] 发往模型的指令全文', {
+      messageChars: outboundMessage.length,
+      attachments: material.pages.map((p) => ({ page: p.pageNumber, bytes: p.png.length })),
+    });
+    logger.warn(`[toc-review-debug] 指令文本\n${truncDebug(outboundMessage)}`);
+  }
+  const turnRes = await finishTurn(outboundMessage, outboundAttachments);
   if (!isOk(turnRes)) {
     takeTocDraftSession(sessionId);
     await closeSession();
@@ -562,6 +621,28 @@ export async function reviewTocWithAgent(
   const record = takeTocDraftSession(sessionId);
   const merged = record?.merged ?? [];
   const failures = record?.errorCodes ?? [];
+  if (tocDebug) {
+    const byChange = new Map<string, number>();
+    for (const row of record?.diff ?? []) {
+      byChange.set(row.change, (byChange.get(row.change) ?? 0) + 1);
+    }
+    logger.warn('[toc-review-debug] 合并暂存', {
+      calls: record?.calls ?? 0,
+      successes: record?.successes ?? 0,
+      errorCodes: failures,
+      changeCounts: Object.fromEntries(byChange),
+    });
+    for (const row of record?.diff ?? []) {
+      logger.warn('[toc-review-debug] diff 行', {
+        entryId: row.entryId,
+        change: row.change,
+        before: row.before ? stringifyDebug(row.before) : null,
+        after: row.after ? stringifyDebug(row.after) : null,
+        reason: row.reason,
+        needsReview: row.needsReview,
+      });
+    }
+  }
   const gate = validateMergedEntries(merged);
   const draft =
     gate.ok && (record?.successes ?? 0) > 0

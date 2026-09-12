@@ -332,6 +332,13 @@ export async function extractTocBaseline(
   }
   // P2.2 唯一质量门：usable 才短路；none/unusable 走 OCR（日志只记状态/reason/计数）。
   const outlineQuality = classifyEmbeddedOutline(inspector, input.bytes, pageCount);
+  logger.warn('[toc-baseline] embedded 门', {
+    quality: outlineQuality.quality,
+    reason: outlineQuality.reason,
+    totalItems: outlineQuality.totalItems,
+    validEntries: outlineQuality.validEntries,
+    semanticEntries: outlineQuality.semanticEntries,
+  });
   if (outlineQuality.quality === 'usable') {
     return ok(embeddedBaselineResult(fromPage, toPage, pageCount));
   }

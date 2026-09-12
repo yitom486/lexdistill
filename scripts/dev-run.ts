@@ -137,9 +137,11 @@ async function main(): Promise<number> {
   if (checkOnly) return 0;
 
   // 2) 直属子进程启动（stdio 继承；unix 独立进程组以便整组杀）。
+  // 注意：子进程经 `bun run --filter` 启动，Bun 默认 --elide-lines=10 会吞掉超长
+  // 输出（[N lines elided]）；调试需要全量日志，此处显式关掉（0 = 全显示）。
   const specs: Array<{ name: string; argv: string[] }> = [];
-  if (only !== 'gateway') specs.push({ name: 'web', argv: ['run', '--filter', '@study-studio/web', 'dev'] });
-  if (only !== 'web') specs.push({ name: 'gateway', argv: ['run', '--filter', '@study-studio/gateway', 'dev'] });
+  if (only !== 'gateway') specs.push({ name: 'web', argv: ['run', '--elide-lines=0', '--filter', '@study-studio/web', 'dev'] });
+  if (only !== 'web') specs.push({ name: 'gateway', argv: ['run', '--elide-lines=0', '--filter', '@study-studio/gateway', 'dev'] });
   const children = new Map<ChildProcess, string>();
   for (const spec of specs) {
     const child = spawn('bun', spec.argv, {

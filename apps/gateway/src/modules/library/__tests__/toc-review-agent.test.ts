@@ -8,6 +8,7 @@ import type {
 import { BusinessError, isOk, logger, ok } from '@study-studio/shared';
 import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
 import {
+  TOC_REVIEW_DEBUG_ENV,
   TOC_REVIEW_EFFORT_ENV,
   TOC_REVIEW_MODEL_ENV,
   TOC_REVIEW_SYSTEM_PROMPT,
@@ -16,6 +17,7 @@ import {
   buildTocReviewRetryMessage,
   formatReviewEvidence,
   isTocDraftToolCall,
+  isTocReviewDebug,
   resolveTocReviewModelOptions,
   reviewTocWithAgent,
 } from '../application/pdf-import/toc-review-agent.js';
@@ -557,8 +559,60 @@ describe('P3.5 reviewTocWithAgent（增量工具通道 mock）', () => {
     expect(dumped).not.toContain('iVBOR');
   });
 
-  it('buildTocReviewMessage 纯函数：含范围/条目/计数与工具指令，不含图片字节', () => {
-    const baseline = {
+  it('isTocReviewDebug：仅 1/true 开门，其余关闭', () => {
+    const saved = process.env[TOC_REVIEW_DEBUG_ENV];
+    try {
+      delete process.env[TOC_REVIEW_DEBUG_ENV];
+      expect(isTocReviewDebug()).toBe(false);
+      process.env[TOC_REVIEW_DEBUG_ENV] = '0';
+      expect(isTocReviewDebug()).toBe(false);
+      process.env[TOC_REVIEW_DEBUG_ENV] = '';
+      expect(isTocReviewDebug()).toBe(false);
+      process.env[TOC_REVIEW_DEBUG_ENV] = '1';
+      expect(isTocReviewDebug()).toBe(true);
+      process.env[TOC_REVIEW_DEBUG_ENV] = 'true';
+      expect(isTocReviewDebug()).toBe(true);
+    } finally {
+      if (saved === undefined) delete process.env[TOC_REVIEW_DEBUG_ENV];
+      else process.env[TOC_REVIEW_DEBUG_ENV] = saved;
+    }
+  });
+
+  it('开旗时才记请求/工具参数/diff 明细（默认关闭由上一条卫生用例覆盖）', async () => {
+    const savedFlag = process.env[TOC_REVIEW_DEBUG_ENV];
+    const captured: unknown[][] = [];
+    const originalWarn = logger.warn;
+    logger.warn = (...args: unknown[]): void => {
+      captured.push(args);
+    };
+    try {
+      process.env[TOC_REVIEW_DEBUG_ENV] = '1';
+      const res = await reviewTocWithAgent(
+        {
+          loadInspector: async () =>
+            agentMock({ pageCount: 371, calls: newCalls(), ocrMarkdown: twoPageOcr() }),
+          adapter: mockToolAdapter({
+            calls: newAgentCalls(),
+            steps: [{ kind: 'tool', tool: 'add', input: GOOD_ADD }],
+          }),
+        },
+        { userId: PROBE_USER, filename: 'secret-path-toc.pdf', bytes: mockBytes(), fromPage: 1, toPage: 2 }
+      );
+      expect(isOk(res)).toBe(true);
+    } finally {
+      logger.warn = originalWarn;
+      if (savedFlag === undefined) delete process.env[TOC_REVIEW_DEBUG_ENV];
+      else process.env[TOC_REVIEW_DEBUG_ENV] = savedFlag;
+    }
+    const dumped = JSON.stringify(captured);
+    // 开旗后的终端输出必须含可排障信息：指令标记、工具名、diff 行标记
+    expect(dumped).toContain('[toc-review-debug]');
+    expect(dumped).toContain(SECRET_TITLE);
+    expect(dumped).toContain(TOC_DRAFT_ADD_ENTRY_TOOL);
+    expect(dumped).toContain('diff 行');
+  });
+
+  it('buildTocReviewMessage 纯函数：含范围/条目/计数与工具指令，不含图片字节', () => {    const baseline = {
       status: 'ok' as const,
       verdict: 'thin' as const,
       range: { fromPage: 3, toPage: 4 },
