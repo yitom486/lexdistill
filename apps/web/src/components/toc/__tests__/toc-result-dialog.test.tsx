@@ -146,6 +146,8 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
     expect(html).toContain('AI 重建目录');
     expect(html).toContain('16–21');
     expect(html).toContain('开始重建');
+    // 无已保存偏好：触发器与预览双双指向服务端默认
+    expect(html).toContain('服务端默认');
     const disabled = renderToStaticMarkup(
       React.createElement(TocReviewConfigDialogContent, {
         rangeText: '16–21',
@@ -167,7 +169,7 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
     expect(disabled).toContain('disabled');
   });
 
-  it('配置 Dialog：模型三态 + effort 三态 + 记住偏好 + 生效来源行', () => {
+  it('配置 Dialog：模型/思考等级显式下拉 + 记住偏好 + 本次生效预览', () => {
     const html = renderToStaticMarkup(
       React.createElement(TocReviewConfigDialogContent, {
         rangeText: '16–21',
@@ -186,12 +188,11 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
         onClose: () => {},
       })
     );
-    expect(html).toContain('跟随偏好');
-    expect(html).toContain('服务端默认');
-    expect(html).toContain('指定模型');
+    expect(html).toContain('模型');
     expect(html).toContain('思考等级');
     expect(html).toContain('记住为偏好');
-    // 跟随偏好回显已保存值
+    // 本次生效预览回显已保存值（跟随偏好态）
+    expect(html).toContain('本次发送');
     expect(html).toContain('m-saved');
   });
 

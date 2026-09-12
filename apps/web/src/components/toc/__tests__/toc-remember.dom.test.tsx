@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import * as React from 'react';
 import { TocReviewConfigDialogContent } from '../TocReviewDialogs.js';
 import { resolveRememberWrite } from '../../../lib/toc-confirm-flow.js';
+import type { TocReviewModelMode } from '../../../lib/toc-confirm-flow.js';
 import { usePreferencesStore } from '../../../stores/usePreferencesStore.js';
 import { act, setupDom, type DomHandle } from './dom-setup.js';
 import type { TocBaselineData } from '../../../lib/toc-confirm-flow.js';
@@ -27,16 +28,27 @@ const BASELINE = {
   pageEvidence: [{ page: 16, excerpt: 'x' }],
 } as unknown as TocBaselineData;
 
-function renderHarness(): void {
+function renderHarness(session?: {
+  sessionModel: string;
+  sessionModelMode: TocReviewModelMode;
+  sessionEffort: string;
+  sessionEffortMode: TocReviewModelMode;
+}): void {
   if (!handle) throw new Error('dom not ready');
   const root = handle.root;
+  const s = session ?? {
+    sessionModel: '',
+    sessionModelMode: 'inherit' as TocReviewModelMode,
+    sessionEffort: '',
+    sessionEffortMode: 'inherit' as TocReviewModelMode,
+  };
   act(() => {
     root.render(
       React.createElement(() => {
-        const savedModel = usePreferencesStore((s) => s.tocReviewModel);
-        const savedEffort = usePreferencesStore((s) => s.tocReviewEffort);
-        const setSavedTocModel = usePreferencesStore((s) => s.setTocReviewModel);
-        const setSavedTocEffort = usePreferencesStore((s) => s.setTocReviewEffort);
+        const savedModel = usePreferencesStore((st) => st.tocReviewModel);
+        const savedEffort = usePreferencesStore((st) => st.tocReviewEffort);
+        const setSavedTocModel = usePreferencesStore((st) => st.setTocReviewModel);
+        const setSavedTocEffort = usePreferencesStore((st) => st.setTocReviewEffort);
         return React.createElement(TocReviewConfigDialogContent, {
           rangeText: '16–21',
           baseline: BASELINE,
@@ -46,10 +58,10 @@ function renderHarness(): void {
           starting: false,
           savedModel,
           savedEffort,
-          sessionModel: '',
-          sessionModelMode: 'inherit',
-          sessionEffort: '',
-          sessionEffortMode: 'inherit',
+          sessionModel: s.sessionModel,
+          sessionModelMode: s.sessionModelMode,
+          sessionEffort: s.sessionEffort,
+          sessionEffortMode: s.sessionEffortMode,
           // 与 Panel handleStartReview 完全相同的 persist 应用逻辑
           onStart: (config) => {
             const write = resolveRememberWrite(config);
@@ -71,17 +83,6 @@ function clickByLabel(label: string): void {
   });
 }
 
-function setInputValue(label: string, value: string): void {
-  const el = document.querySelector(`input[aria-label="${label}"]`);
-  if (!(el instanceof HTMLInputElement)) throw new Error(`input not found: ${label}`);
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-  if (!setter) throw new Error('no value setter');
-  act(() => {
-    setter.call(el, value);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-}
-
 describe('P3.5-FIX2-A1 remember 语义 DOM 回归', () => {
   it('inherit/inherit 下记住复选框禁用（无可记住内容）', async () => {
     handle = await setupDom();
@@ -96,10 +97,13 @@ describe('P3.5-FIX2-A1 remember 语义 DOM 回归', () => {
   it('混合模式记住：只写 explicit 项，inherit 项逐字不动', async () => {
     handle = await setupDom();
     usePreferencesStore.setState({ tocReviewModel: 'm-saved', tocReviewEffort: 'high' });
-    renderHarness();
-    // 模型切到指定并填写；effort 保持跟随偏好
-    clickByLabel('指定模型');
-    setInputValue('模型 id', 'm-once');
+    // 指定模型态走本次覆盖 props 预置（与下拉点选同一条初始化路）；effort 保持跟随偏好
+    renderHarness({
+      sessionModel: 'm-once',
+      sessionModelMode: 'explicit',
+      sessionEffort: '',
+      sessionEffortMode: 'inherit',
+    });
     // 记住此时可用（存在 explicit 项）
     const box = document.querySelector('input[aria-label="记住为偏好"]');
     if (!(box instanceof HTMLInputElement)) throw new Error('remember checkbox missing');

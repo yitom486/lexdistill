@@ -30,6 +30,31 @@ export interface TocModelConfig {
 
 export const TOC_EFFORT_CHOICES = ['low', 'medium', 'high'] as const;
 
+export type TocEffortChoice = (typeof TOC_EFFORT_CHOICES)[number];
+
+/**
+ * Inkdown 式显式选择：一个字段一个下拉，选什么发什么，值永远可见。
+ * - 模型：网关没有"可用模型列表"端点，id 无法枚举，故不做假下拉；
+ *   「指定模型」后手填 id + 本次生效预览，绝不出现"不知发了什么"的跟随态。
+ * - 思考等级：low/medium/high 全枚举 + 费用提示，目录是简单任务，默认不选 high。
+ * 对外契约不变：仍输出 TocModelConfig（model/effort 缺席 = 不发送 = 服务端默认），
+ * panel 与 resolveRememberWrite 零改动。
+ */
+type ModelSel = '__saved__' | '__default__' | '__custom__';
+type EffortSel = '__saved__' | '__default__' | TocEffortChoice;
+
+function asEffortChoice(value: string): TocEffortChoice | null {
+  return (TOC_EFFORT_CHOICES as readonly string[]).includes(value)
+    ? (value as TocEffortChoice)
+    : null;
+}
+
+function effortCostHint(value: TocEffortChoice): string {
+  if (value === 'low') return '（快速·便宜，目录任务一般够用）';
+  if (value === 'medium') return '（均衡）';
+  return '（最强·最贵，目录任务一般不需要）';
+}
+
 export interface TocReviewConfigDialogContentProps {
   rangeText: string;
   baseline: TocBaselineData;
@@ -49,43 +74,66 @@ export interface TocReviewConfigDialogContentProps {
   onClose(): void;
 }
 
-function savedLabel(value: string): string {
-  const text = value.trim();
-  return text ? text : '未设（走服务端默认）';
-}
-
 export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContentProps): React.ReactElement {
   const {
     rangeText, baseline, evidencePages, sizeHint, reviewDisabledReason, starting,
     savedModel, savedEffort, sessionModel, sessionModelMode, sessionEffort, sessionEffortMode,
     onStart, onClose,
   } = props;
-  const [modelMode, setModelMode] = React.useState<TocReviewModelMode>(() => sessionModelMode);
+  const trimmedSavedModel = savedModel.trim();
+  const trimmedSavedEffort = savedEffort.trim();
+  const [modelSel, setModelSel] = React.useState<ModelSel>(() =>
+    sessionModelMode === 'explicit'
+      ? '__custom__'
+      : sessionModelMode === 'default'
+        ? '__default__'
+        : trimmedSavedModel
+          ? '__saved__'
+          : '__default__');
   const [modelText, setModelText] = React.useState<string>(() => sessionModel || savedModel);
-  const [effortMode, setEffortMode] = React.useState<TocReviewModelMode>(() => sessionEffortMode);
-  const [effort, setEffort] = React.useState<string>(() => {
-    const current = (sessionEffortMode === 'explicit' ? sessionEffort : savedEffort).trim();
-    return (TOC_EFFORT_CHOICES as readonly string[]).includes(current) ? current : '';
+  const [effortSel, setEffortSel] = React.useState<EffortSel>(() => {
+    if (sessionEffortMode === 'explicit') return asEffortChoice(sessionEffort) ?? '__default__';
+    if (sessionEffortMode === 'default') return '__default__';
+    return trimmedSavedEffort ? '__saved__' : '__default__';
   });
   const [remember, setRemember] = React.useState<boolean>(false);
-  // P3.5-FIX2-A1：双跟随偏好时无可记住的内容，禁用复选框（而非勾选后静默无操作）。
-  const nothingToRemember = modelMode === 'inherit' && effortMode === 'inherit';
-  const effectiveModel = modelMode === 'explicit' ? modelText.trim() : '';
-  const effectiveEffort = effortMode === 'explicit' ? effort : '';
-  const modelSourceLine =
-    modelMode === 'explicit'
-      ? modelText.trim()
-        ? `本次指定：${modelText.trim()}${remember ? '（将记住为偏好）' : '（仅本次）'}`
-        : '已选指定模型但未填写 → 本次使用默认'
-      : modelMode === 'default'
-        ? '本次使用服务端默认配置（忽略本地已保存偏好；按服务端环境变量 > 引擎默认）'
-        : `跟随已保存偏好：${savedLabel(savedModel)}`;
-  const effortSourceLine =
-    effortMode === 'explicit'
-      ? `本次指定：${effort || '（未选，按默认）'}${remember ? '（将记住为偏好）' : '（仅本次）'}`
-      : effortMode === 'default'
-        ? '本次使用服务端默认配置（忽略本地已保存偏好）'
-        : `跟随已保存偏好：${savedLabel(savedEffort)}`;
+  // 双跟随已保存时无可记住的内容，禁用复选框（而非勾选后静默无操作）。
+  const nothingToRemember = modelSel === '__saved__' && effortSel === '__saved__';
+  const modelMode: TocReviewModelMode =
+    modelSel === '__custom__' ? 'explicit' : modelSel === '__default__' ? 'default' : 'inherit';
+  const effectiveModel = modelSel === '__custom__' ? modelText.trim() : '';
+  const effortMode: TocReviewModelMode =
+    effortSel === '__saved__' ? 'inherit' : effortSel === '__default__' ? 'default' : 'explicit';
+  const effectiveEffort = effortSel === '__saved__' || effortSel === '__default__' ? '' : effortSel;
+  // 本次生效预览：永远可见的一行真相——实际发什么、不发什么。
+  const modelPreview =
+    modelSel === '__custom__'
+      ? effectiveModel
+        ? `本次发送模型：${effectiveModel}（仅本次）`
+        : '指定了模型但未填写 → 本次不发送（服务端默认）'
+      : modelSel === '__saved__' && trimmedSavedModel
+        ? `本次发送已保存模型：${trimmedSavedModel}`
+        : '本次不发送模型（服务端默认，跟随网关配置）';
+  const effortPreview =
+    effortSel === '__saved__'
+      ? trimmedSavedEffort
+        ? `本次发送已保存思考等级：${trimmedSavedEffort}`
+        : '本次不发送思考等级（服务端默认）'
+      : effortSel === '__default__'
+        ? '本次不发送思考等级（服务端默认，跟随网关配置）'
+        : `本次发送思考等级：${effortSel}${effortCostHint(effortSel)}`;
+  const modelTriggerText =
+    modelSel === '__custom__'
+      ? modelText.trim() || '指定模型…'
+      : modelSel === '__saved__'
+        ? `跟随已保存（${trimmedSavedModel}）`
+        : '服务端默认';
+  const effortTriggerText =
+    effortSel === '__saved__'
+      ? `跟随已保存（${trimmedSavedEffort}）`
+      : effortSel === '__default__'
+        ? '服务端默认'
+        : `${effortSel}${effortCostHint(effortSel)}`;
   return (
     <div className="space-y-2">
       <DialogHeader>
@@ -104,40 +152,39 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
         )}
       </div>
       <fieldset className="space-y-1.5 rounded-xl border border-toc-border bg-toc-surface p-2 text-[11px] text-toc-strong">
-        <legend className="px-1 text-[11px] font-bold text-toc-muted">模型配置（本次生效）</legend>
-        <div className="flex flex-col gap-1" role="radiogroup" aria-label="模型取值">
-          <label className="flex items-center gap-1">
-            <input
-              type="radio"
-              name="toc-review-model-mode"
-              aria-label="跟随已保存偏好"
-              checked={modelMode === 'inherit'}
-              onChange={() => setModelMode('inherit')}
-            />
-            跟随偏好（当前：{savedLabel(savedModel)}）
-          </label>
-          <label className="flex items-center gap-1">
-            <input
-              type="radio"
-              name="toc-review-model-mode"
-              aria-label="使用服务端默认模型"
-              checked={modelMode === 'default'}
-              onChange={() => setModelMode('default')}
-            />
-            使用服务端默认（忽略本地偏好）
-          </label>
-          <label className="flex items-center gap-1">
-            <input
-              type="radio"
-              name="toc-review-model-mode"
-              aria-label="指定模型"
-              checked={modelMode === 'explicit'}
-              onChange={() => setModelMode('explicit')}
-            />
-            指定模型
-          </label>
-        </div>
-        {modelMode === 'explicit' && (
+        <legend className="px-1 text-[11px] font-bold text-toc-muted">模型（本次生效）</legend>
+        <Select
+          value={modelSel}
+          onValueChange={(v) => {
+            if (v === '__saved__' && trimmedSavedModel) {
+              setModelSel('__saved__');
+              return;
+            }
+            if (v === '__custom__') {
+              setModelSel('__custom__');
+              return;
+            }
+            setModelSel('__default__');
+          }}
+        >
+          <SelectTrigger className="h-7 w-full text-[11px]" aria-label="模型">
+            <SelectValue placeholder="选择模型">{modelTriggerText}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {trimmedSavedModel && (
+              <SelectItem value="__saved__" className="text-[11px]">
+                跟随已保存（{trimmedSavedModel}）
+              </SelectItem>
+            )}
+            <SelectItem value="__default__" className="text-[11px]">
+              服务端默认（跟随网关配置）
+            </SelectItem>
+            <SelectItem value="__custom__" className="text-[11px]">
+              指定模型…
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        {modelSel === '__custom__' && (
           <input
             type="text"
             aria-label="模型 id"
@@ -147,42 +194,46 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
             className="h-7 w-full rounded-lg border border-toc-border bg-toc-surface px-2 text-toc-strong outline-none"
           />
         )}
-        <div className="flex items-center gap-2">
-          <label htmlFor="toc-review-effort">思考等级</label>
-          <Select
-            value={effortMode === 'inherit' ? 'saved' : effortMode === 'default' ? 'default' : effort || 'default'}
-            onValueChange={(v) => {
-              if (v === 'saved') {
-                setEffortMode('inherit');
-                return;
-              }
-              if (v === 'default' || v === null) {
-                setEffortMode('default');
-                setEffort('');
-                return;
-              }
-              setEffortMode('explicit');
-              setEffort(v);
-            }}
-          >
-            <SelectTrigger id="toc-review-effort" className="h-7 w-36 text-[11px]" aria-label="思考等级">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="saved" className="text-[11px]">
-                跟随偏好（{savedLabel(savedEffort)}）
+        <p className="text-toc-muted" aria-live="polite">{modelPreview}</p>
+      </fieldset>
+      <fieldset className="space-y-1.5 rounded-xl border border-toc-border bg-toc-surface p-2 text-[11px] text-toc-strong">
+        <legend className="px-1 text-[11px] font-bold text-toc-muted">思考等级（本次生效）</legend>
+        <Select
+          value={effortSel}
+          onValueChange={(v) => {
+            if (v === '__saved__' && trimmedSavedEffort) {
+              setEffortSel('__saved__');
+              return;
+            }
+            if (v === null || v === '__default__') {
+              setEffortSel('__default__');
+              return;
+            }
+            setEffortSel(asEffortChoice(v) ?? '__default__');
+          }}
+        >
+          <SelectTrigger className="h-7 w-full text-[11px]" aria-label="思考等级">
+            <SelectValue placeholder="选择思考等级">{effortTriggerText}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {trimmedSavedEffort && (
+              <SelectItem value="__saved__" className="text-[11px]">
+                跟随已保存（{trimmedSavedEffort}）
               </SelectItem>
-              <SelectItem value="default" className="text-[11px]">
-                服务端默认
+            )}
+            <SelectItem value="__default__" className="text-[11px]">
+              服务端默认（跟随网关配置）
+            </SelectItem>
+            {TOC_EFFORT_CHOICES.map((choice) => (
+              <SelectItem key={choice} value={choice} className="text-[11px]">
+                {choice}{effortCostHint(choice)}
               </SelectItem>
-              {TOC_EFFORT_CHOICES.map((choice) => (
-                <SelectItem key={choice} value={choice} className="text-[11px]">
-                  {choice}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-toc-muted" aria-live="polite">{effortPreview}</p>
+      </fieldset>
+      <div className="space-y-1 rounded-xl border border-toc-border bg-toc-surface p-2 text-[11px] text-toc-strong">
         <label className="flex items-center gap-1 text-toc-muted">
           <input
             type="checkbox"
@@ -193,9 +244,7 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
           />
           记住为偏好（{nothingToRemember ? '跟随偏好时无需记住' : '下次默认使用；选默认则清空已保存'}）
         </label>
-        <p className="text-toc-muted" aria-live="polite">{modelSourceLine}</p>
-        <p className="text-toc-muted" aria-live="polite">{effortSourceLine}</p>
-      </fieldset>
+      </div>
       <DialogFooter>
         <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]" onClick={onClose}>
           取消
