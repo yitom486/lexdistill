@@ -471,23 +471,23 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
   return (
     <div className="space-y-6">
       {/* 顶部控制与切换栏 */}
-      <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-4 sm:p-6 border border-amber-900/10 dark:border-amber-500/15 shadow-sm">
+      <div className="bg-paper-soft rounded-2xl p-4 sm:p-6 border border-line-accent shadow-sm">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <Badge variant="amber">课程底座</Badge>
-              <span className="text-xs text-stone-500 dark:text-stone-400">
+              <span className="text-xs text-ink-ghost">
                 权威字形 · 标准发音 · 熟练度回写
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-serif font-bold text-stone-900 dark:text-stone-100 mt-1">
+            <h2 className="text-xl sm:text-2xl font-serif font-bold text-ink mt-1">
               五十音工作室 (Kana Studio)
             </h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* 平/片假名切换 */}
-            <div className="flex items-center bg-stone-200/70 dark:bg-stone-800/80 rounded-xl p-1 text-xs">
+            <div className="flex items-center bg-veil-stone-200o70-stone-800o80 rounded-xl p-1 text-xs">
               <button
                 onClick={() => {
                   sound.playClick();
@@ -495,8 +495,8 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                 }}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                   scriptMode === 'HIRAGANA'
-                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-sm font-bold'
-                    : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                    ? 'bg-tone-white dark:bg-tone-stone-700 text-ink shadow-sm font-bold'
+                    : 'text-ink-stone-500 hover:text-ink-soft'
                 }`}
               >
                 平假名
@@ -508,8 +508,8 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                 }}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                   scriptMode === 'KATAKANA'
-                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-sm font-bold'
-                    : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                    ? 'bg-tone-white dark:bg-tone-stone-700 text-ink shadow-sm font-bold'
+                    : 'text-ink-stone-500 hover:text-ink-soft'
                 }`}
               >
                 片假名
@@ -521,8 +521,8 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                 }}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                   scriptMode === 'BOTH'
-                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-sm font-bold'
-                    : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                    ? 'bg-tone-white dark:bg-tone-stone-700 text-ink shadow-sm font-bold'
+                    : 'text-ink-stone-500 hover:text-ink-soft'
                 }`}
               >
                 平片对照
@@ -580,7 +580,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
 
         {/* 矩阵选项卡 (清音 / 浊音&半浊音 / 拗音) */}
         {!isDrillActive && (
-          <div className="mt-4 pt-4 border-t border-amber-900/10 dark:border-amber-500/10 flex items-center justify-between">
+          <div className="mt-4 pt-4 border-t border-line-amber-900o10-amber-500o10 flex items-center justify-between">
             <Tabs
               value={matrixTab}
               onValueChange={(val) => {
@@ -590,20 +590,20 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
               }}
             >
               <TabsList className="bg-transparent p-0 border-0">
-                <TabsIndicator className="bg-amber-500 shadow-sm" />
-                <TabsTrigger value="SEION" className="px-3 py-1.5 text-xs data-[selected]:text-stone-950">
+                <TabsIndicator className="bg-tone-amber-500 shadow-sm" />
+                <TabsTrigger value="SEION" className="px-3 py-1.5 text-xs data-[selected]:text-tone-stone-950">
                   清音矩阵 (46)
                 </TabsTrigger>
-                <TabsTrigger value="DAKUON_HANDAKUON" className="px-3 py-1.5 text-xs data-[selected]:text-stone-950">
+                <TabsTrigger value="DAKUON_HANDAKUON" className="px-3 py-1.5 text-xs data-[selected]:text-tone-stone-950">
                   浊音与半浊音 (25)
                 </TabsTrigger>
-                <TabsTrigger value="YOON" className="px-3 py-1.5 text-xs data-[selected]:text-stone-950">
+                <TabsTrigger value="YOON" className="px-3 py-1.5 text-xs data-[selected]:text-tone-stone-950">
                   常用拗音 (33)
                 </TabsTrigger>
               </TabsList>
             </Tabs>
 
-            <span className="text-xs text-stone-400 font-mono hidden sm:inline">
+            <span className="text-xs text-ink-stone-400 font-mono hidden sm:inline">
               点击假名播放发音 · 点击“详情”打开讲义
             </span>
           </div>
@@ -619,12 +619,12 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="max-w-2xl mx-auto bg-[#faf9f6] dark:bg-[#1a1816] rounded-3xl p-6 sm:p-8 border border-amber-900/15 dark:border-amber-500/20 shadow-md space-y-6"
+            className="max-w-2xl mx-auto bg-paper-soft rounded-3xl p-6 sm:p-8 border border-line-amber-900o15-amber-500o20 shadow-md space-y-6"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge variant="amber">考核冲刺</Badge>
-                <span className="text-xs text-stone-500">
+                <span className="text-xs text-ink-stone-500">
                   {isWordMode ? (
                     wordList.length === 0 ? (
                       <>{generateWords.isPending ? '抽词中…' : '暂无词语'}</>
@@ -639,7 +639,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                 </span>
                 {!isWordMode && drillItems.length > 0 && (
                   <span
-                    className="text-[10px] px-1.5 py-0.5 rounded-md bg-stone-200/70 dark:bg-stone-800 text-stone-500 dark:text-stone-400"
+                    className="text-[10px] px-1.5 py-0.5 rounded-md bg-veil-stone-200o70-stone-800 text-ink-ghost"
                     title="题池跟随矩阵选项卡范围"
                   >
                     {matrixTab === 'SEION'
@@ -653,14 +653,14 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
 
               <div className="flex items-center gap-3">
                 {drillStreak > 0 && (
-                  <div className="flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400">
-                    <Flame className="w-4 h-4 fill-amber-500 text-amber-500 animate-pulse" />
+                  <div className="flex items-center gap-1 text-xs font-bold text-accent-ink">
+                    <Flame className="w-4 h-4 fill-tone-amber-500 text-tone-amber-500 animate-pulse" />
                     <span>{drillStreak} 连对</span>
                   </div>
                 )}
                 {drillAnswered > 0 && (
                   <div
-                    className="text-xs text-stone-500 dark:text-stone-400"
+                    className="text-xs text-ink-ghost"
                     title="本轮战报会随画像回写，导师可见你的假名薄弱项"
                   >
                     本轮 {drillCorrect}/{drillAnswered} ·{' '}
@@ -681,7 +681,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                     setWordStudyDone(false);
                     resetRoundStats();
                   }}
-                  className="text-xs rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 px-2 py-1"
+                  className="text-xs rounded-lg border border-line-stone-300-stone-700 bg-surface-dim px-2 py-1"
                 >
                   <option value="AUDIO_TO_KANA">听音辨字</option>
                   <option value="KANA_TO_ROMAJI">看字辨音</option>
@@ -703,7 +703,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                       resetRoundStats();
                     }}
                     title="每轮题量"
-                    className="text-xs rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 px-2 py-1"
+                    className="text-xs rounded-lg border border-line-stone-300-stone-700 bg-surface-dim px-2 py-1"
                   >
                     <option value={10}>10 题</option>
                     <option value={20}>20 题</option>
@@ -718,19 +718,19 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
             {isWordMode ? (
               <div className="text-center py-6 space-y-4">
                 {!currentWord ? (
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-ink-stone-500">
                     {generateWords.isPending ? '正在从本地词典抽词…' : '暂无可用词语，请先安装日语词典包。'}
                   </p>
                 ) : !wordStudyDone ? (
                   <div className="space-y-4">
-                    <p className="text-xs text-stone-500">先学：看读音释义、跟读两遍，再去测验</p>
-                    <div className="text-6xl font-serif font-bold text-stone-900 dark:text-stone-100">
+                    <p className="text-xs text-ink-stone-500">先学：看读音释义、跟读两遍，再去测验</p>
+                    <div className="text-6xl font-serif font-bold text-ink">
                       {currentWord.kana}
                     </div>
-                    <p className="text-sm text-stone-500 dark:text-stone-400">
+                    <p className="text-sm text-ink-ghost">
                       {currentWord.headword}
                     </p>
-                    <p className="text-sm text-stone-700 dark:text-stone-200">
+                    <p className="text-sm text-ink-mute-deep">
                       {currentWord.meanings.join('；')}
                     </p>
                     <div className="flex items-center justify-center gap-3">
@@ -752,7 +752,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                           setWordStudyDone(true);
                         }}
                         size="sm"
-                        className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-6"
+                        className="bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs px-6"
                       >
                         记住了，去测验 ➔
                       </Button>
@@ -760,20 +760,20 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                   </div>
                 ) : drillMode === 'WORD_DICTATION' ? (
                   <div className="space-y-3">
-                    <p className="text-xs text-stone-500">听发音，用罗马字拼出假名（自动转换）：</p>
+                    <p className="text-xs text-ink-stone-500">听发音，用罗马字拼出假名（自动转换）：</p>
                     <button
                       onClick={() => {
                         sound.playClick();
                         void speechStudio.speak(currentWord.audioText || currentWord.kana, { lang: 'JA', purpose: 'dictation' });
                       }}
-                      className="mx-auto w-20 h-20 rounded-full bg-amber-500/15 border-2 border-amber-500/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-all text-amber-700 dark:text-amber-300 shadow-sm"
+                      className="mx-auto w-20 h-20 rounded-full bg-wash-amber-500o15 border-2 border-line-amber-500o30 flex items-center justify-center hover:scale-105 active:scale-95 transition-all text-accent-ink-strong shadow-sm"
                     >
                       <Volume2 className="w-8 h-8" />
                     </button>
-                    <p className="text-sm text-stone-600 dark:text-stone-300">
+                    <p className="text-sm text-ink-faint">
                       词义提示：{currentWord.meanings.join('；')}
                     </p>
-                    <p className="text-4xl font-serif font-bold text-stone-900 dark:text-stone-100 min-h-[3rem]">
+                    <p className="text-4xl font-serif font-bold text-ink min-h-[3rem]">
                       {wordInput
                         ? romajiToKana(wordInput, allKana, scriptMode === 'KATAKANA' ? 'KATAKANA' : 'HIRAGANA') || '···'
                         : '···'}
@@ -787,25 +787,25 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                         }}
                         disabled={isAnswered}
                         placeholder="输入罗马字，如 ame（长音用 -，如 konpyu-ta-）"
-                        className="flex-1 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 px-3 py-2 text-sm font-mono"
+                        className="flex-1 rounded-xl border border-line-stone-300-stone-700 bg-surface-dim px-3 py-2 text-sm font-mono"
                       />
                       {!isAnswered && (
-                        <Button onClick={handleSubmitWordInput} size="sm" className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-5">
+                        <Button onClick={handleSubmitWordInput} size="sm" className="bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs px-5">
                           提交
                         </Button>
                       )}
                     </div>
                     {isAnswered && (
-                      <p className="text-sm text-stone-600 dark:text-stone-300">
+                      <p className="text-sm text-ink-faint">
                         正确答案：<span className="font-bold font-serif">{currentWord.kana}</span>
-                        <span className="text-stone-400">（{currentWord.headword}）</span>
+                        <span className="text-ink-stone-400">（{currentWord.headword}）</span>
                       </p>
                     )}
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <p className="text-xs text-stone-500">看单词，选择正确的中文释义：</p>
-                    <div className="text-6xl font-serif font-bold text-stone-900 dark:text-stone-100">
+                    <p className="text-xs text-ink-stone-500">看单词，选择正确的中文释义：</p>
+                    <div className="text-6xl font-serif font-bold text-ink">
                       {currentWord.kana}
                     </div>
                     <button
@@ -813,7 +813,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                         sound.playClick();
                         void speechStudio.speak(currentWord.audioText || currentWord.kana, { lang: 'JA', purpose: 'preview' });
                       }}
-                      className="text-xs text-amber-600 dark:text-amber-400 hover:underline"
+                      className="text-xs text-accent-ink hover:underline"
                     >
                       🔊 播放发音
                     </button>
@@ -823,14 +823,14 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                         const isCorrectOpt = opt === correct;
                         const isSelected = selectedOption === opt;
                         let btnStyle =
-                          'bg-white dark:bg-stone-800/80 border-stone-200 dark:border-stone-700 hover:border-amber-500/50';
+                          'bg-tone-white dark:bg-tone-stone-800o80 border-line hover:border-tone-amber-500o50';
                         if (isAnswered) {
                           if (isCorrectOpt) {
-                            btnStyle = 'bg-emerald-500/15 border-emerald-500 text-emerald-800 dark:text-emerald-300 font-bold';
+                            btnStyle = 'bg-tone-emerald-500o15 border-tone-emerald-500 text-ink-emerald-800-emerald-300 font-bold';
                           } else if (isSelected) {
-                            btnStyle = 'bg-rose-500/15 border-rose-500 text-rose-800 dark:text-rose-300';
+                            btnStyle = 'bg-wash-rose-500o15 border-tone-rose-500 text-ink-rose-800-rose-300';
                           } else {
-                            btnStyle = 'opacity-40 border-stone-200 dark:border-stone-800';
+                            btnStyle = 'opacity-40 border-line-soft';
                           }
                         }
                         return (
@@ -842,10 +842,10 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                           >
                             <span>{opt}</span>
                             {isAnswered && isCorrectOpt && (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500 inline ml-2" />
+                              <CheckCircle2 className="w-4 h-4 text-tone-emerald-500 inline ml-2" />
                             )}
                             {isAnswered && isSelected && !isCorrectOpt && (
-                              <XCircle className="w-4 h-4 text-rose-500 inline ml-2" />
+                              <XCircle className="w-4 h-4 text-tone-rose-500 inline ml-2" />
                             )}
                           </button>
                         );
@@ -862,7 +862,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                       disabled={collectEntry.isPending}
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 text-xs text-amber-700 dark:text-amber-300"
+                      className="gap-1.5 text-xs text-accent-ink-strong"
                     >
                       <BookOpen className="w-3.5 h-3.5" />
                       转生词卡
@@ -874,7 +874,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                     <Button
                       onClick={handleNextWord}
                       size="sm"
-                      className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-6"
+                      className="bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs px-6"
                     >
                       下一词 ➔
                     </Button>
@@ -885,18 +885,18 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
               <div className="text-center py-6 space-y-4">
                 {activeMode === 'AUDIO_TO_KANA' ? (
                   <div className="space-y-3">
-                    <p className="text-xs text-stone-500">听发音，点击选择正确的假名：</p>
+                    <p className="text-xs text-ink-stone-500">听发音，点击选择正确的假名：</p>
                     <button
                       onClick={() => handlePlayAudio(currentDrillKana)}
-                      className="mx-auto w-20 h-20 rounded-full bg-amber-500/15 border-2 border-amber-500/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-all text-amber-700 dark:text-amber-300 shadow-sm"
+                      className="mx-auto w-20 h-20 rounded-full bg-wash-amber-500o15 border-2 border-line-amber-500o30 flex items-center justify-center hover:scale-105 active:scale-95 transition-all text-accent-ink-strong shadow-sm"
                     >
                       <Volume2 className="w-8 h-8" />
                     </button>
                   </div>
                 ) : activeMode === 'KANA_TO_ROMAJI' ? (
                   <div className="space-y-2">
-                    <p className="text-xs text-stone-500">看假名，选择正确的罗马字发音：</p>
-                    <div className="text-6xl font-serif font-bold text-stone-900 dark:text-stone-100">
+                    <p className="text-xs text-ink-stone-500">看假名，选择正确的罗马字发音：</p>
+                    <div className="text-6xl font-serif font-bold text-ink">
                       {scriptMode === 'KATAKANA'
                         ? currentDrillKana.katakana
                         : currentDrillKana.hiragana}
@@ -904,8 +904,8 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-xs text-stone-500">平假名 ➔ 选出对应的片假名：</p>
-                    <div className="text-6xl font-serif font-bold text-stone-900 dark:text-stone-100">
+                    <p className="text-xs text-ink-stone-500">平假名 ➔ 选出对应的片假名：</p>
+                    <div className="text-6xl font-serif font-bold text-ink">
                       {currentDrillKana.hiragana}
                     </div>
                   </div>
@@ -935,14 +935,14 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                     });
 
                     let btnStyle =
-                      'bg-white dark:bg-stone-800/80 border-stone-200 dark:border-stone-700 hover:border-amber-500/50';
+                      'bg-tone-white dark:bg-tone-stone-800o80 border-line hover:border-tone-amber-500o50';
                     if (isAnswered) {
                       if (isCorrectOpt) {
-                        btnStyle = 'bg-emerald-500/15 border-emerald-500 text-emerald-800 dark:text-emerald-300 font-bold';
+                        btnStyle = 'bg-tone-emerald-500o15 border-tone-emerald-500 text-ink-emerald-800-emerald-300 font-bold';
                       } else if (isSelected) {
-                        btnStyle = 'bg-rose-500/15 border-rose-500 text-rose-800 dark:text-rose-300';
+                        btnStyle = 'bg-wash-rose-500o15 border-tone-rose-500 text-ink-rose-800-rose-300';
                       } else {
-                        btnStyle = 'opacity-40 border-stone-200 dark:border-stone-800';
+                        btnStyle = 'opacity-40 border-line-soft';
                       }
                     }
 
@@ -956,24 +956,24 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                         <span className="flex flex-col items-center leading-tight">
                           <span>{opt}</span>
                           {isAnswered && activeMode !== 'KANA_TO_ROMAJI' && optionKana && (
-                            <span className="text-xs font-mono font-normal text-stone-500 dark:text-stone-400">
+                            <span className="text-xs font-mono font-normal text-ink-ghost">
                               {optionKana.romaji}
                             </span>
                           )}
                         </span>
                         {isAnswered && isCorrectOpt && (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          <CheckCircle2 className="w-4 h-4 text-tone-emerald-500" />
                         )}
                         {isAnswered && isSelected && !isCorrectOpt && (
-                          <XCircle className="w-4 h-4 text-rose-500" />
+                          <XCircle className="w-4 h-4 text-tone-rose-500" />
                         )}
                       </button>
                     );
                   })}
                 </div>
                 {isAnswered && activeMode !== 'KANA_TO_ROMAJI' && (
-                  <p className="text-xs text-stone-500 dark:text-stone-400">
-                    正确读音：<span className="font-mono font-semibold text-amber-700 dark:text-amber-300">{currentDrillKana.romaji}</span>
+                  <p className="text-xs text-ink-ghost">
+                    正确读音：<span className="font-mono font-semibold text-accent-ink-strong">{currentDrillKana.romaji}</span>
                   </p>
                 )}
 
@@ -990,7 +990,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                       }
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 text-xs text-amber-700 dark:text-amber-300"
+                      className="gap-1.5 text-xs text-accent-ink-strong"
                     >
                       <Bot className="w-3.5 h-3.5" />
                       问 AI 导师
@@ -1000,7 +1000,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                       onClick={() => currentDrillKana && handleOpenKanaGuide(currentDrillKana)}
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 text-xs text-amber-700 dark:text-amber-300"
+                      className="gap-1.5 text-xs text-accent-ink-strong"
                     >
                       <BookOpen className="w-3.5 h-3.5" />
                       查看详情
@@ -1009,7 +1009,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                       onClick={handleNextDrill}
                       disabled={practiceMutation.isPending}
                       size="sm"
-                      className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-6"
+                      className="bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs px-6"
                     >
                       下一题 ➔
                     </Button>
@@ -1018,7 +1018,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
               </div>
             ) : (
               <div className="text-center py-6 space-y-4">
-                <p className="text-xs text-stone-500">
+                <p className="text-xs text-ink-stone-500">
                   {isKanaLoading || adaptiveKanaQueueQuery.isLoading
                     ? '正在按练习记录组题…'
                     : '假名表为空：请确认网关已启动（默认 localhost:8080），然后重试。'}
@@ -1040,7 +1040,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                       void refetchKana();
                     }}
                     size="sm"
-                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                    className="bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs"
                   >
                     重新加载
                   </Button>
@@ -1062,7 +1062,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                 {groupedByRow.map(({ rowName, items }) => (
                 <div
                   key={rowName}
-                  className="grid grid-cols-1 gap-3 rounded-2xl border border-amber-900/10 bg-[#faf9f6] p-3.5 dark:border-amber-500/10 dark:bg-[#1a1816] sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:items-stretch sm:p-4"
+                  className="grid grid-cols-1 gap-3 rounded-2xl border border-line-amber-900o10 bg-paper-soft p-3.5 dark:border-wash-amber-500o10 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:items-stretch sm:p-4"
                 >
                   <KanaRowLabel
                     rowName={rowName}
@@ -1081,18 +1081,18 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                           onClick={() => handleSelectKana(kana)}
                           className={`group relative ${KANA_COLUMN_CLASSES[kana.col] ?? ''} flex flex-col items-center justify-center gap-1 rounded-xl border p-2.5 transition-all cursor-pointer select-none sm:p-3.5 ${
                             isActive
-                              ? 'bg-amber-500/15 border-amber-500 shadow-sm'
-                              : 'bg-white dark:bg-stone-800/80 border-stone-200/80 dark:border-stone-700/80 hover:border-amber-500/50 hover:shadow-sm'
+                              ? 'bg-wash-amber-500o15 border-tone-amber-500 shadow-sm'
+                              : 'bg-tone-white dark:bg-tone-stone-800o80 border-line-stone-200o80-stone-700o80 hover:border-tone-amber-500o50 hover:shadow-sm'
                           }`}
                         >
                           {/* 假名主字面 */}
-                          <div className="text-xl sm:text-2xl font-serif font-bold text-stone-900 dark:text-stone-100 group-hover:scale-105 transition-transform flex items-baseline gap-1">
+                          <div className="text-xl sm:text-2xl font-serif font-bold text-ink group-hover:scale-105 transition-transform flex items-baseline gap-1">
                             {scriptMode === 'HIRAGANA' && <span>{kana.hiragana}</span>}
                             {scriptMode === 'KATAKANA' && <span>{kana.katakana}</span>}
                             {scriptMode === 'BOTH' && (
                               <>
                                 <span>{kana.hiragana}</span>
-                                <span className="text-xs text-stone-400 font-sans font-normal">
+                                <span className="text-xs text-ink-stone-400 font-sans font-normal">
                                   / {kana.katakana}
                                 </span>
                               </>
@@ -1101,7 +1101,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
 
                           {/* 罗马音辅助注记 */}
                           {showRomaji && (
-                            <div className="text-[11px] font-mono text-stone-400 group-hover:text-amber-600 dark:group-hover:text-amber-400">
+                            <div className="text-[11px] font-mono text-ink-stone-400 group-hover:text-accent-ink">
                               {kana.romaji}
                             </div>
                           )}
@@ -1123,7 +1123,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                               event.stopPropagation();
                               handleOpenKanaGuide(kana);
                             }}
-                            className="mt-1 h-6 rounded-lg px-2 text-[10px] text-amber-700 hover:bg-amber-500/15 dark:text-amber-300"
+                            className="mt-1 h-6 rounded-lg px-2 text-[10px] text-tone-amber-700 hover:bg-wash-amber-500o15 dark:text-ink-amber-300"
                             aria-label={`查看 ${kana.hiragana} 的发音与记忆详情`}
                           >
                             <Lightbulb className="h-3 w-3" />
@@ -1136,7 +1136,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                             variant="ghost"
                             size="icon"
                             onClick={(event) => handlePlayAudio(kana, event)}
-                            className="absolute right-1 top-1 h-7 w-7 rounded-lg p-0 text-stone-400 opacity-70 transition-opacity hover:text-amber-600 sm:opacity-0 sm:group-hover:opacity-100"
+                            className="absolute right-1 top-1 h-7 w-7 rounded-lg p-0 text-ink-stone-400 opacity-70 transition-opacity hover:text-tone-amber-600 sm:opacity-0 sm:group-hover:opacity-100"
                             title="播放发音"
                             aria-label={`播放 ${kana.hiragana} 发音`}
                           >
@@ -1150,8 +1150,8 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                 ))}
               </div>
             ) : (
-              <div className="rounded-2xl border border-amber-900/10 bg-[#faf9f6] p-6 text-center dark:border-amber-500/10 dark:bg-[#1a1816]">
-                <p className="text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+              <div className="rounded-2xl border border-line-amber-900o10 bg-paper-soft p-6 text-center dark:border-wash-amber-500o10">
+                <p className="text-xs leading-relaxed text-ink-ghost">
                   {isKanaLoading
                     ? '正在加载假名表…'
                     : '假名表暂时不可用，请确认网关已启动（默认 localhost:8080），然后重试。'}
@@ -1205,7 +1205,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                 <Badge variant="amber" className="text-xs">
                   假名讲义
                 </Badge>
-                <span className="text-xs text-stone-500 dark:text-stone-400">
+                <span className="text-xs text-ink-ghost">
                   {activeKana.row} · {activeKana.col}
                 </span>
               </div>
@@ -1218,14 +1218,14 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
             </DialogHeader>
 
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4 dark:bg-amber-500/15 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 rounded-2xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o15 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-4">
-                  <div className="flex h-20 min-w-20 shrink-0 flex-col items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/20 text-stone-900 dark:text-stone-100">
+                  <div className="flex h-20 min-w-20 shrink-0 flex-col items-center justify-center rounded-2xl border border-line-amber-500o30 bg-tone-amber-500o20 text-ink">
                     <div className="flex items-baseline gap-1 text-3xl font-serif font-bold">
                       {scriptMode === 'BOTH' ? (
                         <>
                           <span>{activeKana.hiragana}</span>
-                          <span className="text-sm text-stone-500 dark:text-stone-400">
+                          <span className="text-sm text-ink-ghost">
                             / {activeKana.katakana}
                           </span>
                         </>
@@ -1235,15 +1235,15 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                         activeKana.hiragana
                       )}
                     </div>
-                    <span className="mt-0.5 text-xs font-mono text-amber-700 dark:text-amber-300">
+                    <span className="mt-0.5 text-xs font-mono text-accent-ink-strong">
                       {activeKana.romaji}
                     </span>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-stone-700 dark:text-stone-200">
+                    <p className="text-xs font-semibold text-ink-mute-deep">
                       一个发音单位 · {activeKana.romaji}
                     </p>
-                    <p className="mt-1 text-xs leading-relaxed text-stone-600 dark:text-stone-300">
+                    <p className="mt-1 text-xs leading-relaxed text-ink-faint">
                       先把声音、字形和口形绑定起来，再用下面的例词确认它在词中的读法。
                     </p>
                   </div>
@@ -1265,7 +1265,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                     size="sm"
                     variant="secondary"
                     onClick={() => handleAskTutor(activeKana)}
-                    className="flex-1 gap-1 bg-amber-600 text-xs text-white hover:bg-amber-700 sm:flex-none"
+                    className="flex-1 gap-1 bg-tone-amber-600 text-xs text-tone-white hover:bg-tone-amber-700 sm:flex-none"
                   >
                     <Bot className="h-3.5 w-3.5" />
                     AI 假名点拨
@@ -1274,50 +1274,50 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
               </div>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="rounded-xl border border-amber-900/10 bg-white/70 p-3 dark:border-amber-500/10 dark:bg-stone-900/35">
-                  <div className="flex items-center gap-2 text-xs font-bold text-stone-800 dark:text-stone-100">
-                    <Info className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10">
+                  <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
+                    <Info className="h-3.5 w-3.5 text-accent-ink" />
                     发音抓手
                   </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-stone-600 dark:text-stone-300">
+                  <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
                     {activeKana.learningGuide?.soundDescription ??
                       `它表示 ${activeKana.romaji} 这一拍，先把声音和字形绑定起来。`}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-amber-900/10 bg-white/70 p-3 dark:border-amber-500/10 dark:bg-stone-900/35">
-                  <div className="flex items-center gap-2 text-xs font-bold text-stone-800 dark:text-stone-100">
-                    <Lightbulb className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10">
+                  <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
+                    <Lightbulb className="h-3.5 w-3.5 text-accent-ink" />
                     记忆窍门
                   </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-stone-600 dark:text-stone-300">
+                  <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
                     {activeKana.learningGuide?.memoryTip ??
                       `先把 ${activeKana.romaji} 的声音和字形绑定，再用例词重复认读。`}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-amber-900/10 bg-white/70 p-3 dark:border-amber-500/10 dark:bg-stone-900/35">
-                  <div className="flex items-center gap-2 text-xs font-bold text-stone-800 dark:text-stone-100">
-                    <Mic2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10">
+                  <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
+                    <Mic2 className="h-3.5 w-3.5 text-accent-ink" />
                     发音动作
                   </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-stone-600 dark:text-stone-300">
+                  <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
                     {activeKana.learningGuide?.pronunciationTip ??
                       '保持短而清楚的一拍，不要拖成长音，也不要额外添加中文声调。'}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-amber-900/10 bg-white/70 p-3 dark:border-amber-500/10 dark:bg-stone-900/35">
-                  <div className="flex items-center gap-2 text-xs font-bold text-stone-800 dark:text-stone-100">
-                    <GitCompareArrows className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10">
+                  <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
+                    <GitCompareArrows className="h-3.5 w-3.5 text-accent-ink" />
                     易混淆对照
                   </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-stone-600 dark:text-stone-300">
+                  <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
                     {activeKana.learningGuide?.confusionNotes ??
                       '先看收笔方向和是否有圆圈，再结合罗马字与例词确认。'}
                   </p>
                   {activeKanaConfusions.length > 0 && (
-                    <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+                    <p className="mt-1.5 text-[11px] text-accent-ink-strong">
                       本表形近对照：{activeKanaConfusions.join('、')}
                     </p>
                   )}
@@ -1325,14 +1325,14 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
               </div>
 
               {activeKana.mnemonic && (
-                <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                <p className="text-[11px] text-ink-ghost">
                   字源/来源：{activeKana.mnemonic}
                 </p>
               )}
 
               {(activeKana.learningGuide?.exampleWords ?? []).length > 0 && (
-                <div className="rounded-xl border border-amber-900/10 bg-white/55 p-3 dark:border-amber-500/10 dark:bg-stone-900/25">
-                  <div className="mb-2 text-xs font-bold text-stone-800 dark:text-stone-100">
+                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo55-stone-900o25 p-3 dark:border-wash-amber-500o10">
+                  <div className="mb-2 text-xs font-bold text-ink-deep">
                     放进词里记
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1349,27 +1349,27 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                             purpose: 'preview',
                           });
                         }}
-                        className="h-auto min-h-8 justify-start rounded-lg bg-white/80 px-2.5 py-1.5 text-left whitespace-normal dark:bg-stone-800/70"
+                        className="h-auto min-h-8 justify-start rounded-lg bg-veil-whiteo80 px-2.5 py-1.5 text-left whitespace-normal dark:bg-veil-stone-800o70"
                         title="播放例词发音"
                         aria-label={`播放例词 ${exampleWord.word} 的发音`}
                       >
-                        <span className="text-sm font-serif font-semibold text-stone-900 dark:text-stone-100">
+                        <span className="text-sm font-serif font-semibold text-ink">
                           {exampleWord.word}
                         </span>
-                        <span className="text-[11px] font-mono text-stone-500 dark:text-stone-400">
+                        <span className="text-[11px] font-mono text-ink-ghost">
                           {exampleWord.reading}
                         </span>
-                        <span className="text-[11px] text-stone-600 dark:text-stone-300">
+                        <span className="text-[11px] text-ink-faint">
                           · {exampleWord.meaning}
                         </span>
-                        <Volume2 className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                        <Volume2 className="h-3 w-3 text-accent-ink" />
                       </Button>
                     ))}
                   </div>
                 </div>
               )}
 
-              <p className="text-[11px] text-stone-500 dark:text-stone-400">
+              <p className="text-[11px] text-ink-ghost">
                 基础讲解来自应用内置课程资产；想结合你的错误记录换一种说法，再点击“AI 假名点拨”。
               </p>
             </div>

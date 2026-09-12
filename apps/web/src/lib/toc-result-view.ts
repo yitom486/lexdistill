@@ -1,4 +1,4 @@
-import type { TocReviewDiffRow } from './toc-confirm-flow.js';
+import type { EditableTocEntry, TocReviewDiffRow } from './toc-confirm-flow.js';
 
 /**
  * CMD-LINGUA-P3.5 结果 Dialog 纯展示逻辑（无 React、无网络、无存储）。
@@ -38,4 +38,21 @@ export function adoptedSummaryText(adoptedCount: number, adoptableCount: number)
   if (adoptableCount === 0) return '无可采用的变更（基线已确认无误）';
   if (adoptedCount === 0) return `已采用 0/${adoptableCount} 项变更（只存本页，未入库）`;
   return `已采用 ${adoptedCount}/${adoptableCount} 项变更（只存本页，未入库）`;
+}
+
+export interface TocAdoptReport {
+  /** 用户选中的操作 id（entryId；仅真实存在的行，未知 id 已剔除）。 */
+  selectedIds: string[];
+  /** Dialog 内当前全部编辑行（entryId → 行；父级按选中取用）。 */
+  edited: EditableTocEntry[];
+}
+
+/**
+ * Dialog 采用回执（纯函数）：把内部 adopted 集合 + 当前编辑行打包给父级。
+ * 父级以 baseline + 本回执构造最终 entries；Dialog 自身不决定最终目录。
+ */
+export function buildAdoptReport(rows: EditableTocEntry[], adoptedIds: ReadonlySet<string>): TocAdoptReport {
+  const byId = new Map(rows.map((row) => [row.key, row]));
+  const selectedIds = [...adoptedIds].filter((id) => byId.has(id));
+  return { selectedIds, edited: rows.map((row) => ({ ...row })) };
 }

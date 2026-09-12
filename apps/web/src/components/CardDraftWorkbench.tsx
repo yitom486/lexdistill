@@ -92,14 +92,14 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
   };
 
   return (
-    <div className="p-3 rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 space-y-2">
+    <div className="p-3 rounded-2xl border border-line bg-surface space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-bold text-stone-900 dark:text-stone-100">
+        <span className="text-sm font-bold text-ink">
           {editing ? (
             <input
               value={headword}
               onChange={(e) => setHeadword(e.target.value)}
-              className="w-32 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 outline-none focus:border-amber-500 text-sm font-bold"
+              className="w-32 h-7 px-2 rounded-lg border border-line bg-surface outline-none focus:border-tone-amber-500 text-sm font-bold"
             />
           ) : (
             draft.headword
@@ -110,11 +110,11 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
             value={reading}
             onChange={(e) => setReading(e.target.value)}
             placeholder="读音"
-            className="w-28 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 outline-none focus:border-amber-500 text-xs"
+            className="w-28 h-7 px-2 rounded-lg border border-line bg-surface outline-none focus:border-tone-amber-500 text-xs"
           />
         ) : (
           draft.reading && (
-            <span className="text-xs text-stone-500 dark:text-stone-400">{draft.reading}</span>
+            <span className="text-xs text-ink-ghost">{draft.reading}</span>
           )
         )}
         {draft.partOfSpeech && <Badge variant="secondary">{draft.partOfSpeech}</Badge>}
@@ -136,11 +136,11 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
           </Button>
         )}
         <Button variant="ghost" size="sm" onClick={handleAccept} disabled={accept.isPending} title="接受并入库成卡">
-          <Check className="w-3.5 h-3.5 text-emerald-600" />
+          <Check className="w-3.5 h-3.5 text-tone-emerald-600" />
           入库
         </Button>
         <Button variant="ghost" size="sm" onClick={handleDismiss} disabled={dismiss.isPending} title="不要这条">
-          <X className="w-3.5 h-3.5 text-stone-400" />
+          <X className="w-3.5 h-3.5 text-ink-stone-400" />
         </Button>
       </div>
       {editing ? (
@@ -149,7 +149,7 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
             value={meaningsText}
             onChange={(e) => setMeaningsText(e.target.value)}
             placeholder={draft.kind === 'sentence' ? '译文' : '释义，用 ； 分隔'}
-            className="flex-1 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 outline-none focus:border-amber-500 text-xs"
+            className="flex-1 h-7 px-2 rounded-lg border border-line bg-surface outline-none focus:border-tone-amber-500 text-xs"
           />
           <Button size="sm" disabled={!dirty || update.isPending} onClick={handleSave}>
             保存修改
@@ -168,8 +168,8 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
           </Button>
         </div>
       ) : (
-        <p className="text-xs text-stone-600 dark:text-stone-300">
-          {draft.kind === 'sentence' && <span className="text-stone-400">译文：</span>}
+        <p className="text-xs text-ink-faint">
+          {draft.kind === 'sentence' && <span className="text-ink-stone-400">译文：</span>}
           {draft.meanings.join('；')}
         </p>
       )}
@@ -186,13 +186,13 @@ export function CardDraftWorkbench() {
   const { data: drafts = [], isLoading } = useCardDraftsQuery(undefined, shell.track);
   if (isLoading || drafts.length === 0) return null;
   return (
-    <section className="mb-4 p-4 rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/5 space-y-2">
+    <section className="mb-4 p-4 rounded-2xl border border-dashed border-tone-amber-500o40 bg-wash-amber-500o5 space-y-2">
       <div className="flex items-center gap-2">
-        <Inbox className="w-4 h-4 text-amber-500" />
-        <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">
+        <Inbox className="w-4 h-4 text-tone-amber-500" />
+        <h3 className="text-sm font-bold text-ink">
           待确认生词（{drafts.length}）
         </h3>
-        <span className="text-[11px] text-stone-500 dark:text-stone-400">
+        <span className="text-[11px] text-ink-ghost">
           AI 抽词/助手整理的候选，接受才入库成卡
         </span>
       </div>

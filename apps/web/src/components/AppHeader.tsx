@@ -73,7 +73,7 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
   };
 
   return (
-    <header className="shrink-0 border-b border-stone-200/80 dark:border-stone-800/80 bg-white/85 dark:bg-[#1a1917]/85 backdrop-blur-md sticky top-0 z-40 transition-colors">
+    <header className="shrink-0 border-b border-line-stone-200o80-stone-800o80 bg-veil-whiteo85 dark:bg-surface-h1a1917o85 backdrop-blur-md sticky top-0 z-40 transition-colors">
       <div className="px-4 sm:px-6 h-14 sm:h-15 flex items-center justify-between gap-3">
         {/* 左侧：移动端汉堡菜单 + 品牌标志 + 网关微指示灯 */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
@@ -95,12 +95,12 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
               whileHover={{ scale: 1.05, rotate: 2 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => sound.playClick()}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 text-stone-950 font-bold flex items-center justify-center shadow-xs cursor-pointer shrink-0"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-tone-amber-500 to-tone-amber-600 text-tone-stone-950 font-bold flex items-center justify-center shadow-xs cursor-pointer shrink-0"
             >
-              <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-stone-950" />
+              <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-tone-stone-950" />
             </motion.div>
 
-            <span className="font-bold text-base sm:text-lg text-stone-900 dark:text-stone-100 tracking-tight font-serif truncate">
+            <span className="font-bold text-base sm:text-lg text-ink tracking-tight font-serif truncate">
               Lingua Studio
             </span>
 
@@ -108,8 +108,8 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
             <span
               className={`w-2 h-2 rounded-full shrink-0 transition-colors ${
                 isConnected
-                  ? 'bg-emerald-500 shadow-xs shadow-emerald-500/50'
-                  : 'bg-amber-400'
+                  ? 'bg-tone-emerald-500 shadow-xs shadow-line-emerald-500o50'
+                  : 'bg-ink-amber-400'
               }`}
               title={
                 isConnected
@@ -128,13 +128,13 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
               sound.playClick();
               setIsCommandOpen(true);
             }}
-            className="w-full flex items-center justify-between gap-3 px-3 py-1.5 rounded-xl border border-stone-200/90 dark:border-stone-800/90 bg-stone-100/70 dark:bg-stone-900/60 hover:bg-stone-100 dark:hover:bg-stone-900 hover:border-amber-500/40 text-stone-500 dark:text-stone-400 text-xs transition-all shadow-2xs cursor-pointer group"
+            className="w-full flex items-center justify-between gap-3 px-3 py-1.5 rounded-xl border border-line-stone-200o90-stone-800o90 bg-veil-stone-100o70-stone-900o60 hover:bg-surface-stone-100-stone-900 hover:border-tone-amber-500o40 text-ink-ghost text-xs transition-all shadow-2xs cursor-pointer group"
           >
             <div className="flex items-center gap-2 truncate">
-              <Search className="w-3.5 h-3.5 text-stone-400 group-hover:text-amber-500 transition-colors shrink-0" />
+              <Search className="w-3.5 h-3.5 text-ink-stone-400 group-hover:text-tone-amber-500 transition-colors shrink-0" />
               <span className="truncate">搜索题库、课文、指令...</span>
             </div>
-            <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 shadow-2xs shrink-0">
+            <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-dim border border-line text-ink-ghost shadow-2xs shrink-0">
               ⌘K
             </kbd>
           </button>
@@ -146,7 +146,7 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="sm:hidden h-8 w-8 text-stone-600 dark:text-stone-300"
+            className="sm:hidden h-8 w-8 text-ink-faint"
             aria-label="快捷搜索"
             onClick={() => {
               sound.playClick();
@@ -164,10 +164,10 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
               sound.playClick();
               openTutor(null);
             }}
-            className="gap-1.5 border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15 text-amber-900 dark:text-amber-200 font-medium h-8 sm:h-9 px-2.5 sm:px-3 text-xs"
+            className="gap-1.5 border-line-amber-500o30 bg-wash-amber-500o5 hover:bg-wash-amber-500o15 text-ink-amber-900-amber-200 font-medium h-8 sm:h-9 px-2.5 sm:px-3 text-xs"
             title="唤起 AI 交互助教"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <Sparkles className="w-3.5 h-3.5 text-tone-amber-500" />
             <span className="hidden sm:inline">AI 助教</span>
           </Button>
 
@@ -179,7 +179,7 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
             <Button
               variant="outline"
               size="sm"
-              className="h-8 gap-1.5 border-amber-500/30 px-2.5 text-amber-700 hover:bg-amber-100/70 dark:text-amber-300 dark:hover:bg-amber-950/40 sm:h-9 sm:px-3"
+              className="h-8 gap-1.5 border-line-amber-500o30 px-2.5 text-tone-amber-700 hover:bg-wash-amber-100o70 dark:text-ink-amber-300 dark:hover:bg-grad-amber-950o40 sm:h-9 sm:px-3"
               disabled={updateChecking}
               onClick={() => void handleCheckForUpdate()}
               title="检查应用更新"
@@ -199,13 +199,13 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
               toggleTheme();
             }}
             aria-label="切换明暗主题"
-            className="h-8 w-8 sm:h-9 sm:w-9 text-stone-600 dark:text-stone-300 hover:text-amber-600 dark:hover:text-amber-400"
+            className="h-8 w-8 sm:h-9 sm:w-9 text-ink-faint hover:text-accent-ink"
             title={theme === 'light' ? '切换到深色模式' : '切换到暖亮模式'}
           >
             {theme === 'light' ? (
-              <Moon className="w-4 h-4 text-amber-600" />
+              <Moon className="w-4 h-4 text-tone-amber-600" />
             ) : (
-              <Sun className="w-4 h-4 text-amber-400" />
+              <Sun className="w-4 h-4 text-ink-amber-400" />
             )}
           </Button>
         </div>

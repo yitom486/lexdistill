@@ -132,6 +132,30 @@ describe('P4C 只读三专线请求层', () => {
     expect(calls.length).toBe(2);
     expect(calls[1]?.url).toContain('/review-toc');
     expect(calls[1]?.jsonBody).toMatchObject({ filePath: 'C:\\book\\a.pdf', startPage: 2, endPage: 4 });
+    // 缺席 modelOptions：一律不传（后端走环境变量 > 适配器默认）
+    expect(calls[1]?.jsonBody).not.toHaveProperty('model');
+    expect(calls[1]?.jsonBody).not.toHaveProperty('effort');
+  });
+
+  it('review：modelOptions 实际透传（显式）/ 空串不传', async () => {
+    installFetchStub();
+    nextResponse = { status: 200, payload: REVIEW_PAYLOAD };
+    await requestReviewToc(
+      'u1',
+      { filePath: 'C:\\book\\a.pdf' },
+      { startPage: 2, endPage: 4 },
+      { model: 'm-once', effort: 'high' }
+    );
+    expect(calls[0]?.jsonBody).toMatchObject({ model: 'm-once', effort: 'high' });
+
+    await requestReviewToc(
+      'u1',
+      { filePath: 'C:\\book\\a.pdf' },
+      { startPage: 2, endPage: 4 },
+      { model: '  ', effort: '' }
+    );
+    expect(calls[1]?.jsonBody).not.toHaveProperty('model');
+    expect(calls[1]?.jsonBody).not.toHaveProperty('effort');
   });
 
   it('后端错误：userMessage 原样透传，不抛原始栈', async () => {

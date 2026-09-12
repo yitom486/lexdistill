@@ -63,9 +63,7 @@ export function QuestionRenderer({
               type="button"
               onClick={() => update(key)}
               disabled={disabled}
-              className={`rounded-md border px-3 py-2 text-left text-sm transition ${
-                selected ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950' : 'border-slate-200 hover:border-indigo-300 dark:border-slate-700'
-              }`}
+              className={`rounded-md border px-3 py-2 text-left text-sm transition ${ selected ? 'border-ink-indigo-500 bg-tint-indigo-50 dark:bg-tint-indigo-950' : 'border-line-slate-200-slate-700 hover:border-line-indigo-300' }`}
             >
               <span className="mr-2 font-semibold">{key}.</span>
               {opt}
@@ -87,7 +85,7 @@ export function QuestionRenderer({
           onChange={(e) => update(e.target.value)}
           disabled={disabled}
           placeholder="填入答案"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600"
+          className="rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600"
         />
         <Button size="sm" className="w-fit" disabled={!answer.trim() || disabled || busy} onClick={() => onSubmitObjective(answer)}>
           提交
@@ -113,15 +111,13 @@ export function QuestionRenderer({
               type="button"
               onClick={() => toggle(c)}
               disabled={disabled}
-              className={`rounded-md border px-2 py-1 text-sm ${
-                picked.includes(c) ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950' : 'border-slate-200 dark:border-slate-700'
-              }`}
+              className={`rounded-md border px-2 py-1 text-sm ${ picked.includes(c) ? 'border-ink-indigo-500 bg-tint-indigo-50 dark:bg-tint-indigo-950' : 'border-line-slate-200-slate-700' }`}
             >
               {c}
             </button>
           ))}
         </div>
-        <div className="text-sm text-slate-600 dark:text-slate-300">当前顺序：{answer || '（点击上方词块排序）'}</div>
+        <div className="text-sm text-ink-slate-600-slate-300">当前顺序：{answer || '（点击上方词块排序）'}</div>
         <Button size="sm" className="w-fit" disabled={!answer.trim() || disabled || busy} onClick={() => onSubmitObjective(answer)}>
           提交
         </Button>
@@ -160,9 +156,7 @@ export function QuestionRenderer({
               type="button"
               onClick={() => update(key)}
               disabled={disabled}
-              className={`rounded-md border px-3 py-2 text-left text-sm transition ${
-                selected ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950' : 'border-slate-200 hover:border-indigo-300 dark:border-slate-700'
-              }`}
+              className={`rounded-md border px-3 py-2 text-left text-sm transition ${ selected ? 'border-ink-indigo-500 bg-tint-indigo-50 dark:bg-tint-indigo-950' : 'border-line-slate-200-slate-700 hover:border-line-indigo-300' }`}
             >
               <span className="mr-2 font-semibold">{key}.</span>
               {opt}
@@ -185,7 +179,7 @@ export function QuestionRenderer({
         onBlur={() => answer.trim() && onSaveDraft(answer)}
         placeholder={q.type === 'TRANSLATION' ? '输入译文' : '输入写作内容'}
         rows={4}
-        className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600"
+        className="rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600"
       />
       {immediate ? (
         <>
@@ -197,10 +191,10 @@ export function QuestionRenderer({
           >
             {submittingSubjective ? '批改中…' : '提交并即时批改'}
           </Button>
-          <div className="text-xs text-slate-500">提交后立即批改并写回错题信号；输入失焦自动保存草稿。</div>
+          <div className="text-xs text-ink-slate-500">提交后立即批改并写回错题信号；输入失焦自动保存草稿。</div>
         </>
       ) : (
-        <div className="text-xs text-slate-500">主观题在“批量提交主观题”时统一评测；输入失焦自动保存草稿。</div>
+        <div className="text-xs text-ink-slate-500">主观题在“批量提交主观题”时统一评测；输入失焦自动保存草稿。</div>
       )}
     </div>
   );
@@ -210,19 +204,19 @@ export function QuestionRenderer({
 function ReadingPassagePanel({ reading }: { reading: NonNullable<GeneratedQuestion['reading']> }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-md border border-sky-500/25 bg-sky-500/5">
+    <div className="rounded-md border border-line-sky-500o25 bg-wash-sky-500o5">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-sky-800 dark:text-sky-300 cursor-pointer"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-ink-sky-800-sky-300 cursor-pointer"
       >
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         <BookOpen className="h-3.5 w-3.5" />
         <span className="truncate flex-1">篇目 · {reading.title}</span>
-        <span className="text-[10px] text-sky-600/70 dark:text-sky-400/70">{open ? '收起' : '展开阅读'}</span>
+        <span className="text-[10px] text-ink-sky-600o70-sky-400o70">{open ? '收起' : '展开阅读'}</span>
       </button>
       {open && (
-        <div className="max-h-72 overflow-y-auto whitespace-pre-wrap border-t border-sky-500/20 px-3 py-2.5 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+        <div className="max-h-72 overflow-y-auto whitespace-pre-wrap border-t border-line-sky-500o20 px-3 py-2.5 text-sm leading-relaxed text-ink-slate-700-slate-300">
           {reading.body}
         </div>
       )}
@@ -275,10 +269,10 @@ function DictationSubjective({
           <Volume2 className="mr-1 h-3.5 w-3.5" />
           {playing ? '播放中…' : '播放 / 重听音频'}
         </Button>
-        <span className="text-xs text-slate-500">听音频后写出空缺内容；答案不会以文字剧透。</span>
+        <span className="text-xs text-ink-slate-500">听音频后写出空缺内容；答案不会以文字剧透。</span>
       </div>
       {q.dictation?.furiganaHint && (
-        <div className="text-[11px] text-slate-400">提示：{q.dictation.furiganaHint}</div>
+        <div className="text-[11px] text-ink-slate-400">提示：{q.dictation.furiganaHint}</div>
       )}
       <textarea
         value={answer}
@@ -287,7 +281,7 @@ function DictationSubjective({
         onBlur={() => answer.trim() && onSaveDraft(answer)}
         placeholder="输入你听到的句子或空缺词"
         rows={3}
-        className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600"
+        className="rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600"
       />
       {immediate ? (
         <Button
@@ -299,7 +293,7 @@ function DictationSubjective({
           {submittingSubjective ? '批改中…' : '提交并即时批改'}
         </Button>
       ) : (
-        <div className="text-xs text-slate-500">听写题在“批量提交主观题”时统一评测。</div>
+        <div className="text-xs text-ink-slate-500">听写题在“批量提交主观题”时统一评测。</div>
       )}
     </div>
   );

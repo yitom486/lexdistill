@@ -600,9 +600,9 @@ export function TextbookImporterModal({
         className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
         showCloseButton
       >
-        <DialogHeader className="px-6 py-4 border-b border-amber-900/10 dark:border-amber-500/15 bg-amber-500/5 text-left">
+        <DialogHeader className="px-6 py-4 border-b border-line-accent bg-wash-amber-500o5 text-left">
           <div className="flex items-center gap-2.5 pr-8">
-            <div className="p-2 rounded-xl bg-amber-500/15 text-amber-800 dark:text-amber-400">
+            <div className="p-2 rounded-xl bg-wash-amber-500o15 text-ink-amber-800-amber-400">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
@@ -620,9 +620,9 @@ export function TextbookImporterModal({
         </DialogHeader>
 
         <div className="p-6 overflow-y-auto space-y-4 flex-1">
-          <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-amber-500/5 border border-amber-900/10 dark:border-amber-500/10">
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-wash-amber-500o5 border border-line-amber-900o10-amber-500o10">
             <div className="flex items-center gap-2">
-              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors">
+              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs font-semibold shadow-xs transition-colors">
                 <Upload className="w-3.5 h-3.5" />
                 上传教材 JSON 文件
                 <input
@@ -633,7 +633,7 @@ export function TextbookImporterModal({
                 />
               </label>
               <Button variant="secondary" size="sm" onClick={handleLoadSample}>
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <Sparkles className="w-3.5 h-3.5 text-tone-amber-500" />
                 载入官方样例《新编日语》
               </Button>
             </div>
@@ -643,9 +643,9 @@ export function TextbookImporterModal({
             </Button>
           </div>
 
-          <div className="p-3 rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/5 space-y-1.5">
+          <div className="p-3 rounded-2xl border border-dashed border-tone-amber-500o40 bg-wash-amber-500o5 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors">
+              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs font-semibold shadow-xs transition-colors">
                 <FileUp className="w-3.5 h-3.5" />
                 {pdfFile ? '换一份 PDF' : '选择 PDF（<32MB 小文件）'}
                 <input
@@ -676,17 +676,17 @@ export function TextbookImporterModal({
                     ? '追加到该书（接力）'
                     : '开始导入'}
               </Button>
-              <span className="text-[11px] text-stone-500 dark:text-stone-400">
+              <span className="text-[11px] text-ink-ghost">
                 文字版直接提取；扫描版自动 OCR（首次约 80MB 按需下载，不进安装包）· 扫描版韩语暂不支持
                 {azureCreds ? ' · 云回填已启用（只打本地失败页）' : ''}
               </span>
             </div>
             {pdfFileError && (
-              <p role="alert" className="text-[11px] font-semibold text-red-600 dark:text-red-400">
+              <p role="alert" className="text-[11px] font-semibold text-ink-red-600-red-400">
                 {pdfFileError}
               </p>
             )}
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-ghost">
               <span title="大书分段导：先导一段成书，后续段选这本书接力追加，别重复导同一段">
                 接力到已有书（选填，不选则成新书）：
               </span>
@@ -707,14 +707,14 @@ export function TextbookImporterModal({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-ghost">
               <span>导入范围：</span>
               <button
                 type="button"
                 className={`h-7 px-2.5 rounded-lg border text-[11px] font-semibold ${
                   pdfScope === 'all'
-                    ? 'border-amber-600 bg-amber-600 text-white'
-                    : 'border-stone-200 dark:border-stone-700'
+                    ? 'border-tone-amber-600 bg-tone-amber-600 text-tone-white'
+                    : 'border-line'
                 }`}
                 disabled={importPdf.isPending || mapPdf.isPending}
                 onClick={() => {
@@ -729,8 +729,8 @@ export function TextbookImporterModal({
                 type="button"
                 className={`h-7 px-2.5 rounded-lg border text-[11px] font-semibold ${
                   pdfScope === 'range'
-                    ? 'border-amber-600 bg-amber-600 text-white'
-                    : 'border-stone-200 dark:border-stone-700'
+                    ? 'border-tone-amber-600 bg-tone-amber-600 text-tone-white'
+                    : 'border-line'
                 }`}
                 disabled={importPdf.isPending || mapPdf.isPending}
                 onClick={() => setPdfScope('range')}
@@ -746,7 +746,7 @@ export function TextbookImporterModal({
                     value={pdfStartPage}
                     onChange={(e) => setPdfStartPage(e.target.value)}
                     disabled={importPdf.isPending}
-                    className="w-20 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500"
+                    className="w-20 h-7 px-2 rounded-lg border border-line bg-surface text-ink outline-none focus:border-tone-amber-500"
                   />
                   <span>–</span>
                   <input
@@ -756,19 +756,19 @@ export function TextbookImporterModal({
                     value={pdfEndPage}
                     onChange={(e) => setPdfEndPage(e.target.value)}
                     disabled={importPdf.isPending}
-                    className="w-20 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500"
+                    className="w-20 h-7 px-2 rounded-lg border border-line bg-surface text-ink outline-none focus:border-tone-amber-500"
                   />
                 </>
               )}
-              <span className="text-stone-400">
+              <span className="text-ink-stone-400">
                 {pdfScope === 'all'
                   ? '扫描书单次 OCR 最多 30 页，「全部页」只导前 30 页并提示接力；要指定位置请用指定页码'
                   : '1-based 页码，含两端；点下方标题可自动填一段'}
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-ghost">
               <span
-                className="font-bold text-stone-700 dark:text-stone-200"
+                className="font-bold text-ink-mute-deep"
                 title="百 MB 大书走上传会崩网关；同机网关直接填本机绝对路径走 filePath 直读，上限 500MB"
               >
                 本机绝对路径直读（大/扫描教材主入口）：
@@ -786,13 +786,13 @@ export function TextbookImporterModal({
                   }
                 }}
                 disabled={importPdf.isPending || mapPdf.isPending}
-                className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 font-mono"
+                className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-line bg-surface text-ink outline-none focus:border-tone-amber-500 font-mono"
               />
-              <span className="text-stone-400">
+              <span className="text-ink-stone-400">
                 扫描/大教材请把完整绝对路径贴到这里（含盘符与 .pdf）；「选择 PDF」仅用于几十页以内、小于 32MB 的小文件
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-ghost">
               <span title="只打本地 OCR 失败的页（<50 字），平时零花费；Key 只存本机，随请求发网关，网关不落盘">
                 Azure 云回填（选填，难啃扫描页用）：
               </span>
@@ -802,7 +802,7 @@ export function TextbookImporterModal({
                 value={azureDiEndpoint}
                 onChange={(e) => setAzureDi(e.target.value, azureDiKey)}
                 disabled={importPdf.isPending || mapPdf.isPending}
-                className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 font-mono"
+                className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-line bg-surface text-ink outline-none focus:border-tone-amber-500 font-mono"
               />
               <input
                 type="password"
@@ -810,20 +810,20 @@ export function TextbookImporterModal({
                 value={azureDiKey}
                 onChange={(e) => setAzureDi(azureDiEndpoint, e.target.value)}
                 disabled={importPdf.isPending || mapPdf.isPending}
-                className="w-36 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 font-mono"
+                className="w-36 h-7 px-2 rounded-lg border border-line bg-surface text-ink outline-none focus:border-tone-amber-500 font-mono"
               />
             </div>
             {pdfNote && (
-              <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">{pdfNote}</p>
+              <p className="text-[11px] font-semibold text-ink-emerald-700-emerald-400">{pdfNote}</p>
             )}
             {(mapPdf.data?.tocEntries.length ?? 0) > 0 && (
-              <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+              <div className="text-[11px] text-ink-faint space-y-1">
                 <p className="font-bold">目录（点条目按印刷页码定位，仅供参考）：</p>
                 <div className="flex flex-wrap gap-1.5">
                   {mapPdf.data?.tocEntries.slice(0, 30).map((t) => (
                     <span
                       key={`${t.lessonNo}@${t.printedPage}`}
-                      className="px-2 py-0.5 rounded-lg border border-stone-200 dark:border-stone-700"
+                      className="px-2 py-0.5 rounded-lg border border-line"
                       title={t.label}
                     >
                       第{t.lessonNo}課 · p{t.printedPage}
@@ -833,7 +833,7 @@ export function TextbookImporterModal({
               </div>
             )}
             {(mapPdf.data?.headings.length ?? 0) > 0 && (
-              <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+              <div className="text-[11px] text-ink-faint space-y-1">
                 <p className="font-bold">标题（点一行自动填入起始页）：</p>
                 <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
                   {mapPdf.data?.headings.slice(0, 60).map((h, i) => (
@@ -846,7 +846,7 @@ export function TextbookImporterModal({
                         setPdfEndPage(String(h.page + 14));
                         sound.playClick();
                       }}
-                      className="w-full flex items-center justify-between gap-2 px-2 py-1 rounded-lg hover:bg-amber-500/10 text-left cursor-pointer"
+                      className="w-full flex items-center justify-between gap-2 px-2 py-1 rounded-lg hover:bg-wash-amber-500o10 text-left cursor-pointer"
                       title={`从第 ${h.page} 页开始导（默认连导 15 页，可改）`}
                     >
                       <span className="truncate">
@@ -858,7 +858,7 @@ export function TextbookImporterModal({
                           h.structRole ||
                           h.relSize !== undefined) && (
                           <span
-                            className="ml-1.5 text-stone-400"
+                            className="ml-1.5 text-ink-stone-400"
                             title={[
                               h.relSize !== undefined ? `字号约正文 ${h.relSize} 倍` : '',
                               h.bold === true ? '加粗' : '',
@@ -873,7 +873,7 @@ export function TextbookImporterModal({
                           ◈
                         </span>
                       )}</span>
-                      <span className="shrink-0 font-mono text-stone-400">p{h.page}</span>
+                      <span className="shrink-0 font-mono text-ink-stone-400">p{h.page}</span>
                     </button>
                   ))}
                 </div>
@@ -910,13 +910,13 @@ export function TextbookImporterModal({
                     onClick={handleClassifyHeadings}
                     title="小模型判选：课/节/目录/噪音 + 能力板块（临时会话，跑完即焚；默认取列表最末模型）"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <Sparkles className="w-3.5 h-3.5 text-tone-amber-500" />
                     <span>{classify.isPending ? '分类中…' : 'AI 分类'}</span>
                   </Button>
                 </div>
                 {classifyResult && (
-                  <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-2 space-y-1.5">
-                    <p className="font-bold text-stone-700 dark:text-stone-200">
+                  <div className="rounded-xl border border-tone-amber-500o25 bg-wash-amber-500o5 p-2 space-y-1.5">
+                    <p className="font-bold text-ink-mute-deep">
                       分类结果（{classifyResult.model}）：{classifyResult.classes.length} 条已判
                       {classifyResult.dropped > 0 && `，丢弃 ${classifyResult.dropped} 条（对不上原文/非法）`}
                     </p>
@@ -924,11 +924,11 @@ export function TextbookImporterModal({
                       {classifyResult.classes.map((c, i) => (
                         <div
                           key={`${c.page}-${i}`}
-                          className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40"
+                          className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-veil-whiteo60-stone-900o40"
                         >
                           <span className="truncate">
                             {c.text}
-                            <span className="ml-1 font-mono text-stone-400">p{c.page}</span>
+                            <span className="ml-1 font-mono text-ink-stone-400">p{c.page}</span>
                           </span>
                           <span className="flex shrink-0 items-center gap-1">
                             <Badge variant="outline" className="text-[10px]">
@@ -953,8 +953,8 @@ export function TextbookImporterModal({
                 )}
               </div>
             )}
-            <div className="pt-1 mt-1 border-t border-amber-500/20 space-y-1.5">
-              <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200">
+            <div className="pt-1 mt-1 border-t border-tone-amber-500o20 space-y-1.5">
+              <p className="text-[11px] font-bold text-ink-mute-deep">
                 目录识别与人工确认（只读，不入库；用上方已选 PDF / 路径）
               </p>
               <TocReviewPanel
@@ -964,9 +964,9 @@ export function TextbookImporterModal({
             </div>
           </div>
 
-          <div className="p-3 rounded-2xl border border-dashed border-sky-500/40 bg-sky-500/5 space-y-1.5">
+          <div className="p-3 rounded-2xl border border-dashed border-tone-sky-500o40 bg-wash-sky-500o5 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-bold text-stone-700 dark:text-stone-300">
+              <span className="text-[11px] font-bold text-ink-mute">
                 EPUB / MOBI / 网页导入：
               </span>
               <input
@@ -978,7 +978,7 @@ export function TextbookImporterModal({
                   if (e.target.value.trim()) setDocUrl('');
                 }}
                 disabled={importDoc.isPending}
-                className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-sky-500 font-mono text-[11px]"
+                className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-line bg-surface text-ink outline-none focus:border-tint-sky-500 font-mono text-[11px]"
               />
               <input
                 type="text"
@@ -989,7 +989,7 @@ export function TextbookImporterModal({
                   if (e.target.value.trim()) setDocPath('');
                 }}
                 disabled={importDoc.isPending}
-                className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-sky-500 font-mono text-[11px]"
+                className="flex-1 min-w-52 h-7 px-2 rounded-lg border border-line bg-surface text-ink outline-none focus:border-tint-sky-500 font-mono text-[11px]"
               />
               <Button
                 size="sm"
@@ -999,22 +999,22 @@ export function TextbookImporterModal({
                 {importDoc.isPending ? '导入中…' : '开始导入'}
               </Button>
             </div>
-            <p className="text-[11px] text-stone-500 dark:text-stone-400">
+            <p className="text-[11px] text-ink-ghost">
               目录驱动成课（EPUB 按 NCX/nav+spine 定位）；浏览器无本地路径时请用桌面端或网址
             </p>
             {docNote && (
-              <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">{docNote}</p>
+              <p className="text-[11px] font-semibold text-ink-emerald-700-emerald-400">{docNote}</p>
             )}
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-stone-700 dark:text-stone-300 flex items-center gap-1">
-                <FileText className="w-3.5 h-3.5 text-amber-500" />
+              <label className="text-xs font-bold text-ink-mute flex items-center gap-1">
+                <FileText className="w-3.5 h-3.5 text-tone-amber-500" />
                 教材 AST JSON 数据
               </label>
               {parsedAST && (
-                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                <span className="text-xs font-semibold text-ink-emerald-700-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   验证通过: 《{parsedAST.shortTitle}》 共 {parsedAST.lessons.length} 课
                 </span>
@@ -1025,25 +1025,25 @@ export function TextbookImporterModal({
               onChange={handleTextChange}
               placeholder="请在此粘贴符合规范的 Textbook AST JSON，或点击上方载入官方样例..."
               rows={10}
-              className="w-full p-3 font-mono text-xs rounded-2xl bg-white dark:bg-[#151412] border border-stone-200 dark:border-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-500/40 text-stone-800 dark:text-stone-200 leading-relaxed resize-none shadow-inner"
+              className="w-full p-3 font-mono text-xs rounded-2xl bg-surface-ash border border-line-soft focus:outline-none focus:ring-2 focus:ring-tone-amber-500o40 text-ink-soft leading-relaxed resize-none shadow-inner"
             />
           </div>
 
           {parseError && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-2 text-rose-700 dark:text-rose-400 text-xs">
+            <div className="p-3 rounded-xl bg-wash-rose-500o10 border border-line-rose-500o20 flex items-start gap-2 text-ink-rose-700-rose-400 text-xs">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span className="leading-relaxed">{parseError}</span>
             </div>
           )}
 
           {parsedAST && (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-900/10 dark:border-amber-500/20 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-wash-amber-500o10 border border-line-amber-900o10-amber-500o20 flex items-center justify-between">
               <div className="space-y-0.5">
-                <div className="text-xs font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <div className="text-xs font-bold text-ink flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-accent-ink" />
                   自动为全课生词生成 FSRS 记忆卡片
                 </div>
-                <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                <p className="text-[11px] text-ink-ghost">
                   将提取{' '}
                   {parsedAST.lessons.reduce((acc, l) => acc + l.vocabularies.length, 0)}{' '}
                   个生词直接注入今日复习池
@@ -1053,13 +1053,13 @@ export function TextbookImporterModal({
                 type="checkbox"
                 checked={autoGenerateCards}
                 onChange={(e) => setAutoGenerateCards(e.target.checked)}
-                className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-stone-300"
+                className="w-4 h-4 rounded text-tone-amber-600 focus:ring-tone-amber-500 border-tone-stone-300"
               />
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between px-6 py-4 border-t border-amber-900/10 dark:border-amber-500/15 bg-amber-500/5">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-line-accent bg-wash-amber-500o5">
           <Button variant="ghost" onClick={onClose}>
             取消
           </Button>

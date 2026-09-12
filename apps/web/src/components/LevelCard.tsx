@@ -57,9 +57,9 @@ export function LevelCard() {
 
   if (result) {
     return (
-      <section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+      <section className="rounded-2xl border border-line-amber-500o30 bg-wash-amber-500o5 p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <GraduationCap className="w-4 h-4 text-amber-600" />
+          <GraduationCap className="w-4 h-4 text-tone-amber-600" />
           <h3 className="text-sm font-bold">
             {result.passed ? '考过了' : '差一点'} · 正确率 {Math.round(result.accuracy * 100)}%
             （{result.graded} 道
@@ -78,9 +78,9 @@ export function LevelCard() {
             {(result.groups ?? []).map((g) => (
               <div
                 key={g.key}
-                className="flex items-center justify-between gap-2 rounded-xl border border-stone-200 dark:border-stone-700 px-3 py-2 text-xs"
+                className="flex items-center justify-between gap-2 rounded-xl border border-line px-3 py-2 text-xs"
               >
-                <span className="text-stone-700 dark:text-stone-200">
+                <span className="text-ink-mute-deep">
                   {g.label}：{g.correct}/{g.graded}（线 {g.minCorrect}）
                 </span>
                 {g.thin ? (
@@ -99,13 +99,13 @@ export function LevelCard() {
               </div>
             ))}
             {(result.uncoveredGroups ?? []).length > 0 && (
-              <p className="text-[11px] text-stone-400">
+              <p className="text-[11px] text-ink-stone-400">
                 部分考点题库不足未覆盖，本次不计入判定（待题库扩充）。
               </p>
             )}
           </div>
         )}
-        <p className="text-[11px] text-stone-500">
+        <p className="text-[11px] text-ink-stone-500">
           {result.passed
             ? `已定为${LEVEL_LABELS[result.level]}。`
             : result.failReasons?.length
@@ -118,9 +118,9 @@ export function LevelCard() {
 
   if (exam) {
     return (
-      <section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+      <section className="rounded-2xl border border-line-amber-500o30 bg-wash-amber-500o5 p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <GraduationCap className="w-4 h-4 text-amber-600" />
+          <GraduationCap className="w-4 h-4 text-tone-amber-600" />
           <h3 className="text-sm font-bold">定级考 · 目标{LEVEL_LABELS[exam.target]}（20 道，≥80% 过线）</h3>
           <span className="flex-1" />
           <Button
@@ -171,12 +171,12 @@ export function LevelCard() {
   const higher = LEVEL_ORDER.filter((l) => LEVEL_ORDER.indexOf(l) > LEVEL_ORDER.indexOf(current));
 
   return (
-    <section className="rounded-2xl border border-amber-900/10 dark:border-amber-500/15 bg-[#faf9f6] dark:bg-[#1a1816] p-4 shadow-sm space-y-2">
+    <section className="rounded-2xl border border-line-accent bg-paper-soft p-4 shadow-sm space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+        <Award className="w-4 h-4 text-accent-ink" />
         <span className="text-sm font-bold">当前档位</span>
         <Badge variant="amber">{LEVEL_LABELS[current]}</Badge>
-        {info && <span className="text-[11px] text-stone-500 dark:text-stone-400">{info.hint}</span>}
+        {info && <span className="text-[11px] text-ink-ghost">{info.hint}</span>}
         <span className="flex-1" />
         {higher.map((lv) => (
           <Button
@@ -207,7 +207,7 @@ export function LevelCard() {
           </Button>
         ))}
       </div>
-      <p className="text-[11px] text-stone-400">
+      <p className="text-[11px] text-ink-stone-400">
         通过阶段测评后升级；日常失误不降级。收藏数量不计入晋级。
       </p>
     </section>

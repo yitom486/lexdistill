@@ -136,9 +136,9 @@ export function SubjectiveWritingWorkbench({
 
   if (!currentExercise) {
     return (
-      <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-3xl p-10 border border-amber-900/10 dark:border-amber-500/15 shadow-sm text-center space-y-4">
-        <Sparkles className="w-8 h-8 mx-auto text-amber-500" />
-        <p className="text-sm text-stone-600 dark:text-stone-300">
+      <div className="bg-paper-soft rounded-3xl p-10 border border-line-accent shadow-sm text-center space-y-4">
+        <Sparkles className="w-8 h-8 mx-auto text-tone-amber-500" />
+        <p className="text-sm text-ink-faint">
           暂无写作题干。题目由 Gateway learning.content 生成并写入练习队列，不内置演示题。
         </p>
         <Button
@@ -158,16 +158,16 @@ export function SubjectiveWritingWorkbench({
   }
 
   return (
-    <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-3xl p-6 sm:p-8 border border-amber-900/10 dark:border-amber-500/15 shadow-sm space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-stone-200 dark:border-stone-800">
+    <div className="bg-paper-soft rounded-3xl p-6 sm:p-8 border border-line-accent shadow-sm space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-line-soft">
         <div>
           <div className="flex items-center gap-2">
             <Badge variant="amber">AI 深度主观题批改</Badge>
-            <span className="text-xs text-stone-500 dark:text-stone-400">
+            <span className="text-xs text-ink-ghost">
               learning.content 出题 · learning.assess 批改
             </span>
           </div>
-          <h3 className="text-lg font-bold text-stone-900 dark:text-stone-100 mt-1 font-serif">
+          <h3 className="text-lg font-bold text-ink mt-1 font-serif">
             {currentExercise.category}
           </h3>
         </div>
@@ -193,7 +193,7 @@ export function SubjectiveWritingWorkbench({
               handleSwitchExercise(Number(val));
             }}
           >
-            <TabsList className="bg-stone-200/60 dark:bg-stone-900">
+            <TabsList className="bg-veil-stone-200o60-stone-900">
               <TabsIndicator />
               {exercises.map((ex, idx) => (
                 <TabsTrigger key={ex.id} value={String(idx)} className="px-3 py-1.5 text-xs">
@@ -206,21 +206,21 @@ export function SubjectiveWritingWorkbench({
       </div>
 
       <div className="space-y-3">
-        <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-stone-900/60 border border-amber-900/10 dark:border-amber-500/15 space-y-2">
-          <span className="text-xs font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider">
+        <div className="p-4 rounded-2xl bg-wash-amber-50o60-stone-900o60 border border-line-accent space-y-2">
+          <span className="text-xs font-bold text-ink-amber-900-amber-300 uppercase tracking-wider">
             中文题干 (请翻译为地道日文)：
           </span>
-          <p className="text-xl font-bold font-serif text-stone-900 dark:text-stone-100">
+          <p className="text-xl font-bold font-serif text-ink">
             {currentExercise.chinesePrompt}
           </p>
-          <p className="text-xs text-stone-500 dark:text-stone-400">
+          <p className="text-xs text-ink-ghost">
             💡 考点提示：{currentExercise.contextHint}
           </p>
         </div>
 
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-stone-600 dark:text-stone-400 flex items-center gap-1.5">
-            <PenTool className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          <label className="text-xs font-semibold text-ink-faint-soft flex items-center gap-1.5">
+            <PenTool className="w-3.5 h-3.5 text-accent-ink" />
             在此键入你的日文长句作答：
           </label>
           <textarea
@@ -228,7 +228,7 @@ export function SubjectiveWritingWorkbench({
             value={inputSubmission}
             onChange={(e) => setInputSubmission(e.target.value)}
             placeholder="例如：昨日、友達とカフェで日本語の本を読みました。"
-            className="w-full p-4 rounded-2xl bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 border border-stone-300 dark:border-stone-700 outline-none focus:border-amber-500 text-base leading-relaxed resize-none transition-all shadow-xs"
+            className="w-full p-4 rounded-2xl bg-surface text-ink border border-line-stone-300-stone-700 outline-none focus:border-tone-amber-500 text-base leading-relaxed resize-none transition-all shadow-xs"
           />
         </div>
 
@@ -262,17 +262,13 @@ export function SubjectiveWritingWorkbench({
             className="space-y-3"
           >
             <div
-              className={`p-4 rounded-2xl border ${
-                gradingResult.isCorrect
-                  ? 'bg-emerald-50/80 border-emerald-500/30 dark:bg-emerald-950/20'
-                  : 'bg-rose-50/80 border-rose-500/30 dark:bg-rose-950/20'
-              }`}
+              className={`p-4 rounded-2xl border ${ gradingResult.isCorrect ? 'bg-wash-emerald-50o80 border-line-emerald-500o30 dark:bg-wash-emerald-950o20' : 'bg-wash-rose-50o80 border-line-rose-500o30 dark:bg-wash-rose-950o20' }`}
             >
               <div className="flex items-center gap-2 mb-2">
                 {gradingResult.isCorrect ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <CheckCircle2 className="w-4 h-4 text-tone-emerald-600" />
                 ) : (
-                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  <AlertTriangle className="w-4 h-4 text-ink-rose-600" />
                 )}
                 <span className="text-sm font-bold">
                   综合评分 {gradingResult.score}
@@ -281,11 +277,11 @@ export function SubjectiveWritingWorkbench({
                   {gradingResult.isCorrect ? '通过' : '需巩固'}
                 </Badge>
               </div>
-              <p className="text-sm text-stone-700 dark:text-stone-300">
+              <p className="text-sm text-ink-mute">
                 {gradingResult.explanation}
               </p>
               {gradingResult.refinementSuggestion && (
-                <p className="text-xs mt-2 text-stone-500 flex items-start gap-1.5">
+                <p className="text-xs mt-2 text-ink-stone-500 flex items-start gap-1.5">
                   <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   范例：{gradingResult.refinementSuggestion}
                 </p>

@@ -503,6 +503,121 @@ export interface EditableTocEntry {
   confidence: TocDraftConfidence | null;
 }
 
+/** diff 侧快照 → 可编辑行（remove 快照展示 / add 回退值用；key 取 entryId）。 */
+export function diffSideToEditable(entryId: string, side: TocReviewDiffSide): EditableTocEntry {
+  return {
+    key: entryId,
+    title: side.title,
+    printedPage: String(side.printedPage),
+    level: side.level === 1 ? 1 : 2,
+    kind: side.kind,
+    confidence: side.confidence,
+  };
+}
+
+function baselineEntryToEditable(entryId: string, entry: TocBaselineEntry): EditableTocEntry {
+  return {
+    key: entryId,
+    title: entry.title,
+    printedPage: String(entry.printedPage),
+    level: entry.level === 1 ? 1 : 2,
+    kind: entry.kind,
+    confidence: null,
+  };
+}
+
+export interface AiAdoptBuildInput {
+  baselineEntries: TocBaselineEntry[];
+  diff: TocReviewDiffRow[];
+  /** 用户在结果 Dialog 内确认的操作 id（entryId 集合）。 */
+  selectedIds: string[];
+  /** 用户在结果 Dialog 内的当前编辑（entryId → 行）。 */
+  editedById: Record<string, EditableTocEntry>;
+}
+
+/**
+ * P3.5-FIX 父级采用链（纯函数）：以 baseline + 已确认操作构造完整有序 entries。
+ * - keep → 基线原值；selected update → 当前编辑覆盖（缺编辑回退草稿 after）；
+ *   selected add → 当前编辑插入（缺编辑回退草稿 after）；selected remove → 真正移除；
+ * - 未选中操作一律保持基线（update 不覆盖、add 不插入、remove 不移除）；
+ * - 顺序跟随 diff 顺序；绝不把 remove 的 diff.before 当作最终 entries；
+ * - 未知 id 忽略（fail-closed，不捏造）。
+ */
+export function buildAiAdoptedEntries(input: AiAdoptBuildInput): EditableTocEntry[] {
+  const selected = new Set(input.selectedIds);
+  const out: EditableTocEntry[] = [];
+  for (const row of input.diff) {
+    const baselineMatch = /^b(\d+)$/.exec(row.entryId);
+    const baselineEntry =
+      baselineMatch === null ? undefined : input.baselineEntries[Number(baselineMatch[1])];
+    const isSelected = selected.has(row.entryId);
+    if (row.change === 'keep') {
+      if (baselineEntry) out.push(baselineEntryToEditable(row.entryId, baselineEntry));
+      continue;
+    }
+    if (row.change === 'update') {
+      if (!baselineEntry) continue;
+      if (!isSelected) {
+        out.push(baselineEntryToEditable(row.entryId, baselineEntry));
+        continue;
+      }
+      const edited = input.editedById[row.entryId];
+      if (edited) {
+        out.push({ ...edited, key: row.entryId });
+        continue;
+      }
+      if (row.after) {
+        out.push(diffSideToEditable(row.entryId, row.after));
+        continue;
+      }
+      out.push(baselineEntryToEditable(row.entryId, baselineEntry));
+      continue;
+    }
+    if (row.change === 'add') {
+      if (!isSelected) continue;
+      const edited = input.editedById[row.entryId];
+      if (edited) {
+        out.push({ ...edited, key: row.entryId });
+        continue;
+      }
+      if (row.after) out.push(diffSideToEditable(row.entryId, row.after));
+      continue;
+    }
+    // remove：选中才真正移除；未选中保持基线。before 永远只是证据快照，不进 entries。
+    if (!isSelected && baselineEntry) {
+      out.push(baselineEntryToEditable(row.entryId, baselineEntry));
+    }
+  }
+  return out;
+}
+
+export interface TocReviewModelRequest {
+  model?: string;
+  effort?: string;
+}
+
+/**
+ * P3.5-FIX 配置优先级（纯函数）：本次显式 > 已保存偏好 > 缺席。
+ * 空串视为缺席；双缺席返回 {}（调用方不传，后端走环境变量 > 适配器默认）。
+ */
+export function resolveTocReviewModelRequest(options: {
+  session: TocReviewModelRequest;
+  saved: TocReviewModelRequest;
+}): TocReviewModelRequest {
+  const pick = (sessionValue: string | undefined, savedValue: string | undefined): string | undefined => {
+    const session = sessionValue?.trim() ? sessionValue.trim() : undefined;
+    if (session) return session;
+    const saved = savedValue?.trim() ? savedValue.trim() : undefined;
+    return saved;
+  };
+  const model = pick(options.session.model, options.saved.model);
+  const effort = pick(options.session.effort, options.saved.effort);
+  return {
+    ...(model ? { model } : {}),
+    ...(effort ? { effort } : {}),
+  };
+}
+
 export function toEditableEntries(
   entries: Array<{ title: string; printedPage: number; level: number; kind: TocBaselineEntryKind }>,
   confidences?: Array<TocDraftConfidence | null>

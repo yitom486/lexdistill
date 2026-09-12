@@ -161,7 +161,7 @@ export function FsrsCardWorkbench() {
         helper={dictionaryCopy.helper}
       />
 
-      <div className="flex items-center justify-between text-xs text-stone-500 dark:text-stone-400 gap-3">
+      <div className="flex items-center justify-between text-xs text-ink-ghost gap-3">
         <span>
           当前卡片: {filteredCards.length ? currentCardIndex + 1 : 0} / {filteredCards.length}
         </span>
@@ -221,7 +221,7 @@ export function FsrsCardWorkbench() {
             setCardFlipped(false);
           }}
         >
-          <TabsList className="bg-stone-200/60 dark:bg-stone-900">
+          <TabsList className="bg-veil-stone-200o60-stone-900">
             <TabsIndicator />
             {(
               [
@@ -250,7 +250,7 @@ export function FsrsCardWorkbench() {
           }}
           className="fsrs-card-stage h-115 cursor-pointer"
         >
-          <div className="fsrs-card-viewport relative h-full w-full overflow-hidden rounded-3xl border border-amber-900/10 bg-[#faf9f6] shadow-sm dark:border-amber-500/15 dark:bg-[#1a1816]">
+          <div className="fsrs-card-viewport relative h-full w-full overflow-hidden rounded-3xl border border-line-amber-900o10 bg-paper-soft shadow-sm dark:border-wash-amber-500o15">
             <div
               className="fsrs-card-rotor relative h-full w-full transform-style-3d"
               style={{
@@ -272,7 +272,7 @@ export function FsrsCardWorkbench() {
                   <Badge variant="amber">
                     {activeCard.tag} · {activeCard.pos}
                   </Badge>
-                  <span className="text-xs text-stone-400 font-mono">
+                  <span className="text-xs text-ink-stone-400 font-mono">
                     FSRS 稳定性: {activeCard.stability}d · 复习 {activeCard.reps} 次
                   </span>
                 </div>
@@ -283,15 +283,15 @@ export function FsrsCardWorkbench() {
                       title="卡片正面"
                       sandbox=""
                       srcDoc={renderedReview.frontDoc}
-                      className="block h-55 w-full shrink-0 rounded-2xl border-0 bg-white dark:bg-stone-950"
+                      className="block h-55 w-full shrink-0 rounded-2xl border-0 bg-surface-abyss"
                     />
                   ) : (
                     <>
-                      <h2 className="text-4xl sm:text-5xl font-bold font-serif text-stone-900 dark:text-stone-100 tracking-wide">
+                      <h2 className="text-4xl sm:text-5xl font-bold font-serif text-ink tracking-wide">
                         {activeCard.frontWord}
                       </h2>
                       {activeCard.reading && (
-                        <p className="text-sm text-amber-700 dark:text-amber-400 font-mono mt-2">
+                        <p className="text-sm text-accent-ink-warm font-mono mt-2">
                           {activeCard.reading}
                         </p>
                       )}
@@ -306,9 +306,9 @@ export function FsrsCardWorkbench() {
                     />
                   </div>
                 </div>
-                <div className="text-center text-xs text-stone-400">
+                <div className="text-center text-xs text-ink-stone-400">
                   点击卡片或按{' '}
-                  <kbd className="font-mono bg-stone-200 dark:bg-stone-800 px-1.5 py-0.5 rounded">
+                  <kbd className="font-mono bg-line-soft px-1.5 py-0.5 rounded">
                     Space
                   </kbd>{' '}
                   翻转查看释义
@@ -324,7 +324,7 @@ export function FsrsCardWorkbench() {
               >
               <div className="flex min-h-full flex-col justify-between space-y-4">
                 <div className="space-y-3">
-                  <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                  <span className="text-xs font-bold text-accent-ink-warm uppercase tracking-wider">
                     中文释义与核心考点
                   </span>
                   {renderedReview ? (
@@ -333,15 +333,15 @@ export function FsrsCardWorkbench() {
                       title="卡片背面"
                       sandbox=""
                       srcDoc={renderedReview.backDoc}
-                      className="block h-55 w-full shrink-0 rounded-2xl border-0 bg-white dark:bg-stone-950"
+                      className="block h-55 w-full shrink-0 rounded-2xl border-0 bg-surface-abyss"
                     />
                   ) : (
                     <>
-                      <h3 className="text-xl sm:text-2xl font-bold font-serif text-stone-900 dark:text-stone-100">
+                      <h3 className="text-xl sm:text-2xl font-bold font-serif text-ink">
                         {activeCard.backMeaning}
                       </h3>
-                      <div className="p-3.5 rounded-xl bg-amber-500/10 dark:bg-stone-900/60 border border-amber-900/5 text-xs space-y-1">
-                        <div className="font-medium text-stone-900 dark:text-stone-100 flex items-center justify-between">
+                      <div className="p-3.5 rounded-xl bg-wash-amber-500o10-stone-900o60 border border-line-amber-900o5 text-xs space-y-1">
+                        <div className="font-medium text-ink flex items-center justify-between">
                           <span>{activeCard.exampleJp}</span>
                           <span onClick={(e) => e.stopPropagation()}>
                             <UnifiedTtsPlayer
@@ -351,19 +351,19 @@ export function FsrsCardWorkbench() {
                             />
                           </span>
                         </div>
-                        <p className="text-stone-500 dark:text-stone-400 font-serif">
+                        <p className="text-ink-ghost font-serif">
                           {activeCard.exampleZh}
                         </p>
                       </div>
                     </>
                   )}
                   {activeCard.exampleZh && (
-                    <p className="text-xs text-stone-500 dark:text-stone-400 font-serif">
+                    <p className="text-xs text-ink-ghost font-serif">
                       {activeCard.exampleZh}
                     </p>
                   )}
                   {activeCard.note && (
-                    <p className="text-xs text-amber-800 dark:text-amber-300">💡 {activeCard.note}</p>
+                    <p className="text-xs text-ink-amber-800-amber-300">💡 {activeCard.note}</p>
                   )}
                 </div>
 
@@ -373,14 +373,14 @@ export function FsrsCardWorkbench() {
                 >
                   <Button
                     variant="secondary"
-                    className="h-auto py-2.5 hover:bg-rose-500 hover:text-white"
+                    className="h-auto py-2.5 hover:bg-tone-rose-500 hover:text-tone-white"
                     onClick={() => handleCardReview('AGAIN')}
                   >
                     重来 (1)
                   </Button>
                   <Button
                     variant="secondary"
-                    className="h-auto py-2.5 hover:bg-amber-500 hover:text-stone-950"
+                    className="h-auto py-2.5 hover:bg-tone-amber-500 hover:text-tone-stone-950"
                     onClick={() => handleCardReview('HARD')}
                   >
                     困难 (2)
@@ -389,7 +389,7 @@ export function FsrsCardWorkbench() {
                     良好 (3)
                   </Button>
                   <Button
-                    className="h-auto py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="h-auto py-2.5 bg-tone-emerald-600 hover:bg-tone-emerald-700 text-tone-white"
                     onClick={() => handleCardReview('EASY')}
                   >
                     简单 (4)

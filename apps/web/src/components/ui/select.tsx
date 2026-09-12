@@ -23,7 +23,7 @@ const SelectTrigger = React.forwardRef<
   <BaseSelect.Trigger
     ref={ref}
     className={cn(
-      'flex h-9 w-full items-center justify-between rounded-xl border border-amber-900/20 dark:border-amber-500/20 bg-white dark:bg-[#211f1d] px-3 py-2 text-xs font-medium text-stone-900 dark:text-stone-100 shadow-xs ring-offset-background placeholder:text-stone-400 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer transition-all hover:border-amber-500/50',
+      'flex h-9 w-full items-center justify-between rounded-xl border border-line-amber-900o20-amber-500o20 bg-surface-warm px-3 py-2 text-xs font-medium text-ink shadow-xs ring-offset-background placeholder:text-ink-stone-400 focus:outline-none focus:ring-1 focus:ring-tone-amber-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer transition-all hover:border-tone-amber-500o50',
       className
     )}
     {...props}
@@ -45,7 +45,7 @@ const SelectContent = React.forwardRef<
       <BaseSelect.Popup
         ref={ref}
         className={cn(
-          'relative z-50 max-h-96 min-w-[10rem] overflow-hidden rounded-xl border border-amber-900/15 dark:border-amber-500/20 bg-[#faf9f6] dark:bg-[#1c1a17] p-1 text-stone-900 dark:text-stone-100 shadow-xl transition-all',
+          'relative z-50 max-h-96 min-w-[10rem] overflow-hidden rounded-xl border border-line-amber-900o15-amber-500o20 bg-surface-paper-coal p-1 text-ink shadow-xl transition-all',
           className
         )}
         {...props}
@@ -68,16 +68,16 @@ const SelectItem = React.forwardRef<
     className={cn(
       'relative flex w-full cursor-pointer select-none items-center rounded-lg py-1.5 pl-8 pr-2 text-xs outline-none transition-colors',
       // Base UI 用 data-highlighted；避免 amber-950 在深色弹出层上糊成一团
-      'data-[highlighted]:bg-amber-100 data-[highlighted]:text-stone-900',
-      'dark:data-[highlighted]:bg-stone-700 dark:data-[highlighted]:text-stone-50',
-      'focus:bg-amber-100 focus:text-stone-900',
-      'dark:focus:bg-stone-700 dark:focus:text-stone-50',
+      'data-[highlighted]:bg-tint-amber-100 data-[highlighted]:text-tone-stone-900',
+      'dark:data-[highlighted]:bg-tone-stone-700 dark:data-[highlighted]:text-surface-stone-50',
+      'focus:bg-tint-amber-100 focus:text-tone-stone-900',
+      'dark:focus:bg-tone-stone-700 dark:focus:text-surface-stone-50',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
     )}
     {...props}
   >
-    <BaseSelect.ItemIndicator className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center text-amber-600 dark:text-amber-400">
+    <BaseSelect.ItemIndicator className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center text-accent-ink">
       <Check className="h-3.5 w-3.5" />
     </BaseSelect.ItemIndicator>
     <BaseSelect.ItemText>{children}</BaseSelect.ItemText>

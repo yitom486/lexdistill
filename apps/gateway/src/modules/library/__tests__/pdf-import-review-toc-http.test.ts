@@ -45,6 +45,8 @@ afterEach(async () => {
 
 interface CapturedCall {
   systemPrompt?: string;
+  model?: string;
+  effort?: string;
   input: AgentInput;
 }
 
@@ -86,16 +88,21 @@ function makeFakeAdapter(steps: Array<{ kind: 'text'; text: string } | { kind: '
     id: 'mock-http-toc-review',
     name: 'Mock HTTP TOC Review Adapter',
     supportsImageInput: () => true,
-    createSession: async (options) => {
-      const capturing: AgentSession = {
-        ...session,
-        send: async function* (input: AgentInput): AsyncGenerator<AgentEvent, void, unknown> {
-          captured.push({ ...(options.systemPrompt ? { systemPrompt: options.systemPrompt } : {}), input });
-          yield* session.send(input);
-        },
-      };
-      return ok(capturing);
-    },
+      createSession: async (options) => {
+        const capturing: AgentSession = {
+          ...session,
+          send: async function* (input: AgentInput): AsyncGenerator<AgentEvent, void, unknown> {
+            captured.push({
+              ...(options.systemPrompt ? { systemPrompt: options.systemPrompt } : {}),
+              ...((options as { model?: string }).model ? { model: (options as { model?: string }).model } : {}),
+              ...((options as { effort?: string }).effort ? { effort: (options as { effort?: string }).effort } : {}),
+              input,
+            });
+            yield* session.send(input);
+          },
+        };
+        return ok(capturing);
+      },
     resumeSession: async () => ({
       ok: false as const,
       error: new BusinessError('E_CODEX_SESSION', 'mock 不支持恢复', 'AGENT_RUNTIME'),
@@ -255,6 +262,58 @@ describe('P3.4A POST review-toc（真 native + 假工具通道）', () => {
     expect(JSON.stringify(captured)).not.toContain('iVBOR');
     const after = await documentCount(repo, 'u1');
     expect(after).toBe(before);
+  }, 180000);
+
+  it('P3.5-FIX review-toc 透传 model/effort 到 Agent 会话（缺席不传）', async () => {
+    // 环境变量缺席时透传才可断言：暂存并清空，测完恢复
+    const savedModel = process.env['STUDY_STUDIO_TOC_REVIEW_MODEL'];
+    const savedEffort = process.env['STUDY_STUDIO_TOC_REVIEW_EFFORT'];
+    delete process.env['STUDY_STUDIO_TOC_REVIEW_MODEL'];
+    delete process.env['STUDY_STUDIO_TOC_REVIEW_EFFORT'];
+    try {
+    const repo = new DrizzleLearnerRepository(':memory:');
+    repos.push(repo);
+    const captured: CapturedCall[] = [];
+    const app = createApp({
+      repo,
+      server: {
+        agentAdapter: makeFakeAdapter(
+          [{ kind: 'text', text: '这是目录：{"entries": [], "warnings": []}' }],
+          captured
+        ),
+      } as never,
+      port: 0,
+    });
+    const tmp = await writeTempPdf(syntheticTextTocPdf());
+    const withOptions = await postReviewToc(app, 'u1', {
+      filePath: tmp,
+      startPage: 1,
+      endPage: 2,
+      model: 'm-explicit',
+      effort: 'high',
+    });
+    expect(withOptions.status).toBe(200);
+    // 无工具调用会走第二轮追问（createSession 两次属正常）。
+    // 契约：model 走会话创建，effort 走 Turn 输入（agent-core 无会话级 effort）。
+    expect(captured.length).toBeGreaterThanOrEqual(1);
+    expect(captured[0]).toMatchObject({ model: 'm-explicit' });
+    expect(captured[0]?.input.turnOptions).toMatchObject({ model: 'm-explicit', effort: 'high' });
+
+    captured.length = 0;
+    const withoutOptions = await postReviewToc(app, 'u1', { filePath: tmp, startPage: 1, endPage: 2 });
+    expect(withoutOptions.status).toBe(200);
+    expect(captured.length).toBeGreaterThanOrEqual(1);
+    for (const call of captured) {
+      expect(call.model).toBeUndefined();
+      expect(call.effort).toBeUndefined();
+      expect(call.input.turnOptions).toBeUndefined();
+    }
+    } finally {
+      if (savedModel === undefined) delete process.env['STUDY_STUDIO_TOC_REVIEW_MODEL'];
+      else process.env['STUDY_STUDIO_TOC_REVIEW_MODEL'] = savedModel;
+      if (savedEffort === undefined) delete process.env['STUDY_STUDIO_TOC_REVIEW_EFFORT'];
+      else process.env['STUDY_STUDIO_TOC_REVIEW_EFFORT'] = savedEffort;
+    }
   }, 180000);
 
   it('P3.4A 无工具调用：unavailable E_TOC_REVIEW_NO_TOOL_CALL（200，非 502），基线保留、零写', async () => {

@@ -88,11 +88,11 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
         variant="ghost"
         size="icon"
         onClick={handleTogglePlay}
-        className={`h-7 w-7 p-1 text-amber-700 dark:text-amber-400 hover:bg-amber-500/15 ${className}`}
+        className={`h-7 w-7 p-1 text-accent-ink-warm hover:bg-wash-amber-500o15 ${className}`}
         title={isCurrentPlaying ? '停止发音' : `标准发音 (${lang} · ${gender === 'FEMALE' ? '女声' : '男声'})`}
       >
         {isCurrentPlaying ? (
-          <VolumeX className="w-3.5 h-3.5 animate-pulse text-amber-600" />
+          <VolumeX className="w-3.5 h-3.5 animate-pulse text-tone-amber-600" />
         ) : (
           <Volume2 className="w-3.5 h-3.5 hover:scale-110 transition-transform" />
         )}
@@ -112,8 +112,8 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
         onClick={handleTogglePlay}
         className={`gap-1.5 shadow-xs ${
           isCurrentPlaying
-            ? 'bg-amber-500 text-stone-950 border-amber-600 shadow-amber-500/20 shadow-md hover:bg-amber-500'
-            : 'border border-stone-200 dark:border-stone-700 hover:border-amber-500/50 hover:bg-amber-500/10'
+            ? 'bg-tone-amber-500 text-tone-stone-950 border-tone-amber-600 shadow-tone-amber-500o20 shadow-md hover:bg-tone-amber-500'
+            : 'border border-line hover:border-tone-amber-500o50 hover:bg-wash-amber-500o10'
         } ${className}`}
         title={`朗读 (${lang} · ${gender === 'FEMALE' ? '自然女声' : '自然男声'} · ${rate}x)`}
       >
@@ -122,14 +122,14 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
             <VolumeX className="w-4 h-4 animate-pulse" />
             <span>{label || '暂停'}</span>
             <span className="flex items-center gap-0.5 ml-1">
-              <span className="w-1 h-3 bg-stone-950 rounded-full animate-bounce [animation-delay:0ms]" />
-              <span className="w-1 h-4 bg-stone-950 rounded-full animate-bounce [animation-delay:150ms]" />
-              <span className="w-1 h-2 bg-stone-950 rounded-full animate-bounce [animation-delay:300ms]" />
+              <span className="w-1 h-3 bg-tone-stone-950 rounded-full animate-bounce [animation-delay:0ms]" />
+              <span className="w-1 h-4 bg-tone-stone-950 rounded-full animate-bounce [animation-delay:150ms]" />
+              <span className="w-1 h-2 bg-tone-stone-950 rounded-full animate-bounce [animation-delay:300ms]" />
             </span>
           </>
         ) : (
           <>
-            <Volume2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <Volume2 className="w-4 h-4 text-accent-ink" />
             <span>{label || '标准发音'}</span>
             <span className="text-[10px] opacity-60 font-mono">
               {gender === 'FEMALE' ? '女' : '男'}
@@ -159,13 +159,13 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
               duration: 0.45 + (i % 5) * 0.12,
               ease: 'easeInOut',
             }}
-            className="w-1.5 rounded-full dark:bg-stone-700 transition-colors"
+            className="w-1.5 rounded-full dark:bg-tone-stone-700 transition-colors"
           />
         ))}
       </div>
 
       {/* 控制台操作排 */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-stone-200/80 dark:border-stone-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-tone-stone-200o80-stone-800">
         {/* 左侧：循环播放与语速档位 */}
         <div className="flex items-center gap-2">
           {onToggleLoop && (
@@ -185,7 +185,7 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
           )}
 
           {/* 语速档位切换 (0.75x, 1x, 1.25x) */}
-          <div className="flex items-center bg-stone-200/60 dark:bg-stone-900 p-0.5 rounded-xl border border-stone-300/40 dark:border-stone-800 text-xs">
+          <div className="flex items-center bg-veil-stone-200o60-stone-900 p-0.5 rounded-xl border border-line-stone-300o40-stone-800 text-xs">
             {[0.75, 1.0, 1.25].map((spd) => (
               <Button
                 key={spd}
@@ -228,11 +228,7 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
             type="button"
             size="icon"
             onClick={handleTogglePlay}
-            className={`w-14 h-14 rounded-2xl shadow-md ${
-              isCurrentPlaying
-                ? 'bg-amber-600 text-white shadow-amber-600/30 hover:bg-amber-600'
-                : 'bg-amber-500 text-stone-950 hover:bg-amber-400 shadow-amber-500/25'
-            }`}
+            className={`w-14 h-14 rounded-2xl shadow-md ${ isCurrentPlaying ? 'bg-tone-amber-600 text-tone-white shadow-halo-amber-600o30 hover:bg-tone-amber-600' : 'bg-tone-amber-500 text-tone-stone-950 hover:bg-ink-amber-400 shadow-tone-amber-500o25' }`}
             title={isCurrentPlaying ? '暂停' : '开始发音'}
           >
             {isCurrentPlaying ? (
@@ -272,7 +268,7 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
               const nextGender: TtsGender = gender === 'FEMALE' ? 'MALE' : 'FEMALE';
               setGender(nextGender);
             }}
-            className="gap-1 border border-stone-300/40 dark:border-stone-800"
+            className="gap-1 border border-line-stone-300o40-stone-800"
             title="点击切换男女声"
           >
             <span>{gender === 'FEMALE' ? '👩 女声' : '👨 男声'}</span>

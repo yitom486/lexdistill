@@ -532,9 +532,9 @@ export function HangulStudioWorkbench({ onOpenTutor }: HangulStudioWorkbenchProp
                         onClick={() => answer(opt)}
                         className={`rounded-xl border p-3 text-lg font-medium transition ${
                           isAnswered && isCorrectOpt
-                            ? 'border-green-500 bg-green-500/10'
+                            ? 'border-ink-green-500 bg-wash-green-500o10'
                             : isAnswered && isPicked
-                              ? 'border-red-500 bg-red-500/10'
+                              ? 'border-ink-red-500 bg-wash-red-500o10'
                               : 'hover:border-primary'
                         }`}
                       >
@@ -548,12 +548,12 @@ export function HangulStudioWorkbench({ onOpenTutor }: HangulStudioWorkbenchProp
                     <div className="flex items-center gap-2 text-sm">
                       {selectedOption === correctAnswer ? (
                         <>
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          <CheckCircle2 className="h-4 w-4 text-ink-green-500" />
                           回答正确 · {current.jamo}（{current.name}）= {current.romanization}
                         </>
                       ) : (
                         <>
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-ink-red-500" />
                           正确答案：{correctAnswer} · {current.jamo}（{current.name}）
                         </>
                       )}
@@ -629,9 +629,9 @@ export function HangulStudioWorkbench({ onOpenTutor }: HangulStudioWorkbenchProp
                         onClick={() => answerWord(opt)}
                         className={`rounded-xl border p-3 text-lg font-medium transition ${
                           isAnswered && isCorrectOpt
-                            ? 'border-green-500 bg-green-500/10'
+                            ? 'border-ink-green-500 bg-wash-green-500o10'
                             : isAnswered && isPicked
-                              ? 'border-red-500 bg-red-500/10'
+                              ? 'border-ink-red-500 bg-wash-red-500o10'
                               : 'hover:border-primary'
                         }`}
                       >
@@ -645,12 +645,12 @@ export function HangulStudioWorkbench({ onOpenTutor }: HangulStudioWorkbenchProp
                     <div className="flex items-center gap-2 text-sm">
                       {selectedOption === wordCorrectAnswer ? (
                         <>
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          <CheckCircle2 className="h-4 w-4 text-ink-green-500" />
                           回答正确 · {currentWord.korean} = {currentWord.meanings.join('；')}
                         </>
                       ) : (
                         <>
-                          <XCircle className="h-4 w-4 text-red-500" />
+                          <XCircle className="h-4 w-4 text-ink-red-500" />
                           正确答案：{wordCorrectAnswer} · {currentWord.korean} = {currentWord.meanings.join('；')}
                         </>
                       )}

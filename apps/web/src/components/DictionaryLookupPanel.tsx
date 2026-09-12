@@ -56,7 +56,7 @@ function PitchBadge({ pronunciation, reading }: { pronunciation: unknown; readin
       </Badge>
       {graph && (
         <span
-          className="inline-flex items-center rounded-md border border-amber-500/25 bg-white px-1 dark:bg-stone-900 [&_svg]:h-7 [&_svg]:w-auto"
+          className="inline-flex items-center rounded-md border border-tone-amber-500o25 bg-tone-white px-1 dark:bg-tone-stone-900 [&_svg]:h-7 [&_svg]:w-auto"
           title={`声调阶梯（${reading} ${info.label}）`}
           dangerouslySetInnerHTML={{ __html: graph }}
         />
@@ -224,7 +224,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
   };
 
   return (
-    <section className="rounded-2xl border border-amber-900/10 bg-white/70 p-4 shadow-sm dark:border-amber-500/15 dark:bg-[#1a1816]">
+    <section className="rounded-2xl border border-line-amber-900o10 bg-veil-paper-70 p-4 shadow-sm dark:border-wash-amber-500o15">
       <form
         className="flex flex-col gap-3 sm:flex-row sm:items-end"
         onSubmit={(event) => {
@@ -234,18 +234,18 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
       >
         <div className="min-w-0 flex-1">
           <label
-            className="text-sm font-semibold text-stone-800 dark:text-stone-200"
+            className="text-sm font-semibold text-ink-soft"
             htmlFor={`dictionary-${language}`}
           >
             {title}
           </label>
-          <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">{helper}</p>
+          <p className="mt-0.5 text-xs text-ink-ghost">{helper}</p>
           <input
             id={`dictionary-${language}`}
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder={language === 'en' ? '例如：resilient' : '输入要查询的词'}
-            className="mt-2 h-9 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+            className="mt-2 h-9 w-full rounded-xl border border-ink-stone-200 bg-tone-white px-3 text-sm text-tone-stone-900 outline-none transition focus:border-tone-amber-500 focus:ring-2 focus:ring-tone-amber-500o20 dark:border-tone-stone-700 dark:bg-tone-stone-900 dark:text-tone-stone-100"
           />
         </div>
         <Button type="submit" size="sm" disabled={!input.trim() || lookup.isFetching} className="gap-1.5">
@@ -263,7 +263,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
                 setInput(h.query);
                 setQuery(h.query);
               }}
-              className="rounded-full border border-stone-200 px-2.5 py-1 text-[11px] text-stone-500 hover:border-amber-500/50 hover:text-amber-700 dark:border-stone-700 dark:text-stone-400 dark:hover:text-amber-300"
+              className="rounded-full border border-ink-stone-200 px-2.5 py-1 text-[11px] text-ink-stone-500 hover:border-tone-amber-500o50 hover:text-tone-amber-700 dark:border-tone-stone-700 dark:text-ink-stone-400 dark:hover:text-ink-amber-300"
               title={`最近查过（${h.hitCount} 条结果）`}
             >
               {h.query}
@@ -272,24 +272,24 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
         </div>
       )}
       {!query && showWordlist && (
-        <div className="mt-3 border-t border-stone-200 pt-3 dark:border-stone-800 space-y-3">
-          <p className="text-[11px] font-bold text-stone-500 dark:text-stone-400">
+        <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800 space-y-3">
+          <p className="text-[11px] font-bold text-ink-ghost">
             零基础单词表 · 按顺序点词展开学透（收进生词本即计入带路第 3 天）
           </p>
-          {wordlists.isLoading && <p className="text-xs text-stone-500">单词表加载中…</p>}
+          {wordlists.isLoading && <p className="text-xs text-ink-stone-500">单词表加载中…</p>}
           {(wordlists.data ?? []).map((group) => {
             const done = group.words.filter(
               (w) => w.collected || collectedIds.includes(w.entryId)
             ).length;
             return (
               <div key={group.id} className="space-y-1.5">
-                <p className="text-xs font-semibold text-stone-700 dark:text-stone-200">
+                <p className="text-xs font-semibold text-ink-mute-deep">
                   {group.title}
-                  <span className="ml-2 font-mono text-[10px] text-stone-400">
+                  <span className="ml-2 font-mono text-[10px] text-ink-stone-400">
                     {done}/{group.words.length} 已收
                   </span>
                 </p>
-                <p className="text-[11px] text-stone-400">{group.subtitle}</p>
+                <p className="text-[11px] text-ink-stone-400">{group.subtitle}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   {group.words.map((w) => {
                     const isCollected = w.collected || collectedIds.includes(w.entryId);
@@ -304,21 +304,21 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
                           }}
                           className={`w-full flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${
                             expanded
-                              ? 'border-amber-500/60 bg-amber-500/10'
-                              : 'border-stone-200 hover:border-amber-500/50 dark:border-stone-700'
+                              ? 'border-halo-amber-500o60 bg-wash-amber-500o10'
+                              : 'border-ink-stone-200 hover:border-tone-amber-500o50 dark:border-tone-stone-700'
                           }`}
                           title="展开学透卡：发音/释义/例句/收藏一条龙"
                         >
                           <span className="min-w-0">
-                            <span className="font-serif text-sm font-bold text-stone-900 dark:text-stone-100">
+                            <span className="font-serif text-sm font-bold text-ink">
                               {w.headword}
                             </span>
                             {w.reading && (
-                              <span className="ml-2 font-mono text-[11px] text-amber-700 dark:text-amber-300">
+                              <span className="ml-2 font-mono text-[11px] text-accent-ink-strong">
                                 {w.reading}
                               </span>
                             )}
-                            <span className="ml-2 text-[11px] text-stone-500">
+                            <span className="ml-2 text-[11px] text-ink-stone-500">
                               {(w.meanings[0] ?? '').slice(0, 12)}
                             </span>
                           </span>
@@ -331,7 +331,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
                               已收
                             </Badge>
                           ) : (
-                            <span className="text-[10px] text-stone-400 shrink-0">学透它 →</span>
+                            <span className="text-[10px] text-ink-stone-400 shrink-0">学透它 →</span>
                           )}
                         </button>
                         {expanded && (
@@ -360,38 +360,38 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
             );
           })}
           {(wordlists.data ?? []).length === 0 && !wordlists.isLoading && (
-            <p className="text-xs text-stone-500">单词表暂不可用，直接用上方搜索查词即可。</p>
+            <p className="text-xs text-ink-stone-500">单词表暂不可用，直接用上方搜索查词即可。</p>
           )}
         </div>
       )}
 
       {query && (
-        <div className="mt-3 border-t border-stone-200 pt-3 dark:border-stone-800">
+        <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800">
           {lookup.isFetching ? (
-            <p className="text-xs text-stone-500">正在查询本地词典…</p>
+            <p className="text-xs text-ink-stone-500">正在查询本地词典…</p>
           ) : lookup.isError ? (
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-ink-stone-500">
               暂时无法查询本地词典，请检查 Gateway 连接后重试。
             </p>
           ) : lookup.data?.entries.length ? (
             <div className="space-y-3">
               {groupEntriesBySource(lookup.data.entries).map((group) => (
                 <div key={group.source} className="space-y-2">
-                  <p className="text-[11px] font-bold text-stone-500 dark:text-stone-400">
+                  <p className="text-[11px] font-bold text-ink-ghost">
                     {group.source} · {group.entries.length} 条
                   </p>
                   {group.entries.map((entry) => (
                 <div key={entry.id}>
                 <div
-                  className="flex flex-col gap-2 rounded-xl bg-amber-50/70 p-3 dark:bg-amber-500/10 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-2 rounded-xl bg-wash-amber-50o70 p-3 dark:bg-wash-amber-500o10 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">
+                      <span className="font-serif text-lg font-bold text-ink">
                         {entry.headword}
                       </span>
                       {entry.reading && (
-                        <span className="font-mono text-xs text-amber-700 dark:text-amber-300">
+                        <span className="font-mono text-xs text-accent-ink-strong">
                           {entry.reading}
                         </span>
                       )}
@@ -407,7 +407,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
                       )}
                       {entry.frequencies && entry.frequencies.length > 0 && (
                         <span
-                          className="font-mono text-[10px] text-stone-400 dark:text-stone-500"
+                          className="font-mono text-[10px] text-ink-hint"
                           title="各来源词频（数字越小越常用）"
                         >
                           {entry.frequencies.map((f) => `${f.source} ${f.value}`).join(' · ')}
@@ -415,14 +415,14 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
                       )}
                     </div>
                     {entry.inflectionNote && (
-                      <p className="mt-1 text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+                      <p className="mt-1 text-[11px] font-semibold text-ink-sky-700-sky-300">
                         {entry.inflectionNote}
                       </p>
                     )}
-                    <p className="mt-1 text-xs text-stone-600 dark:text-stone-300">
+                    <p className="mt-1 text-xs text-ink-faint">
                       {entry.meanings.join('；')}
                     </p>
-                    <p className="mt-1 text-[11px] text-stone-400">来源：{entry.sourceLabel}</p>
+                    <p className="mt-1 text-[11px] text-ink-stone-400">来源：{entry.sourceLabel}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                   <Button
@@ -487,19 +487,19 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
               ))}
             </div>
           ) : lookup.data?.externalLookup ? (
-            <div className="flex flex-wrap items-center gap-3 text-xs text-stone-600 dark:text-stone-300">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-ink-faint">
               <span>本地词典暂未收录「{query}」。</span>
               <a
                 href={lookup.data.externalLookup.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 font-semibold text-amber-700 hover:underline dark:text-amber-300"
+                className="inline-flex items-center gap-1 font-semibold text-tone-amber-700 hover:underline dark:text-ink-amber-300"
               >
                 前往 OJAD 查询 <ExternalLink className="h-3.5 w-3.5" />
               </a>
             </div>
           ) : (
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-ink-stone-500">
               本地词典暂未收录「{query}」。{language === 'en' ? '请先确认英语离线词典包已经安装。' : ''}
               也可以直接用中文含义反查（比如查"水"找 water）。
             </p>
@@ -507,7 +507,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
         </div>
       )}
       {unstudiedNewCount > 0 && (
-        <p className="mt-3 rounded-xl border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2 text-[11px] text-stone-600 dark:text-stone-300">
+        <p className="mt-3 rounded-xl border border-dashed border-tone-amber-500o40 bg-wash-amber-500o5 px-3 py-2 text-[11px] text-ink-faint">
           生词本里有 {unstudiedNewCount} 张新卡还没讲透：展开上面词条点"学透了，入库开练"，否则它们进不了练习池（复习不受影响）。
         </p>
       )}

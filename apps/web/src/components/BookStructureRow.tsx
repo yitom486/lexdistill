@@ -19,9 +19,9 @@ export function BookStructureRow({
   const lessons = saved.classes.filter((c) => c.kind === 'lesson').length;
   const skills = [...new Set(saved.classes.map((c) => c.skillId).filter((s): s is string => !!s))];
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-stone-500 dark:text-stone-400">
+    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-ghost">
       <span className="inline-flex items-center gap-1 font-bold">
-        <ScanLine className="w-3.5 h-3.5 text-amber-600" />
+        <ScanLine className="w-3.5 h-3.5 text-tone-amber-600" />
         AI 结构存档
       </span>
       <span>
@@ -34,7 +34,7 @@ export function BookStructureRow({
         </Badge>
       ))}
       {skills.length > 6 && <span>+{skills.length - 6}</span>}
-      {saved.model && <span className="font-mono text-stone-400">by {saved.model}</span>}
+      {saved.model && <span className="font-mono text-ink-stone-400">by {saved.model}</span>}
     </div>
   );
 }

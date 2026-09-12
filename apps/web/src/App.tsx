@@ -72,7 +72,6 @@ const COACH_WIDTH_MAX = 960;
 
 export function App() {
   useEnsureGateway();
-  const theme = usePreferencesStore((s) => s.theme);
   const coachPanelWidthPx = usePreferencesStore((s) => s.coachPanelWidthPx);
   const setCoachPanelWidthPx = usePreferencesStore((s) => s.setCoachPanelWidthPx);
   const coachPanelOpen = usePreferencesStore((s) => s.coachPanelOpen);
@@ -251,9 +250,7 @@ export function App() {
 
   return (
     <div
-      className={`h-[100dvh] ${
-        theme === 'dark' ? 'dark bg-[#141312] text-stone-100' : 'bg-[#fbfaf8] text-stone-800'
-      } transition-colors flex font-sans relative overflow-hidden`}
+      className="h-[100dvh] bg-paper text-ink-deep transition-colors flex font-sans relative overflow-hidden"
     >
       <Toaster position="top-center" richColors />
       <SelectionLookupPopup />
@@ -299,7 +296,7 @@ export function App() {
             aria-orientation="vertical"
             aria-label="调整导师面板宽度"
             tabIndex={freeCoachVisible ? 0 : -1}
-            className="w-1.5 shrink-0 cursor-ew-resize rounded-l-xl bg-stone-800/40 hover:bg-sky-500/40 active:bg-sky-500/60"
+            className="w-1.5 shrink-0 cursor-ew-resize rounded-l-xl bg-veil-stone-800o40 hover:bg-tone-sky-500o40 active:bg-wash-sky-500o60"
             onPointerDown={onCoachResizePointerDown}
             onPointerMove={onCoachResizePointerMove}
             onPointerUp={onCoachResizePointerUp}
@@ -333,7 +330,7 @@ export function App() {
           {shell.copy.interimBanner && (
             <div
               role="status"
-              className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-xs text-amber-950/90 dark:text-amber-100/90"
+              className="rounded-xl border border-tone-amber-500o25 bg-wash-amber-500o10 px-3.5 py-2.5 text-xs text-ink-amber-950o90-amber-100o90"
             >
               {shell.copy.interimBanner}
             </div>

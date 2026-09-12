@@ -50,7 +50,7 @@ export function effortLabel(v: string): string {
 
 /** Agent 面板恒为深色底，不依赖 html.dark；高亮项强制浅色字 */
 export const darkMenuItem =
-  'text-stone-200 data-[highlighted]:bg-stone-700 data-[highlighted]:text-white focus:bg-stone-700 focus:text-white';
+  'text-ink-stone-200 data-[highlighted]:bg-tone-stone-700 data-[highlighted]:text-tone-white focus:bg-tone-stone-700 focus:text-tone-white';
 
 export const compactSelect =
-  'h-7 min-w-0 w-full gap-1 overflow-hidden rounded-md border border-stone-700/80 bg-transparent px-2 text-[11px] text-stone-300 hover:border-stone-500 hover:bg-stone-800/60 focus:ring-0 shadow-none';
+  'h-7 min-w-0 w-full gap-1 overflow-hidden rounded-md border border-line-stone-700o80 bg-transparent px-2 text-[11px] text-tone-stone-300 hover:border-ink-stone-500 hover:bg-veil-stone-800o60 focus:ring-0 shadow-none';

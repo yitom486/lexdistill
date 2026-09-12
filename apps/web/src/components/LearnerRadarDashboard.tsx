@@ -31,19 +31,19 @@ function EncounteredTermsHeat() {
   const top = [...terms].sort((a, b) => b.exposureCount - a.exposureCount).slice(0, 12);
 
   return (
-    <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-5 border border-amber-900/10 dark:border-amber-500/15 shadow-sm space-y-3">
+    <div className="bg-paper-soft rounded-2xl p-5 border border-line-accent shadow-sm space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-stone-700 dark:text-stone-300 flex items-center gap-2">
-          <Flame className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+        <h3 className="text-sm font-bold text-ink-mute flex items-center gap-2">
+          <Flame className="w-4 h-4 text-accent-ink" />
           相遇词热力（{terms.length}）
         </h3>
-        <span className="text-[11px] text-stone-400">查过/收过的词，见得越多越热 · 点词去生词本</span>
+        <span className="text-[11px] text-ink-stone-400">查过/收过的词，见得越多越热 · 点词去生词本</span>
       </div>
       {isLoading ? (
-        <p className="text-xs text-stone-400">加载中…</p>
+        <p className="text-xs text-ink-stone-400">加载中…</p>
       ) : top.length === 0 ? (
-        <div className="py-4 px-4 text-center rounded-xl bg-stone-100/50 dark:bg-stone-900/30 border border-dashed border-stone-200 dark:border-stone-800 space-y-2">
-          <p className="text-xs text-stone-500 dark:text-stone-400">
+        <div className="py-4 px-4 text-center rounded-xl bg-veil-stone-100o50-stone-900o30 border border-dashed border-line-soft space-y-2">
+          <p className="text-xs text-ink-ghost">
             还没有相遇词——去生词闪卡查第一个词，这里就会热起来
           </p>
           <div className="flex items-center justify-center gap-2">
@@ -92,14 +92,14 @@ function EncounteredTermsHeat() {
                 sound.playClick();
                 setActiveTab('CARDS');
               }}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-semibold cursor-pointer transition-colors border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15 text-stone-700 dark:text-stone-200"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-semibold cursor-pointer transition-colors border-line-amber-500o30 bg-wash-amber-500o5 hover:bg-wash-amber-500o15 text-ink-mute-deep"
             >
               <span>{t.headword}</span>
-              <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400">
+              <span className="font-mono text-[10px] text-accent-ink">
                 ×{t.exposureCount}
               </span>
               {t.status === 'collected' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="已收藏" />
+                <span className="w-1.5 h-1.5 rounded-full bg-tone-emerald-500" title="已收藏" />
               )}
             </button>
           ))}
@@ -154,10 +154,10 @@ export function LearnerRadarDashboard({
           description={evidence.attempts > 0 ? `${evidence.correct}/${evidence.attempts} 次答对 · ${evidence.observedSkillCount} 个已练技能；不代表整体水平` : '尚无有效练习记录，未测能力保持未知'}
         >
           <div className="flex items-baseline gap-1 pt-1">
-            <span className="text-3xl font-bold font-mono text-amber-600 dark:text-amber-400">
+            <span className="text-3xl font-bold font-mono text-accent-ink">
               {practicePercent === null ? '待评测' : <><NumberTicker value={practicePercent} />%</>}
             </span>
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+            <span className="text-xs text-ink-emerald-600-emerald-400 font-semibold">
               累计记录
             </span>
           </div>
@@ -169,10 +169,10 @@ export function LearnerRadarDashboard({
           description="4 级抗遗忘间隔重复智能调度"
         >
           <div className="flex items-baseline gap-1 pt-1">
-            <span className="text-3xl font-bold font-mono text-amber-600 dark:text-amber-400">
+            <span className="text-3xl font-bold font-mono text-accent-ink">
               <NumberTicker value={activeCardsCount} />
             </span>
-            <span className="text-xs text-stone-500 dark:text-stone-400">
+            <span className="text-xs text-ink-ghost">
               {profile.totalCardsReviewed > 0
                 ? `张活跃卡片 · 稳固率 ${retentionPercent}%`
                 : '张卡片 · 待开始复习'}
@@ -186,10 +186,10 @@ export function LearnerRadarDashboard({
           description={shell.copy.targetWeaknessLabel}
         >
           <div className="flex items-baseline gap-1 pt-1">
-            <span className="text-3xl font-bold font-mono text-rose-600 dark:text-rose-400">
+            <span className="text-3xl font-bold font-mono text-ink-rose-600-rose-400">
               <NumberTicker value={unresolvedMistakesCount} />
             </span>
-            <span className="text-xs text-stone-500 dark:text-stone-400">项弱点待清零</span>
+            <span className="text-xs text-ink-ghost">项弱点待清零</span>
           </div>
         </BentoCard>
       </BentoGrid>
@@ -201,10 +201,10 @@ export function LearnerRadarDashboard({
       <EncounteredTermsHeat />
 
       {/* 掌握度细项雷达 */}
-      <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-5 border border-amber-900/10 dark:border-amber-500/15 shadow-sm space-y-4">
+      <div className="bg-paper-soft rounded-2xl p-5 border border-line-accent shadow-sm space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-stone-700 dark:text-stone-300 flex items-center gap-2">
-            <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          <h3 className="text-sm font-bold text-ink-mute flex items-center gap-2">
+            <Award className="w-4 h-4 text-accent-ink" />
             {shell.trackName}技能画像 ({shell.copy.levelSchemeLabel})
           </h3>
           <Tabs
@@ -215,12 +215,12 @@ export function LearnerRadarDashboard({
             }}
           >
             <TabsList className="bg-transparent p-0 border-0 gap-1">
-              <TabsIndicator className="bg-amber-500 shadow-sm" />
+              <TabsIndicator className="bg-tone-amber-500 shadow-sm" />
               {['ALL', 'GRAMMAR', 'VOCAB', 'LISTENING', 'NUANCE'].map((dim) => (
                 <TabsTrigger
                   key={dim}
                   value={dim}
-                  className="px-2.5 py-1 text-xs data-[selected]:text-stone-950 data-[selected]:font-bold"
+                  className="px-2.5 py-1 text-xs data-[selected]:text-tone-stone-950 data-[selected]:font-bold"
                 >
                   {dim === 'ALL'
                     ? '全部'
@@ -238,8 +238,8 @@ export function LearnerRadarDashboard({
         </div>
 
         {visibleMetrics.length === 0 ? (
-          <div className="py-8 px-4 text-center rounded-xl bg-stone-100/50 dark:bg-stone-900/30 border border-dashed border-stone-200 dark:border-stone-800">
-            <p className="text-xs text-stone-500 dark:text-stone-400 mb-2.5">
+          <div className="py-8 px-4 text-center rounded-xl bg-veil-stone-100o50-stone-900o30 border border-dashed border-line-soft">
+            <p className="text-xs text-ink-ghost mb-2.5">
               {shell.copy.emptySkillsHint}
             </p>
             <Button
@@ -263,10 +263,10 @@ export function LearnerRadarDashboard({
                 return (
                   <div
                     key={metric.id}
-                    className="p-4 rounded-xl bg-stone-100/70 dark:bg-stone-900/50 border border-stone-200/80 dark:border-stone-800 space-y-2"
+                    className="p-4 rounded-xl bg-veil-stone-100o70-stone-900o50 border border-tone-stone-200o80-stone-800 space-y-2"
                   >
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-stone-800 dark:text-stone-200">
+                      <span className="font-bold text-ink-soft">
                         {metric.name}
                       </span>
                       <Badge
@@ -280,11 +280,11 @@ export function LearnerRadarDashboard({
                     <Progress
                       value={metric.proficiency * 100}
                       indicatorClassName={
-                        isStrong ? 'bg-emerald-500' : isWeak ? 'bg-rose-500' : 'bg-amber-500'
+                        isStrong ? 'bg-tone-emerald-500' : isWeak ? 'bg-tone-rose-500' : 'bg-tone-amber-500'
                       }
                     />
 
-                    <div className="flex justify-between items-center text-[11px] text-stone-400 pt-1">
+                    <div className="flex justify-between items-center text-[11px] text-ink-stone-400 pt-1">
                       <span>总练习 {metric.totalAttempts} 次 · 连续错误 {metric.consecutiveErrors} 次</span>
                       {isWeak && (
                         <Button

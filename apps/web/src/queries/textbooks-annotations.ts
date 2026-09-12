@@ -942,9 +942,17 @@ async function postTocEndpoint(
   endpoint: 'discover-toc' | 'extract-toc' | 'review-toc',
   source: TocPdfSource,
   range: { startPage: number; endPage: number } | undefined,
-  fallback: string
+  fallback: string,
+  extra?: { model?: string; effort?: string }
 ): Promise<unknown> {
   const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${endpoint}`;
+  const modelOptions =
+    endpoint === 'review-toc'
+      ? {
+          ...(extra?.model?.trim() ? { model: extra.model.trim() } : {}),
+          ...(extra?.effort?.trim() ? { effort: extra.effort.trim() } : {}),
+        }
+      : {};
   const res =
     'filePath' in source
       ? await fetchPdfGateway(url, {
@@ -953,6 +961,7 @@ async function postTocEndpoint(
           body: JSON.stringify({
             filePath: source.filePath,
             ...(range ? { startPage: range.startPage, endPage: range.endPage } : {}),
+            ...modelOptions,
           }),
         })
       : await (async () => {
@@ -962,6 +971,8 @@ async function postTocEndpoint(
             form.append('startPage', String(range.startPage));
             form.append('endPage', String(range.endPage));
           }
+          if (modelOptions.model) form.append('model', modelOptions.model);
+          if (modelOptions.effort) form.append('effort', modelOptions.effort);
           return fetchPdfGateway(url, { method: 'POST', body: form });
         })();
   const payload: unknown = await res.json().catch(() => null);
@@ -1240,13 +1251,15 @@ export async function streamExtractTocBaseline(
 /**
  * P4C-3：AI 审核目录（review-toc，只读草稿）。仅在用户确认范围 + 已有基线后调用；
  * embedded 返回时 draft 为 null（不需要 AI 审核），组件不得再触发 AI。
+ * modelOptions 缺席字段一律不传（后端走环境变量 > 适配器默认）。
  */
 export async function requestReviewToc(
   userId: string,
   source: TocPdfSource,
-  range: { startPage: number; endPage: number }
+  range: { startPage: number; endPage: number },
+  modelOptions?: { model?: string; effort?: string }
 ): Promise<TocReviewData> {
-  const payload = await postTocEndpoint(userId, 'review-toc', source, range, 'AI 审核目录失败');
+  const payload = await postTocEndpoint(userId, 'review-toc', source, range, 'AI 审核目录失败', modelOptions);
   const narrowed = narrowTocReview(payload);
   if (!narrowed) throw new Error('AI 审核返回异常，请稍后重试');
   return narrowed;
@@ -1254,8 +1267,11 @@ export async function requestReviewToc(
 
 export function useReviewTocMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
-    mutationFn: (vars: { source: TocPdfSource; range: { startPage: number; endPage: number } }) =>
-      requestReviewToc(userId, vars.source, vars.range),
+    mutationFn: (vars: {
+      source: TocPdfSource;
+      range: { startPage: number; endPage: number };
+      modelOptions?: { model?: string; effort?: string };
+    }) => requestReviewToc(userId, vars.source, vars.range, vars.modelOptions),
     onError: (e) => {
       logger.debug('[useReviewTocMutation] review failed', e);
     },

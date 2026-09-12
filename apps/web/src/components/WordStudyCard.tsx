@@ -73,13 +73,13 @@ export function WordStudyCard({
   };
 
   return (
-    <div className="mt-2 rounded-xl border border-amber-500/25 bg-white p-4 shadow-sm dark:bg-stone-900 space-y-3">
+    <div className="mt-2 rounded-xl border border-tone-amber-500o25 bg-tone-white p-4 shadow-sm dark:bg-tone-stone-900 space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="font-serif text-3xl font-bold text-stone-900 dark:text-stone-100">
+        <span className="font-serif text-3xl font-bold text-ink">
           {entry.headword}
         </span>
         {entry.reading && (
-          <span className="font-mono text-sm text-amber-700 dark:text-amber-300">
+          <span className="font-mono text-sm text-accent-ink-strong">
             {entry.reading}
           </span>
         )}
@@ -112,8 +112,8 @@ export function WordStudyCard({
       </div>
       <ol className="space-y-1.5">
         {entry.meanings.map((m, i) => (
-          <li key={i} className="flex gap-2 text-sm text-stone-700 dark:text-stone-200">
-            <span className="font-mono text-xs text-amber-600 dark:text-amber-400 pt-0.5">
+          <li key={i} className="flex gap-2 text-sm text-ink-mute-deep">
+            <span className="font-mono text-xs text-accent-ink pt-0.5">
               {i + 1}.
             </span>
             <span>{m}</span>
@@ -121,18 +121,18 @@ export function WordStudyCard({
         ))}
       </ol>
       {examples.data !== undefined && examples.data !== null && examples.data.length > 0 && (
-        <div className="space-y-1.5 rounded-xl bg-stone-50 dark:bg-stone-900/60 p-3">
-          <p className="text-[11px] font-bold text-stone-500 dark:text-stone-400">例句</p>
+        <div className="space-y-1.5 rounded-xl bg-surface-stone-50-stone-900o60 p-3">
+          <p className="text-[11px] font-bold text-ink-ghost">例句</p>
           {examples.data.map((e, i) => (
             <div key={i} className="space-y-0.5">
-              <p className="text-sm text-stone-800 dark:text-stone-100">{e.sentence}</p>
-              <p className="text-xs text-stone-500 dark:text-stone-400">{e.translation}</p>
+              <p className="text-sm text-ink-deep">{e.sentence}</p>
+              <p className="text-xs text-ink-ghost">{e.translation}</p>
             </div>
           ))}
         </div>
       )}
       {examples.isFetching && (
-        <p className="text-[11px] text-stone-400">例句生成中…</p>
+        <p className="text-[11px] text-ink-stone-400">例句生成中…</p>
       )}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <Button type="button" size="sm" className="gap-1.5" onClick={handleAskAi} title="让 AI 讲用法和例句">
@@ -150,7 +150,7 @@ export function WordStudyCard({
         >
           {collected ? (
             <>
-              <Check className="h-3.5 w-3.5 text-emerald-500" />
+              <Check className="h-3.5 w-3.5 text-tone-emerald-500" />
               已在生词本
             </>
           ) : (
@@ -172,7 +172,7 @@ export function WordStudyCard({
           <Check className="h-3.5 w-3.5" />
           {studyPending ? '入库中…' : '学透了，入库开练'}
         </Button>
-        <span className="text-[11px] text-stone-400">只收不标的不进练习池——别裸考。</span>
+        <span className="text-[11px] text-ink-stone-400">只收不标的不进练习池——别裸考。</span>
       </div>
       <DictionaryEntryDialog
         open={dictOpen}

@@ -487,40 +487,40 @@ export function SystemSettingsPopover() {
         className={buttonVariants({
           variant: 'outline',
           size: 'sm',
-          className: 'gap-1.5 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-stone-800 hover:border-amber-500/40 cursor-pointer h-8 sm:h-9 px-2.5 sm:px-3 text-xs',
+          className: 'gap-1.5 text-ink-mute border-line-soft hover:border-tone-amber-500o40 cursor-pointer h-8 sm:h-9 px-2.5 sm:px-3 text-xs',
         })}
         title="系统与语音设置"
       >
-        <SlidersHorizontal className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
+        <SlidersHorizontal className="w-3.5 h-3.5 text-ink-ghost" />
         <span className="hidden md:inline font-medium">设置</span>
         <span
           className={`w-1.5 h-1.5 rounded-full ${
-            isConnected ? 'bg-emerald-500' : 'bg-amber-400'
+            isConnected ? 'bg-tone-emerald-500' : 'bg-ink-amber-400'
           }`}
         />
       </PopoverTrigger>
 
       <PopoverContent
         align="end"
-        className="w-80 max-h-[calc(100dvh-2rem)] p-0 flex flex-col border border-stone-200/90 dark:border-stone-800/90 shadow-xl rounded-2xl bg-white/95 dark:bg-[#1a1917]/95 backdrop-blur-md overflow-hidden z-50"
+        className="w-80 max-h-[calc(100dvh-2rem)] p-0 flex flex-col border border-line-stone-200o90-stone-800o90 shadow-xl rounded-2xl bg-veil-whiteo95 dark:bg-surface-h1a1917o95 backdrop-blur-md overflow-hidden z-50"
       >
         {/* Header */}
-        <div className="shrink-0 px-4 py-3 border-b border-stone-100 dark:border-stone-800/80 flex items-center justify-between">
+        <div className="shrink-0 px-4 py-3 border-b border-tone-stone-100-stone-800o80 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-amber-500" />
-            <h4 className="font-semibold text-xs text-stone-800 dark:text-stone-200">
+            <SlidersHorizontal className="w-4 h-4 text-tone-amber-500" />
+            <h4 className="font-semibold text-xs text-ink-soft">
               系统控制中心
             </h4>
           </div>
           {/* 网关轻量状态指示 */}
           <div className="flex items-center gap-1.5 text-[11px] font-medium">
             {isConnected ? (
-              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+              <span className="inline-flex items-center gap-1 text-ink-emerald-600-emerald-400">
                 <Wifi className="w-3 h-3" />
                 <span>已联通{latencyMs ? ` (${latencyMs}ms)` : ''}</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 text-accent-ink">
                 <WifiOff className="w-3 h-3" />
                 <span>离线模式</span>
               </span>
@@ -530,27 +530,27 @@ export function SystemSettingsPopover() {
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 text-xs">
           {isDesktop && (
-            <div className="space-y-2 rounded-xl border border-amber-500/25 bg-amber-50/60 p-2.5 dark:border-amber-400/20 dark:bg-amber-950/20">
-              <div className="flex items-center justify-between font-medium text-stone-700 dark:text-stone-300">
+            <div className="space-y-2 rounded-xl border border-tone-amber-500o25 bg-wash-amber-50o60-amber-950o20 p-2.5 dark:border-line-amber-400o20">
+              <div className="flex items-center justify-between font-medium text-ink-mute">
                 <div className="flex items-center gap-1.5">
-                  <RefreshCw className="h-3.5 w-3.5 text-amber-500" />
+                  <RefreshCw className="h-3.5 w-3.5 text-tone-amber-500" />
                   <span>应用更新</span>
                 </div>
                 <Badge
                   variant="outline"
-                  className="border-amber-500/30 px-1.5 py-0 text-[10px] text-amber-600 dark:text-amber-400"
+                  className="border-line-amber-500o30 px-1.5 py-0 text-[10px] text-accent-ink"
                 >
                   桌面端
                 </Badge>
               </div>
-              <p className="text-[10px] leading-relaxed text-stone-500 dark:text-stone-400">
+              <p className="text-[10px] leading-relaxed text-ink-ghost">
                 启动时会自动检查更新；你也可以随时手动检查。更新应用不会覆盖学习数据和本地配置。
               </p>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 w-full gap-1.5 border-amber-500/30 text-[11px] text-amber-700 hover:bg-amber-100/70 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                className="h-8 w-full gap-1.5 border-line-amber-500o30 text-[11px] text-tone-amber-700 hover:bg-wash-amber-100o70 dark:text-ink-amber-300 dark:hover:bg-grad-amber-950o40"
                 disabled={updateChecking}
                 onClick={() => void handleCheckForUpdate()}
               >
@@ -563,21 +563,21 @@ export function SystemSettingsPopover() {
           {/* 1. TTS 语音设置 */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 font-medium text-stone-700 dark:text-stone-300">
-                <Volume2 className="w-3.5 h-3.5 text-amber-500" />
+              <div className="flex items-center gap-1.5 font-medium text-ink-mute">
+                <Volume2 className="w-3.5 h-3.5 text-tone-amber-500" />
                 <span>发音音色与语速</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge
                   variant="outline"
-                  className="text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-600 dark:text-amber-400 font-mono"
+                  className="text-[10px] px-1.5 py-0 border-line-amber-500o30 text-accent-ink font-mono"
                 >
                   {voicePack.trackLabel} · {speechLang}
                 </Badge>
                 <button
                   type="button"
                   onClick={handlePreview}
-                  className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                  className="text-[11px] text-accent-ink hover:underline flex items-center gap-1 cursor-pointer font-medium"
                 >
                   <Play className="w-2.5 h-2.5 fill-current" />
                   试听
@@ -617,29 +617,29 @@ export function SystemSettingsPopover() {
                 onClick={() => handleGenderChange('FEMALE')}
                 className={`py-1.5 px-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                   gender === 'FEMALE'
-                    ? 'border-amber-500/60 bg-amber-500/10 text-amber-900 dark:text-amber-200 font-semibold'
-                    : 'border-stone-200 dark:border-stone-800 hover:bg-stone-100 dark:hover:bg-stone-800/60 text-stone-600 dark:text-stone-400'
+                    ? 'border-halo-amber-500o60 bg-wash-amber-500o10 text-ink-amber-900-amber-200 font-semibold'
+                    : 'border-line-soft hover:bg-tone-stone-100 dark:hover:bg-veil-stone-800o60 text-ink-faint-soft'
                 }`}
               >
                 <span className="truncate">{femaleChipLabel}</span>
-                {gender === 'FEMALE' && <Check className="w-3 h-3 text-amber-500" />}
+                {gender === 'FEMALE' && <Check className="w-3 h-3 text-tone-amber-500" />}
               </button>
               <button
                 type="button"
                 onClick={() => handleGenderChange('MALE')}
                 className={`py-1.5 px-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                   gender === 'MALE'
-                    ? 'border-amber-500/60 bg-amber-500/10 text-amber-900 dark:text-amber-200 font-semibold'
-                    : 'border-stone-200 dark:border-stone-800 hover:bg-stone-100 dark:hover:bg-stone-800/60 text-stone-600 dark:text-stone-400'
+                    ? 'border-halo-amber-500o60 bg-wash-amber-500o10 text-ink-amber-900-amber-200 font-semibold'
+                    : 'border-line-soft hover:bg-tone-stone-100 dark:hover:bg-veil-stone-800o60 text-ink-faint-soft'
                 }`}
               >
                 <span className="truncate">{maleChipLabel}</span>
-                {gender === 'MALE' && <Check className="w-3 h-3 text-amber-500" />}
+                {gender === 'MALE' && <Check className="w-3 h-3 text-tone-amber-500" />}
               </button>
             </div>
 
-            <div className="flex items-center gap-1 text-[10px] text-stone-500 dark:text-stone-400 truncate">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+            <div className="flex items-center gap-1 text-[10px] text-ink-ghost truncate">
+              <span className="w-1.5 h-1.5 rounded-full bg-tone-emerald-500 shrink-0" />
               <span className="truncate">
                 当前引擎: {editEngine && editEngine !== 'system' ? `${editEngine === 'azure-speech' ? 'Azure' : '兼容端点'} · ` : ''}{describeEffectiveVoice()}
               </span>
@@ -648,7 +648,7 @@ export function SystemSettingsPopover() {
             {/* 具体音色选择：随引擎切换，选中即生效（保存后持久） */}
             {editEngine === 'system' && langVoices.length > 0 && (
               <div className="space-y-1">
-                <label className="text-[10px] font-medium text-stone-500 dark:text-stone-400">
+                <label className="text-[10px] font-medium text-ink-ghost">
                   系统音色（英语请优先选 David / Mark / Guy）
                 </label>
                 <Select
@@ -681,7 +681,7 @@ export function SystemSettingsPopover() {
                   ]
                 ).map((group) => (
                   <div key={group.gender} className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-stone-500 dark:text-stone-400 w-8 shrink-0">
+                    <span className="text-[11px] font-bold text-ink-ghost w-8 shrink-0">
                       {group.label}
                     </span>
                     <Select
@@ -746,11 +746,11 @@ export function SystemSettingsPopover() {
                   </Select>
                 )}
                 {remoteVoices.length > 0 ? (
-                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 leading-relaxed">
+                  <p className="text-[10px] text-ink-emerald-600-emerald-400 leading-relaxed">
                     已加载 {remoteVoices.length} 个{speechLang === 'JA' ? '日语' : speechLang === 'KO' ? '韩语' : '英语'}云端音色（含各音色可用风格）。
                   </p>
                 ) : (
-                  <p className="text-[10px] text-stone-400 leading-relaxed">
+                  <p className="text-[10px] text-ink-stone-400 leading-relaxed">
                     到下方填好区域与 Key 后自动拉取该区全量音色与说话风格。
                   </p>
                 )}
@@ -781,13 +781,13 @@ export function SystemSettingsPopover() {
                   value={editVoiceId}
                   onChange={(e) => setEditVoiceId(e.target.value)}
                   placeholder="音色 id（可空，如 alloy）"
-                  className="w-full p-2 text-[11px] font-mono rounded-lg bg-white dark:bg-[#131211] border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-200"
+                  className="w-full p-2 text-[11px] font-mono rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft"
                 />
               </div>
             )}
 
             {editEngine === 'system' && !hasNamed && (
-              <p className="text-[10px] text-amber-700/90 dark:text-amber-300/90 leading-relaxed">
+              <p className="text-[10px] text-ink-amber-700o90-amber-300o90 leading-relaxed">
                 {gender === 'MALE'
                   ? '未检测到具名男声（如 Microsoft David/Mark）。若列表里只有 Google US English，听感会偏女声；请在上方手动选男声，或到系统设置安装英文男声 / 启用 TTS 外挂。'
                   : '未检测到具名女声引擎；已使用该语种默认音色。'}
@@ -796,9 +796,9 @@ export function SystemSettingsPopover() {
 
             {/* 语速滑动条 */}
             <div className="pt-1">
-              <div className="flex justify-between text-[11px] text-stone-500 dark:text-stone-400 mb-1.5">
+              <div className="flex justify-between text-[11px] text-ink-ghost mb-1.5">
                 <span>朗读语速</span>
-                <span className="font-mono font-semibold text-stone-700 dark:text-stone-300">
+                <span className="font-mono font-semibold text-ink-mute">
                   {rate.toFixed(1)}x
                 </span>
               </div>
@@ -817,14 +817,14 @@ export function SystemSettingsPopover() {
             </div>
           </div>
 
-          <div className="h-px bg-stone-100 dark:bg-stone-800/80" />
+          <div className="h-px bg-tone-stone-100-stone-800o80" />
 
           {/* 2. 连接配置：引擎与音色到上方选择区定，这里只填连通三件套 */}
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5 font-medium text-stone-700 dark:text-stone-300">
-              <Plug className="w-3.5 h-3.5 text-amber-500" />
+            <div className="flex items-center gap-1.5 font-medium text-ink-mute">
+              <Plug className="w-3.5 h-3.5 text-tone-amber-500" />
               <span>神经语音连接</span>
-              <span className="text-[10px] font-mono text-stone-400">
+              <span className="text-[10px] font-mono text-ink-stone-400">
                 {editEngine === 'system'
                   ? '未启用'
                   : editEngine === 'azure-speech'
@@ -856,9 +856,9 @@ export function SystemSettingsPopover() {
                     value={editUrl}
                     onChange={(e) => setEditUrl(e.target.value)}
                     placeholder="端点 URL，如 https://api.openai.com/v1/audio/speech"
-                    className="w-full p-2 text-[11px] font-mono rounded-lg bg-white dark:bg-[#131211] border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-200"
+                    className="w-full p-2 text-[11px] font-mono rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft"
                   />
-                  <p className="text-[10px] text-stone-400 leading-relaxed">
+                  <p className="text-[10px] text-ink-stone-400 leading-relaxed">
                     任何 OpenAI /v1/audio/speech 兼容端点：公有云、自建网关或本地兼容服务均可直填。
                   </p>
                 </>
@@ -879,7 +879,7 @@ export function SystemSettingsPopover() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-[10px] text-stone-400 leading-relaxed">
+                  <p className="text-[10px] text-ink-stone-400 leading-relaxed">
                     Azure Speech 原生 REST：选区域 + 填 Key 即可，音色不选按语种用默认神经音色。
                   </p>
                 </>
@@ -891,10 +891,10 @@ export function SystemSettingsPopover() {
                 onChange={(e) => setEditApiKey(e.target.value)}
                 placeholder="API Key（可空传本地服务；仅存本机）"
                 autoComplete="off"
-                className="w-full p-2 text-[11px] font-mono rounded-lg bg-white dark:bg-[#131211] border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-200"
+                className="w-full p-2 text-[11px] font-mono rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft"
               />
             )}
-                <p className="text-[10px] text-stone-400 leading-relaxed">
+                <p className="text-[10px] text-ink-stone-400 leading-relaxed">
                   Key 随本次请求发往本机网关代调第三方，网关不落盘。先验证再保存。
                 </p>
                 <div className="flex gap-2">
@@ -924,13 +924,13 @@ export function SystemSettingsPopover() {
             </Button>
           </div>
 
-          <div className="h-px bg-stone-100 dark:bg-stone-800/80" />
+          <div className="h-px bg-tone-stone-100-stone-800o80" />
 
           {/* 3. 词典包：内容按需进入 SQLite，避免初装体积与无授权数据混入。 */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between font-medium text-stone-700 dark:text-stone-300">
+            <div className="flex items-center justify-between font-medium text-ink-mute">
               <div className="flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                <BookOpen className="w-3.5 h-3.5 text-tone-amber-500" />
                 <span>离线词典包</span>
               </div>
               <Button
@@ -952,14 +952,14 @@ export function SystemSettingsPopover() {
                 {installableDictionaries.map((dictionary) => (
                   <div
                     key={dictionary.id}
-                    className="rounded-xl border border-stone-200/80 bg-stone-50/70 p-2.5 dark:border-stone-800 dark:bg-stone-900/50"
+                    className="rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium text-stone-800 dark:text-stone-200">
+                        <p className="font-medium text-ink-soft">
                           {dictionaryLangLabel(dictionary.language)}释义 · {dictionary.provider}
                         </p>
-                        <p className="mt-0.5 text-[10px] leading-relaxed text-stone-500 dark:text-stone-400">
+                        <p className="mt-0.5 text-[10px] leading-relaxed text-ink-ghost">
                           {dictionary.installed
                             ? `已写入本机 SQLite${dictionary.entryCount ? ` · ${dictionary.entryCount.toLocaleString()} 条` : ''}`
                             : dictionary.installerReady === false
@@ -1021,21 +1021,21 @@ export function SystemSettingsPopover() {
                         </Button>
                       )}
                     </div>
-                    <p className="mt-2 text-[10px] text-stone-400">
+                    <p className="mt-2 text-[10px] text-ink-stone-400">
                       {dictionary.licenseName} · 已保留来源与署名
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-stone-500">正在读取词典包状态…</p>
+              <p className="text-[11px] text-ink-stone-500">正在读取词典包状态…</p>
             )}
-            <div className="rounded-xl border border-dashed border-stone-300/80 p-2.5 dark:border-stone-700">
-              <p className="text-[11px] font-medium text-stone-700 dark:text-stone-300">
+            <div className="rounded-xl border border-dashed border-line-stone-300o80 p-2.5 dark:border-tone-stone-700">
+              <p className="text-[11px] font-medium text-ink-mute">
                 自备 Yomitan 词典包（bank v3 .zip）
               </p>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-amber-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-700">
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-tone-amber-600 px-2 py-1 text-[11px] font-semibold text-tone-white hover:bg-tone-amber-700">
                   <Download className="h-3 w-3" />
                   {installCustomDictionary.isPending ? '安装中…' : '选择 zip 安装'}
                   <input
@@ -1062,7 +1062,7 @@ export function SystemSettingsPopover() {
                   </SelectContent>
                 </Select>
               </div>
-              <label className="mt-1.5 flex cursor-pointer items-start gap-1.5 text-[10px] leading-relaxed text-stone-500">
+              <label className="mt-1.5 flex cursor-pointer items-start gap-1.5 text-[10px] leading-relaxed text-ink-stone-500">
                 <input
                   type="checkbox"
                   checked={customDictLicenseOk}
@@ -1074,19 +1074,19 @@ export function SystemSettingsPopover() {
             </div>
           </div>
 
-          <div className="h-px bg-stone-100 dark:bg-stone-800/80" />
+          <div className="h-px bg-tone-stone-100-stone-800o80" />
 
           {/* 3b. Anki 推送（EXTERNAL 桥接，默认关闭；只连本机 AnkiConnect）。 */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between font-medium text-stone-700 dark:text-stone-300">
+            <div className="flex items-center justify-between font-medium text-ink-mute">
               <div className="flex items-center gap-1.5">
-                <Plug className="w-3.5 h-3.5 text-amber-500" />
+                <Plug className="w-3.5 h-3.5 text-tone-amber-500" />
                 <span>推送到 Anki</span>
               </div>
               {ankiStatus.data && (
                 <Badge
                   variant="outline"
-                  className="border-amber-500/30 px-1.5 py-0 text-[10px] text-amber-600 dark:text-amber-400"
+                  className="border-line-amber-500o30 px-1.5 py-0 text-[10px] text-accent-ink"
                 >
                   {ankiStatus.data.connected
                     ? `已连接 v${ankiStatus.data.ankiVersion ?? '?'}`
@@ -1094,8 +1094,8 @@ export function SystemSettingsPopover() {
                 </Badge>
               )}
             </div>
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-stone-200/80 bg-stone-50/70 p-2.5 dark:border-stone-800 dark:bg-stone-900/50">
-              <p className="text-[10px] leading-relaxed text-stone-500 dark:text-stone-400">
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50">
+              <p className="text-[10px] leading-relaxed text-ink-ghost">
                 把生词本卡片推送到本机 Anki（需打开 Anki + 安装 AnkiConnect 插件）。关闭时查词面板不显示推送入口。
               </p>
               <Switch
@@ -1115,16 +1115,16 @@ export function SystemSettingsPopover() {
             </div>
           </div>
 
-          <div className="h-px bg-stone-100 dark:bg-stone-800/80" />
+          <div className="h-px bg-tone-stone-100-stone-800o80" />
 
           {/* 4. 学情画像与打卡目标入口 */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between font-medium text-stone-700 dark:text-stone-300">
+            <div className="flex items-center justify-between font-medium text-ink-mute">
               <div className="flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-amber-500" />
+                <User className="w-3.5 h-3.5 text-tone-amber-500" />
                 <span>学习者画像与打卡</span>
               </div>
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-600 dark:text-amber-400">
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-line-amber-500o30 text-accent-ink">
                 {profile.studyGoal.replace('JLPT_', '')}
               </Badge>
             </div>
@@ -1135,18 +1135,18 @@ export function SystemSettingsPopover() {
                 setOpen(false);
                 setProfileModalOpen(true);
               }}
-              className="p-2.5 rounded-xl border border-stone-200/80 dark:border-stone-800 hover:border-amber-500/40 bg-stone-50/70 dark:bg-stone-900/50 flex items-center justify-between cursor-pointer group transition-all"
+              className="p-2.5 rounded-xl border border-tone-stone-200o80-stone-800 hover:border-tone-amber-500o40 bg-veil-stone-50o70-stone-900o50 flex items-center justify-between cursor-pointer group transition-all"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 to-amber-600 text-stone-950 font-bold flex items-center justify-center text-xs shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-tone-amber-500 to-tone-amber-600 text-tone-stone-950 font-bold flex items-center justify-center text-xs shrink-0">
                   {profile.displayName.slice(0, 1) || '学'}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-medium text-stone-800 dark:text-stone-200 truncate">
+                  <div className="font-medium text-ink-soft truncate">
                     {profile.displayName || '学员'}
                   </div>
-                  <div className="text-[10px] text-stone-500 dark:text-stone-400 flex items-center gap-1.5">
-                    <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400 font-medium">
+                  <div className="text-[10px] text-ink-ghost flex items-center gap-1.5">
+                    <span className="flex items-center gap-0.5 text-accent-ink font-medium">
                       <Flame className="w-2.5 h-2.5 fill-current" />
                       {profile.streakDays} 天连续
                     </span>
@@ -1159,7 +1159,7 @@ export function SystemSettingsPopover() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 text-[11px] text-stone-400 group-hover:text-amber-500 transition-colors shrink-0">
+              <div className="flex items-center gap-1 text-[11px] text-ink-stone-400 group-hover:text-tone-amber-500 transition-colors shrink-0">
                 <span>管理</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </div>
@@ -1169,17 +1169,17 @@ export function SystemSettingsPopover() {
           {/* 5. 桌面端数据管理（仅 Tauri 壳内可见） */}
           {isDesktop && (
             <>
-              <div className="h-px bg-stone-100 dark:bg-stone-800/80" />
+              <div className="h-px bg-tone-stone-100-stone-800o80" />
               <div className="space-y-2">
-                <div className="flex items-center gap-1.5 font-medium text-stone-700 dark:text-stone-300">
-                  <DatabaseBackup className="w-3.5 h-3.5 text-amber-500" />
+                <div className="flex items-center gap-1.5 font-medium text-ink-mute">
+                  <DatabaseBackup className="w-3.5 h-3.5 text-tone-amber-500" />
                   <span>学习数据管理</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-600 dark:text-amber-400">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-line-amber-500o30 text-accent-ink">
                     桌面端
                   </Badge>
                 </div>
-                <div className="rounded-xl border border-stone-200/80 bg-stone-50/70 p-2.5 dark:border-stone-800 dark:bg-stone-900/50">
-                  <p className="text-[10px] leading-relaxed text-stone-500 dark:text-stone-400">
+                <div className="rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50">
+                  <p className="text-[10px] leading-relaxed text-ink-ghost">
                     学习库保存在本机应用数据目录，随应用重启保留。建议定期备份；恢复时把备份文件放回原目录并重启应用即可。
                   </p>
                   <Button

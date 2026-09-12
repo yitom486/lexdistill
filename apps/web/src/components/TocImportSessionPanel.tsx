@@ -52,7 +52,7 @@ function messageOf(error: unknown): string | null {
 }
 
 const inputClassName =
-  'h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 text-[11px]';
+  'h-7 px-2 rounded-lg border border-line bg-surface text-ink outline-none focus:border-tone-amber-500 text-[11px]';
 
 export interface SessionExecuteDialogView {
   lessonTitle: string;
@@ -116,12 +116,12 @@ export function TocImportSessionPanelView(props: TocImportSessionPanelViewProps)
   const blockReasonOf = (ordinal: number): string | null =>
     chunkBlockReasons.find((b) => b.ordinal === ordinal)?.message ?? null;
   return (
-    <div className="space-y-2 pt-1 mt-1 border-t border-emerald-500/20">
-      <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
-        <CalendarClock className="w-3.5 h-3.5 text-emerald-600" />
+    <div className="space-y-2 pt-1 mt-1 border-t border-line-emerald-500o20">
+      <p className="text-[11px] font-bold text-ink-mute-deep flex items-center gap-1.5">
+        <CalendarClock className="w-3.5 h-3.5 text-tone-emerald-600" />
         导入会话（可恢复计划，一次只导一课）
       </p>
-      <p className="text-[11px] text-stone-500 dark:text-stone-400">
+      <p className="text-[11px] text-ink-ghost">
         刷新后状态丢失；用同一 PDF 与同一确认结果重新准备，可回到同一 session（reused）；plan 不同即新会话，不复用旧进度。
       </p>
       {prepareVisible ? (
@@ -134,29 +134,29 @@ export function TocImportSessionPanelView(props: TocImportSessionPanelViewProps)
             disabled={preparing}
             onClick={onOpenPrepareDialog}
           >
-            <ListOrdered className="w-3.5 h-3.5 text-emerald-600" />
+            <ListOrdered className="w-3.5 h-3.5 text-tone-emerald-600" />
             <span>{preparing ? '准备中…' : '准备导入会话'}</span>
           </Button>
         </div>
       ) : (
         prepareBlockReason && (
-          <p className="text-[11px] text-stone-400">{prepareBlockReason}</p>
+          <p className="text-[11px] text-ink-stone-400">{prepareBlockReason}</p>
         )
       )}
       {prepareError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {prepareError}
         </p>
       )}
-      {sessionLoading && <p className="text-[11px] text-stone-400">读取会话状态…</p>}
+      {sessionLoading && <p className="text-[11px] text-ink-stone-400">读取会话状态…</p>}
       {sessionError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {sessionError}
         </p>
       )}
       {session && (
-        <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-2 space-y-1.5">
-          <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200 flex flex-wrap items-center gap-1.5">
+        <div className="rounded-xl border border-line-emerald-500o25 bg-wash-emerald-500o5 p-2 space-y-1.5">
+          <p className="text-[11px] font-bold text-ink-mute-deep flex flex-wrap items-center gap-1.5">
             <Badge variant="emerald" className="text-[10px]">
               {sessionStatusLabel(session.status)}
             </Badge>
@@ -164,13 +164,13 @@ export function TocImportSessionPanelView(props: TocImportSessionPanelViewProps)
               {session.completedChunks}/{session.totalChunks} 课已完成
             </span>
             {session.documentId ? (
-              <span className="font-mono font-normal text-stone-500">目标 {session.documentId}</span>
+              <span className="font-mono font-normal text-ink-stone-500">目标 {session.documentId}</span>
             ) : (
-              <span className="font-normal text-stone-400">暂无目标教材</span>
+              <span className="font-normal text-ink-stone-400">暂无目标教材</span>
             )}
           </p>
           {reusedNote && (
-            <p className="text-[11px] text-stone-500 dark:text-stone-400">
+            <p className="text-[11px] text-ink-ghost">
               已找到相同计划的会话，未重复创建（reused）。
             </p>
           )}
@@ -181,18 +181,18 @@ export function TocImportSessionPanelView(props: TocImportSessionPanelViewProps)
               return (
                 <div
                   key={chunk.ordinal}
-                  className="flex flex-wrap items-center gap-1.5 px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px]"
+                  className="flex flex-wrap items-center gap-1.5 px-2 py-1 rounded-lg bg-veil-whiteo60-stone-900o40 text-[11px]"
                 >
-                  <span className="font-mono text-stone-400">#{chunk.ordinal}</span>
+                  <span className="font-mono text-ink-stone-400">#{chunk.ordinal}</span>
                   <span className="font-semibold truncate">{chunk.lessonTitle}</span>
-                  <span className="font-mono text-stone-400">
+                  <span className="font-mono text-ink-stone-400">
                     物{chunk.range.fromPage}–{chunk.range.toPage}
                   </span>
                   <Badge variant="outline" className="text-[10px]">
                     {sessionChunkStatusLabel(chunk.status)}
                   </Badge>
                   {chunk.attempts > 0 && (
-                    <span className="text-[10px] text-stone-400">尝试 {chunk.attempts} 次</span>
+                    <span className="text-[10px] text-ink-stone-400">尝试 {chunk.attempts} 次</span>
                   )}
                   {isNext && session.next && !blocked && (
                     <Button
@@ -207,7 +207,7 @@ export function TocImportSessionPanelView(props: TocImportSessionPanelViewProps)
                       导入下一课
                     </Button>
                   )}
-                  {blocked && <span className="text-[10px] text-stone-400">{blocked}</span>}
+                  {blocked && <span className="text-[10px] text-ink-stone-400">{blocked}</span>}
                 </div>
               );
             })}
@@ -215,12 +215,12 @@ export function TocImportSessionPanelView(props: TocImportSessionPanelViewProps)
         </div>
       )}
       {executeError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {executeError}
         </p>
       )}
       {executeResult && (
-        <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+        <div className="p-2 rounded-xl border border-line-emerald-500o30 bg-wash-emerald-500o5 text-[11px] text-ink-faint space-y-1">
           <p className="font-bold">已导入：{executeResult.lessonTitle}</p>
           <p className="font-mono text-[10px]">
             document {executeResult.documentId} · lesson {executeResult.lessonId} · 物理{' '}
@@ -267,11 +267,11 @@ export function SessionPrepareDialogContent(props: {
   const { docTitle, preparing, onClose, onDocTitleChange, onConfirm } = props;
   return (
     <div className="space-y-2">
-      <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100">准备导入会话</h2>
-      <p className="text-[11px] text-stone-500 dark:text-stone-400">
+      <h2 className="text-sm font-bold text-ink">准备导入会话</h2>
+      <p className="text-[11px] text-ink-ghost">
         这会创建可恢复导入计划，但不会立刻导入教材内容。同一计划重复准备将复用同一会话。
       </p>
-      <label className="block space-y-1 text-[11px] text-stone-600 dark:text-stone-300">
+      <label className="block space-y-1 text-[11px] text-ink-faint">
         <span className="font-bold">新教材标题（首课落库时使用）</span>
         <input
           type="text"
@@ -303,12 +303,12 @@ export function SessionExecuteDialogContent(props: {
   const { dialog, executing, onClose, onConfirm } = props;
   return (
     <div className="space-y-2">
-      <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100">导入下一课</h2>
-      <p className="text-[11px] text-stone-500 dark:text-stone-400">
+      <h2 className="text-sm font-bold text-ink">导入下一课</h2>
+      <p className="text-[11px] text-ink-ghost">
         仅导入这一课，不会自动继续下一课。
       </p>
-      <div className="space-y-1 text-[11px] text-stone-600 dark:text-stone-300">
-        <p className="font-bold text-stone-800 dark:text-stone-100">{dialog.lessonTitle}</p>
+      <div className="space-y-1 text-[11px] text-ink-faint">
+        <p className="font-bold text-ink-deep">{dialog.lessonTitle}</p>
         <p>
           印刷 {dialog.printedStart} 页 · PDF 物理 {dialog.physicalFrom}–
           {dialog.physicalTo} 页（共 {dialog.pages} 页）

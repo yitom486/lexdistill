@@ -11,7 +11,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      'inline-flex items-center justify-center rounded-2xl bg-stone-200/60 dark:bg-[#1f1d1b] p-1 text-stone-500 relative border border-stone-200/80 dark:border-stone-800',
+      'inline-flex items-center justify-center rounded-2xl bg-veil-sand-clay p-1 text-ink-stone-500 relative border border-tone-stone-200o80-stone-800',
       className
     )}
     {...props}
@@ -26,7 +26,7 @@ const TabsIndicator = React.forwardRef<
   <TabsPrimitive.Indicator
     ref={ref}
     className={cn(
-      'absolute rounded-xl bg-white dark:bg-[#282522] shadow-xs transition-all duration-200 z-0 pointer-events-none',
+      'absolute rounded-xl bg-surface-espresso shadow-xs transition-all duration-200 z-0 pointer-events-none',
       className
     )}
     {...props}
@@ -41,7 +41,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Tab
     ref={ref}
     className={cn(
-      'inline-flex items-center justify-center whitespace-nowrap rounded-xl px-3.5 py-2 text-xs sm:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 data-[selected]:text-amber-950 dark:data-[selected]:text-amber-300 data-[selected]:font-semibold cursor-pointer relative z-10 gap-2 shrink-0 select-none',
+      'inline-flex items-center justify-center whitespace-nowrap rounded-xl px-3.5 py-2 text-xs sm:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-ink-faint-soft hover:text-tone-stone-900 dark:hover:text-ink-stone-200 data-[selected]:text-ink-amber-950 dark:data-[selected]:text-ink-amber-300 data-[selected]:font-semibold cursor-pointer relative z-10 gap-2 shrink-0 select-none',
       className
     )}
     {...props}

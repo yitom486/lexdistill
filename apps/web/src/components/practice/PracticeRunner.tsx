@@ -38,14 +38,14 @@ export function PracticeRunner({ runId, userId, items, attempts, language, onCom
         {items.map((it) => {
           const s = states[it.itemId] ?? { status: 'PENDING' as const, userAnswer: '' };
           return (
-            <div key={it.itemId} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+            <div key={it.itemId} className="rounded-lg border border-line-slate-200-slate-700 p-4">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs text-slate-500">{it.question.type}</span>
+                <span className="text-xs text-ink-slate-500">{it.question.type}</span>
                 {s.status === 'GRADED' ? (
                   s.isCorrect ? (
-                    <Badge className="bg-emerald-100 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" />正确</Badge>
+                    <Badge className="bg-tint-emerald-100 text-tone-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" />正确</Badge>
                   ) : (
-                    <Badge className="bg-rose-100 text-rose-700"><XCircle className="mr-1 h-3 w-3" />需复习</Badge>
+                    <Badge className="bg-tint-rose-100 text-ink-rose-700"><XCircle className="mr-1 h-3 w-3" />需复习</Badge>
                   )
                 ) : s.status === 'SUBMITTED' ? (
                   <Badge variant="secondary">等待批改</Badge>
@@ -55,7 +55,7 @@ export function PracticeRunner({ runId, userId, items, attempts, language, onCom
               </div>
               <div className="mb-1 font-medium">{it.question.prompt}</div>
               {it.question.type !== 'LISTENING_DICTATION' && it.question.content && (
-                <div className="mb-3 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
+                <div className="mb-3 whitespace-pre-wrap text-sm text-ink-slate-600-slate-300">
                   {it.question.content}
                 </div>
               )}

@@ -201,13 +201,13 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
   if (!currentQ) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <p className="text-sm text-stone-500 dark:text-stone-400 max-w-md">
+        <p className="text-sm text-ink-ghost max-w-md">
           {questionsLoading
             ? '题库加载中…'
             : shell.copy.quizEmptyHint}
         </p>
         {shell.featureFlags.koreanInterim && shell.track === 'ko' && (
-          <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 max-w-sm">
+          <p className="text-[11px] text-ink-amber-700o80-amber-400o80 max-w-sm">
             韩语轨道为 interim 骨架：侧栏与题库已按 TOPIK 分区；界面母语仍为中文（非整页韩语 i18n）。
           </p>
         )}
@@ -294,7 +294,7 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
     >
       <PlanIntentBanner />
       {/* 做题顶部子模式切换与 AI 靶向弱项组卷按钮 */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-[#faf9f6] dark:bg-[#1a1816] p-3 rounded-2xl border border-amber-900/10 dark:border-amber-500/15 shadow-xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-paper-soft p-3 rounded-2xl border border-line-accent shadow-xs">
         {/* 子模式切换 */}
         <Tabs
           value={quizSubMode}
@@ -305,7 +305,7 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
             }
           }}
         >
-          <TabsList className="bg-stone-200/60 dark:bg-stone-900">
+          <TabsList className="bg-veil-stone-200o60-stone-900">
             <TabsIndicator />
             <TabsTrigger value="OBJECTIVE">
               ⚡ 客观快速秒测 ({questions.length}题)
@@ -332,36 +332,36 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
       ) : (
         <>
           {/* 顶部进度指示 */}
-          <div className="flex items-center justify-between text-xs text-stone-500 dark:text-stone-400 px-1">
+          <div className="flex items-center justify-between text-xs text-ink-ghost px-1">
             <span className="flex items-center gap-1.5 font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <Sparkles className="w-3.5 h-3.5 text-accent-ink" />
               第 {questionIndex + 1} 题 / 共 {questions.length} 题 · {currentQ.category}
             </span>
             <div className="flex items-center gap-3">
-              <span className="hidden sm:inline text-[11px] text-stone-400 font-mono">
+              <span className="hidden sm:inline text-[11px] text-ink-stone-400 font-mono">
                 快捷键: 1-4 选选项 / Enter 提交
               </span>
-              <span className="font-semibold text-amber-700 dark:text-amber-400 font-mono">
+              <span className="font-semibold text-accent-ink-warm font-mono">
                 当前得分: <NumberTicker value={sessionScore} className="inline-block" />
               </span>
             </div>
           </div>
 
           {/* 题目主卡片 */}
-          <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-3xl p-6 sm:p-8 border border-amber-900/10 dark:border-amber-500/15 shadow-sm space-y-6">
+          <div className="bg-paper-soft rounded-3xl p-6 sm:p-8 border border-line-accent shadow-sm space-y-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Badge variant="amber">
                   {currentQ.type === 'CHOICE' ? '单项选择题' : currentQ.type === 'FILL_BLANK' ? '填空变形题' : '连词成句题'}
                 </Badge>
-                <span className="text-xs text-stone-400 font-mono">
+                <span className="text-xs text-ink-stone-400 font-mono">
                   考查点: {currentQ.testedSkill}
                 </span>
               </div>
-              <h3 className="text-sm font-medium text-stone-500 dark:text-stone-400">
+              <h3 className="text-sm font-medium text-ink-ghost">
                 {currentQ.prompt}
               </h3>
-              <div className="text-lg sm:text-xl font-medium text-stone-900 dark:text-stone-100 pt-2 tracking-wide font-serif">
+              <div className="text-lg sm:text-xl font-medium text-ink pt-2 tracking-wide font-serif">
                 {currentQ.content}
               </div>
               <div className="pt-1">
@@ -395,26 +395,18 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
                           sound.playClick();
                           setSelectedChoice(opt.key);
                         }}
-                        className={`w-full h-auto p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between items-stretch whitespace-normal ${
-                          showCorrect
-                            ? 'bg-emerald-500/15 border-emerald-500 text-emerald-950 dark:text-emerald-200 hover:bg-emerald-500/15'
-                            : showWrong
-                            ? 'bg-rose-500/15 border-rose-500 text-rose-950 dark:text-rose-200 hover:bg-rose-500/15'
-                            : isSelected
-                            ? 'bg-amber-500/15 border-amber-500 text-amber-950 dark:text-amber-100 ring-2 ring-amber-500/30 hover:bg-amber-500/15'
-                            : 'bg-stone-100/70 dark:bg-stone-900/50 border-stone-200/80 dark:border-stone-800 text-stone-800 dark:text-stone-200 hover:border-amber-500/40'
-                        }`}
+                        className={`w-full h-auto p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between items-stretch whitespace-normal ${ showCorrect ? 'bg-tone-emerald-500o15 border-tone-emerald-500 text-ink-emerald-950 dark:text-ink-emerald-200 hover:bg-tone-emerald-500o15' : showWrong ? 'bg-wash-rose-500o15 border-tone-rose-500 text-ink-rose-950 dark:text-line-rose-200 hover:bg-wash-rose-500o15' : isSelected ? 'bg-wash-amber-500o15 border-tone-amber-500 text-ink-amber-950-amber-100 ring-2 ring-line-amber-500o30 hover:bg-wash-amber-500o15' : 'bg-veil-stone-100o70-stone-900o50 border-tone-stone-200o80-stone-800 text-ink-soft hover:border-tone-amber-500o40' }`}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <Badge variant="secondary" className="rounded font-mono text-xs">
                             {opt.key} ({optIdx + 1})
                           </Badge>
-                          {showCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
-                          {showWrong && <XCircle className="w-4 h-4 text-rose-600" />}
+                          {showCorrect && <CheckCircle2 className="w-4 h-4 text-tone-emerald-600" />}
+                          {showWrong && <XCircle className="w-4 h-4 text-ink-rose-600" />}
                         </div>
                         <div className="text-base font-semibold pt-1">{opt.text}</div>
                         {opt.note && (
-                          <div className="text-xs text-stone-400 mt-1">{opt.note}</div>
+                          <div className="text-xs text-ink-stone-400 mt-1">{opt.note}</div>
                         )}
                       </Button>
                     </motion.div>
@@ -433,7 +425,7 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
                     value={fillBlankInput}
                     onChange={(e) => setFillBlankInput(e.target.value)}
                     placeholder="在此输入你的答案..."
-                    className="flex-1 py-3 px-4 rounded-xl bg-stone-100/90 dark:bg-stone-900/80 text-stone-900 dark:text-stone-100 border border-stone-300 dark:border-stone-700 outline-none focus:border-amber-500 text-base"
+                    className="flex-1 py-3 px-4 rounded-xl bg-veil-stone-100o90-stone-900o80 text-ink border border-line-stone-300-stone-700 outline-none focus:border-tone-amber-500 text-base"
                   />
                 </div>
               </div>
@@ -442,9 +434,9 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
             {/* 题型 3: REORDER (连词成句) */}
             {currentQ.type === 'REORDER' && currentQ.chunks && (
               <div className="space-y-4 pt-2">
-                <div className="min-h-14 p-3 rounded-2xl border-2 border-dashed border-amber-500/30 bg-amber-50/40 dark:bg-stone-900/40 flex flex-wrap gap-2 items-center">
+                <div className="min-h-14 p-3 rounded-2xl border-2 border-dashed border-line-amber-500o30 bg-wash-amber-50o40-stone-900o40 flex flex-wrap gap-2 items-center">
                   {reorderSelectedChunks.length === 0 ? (
-                    <span className="text-xs text-stone-400">
+                    <span className="text-xs text-ink-stone-400">
                       点击下方词块按正确语序填入此处...
                     </span>
                   ) : (
@@ -490,7 +482,7 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
             )}
 
             {/* 提交 / 下一题控制条 */}
-            <div className="flex items-center justify-between pt-4 border-t border-stone-200 dark:border-stone-800">
+            <div className="flex items-center justify-between pt-4 border-t border-line-soft">
               {!quizSubmitted ? (
                 <ShimmerButton
                   onClick={handleQuizSubmit}
@@ -518,16 +510,16 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
                 animate={{ opacity: 1, y: 0 }}
                 className={`p-4 rounded-2xl border space-y-3 ${
                   isCurrentAnswerCorrect
-                    ? 'bg-emerald-500/10 border-emerald-500/30'
-                    : 'bg-rose-500/10 border-rose-500/30'
+                    ? 'bg-wash-emerald-500o10 border-line-emerald-500o30'
+                    : 'bg-wash-rose-500o10 border-line-rose-500o30'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
                     {isCurrentAnswerCorrect ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      <CheckCircle2 className="w-5 h-5 text-tone-emerald-600" />
                     ) : (
-                      <XCircle className="w-5 h-5 text-rose-600" />
+                      <XCircle className="w-5 h-5 text-ink-rose-600" />
                     )}
                     <span className="font-bold text-sm">
                       {isCurrentAnswerCorrect ? '解答正确！' : `解答有误，标准答案：${currentQ.correctAnswer}`}
@@ -558,7 +550,7 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
                   </Button>
                 </div>
 
-                <p className="text-xs sm:text-sm text-stone-700 dark:text-stone-300 leading-relaxed font-serif">
+                <p className="text-xs sm:text-sm text-ink-mute leading-relaxed font-serif">
                   {currentQ.explanation}
                 </p>
               </motion.div>

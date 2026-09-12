@@ -85,17 +85,17 @@ export function TodayPlanWorkbench() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-5 max-w-3xl"
     >
-      <div className="rounded-2xl border border-amber-900/10 dark:border-amber-500/15 bg-[#faf9f6] dark:bg-[#1a1816] p-5 shadow-sm space-y-4">
+      <div className="rounded-2xl border border-line-accent bg-paper-soft p-5 shadow-sm space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-300 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-wash-amber-500o15 border border-line-amber-500o30 text-ink-amber-900-amber-300 flex items-center justify-center">
               <CalendarCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold font-serif text-stone-900 dark:text-stone-100">
+              <h2 className="text-lg font-bold font-serif text-ink">
                 今日学习
               </h2>
-              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+              <p className="text-xs text-ink-ghost mt-0.5">
                 {shell.trackName}轨道 · 今天要做的 {total > 0 ? `${total} 件事，做完即达标` : '事项'}，每天按你的进度换新；都是现有模块的入口，不另起一套课程。
               </p>
             </div>
@@ -107,22 +107,22 @@ export function TodayPlanWorkbench() {
 
         <div className="flex items-end justify-between gap-3">
           <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-bold font-mono text-amber-600 dark:text-amber-400">
+            <span className="text-3xl font-bold font-mono text-accent-ink">
               <NumberTicker value={completed} />
             </span>
-            <span className="text-xs text-stone-500">/ {total} 步完成</span>
+            <span className="text-xs text-ink-stone-500">/ {total} 步完成</span>
           </div>
-          <span className="text-xs font-mono text-stone-500">{percent}%</span>
+          <span className="text-xs font-mono text-ink-stone-500">{percent}%</span>
         </div>
         <Progress value={percent} className="h-2" />
       </div>
 
       {isLoading && (
-        <p className="text-xs text-stone-500">正在生成今日计划…</p>
+        <p className="text-xs text-ink-stone-500">正在生成今日计划…</p>
       )}
       <CourseRouteBanner />
       {isError && (
-        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-xs text-rose-800 dark:text-rose-200">
+        <div className="rounded-2xl border border-line-rose-500o20 bg-wash-rose-500o5 p-4 text-xs text-ink-rose-800-rose-200">
           暂时无法读取今日计划。
           <Button variant="ghost" size="sm" className="ml-2" onClick={() => void refetch()}>
             重试
@@ -140,26 +140,26 @@ export function TodayPlanWorkbench() {
                 key={step.id}
                 className={`rounded-2xl border p-4 shadow-xs ${
                   step.done
-                    ? 'border-emerald-500/20 bg-emerald-500/5'
+                    ? 'border-line-emerald-500o20 bg-wash-emerald-500o5'
                     : isNext
-                      ? 'border-amber-500/30 bg-amber-500/8'
-                      : 'border-amber-900/10 dark:border-amber-500/15 bg-white/70 dark:bg-[#1a1816]'
+                      ? 'border-line-amber-500o30 bg-wash-amber-500o8'
+                      : 'border-line-accent bg-veil-paper-70'
                 }`}
               >
                 <div className="flex items-start gap-3">
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
                       step.done
-                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
-                        : 'bg-amber-500/15 border-amber-500/30 text-amber-900 dark:text-amber-300'
+                        ? 'bg-tone-emerald-500o15 border-line-emerald-500o30 text-ink-emerald-700-emerald-300'
+                        : 'bg-wash-amber-500o15 border-line-amber-500o30 text-ink-amber-900-amber-300'
                     }`}
                   >
                     {step.done ? <CheckCircle2 className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
                   </div>
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] font-mono text-stone-400">{index + 1}</span>
-                      <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">
+                      <span className="text-[10px] font-mono text-ink-stone-400">{index + 1}</span>
+                      <h3 className="text-sm font-bold text-ink">
                         {step.title}
                       </h3>
                       {step.done && (
@@ -173,8 +173,8 @@ export function TodayPlanWorkbench() {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">{step.summary}</p>
-                    <p className="text-[11px] font-mono text-stone-400">
+                    <p className="text-xs text-ink-ghost">{step.summary}</p>
+                    <p className="text-[11px] font-mono text-ink-stone-400">
                       {step.currentCount}/{step.targetCount ?? 1}
                     </p>
                     <div className="flex flex-wrap gap-2">

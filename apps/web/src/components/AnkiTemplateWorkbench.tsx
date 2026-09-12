@@ -208,13 +208,13 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
           </DialogDescription>
         </DialogHeader>
         {!isConnected ? (
-          <p className="text-xs text-stone-500">网关未连接，模板工作台需要网关渲染支持。</p>
+          <p className="text-xs text-ink-stone-500">网关未连接，模板工作台需要网关渲染支持。</p>
         ) : formatsQuery.isLoading ? (
-          <p className="flex items-center gap-2 text-xs text-stone-500">
+          <p className="flex items-center gap-2 text-xs text-ink-stone-500">
             <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> 正在读取模板…
           </p>
         ) : !selected ? (
-          <p className="text-xs text-stone-500">暂无可用模板。</p>
+          <p className="text-xs text-ink-stone-500">暂无可用模板。</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-3">
@@ -240,12 +240,12 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="h-8 w-32 rounded-lg border border-stone-200 bg-white px-2 text-xs dark:border-stone-700 dark:bg-stone-900"
+                  className="h-8 w-32 rounded-lg border border-ink-stone-200 bg-tone-white px-2 text-xs dark:border-tone-stone-700 dark:bg-tone-stone-900"
                   placeholder="模板名"
                 />
               </div>
               <div>
-                <p className="mb-1 text-[11px] font-medium text-stone-600 dark:text-stone-300">
+                <p className="mb-1 text-[11px] font-medium text-ink-faint">
                   插入字段标记（点按插入到光标处）
                 </p>
                 <div className="flex flex-wrap gap-1">
@@ -254,7 +254,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                       key={m}
                       type="button"
                       onClick={() => insertMarker(m)}
-                      className="rounded-md border border-stone-200 px-1.5 py-0.5 font-mono text-[10px] text-stone-500 hover:border-amber-500/50 hover:text-amber-600 dark:border-stone-700 dark:text-stone-400"
+                      className="rounded-md border border-ink-stone-200 px-1.5 py-0.5 font-mono text-[10px] text-ink-stone-500 hover:border-tone-amber-500o50 hover:text-tone-amber-600 dark:border-tone-stone-700 dark:text-ink-stone-400"
                     >
                       {`{${m}}`}
                     </button>
@@ -262,7 +262,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                 </div>
               </div>
               <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-stone-600 dark:text-stone-300">
+                <span className="mb-1 block text-[11px] font-medium text-ink-faint">
                   字段映射（JSON：Anki 字段名 → 字段模板）
                 </span>
                 <textarea
@@ -271,12 +271,12 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                   {...areaProps('fields')}
                   rows={5}
                   spellCheck={false}
-                  className="w-full rounded-lg border border-stone-200 bg-white p-2 font-mono text-[11px] dark:border-stone-700 dark:bg-stone-900"
+                  className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900"
                 />
               </label>
-              {fieldsError && <p className="text-[11px] text-rose-600">{fieldsError}</p>}
+              {fieldsError && <p className="text-[11px] text-ink-rose-600">{fieldsError}</p>}
               <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-stone-600 dark:text-stone-300">
+                <span className="mb-1 block text-[11px] font-medium text-ink-faint">
                   正面模板
                 </span>
                 <textarea
@@ -286,7 +286,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                   {...areaProps('front')}
                   rows={3}
                   spellCheck={false}
-                  className="w-full rounded-lg border border-stone-200 bg-white p-2 font-mono text-[11px] dark:border-stone-700 dark:bg-stone-900"
+                  className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900"
                 />
               </label>
               <EditorArea
@@ -338,11 +338,11 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
               </div>
             </div>
             <div className="space-y-2">
-              <p className="text-[11px] font-medium text-stone-600 dark:text-stone-300">
+              <p className="text-[11px] font-medium text-ink-faint">
                 实时预览（示例词：{SAMPLE_ENTRY.headword}；模板脚本永不执行）
               </p>
               {preview.isPending && (
-                <p className="flex items-center gap-1.5 text-[11px] text-stone-400">
+                <p className="flex items-center gap-1.5 text-[11px] text-ink-stone-400">
                   <LoaderCircle className="h-3 w-3 animate-spin" /> 渲染中…
                 </p>
               )}
@@ -351,18 +351,18 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                   title="卡片预览"
                   sandbox=""
                   srcDoc={previewDoc}
-                  className="h-72 w-full rounded-xl border border-stone-200 bg-white dark:border-stone-700"
+                  className="h-72 w-full rounded-xl border border-ink-stone-200 bg-tone-white dark:border-tone-stone-700"
                 />
               )}
               {preview.data && preview.data.issues.length > 0 && (
-                <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] text-amber-700 dark:text-amber-300">
+                <div className="rounded-xl border border-tone-amber-500o40 bg-wash-amber-500o5 p-2 text-[11px] text-accent-ink-strong">
                   {preview.data.issues.map((issue) => (
                     <p key={issue}>⚠ {issue}</p>
                   ))}
                 </div>
               )}
               {preview.isError && (
-                <p className="text-[11px] text-rose-600">
+                <p className="text-[11px] text-ink-rose-600">
                   {preview.error instanceof Error ? preview.error.message : '预览失败。'}
                 </p>
               )}
@@ -384,7 +384,7 @@ function EditorArea(props: {
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-medium text-stone-600 dark:text-stone-300">
+      <span className="mb-1 block text-[11px] font-medium text-ink-faint">
         {props.label}
       </span>
       <textarea
@@ -394,7 +394,7 @@ function EditorArea(props: {
         onFocus={(e) => props.onFocusArea(e.currentTarget)}
         rows={props.rows}
         spellCheck={false}
-        className="w-full rounded-lg border border-stone-200 bg-white p-2 font-mono text-[11px] dark:border-stone-700 dark:bg-stone-900"
+        className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900"
       />
     </label>
   );

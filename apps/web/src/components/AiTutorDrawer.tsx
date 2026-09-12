@@ -473,7 +473,7 @@ export function AiTutorDrawer({
     <div
       role="dialog"
       aria-label="AI 导师"
-      className="fixed z-50 flex flex-col rounded-2xl border border-amber-900/15 dark:border-amber-500/20 bg-[#faf9f6] dark:bg-[#1a1816] shadow-2xl"
+      className="fixed z-50 flex flex-col rounded-2xl border border-line-amber-900o15-amber-500o20 bg-paper-soft shadow-2xl"
       style={{ right, top, width: panelWidth, height: '78vh', display: isOpen ? 'flex' : 'none' }}
     >
         <div
@@ -481,7 +481,7 @@ export function AiTutorDrawer({
           aria-orientation="vertical"
           aria-label="调整题目导师宽度"
           tabIndex={isOpen ? 0 : -1}
-          className="absolute inset-y-0 left-0 z-20 w-1.5 cursor-ew-resize bg-transparent hover:bg-amber-500/35 active:bg-amber-500/50"
+          className="absolute inset-y-0 left-0 z-20 w-1.5 cursor-ew-resize bg-transparent hover:bg-tone-amber-500o35 active:bg-tone-amber-500o50"
           onPointerDown={onResizePointerDown}
           onPointerMove={onResizePointerMove}
           onPointerUp={onResizePointerUp}
@@ -489,7 +489,7 @@ export function AiTutorDrawer({
         />
         <>
             <SheetHeader
-              className="bg-amber-500/10 dark:bg-amber-500/15 p-4 border-b border-amber-900/10 dark:border-amber-500/10 shrink-0 cursor-move select-none"
+              className="bg-wash-amber-500o10-amber-500o15 p-4 border-b border-line-amber-900o10-amber-500o10 shrink-0 cursor-move select-none"
               onPointerDown={handlePanelDragStart}
               onPointerMove={handlePanelDragMove}
               onPointerUp={handlePanelDragEnd}
@@ -497,17 +497,17 @@ export function AiTutorDrawer({
             >
               <div className="flex items-center justify-between pr-8">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-amber-500 text-stone-950 shadow-sm">
+                  <div className="p-2 rounded-xl bg-tone-amber-500 text-tone-stone-950 shadow-sm">
                     <Bot className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="flex items-center gap-1.5 text-base font-bold font-serif leading-none tracking-tight text-stone-900 dark:text-stone-100">
+                    <h2 className="flex items-center gap-1.5 text-base font-bold font-serif leading-none tracking-tight text-ink">
                       AI 智能导师专属追问室
-                      <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      <Sparkles className="w-3.5 h-3.5 text-accent-ink" />
                     </h2>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                    <p className="text-xs text-ink-ghost">
                       {tutorCopy.headerHint} · 聚焦：{context.skillTag}
-                      <span className="ml-1 text-stone-500">· 关闭保留会话</span>
+                      <span className="ml-1 text-ink-stone-500">· 关闭保留会话</span>
                     </p>
                   </div>
                 </div>
@@ -522,7 +522,7 @@ export function AiTutorDrawer({
                     </>
                   ) : (
                     <>
-                      <WifiOff className="w-2.5 h-2.5 text-stone-400" />
+                      <WifiOff className="w-2.5 h-2.5 text-ink-stone-400" />
                       离线演练
                     </>
                   )}
@@ -531,31 +531,31 @@ export function AiTutorDrawer({
                   type="button"
                   onClick={onClose}
                   aria-label="关闭"
-                  className="rounded-xl p-1.5 text-stone-400 transition-colors hover:bg-stone-200/60 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-200 cursor-pointer"
+                  className="rounded-xl p-1.5 text-ink-stone-400 transition-colors hover:bg-veil-stone-200o60 hover:text-tone-stone-700 dark:hover:bg-tone-stone-800 dark:hover:text-ink-stone-200 cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
             </SheetHeader>
 
-            <div className="p-3 bg-amber-50/70 dark:bg-stone-900/70 border-b border-amber-900/10 dark:border-amber-500/10 text-xs space-y-1 shrink-0">
+            <div className="p-3 bg-wash-amber-50o70-stone-900o70 border-b border-line-amber-900o10-amber-500o10 text-xs space-y-1 shrink-0">
               <Badge variant="amber" className="mb-1">
                 📌 正在剖析题干
               </Badge>
-              <p className="text-stone-800 dark:text-stone-200 font-medium">
+              <p className="text-ink-soft font-medium">
                 {context.questionText}
               </p>
-              <div className="flex items-center gap-3 text-[11px] text-stone-500 pt-0.5">
+              <div className="flex items-center gap-3 text-[11px] text-ink-stone-500 pt-0.5">
                 <span>
                   标准答案：
-                  <strong className="text-emerald-700 dark:text-emerald-400">
+                  <strong className="text-ink-emerald-700-emerald-400">
                     {context.correctAnswer}
                   </strong>
                 </span>
                 {context.userAnswer && (
                   <span>
                     你的提交：
-                    <strong className="text-rose-600">{context.userAnswer}</strong>
+                    <strong className="text-ink-rose-600">{context.userAnswer}</strong>
                   </span>
                 )}
               </div>
@@ -589,21 +589,17 @@ export function AiTutorDrawer({
                     <div
                       className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs ${
                         isAi
-                          ? 'bg-amber-500 text-stone-950 font-bold'
-                          : 'bg-stone-700 text-white'
+                          ? 'bg-tone-amber-500 text-tone-stone-950 font-bold'
+                          : 'bg-tone-stone-700 text-tone-white'
                       }`}
                     >
                       {isAi ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
                     </div>
                     <div
-                      className={`max-w-[85%] p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${
-                        isAi
-                          ? 'bg-white dark:bg-stone-900/90 text-stone-800 dark:text-stone-200 border border-amber-900/10 dark:border-amber-500/15 shadow-sm rounded-tl-none font-serif'
-                          : 'bg-amber-500 text-stone-950 font-medium rounded-tr-none shadow-sm'
-                      }`}
+                      className={`max-w-[85%] p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${ isAi ? 'bg-tone-white dark:bg-veil-stone-900o90 text-ink-soft border border-line-accent shadow-sm rounded-tl-none font-serif' : 'bg-tone-amber-500 text-tone-stone-950 font-medium rounded-tr-none shadow-sm' }`}
                     >
                       {isAi && msg.reasoning ? (
-                        <div className="mb-2 text-[11px] text-stone-500 dark:text-stone-400 border-l-2 border-amber-500/40 pl-2 font-sans">
+                        <div className="mb-2 text-[11px] text-ink-ghost border-l-2 border-tone-amber-500o40 pl-2 font-sans">
                           <MarkdownText text={msg.reasoning} />
                         </div>
                       ) : null}
@@ -613,14 +609,14 @@ export function AiTutorDrawer({
                         msg.text
                       )}
                       {msg.isStreaming && (
-                        <span className="inline-block w-1.5 h-4 ml-1 bg-amber-500 animate-pulse align-middle" />
+                        <span className="inline-block w-1.5 h-4 ml-1 bg-tone-amber-500 animate-pulse align-middle" />
                       )}
                       {isAi && (msg.toolCalls?.length ?? 0) > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {(msg.toolCalls ?? []).map((t, i) => (
                             <span
                               key={t.callId ?? `${t.toolName}-${i}`}
-                              className="inline-block text-[10px] px-1.5 py-0.5 rounded-md border border-sky-500/30 text-sky-700 dark:text-sky-300"
+                              className="inline-block text-[10px] px-1.5 py-0.5 rounded-md border border-line-sky-500o30 text-ink-sky-700-sky-300"
                               title={t.done ? '工具调用完成' : '工具调用中…'}
                             >
                               🔧 {t.toolName}
@@ -634,7 +630,7 @@ export function AiTutorDrawer({
                           <button
                             type="button"
                             onClick={() => handleRetryOffline(msg)}
-                            className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md border border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 cursor-pointer"
+                            className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md border border-tone-amber-500o40 text-accent-ink-strong hover:bg-wash-amber-500o10 cursor-pointer"
                             title="网关恢复后重新发送，转真 AI 作答"
                           >
                             <RotateCcw className="w-2.5 h-2.5" />
@@ -647,10 +643,10 @@ export function AiTutorDrawer({
                           <span
                             className={`inline-block text-[10px] px-1.5 py-0.5 rounded-md border ${
                               msg.source === 'streamed'
-                                ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                                ? 'border-line-emerald-500o30 text-ink-emerald-600-emerald-400'
                                 : msg.source === 'fallback'
-                                  ? 'border-amber-500/40 text-amber-700 dark:text-amber-300'
-                                  : 'border-stone-300 dark:border-stone-700 text-stone-400'
+                                  ? 'border-tone-amber-500o40 text-accent-ink-strong'
+                                  : 'border-line-stone-300-stone-700 text-ink-stone-400'
                             }`}
                             title={
                               msg.source === 'streamed'
@@ -682,7 +678,7 @@ export function AiTutorDrawer({
                         ) : null;
                       })()}
                       {isAi && !msg.isStreaming && mergedCards.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-amber-900/10 dark:border-amber-500/10 space-y-1.5 font-sans">
+                        <div className="mt-2 pt-2 border-t border-line-amber-900o10-amber-500o10 space-y-1.5 font-sans">
                           {mergedCards.map((q) => (
                             <button
                               key={q}
@@ -690,10 +686,10 @@ export function AiTutorDrawer({
                               onClick={() => handleSendMessage(q)}
                               disabled={isTyping}
                               title="对这个问题感兴趣？点一下直接问"
-                              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15 text-left text-xs text-stone-700 dark:text-stone-200 transition-colors cursor-pointer disabled:opacity-50"
+                              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-line-amber-500o30 bg-wash-amber-500o5 hover:bg-wash-amber-500o15 text-left text-xs text-ink-mute-deep transition-colors cursor-pointer disabled:opacity-50"
                             >
                               <span className="leading-relaxed">{q}</span>
-                              <Reply className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                              <Reply className="w-3.5 h-3.5 shrink-0 text-accent-ink" />
                             </button>
                           ))}
                         </div>
@@ -704,7 +700,7 @@ export function AiTutorDrawer({
               })}
 
               {isTyping && (
-                <div className="flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-300">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-wash-amber-500o10 border border-tone-amber-500o20 text-xs text-accent-ink-strong">
                   <div className="flex items-center gap-2">
                     <Bot className="w-4 h-4 animate-spin" />
                     <span>AI 导师正在实时组织讲解与分析...</span>
@@ -713,7 +709,7 @@ export function AiTutorDrawer({
                     variant="ghost"
                     size="sm"
                     onClick={handleInterrupt}
-                    className="h-6 px-2 text-[11px] text-amber-800 dark:text-amber-200 hover:bg-amber-500/20 gap-1 rounded"
+                    className="h-6 px-2 text-[11px] text-ink-amber-800-amber-200 hover:bg-tone-amber-500o20 gap-1 rounded"
                   >
                     <Square className="w-3 h-3 fill-current" />
                     停止生成
@@ -724,13 +720,13 @@ export function AiTutorDrawer({
               </ErrorBoundary>
             </div>
 
-            <div className="px-4 py-2 bg-stone-100/60 dark:bg-stone-900/40 border-t border-amber-900/10 dark:border-amber-500/10 flex flex-wrap gap-1.5 shrink-0">
+            <div className="px-4 py-2 bg-veil-stone-100o60-stone-900o40 border-t border-line-amber-900o10-amber-500o10 flex flex-wrap gap-1.5 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleQuizMe}
                 disabled={isTyping}
-                className="h-7 rounded-full text-[11px] px-2.5 border-amber-500/50 text-amber-700 dark:text-amber-300"
+                className="h-7 rounded-full text-[11px] px-2.5 border-tone-amber-500o50 text-accent-ink-strong"
                 title="让 AI 按本次讲解现场出一道单选题"
               >
                 📝 就本轮考我一题
@@ -740,14 +736,14 @@ export function AiTutorDrawer({
                 size="sm"
                 onClick={handleExpandAsk}
                 disabled={isTyping}
-                className="h-7 rounded-full text-[11px] px-2.5 border-amber-500/50 text-amber-700 dark:text-amber-300"
+                className="h-7 rounded-full text-[11px] px-2.5 border-tone-amber-500o50 text-accent-ink-strong"
                 title="让 AI 按本次问答给出值得深挖的拓展问题"
               >
                 ✨ 拓展追问
               </Button>
             </div>
 
-            <div className="p-3 border-t border-amber-900/10 dark:border-amber-500/15 shrink-0">
+            <div className="p-3 border-t border-line-accent shrink-0">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -760,7 +756,7 @@ export function AiTutorDrawer({
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   placeholder="向 AI 导师追问（例如：请解释和『に関して』的区别）..."
-                  className="flex-1 py-2.5 px-3.5 bg-stone-100 dark:bg-stone-900 text-stone-900 dark:text-stone-100 rounded-xl border border-stone-200 dark:border-stone-800 text-xs sm:text-sm outline-none focus:border-amber-500 transition-all"
+                  className="flex-1 py-2.5 px-3.5 bg-surface-stone-100-stone-900 text-ink rounded-xl border border-line-soft text-xs sm:text-sm outline-none focus:border-tone-amber-500 transition-all"
                 />
                 {isTyping ? (
                   <Button
@@ -769,7 +765,7 @@ export function AiTutorDrawer({
                     size="icon"
                     onClick={handleInterrupt}
                     aria-label="停止"
-                    className="border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+                    className="border-line-amber-500o30 text-tone-amber-600 hover:bg-wash-amber-500o10"
                   >
                     <Square className="w-4 h-4 fill-current" />
                   </Button>

@@ -11,16 +11,16 @@ import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 
 const SOURCE_LABEL: Record<LearningAnalysisReport['source'], { text: string; tone: string }> = {
-  ai: { text: 'AI 分析', tone: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' },
-  cached: { text: '上次可信分析', tone: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
-  'local-rules': { text: '本地规则建议', tone: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+  ai: { text: 'AI 分析', tone: 'bg-wash-blue-500o10 text-ink-blue-600 dark:text-ink-blue-400' },
+  cached: { text: '上次可信分析', tone: 'bg-wash-amber-500o10 text-accent-ink' },
+  'local-rules': { text: '本地规则建议', tone: 'bg-wash-emerald-500o10 text-ink-emerald-600-emerald-400' },
 };
 
 const KIND_ICON: Record<LearningSuggestion['kind'], React.ReactNode> = {
-  WEAKNESS: <Target className="h-4 w-4 text-rose-500" />,
-  PLAN: <BookOpen className="h-4 w-4 text-indigo-500" />,
-  TIP: <Lightbulb className="h-4 w-4 text-amber-500" />,
-  ENCOURAGEMENT: <Sparkles className="h-4 w-4 text-emerald-500" />,
+  WEAKNESS: <Target className="h-4 w-4 text-tone-rose-500" />,
+  PLAN: <BookOpen className="h-4 w-4 text-ink-indigo-500" />,
+  TIP: <Lightbulb className="h-4 w-4 text-tone-amber-500" />,
+  ENCOURAGEMENT: <Sparkles className="h-4 w-4 text-tone-emerald-500" />,
 };
 
 /**

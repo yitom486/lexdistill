@@ -103,32 +103,32 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
   } = props;
   const copy = getTutorTrackCopy(track);
   return (
-    <header className="flex items-start justify-between gap-2 px-3 py-2.5 border-b border-stone-800/90">
+    <header className="flex items-start justify-between gap-2 px-3 py-2.5 border-b border-line-stone-800o90">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold tracking-tight">Agent</span>
           <span
             className={`inline-flex items-center gap-1 text-[10px] ${
-              connected ? 'text-emerald-400' : 'text-stone-500'
+              connected ? 'text-ink-emerald-400' : 'text-ink-stone-500'
             }`}
           >
             <span
               className={`size-1.5 rounded-full ${
-                connected ? 'bg-emerald-400' : 'bg-stone-600'
+                connected ? 'bg-ink-emerald-400' : 'bg-tone-stone-600'
               }`}
             />
             {connected ? '已连接' : '未连接'}
           </span>
           {authLinked ? (
             <span
-              className="inline-flex items-center gap-1 text-[10px] text-emerald-500/90"
+              className="inline-flex items-center gap-1 text-[10px] text-ink-emerald-500o90"
               title={codexStatus?.message}
             >
               <KeyRound className="size-3" />
               Codex 已登录
             </span>
           ) : (
-            <span className="text-[10px] text-amber-500/90" title={codexStatus?.message}>
+            <span className="text-[10px] text-ink-amber-500o90" title={codexStatus?.message}>
               待 login
             </span>
           )}
@@ -136,12 +136,12 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             <span
               className={`inline-flex items-center gap-1 text-[10px] ${
                 codexTurnHealth.state === 'healthy'
-                  ? 'text-emerald-400'
+                  ? 'text-ink-emerald-400'
                   : codexTurnHealth.state === 'running'
-                    ? 'text-sky-400'
+                    ? 'text-tone-sky-400'
                     : codexTurnHealth.state === 'fallback'
-                      ? 'text-amber-400'
-                      : 'text-rose-400'
+                      ? 'text-ink-amber-400'
+                      : 'text-ink-rose-400'
               }`}
               title={
                 codexTurnHealth.state === 'fallback' || codexTurnHealth.state === 'failed'
@@ -152,12 +152,12 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
               <span
                 className={`size-1.5 rounded-full ${
                   codexTurnHealth.state === 'healthy'
-                    ? 'bg-emerald-400'
+                    ? 'bg-ink-emerald-400'
                     : codexTurnHealth.state === 'running'
-                      ? 'bg-sky-400 animate-pulse'
+                      ? 'bg-tone-sky-400 animate-pulse'
                       : codexTurnHealth.state === 'fallback'
-                        ? 'bg-amber-400'
-                        : 'bg-rose-400'
+                        ? 'bg-ink-amber-400'
+                        : 'bg-ink-rose-400'
                 }`}
               />
               {codexTurnHealth.state === 'healthy'
@@ -173,7 +173,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           lastCoachPrompt ? (
             <button
               type="button"
-              className="text-[10px] font-medium text-sky-400 hover:text-sky-300"
+              className="text-[10px] font-medium text-tone-sky-400 hover:text-ink-sky-300"
               disabled={busy}
               onClick={retryLastCodexTurn}
             >
@@ -182,7 +182,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           ) : null}
           {typeof rateLimits?.primaryUsedPercent === 'number' ? (
             <span
-              className="inline-flex items-center gap-1 text-[10px] text-stone-500"
+              className="inline-flex items-center gap-1 text-[10px] text-ink-stone-500"
               title={
                 [
                   '这是 Codex 账号额度占用，不是本轮生成进度。',
@@ -202,8 +202,8 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
         <p
           className={`mt-0.5 text-[10px] truncate ${
             codexTurnHealth.state === 'fallback' || codexTurnHealth.state === 'failed'
-              ? 'text-amber-500/90'
-              : 'text-stone-500'
+              ? 'text-ink-amber-500o90'
+              : 'text-ink-stone-500'
           }`}
           title={
             codexTurnHealth.state === 'fallback' || codexTurnHealth.state === 'failed'
@@ -218,13 +218,13 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
       </div>
       <div className="flex items-center gap-0.5 shrink-0">
         {connected ? (
-          <Wifi className="size-3.5 text-emerald-500/70 mr-1" />
+          <Wifi className="size-3.5 text-ink-emerald-500o70 mr-1" />
         ) : (
-          <WifiOff className="size-3.5 text-stone-600 mr-1" />
+          <WifiOff className="size-3.5 text-tone-stone-600 mr-1" />
         )}
         <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
           <PopoverTrigger
-            className="inline-flex size-7 items-center justify-center rounded-md text-stone-400 hover:bg-stone-800 hover:text-stone-100"
+            className="inline-flex size-7 items-center justify-center rounded-md text-ink-stone-400 hover:bg-tone-stone-800 hover:text-tone-stone-100"
             title="会话历史"
             onClick={() => {
               sound.playClick();
@@ -235,13 +235,13 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           </PopoverTrigger>
           <PopoverContent
             align="end"
-            className="w-72 p-2 bg-[#12141a] border-stone-700 text-stone-100"
+            className="w-72 p-2 bg-panel-chat-fixed border-tone-stone-700 text-tone-stone-100"
           >
             <div className="flex items-center justify-between px-1 pb-2">
-              <p className="text-[11px] font-medium text-stone-300">Codex 会话</p>
+              <p className="text-[11px] font-medium text-tone-stone-300">Codex 会话</p>
               <button
                 type="button"
-                className="text-[10px] text-sky-400 hover:text-sky-300"
+                className="text-[10px] text-tone-sky-400 hover:text-ink-sky-300"
                 onClick={() => {
                   startNewChat();
                   setHistoryOpen(false);
@@ -252,13 +252,13 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             </div>
             <div className="max-h-64 space-y-1 overflow-y-auto">
               {threads.length === 0 ? (
-                <p className="px-2 py-3 text-[11px] text-stone-500">暂无持久化会话</p>
+                <p className="px-2 py-3 text-[11px] text-ink-stone-500">暂无持久化会话</p>
               ) : (
                 threads.map((t) => (
                   <div
                     key={t.id}
-                    className={`flex items-start gap-1 rounded-lg px-2 py-1.5 hover:bg-stone-800/80 ${
-                      t.id === coachThreadId ? 'bg-stone-800' : ''
+                    className={`flex items-start gap-1 rounded-lg px-2 py-1.5 hover:bg-tone-stone-800o80 ${
+                      t.id === coachThreadId ? 'bg-tone-stone-800' : ''
                     }`}
                   >
                     <button
@@ -266,10 +266,10 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                       className="min-w-0 flex-1 text-left"
                       onClick={() => openThread(t.id)}
                     >
-                      <p className="truncate text-[11px] text-stone-200">
+                      <p className="truncate text-[11px] text-ink-stone-200">
                         {t.name || t.preview || t.id.slice(0, 12)}
                       </p>
-                      <p className="text-[10px] text-stone-500">
+                      <p className="text-[10px] text-ink-stone-500">
                         {t.updatedAt
                           ? new Date(t.updatedAt * 1000).toLocaleString()
                           : t.id.slice(0, 8)}
@@ -279,7 +279,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-6 shrink-0 text-stone-500 hover:text-amber-300"
+                      className="size-6 shrink-0 text-ink-stone-500 hover:text-ink-amber-300"
                       title="压缩上下文"
                       disabled={compactThread.isPending}
                       onClick={() => {
@@ -296,7 +296,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-6 shrink-0 text-stone-500 hover:text-sky-300"
+                      className="size-6 shrink-0 text-ink-stone-500 hover:text-ink-sky-300"
                       title="分叉会话"
                       disabled={forkThread.isPending}
                       onClick={() => {
@@ -322,7 +322,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-6 shrink-0 text-stone-500 hover:text-rose-400"
+                      className="size-6 shrink-0 text-ink-stone-500 hover:text-ink-rose-400"
                       title="归档"
                       onClick={() => {
                         sound.playClick();
@@ -339,7 +339,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                 ))
               )}
             </div>
-            <label className="mt-2 flex items-center gap-2 border-t border-stone-800 px-1 pt-2 text-[10px] text-stone-400">
+            <label className="mt-2 flex items-center gap-2 border-t border-tone-stone-800 px-1 pt-2 text-[10px] text-ink-stone-400">
               <input
                 type="checkbox"
                 checked={coachPersistThread}
@@ -351,7 +351,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
         </Popover>
         <Popover open={skillsOpen} onOpenChange={setSkillsOpen}>
           <PopoverTrigger
-            className="inline-flex size-7 items-center justify-center rounded-md text-stone-400 hover:bg-stone-800 hover:text-stone-100"
+            className="inline-flex size-7 items-center justify-center rounded-md text-ink-stone-400 hover:bg-tone-stone-800 hover:text-tone-stone-100"
             title="Skills"
             onClick={() => sound.playClick()}
           >
@@ -359,32 +359,32 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           </PopoverTrigger>
           <PopoverContent
             align="end"
-            className="w-72 p-2 bg-[#12141a] border-stone-700 text-stone-100"
+            className="w-72 p-2 bg-panel-chat-fixed border-tone-stone-700 text-tone-stone-100"
           >
-            <p className="px-1 pb-2 text-[11px] font-medium text-stone-300">
+            <p className="px-1 pb-2 text-[11px] font-medium text-tone-stone-300">
               Codex Skills（只读）
             </p>
             <div className="max-h-40 space-y-1 overflow-y-auto">
               {skills.length === 0 ? (
-                <p className="px-2 py-3 text-[11px] text-stone-500">暂无 skill</p>
+                <p className="px-2 py-3 text-[11px] text-ink-stone-500">暂无 skill</p>
               ) : (
                 skills.map((s) => (
                   <div
                     key={`${s.scope ?? 'x'}:${s.name}`}
-                    className="rounded-lg px-2 py-1.5 hover:bg-stone-800/80"
+                    className="rounded-lg px-2 py-1.5 hover:bg-tone-stone-800o80"
                   >
                     <div className="flex items-center gap-1.5">
-                      <p className="min-w-0 truncate text-[11px] text-stone-200">{s.name}</p>
+                      <p className="min-w-0 truncate text-[11px] text-ink-stone-200">{s.name}</p>
                       <span
                         className={`shrink-0 text-[9px] ${
-                          s.enabled ? 'text-emerald-500' : 'text-stone-600'
+                          s.enabled ? 'text-tone-emerald-500' : 'text-tone-stone-600'
                         }`}
                       >
                         {s.enabled ? 'on' : 'off'}
                       </span>
                     </div>
                     {s.description ? (
-                      <p className="mt-0.5 line-clamp-2 text-[10px] text-stone-500">
+                      <p className="mt-0.5 line-clamp-2 text-[10px] text-ink-stone-500">
                         {s.description}
                       </p>
                     ) : null}
@@ -392,21 +392,21 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                 ))
               )}
             </div>
-            <div className="mt-2 border-t border-stone-800 px-1 pt-2">
-              <p className="pb-1 text-[10px] font-medium text-stone-400">
+            <div className="mt-2 border-t border-tone-stone-800 px-1 pt-2">
+              <p className="pb-1 text-[10px] font-medium text-ink-stone-400">
                 MCP 状态（观测，非学习工具总线）
               </p>
               <div className="max-h-28 space-y-1 overflow-y-auto">
                 {mcpServers.length === 0 ? (
-                  <p className="px-1 py-2 text-[10px] text-stone-600">未配置 MCP</p>
+                  <p className="px-1 py-2 text-[10px] text-tone-stone-600">未配置 MCP</p>
                 ) : (
                   mcpServers.map((s) => (
                     <div
                       key={s.name}
                       className="flex items-center justify-between gap-2 rounded px-1 py-0.5"
                     >
-                      <span className="truncate text-[10px] text-stone-300">{s.name}</span>
-                      <span className="shrink-0 text-[9px] text-stone-500">
+                      <span className="truncate text-[10px] text-tone-stone-300">{s.name}</span>
+                      <span className="shrink-0 text-[9px] text-ink-stone-500">
                         {s.authStatus} · {s.toolCount} tools
                       </span>
                     </div>
@@ -420,7 +420,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-stone-400 hover:text-stone-100"
+          className="size-7 text-ink-stone-400 hover:text-tone-stone-100"
           title="新对话（新开 thread）"
           onClick={startNewChat}
         >
@@ -430,7 +430,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-stone-400 hover:text-stone-100"
+          className="size-7 text-ink-stone-400 hover:text-tone-stone-100"
           title="清屏（保留当前会话）"
           onClick={clearDisplay}
         >
@@ -441,7 +441,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             type="button"
             variant="ghost"
             size="icon"
-            className="size-7 text-stone-400 hover:text-stone-100"
+            className="size-7 text-ink-stone-400 hover:text-tone-stone-100"
             title="关闭面板（会话不断开）"
             onClick={onClose}
           >

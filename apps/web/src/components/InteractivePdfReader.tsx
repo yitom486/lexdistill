@@ -246,7 +246,7 @@ export function InteractivePdfReader({
   return (
     <div className="space-y-4">
       {/* 顶部阅读器控制条 */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-[#faf9f6] dark:bg-[#1a1816] border border-amber-900/10 dark:border-amber-500/15 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-paper-soft border border-line-accent shadow-sm">
         {/* 模式切换 */}
         <Tabs
           value={viewMode}
@@ -256,7 +256,7 @@ export function InteractivePdfReader({
             setViewMode(val as 'STRUCTURED' | 'PDF_PAGE');
           }}
         >
-          <TabsList className="bg-stone-200/70 dark:bg-stone-800/80">
+          <TabsList className="bg-veil-stone-200o70-stone-800o80">
             <TabsIndicator />
             <TabsTrigger value="PDF_PAGE" className="px-3 py-1.5 text-xs gap-1.5">
               <BookOpen className="w-3.5 h-3.5" />
@@ -282,36 +282,36 @@ export function InteractivePdfReader({
           >
             {showChineseTranslation ? (
               <>
-                <Eye className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <Eye className="w-3.5 h-3.5 text-accent-ink" />
                 <span>中文对照: 开启</span>
               </>
             ) : (
               <>
-                <EyeOff className="w-3.5 h-3.5 text-stone-400" />
+                <EyeOff className="w-3.5 h-3.5 text-ink-stone-400" />
                 <span>中文对照: 隐藏</span>
               </>
             )}
           </Button>
 
           {viewMode === 'PDF_PAGE' && (
-            <div className="flex items-center gap-1 border border-stone-200 dark:border-stone-800 rounded-xl px-1 py-0.5">
+            <div className="flex items-center gap-1 border border-line-soft rounded-xl px-1 py-0.5">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setZoomLevel((z) => Math.max(z - 10, 80))}
-                className="h-7 w-7 text-stone-500"
+                className="h-7 w-7 text-ink-stone-500"
                 title="缩小"
               >
                 <ZoomOut className="w-3.5 h-3.5" />
               </Button>
-              <span className="text-[11px] font-mono font-semibold px-1 text-stone-600 dark:text-stone-300">
+              <span className="text-[11px] font-mono font-semibold px-1 text-ink-faint">
                 {zoomLevel}%
               </span>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setZoomLevel((z) => Math.min(z + 10, 130))}
-                className="h-7 w-7 text-stone-500"
+                className="h-7 w-7 text-ink-stone-500"
                 title="放大"
               >
                 <ZoomIn className="w-3.5 h-3.5" />
@@ -346,44 +346,44 @@ export function InteractivePdfReader({
         ref={containerRef}
         onMouseUp={handleMouseUp}
         data-manual-lookup="true"
-        className="relative min-h-[600px] p-6 sm:p-10 rounded-3xl bg-white dark:bg-[#181614] border border-amber-900/10 dark:border-amber-500/15 shadow-sm overflow-hidden select-text"
+        className="relative min-h-[600px] p-6 sm:p-10 rounded-3xl bg-surface-dusk border border-line-accent shadow-sm overflow-hidden select-text"
         style={{ fontSize: `${(zoomLevel / 100) * 16}px` }}
       >
         {viewMode === 'PDF_PAGE' ? (
           /* 仿真原版双栏教材排版 */
           <div className="max-w-4xl mx-auto space-y-8">
             {/* 顶栏教材标识 */}
-            <div className="flex items-center justify-between border-b-2 border-stone-800 dark:border-stone-300 pb-3">
+            <div className="flex items-center justify-between border-b-2 border-line-stone-800-stone-300 pb-3">
               <div className="flex items-center gap-3">
-                <Badge className="rounded-md bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 border-transparent hover:bg-stone-900">
+                <Badge className="rounded-md bg-ink text-surface border-transparent hover:bg-tone-stone-900">
                   {book.shortTitle}
                 </Badge>
-                <span className="font-bold text-sm tracking-wider text-stone-800 dark:text-stone-200">
+                <span className="font-bold text-sm tracking-wider text-ink-soft">
                   {lesson.title}
                 </span>
               </div>
-              <span className="text-xs font-mono text-stone-400">
+              <span className="text-xs font-mono text-ink-stone-400">
                 PAGE {currentPage} / {totalPages}
               </span>
             </div>
 
             {/* 课文主对话区 */}
             <div className="space-y-4">
-              <div className="inline-block px-3 py-1 rounded-md bg-amber-500/10 text-amber-800 dark:text-amber-300 text-xs font-bold mb-2">
+              <div className="inline-block px-3 py-1 rounded-md bg-wash-amber-500o10 text-ink-amber-800-amber-300 text-xs font-bold mb-2">
                 {book.language === 'EN' ? '【Dialogue · 课文会话】' : '【基本会话 · 基本会話】'}
               </div>
               <div className="space-y-4 leading-relaxed font-serif">
                 {lesson.dialogues.map((dlg) => (
                   <div
                     key={dlg.id}
-                    className="p-3.5 rounded-xl hover:bg-amber-500/5 transition-colors border-l-2 border-transparent hover:border-amber-500/40"
+                    className="p-3.5 rounded-xl hover:bg-wash-amber-500o5 transition-colors border-l-2 border-transparent hover:border-tone-amber-500o40"
                   >
                     <div className="flex items-baseline gap-3">
-                      <span className="font-bold text-amber-700 dark:text-amber-400 shrink-0 font-sans text-xs px-2 py-0.5 rounded-md bg-amber-500/10">
+                      <span className="font-bold text-accent-ink-warm shrink-0 font-sans text-xs px-2 py-0.5 rounded-md bg-wash-amber-500o10">
                         {dlg.speaker}
                       </span>
                       <div className="flex-1 space-y-1">
-                        <div className="text-stone-900 dark:text-stone-100 text-base flex flex-wrap items-center gap-x-2">
+                        <div className="text-ink text-base flex flex-wrap items-center gap-x-2">
                           <span>{dlg.japanese}</span>
                           <UnifiedTtsPlayer
                             variant="inline"
@@ -400,7 +400,7 @@ export function InteractivePdfReader({
                               );
                               toast.info('已将整句提交给 AI 导师讲透');
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-amber-700 hover:bg-amber-500/10 dark:text-amber-300 cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-tone-amber-700 hover:bg-wash-amber-500o10 dark:text-ink-amber-300 cursor-pointer"
                             title="整句讲透：语法成分 + 助词接续 + 语感（不用先划选）"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
@@ -410,7 +410,7 @@ export function InteractivePdfReader({
                             type="button"
                             onClick={() => handleCollectSentence(dlg.japanese, dlg.chinese)}
                             disabled={proposeDraft.isPending}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-stone-500 hover:bg-amber-500/10 hover:text-amber-700 dark:text-stone-400 dark:hover:text-amber-300 cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-ink-stone-500 hover:bg-wash-amber-500o10 hover:text-tone-amber-700 dark:text-ink-stone-400 dark:hover:text-ink-amber-300 cursor-pointer"
                             title="收进生词草稿箱，确认后建成句子卡"
                           >
                             <BookmarkPlus className="w-3.5 h-3.5" />
@@ -418,7 +418,7 @@ export function InteractivePdfReader({
                           </button>
                         </div>
                         {showChineseTranslation && (
-                          <div className="text-xs text-stone-500 dark:text-stone-400 font-sans">
+                          <div className="text-xs text-ink-ghost font-sans">
                             {dlg.chinese}
                           </div>
                         )}
@@ -430,26 +430,26 @@ export function InteractivePdfReader({
             </div>
 
             {/* 双栏底注与语法句型 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-stone-200 dark:border-stone-800">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-line-soft">
               {/* 左栏: 核心语法句型 */}
               <div className="space-y-4">
-                <div className="font-bold text-xs text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                <div className="font-bold text-xs text-ink flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-tone-amber-600"></span>
                   {book.language === 'EN' ? '【Core Grammar · 核心语法】' : '【重要文法 · 文法ノート】'}
                 </div>
                 <div className="space-y-3">
                   {lesson.grammarPoints.map((gp) => (
                     <div
                       key={gp.id}
-                      className="p-3 rounded-xl bg-stone-50 dark:bg-[#201d19] border border-stone-200 dark:border-stone-800/80 space-y-1.5"
+                      className="p-3 rounded-xl bg-paper-cream-deep border border-line-stone-200-stone-800o80 space-y-1.5"
                     >
-                      <div className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                      <div className="text-xs font-bold text-accent-ink-warm">
                         {gp.title}
                       </div>
-                      <div className="text-[11px] font-mono text-stone-600 dark:text-stone-300">
+                      <div className="text-[11px] font-mono text-ink-faint">
                         接续: {gp.structure}
                       </div>
-                      <p className="text-xs text-stone-500 dark:text-stone-400 leading-normal">
+                      <p className="text-xs text-ink-ghost leading-normal">
                         {gp.explanation}
                       </p>
                     </div>
@@ -459,8 +459,8 @@ export function InteractivePdfReader({
 
               {/* 右栏: 本课生词表 */}
               <div className="space-y-4">
-                <div className="font-bold text-xs text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                <div className="font-bold text-xs text-ink flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-tone-emerald-600"></span>
                   {book.language === 'EN' ? '【Vocabulary · 重点词汇】' : '【新出単語 · 生词表】'}
                 </div>
 
@@ -468,24 +468,24 @@ export function InteractivePdfReader({
                   {lesson.vocabularies.map((v) => (
                     <div
                       key={v.id}
-                      className="flex items-center justify-between p-2 rounded-lg bg-stone-50 dark:bg-[#201d19] text-xs hover:bg-amber-500/10 transition-colors"
+                      className="flex items-center justify-between p-2 rounded-lg bg-paper-cream-deep text-xs hover:bg-wash-amber-500o10 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-stone-900 dark:text-stone-100">
+                        <span className="font-bold text-ink">
                           {v.kanji}
                         </span>
-                        <span className="text-[11px] text-stone-400">({v.kana})</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-300">
+                        <span className="text-[11px] text-ink-stone-400">({v.kana})</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-line-soft text-ink-faint">
                           {v.pos}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-stone-600 dark:text-stone-400">{v.chinese}</span>
+                        <span className="text-ink-faint-soft">{v.chinese}</span>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleAddSelectedToCards()}
-                          className="h-7 w-7 text-stone-400 hover:text-amber-600"
+                          className="h-7 w-7 text-ink-stone-400 hover:text-tone-amber-600"
                           title="加入闪卡"
                         >
                           <BookmarkPlus className="w-3.5 h-3.5" />
@@ -500,11 +500,11 @@ export function InteractivePdfReader({
         ) : (
           /* 结构分解排版模式 */
           <div className="max-w-3xl mx-auto space-y-6">
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-900/10 dark:border-amber-500/20">
-              <h4 className="text-sm font-bold text-stone-900 dark:text-stone-100 mb-1">
+            <div className="p-4 rounded-2xl bg-wash-amber-500o10 border border-line-amber-900o10-amber-500o20">
+              <h4 className="text-sm font-bold text-ink mb-1">
                 {lesson.subTitle}
               </h4>
-              <p className="text-xs text-stone-500 dark:text-stone-400">
+              <p className="text-xs text-ink-ghost">
                 本模式对长课文进行段落与语义分块，支持单句反复回放与语法点对齐。
               </p>
             </div>
@@ -513,10 +513,10 @@ export function InteractivePdfReader({
               {lesson.dialogues.map((dlg, idx) => (
                 <div
                   key={dlg.id}
-                  className="p-5 rounded-2xl bg-stone-50 dark:bg-[#1e1c19] border border-stone-200 dark:border-stone-800 space-y-3"
+                  className="p-5 rounded-2xl bg-paper-cream-night border border-line-soft space-y-3"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-600 text-white">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-tone-amber-600 text-tone-white">
                       第 {idx + 1} 句 · {dlg.speaker}
                     </span>
                     <UnifiedTtsPlayer
@@ -526,11 +526,11 @@ export function InteractivePdfReader({
                       label="朗读"
                     />
                   </div>
-                  <div className="text-lg font-serif text-stone-900 dark:text-stone-100">
+                  <div className="text-lg font-serif text-ink">
                     {dlg.japanese}
                   </div>
                   {showChineseTranslation && (
-                    <div className="text-sm text-stone-500 dark:text-stone-400 border-t border-stone-200 dark:border-stone-800/80 pt-2">
+                    <div className="text-sm text-ink-ghost border-t border-line-stone-200-stone-800o80 pt-2">
                       {dlg.chinese}
                     </div>
                   )}
@@ -552,13 +552,13 @@ export function InteractivePdfReader({
                 left: selectionPopupPosition.x,
                 top: selectionPopupPosition.y,
               }}
-              className="z-50 p-3 rounded-2xl bg-[#1c1a17] text-white shadow-2xl border border-amber-500/30 flex flex-col gap-2 min-w-[240px] max-w-[320px]"
+              className="z-50 p-3 rounded-2xl bg-surface-coal-fixed text-tone-white shadow-2xl border border-line-amber-500o30 flex flex-col gap-2 min-w-[240px] max-w-[320px]"
             >
               {/* 词义预览 */}
               {activeWordDetail && (
-                <div className="space-y-0.5 border-b border-stone-700 pb-2">
+                <div className="space-y-0.5 border-b border-tone-stone-700 pb-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-400 text-xs flex items-center gap-1">
+                    <span className="font-bold text-ink-amber-400 text-xs flex items-center gap-1">
                       {activeWordDetail.word}
                       <UnifiedTtsPlayer
                         variant="inline"
@@ -567,12 +567,12 @@ export function InteractivePdfReader({
                       />
                     </span>
                     {activeWordDetail.reading && (
-                      <span className="text-[10px] text-stone-400">
+                      <span className="text-[10px] text-ink-stone-400">
                         {activeWordDetail.reading}
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-stone-300 line-clamp-2">
+                  <p className="text-[11px] text-tone-stone-300 line-clamp-2">
                     {activeWordDetail.meaning}
                   </p>
                 </div>
@@ -583,7 +583,7 @@ export function InteractivePdfReader({
                 <Button
                   onClick={handleAddSelectedToCards}
                   size="sm"
-                  className="flex-1 h-8 gap-1 bg-amber-600 hover:bg-amber-700 text-[11px] text-white"
+                  className="flex-1 h-8 gap-1 bg-tone-amber-600 hover:bg-tone-amber-700 text-[11px] text-tone-white"
                 >
                   <BookmarkPlus className="w-3.5 h-3.5" />
                   转为闪卡
@@ -592,16 +592,16 @@ export function InteractivePdfReader({
                   onClick={handleSaveAnnotation}
                   size="sm"
                   variant="outline"
-                  className="h-8 gap-1 border-stone-700 text-stone-300 hover:bg-stone-800 text-[11px]"
+                  className="h-8 gap-1 border-tone-stone-700 text-tone-stone-300 hover:bg-tone-stone-800 text-[11px]"
                 >
-                  <Highlighter className="w-3.5 h-3.5 text-amber-400" />
+                  <Highlighter className="w-3.5 h-3.5 text-ink-amber-400" />
                   划线重点
                 </Button>
                 <Button
                   onClick={handleAskTutorForSelection}
                   size="sm"
                   variant="secondary"
-                  className="flex-1 h-8 gap-1 bg-stone-800 hover:bg-stone-700 text-[11px] text-amber-300"
+                  className="flex-1 h-8 gap-1 bg-tone-stone-800 hover:bg-tone-stone-700 text-[11px] text-ink-amber-300"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   导师点拨
@@ -610,9 +610,9 @@ export function InteractivePdfReader({
                   onClick={handleLookupSelection}
                   size="sm"
                   variant="outline"
-                  className="h-8 gap-1 border-stone-700 text-stone-300 hover:bg-stone-800 text-[11px]"
+                  className="h-8 gap-1 border-tone-stone-700 text-tone-stone-300 hover:bg-tone-stone-800 text-[11px]"
                 >
-                  <BookOpen className="w-3.5 h-3.5 text-sky-400" />
+                  <BookOpen className="w-3.5 h-3.5 text-tone-sky-400" />
                   查词典
                 </Button>
               </div>
@@ -632,7 +632,7 @@ export function InteractivePdfReader({
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <span className="text-xs font-mono font-semibold text-stone-600 dark:text-stone-400">
+          <span className="text-xs font-mono font-semibold text-ink-faint-soft">
             第 {currentPage} 页 / 共 {totalPages} 页
           </span>
           <Button

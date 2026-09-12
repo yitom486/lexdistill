@@ -123,21 +123,21 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
     <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
       <PlanIntentBanner />
       {/* 顶部总览与冲刺卡片 */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#faf9f6] dark:bg-[#1a1816] p-5 rounded-2xl border border-amber-900/10 dark:border-amber-500/15 shadow-xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-paper-soft p-5 rounded-2xl border border-line-accent shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-300 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-wash-amber-500o15 border border-line-amber-500o30 text-ink-amber-900-amber-300 flex items-center justify-center font-bold">
             <AlertTriangle className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold font-serif text-stone-900 dark:text-stone-100">
+              <h2 className="text-lg font-bold font-serif text-ink">
                 错题本智能归因与专项攻克
               </h2>
-              <Badge variant="amber" className="text-[11px] border-amber-500/20">
+              <Badge variant="amber" className="text-[11px] border-tone-amber-500o20">
                 两连对出库标准
               </Badge>
             </div>
-            <p className="text-xs text-stone-500 dark:text-stone-400">
+            <p className="text-xs text-ink-ghost">
               待攻克: {unresolvedMistakes.length} 题 · 已攻克: {resolvedMistakes.length} 题
             </p>
           </div>
@@ -162,13 +162,13 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="p-6 sm:p-8 rounded-2xl bg-[#faf9f6] dark:bg-[#1a1816] border-2 border-amber-500/40 shadow-md space-y-6"
+            className="p-6 sm:p-8 rounded-2xl bg-paper-soft border-2 border-tone-amber-500o40 shadow-md space-y-6"
           >
             {/* 冲刺顶栏导航 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge>🔥 错题冲刺中</Badge>
-                <span className="text-xs text-stone-500 font-mono">
+                <span className="text-xs text-ink-stone-500 font-mono">
                   第 {sprintIndex + 1} / {unresolvedMistakes.length} 题
                 </span>
                 <Badge variant="secondary">考点: {activeSprintItem.categoryTag}</Badge>
@@ -181,15 +181,15 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
 
             {/* 题目内容展示 */}
             <div className="space-y-3 py-3">
-              <p className="text-xs text-stone-500 font-medium">{activeSprintItem.prompt}</p>
-              <h3 className="text-xl sm:text-2xl font-serif font-bold text-stone-900 dark:text-stone-100">
+              <p className="text-xs text-ink-stone-500 font-medium">{activeSprintItem.prompt}</p>
+              <h3 className="text-xl sm:text-2xl font-serif font-bold text-ink">
                 {activeSprintItem.sentence}
               </h3>
             </div>
 
             {/* 作答输入框 */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-stone-600 dark:text-stone-400">
+              <label className="text-xs font-semibold text-ink-faint-soft">
                 请键入正确的助词或选项答案：
               </label>
               <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -204,7 +204,7 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
                   }}
                   disabled={sprintFeedback?.submitted}
                   placeholder="在此输入订正后的答案..."
-                  className="flex-1 w-full px-4 py-3 rounded-xl bg-white dark:bg-[#211f1d] border border-amber-900/20 dark:border-amber-500/20 text-stone-900 dark:text-stone-100 font-medium outline-none focus:ring-2 focus:ring-amber-500 shadow-xs"
+                  className="flex-1 w-full px-4 py-3 rounded-xl bg-surface-warm border border-line-amber-900o20-amber-500o20 text-ink font-medium outline-none focus:ring-2 focus:ring-tone-amber-500 shadow-xs"
                 />
 
                 {!sprintFeedback?.submitted ? (
@@ -215,7 +215,7 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
                   <Button
                     variant="secondary"
                     onClick={handleNextSprintItem}
-                    className="w-full sm:w-auto h-11 px-6 shrink-0 bg-stone-900 dark:bg-amber-600 text-white hover:brightness-110"
+                    className="w-full sm:w-auto h-11 px-6 shrink-0 bg-surface-stone-900-amber-600 text-tone-white hover:brightness-110"
                   >
                     {sprintIndex < unresolvedMistakes.length - 1 ? '下一题 ➔' : '完成冲刺 ➔'}
                   </Button>
@@ -228,22 +228,18 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
               <motion.div
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`p-4 rounded-xl border text-xs space-y-3 ${
-                  sprintFeedback.isCorrect
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
-                    : 'bg-rose-500/10 border-rose-500/30 text-rose-900 dark:text-rose-200'
-                }`}
+                className={`p-4 rounded-xl border text-xs space-y-3 ${ sprintFeedback.isCorrect ? 'bg-wash-emerald-500o10 border-line-emerald-500o30 text-ink-emerald-900-emerald-200' : 'bg-wash-rose-500o10 border-line-rose-500o30 text-ink-rose-900-rose-200' }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 font-bold text-sm">
                     {sprintFeedback.isCorrect ? (
                       <>
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                        <CheckCircle2 className="w-5 h-5 text-tone-emerald-600" />
                         <span>订正正确！当前攻克进度稳步提升</span>
                       </>
                     ) : (
                       <>
-                        <XCircle className="w-5 h-5 text-rose-600" />
+                        <XCircle className="w-5 h-5 text-ink-rose-600" />
                         <span>仍有偏差：标准答案为「{activeSprintItem.correctAnswer}」</span>
                       </>
                     )}
@@ -261,14 +257,14 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
                         explanation: activeSprintItem.reviewNote,
                       })
                     }
-                    className="text-amber-700 dark:text-amber-400"
+                    className="text-accent-ink-warm"
                   >
                     <Bot className="w-4 h-4" />
                     <span>向 AI 导师追问</span>
                   </Button>
                 </div>
 
-                <p className="text-stone-700 dark:text-stone-300 font-sans leading-relaxed">
+                <p className="text-ink-mute font-sans leading-relaxed">
                   💡 {activeSprintItem.reviewNote}
                 </p>
               </motion.div>
@@ -292,7 +288,7 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
                 setFilterState(val as typeof filterState);
               }}
             >
-              <TabsList className="bg-stone-200/60 dark:bg-stone-900">
+              <TabsList className="bg-veil-stone-200o60-stone-900">
                 <TabsIndicator />
                 <TabsTrigger value="ALL" className="px-3 py-1 text-xs">
                   全部 ({mistakes.length})
@@ -332,12 +328,12 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
           {/* 错题卡片流 */}
           <div className="space-y-3">
             {filteredMistakes.length === 0 ? (
-              <div className="p-8 text-center rounded-2xl bg-[#faf9f6] dark:bg-[#1a1816] border border-amber-900/10 dark:border-amber-500/15 space-y-2">
-                <Award className="w-8 h-8 text-amber-500 mx-auto" />
-                <p className="text-sm font-semibold text-stone-800 dark:text-stone-200">
+              <div className="p-8 text-center rounded-2xl bg-paper-soft border border-line-accent space-y-2">
+                <Award className="w-8 h-8 text-tone-amber-500 mx-auto" />
+                <p className="text-sm font-semibold text-ink-soft">
                   当前分类下没有匹配的错题！
                 </p>
-                <p className="text-xs text-stone-400">保持全对节奏，持续稳固记忆曲线</p>
+                <p className="text-xs text-ink-stone-400">保持全对节奏，持续稳固记忆曲线</p>
               </div>
             ) : (
               filteredMistakes.map((m) => (
@@ -345,7 +341,7 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
                   key={m.id}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-5 rounded-2xl bg-[#faf9f6] dark:bg-[#1a1816] border border-amber-900/10 dark:border-amber-500/15 shadow-2xs space-y-3"
+                  className="p-5 rounded-2xl bg-paper-soft border border-line-accent shadow-2xs space-y-3"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -374,29 +370,29 @@ export const MistakeSprintWorkbench: React.FC<MistakeSprintWorkbenchProps> = ({
                           explanation: m.reviewNote,
                         })
                       }
-                      className="text-amber-700 dark:text-amber-400"
+                      className="text-accent-ink-warm"
                     >
                       <Bot className="w-3.5 h-3.5" />
                       <span>AI 错因深度诊断</span>
                     </Button>
                   </div>
 
-                  <div className="text-sm font-medium text-stone-900 dark:text-stone-100 font-serif">
+                  <div className="text-sm font-medium text-ink font-serif">
                     {m.sentence}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-800 dark:text-rose-300 space-y-0.5">
+                    <div className="p-2.5 rounded-xl bg-wash-rose-500o10 text-ink-rose-800-rose-300 space-y-0.5">
                       <span className="font-bold">您的历史错误答复：</span>
                       <p className="font-mono">{m.userWrongAnswer || '(未填)'}</p>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 space-y-0.5">
+                    <div className="p-2.5 rounded-xl bg-wash-emerald-500o10 text-ink-emerald-800-emerald-300 space-y-0.5">
                       <span className="font-bold">权威标准考点答案：</span>
                       <p className="font-mono">{m.correctAnswer}</p>
                     </div>
                   </div>
 
-                  <p className="text-xs text-stone-600 dark:text-stone-400 font-sans leading-relaxed">
+                  <p className="text-xs text-ink-faint-soft font-sans leading-relaxed">
                     💡 <span className="font-medium">错因解析：</span>
                     {m.reviewNote}
                   </p>

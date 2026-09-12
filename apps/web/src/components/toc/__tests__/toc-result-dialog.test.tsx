@@ -90,6 +90,23 @@ describe('P3.5 结果 Dialog 内容（SSR）', () => {
     expect(changed).toContain('旧付録');
   });
 
+  it('可读性：正文≥14px、行高≥36px、表头 sticky、状态不只靠颜色', () => {
+    const html = renderContent();
+    // 正文单元格 14px
+    expect(html).toContain('text-[14px]');
+    // 行高：输入框 h-9（36px）+ 行 min-h
+    expect(html).toContain('min-h-[36px]');
+    // 表头 sticky
+    expect(html).toContain('sticky');
+    // 状态徽标是文字（保留/新增/修改/删除），不是纯色块
+    for (const label of ['保留', '新增', '修改', '删除']) {
+      expect(html).toContain(label);
+    }
+    // 修改/删除行另有文字证据行（原：/删前：），双通道
+    expect(html).toContain('原：');
+    expect(html).toContain('删前：');
+  });
+
   it('逐条输入框 aria齊备；改后值只活 state（SSR 断言初始值）', () => {
     const html = renderContent();
     expect(html).toContain('aria-label="条目标题 b0"');
@@ -115,6 +132,10 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
         sizeHint: null,
         reviewDisabledReason: null,
         starting: false,
+        savedModel: '',
+        savedEffort: '',
+        sessionModel: '',
+        sessionEffort: '',
         onStart: () => {},
         onClose: () => {},
       })
@@ -130,11 +151,40 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
         sizeHint: null,
         reviewDisabledReason: '先提取目录基线',
         starting: false,
+        savedModel: 'm-saved',
+        savedEffort: 'high',
+        sessionModel: '',
+        sessionEffort: '',
         onStart: () => {},
         onClose: () => {},
       })
     );
     expect(disabled).toContain('disabled');
+  });
+
+  it('配置 Dialog：模型使用默认/指定 + effort + 记住偏好 + 生效来源行', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(TocReviewConfigDialogContent, {
+        rangeText: '16–21',
+        baseline,
+        evidencePages: 1,
+        sizeHint: null,
+        reviewDisabledReason: null,
+        starting: false,
+        savedModel: 'm-saved',
+        savedEffort: 'high',
+        sessionModel: '',
+        sessionEffort: '',
+        onStart: () => {},
+        onClose: () => {},
+      })
+    );
+    expect(html).toContain('使用默认');
+    expect(html).toContain('指定模型');
+    expect(html).toContain('思考等级');
+    expect(html).toContain('记住为偏好');
+    // 已保存偏好回显：指定模型被选中且来源行展示偏好值
+    expect(html).toContain('m-saved');
   });
 
   it('进度 Dialog：不定长进度 + 不可取消声明', () => {

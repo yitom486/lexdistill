@@ -54,21 +54,21 @@ export function WritingStudioWorkbench() {
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col gap-4 max-w-3xl w-full"
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border border-amber-900/10 dark:border-amber-500/15 bg-[#faf9f6] dark:bg-[#1a1816] shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border border-line-accent bg-paper-soft shadow-xs">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-300 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-wash-amber-500o15 border border-line-amber-500o30 text-ink-amber-900-amber-300 flex items-center justify-center">
             <PenLine className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold font-serif text-stone-900 dark:text-stone-100">
+              <h2 className="text-lg font-bold font-serif text-ink">
                 写作与翻译工作室
               </h2>
               <Badge variant="amber" className="text-[10px]">
                 learning.content
               </Badge>
             </div>
-            <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+            <p className="text-xs text-ink-ghost mt-0.5">
               体裁与难度驱动出题 · 提交走 Gateway 批改
             </p>
           </div>

@@ -65,17 +65,17 @@ export function PracticeQueueToCardsPanel() {
   };
 
   return (
-    <section className="rounded-xl border border-amber-900/15 dark:border-amber-500/20 bg-amber-500/[0.04] p-4 space-y-3">
+    <section className="rounded-xl border border-line-amber-900o15-amber-500o20 bg-amber-500/[0.04] p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2">
-            <Inbox className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-            <h4 className="text-sm font-semibold text-stone-900 dark:text-stone-100">练习队列</h4>
+            <Inbox className="w-4 h-4 text-accent-ink-warm" />
+            <h4 className="text-sm font-semibold text-ink">练习队列</h4>
             <Badge variant="outline" className="text-[10px]">
               ≠ 自动进 FSRS
             </Badge>
           </div>
-          <p className="text-[11px] text-stone-500 leading-relaxed">
+          <p className="text-[11px] text-ink-stone-500 leading-relaxed">
             Agent / 出题入库只进练习队列。勾选条目后点「转入复习」才会生成闪卡。
           </p>
         </div>
@@ -91,9 +91,9 @@ export function PracticeQueueToCardsPanel() {
       </div>
 
       {isLoading ? (
-        <p className="text-xs text-stone-400">加载练习集合…</p>
+        <p className="text-xs text-ink-stone-400">加载练习集合…</p>
       ) : collections.length === 0 ? (
-        <p className="text-xs text-stone-400">
+        <p className="text-xs text-ink-stone-400">
           暂无练习队列。做题时若开启 collect，生成结果会出现在这里。
         </p>
       ) : (
@@ -109,8 +109,8 @@ export function PracticeQueueToCardsPanel() {
                 }}
                 className={`px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${
                   activeCollectionId === c.id
-                    ? 'border-amber-600/50 bg-amber-500/15 text-amber-900 dark:text-amber-100'
-                    : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100/80 dark:hover:bg-stone-800/60'
+                    ? 'border-line-amber-600o50 bg-wash-amber-500o15 text-ink-amber-900-amber-100'
+                    : 'border-line text-ink-faint hover:bg-veil-stone-100o80 dark:hover:bg-veil-stone-800o60'
                 }`}
               >
                 {humanizeCollectionTitle(c.title)}
@@ -119,20 +119,20 @@ export function PracticeQueueToCardsPanel() {
           </div>
 
           {itemsLoading ? (
-            <p className="text-xs text-stone-400">加载条目…</p>
+            <p className="text-xs text-ink-stone-400">加载条目…</p>
           ) : items.length === 0 ? (
-            <p className="text-xs text-stone-400">该集合暂无条目。</p>
+            <p className="text-xs text-ink-stone-400">该集合暂无条目。</p>
           ) : (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <button
                   type="button"
-                  className="text-[11px] text-amber-800 dark:text-amber-300 hover:underline"
+                  className="text-[11px] text-ink-amber-800-amber-300 hover:underline"
                   onClick={toggleAll}
                 >
                   {selected.size === items.length ? '取消全选' : '全选本集合'}
                 </button>
-                <span className="text-[10px] text-stone-400">{items.length} 条</span>
+                <span className="text-[10px] text-ink-stone-400">{items.length} 条</span>
               </div>
               <ul className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
                 {items.map((item) => {
@@ -142,14 +142,14 @@ export function PracticeQueueToCardsPanel() {
                     item.id;
                   return (
                     <li key={item.id}>
-                      <label className="flex items-start gap-2 rounded-lg border border-stone-200/80 dark:border-stone-700/80 px-2.5 py-2 cursor-pointer hover:bg-stone-50/80 dark:hover:bg-stone-900/40">
+                      <label className="flex items-start gap-2 rounded-lg border border-line-stone-200o80-stone-700o80 px-2.5 py-2 cursor-pointer hover:bg-veil-stone-50o80 dark:hover:bg-veil-stone-900o40">
                         <input
                           type="checkbox"
-                          className="mt-0.5 accent-amber-700"
+                          className="mt-0.5 accent-tone-amber-700"
                           checked={selected.has(item.id)}
                           onChange={() => toggle(item.id)}
                         />
-                        <span className="min-w-0 text-[12px] text-stone-800 dark:text-stone-200 leading-snug line-clamp-2">
+                        <span className="min-w-0 text-[12px] text-ink-soft leading-snug line-clamp-2">
                           {label}
                         </span>
                       </label>

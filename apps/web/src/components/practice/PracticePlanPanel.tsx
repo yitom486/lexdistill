@@ -132,9 +132,9 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
         </div>
       </div>
 
-      {isLoading && <div className="text-xs text-slate-400">加载中…</div>}
+      {isLoading && <div className="text-xs text-ink-slate-400">加载中…</div>}
       {isError && (
-        <div className="rounded-md border border-rose-200 p-3 text-xs text-rose-600">
+        <div className="rounded-md border border-line-rose-200 p-3 text-xs text-ink-rose-600">
           练习计划加载失败：{(error as Error).message}
           <Button size="sm" variant="outline" className="ml-2" onClick={() => refetch()}>重试</Button>
         </div>
@@ -142,7 +142,7 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
 
       <div className="flex flex-col gap-2">
         {sortedTemplates.map((tpl) => (
-          <div key={tpl.id} className="flex items-center justify-between rounded-md border border-slate-200 p-3 dark:border-slate-700">
+          <div key={tpl.id} className="flex items-center justify-between rounded-md border border-line-slate-200-slate-700 p-3">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <Switch
@@ -151,7 +151,7 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
                   disabled={toggleMutation.isPending}
                   title={tpl.enabled ? '点击停用该模板' : '点击启用该模板'}
                 />
-                <span className={tpl.enabled ? 'text-sm font-medium' : 'text-sm font-medium text-slate-400'}>
+                <span className={tpl.enabled ? 'text-sm font-medium' : 'text-sm font-medium text-ink-slate-400'}>
                   {tpl.name}
                 </span>
                 {isDueToday(tpl) && (
@@ -159,7 +159,7 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
                 )}
                 <Badge variant="secondary">revision {tpl.revision}</Badge>
               </div>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-ink-slate-500">
                 {tpl.blocks.map((b) => `${b.kind}×${b.count}`).join(' · ')}
               </span>
             </div>
@@ -187,7 +187,7 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
           </div>
         ))}
         {templates.length === 0 && !isLoading && !isError && (
-          <div className="rounded-md border border-dashed border-slate-300 p-6 text-center text-sm text-slate-400">
+          <div className="rounded-md border border-dashed border-line-slate-300 p-6 text-center text-sm text-ink-slate-400">
             还没有练习计划，点击「新建」创建第一个
           </div>
         )}

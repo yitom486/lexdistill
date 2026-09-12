@@ -114,13 +114,13 @@ export function KanaRowLabel({
       type="button"
       variant="ghost"
       onClick={onOpen}
-      className="group h-full min-h-20 w-full min-w-0 flex-col items-start justify-center gap-1 rounded-xl border-b border-stone-200 px-2.5 py-3 text-left hover:bg-amber-500/10 hover:text-amber-700 dark:border-stone-800 dark:hover:text-amber-300 sm:rounded-none sm:border-b-0 sm:border-r sm:px-3 sm:py-2"
+      className="group h-full min-h-20 w-full min-w-0 flex-col items-start justify-center gap-1 rounded-xl border-b border-ink-stone-200 px-2.5 py-3 text-left hover:bg-wash-amber-500o10 hover:text-tone-amber-700 dark:border-tone-stone-800 dark:hover:text-ink-amber-300 sm:rounded-none sm:border-b-0 sm:border-r sm:px-3 sm:py-2"
       aria-label={`打开 ${rowName} 的行记忆讲义`}
     >
-      <span className="font-serif text-xs font-bold text-stone-600 dark:text-stone-300 sm:text-sm">
+      <span className="font-serif text-xs font-bold text-ink-faint sm:text-sm">
         {rowName}
       </span>
-      <span className="flex items-center gap-1 text-[10px] font-sans font-normal text-stone-400 transition-colors group-hover:text-amber-700 dark:text-stone-500 dark:group-hover:text-amber-300">
+      <span className="flex items-center gap-1 text-[10px] font-sans font-normal text-ink-stone-400 transition-colors group-hover:text-tone-amber-700 dark:text-ink-stone-500 dark:group-hover:text-ink-amber-300">
         <BookOpen className="h-3 w-3" />
         讲这一行
       </span>
@@ -128,7 +128,7 @@ export function KanaRowLabel({
         variant={highlight.emphasis ? 'amber' : 'outline'}
         className={cn(
           'max-w-full gap-1 truncate px-1.5 py-0 text-[9px] leading-4',
-          !highlight.emphasis && 'text-stone-400 dark:text-stone-500'
+          !highlight.emphasis && 'text-ink-hint'
         )}
       >
         {highlight.label}
@@ -137,8 +137,8 @@ export function KanaRowLabel({
         className={cn(
           'max-w-full truncate font-mono text-[10px] leading-4',
           highlight.emphasis
-            ? 'text-amber-700 dark:text-amber-300'
-            : 'text-stone-400 dark:text-stone-500'
+            ? 'text-accent-ink-strong'
+            : 'text-ink-hint'
         )}
         title={highlight.detail}
       >

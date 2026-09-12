@@ -217,7 +217,7 @@ export function TextbookCurriculum({
   if (!currentBook || !currentLesson) {
     return (
       <div className="p-10 text-center space-y-3">
-        <p className="text-sm text-stone-500">
+        <p className="text-sm text-ink-stone-500">
           {booksList.length === 0
             ? '暂无教材。内置课程教材由 Gateway 启动时自动入库；也可导入自定义教材 AST。'
             : '教材结构加载中…'}
@@ -229,7 +229,7 @@ export function TextbookCurriculum({
               sound.playClick();
               setIsImporterOpen(true);
             }}
-            className="text-xs font-semibold text-amber-700 dark:text-amber-400 underline underline-offset-4"
+            className="text-xs font-semibold text-accent-ink-warm underline underline-offset-4"
           >
             打开教材导入器
           </button>
@@ -288,16 +288,16 @@ export function TextbookCurriculum({
   return (
     <div className="space-y-6">
       {/* 顶部教材选择器与信息栏 */}
-      <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-4 sm:p-6 border border-amber-900/10 dark:border-amber-500/15 shadow-sm">
+      <div className="bg-paper-soft rounded-2xl p-4 sm:p-6 border border-line-accent shadow-sm">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <Badge variant="amber">{currentBook.level}</Badge>
-              <span className="text-xs text-stone-500 dark:text-stone-400">
+              <span className="text-xs text-ink-ghost">
                 {currentBook.publisher} · 共 {currentBook.totalLessons} 课
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-serif font-bold text-stone-900 dark:text-stone-100 mt-1">
+            <h2 className="text-xl sm:text-2xl font-serif font-bold text-ink mt-1">
               {currentBook.title}
             </h2>
           </div>
@@ -341,7 +341,7 @@ export function TextbookCurriculum({
                 setSelectedLessonId(book?.lessons[0]?.id ?? '');
               }}
             >
-              <TabsList className="bg-stone-200/60 dark:bg-stone-900">
+              <TabsList className="bg-veil-stone-200o60-stone-900">
                 <TabsIndicator />
                 {filteredBooks.map((book) => (
                   <TabsTrigger key={book.id} value={book.id} className="px-3 py-1.5 text-xs">
@@ -386,11 +386,11 @@ export function TextbookCurriculum({
         {/* 左侧：课次列表 */}
         <div className="lg:col-span-4 space-y-2">
           <div className="flex items-center justify-between px-1 mb-2">
-            <h3 className="text-sm font-bold text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <h3 className="text-sm font-bold text-ink-mute flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-accent-ink" />
               课程大纲结构 (Textbook AST)
             </h3>
-            <span className="text-xs text-stone-400 dark:text-stone-500">
+            <span className="text-xs text-ink-hint">
               {currentBook.lessons.length} 个单元
             </span>
           </div>
@@ -409,8 +409,8 @@ export function TextbookCurriculum({
                   }}
                   className={`w-full h-auto text-left p-3.5 rounded-xl border justify-start ${
                     isSelected
-                      ? 'bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/40 shadow-sm hover:bg-amber-500/15'
-                      : 'bg-[#faf9f6] dark:bg-[#1a1816] border-amber-900/10 dark:border-amber-500/10 hover:border-amber-500/30'
+                      ? 'bg-wash-amber-500o10 dark:bg-tone-amber-500o20 border-tone-amber-500o40 shadow-sm hover:bg-wash-amber-500o15'
+                      : 'bg-paper-soft border-line-amber-900o10-amber-500o10 hover:border-line-amber-500o30'
                   }`}
                 >
                   <div className="w-full">
@@ -419,19 +419,19 @@ export function TextbookCurriculum({
                       <Badge variant="amber" className="rounded text-[11px] font-mono">
                         Lesson {lesson.lessonNumber}
                       </Badge>
-                      <h4 className="text-sm font-bold text-stone-900 dark:text-stone-100 mt-1">
+                      <h4 className="text-sm font-bold text-ink mt-1">
                         {lesson.title}
                       </h4>
-                      <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                      <p className="text-xs text-ink-ghost mt-0.5">
                         {lesson.subTitle}
                       </p>
                     </div>
                     {isSelected && (
-                      <ChevronRight className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-1" />
+                      <ChevronRight className="w-4 h-4 text-accent-ink shrink-0 mt-1" />
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3 mt-2 text-[11px] text-stone-400 dark:text-stone-500">
+                  <div className="flex items-center gap-3 mt-2 text-[11px] text-ink-hint">
                     <span>词汇: {lesson.vocabularies.length}</span>
                     <span>文法: {lesson.grammarPoints.length}</span>
                     <span>会话: {lesson.dialogues.length}</span>
@@ -449,19 +449,19 @@ export function TextbookCurriculum({
           data-lookup-scope={currentBook.language === 'EN' ? 'en' : currentBook.language === 'KO' ? 'ko' : 'ja'}
         >
           {/* 课次标题与快速靶向测验启动栏 */}
-          <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-5 border border-amber-900/10 dark:border-amber-500/15 shadow-sm">
+          <div className="bg-paper-soft rounded-2xl p-5 border border-line-accent shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-amber-700 dark:text-amber-400 font-semibold">
+                  <span className="text-xs text-accent-ink-warm font-semibold">
                     场景：{currentLesson.scene}
                   </span>
-                  <span className="text-xs text-stone-400">•</span>
-                  <span className="text-xs text-stone-500 dark:text-stone-400">
+                  <span className="text-xs text-ink-stone-400">•</span>
+                  <span className="text-xs text-ink-ghost">
                     等级：{currentLesson.targetLevel}
                   </span>
                 </div>
-                <h3 className="text-xl font-bold font-serif text-stone-900 dark:text-stone-100 mt-1">
+                <h3 className="text-xl font-bold font-serif text-ink mt-1">
                   {currentLesson.title}
                 </h3>
               </div>
@@ -498,7 +498,7 @@ export function TextbookCurriculum({
                     className="gap-1.5"
                     title="AI 按本课课文抽生词与文法（非法条目自动丢弃）"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <Sparkles className="w-3.5 h-3.5 text-tone-amber-500" />
                     <span>{enrichLesson.isPending ? '抽取中…' : 'AI 抽生词'}</span>
                   </Button>
                 )}
@@ -520,7 +520,7 @@ export function TextbookCurriculum({
             </div>
 
             {/* 子选项卡：交互精读与原版排版 | 核心词汇 | 核心语法 */}
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-amber-900/10 dark:border-amber-500/10">
+            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-line-amber-900o10-amber-500o10">
               <Tabs
                 value={lessonSubTab}
                 onValueChange={(val) => {
@@ -530,22 +530,22 @@ export function TextbookCurriculum({
                 }}
               >
                 <TabsList className="bg-transparent p-0 border-0">
-                  <TabsIndicator className="bg-amber-500 shadow-sm" />
+                  <TabsIndicator className="bg-tone-amber-500 shadow-sm" />
                   <TabsTrigger
                     value="READER"
-                    className="px-3 py-1.5 text-xs data-[selected]:text-stone-950"
+                    className="px-3 py-1.5 text-xs data-[selected]:text-tone-stone-950"
                   >
                     📖 交互精读与排版 ({currentLesson.dialogues.length})
                   </TabsTrigger>
                   <TabsTrigger
                     value="VOCAB"
-                    className="px-3 py-1.5 text-xs data-[selected]:text-stone-950"
+                    className="px-3 py-1.5 text-xs data-[selected]:text-tone-stone-950"
                   >
                     📚 重点词汇库 ({currentLesson.vocabularies.length})
                   </TabsTrigger>
                   <TabsTrigger
                     value="GRAMMAR"
-                    className="px-3 py-1.5 text-xs data-[selected]:text-stone-950"
+                    className="px-3 py-1.5 text-xs data-[selected]:text-tone-stone-950"
                   >
                     💡 核心文法剖析 ({currentLesson.grammarPoints.length})
                   </TabsTrigger>
@@ -569,26 +569,26 @@ export function TextbookCurriculum({
 
           {/* 子内容 2: 重点词汇库 */}
           {lessonSubTab === 'VOCAB' && (
-            <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-5 border border-amber-900/10 dark:border-amber-500/15 space-y-3">
+            <div className="bg-paper-soft rounded-2xl p-5 border border-line-accent space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {currentLesson.vocabularies.map((vocab) => {
                   const isAdded = addedCardsMap[vocab.id];
                   return (
                     <div
                       key={vocab.id}
-                      className="p-3.5 rounded-xl bg-stone-100/70 dark:bg-stone-900/50 border border-stone-200/80 dark:border-stone-800 flex flex-col justify-between gap-2"
+                      className="p-3.5 rounded-xl bg-veil-stone-100o70-stone-900o50 border border-tone-stone-200o80-stone-800 flex flex-col justify-between gap-2"
                     >
                       <div className="flex items-start justify-between">
                         <div>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-base font-bold text-stone-900 dark:text-stone-100">
+                            <span className="text-base font-bold text-ink">
                               {vocab.kanji}
                             </span>
-                            <span className="text-xs text-amber-700 dark:text-amber-400 font-mono">
+                            <span className="text-xs text-accent-ink-warm font-mono">
                               {vocab.kana}
                             </span>
                           </div>
-                          <p className="text-xs text-stone-600 dark:text-stone-400 mt-1 font-serif">
+                          <p className="text-xs text-ink-faint-soft mt-1 font-serif">
                             {vocab.chinese}
                           </p>
                         </div>
@@ -600,9 +600,9 @@ export function TextbookCurriculum({
                         </div>
                       </div>
 
-                      <div className="text-[11px] text-stone-500 dark:text-stone-400 bg-stone-200/50 dark:bg-stone-800/40 p-2 rounded-lg">
-                        <p className="font-medium text-stone-700 dark:text-stone-300">{vocab.exampleSentence}</p>
-                        <p className="text-stone-500">{vocab.exampleTranslation}</p>
+                      <div className="text-[11px] text-ink-ghost bg-veil-stone-200o50-stone-800o40 p-2 rounded-lg">
+                        <p className="font-medium text-ink-mute">{vocab.exampleSentence}</p>
+                        <p className="text-ink-stone-500">{vocab.exampleTranslation}</p>
                       </div>
 
                       <div className="flex justify-end pt-1">
@@ -639,10 +639,10 @@ export function TextbookCurriculum({
               {currentLesson.grammarPoints.map((gp) => (
                 <div
                   key={gp.id}
-                  className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-5 border border-amber-900/10 dark:border-amber-500/15 space-y-3"
+                  className="bg-paper-soft rounded-2xl p-5 border border-line-accent space-y-3"
                 >
                   <div className="flex items-start justify-between">
-                    <h4 className="text-base font-bold text-stone-900 dark:text-stone-100 font-serif">
+                    <h4 className="text-base font-bold text-ink font-serif">
                       {gp.title}
                     </h4>
                     <Badge variant="amber" className="text-[11px] font-mono">
@@ -650,25 +650,25 @@ export function TextbookCurriculum({
                     </Badge>
                   </div>
 
-                  <p className="text-xs sm:text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-ink-mute leading-relaxed">
                     {gp.explanation}
                   </p>
 
                   {gp.contrast && (
-                    <div className="p-2.5 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 text-xs text-amber-950 dark:text-amber-200">
+                    <div className="p-2.5 rounded-xl bg-wash-amber-500o10-amber-500o15 border border-tone-amber-500o20 text-xs text-ink-amber-950-amber-200">
                       💡 <span className="font-semibold">辨析要点：</span>{gp.contrast}
                     </div>
                   )}
 
                   <div className="space-y-1.5 pt-2">
-                    <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">典型用例：</p>
+                    <p className="text-xs font-semibold text-ink-ghost">典型用例：</p>
                     {gp.examples.map((ex, exIdx) => (
                       <div
                         key={exIdx}
-                        className="p-2.5 rounded-lg bg-stone-100/80 dark:bg-stone-900/60 text-xs space-y-0.5"
+                        className="p-2.5 rounded-lg bg-veil-stone-100o80-stone-900o60 text-xs space-y-0.5"
                       >
-                        <p className="font-medium text-stone-900 dark:text-stone-100">{ex.ja}</p>
-                        <p className="text-stone-500 dark:text-stone-400 font-serif">{ex.zh}</p>
+                        <p className="font-medium text-ink">{ex.ja}</p>
+                        <p className="text-ink-ghost font-serif">{ex.zh}</p>
                       </div>
                     ))}
                   </div>

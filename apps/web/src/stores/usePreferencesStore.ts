@@ -40,6 +40,10 @@ export interface PreferencesState {
   coachCollaborationMode: string;
   /** 复习页卡片模板 id（默认 study-basic；持久化偏好） */
   reviewCardFormatId: string;
+  /** 目录 AI 审核模型 id；空=使用默认（环境变量 > 适配器默认） */
+  tocReviewModel: string;
+  /** 目录 AI 审核思考等级；空=使用默认 */
+  tocReviewEffort: string;
 
   setTheme: (theme: 'light' | 'dark') => void;
   toggleTheme: () => void;
@@ -64,6 +68,8 @@ export interface PreferencesState {
   setCoachPersistThread: (persist: boolean) => void;
   setCoachCollaborationMode: (mode: string) => void;
   setReviewCardFormatId: (formatId: string) => void;
+  setTocReviewModel: (model: string) => void;
+  setTocReviewEffort: (effort: string) => void;
 }
 
 const applyThemeToDom = (theme: 'light' | 'dark') => {
@@ -125,6 +131,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       coachPersistThread: true,
       coachCollaborationMode: '',
       reviewCardFormatId: 'study-basic',
+      tocReviewModel: '',
+      tocReviewEffort: '',
 
       setTheme: (theme: 'light' | 'dark') => {
         runThemeTransition(() => {
@@ -173,6 +181,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       setCoachCollaborationMode: (coachCollaborationMode: string) =>
         set({ coachCollaborationMode }),
       setReviewCardFormatId: (reviewCardFormatId: string) => set({ reviewCardFormatId }),
+      setTocReviewModel: (tocReviewModel: string) => set({ tocReviewModel }),
+      setTocReviewEffort: (tocReviewEffort: string) => set({ tocReviewEffort }),
     }),
     {
       name: 'study_studio_user_preferences',

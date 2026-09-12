@@ -158,15 +158,15 @@ export function ResizableSplitPane({
           onPointerCancel={(e) => endDrag(e.currentTarget, e.pointerId)}
           className={cn(
             'w-3 shrink-0 cursor-col-resize flex items-stretch justify-center group touch-none select-none',
-            'outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 rounded-sm'
+            'outline-none focus-visible:ring-2 focus-visible:ring-tone-amber-500o40 rounded-sm'
           )}
         >
           <div
             className={cn(
               'w-px self-stretch my-3 rounded-full transition-[width,background-color]',
               dragging
-                ? 'w-0.5 bg-amber-500'
-                : 'bg-stone-300 dark:bg-stone-700 group-hover:w-0.5 group-hover:bg-amber-500/80'
+                ? 'w-0.5 bg-tone-amber-500'
+                : 'bg-line-stone-300-stone-700 group-hover:w-0.5 group-hover:bg-tone-amber-500o80'
             )}
           />
         </div>

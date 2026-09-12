@@ -103,8 +103,8 @@ export function EnrichJobPanel({ documentId, pendingCount }: EnrichJobPanelProps
   // 无任务：启动入口
   if (!job) {
     return (
-      <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
-        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+      <div className="flex items-center gap-2 text-xs text-ink-ghost">
+        <Sparkles className="w-3.5 h-3.5 text-tone-amber-500" />
         <span>整本 {pendingCount} 课待抽（后台运行，不锁页面）</span>
         <Select value={concurrency} onValueChange={(v) => v && setConcurrency(v)}>
           <SelectTrigger className="w-[6.5rem] h-7 text-xs" title="并发课数：多路并行提速，限流失败可重试">
@@ -135,15 +135,15 @@ export function EnrichJobPanel({ documentId, pendingCount }: EnrichJobPanelProps
   const failedIds = job.failed.map((f) => f.lessonId);
 
   return (
-    <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 dark:bg-amber-500/10 px-3.5 py-3 space-y-2">
+    <div className="rounded-xl border border-tone-amber-500o25 bg-wash-amber-500o5-amber-500o10 px-3.5 py-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs font-semibold text-stone-700 dark:text-stone-200">
+        <div className="flex items-center gap-2 text-xs font-semibold text-ink-mute-deep">
           {job.status === 'running' ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-tone-amber-600" />
           ) : job.status === 'done' && failedIds.length === 0 ? (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-tone-emerald-600" />
           ) : (
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+            <AlertTriangle className="w-3.5 h-3.5 text-tone-amber-600" />
           )}
           <span>
             {job.status === 'running'
@@ -215,7 +215,7 @@ export function EnrichJobPanel({ documentId, pendingCount }: EnrichJobPanelProps
 
       <Progress value={job.doneLessons} max={Math.max(job.totalLessons, 1)} />
 
-      <div className="flex items-center justify-between text-[11px] text-stone-500 dark:text-stone-400">
+      <div className="flex items-center justify-between text-[11px] text-ink-ghost">
         <span>
           {job.status === 'running' && job.currentLessonTitle
             ? `正在抽：${job.currentLessonTitle}`
@@ -225,7 +225,7 @@ export function EnrichJobPanel({ documentId, pendingCount }: EnrichJobPanelProps
       </div>
 
       {failedIds.length > 0 && (
-        <div className="text-[11px] text-amber-700 dark:text-amber-400 space-y-0.5">
+        <div className="text-[11px] text-accent-ink-warm space-y-0.5">
           {job.failed.map((f) => (
             <div key={f.lessonId}>
               {f.lessonTitle}：{f.error}
@@ -234,7 +234,7 @@ export function EnrichJobPanel({ documentId, pendingCount }: EnrichJobPanelProps
         </div>
       )}
       {job.status === 'failed' && job.error && (
-        <div className="text-[11px] text-red-600 dark:text-red-400">{job.error}</div>
+        <div className="text-[11px] text-ink-red-600-red-400">{job.error}</div>
       )}
     </div>
   );

@@ -382,8 +382,14 @@ export function createPdfImportRoutes(
             new BusinessError('E_INVALID_INPUT', '请提供已确认的目录页范围（startPage/endPage）', 'VALIDATION')
           );
         }
+        // P3.5-FIX：请求级模型覆盖（显式 > 环境变量 > 适配器默认；缺席不传）。
+        const model = input.value.model;
+        const effort = input.value.effort;
         const res = await reviewTocWithAgent(
-          { adapter: deps.server.agentAdapter },
+          {
+            adapter: deps.server.agentAdapter,
+            ...((model ?? effort) ? { modelOptions: { ...(model ? { model } : {}), ...(effort ? { effort } : {}) } } : {}),
+          },
           { userId, filename: input.value.filename, bytes: input.value.bytes, fromPage, toPage }
         );
         if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
@@ -725,6 +731,9 @@ interface PdfRouteInput {
   pages?: number[];
   /** P5-B：显式物理页号集（folio-candidates 专用；与起止范围互斥使用）。 */
   pageNumbers?: number[];
+  /** P3.5-FIX：目录专精模型覆盖（review-toc 专用；缺席走环境变量 > 适配器默认）。 */
+  model?: string;
+  effort?: string;
   /** P5-C：已确认目录条目 + 用户确认 anchors（preview-toc-segments 专用，原样透传，服务侧严格校验）。 */
   entries?: unknown;
   anchors?: unknown;
@@ -898,6 +907,8 @@ async function readPdfInput(
     }
     const fingerprint = strField((body as Record<string, unknown>)['fingerprint']);
     const docTitle = strField((body as Record<string, unknown>)['docTitle']);
+    const model = strField((body as Record<string, unknown>)['model']);
+    const effort = strField((body as Record<string, unknown>)['effort']);
     return {
       ok: true,
       value: {
@@ -910,6 +921,8 @@ async function readPdfInput(
         ...(lessonIndex !== undefined ? { lessonIndex } : {}),
         ...(fingerprint ? { fingerprint } : {}),
         ...(docTitle ? { docTitle } : {}),
+        ...(model ? { model } : {}),
+        ...(effort ? { effort } : {}),
         ...(azure ? { azure } : {}),
         ...(classes !== undefined ? { classes } : {}),
       },
@@ -926,6 +939,8 @@ async function readPdfInput(
   let lessonIndexRaw: unknown;
   let fingerprintRaw: unknown;
   let docTitleRaw: unknown;
+  let modelRaw: unknown;
+  let effortRaw: unknown;
   try {
     const body = await c.req.parseBody();
     const candidate = body['file'];
@@ -940,6 +955,8 @@ async function readPdfInput(
     lessonIndexRaw = body['lessonIndex'];
     fingerprintRaw = body['fingerprint'];
     docTitleRaw = body['docTitle'];
+    modelRaw = body['model'];
+    effortRaw = body['effort'];
   } catch {
     return fail('上传体不是合法 multipart，请用 file 字段上传 PDF');
   }
@@ -962,6 +979,8 @@ async function readPdfInput(
   }
   const fingerprint = fingerprintRaw === undefined ? undefined : strField(fingerprintRaw);
   const docTitle = docTitleRaw === undefined ? undefined : strField(docTitleRaw);
+  const model = modelRaw === undefined ? undefined : strField(modelRaw);
+  const effort = effortRaw === undefined ? undefined : strField(effortRaw);
   return {
     ok: true,
     value: {
@@ -974,6 +993,8 @@ async function readPdfInput(
       ...(lessonIndex !== undefined ? { lessonIndex } : {}),
       ...(fingerprint ? { fingerprint } : {}),
       ...(docTitle ? { docTitle } : {}),
+      ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
       ...(azure ? { azure } : {}),
       ...(classes !== undefined ? { classes } : {}),
     },

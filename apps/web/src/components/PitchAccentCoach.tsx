@@ -86,9 +86,9 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
 
   if (!currentWord) {
     return (
-      <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-10 border border-amber-900/10 dark:border-amber-500/15 shadow-sm text-center space-y-3">
-        <AlertCircle className="w-8 h-8 mx-auto text-amber-500" />
-        <p className="text-sm text-stone-600 dark:text-stone-300">
+      <div className="bg-paper-soft rounded-2xl p-10 border border-line-accent shadow-sm text-center space-y-3">
+        <AlertCircle className="w-8 h-8 mx-auto text-tone-amber-500" />
+        <p className="text-sm text-ink-faint">
           {pitchQuery.isError
             ? '声调基准词表加载失败，请确认 Gateway 已启动后重试。'
             : pitchQuery.isLoading
@@ -288,16 +288,16 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
   return (
     <div className="space-y-6">
       {/* 顶部标题与科普说明 */}
-      <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-5 border border-amber-900/10 dark:border-amber-500/15 shadow-sm">
+      <div className="bg-paper-soft rounded-2xl p-5 border border-line-accent shadow-sm">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <Badge variant="amber">AI 声学与音调纠正 (Pitch Accent)</Badge>
-              <span className="text-xs text-stone-500 dark:text-stone-400">
+              <span className="text-xs text-ink-ghost">
                 日语特有高低重音可视化评测
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-serif font-bold text-stone-900 dark:text-stone-100 mt-1">
+            <h2 className="text-xl sm:text-2xl font-serif font-bold text-ink mt-1">
               声调走向精准训练与跟读评分
             </h2>
           </div>
@@ -312,7 +312,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
               setEvalResult(null);
             }}
           >
-            <TabsList className="bg-stone-200/60 dark:bg-stone-900 flex-wrap h-auto">
+            <TabsList className="bg-veil-stone-200o60-stone-900 flex-wrap h-auto">
               <TabsIndicator />
               {words.map((item, idx) => (
                 <TabsTrigger key={item.id} value={String(idx)} className="px-3 py-1.5 text-xs">
@@ -326,7 +326,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
 
       {/* 本地词典优先；OJAD 只在未命中时作为用户主动打开的外部检索。 */}
       <form
-        className="rounded-2xl border border-amber-900/10 dark:border-amber-500/15 bg-white/60 dark:bg-[#1a1816] p-4"
+        className="rounded-2xl border border-line-accent bg-veil-paper-60 p-4"
         onSubmit={(event) => {
           event.preventDefault();
           setDictionaryQuery(dictionaryInput.trim());
@@ -334,10 +334,10 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
-            <label htmlFor="ja-dictionary-query" className="text-sm font-semibold text-stone-800 dark:text-stone-200">
+            <label htmlFor="ja-dictionary-query" className="text-sm font-semibold text-ink-soft">
               日语词典查询
             </label>
-            <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
+            <p className="mt-0.5 text-xs text-ink-ghost">
               优先检索应用本地词表；未收录时可前往 OJAD 自行确认。
             </p>
           </div>
@@ -347,7 +347,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
               value={dictionaryInput}
               onChange={(event) => setDictionaryInput(event.target.value)}
               placeholder="例如：雨、あめ、ame"
-              className="h-9 min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 sm:w-56"
+              className="h-9 min-w-0 flex-1 rounded-xl border border-ink-stone-200 bg-tone-white px-3 text-sm text-tone-stone-900 outline-none transition focus:border-tone-amber-500 focus:ring-2 focus:ring-tone-amber-500o20 dark:border-tone-stone-700 dark:bg-tone-stone-900 dark:text-tone-stone-100 sm:w-56"
             />
             <Button type="submit" size="sm" disabled={!dictionaryInput.trim() || dictionaryLookup.isFetching}>
               <Search className="h-3.5 w-3.5" />
@@ -357,9 +357,9 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
         </div>
 
         {dictionaryQuery && (
-          <div className="mt-3 border-t border-stone-200 pt-3 dark:border-stone-800">
+          <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800">
             {dictionaryLookup.isFetching ? (
-              <p className="text-xs text-stone-500">正在查询本地词典…</p>
+              <p className="text-xs text-ink-stone-500">正在查询本地词典…</p>
             ) : dictionaryLookup.data?.entries.length ? (
               <div className="space-y-2">
                 {dictionaryLookup.data.entries.map((entry) => {
@@ -368,11 +368,11 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                     pitchPattern?: string[];
                   } | undefined;
                   return (
-                    <div key={entry.id} className="rounded-xl bg-amber-50/70 p-3 text-sm dark:bg-amber-500/10">
+                    <div key={entry.id} className="rounded-xl bg-wash-amber-50o70 p-3 text-sm dark:bg-wash-amber-500o10">
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                        <span className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">{entry.headword}</span>
-                        {entry.reading && <span className="font-mono text-amber-700 dark:text-amber-300">{entry.reading}</span>}
-                        {entry.romanization && <span className="text-xs text-stone-500">{entry.romanization}</span>}
+                        <span className="font-serif text-lg font-bold text-ink">{entry.headword}</span>
+                        {entry.reading && <span className="font-mono text-accent-ink-strong">{entry.reading}</span>}
+                        {entry.romanization && <span className="text-xs text-ink-stone-500">{entry.romanization}</span>}
                         <button
                           type="button"
                           title={`朗读${entry.reading || entry.headword}`}
@@ -383,35 +383,35 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                               purpose: 'preview',
                             });
                           }}
-                          className="inline-flex items-center justify-center w-6 h-6 rounded-full hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 cursor-pointer"
+                          className="inline-flex items-center justify-center w-6 h-6 rounded-full hover:bg-tone-amber-500o20 text-accent-ink-strong cursor-pointer"
                         >
                           <Volume2 className="w-3.5 h-3.5" />
                         </button>
                         {pronunciation?.pitchType && <Badge variant="amber">{pronunciation.pitchType}</Badge>}
                       </div>
-                      <p className="mt-1 text-xs text-stone-600 dark:text-stone-300">{entry.meanings.join('；')}</p>
+                      <p className="mt-1 text-xs text-ink-faint">{entry.meanings.join('；')}</p>
                       {pronunciation?.pitchPattern && (
-                        <p className="mt-1 text-xs text-stone-500">音调走向：{pronunciation.pitchPattern.join(' → ')}</p>
+                        <p className="mt-1 text-xs text-ink-stone-500">音调走向：{pronunciation.pitchPattern.join(' → ')}</p>
                       )}
-                      <p className="mt-2 text-[11px] text-stone-400">来源：{entry.sourceLabel}</p>
+                      <p className="mt-2 text-[11px] text-ink-stone-400">来源：{entry.sourceLabel}</p>
                     </div>
                   );
                 })}
               </div>
             ) : dictionaryLookup.data?.externalLookup ? (
-              <div className="flex flex-wrap items-center gap-3 text-xs text-stone-600 dark:text-stone-300">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-ink-faint">
                 <span>本地词典暂未收录「{dictionaryQuery}」。</span>
                 <a
                   href={dictionaryLookup.data.externalLookup.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-semibold text-amber-700 hover:underline dark:text-amber-300"
+                  className="inline-flex items-center gap-1 font-semibold text-tone-amber-700 hover:underline dark:text-ink-amber-300"
                 >
                   前往 OJAD 查询 <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
             ) : (
-              <p className="text-xs text-stone-500">暂时无法取得词典结果，请稍后重试。</p>
+              <p className="text-xs text-ink-stone-500">暂时无法取得词典结果，请稍后重试。</p>
             )}
           </div>
         )}
@@ -421,18 +421,18 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* 左侧：音高走势与对比卡片 */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-6 border border-amber-900/10 dark:border-amber-500/15 shadow-sm space-y-6">
+          <div className="bg-paper-soft rounded-2xl p-6 border border-line-accent shadow-sm space-y-6">
             {/* 核心词汇音调大图 */}
-            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 pb-4 border-b border-stone-200 dark:border-stone-800">
+            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 pb-4 border-b border-line-soft">
               <div>
                 <div className="flex items-baseline gap-3">
-                  <span className="text-4xl font-serif font-bold text-stone-900 dark:text-stone-100">
+                  <span className="text-4xl font-serif font-bold text-ink">
                     {currentWord.kanji}
                   </span>
-                  <span className="text-xl text-amber-700 dark:text-amber-400 font-mono font-semibold">
+                  <span className="text-xl text-accent-ink-warm font-mono font-semibold">
                     {currentWord.kana}
                   </span>
-                  <span className="text-sm text-stone-500 font-serif">
+                  <span className="text-sm text-ink-stone-500 font-serif">
                     ({currentWord.meaning})
                   </span>
                 </div>
@@ -466,10 +466,10 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
 
             {/* 声调走向走势阶梯图 (Mora Pitch Step Chart) */}
             <div className="space-y-2">
-              <span className="text-xs font-semibold text-stone-500 dark:text-stone-400">
+              <span className="text-xs font-semibold text-ink-ghost">
                 拍位音高走向剖析 (Pitch Step Curve)：
               </span>
-              <div className="p-6 rounded-2xl bg-amber-50/60 dark:bg-stone-900/50 border border-amber-900/10 dark:border-amber-500/15">
+              <div className="p-6 rounded-2xl bg-wash-amber-50o60-stone-900o50 border border-line-accent">
                 <div className="flex items-center justify-around">
                   {currentWord.moraList.map((mora, idx) => {
                     const isHigh = currentWord.pitchPattern[idx] === 'H';
@@ -478,8 +478,8 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                         <span
                           className={`text-xs px-2 py-0.5 rounded-md font-mono font-bold transition-all ${
                             isHigh
-                              ? 'bg-amber-500 text-stone-950 shadow-sm scale-110'
-                              : 'bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-400'
+                              ? 'bg-tone-amber-500 text-tone-stone-950 shadow-sm scale-110'
+                              : 'bg-line-soft text-ink-faint-soft'
                           }`}
                         >
                           {isHigh ? '高音 H' : '低音 L'}
@@ -489,18 +489,18 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                         <div
                           className={`w-12 rounded-xl transition-all duration-300 flex items-center justify-center font-bold text-sm ${
                             isHigh
-                              ? 'h-24 bg-gradient-to-t from-amber-500 to-amber-400 text-stone-950 shadow-md'
-                              : 'h-12 bg-stone-300 dark:bg-stone-800 text-stone-700 dark:text-stone-300'
+                              ? 'h-24 bg-gradient-to-t from-tone-amber-500 to-ink-amber-400 text-tone-stone-950 shadow-md'
+                              : 'h-12 bg-tone-stone-300 dark:bg-tone-stone-800 text-ink-mute'
                           }`}
                         >
                           {isHigh ? '↑' : '↓'}
                         </div>
 
                         {/* 假名显示 */}
-                        <span className="text-xl font-bold text-stone-900 dark:text-stone-100 font-serif">
+                        <span className="text-xl font-bold text-ink font-serif">
                           {mora}
                         </span>
-                        <span className="text-[11px] text-stone-400 font-mono">第 {idx + 1} 拍</span>
+                        <span className="text-[11px] text-ink-stone-400 font-mono">第 {idx + 1} 拍</span>
                       </div>
                     );
                   })}
@@ -509,16 +509,16 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
             </div>
 
             {/* 专家辨析提示 */}
-            <div className="p-3.5 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/25 text-xs text-amber-950 dark:text-amber-200 leading-relaxed">
+            <div className="p-3.5 rounded-xl bg-wash-amber-500o10-amber-500o15 border border-tone-amber-500o25 text-xs text-ink-amber-950-amber-200 leading-relaxed">
               💡 <span className="font-bold">发音要领：</span>
               {currentWord.tip}
             </div>
 
             {/* 易混淆对比词条对 (如 雨 vs 飴) */}
             {currentWord.contrastPair && (
-              <div className="p-4 rounded-xl bg-stone-100/80 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800 space-y-2">
+              <div className="p-4 rounded-xl bg-veil-stone-100o80-stone-900o60 border border-line-soft space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-stone-700 dark:text-stone-300">
+                  <span className="text-xs font-bold text-ink-mute">
                     🔥 经典对比辨析 (Minimal Pair)：
                   </span>
                   <Button
@@ -533,10 +533,10 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <div>
-                    <span className="font-bold text-stone-900 dark:text-stone-100 mr-2">
+                    <span className="font-bold text-ink mr-2">
                       {currentWord.contrastPair.kanji} ({currentWord.contrastPair.kana})
                     </span>
-                    <span className="text-xs text-stone-500">
+                    <span className="text-xs text-ink-stone-500">
                       {currentWord.contrastPair.meaning}
                     </span>
                   </div>
@@ -551,19 +551,19 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
 
         {/* 右侧：实时录音跟读评测器 */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="bg-[#faf9f6] dark:bg-[#1a1816] rounded-2xl p-6 border border-amber-900/10 dark:border-amber-500/15 shadow-sm space-y-5">
+          <div className="bg-paper-soft rounded-2xl p-6 border border-line-accent shadow-sm space-y-5">
             <div>
-              <h3 className="text-base font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
-                <Mic className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <h3 className="text-base font-bold text-ink flex items-center gap-2">
+                <Mic className="w-4 h-4 text-accent-ink" />
                 麦克风实时跟读打分
               </h3>
-              <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">
+              <p className="text-xs text-ink-ghost mt-1">
                 点击按钮朗读「{currentWord.kanji}」，AI 引擎将比对声调起伏
               </p>
             </div>
 
             {/* 声波画布 */}
-            <div className="relative h-28 bg-stone-950 rounded-xl overflow-hidden flex items-center justify-center border border-amber-900/20">
+            <div className="relative h-28 bg-tone-stone-950 rounded-xl overflow-hidden flex items-center justify-center border border-line-amber-900o20">
               <canvas
                 ref={canvasRef}
                 width={360}
@@ -571,7 +571,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                 className="w-full h-full object-contain"
               />
               {!isRecording && !evalResult && (
-                <div className="absolute inset-0 flex items-center justify-center text-xs text-stone-500">
+                <div className="absolute inset-0 flex items-center justify-center text-xs text-ink-stone-500">
                   <span>等待开始录音...</span>
                 </div>
               )}
@@ -582,7 +582,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
               {isRecording ? (
                 <div className="space-y-2">
                   <Progress value={recordingProgress} />
-                  <p className="text-xs text-center text-amber-700 dark:text-amber-400 font-semibold animate-pulse">
+                  <p className="text-xs text-center text-accent-ink-warm font-semibold animate-pulse">
                     正在录音分析中... 请清晰朗读：{currentWord.kana}
                   </p>
                 </div>
@@ -602,34 +602,34 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="p-4 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 space-y-3"
+                className="p-4 rounded-xl bg-wash-amber-500o10-amber-500o15 border border-line-amber-500o30 space-y-3"
               >
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                    <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <span className="text-xs font-bold text-ink-amber-900-amber-200 flex items-center gap-1.5">
+                    <Award className="w-4 h-4 text-accent-ink" />
                     AI 声调综合得分
                   </span>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold font-mono text-amber-600 dark:text-amber-400">
+                    <span className="text-3xl font-bold font-mono text-accent-ink">
                       {evalResult.score}
                     </span>
-                    <span className="text-xs text-stone-500 font-mono">/ 100</span>
+                    <span className="text-xs text-ink-stone-500 font-mono">/ 100</span>
                   </div>
                 </div>
 
                 {/* 细分指标 */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2 rounded bg-stone-100/70 dark:bg-stone-900/60 flex justify-between">
-                    <span className="text-stone-500">音高匹配度</span>
-                    <span className="font-bold text-stone-800 dark:text-stone-200">{evalResult.pitchMatch}%</span>
+                  <div className="p-2 rounded bg-veil-stone-100o70-stone-900o60 flex justify-between">
+                    <span className="text-ink-stone-500">音高匹配度</span>
+                    <span className="font-bold text-ink-soft">{evalResult.pitchMatch}%</span>
                   </div>
-                  <div className="p-2 rounded bg-stone-100/70 dark:bg-stone-900/60 flex justify-between">
-                    <span className="text-stone-500">节奏连贯度</span>
-                    <span className="font-bold text-stone-800 dark:text-stone-200">{evalResult.fluency}%</span>
+                  <div className="p-2 rounded bg-veil-stone-100o70-stone-900o60 flex justify-between">
+                    <span className="text-ink-stone-500">节奏连贯度</span>
+                    <span className="font-bold text-ink-soft">{evalResult.fluency}%</span>
                   </div>
                 </div>
 
-                <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-serif">
+                <p className="text-xs text-ink-mute leading-relaxed font-serif">
                   {evalResult.comment}
                 </p>
               </motion.div>

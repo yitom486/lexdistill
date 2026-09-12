@@ -75,7 +75,7 @@ function reasonLabel(reason: string): string {
 }
 
 const inputClassName =
-  'h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 text-[11px]';
+  'h-7 px-2 rounded-lg border border-line bg-surface text-ink outline-none focus:border-tone-amber-500 text-[11px]';
 
 export interface LessonImportGateView {
   lessonIndex: number;
@@ -156,16 +156,16 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
   const corroboratedKey = (physicalPage: number, value: number): boolean =>
     corroborated.some((c) => c.physicalPage === physicalPage && c.value === value);
   return (
-    <div className="space-y-2 pt-1 mt-1 border-t border-amber-500/20">
-      <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
-        <Anchor className="w-3.5 h-3.5 text-amber-600" />
+    <div className="space-y-2 pt-1 mt-1 border-t border-tone-amber-500o20">
+      <p className="text-[11px] font-bold text-ink-mute-deep flex items-center gap-1.5">
+        <Anchor className="w-3.5 h-3.5 text-tone-amber-600" />
         页码 anchor 与分段预览（只读）
       </p>
-      <p className="text-[11px] text-stone-500 dark:text-stone-400">
+      <p className="text-[11px] text-ink-ghost">
         候选只是弱证据；只有你点击确认后才成为本次会话 anchor；anchor 与预览只保存在当前页面，刷新即丢失。
       </p>
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
-        <span className="font-bold text-stone-700 dark:text-stone-200">检查 folio 页：</span>
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-ghost">
+        <span className="font-bold text-ink-mute-deep">检查 folio 页：</span>
         <input
           type="text"
           aria-label="检查物理页号"
@@ -183,17 +183,17 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
           onClick={onCheckFolio}
           title={hasSource ? '看这些物理页的页眉/页脚印刷码（只读）' : '先选择 PDF 文件或填写本机路径'}
         >
-          <FileSearch className="w-3.5 h-3.5 text-amber-600" />
+          <FileSearch className="w-3.5 h-3.5 text-tone-amber-600" />
           <span>{checking ? '检查中…' : '检查 folio'}</span>
         </Button>
       </div>
       {checkError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {checkError}
         </p>
       )}
       {folioError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {folioError}
         </p>
       )}
@@ -202,11 +202,11 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
           {folio.pages.map((page) => (
             <div
               key={page.physicalPage}
-              className="rounded-xl border border-stone-200 dark:border-stone-700 p-2 space-y-1"
+              className="rounded-xl border border-line p-2 space-y-1"
             >
-              <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200">
+              <p className="text-[11px] font-bold text-ink-mute-deep">
                 PDF 物理页 {page.physicalPage}
-                {page.candidates.length === 0 && <span className="font-normal text-stone-400">（无候选）</span>}
+                {page.candidates.length === 0 && <span className="font-normal text-ink-stone-400">（无候选）</span>}
               </p>
               {page.candidates.map((candidate, index) => {
                 const arabic = candidate.normalized.kind === 'arabic';
@@ -217,7 +217,7 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
                 return (
                   <div
                     key={`${candidate.location}-${candidate.raw}-${index}`}
-                    className="flex flex-wrap items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40"
+                    className="flex flex-wrap items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg bg-veil-whiteo60-stone-900o40"
                   >
                     <span className="font-mono font-bold">{candidate.raw}</span>
                     <Badge variant="outline" className="text-[10px]">
@@ -263,25 +263,25 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
         </div>
       )}
 
-      <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+      <div className="text-[11px] text-ink-faint space-y-1">
         <p className="font-bold">
           本地 anchors（{anchors.length} 个，初始为零，只增于你的确认点击）：
         </p>
         {anchors.length === 0 && (
-          <p className="text-stone-400">暂无 anchor。请先检查 folio，再逐条确认。</p>
+          <p className="text-ink-stone-400">暂无 anchor。请先检查 folio，再逐条确认。</p>
         )}
         <div className="flex flex-wrap gap-1.5">
           {anchors.map((anchor) => (
             <span
               key={anchor.printedPage}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-[11px] font-semibold"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-line-amber-500o30 bg-wash-amber-500o10 text-[11px] font-semibold"
             >
               {anchor.label}
               <button
                 type="button"
                 aria-label={`移除anchor印${anchor.printedPage}`}
                 onClick={() => onRemoveAnchor(anchor.printedPage)}
-                className="p-0.5 rounded hover:bg-amber-500/20 cursor-pointer"
+                className="p-0.5 rounded hover:bg-tone-amber-500o20 cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -302,26 +302,26 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
           <Eye className="w-3.5 h-3.5" />
           <span>{requestingPreview ? '预览中…' : '请求分段预览'}</span>
         </Button>
-        {anchors.length === 0 && <span className="text-[11px] text-stone-400">先确认至少一个 anchor</span>}
+        {anchors.length === 0 && <span className="text-[11px] text-ink-stone-400">先确认至少一个 anchor</span>}
       </div>
       {previewBuildError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {previewBuildError}
         </p>
       )}
       {previewError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {previewError}
         </p>
       )}
       {preview && !previewValid && (
-        <p role="alert" className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+        <p role="alert" className="text-[11px] font-semibold text-accent-ink-warm">
           anchor 已变更，当前预览已失效，请重新请求分段预览。
         </p>
       )}
       {preview && previewValid && (
-        <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-2 space-y-1.5">
-          <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
+        <div className="rounded-xl border border-line-violet-500o30 bg-wash-violet-500o5 p-2 space-y-1.5">
+          <p className="text-[11px] font-bold text-ink-mute-deep flex items-center gap-1.5">
             <Badge variant="amber" className="text-[10px]">
               仅预览，尚未 OCR/导入
             </Badge>
@@ -334,13 +334,13 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
             {preview.lessons.map((lesson) => (
               <div
                 key={lesson.lessonIndex}
-                className="px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px] space-y-0.5"
+                className="px-2 py-1 rounded-lg bg-veil-whiteo60-stone-900o40 text-[11px] space-y-0.5"
               >
                 <p className="truncate font-semibold">
                   {lesson.title}
-                  <span className="ml-1 font-mono font-normal text-stone-400">印{lesson.printedStart}页</span>
+                  <span className="ml-1 font-mono font-normal text-ink-stone-400">印{lesson.printedStart}页</span>
                 </p>
-                <p className="font-mono text-[10px] text-stone-500">
+                <p className="font-mono text-[10px] text-ink-stone-500">
                   {lesson.status === 'mapped'
                     ? `物${lesson.physicalStart}–${lesson.physicalEnd ?? '?'}`
                     : '未映射'}{' '}
@@ -363,7 +363,7 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
             ))}
           </div>
           {preview.chunks.length > 0 && (
-            <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-0.5">
+            <div className="text-[11px] text-ink-faint space-y-0.5">
               <p className="font-bold">chunk 计划（仅预览）：</p>
               {preview.chunks.map((chunk) => (
                 <p key={`${chunk.lessonIndex}-${chunk.chunkIndex}`} className="font-mono text-[10px]">
@@ -373,23 +373,23 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
             </div>
           )}
           {preview.diagnostics.unresolvedCount > 0 ? (
-            <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
+            <p className="text-[11px] font-bold text-ink-rose-600-rose-400">
               当前目录不能自动导入；请补充或修正 anchor。（未映射 {preview.diagnostics.unresolvedCount} 课）
             </p>
           ) : (
-            <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+            <p className="text-[11px] font-bold text-ink-emerald-700-emerald-400">
               分段计划已验证；下一阶段才可能执行导入。
             </p>
           )}
         </div>
       )}
       {importError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {importError}
         </p>
       )}
       {importResult && (
-        <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+        <div className="p-2 rounded-xl border border-line-emerald-500o30 bg-wash-emerald-500o5 text-[11px] text-ink-faint space-y-1">
           <p className="font-bold">已创建新教材 document：{importResult.lessonTitle}</p>
           <p className="font-mono text-[10px]">
             document {importResult.documentId} · lesson {importResult.lessonId} · 物理{' '}
@@ -427,12 +427,12 @@ export function LessonImportDialogContent(props: {
   const { dialog, importing, onClose, onDocTitleChange, onConfirm } = props;
   return (
     <div className="space-y-2">
-      <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100">确认导入这一课</h2>
-      <p className="text-[11px] text-stone-500 dark:text-stone-400">
+      <h2 className="text-sm font-bold text-ink">确认导入这一课</h2>
+      <p className="text-[11px] text-ink-ghost">
         将导入这一课；这会创建教材数据。不是整本教材导入；不会继续接力导入后续章节。
       </p>
-      <div className="space-y-1.5 text-[11px] text-stone-600 dark:text-stone-300">
-        <p className="font-bold text-stone-800 dark:text-stone-100">{dialog.lessonTitle}</p>
+      <div className="space-y-1.5 text-[11px] text-ink-faint">
+        <p className="font-bold text-ink-deep">{dialog.lessonTitle}</p>
         <p>
           印刷 {dialog.printedStart} 页 · PDF 物理 {dialog.physicalFrom}–
           {dialog.physicalTo} 页（共 {dialog.pages} 页）

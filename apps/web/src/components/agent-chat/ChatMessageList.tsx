@@ -52,16 +52,16 @@ export function ChatMessageList(props: ChatMessageListProps) {
   return (
     <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
       {queueItems.length > 0 ? (
-        <div className="rounded-xl border border-sky-500/25 bg-sky-500/5 px-2.5 py-2">
+        <div className="rounded-xl border border-line-sky-500o25 bg-wash-sky-500o5 px-2.5 py-2">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-sky-300/90">
+            <div className="flex items-center gap-1.5 text-[10px] font-medium text-ink-sky-300o90">
               <ListOrdered className="size-3" />
               下一轮队列 · {queueItems.length}
             </div>
             <Button
               type="button"
               size="sm"
-              className="h-6 gap-1 px-2 text-[10px] bg-sky-700 hover:bg-sky-600"
+              className="h-6 gap-1 px-2 text-[10px] bg-tint-sky-700 hover:bg-tint-sky-600"
               disabled={busy}
               title="立即消费队列"
               onClick={() => startQueuedTurn()}
@@ -74,14 +74,14 @@ export function ChatMessageList(props: ChatMessageListProps) {
             {queueItems.map((q) => (
               <div
                 key={q.id}
-                className="flex items-start gap-1 rounded-lg bg-stone-900/50 px-2 py-1"
+                className="flex items-start gap-1 rounded-lg bg-veil-stone-900o50 px-2 py-1"
               >
-                <p className="min-w-0 flex-1 truncate text-[11px] text-stone-300">{q.text}</p>
+                <p className="min-w-0 flex-1 truncate text-[11px] text-tone-stone-300">{q.text}</p>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-5 shrink-0 text-stone-500 hover:text-rose-400"
+                  className="size-5 shrink-0 text-ink-stone-500 hover:text-ink-rose-400"
                   title="移出队列"
                   onClick={() => {
                     if (!coachThreadId) return;
@@ -105,24 +105,24 @@ export function ChatMessageList(props: ChatMessageListProps) {
           className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
         >
           {m.role === 'system' ? (
-            <p className="w-full text-center text-[10px] text-stone-500">{m.text}</p>
+            <p className="w-full text-center text-[10px] text-ink-stone-500">{m.text}</p>
           ) : m.role === 'approval' && m.approval ? (
-            <div className="w-full max-w-[95%] rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
+            <div className="w-full max-w-[95%] rounded-xl border border-tone-amber-500o35 bg-wash-amber-500o10 px-3 py-2.5">
               <div className="flex items-start gap-2">
-                <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
+                <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-ink-amber-400" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <div>
-                    <p className="text-[11px] font-medium text-amber-100/90">
+                    <p className="text-[11px] font-medium text-ink-amber-100o90">
                       需要批准 · {m.approval.action}
                     </p>
-                    <p className="mt-0.5 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-stone-400">
+                    <p className="mt-0.5 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-ink-stone-400">
                       {m.approval.description}
                     </p>
                   </div>
                   {m.approval.status === 'pending' ? (
                     <div className="space-y-2">
                       {m.approval.expiresAt ? (
-                        <p className="text-[10px] text-amber-500/80">
+                        <p className="text-[10px] text-tone-amber-500o80">
                           约 2 分钟内未操作将自动拒绝
                         </p>
                       ) : null}
@@ -130,7 +130,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
                         <Button
                           type="button"
                           size="sm"
-                          className="h-7 px-2.5 text-[11px] bg-emerald-700 hover:bg-emerald-600"
+                          className="h-7 px-2.5 text-[11px] bg-tone-emerald-700 hover:bg-tone-emerald-600"
                           onClick={() =>
                             respondApproval(m.approval!.approvalId, 'accept')
                           }
@@ -140,7 +140,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
                         <Button
                           type="button"
                           size="sm"
-                          className="h-7 px-2.5 text-[11px] bg-emerald-800/80 hover:bg-emerald-700"
+                          className="h-7 px-2.5 text-[11px] bg-wash-emerald-800o80 hover:bg-tone-emerald-700"
                           onClick={() =>
                             respondApproval(
                               m.approval!.approvalId,
@@ -154,7 +154,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="h-7 px-2.5 text-[11px] border-stone-600"
+                          className="h-7 px-2.5 text-[11px] border-tone-stone-600"
                           onClick={() =>
                             respondApproval(m.approval!.approvalId, 'decline')
                           }
@@ -164,7 +164,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-[10px] text-stone-500">
+                    <p className="text-[10px] text-ink-stone-500">
                       {m.approval.status === 'accepted'
                         ? '已允许'
                         : m.approval.status === 'accepted_session'
@@ -183,13 +183,13 @@ export function ChatMessageList(props: ChatMessageListProps) {
             <>
           {m.role !== 'user' && (
             <div
-              className={`mt-0.5 w-7 h-7 rounded-full bg-stone-800 flex items-center justify-center shrink-0 ${
-                m.streaming ? 'ring-2 ring-sky-400/40' : ''
+              className={`mt-0.5 w-7 h-7 rounded-full bg-tone-stone-800 flex items-center justify-center shrink-0 ${
+                m.streaming ? 'ring-2 ring-halo-sky-400o40' : ''
               }`}
             >
               <Bot
                 className={`w-3.5 h-3.5 ${
-                  m.streaming ? 'text-sky-300' : 'text-emerald-400'
+                  m.streaming ? 'text-ink-sky-300' : 'text-ink-emerald-400'
                 }`}
               />
             </div>
@@ -203,15 +203,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
               !m.toolCalls?.length;
             return (
           <div
-            className={`relative max-w-[88%] rounded-2xl text-[13px] leading-relaxed ${
-              m.role === 'user'
-                ? 'bg-sky-700/25 border border-sky-600/30 px-3 py-2 text-stone-50'
-                : waitingFirstToken
-                  ? 'px-1 py-1 text-stone-200'
-                  : m.streaming
-                    ? 'overflow-hidden border border-sky-500/25 bg-stone-900/40 px-3 py-2 text-stone-200'
-                    : 'px-3 py-2 bg-transparent text-stone-200'
-            }`}
+            className={`relative max-w-[88%] rounded-2xl text-[13px] leading-relaxed ${ m.role === 'user' ? 'bg-wash-sky-700o25 border border-line-sky-600o30 px-3 py-2 text-surface-stone-50' : waitingFirstToken ? 'px-1 py-1 text-ink-stone-200' : m.streaming ? 'overflow-hidden border border-line-sky-500o25 bg-veil-stone-900o40 px-3 py-2 text-ink-stone-200' : 'px-3 py-2 bg-transparent text-ink-stone-200' }`}
           >
             {m.role !== 'user' && m.streaming && !waitingFirstToken ? (
               <BorderBeam
@@ -238,7 +230,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
               <div>
                 <MarkdownText text={m.text} surface="dark" />
                 {m.streaming && m.text ? (
-                  <span className="ml-0.5 inline-block h-3.5 w-1.5 align-middle bg-sky-400/80 animate-pulse" />
+                  <span className="ml-0.5 inline-block h-3.5 w-1.5 align-middle bg-wash-sky-400o80 animate-pulse" />
                 ) : null}
                 {!m.streaming && (() => {
                   const speakable = toSpeakableText(m.text, track);
@@ -255,7 +247,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
               </div>
             )}
             {!m.streaming && m.source ? (
-              <div className="mt-1.5 text-[10px] text-stone-600">
+              <div className="mt-1.5 text-[10px] text-tone-stone-600">
                 via {m.source === 'codex' ? 'Codex App Server' : m.source}
               </div>
             ) : null}

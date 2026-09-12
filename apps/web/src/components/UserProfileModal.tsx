@@ -114,17 +114,17 @@ export function UserProfileModal() {
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="space-y-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-stone-950 shadow-md">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-tone-amber-500 to-tone-amber-600 flex items-center justify-center text-tone-stone-950 shadow-md">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
+              <DialogTitle className="text-lg font-bold text-ink flex items-center gap-2">
                 学情画像与学习目标设定
                 <Badge variant="amber" className="text-[10px] font-semibold">
                   动态驱动
                 </Badge>
               </DialogTitle>
-              <DialogDescription className="text-xs text-stone-500 dark:text-stone-400">
+              <DialogDescription className="text-xs text-ink-ghost">
                 配置你的专属备考赛道与每日节奏，AI 导师将据此智能编排自适应题目与复习密度
               </DialogDescription>
             </div>
@@ -134,8 +134,8 @@ export function UserProfileModal() {
         <div className="space-y-5 py-2">
           {/* 1. 昵称设定 */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-amber-500" />
+            <label className="text-xs font-semibold text-ink-mute flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-tone-amber-500" />
               学员昵称
             </label>
             <div className="relative">
@@ -145,25 +145,25 @@ export function UserProfileModal() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="例如：极光学者、冲刺N1小能手"
                 maxLength={24}
-                className="w-full h-10 px-3.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1f1d1a] text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 transition-all shadow-xs"
+                className="w-full h-10 px-3.5 rounded-xl border border-line-soft bg-surface-clay text-sm text-ink focus:outline-none focus:ring-2 focus:ring-tone-amber-500o40 focus:border-tone-amber-500 transition-all shadow-xs"
               />
             </div>
           </div>
 
           {/* 2. 目标选择：语种大类 → 赛道子项 */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center justify-between">
+            <label className="text-xs font-semibold text-ink-mute flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Target className="w-3.5 h-3.5 text-amber-500" />
+                <Target className="w-3.5 h-3.5 text-tone-amber-500" />
                 攻坚目标与备考赛道
               </span>
-              <span className="text-[11px] text-amber-600 dark:text-amber-400">
+              <span className="text-[11px] text-accent-ink">
                 {findStudyGoalOption(studyGoal)?.label}
               </span>
             </label>
 
             <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-[11px] text-stone-500 dark:text-stone-400">
+              <div className="flex items-center gap-1.5 text-[11px] text-ink-ghost">
                 <Languages className="w-3.5 h-3.5" />
                 <span>先选目标语种，再选具体赛道</span>
               </div>
@@ -177,8 +177,8 @@ export function UserProfileModal() {
                       onClick={() => handleTrackChange(group.lang)}
                       className={`px-2.5 py-2 rounded-xl border text-left transition-all cursor-pointer ${
                         active
-                          ? 'border-amber-500 bg-amber-500/10 dark:bg-amber-500/15 text-amber-900 dark:text-amber-200 shadow-xs'
-                          : 'border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1f1d1a] hover:border-stone-300 dark:hover:border-stone-700 text-stone-600 dark:text-stone-400'
+                          ? 'border-tone-amber-500 bg-wash-amber-500o10-amber-500o15 text-ink-amber-900-amber-200 shadow-xs'
+                          : 'border-line-soft bg-surface-clay hover:border-line-stone-300-stone-700 text-ink-faint-soft'
                       }`}
                     >
                       <div className="text-xs font-bold">{group.label}</div>
@@ -204,11 +204,11 @@ export function UserProfileModal() {
                     <div className="flex flex-col py-0.5 text-left">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-xs">{goal.label}</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono uppercase">
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-wash-amber-500o15 text-accent-ink-strong font-mono uppercase">
                           {goal.lang}
                         </span>
                       </div>
-                      <span className="text-[11px] text-stone-400 dark:text-stone-500">
+                      <span className="text-[11px] text-ink-hint">
                         {goal.desc}
                       </span>
                     </div>
@@ -220,8 +220,8 @@ export function UserProfileModal() {
 
           {/* 3. 语言掌握阶段 */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-amber-500" />
+            <label className="text-xs font-semibold text-ink-mute flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-tone-amber-500" />
               当前自评能力梯度
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -237,12 +237,12 @@ export function UserProfileModal() {
                     }}
                     className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                       isSelected
-                        ? 'border-amber-500 bg-amber-500/10 dark:bg-amber-500/15 text-amber-900 dark:text-amber-200 shadow-xs'
-                        : 'border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1f1d1a] hover:border-stone-300 dark:hover:border-stone-700'
+                        ? 'border-tone-amber-500 bg-wash-amber-500o10-amber-500o15 text-ink-amber-900-amber-200 shadow-xs'
+                        : 'border-line-soft bg-surface-clay hover:border-line-stone-300-stone-700'
                     }`}
                   >
                     <div className="text-xs font-bold truncate">{lvl.label}</div>
-                    <div className="text-[10px] text-stone-400 dark:text-stone-500 truncate mt-0.5">
+                    <div className="text-[10px] text-ink-hint truncate mt-0.5">
                       {lvl.sub}
                     </div>
                   </button>
@@ -252,11 +252,11 @@ export function UserProfileModal() {
           </div>
 
           {/* 4. 每日打卡门槛配置 */}
-          <div className="p-4 rounded-2xl border border-amber-900/10 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-950/15 space-y-4">
+          <div className="p-4 rounded-2xl border border-line-amber-900o10-amber-500o20 bg-wash-amber-50o50-amber-950o15 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Flame className="w-4 h-4 text-amber-500" />
-                <span className="text-xs font-bold text-stone-900 dark:text-stone-100">
+                <Flame className="w-4 h-4 text-tone-amber-500" />
+                <span className="text-xs font-bold text-ink">
                   每日打卡要求与连胜门槛
                 </span>
               </div>
@@ -268,11 +268,11 @@ export function UserProfileModal() {
             {/* 客观题目数滑块 */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-stone-600 dark:text-stone-300 flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                <span className="text-ink-faint flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-tone-amber-500" />
                   每日自适应测试做题数
                 </span>
-                <span className="font-mono font-bold text-amber-600 dark:text-amber-400 bg-white dark:bg-stone-900 px-2 py-0.5 rounded border border-amber-500/20 text-xs">
+                <span className="font-mono font-bold text-accent-ink bg-surface px-2 py-0.5 rounded border border-tone-amber-500o20 text-xs">
                   {dailyGoalQuizzes} 道
                 </span>
               </div>
@@ -293,11 +293,11 @@ export function UserProfileModal() {
             {/* 记忆卡片复习数滑块 */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-stone-600 dark:text-stone-300 flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-amber-500" />
+                <span className="text-ink-faint flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-tone-amber-500" />
                   每日 FSRS 闪卡复习量
                 </span>
-                <span className="font-mono font-bold text-amber-600 dark:text-amber-400 bg-white dark:bg-stone-900 px-2 py-0.5 rounded border border-amber-500/20 text-xs">
+                <span className="font-mono font-bold text-accent-ink bg-surface px-2 py-0.5 rounded border border-tone-amber-500o20 text-xs">
                   {dailyGoalCards} 张
                 </span>
               </div>
@@ -315,9 +315,9 @@ export function UserProfileModal() {
               />
             </div>
 
-            <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed">
+            <p className="text-[11px] text-ink-ghost leading-relaxed">
               💡 达成上述两个指标即可点亮今日连胜；若状态极佳完成度超过 150%，将激活金色
-              <strong className="text-amber-600 dark:text-amber-400 mx-1">「超额连刷」</strong>
+              <strong className="text-accent-ink mx-1">「超额连刷」</strong>
               高光足迹！
             </p>
           </div>

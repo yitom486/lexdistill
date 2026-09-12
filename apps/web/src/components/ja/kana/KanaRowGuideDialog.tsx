@@ -92,10 +92,10 @@ export function KanaRowGuideDialog({
       {open && items.length > 0 && (
         <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden p-0">
           <div className="flex max-h-[90vh] flex-col">
-            <DialogHeader className="shrink-0 border-b border-amber-900/10 bg-linear-to-br from-[#faf9f6] via-amber-50 to-orange-50 p-5 pr-12 dark:border-amber-500/15 dark:from-[#1a1816] dark:via-amber-950/35 dark:to-orange-950/25 sm:p-6 sm:pr-14">
+            <DialogHeader className="shrink-0 border-b border-line-amber-900o10 bg-linear-to-br from-paper-soft via-grad-amber-50-amber-950o35 to-grad-orange-50-orange-950o25 p-5 pr-12 dark:border-wash-amber-500o15 sm:p-6 sm:pr-14">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="amber">这一行的记忆卡</Badge>
-                <span className="text-xs font-serif text-stone-500 dark:text-stone-400">
+                <span className="text-xs font-serif text-ink-ghost">
                   {rowName} · {kind}
                 </span>
                 <KanaGuideSpeakButton
@@ -110,20 +110,20 @@ export function KanaRowGuideDialog({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="min-h-0 overflow-y-auto bg-[#fcfbf8] p-4 dark:bg-[#151311] sm:p-6">
+            <div className="min-h-0 overflow-y-auto bg-paper-clean p-4 sm:p-6">
               <div className="mx-auto flex max-w-3xl flex-col gap-4">
-                <section className="rounded-3xl border border-amber-500/25 bg-amber-500/10 p-4 dark:bg-amber-500/10">
+                <section className="rounded-3xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o10">
                   <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-wash-amber-500o15 text-accent-ink-strong">
                       <Volume2 className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink-strong">
                             这一行先听一遍
                           </p>
-                          <h3 className="mt-0.5 text-lg font-serif font-bold text-stone-900 dark:text-stone-100">
+                          <h3 className="mt-0.5 text-lg font-serif font-bold text-ink">
                             {rowName} 不要只看，要让耳朵也签到
                           </h3>
                         </div>
@@ -145,18 +145,18 @@ export function KanaRowGuideDialog({
                         {items.map((item) => (
                           <div
                             key={item.id}
-                            className="flex items-center gap-1.5 rounded-2xl border border-amber-500/20 bg-white/75 px-3 py-2 dark:bg-stone-900/45"
+                            className="flex items-center gap-1.5 rounded-2xl border border-tone-amber-500o20 bg-veil-whiteo75-stone-900o45 px-3 py-2"
                           >
                             <div className="flex items-baseline gap-1.5">
-                              <span className="font-serif text-2xl font-bold text-stone-900 dark:text-stone-100">
+                              <span className="font-serif text-2xl font-bold text-ink">
                                 {scriptMode === 'KATAKANA' ? item.katakana : item.hiragana}
                               </span>
                               {scriptMode === 'BOTH' && (
-                                <span className="text-xs text-stone-500 dark:text-stone-400">
+                                <span className="text-xs text-ink-ghost">
                                   / {item.katakana}
                                 </span>
                               )}
-                              <span className="font-mono text-xs font-bold text-amber-700 dark:text-amber-300">
+                              <span className="font-mono text-xs font-bold text-accent-ink-strong">
                                 {item.romaji}
                               </span>
                             </div>
@@ -172,28 +172,28 @@ export function KanaRowGuideDialog({
                 </section>
 
                 <div className="grid gap-3 md:grid-cols-2">
-                  <section className="rounded-3xl border border-sky-500/20 bg-sky-500/10 p-4 dark:bg-sky-500/10">
-                    <div className="flex items-center gap-2 text-sm font-bold text-sky-900 dark:text-sky-200">
+                  <section className="rounded-3xl border border-line-sky-500o20 bg-wash-sky-500o10 p-4 dark:bg-wash-sky-500o10">
+                    <div className="flex items-center gap-2 text-sm font-bold text-ink-sky-900-sky-200">
                       <Lightbulb className="h-4 w-4" />
                       记忆抓手
                     </div>
-                    <p className="mt-2 text-xs leading-relaxed text-stone-700 dark:text-stone-200">
+                    <p className="mt-2 text-xs leading-relaxed text-ink-mute-deep">
                       {guide.memoryTip}
                     </p>
                   </section>
-                  <section className="rounded-3xl border border-violet-500/20 bg-violet-500/10 p-4 dark:bg-violet-500/10">
-                    <div className="flex items-center gap-2 text-sm font-bold text-violet-900 dark:text-violet-200">
+                  <section className="rounded-3xl border border-line-violet-500o20 bg-wash-violet-500o10 p-4 dark:bg-wash-violet-500o10">
+                    <div className="flex items-center gap-2 text-sm font-bold text-ink-violet-900-violet-200">
                       <Info className="h-4 w-4" />
                       发音提醒
                     </div>
-                    <p className="mt-2 text-xs leading-relaxed text-stone-700 dark:text-stone-200">
+                    <p className="mt-2 text-xs leading-relaxed text-ink-mute-deep">
                       {guide.pronunciationTip}
                     </p>
                   </section>
                 </div>
 
-                <section className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-4 dark:bg-rose-500/10">
-                  <div className="flex items-center gap-2 text-sm font-bold text-rose-900 dark:text-rose-200">
+                <section className="rounded-3xl border border-line-rose-500o20 bg-wash-rose-500o10 p-4 dark:bg-wash-rose-500o10">
+                  <div className="flex items-center gap-2 text-sm font-bold text-ink-rose-900-rose-200">
                     <GitCompareArrows className="h-4 w-4" />
                     容易撞脸的地方
                   </div>
@@ -201,7 +201,7 @@ export function KanaRowGuideDialog({
                     {guide.confusions.map((confusion) => (
                       <span
                         key={confusion}
-                        className="rounded-full border border-rose-500/20 bg-white/70 px-3 py-1.5 text-xs font-semibold text-stone-700 dark:bg-stone-900/35 dark:text-stone-200"
+                        className="rounded-full border border-line-rose-500o20 bg-veil-whiteo70-stone-900o35 px-3 py-1.5 text-xs font-semibold text-tone-stone-700 dark:text-ink-stone-200"
                       >
                         {confusion}
                       </span>
@@ -210,8 +210,8 @@ export function KanaRowGuideDialog({
                 </section>
 
                 {guide.examples.length > 0 && (
-                  <section className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-4 dark:bg-emerald-500/10">
-                    <div className="flex items-center gap-2 text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                  <section className="rounded-3xl border border-line-emerald-500o20 bg-wash-emerald-500o10 p-4 dark:bg-wash-emerald-500o10">
+                    <div className="flex items-center gap-2 text-sm font-bold text-ink-emerald-900-emerald-200">
                       <ArrowRight className="h-4 w-4" />
                       放进词里，记忆就不飘了
                     </div>
@@ -219,18 +219,18 @@ export function KanaRowGuideDialog({
                       {guide.examples.map((example) => (
                         <div
                           key={`${example.word}-${example.reading}`}
-                          className="flex items-center justify-between gap-2 rounded-2xl border border-emerald-500/15 bg-white/70 px-3 py-2 dark:bg-stone-900/35"
+                          className="flex items-center justify-between gap-2 rounded-2xl border border-tone-emerald-500o15 bg-veil-whiteo70-stone-900o35 px-3 py-2"
                         >
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-baseline gap-2">
-                              <span className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">
+                              <span className="font-serif text-lg font-bold text-ink">
                                 {example.word}
                               </span>
-                              <span className="font-mono text-[11px] text-emerald-700 dark:text-emerald-300">
+                              <span className="font-mono text-[11px] text-ink-emerald-700-emerald-300">
                                 {example.reading}
                               </span>
                             </div>
-                            <span className="text-[11px] text-stone-600 dark:text-stone-300">
+                            <span className="text-[11px] text-ink-faint">
                               {example.meaning}
                             </span>
                           </div>
@@ -245,7 +245,7 @@ export function KanaRowGuideDialog({
                   </section>
                 )}
 
-                <p className="rounded-2xl border border-stone-200 bg-white/70 p-3 text-[11px] leading-relaxed text-stone-500 dark:border-stone-800 dark:bg-stone-900/30 dark:text-stone-400">
+                <p className="rounded-2xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o30 p-3 text-[11px] leading-relaxed text-ink-stone-500 dark:border-tone-stone-800 dark:text-ink-stone-400">
                   先试着自己读一遍，再点播放按钮核对。读错不扣分，它只是告诉你这一行还需要再见几次。
                 </p>
               </div>

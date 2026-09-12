@@ -113,7 +113,7 @@ export function LessonDialog() {
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-amber-600" />
+            <BookOpen className="w-4 h-4 text-tone-amber-600" />
             {active ? active.title : '语法讲义'}
           </DialogTitle>
           <DialogDescription>
@@ -124,11 +124,11 @@ export function LessonDialog() {
         </DialogHeader>
 
         {isLoading ? (
-          <p className="text-xs text-stone-500 py-6 text-center">讲义加载中…</p>
+          <p className="text-xs text-ink-stone-500 py-6 text-center">讲义加载中…</p>
         ) : !active ? (
           <div className="space-y-2 py-2">
             {lessons.length === 0 && (
-              <p className="text-xs text-stone-500 py-6 text-center">
+              <p className="text-xs text-ink-stone-500 py-6 text-center">
                 当前轨道暂无讲义，直接做题即可。
               </p>
             )}
@@ -140,10 +140,10 @@ export function LessonDialog() {
                   sound.playClick();
                   openLesson(l.skillId);
                 }}
-                className="w-full rounded-xl border border-stone-200 dark:border-stone-700 p-3 text-left hover:border-amber-500/50 transition-colors"
+                className="w-full rounded-xl border border-line p-3 text-left hover:border-tone-amber-500o50 transition-colors"
               >
                 <span className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold text-stone-900 dark:text-stone-100">
+                  <span className="text-sm font-bold text-ink">
                     {l.title}
                   </span>
                   {l.completed ? (
@@ -156,7 +156,7 @@ export function LessonDialog() {
                     </Badge>
                   )}
                 </span>
-                <span className="block text-[11px] text-stone-500 mt-1">{l.summary}</span>
+                <span className="block text-[11px] text-ink-stone-500 mt-1">{l.summary}</span>
               </button>
             ))}
           </div>
@@ -164,11 +164,11 @@ export function LessonDialog() {
           <div className="space-y-4 py-2">
             {active.sections.map((s) => (
               <section key={s.heading} className="space-y-1.5">
-                <h4 className="text-sm font-bold text-stone-900 dark:text-stone-100">
+                <h4 className="text-sm font-bold text-ink">
                   {s.heading}
                 </h4>
                 {s.body.map((p, i) => (
-                  <p key={i} className="text-[13px] leading-relaxed text-stone-700 dark:text-stone-300">
+                  <p key={i} className="text-[13px] leading-relaxed text-ink-mute">
                     {p}
                   </p>
                 ))}
@@ -177,34 +177,34 @@ export function LessonDialog() {
 
             {active.examples.length > 0 && (
               <section className="space-y-2">
-                <h4 className="text-sm font-bold text-stone-900 dark:text-stone-100">例句跟读</h4>
+                <h4 className="text-sm font-bold text-ink">例句跟读</h4>
                 {active.examples.map((e, i) => (
                   <div
                     key={i}
-                    className="rounded-xl bg-stone-100/70 dark:bg-stone-800/60 p-3 space-y-1"
+                    className="rounded-xl bg-veil-stone-100o70-stone-800o60 p-3 space-y-1"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
+                      <p className="text-sm font-medium text-ink">
                         {e.ja}
                       </p>
                       <UnifiedTtsPlayer text={e.ja} lang="JA" variant="inline" />
                     </div>
                     {e.reading && (
-                      <p className="text-[11px] text-stone-500 flex items-center gap-1">
+                      <p className="text-[11px] text-ink-stone-500 flex items-center gap-1">
                         <Volume2 className="w-3 h-3" />
                         {e.reading}
                       </p>
                     )}
-                    <p className="text-xs text-stone-600 dark:text-stone-400">{e.zh}</p>
+                    <p className="text-xs text-ink-faint-soft">{e.zh}</p>
                   </div>
                 ))}
               </section>
             )}
 
             {active.pitfall && (
-              <div className="rounded-xl border border-red-500/25 bg-red-500/5 p-3">
-                <p className="text-xs font-bold text-red-700 dark:text-red-300">易错</p>
-                <p className="text-[13px] text-stone-700 dark:text-stone-300 mt-1">
+              <div className="rounded-xl border border-line-red-500o25 bg-wash-red-500o5 p-3">
+                <p className="text-xs font-bold text-ink-red-700-red-300">易错</p>
+                <p className="text-[13px] text-ink-mute mt-1">
                   {active.pitfall}
                 </p>
               </div>

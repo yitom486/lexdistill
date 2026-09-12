@@ -199,7 +199,7 @@ export function PracticePlanEditor({ isOpen, onClose, userId, language, template
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：考研英语晚间 35 分钟"
-              className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600"
+              className="flex-1 rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600"
             />
             <label className="flex items-center gap-2 text-xs">
               <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
@@ -208,7 +208,7 @@ export function PracticePlanEditor({ isOpen, onClose, userId, language, template
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500">重复</span>
+            <span className="text-xs text-ink-slate-500">重复</span>
             <Select value={scheduleKind} onValueChange={(v) => v && setScheduleKind(v as 'daily' | 'weekly')}>
               <SelectTrigger className="w-[8rem]"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -262,13 +262,13 @@ export function PracticePlanEditor({ isOpen, onClose, userId, language, template
               />
             ))}
             {blocks.length === 0 && (
-              <div className="rounded-md border border-dashed border-slate-300 p-6 text-center text-sm text-slate-400">
+              <div className="rounded-md border border-dashed border-line-slate-300 p-6 text-center text-sm text-ink-slate-400">
                 点击上方按钮添加练习块
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-4 rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-800">
+          <div className="flex items-center gap-4 rounded-md bg-surface-slate-50-slate-800 p-3 text-sm">
             <Badge variant="secondary">预计 {preview.total} 题</Badge>
             <Badge variant="secondary">AI 批改 {preview.ai} 次</Badge>
             <Badge variant="secondary">约 {preview.minutes} 分钟</Badge>
@@ -301,9 +301,9 @@ interface BlockRowProps {
 function BlockRow({ block, index, onUpdate, onRemove, onUp, onDown }: BlockRowProps) {
   const isVocab = VOCAB_KINDS.has(block.kind);
   return (
-    <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+    <div className="rounded-md border border-line-slate-200-slate-700 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-500">第 {index + 1} 块 · {BLOCK_KIND_LABELS[block.kind]}</span>
+        <span className="text-xs font-medium text-ink-slate-500">第 {index + 1} 块 · {BLOCK_KIND_LABELS[block.kind]}</span>
         <div className="flex gap-1">
           <Button size="sm" variant="ghost" onClick={onUp}><ArrowUp className="h-3 w-3" /></Button>
           <Button size="sm" variant="ghost" onClick={onDown}><ArrowDown className="h-3 w-3" /></Button>
@@ -340,7 +340,7 @@ function BlockRow({ block, index, onUpdate, onRemove, onUp, onDown }: BlockRowPr
         </Select>
       </div>
       <div className="mt-3 flex items-center gap-3">
-        <span className="text-xs text-slate-500">题量 {block.count}</span>
+        <span className="text-xs text-ink-slate-500">题量 {block.count}</span>
         <Slider
           value={[block.count]}
           min={1}
@@ -394,7 +394,7 @@ function BlockRow({ block, index, onUpdate, onRemove, onUp, onDown }: BlockRowPr
               )}
             </SelectContent>
           </Select>
-          <span className="self-center text-slate-400">→</span>
+          <span className="self-center text-ink-slate-400">→</span>
           <Select
             value={block.translationDirection?.targetLanguage ?? 'en'}
             onValueChange={(v) =>

@@ -243,21 +243,21 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
       {/* 顶部标题与控制栏 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#faf9f6] dark:bg-[#1a1816] p-4 sm:p-5 rounded-2xl border border-amber-900/10 dark:border-amber-500/15 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-paper-soft p-4 sm:p-5 rounded-2xl border border-line-accent shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-300 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-wash-amber-500o15 border border-line-amber-500o30 text-ink-amber-900-amber-300 flex items-center justify-center font-bold">
             <Headphones className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold font-serif text-stone-900 dark:text-stone-100">
+              <h2 className="text-lg font-bold font-serif text-ink">
                 听力精听与影子跟读工作台
               </h2>
-              <Badge variant="amber" className="text-[11px] border-amber-500/20">
+              <Badge variant="amber" className="text-[11px] border-tone-amber-500o20">
                 Web Audio 原声解析
               </Badge>
             </div>
-            <p className="text-xs text-stone-500 dark:text-stone-400">
+            <p className="text-xs text-ink-ghost">
               短句切片循环 · 假名标音遮罩 · 影子同步跟读 · 关键助词听写
             </p>
           </div>
@@ -272,7 +272,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
             setActiveSubMode(val as 'SHADOWING' | 'DICTATION');
           }}
         >
-          <TabsList className="bg-stone-200/60 dark:bg-stone-900 self-start sm:self-auto">
+          <TabsList className="bg-veil-stone-200o60-stone-900 self-start sm:self-auto">
             <TabsIndicator />
             <TabsTrigger value="SHADOWING" className="px-3 py-1.5 text-xs">
               🎙️ 对话短句影子跟读
@@ -290,9 +290,9 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
       {activeSubMode === 'SHADOWING' && (
         <div className="flex flex-col gap-5">
           {/* 教材课文快速选择与播放参数设置 */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdfcfb] dark:bg-[#181615] p-3.5 rounded-xl border border-amber-900/10 dark:border-amber-500/15 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-paper-bright p-3.5 rounded-xl border border-line-accent text-xs">
             <div className="flex items-center gap-2">
-              <span className="text-stone-500 font-medium">当前教材篇目：</span>
+              <span className="text-ink-stone-500 font-medium">当前教材篇目：</span>
               <Select
                 value={selectedLessonId}
                 onValueChange={(value) => {
@@ -333,7 +333,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                 <span>{gender === 'FEMALE' ? '👩 女声' : '👨 男声'}</span>
               </Button>
 
-              <div className="flex items-center gap-1 bg-stone-200/60 dark:bg-stone-800 p-1 rounded-lg">
+              <div className="flex items-center gap-1 bg-veil-stone-200o60-stone-800 p-1 rounded-lg">
                 {[0.75, 1.0, 1.25].map((spd) => (
                   <Button
                     key={spd}
@@ -373,11 +373,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                   sound.playClick();
                   setMaskText(!maskText);
                 }}
-                className={`h-7 gap-1 px-2.5 ${
-                  maskText
-                    ? 'border-purple-500/30 bg-purple-500/10 text-purple-900 dark:text-purple-300'
-                    : ''
-                }`}
+                className={`h-7 gap-1 px-2.5 ${ maskText ? 'border-line-purple-500o30 bg-wash-purple-500o10 text-ink-purple-900 dark:text-ink-purple-300' : '' }`}
               >
                 <span>{maskText ? '🙈 盲听中' : '👀 看原文'}</span>
               </Button>
@@ -390,7 +386,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
               key={activeSentence.id}
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="p-6 sm:p-8 rounded-2xl bg-[#faf9f6] dark:bg-[#1a1816] border border-amber-900/10 dark:border-amber-500/15 shadow-sm space-y-6 relative overflow-hidden"
+              className="p-6 sm:p-8 rounded-2xl bg-paper-soft border border-line-accent shadow-sm space-y-6 relative overflow-hidden"
             >
               {/* Magic UI 流光边框增强：发音与跟读反馈 */}
               {shadowStep === 'SHADOWING' && (
@@ -402,14 +398,14 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
               {/* 顶部说话者与进度 */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <span className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-300 font-bold flex items-center justify-center text-xs">
+                  <span className="w-8 h-8 rounded-full bg-tone-amber-500o20 text-ink-amber-900-amber-300 font-bold flex items-center justify-center text-xs">
                     {activeSentence.speaker}
                   </span>
                   <div>
-                    <span className="font-semibold text-xs text-stone-800 dark:text-stone-200">
+                    <span className="font-semibold text-xs text-ink-soft">
                       说话者：{activeSentence.speaker}
                     </span>
-                    <span className="text-[11px] text-stone-400 ml-2">
+                    <span className="text-[11px] text-ink-stone-400 ml-2">
                       句段 {sentenceIndex + 1} / {activeLesson.dialogues.length}
                     </span>
                   </div>
@@ -418,7 +414,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                 {/* 影子跟读节拍状态条 */}
                 <div className="flex items-center gap-2">
                   {shadowStep === 'LISTENING' && (
-                    <Badge className="animate-pulse gap-1 bg-amber-500 text-stone-950 border-transparent hover:bg-amber-500">
+                    <Badge className="animate-pulse gap-1 bg-tone-amber-500 text-tone-stone-950 border-transparent hover:bg-tone-amber-500">
                       <Volume2 className="w-3.5 h-3.5" />
                       正在聆听原声 ({rate}x)
                     </Badge>
@@ -430,7 +426,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                     </Badge>
                   )}
                   {shadowStep === 'IDLE' && (
-                    <span className="text-xs text-stone-400">就绪 · 点击播放开始</span>
+                    <span className="text-xs text-ink-stone-400">就绪 · 点击播放开始</span>
                   )}
                 </div>
               </div>
@@ -449,7 +445,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                       duration: 0.5 + (i % 4) * 0.15,
                       ease: 'easeInOut',
                     }}
-                    className="w-1.5 rounded-full dark:bg-stone-700"
+                    className="w-1.5 rounded-full dark:bg-tone-stone-700"
                   />
                 ))}
               </div>
@@ -457,26 +453,26 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
               {/* 日语原句与假名标注区域 */}
               <div className="min-h-[90px] flex flex-col justify-center items-center text-center px-4">
                 {maskText ? (
-                  <div className="p-4 rounded-xl bg-stone-200/50 dark:bg-stone-900/50 text-stone-500 text-sm font-medium flex items-center gap-2">
+                  <div className="p-4 rounded-xl bg-veil-stone-200o50-stone-900o50 text-ink-stone-500 text-sm font-medium flex items-center gap-2">
                     <span>🙈 原文已遮罩，请先盲听 2~3 遍建立听觉反射，再揭晓文本</span>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {/* 带假名的 Ruby 文本 */}
-                    <div className="text-2xl sm:text-3xl font-serif text-stone-900 dark:text-stone-100 tracking-wider flex flex-wrap justify-center items-center gap-x-2 gap-y-1">
+                    <div className="text-2xl sm:text-3xl font-serif text-ink tracking-wider flex flex-wrap justify-center items-center gap-x-2 gap-y-1">
                       {activeSentence.furiganaTokens.map((token, idx) => {
                         if (showFurigana && token.reading) {
                           return (
-                            <ruby key={idx} className="cursor-pointer hover:text-amber-600 transition-colors">
+                            <ruby key={idx} className="cursor-pointer hover:text-tone-amber-600 transition-colors">
                               {token.surface}
-                              <rt className="text-xs text-amber-700 dark:text-amber-400 font-sans select-none">
+                              <rt className="text-xs text-accent-ink-warm font-sans select-none">
                                 {token.reading}
                               </rt>
                             </ruby>
                           );
                         }
                         return (
-                          <span key={idx} className="cursor-pointer hover:text-amber-600 transition-colors">
+                          <span key={idx} className="cursor-pointer hover:text-tone-amber-600 transition-colors">
                             {token.surface}
                           </span>
                         );
@@ -490,7 +486,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                     </div>
 
                     {/* 中文翻译 */}
-                    <p className="text-sm sm:text-base text-stone-500 dark:text-stone-400 font-serif">
+                    <p className="text-sm sm:text-base text-ink-ghost font-serif">
                       {activeSentence.chinese}
                     </p>
                   </div>
@@ -499,12 +495,12 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
 
               {/* 语法要点提示 */}
               {activeSentence.grammarNotes && activeSentence.grammarNotes.length > 0 && !maskText && (
-                <div className="p-3 rounded-xl bg-amber-500/10 dark:bg-stone-900/60 border border-amber-900/10 text-xs text-amber-900 dark:text-amber-300 flex items-start gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="p-3 rounded-xl bg-wash-amber-500o10-stone-900o60 border border-line-amber-900o10 text-xs text-ink-amber-900-amber-300 flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-tone-amber-600 shrink-0 mt-0.5" />
                   <div className="space-y-1">
                     <span className="font-bold">句型语法考点：</span>
                     {activeSentence.grammarNotes.map((n, i) => (
-                      <p key={i} className="text-stone-700 dark:text-stone-300">
+                      <p key={i} className="text-ink-mute">
                         • {n}
                       </p>
                     ))}
@@ -513,7 +509,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
               )}
 
               {/* 核心播放与切换控制器 */}
-              <div className="flex items-center justify-between pt-2 border-t border-stone-200/80 dark:border-stone-800">
+              <div className="flex items-center justify-between pt-2 border-t border-tone-stone-200o80-stone-800">
                 {/* 循环跟读开关 */}
                 <Button
                   variant={isLooping ? 'amber' : 'outline'}
@@ -544,8 +540,8 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                     onClick={handleTogglePlay}
                     className={`w-14 h-14 rounded-2xl shadow-md ${
                       isSpeaking
-                        ? 'bg-amber-600 text-stone-950'
-                        : 'bg-gradient-to-tr from-amber-500 to-amber-600 text-stone-950 hover:brightness-105'
+                        ? 'bg-tone-amber-600 text-tone-stone-950'
+                        : 'bg-gradient-to-tr from-tone-amber-500 to-tone-amber-600 text-tone-stone-950 hover:brightness-105'
                     }`}
                   >
                     {isSpeaking ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
@@ -585,7 +581,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
               </div>
             </motion.div>
           ) : (
-            <div className="p-8 text-center text-stone-400">本课暂无对话短句</div>
+            <div className="p-8 text-center text-ink-stone-400">本课暂无对话短句</div>
           )}
         </div>
       )}
@@ -596,15 +592,15 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
       {activeSubMode === 'DICTATION' && (
         <div className="flex flex-col gap-5">
           {!activeDictation ? (
-            <div className="p-10 rounded-2xl bg-[#faf9f6] dark:bg-[#1a1816] border border-amber-900/10 dark:border-amber-500/15 shadow-sm text-center space-y-4">
-              <Sparkles className="w-8 h-8 mx-auto text-amber-500" />
-              <p className="text-sm text-stone-600 dark:text-stone-300">
+            <div className="p-10 rounded-2xl bg-paper-soft border border-line-accent shadow-sm text-center space-y-4">
+              <Sparkles className="w-8 h-8 mx-auto text-tone-amber-500" />
+              <p className="text-sm text-ink-faint">
                 题池为空。听写题由 Gateway learning.content 依据教材考点实时生成并入库，不内置演示题。
               </p>
               <Button
                 onClick={handleRefreshDictation}
                 disabled={generateDictation.isPending}
-                className="bg-gradient-to-tr from-amber-500 to-amber-600 hover:brightness-105"
+                className="bg-gradient-to-tr from-tone-amber-500 to-tone-amber-600 hover:brightness-105"
               >
                 <Sparkles className="w-4 h-4 mr-1" />
                 {generateDictation.isPending ? '生成中…' : '生成听写题'}
@@ -615,13 +611,13 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
             key={activeDictation.id}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-6 sm:p-8 rounded-2xl bg-[#faf9f6] dark:bg-[#1a1816] border border-amber-900/10 dark:border-amber-500/15 shadow-sm space-y-6"
+            className="p-6 sm:p-8 rounded-2xl bg-paper-soft border border-line-accent shadow-sm space-y-6"
           >
             {/* 顶栏信息 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge variant="amber">{activeDictation.categoryTag}</Badge>
-                <span className="text-xs text-stone-500">
+                <span className="text-xs text-ink-stone-500">
                   第 {dictationIndex + 1} 题 / 共 {dictationPool.length} 题
                 </span>
               </div>
@@ -648,12 +644,12 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
             </div>
 
             {/* 听力挖空展示 */}
-            <div className="space-y-3 text-center py-4 bg-[#fdfcfb] dark:bg-[#181615] rounded-xl border border-amber-900/5 p-4">
-              <p className="text-xs text-stone-500 font-medium">{activeDictation.blankPrompt}</p>
-              <h3 className="text-2xl sm:text-3xl font-bold font-serif text-stone-900 dark:text-stone-100 tracking-wide">
+            <div className="space-y-3 text-center py-4 bg-paper-bright rounded-xl border border-line-amber-900o5 p-4">
+              <p className="text-xs text-ink-stone-500 font-medium">{activeDictation.blankPrompt}</p>
+              <h3 className="text-2xl sm:text-3xl font-bold font-serif text-ink tracking-wide">
                 {activeDictation.clozeDisplay}
               </h3>
-              <p className="text-sm text-stone-500 dark:text-stone-400 font-serif">
+              <p className="text-sm text-ink-ghost font-serif">
                 中文释义：{activeDictation.chinese}
               </p>
             </div>
@@ -670,9 +666,9 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                   }}
                   disabled={hasChecked && isDictationCorrect === true}
                   placeholder="听录音后在此键入所缺假名（如：で / に / か）..."
-                  className="w-full px-4 py-3 rounded-xl bg-white dark:bg-[#211f1d] border border-amber-900/20 dark:border-amber-500/20 text-stone-900 dark:text-stone-100 text-base font-medium outline-none focus:ring-2 focus:ring-amber-500 shadow-xs"
+                  className="w-full px-4 py-3 rounded-xl bg-surface-warm border border-line-amber-900o20-amber-500o20 text-ink text-base font-medium outline-none focus:ring-2 focus:ring-tone-amber-500 shadow-xs"
                 />
-                <span className="absolute right-3 top-3.5 text-xs text-stone-400 font-mono">
+                <span className="absolute right-3 top-3.5 text-xs text-ink-stone-400 font-mono">
                   按 Enter 提交
                 </span>
               </div>
@@ -680,14 +676,14 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
               {!hasChecked ? (
                 <Button
                   onClick={handleCheckDictation}
-                  className="w-full sm:w-auto h-11 px-6 shrink-0 bg-gradient-to-tr from-amber-500 to-amber-600 hover:brightness-105"
+                  className="w-full sm:w-auto h-11 px-6 shrink-0 bg-gradient-to-tr from-tone-amber-500 to-tone-amber-600 hover:brightness-105"
                 >
                   🚀 验证听写
                 </Button>
               ) : (
                 <Button
                   onClick={handleNextDictation}
-                  className="w-full sm:w-auto h-11 px-6 shrink-0 bg-stone-900 dark:bg-amber-600 text-white hover:brightness-110"
+                  className="w-full sm:w-auto h-11 px-6 shrink-0 bg-surface-stone-900-amber-600 text-tone-white hover:brightness-110"
                 >
                   下一题 ➔
                 </Button>
@@ -699,28 +695,24 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
               <motion.div
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`p-4 rounded-xl border text-xs space-y-2 ${
-                  isDictationCorrect
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
-                    : 'bg-rose-500/10 border-rose-500/30 text-rose-900 dark:text-rose-200'
-                }`}
+                className={`p-4 rounded-xl border text-xs space-y-2 ${ isDictationCorrect ? 'bg-wash-emerald-500o10 border-line-emerald-500o30 text-ink-emerald-900-emerald-200' : 'bg-wash-rose-500o10 border-line-rose-500o30 text-ink-rose-900-rose-200' }`}
               >
                 <div className="flex items-center gap-2 font-bold text-sm">
                   {isDictationCorrect ? (
                     <>
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      <CheckCircle2 className="w-5 h-5 text-tone-emerald-600" />
                       <span>听写敏锐！答案完全一致（「{activeDictation.targetWord}」）</span>
                     </>
                   ) : (
                     <>
-                      <XCircle className="w-5 h-5 text-rose-600" />
+                      <XCircle className="w-5 h-5 text-ink-rose-600" />
                       <span>
                         听写有误：正确应为「{activeDictation.targetWord}」(读音: {activeDictation.furiganaHint})，已自动录入错题本
                       </span>
                     </>
                   )}
                 </div>
-                <p className="text-stone-700 dark:text-stone-300 leading-relaxed font-sans">
+                <p className="text-ink-mute leading-relaxed font-sans">
                   💡 {activeDictation.grammarExplanation}
                 </p>
               </motion.div>

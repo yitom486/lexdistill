@@ -27,7 +27,7 @@ export function MarkdownText({ text, surface = 'adaptive' }: { text: string; sur
       <a
         href={href}
         onClick={linkClick}
-        className="text-amber-700 dark:text-amber-300 underline decoration-amber-500/50 underline-offset-2 break-all cursor-pointer"
+        className="text-accent-ink-strong underline decoration-tone-amber-500o50 underline-offset-2 break-all cursor-pointer"
       >
         {children}
       </a>
@@ -37,7 +37,7 @@ export function MarkdownText({ text, surface = 'adaptive' }: { text: string; sur
     ol: ({ children }) => <ol className="my-1.5 list-decimal space-y-1 pl-5">{children}</ol>,
     li: ({ children }) => <li className="leading-relaxed">{children}</li>,
     strong: ({ children }) => (
-      <strong className={dark ? 'font-bold text-stone-100' : 'font-bold text-stone-900 dark:text-stone-100'}>
+      <strong className={dark ? 'font-bold text-tone-stone-100' : 'font-bold text-ink'}>
         {children}
       </strong>
     ),
@@ -45,8 +45,8 @@ export function MarkdownText({ text, surface = 'adaptive' }: { text: string; sur
       <code
         className={
           dark
-            ? 'rounded bg-stone-800 px-1 py-0.5 font-mono text-[0.95em]'
-            : 'rounded bg-stone-200/70 dark:bg-stone-800 px-1 py-0.5 font-mono text-[0.95em]'
+            ? 'rounded bg-tone-stone-800 px-1 py-0.5 font-mono text-[0.95em]'
+            : 'rounded bg-veil-stone-200o70-stone-800 px-1 py-0.5 font-mono text-[0.95em]'
         }
       >
         {children}
@@ -56,8 +56,8 @@ export function MarkdownText({ text, surface = 'adaptive' }: { text: string; sur
       <pre
         className={
           dark
-            ? 'my-2 overflow-x-auto rounded-xl bg-stone-950 p-2.5 text-[0.95em]'
-            : 'my-2 overflow-x-auto rounded-xl bg-stone-100 dark:bg-stone-950 p-2.5 text-[0.95em]'
+            ? 'my-2 overflow-x-auto rounded-xl bg-tone-stone-950 p-2.5 text-[0.95em]'
+            : 'my-2 overflow-x-auto rounded-xl bg-surface-stone-100-stone-950 p-2.5 text-[0.95em]'
         }
       >
         {children}
@@ -71,8 +71,8 @@ export function MarkdownText({ text, surface = 'adaptive' }: { text: string; sur
       <div
         className={
           dark
-            ? 'border-l-2 border-amber-500/40 pl-2 text-stone-300'
-            : 'border-l-2 border-amber-500/40 pl-2 text-stone-600 dark:text-stone-300'
+            ? 'border-l-2 border-tone-amber-500o40 pl-2 text-tone-stone-300'
+            : 'border-l-2 border-tone-amber-500o40 pl-2 text-ink-faint'
         }
       >
         {children}

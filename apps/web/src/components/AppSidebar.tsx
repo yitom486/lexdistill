@@ -114,8 +114,8 @@ function NavButton({
         'w-full flex items-center gap-2.5 rounded-xl text-left text-xs font-medium transition-colors cursor-pointer',
         collapsed ? 'justify-center px-2 py-2.5' : 'px-2.5 py-2',
         active
-          ? 'bg-amber-500/15 text-amber-950 dark:text-amber-200 border border-amber-500/25'
-          : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200/60 dark:hover:bg-stone-800/80 border border-transparent'
+          ? 'bg-wash-amber-500o15 text-ink-amber-950-amber-200 border border-tone-amber-500o25'
+          : 'text-ink-faint-soft hover:bg-veil-stone-200o60-stone-800o80 border border-transparent'
       )}
     >
       <Icon className="w-4 h-4 shrink-0" />
@@ -222,7 +222,7 @@ function SidebarBody({
   return (
     <aside
       className={cn(
-        'flex flex-col min-h-0 border-r border-stone-200/80 dark:border-stone-800 bg-white/90 dark:bg-[#1a1917]/95 backdrop-blur-md h-full',
+        'flex flex-col min-h-0 border-r border-tone-stone-200o80-stone-800 bg-veil-whiteo90 dark:bg-surface-h1a1917o95 backdrop-blur-md h-full',
         collapsed ? 'w-[4.25rem]' : 'w-[16.5rem]',
         'transition-[width] duration-200'
       )}
@@ -234,26 +234,26 @@ function SidebarBody({
         }}
         title="点击配置学员画像与每日打卡目标"
         className={cn(
-          'border-b border-stone-200/80 dark:border-stone-800 cursor-pointer hover:bg-stone-100/60 dark:hover:bg-stone-900/50 transition-colors',
+          'border-b border-tone-stone-200o80-stone-800 cursor-pointer hover:bg-veil-stone-100o60 dark:hover:bg-veil-stone-900o50 transition-colors',
           collapsed ? 'p-2.5' : 'p-3.5'
         )}
       >
         <div className={cn('flex items-center gap-2.5', collapsed && 'justify-center')}>
-          <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-wash-amber-500o15 border border-line-amber-500o30 text-ink-amber-800-amber-300 flex items-center justify-center shrink-0">
             <User className="w-4 h-4" />
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold font-serif truncate text-stone-900 dark:text-stone-100">
+                <span className="text-sm font-bold font-serif truncate text-ink">
                   {profile.displayName}
                 </span>
                 <Badge variant="amber" className="text-[10px] px-1.5 py-0">
                   {profile.levelBadge}
                 </Badge>
               </div>
-              <p className="text-[11px] text-stone-500 truncate flex items-center gap-1">
-                <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />
+              <p className="text-[11px] text-ink-stone-500 truncate flex items-center gap-1">
+                <Flame className="w-3 h-3 text-tone-amber-500 fill-tone-amber-500" />
                 连续{' '}
                 <NumberTicker value={profile.streakDays} className="font-mono font-bold inline" />{' '}
                 天
@@ -271,7 +271,7 @@ function SidebarBody({
             }}
             className="mt-3 space-y-1.5 w-full text-left cursor-pointer"
           >
-            <div className="flex justify-between text-[10px] text-stone-500">
+            <div className="flex justify-between text-[10px] text-ink-stone-500">
               <span>{profile.todayGoalLabel}</span>
               <span className="font-mono">{profile.todayGoalPercent}%</span>
             </div>
@@ -289,7 +289,7 @@ function SidebarBody({
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.id)}
-                  className="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 cursor-pointer"
+                  className="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-ink-stone-400 hover:text-ink-faint cursor-pointer"
                 >
                   {expanded ? (
                     <ChevronDown className="w-3 h-3" />
@@ -319,7 +319,7 @@ function SidebarBody({
         {shell.comingSoonModules.length > 0 && (
           <div>
             {!collapsed && (
-              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-stone-400">
+              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-ink-stone-400">
                 即将推出 · {shell.trackName}
               </div>
             )}
@@ -339,8 +339,8 @@ function SidebarBody({
                     }}
                     className={cn(
                       'w-full flex items-center gap-2 rounded-lg text-[11px] transition-colors cursor-pointer',
-                      'text-stone-400 dark:text-stone-500 opacity-70',
-                      'hover:bg-stone-100/80 dark:hover:bg-stone-800/50',
+                      'text-ink-hint opacity-70',
+                      'hover:bg-veil-stone-100o80 dark:hover:bg-line-stone-800o50',
                       collapsed ? 'justify-center px-0 py-2' : 'px-2 py-1.5'
                     )}
                   >
@@ -362,7 +362,7 @@ function SidebarBody({
       </div>
 
       {showDesktopCollapse && (
-        <div className="p-2 border-t border-stone-200/80 dark:border-stone-800">
+        <div className="p-2 border-t border-tone-stone-200o80-stone-800">
           <Button
             variant="ghost"
             size="sm"
@@ -438,7 +438,7 @@ export function AppSidebar({
         <div className="md:hidden fixed inset-0 z-50 flex">
           <button
             type="button"
-            className="absolute inset-0 bg-stone-950/50 backdrop-blur-sm cursor-pointer border-0"
+            className="absolute inset-0 bg-veil-stone-950o50 backdrop-blur-sm cursor-pointer border-0"
             aria-label="关闭菜单"
             onClick={() => onMobileOpenChange?.(false)}
           />

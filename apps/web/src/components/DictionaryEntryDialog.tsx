@@ -39,7 +39,7 @@ export function DictionaryEntryDialog({
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-amber-600" />
+            <BookOpen className="w-4 h-4 text-tone-amber-600" />
             词典 · {query}
           </DialogTitle>
           <DialogDescription>完整条目（多来源对照）。收藏后例句与来源跟卡走。</DialogDescription>

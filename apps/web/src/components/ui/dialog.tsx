@@ -15,7 +15,7 @@ export const DialogOverlay = React.forwardRef<
   <BaseDialog.Backdrop
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity',
+      'fixed inset-0 z-50 bg-veil-blacko60 backdrop-blur-xs transition-opacity',
       className
     )}
     {...props}
@@ -35,14 +35,14 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       <BaseDialog.Popup
         ref={ref}
         className={cn(
-          'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-amber-900/15 dark:border-amber-500/20 bg-[#faf9f6] dark:bg-[#1a1816] p-6 shadow-2xl duration-200 rounded-3xl outline-none',
+          'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-line-amber-900o15-amber-500o20 bg-paper-soft p-6 shadow-2xl duration-200 rounded-3xl outline-none',
           className
         )}
         {...props}
       >
         {children}
         {showCloseButton && (
-          <BaseDialog.Close className="absolute right-4 top-4 rounded-xl p-1 text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-200/50 dark:hover:bg-stone-800 transition-colors focus:outline-none cursor-pointer">
+          <BaseDialog.Close className="absolute right-4 top-4 rounded-xl p-1 text-ink-stone-400 hover:text-ink hover:bg-veil-stone-200o50 dark:hover:bg-tone-stone-800 transition-colors focus:outline-none cursor-pointer">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </BaseDialog.Close>
@@ -74,7 +74,7 @@ export const DialogTitle = React.forwardRef<
   <BaseDialog.Title
     ref={ref}
     className={cn(
-      'text-lg font-bold font-serif leading-none tracking-tight text-stone-900 dark:text-stone-100',
+      'text-lg font-bold font-serif leading-none tracking-tight text-ink',
       className
     )}
     {...props}
@@ -88,7 +88,7 @@ export const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <BaseDialog.Description
     ref={ref}
-    className={cn('text-xs text-stone-500 dark:text-stone-400', className)}
+    className={cn('text-xs text-ink-ghost', className)}
     {...props}
   />
 ));

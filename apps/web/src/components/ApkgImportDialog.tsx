@@ -144,7 +144,7 @@ export function ApkgImportDialog({ open, onOpenChange }: ApkgImportDialogProps) 
               onChange={(e) => setFilePath(e.target.value)}
               placeholder="例如 C:\Users\你\Downloads\deck.apkg"
               spellCheck={false}
-              className="h-9 min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-3 font-mono text-xs dark:border-stone-700 dark:bg-stone-900"
+              className="h-9 min-w-0 flex-1 rounded-xl border border-ink-stone-200 bg-tone-white px-3 font-mono text-xs dark:border-tone-stone-700 dark:bg-tone-stone-900"
             />
             <Button type="button" size="sm" onClick={handleAnalyze} disabled={analyze.isPending} className="gap-1.5">
               {analyze.isPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <FolderInput className="h-3.5 w-3.5" />}
@@ -154,7 +154,7 @@ export function ApkgImportDialog({ open, onOpenChange }: ApkgImportDialogProps) 
 
           {analysis && (
             <>
-              <div className="rounded-xl border border-stone-200/80 p-3 text-xs dark:border-stone-800">
+              <div className="rounded-xl border border-line-stone-200o80 p-3 text-xs dark:border-tone-stone-800">
                 <p className="font-semibold">
                   {analysis.fileLabel}：{analysis.noteCount} 条笔记 / {analysis.cardCount} 张卡
                   {analysis.mediaFileCount ? ` / 媒体 ${analysis.mediaFileCount} 个（${analysis.mediaRefCount} 处引用暂跳过）` : ''}
@@ -163,7 +163,7 @@ export function ApkgImportDialog({ open, onOpenChange }: ApkgImportDialogProps) 
                   {analysis.decks.map((d) => (
                     <label
                       key={d.name}
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 px-2.5 py-1 text-[11px] dark:border-stone-700"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-ink-stone-200 px-2.5 py-1 text-[11px] dark:border-tone-stone-700"
                     >
                       <input
                         type="checkbox"
@@ -185,7 +185,7 @@ export function ApkgImportDialog({ open, onOpenChange }: ApkgImportDialogProps) 
                   导入选中牌组到生词本（{shell.track}）
                 </Button>
                 {importNotes.data && (
-                  <p className="mt-1.5 text-[11px] text-emerald-600">
+                  <p className="mt-1.5 text-[11px] text-tone-emerald-600">
                     新建 {importNotes.data.created} · 去重 {importNotes.data.skippedDuplicate} · 空正面{' '}
                     {importNotes.data.skippedEmpty} · 媒体入库 {importNotes.data.mediaStored} / 跳过{' '}
                     {importNotes.data.mediaSkipped}
@@ -195,15 +195,15 @@ export function ApkgImportDialog({ open, onOpenChange }: ApkgImportDialogProps) 
               </div>
 
               {analysis.models.map((m) => (
-                <div key={m.modelName} className="rounded-xl border border-stone-200/80 p-3 dark:border-stone-800">
+                <div key={m.modelName} className="rounded-xl border border-line-stone-200o80 p-3 dark:border-tone-stone-800">
                   <p className="text-xs font-semibold">
                     {m.modelName}（{m.exampleNoteCount} 条笔记用此模板）
                   </p>
                   <div className="mt-2 space-y-1.5">
                     {m.ankiFields.map((f) => (
                       <div key={f} className="flex items-center gap-2 text-[11px]">
-                        <code className="w-32 shrink-0 truncate font-mono text-stone-600 dark:text-stone-300">{f}</code>
-                        <span className="text-stone-400">→</span>
+                        <code className="w-32 shrink-0 truncate font-mono text-ink-faint">{f}</code>
+                        <span className="text-ink-stone-400">→</span>
                         <Select
                           value={mappings[m.modelName]?.[f] ?? '__none'}
                           onValueChange={(v) => {
@@ -230,7 +230,7 @@ export function ApkgImportDialog({ open, onOpenChange }: ApkgImportDialogProps) 
                     ))}
                   </div>
                   {m.compatIssues.length > 0 && (
-                    <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] text-amber-700 dark:text-amber-300">
+                    <div className="mt-2 rounded-lg border border-tone-amber-500o40 bg-wash-amber-500o5 p-2 text-[11px] text-accent-ink-strong">
                       {m.compatIssues.map((issue) => (
                         <p key={issue}>⚠ {issue}</p>
                       ))}

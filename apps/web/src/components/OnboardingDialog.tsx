@@ -114,7 +114,7 @@ export function OnboardingDialog() {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-amber-500" />
+            <GraduationCap className="w-5 h-5 text-tone-amber-500" />
             先定个起点，内容才不会劝退你
           </DialogTitle>
           <DialogDescription>
@@ -123,7 +123,7 @@ export function OnboardingDialog() {
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <p className="text-xs font-bold text-stone-500">1 · 学哪门？</p>
+            <p className="text-xs font-bold text-ink-stone-500">1 · 学哪门？</p>
             <div className="grid grid-cols-3 gap-2">
               {TRACKS.map((t) => (
                 <button
@@ -135,18 +135,18 @@ export function OnboardingDialog() {
                   }}
                   className={`rounded-xl border p-3 text-left transition-colors cursor-pointer ${
                     track === t.id
-                      ? 'border-amber-500 bg-amber-500/10'
-                      : 'border-stone-200 dark:border-stone-700 hover:border-amber-500/40'
+                      ? 'border-tone-amber-500 bg-wash-amber-500o10'
+                      : 'border-line hover:border-tone-amber-500o40'
                   }`}
                 >
                   <span className="block text-sm font-bold">{t.name}</span>
-                  <span className="block text-[11px] text-stone-400">{t.hint}</span>
+                  <span className="block text-[11px] text-ink-stone-400">{t.hint}</span>
                 </button>
               ))}
             </div>
           </div>
           <div className="space-y-2">
-            <p className="text-xs font-bold text-stone-500">2 · 现在什么水平？（实话实说）</p>
+            <p className="text-xs font-bold text-ink-stone-500">2 · 现在什么水平？（实话实说）</p>
             <div className="space-y-2">
               {LEVELS.map((l) => (
                 <button
@@ -158,12 +158,12 @@ export function OnboardingDialog() {
                   }}
                   className={`w-full rounded-xl border p-3 text-left transition-colors cursor-pointer ${
                     level === l.id
-                      ? 'border-amber-500 bg-amber-500/10'
-                      : 'border-stone-200 dark:border-stone-700 hover:border-amber-500/40'
+                      ? 'border-tone-amber-500 bg-wash-amber-500o10'
+                      : 'border-line hover:border-tone-amber-500o40'
                   }`}
                 >
                   <span className="block text-sm font-bold">{l.name}</span>
-                  <span className="block text-[11px] text-stone-400">{l.desc[track]}</span>
+                  <span className="block text-[11px] text-ink-stone-400">{l.desc[track]}</span>
                 </button>
               ))}
             </div>

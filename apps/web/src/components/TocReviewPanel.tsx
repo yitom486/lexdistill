@@ -43,10 +43,12 @@ import {
 } from '../lib/toc-discovery-stream.js';
 import {
   TOC_REVIEW_MAX_PAGES_UI,
+  buildAiAdoptedEntries,
   canRequestTocReview,
   decideExtractRequest,
   decideReviewRequest,
   initialTocConfirmState,
+  resolveTocReviewModelRequest,
   toEditableEntries,
   tocConfirmReducer,
   validateTocConfirmRange,
@@ -56,8 +58,11 @@ import {
   type TocDiscoveryData,
   type TocReviewData,
 } from '../lib/toc-confirm-flow.js';
+import type { TocAdoptReport } from '../lib/toc-result-view.js';
 import { TocReviewConfigDialog, TocReviewProgressDialog } from './toc/TocReviewDialogs.js';
+import type { TocModelConfig } from './toc/TocReviewDialogs.js';
 import { TocResultDialog } from './toc/TocResultDialog.js';
+import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 
 /**
  * CMD-LINGUA-P4C：目录识别 → 选范围 → OCR 基线 → AI 审核草稿 → 人工确认。
@@ -99,7 +104,7 @@ function confidenceBadge(confidence: string): 'emerald' | 'amber' | 'outline' {
 }
 
 const inputClassName =
-  'h-7 px-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 outline-none focus:border-amber-500 text-[11px]';
+  'h-7 px-2 rounded-lg border border-line bg-surface text-ink outline-none focus:border-tone-amber-500 text-[11px]';
 
 export interface TocReviewPanelViewProps {
   hasSource: boolean;
@@ -204,7 +209,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
   } = props;
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-stone-500 dark:text-stone-400">
+      <p className="text-[11px] text-ink-ghost">
         只读流程：只调识别 / 基线 / 审核接口，不创建文档、不入库；确认结果只保存在当前页面状态，尚未写入教材。
       </p>
       <div className="flex flex-wrap items-center gap-2">
@@ -217,15 +222,15 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
           onClick={onDiscover}
           title={hasSource ? '用受限 OCR 找疑似目录页（只读）' : '先选择 PDF 文件或填写本机路径'}
         >
-          <ScanSearch className="w-3.5 h-3.5 text-amber-600" />
+          <ScanSearch className="w-3.5 h-3.5 text-tone-amber-600" />
           <span>{discovering ? '识别中…' : '识别目录'}</span>
         </Button>
         {!hasSource && (
-          <span className="text-[11px] text-stone-400">先选择 PDF 文件或填写本机路径，再识别目录</span>
+          <span className="text-[11px] text-ink-stone-400">先选择 PDF 文件或填写本机路径，再识别目录</span>
         )}
       </div>
       {discoverProgress && discoverProgress.started && discovering && (
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-600 dark:text-stone-300">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-faint">
           <span aria-live="polite">{tocDiscoverStageLabel(discoverProgress)}</span>
           <Button
             type="button"
@@ -239,32 +244,32 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
         </div>
       )}
       {discoverProgress?.runtimeDownloading && discovering && (
-        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+        <p className="text-[11px] text-ink-ghost">
           正在准备本地 OCR 运行时，首次可能下载约 80MB（一次性，之后不再下载）。
         </p>
       )}
       {discoverProgress?.phase === 'cancelled' && (
-        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+        <p className="text-[11px] text-ink-ghost">
           已取消识别，未采纳任何结果；可重新识别，或直接在下方手动填写范围。
         </p>
       )}
       {discoverError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {discoverError}
         </p>
       )}
       {discover && discover.outlineQuality === 'usable' && (
-        <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300">
+        <div className="p-2 rounded-xl border border-line-emerald-500o30 bg-wash-emerald-500o5 text-[11px] text-ink-faint">
           本书自带可用的原生目录，已使用内嵌目录，无需 OCR 找目录页。请直接用上方「预览结构」的原生目录，本流程不再做基线与 AI 审核。
         </div>
       )}
       {discover && discover.outlineQuality === 'unusable' && (
-        <div className="p-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-[11px] text-stone-600 dark:text-stone-300">
+        <div className="p-2 rounded-xl border border-line-amber-500o30 bg-wash-amber-500o5 text-[11px] text-ink-faint">
           检测到 PDF 内嵌书签，但标题不足以构成教材目录；已改用 OCR 识别。请从下方候选或手动填写范围继续。
         </div>
       )}
       {discover && !discover.embedded && discover.status === 'found' && (
-        <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+        <div className="text-[11px] text-ink-faint space-y-1">
           <p className="font-bold">候选目录范围（仍需你手动确认，不会自动采用）：</p>
           <div className="flex flex-wrap gap-1.5">
             {discover.candidates.map((candidate, index) => (
@@ -275,8 +280,8 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
                 onClick={() => onSelectCandidate(index)}
                 className={`px-2 py-1 rounded-lg border text-[11px] font-semibold ${
                   selectedIndex === index
-                    ? 'border-amber-600 bg-amber-600 text-white'
-                    : 'border-stone-200 dark:border-stone-700 hover:border-amber-500/50'
+                    ? 'border-tone-amber-600 bg-tone-amber-600 text-tone-white'
+                    : 'border-line hover:border-tone-amber-500o50'
                 }`}
               >
                 第 {candidate.fromPage}–{candidate.toPage} 页 · 得分 {candidate.score}
@@ -286,7 +291,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
         </div>
       )}
       {discover && !discover.embedded && discover.status === 'ambiguous' && (
-        <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+        <div className="text-[11px] text-ink-faint space-y-1">
           <p className="font-bold">
             发现 {discover.candidates.length} 个候选范围（得分仅供参考），请手动选一个，不会自动选择：
           </p>
@@ -299,8 +304,8 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
                 onClick={() => onSelectCandidate(index)}
                 className={`px-2 py-1 rounded-lg border text-[11px] font-semibold ${
                   selectedIndex === index
-                    ? 'border-amber-600 bg-amber-600 text-white'
-                    : 'border-stone-200 dark:border-stone-700 hover:border-amber-500/50'
+                    ? 'border-tone-amber-600 bg-tone-amber-600 text-tone-white'
+                    : 'border-line hover:border-tone-amber-500o50'
                 }`}
               >
                 第 {candidate.fromPage}–{candidate.toPage} 页 · 得分 {candidate.score}
@@ -310,14 +315,14 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
         </div>
       )}
       {discover && !discover.embedded && discover.status === 'not-found' && (
-        <div className="p-2 rounded-xl border border-stone-200 dark:border-stone-700 text-[11px] text-stone-600 dark:text-stone-300">
+        <div className="p-2 rounded-xl border border-line text-[11px] text-ink-faint">
           未找到可信目录页（已看前 {discover.pagesScannedCount} 页）。可以手工填写开始 / 结束页继续，不猜测页码。
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 dark:text-stone-400">
-        <span className="font-bold text-stone-700 dark:text-stone-200">确认范围：</span>
-        <span className="text-stone-400">熟悉教材可直接填写，跳过自动识别（不发识别请求）</span>
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-ghost">
+        <span className="font-bold text-ink-mute-deep">确认范围：</span>
+        <span className="text-ink-stone-400">熟悉教材可直接填写，跳过自动识别（不发识别请求）</span>
         <input
           type="number"
           min={1}
@@ -337,10 +342,10 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
           onChange={(e) => onEndChange(e.target.value)}
           className={`${inputClassName} w-20`}
         />
-        <span className="text-stone-400">正整数，含两端，一次最多 30 页</span>
+        <span className="text-ink-stone-400">正整数，含两端，一次最多 30 页</span>
       </div>
       {rangeError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {rangeError}
         </p>
       )}
@@ -354,13 +359,13 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
           onClick={onExtract}
           title={extractDisabledReason ?? '对确认范围做本地 OCR，产出目录基线（只读）'}
         >
-          <ListChecks className="w-3.5 h-3.5 text-amber-600" />
+          <ListChecks className="w-3.5 h-3.5 text-tone-amber-600" />
           <span>{extracting ? '提取中…' : '提取目录基线'}</span>
         </Button>
-        {extractDisabledReason && <span className="text-[11px] text-stone-400">{extractDisabledReason}</span>}
+        {extractDisabledReason && <span className="text-[11px] text-ink-stone-400">{extractDisabledReason}</span>}
       </div>
       {extractProgress && extractProgress.started && extracting && (
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-600 dark:text-stone-300">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-faint">
           <span aria-live="polite">{tocExtractStageLabel(extractProgress)}</span>
           <Button
             type="button"
@@ -374,32 +379,32 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
         </div>
       )}
       {extractProgress?.runtimeDownloading && extracting && (
-        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+        <p className="text-[11px] text-ink-ghost">
           正在准备本地 OCR 运行时，首次可能下载约 80MB（一次性，之后不再下载）。
         </p>
       )}
       {extractProgress?.phase === 'cancelled' && (
-        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+        <p className="text-[11px] text-ink-ghost">
           已取消提取，未采纳任何结果；可重新提取，或直接手动填写范围。
         </p>
       )}
       {extractError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {extractError}
         </p>
       )}
       {baseline && (
-        <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-2 space-y-1.5">
-          <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200">
+        <div className="rounded-xl border border-tone-amber-500o25 bg-wash-amber-500o5 p-2 space-y-1.5">
+          <p className="text-[11px] font-bold text-ink-mute-deep">
             OCR 基线：第 {baseline.range.fromPage}–{baseline.range.toPage} 页，共 {baseline.entries.length} 条
             {baseline.embedded && <span>（原生目录可用，本次零 OCR）</span>}
           </p>
-          <p className="text-[11px] text-stone-500 dark:text-stone-400">
+          <p className="text-[11px] text-ink-ghost">
             printedPage 是教材印刷页，不等于 PDF 物理页，请勿直接当页码跳转。
             {baseline.entries.length === 0 && '本次没有提取到可用条目，可以换一段页码重试。'}
           </p>
           {!baseline.embedded && baseline.verdict !== 'usable' && (
-            <div className="p-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-[11px] text-stone-600 dark:text-stone-300">
+            <div className="p-2 rounded-xl border border-line-amber-500o30 bg-wash-amber-500o5 text-[11px] text-ink-faint">
               {baseline.verdict === 'empty'
                 ? '规则未形成目录条目，但如目录原文证据足够，可让 AI 根据原文与页面图重建草稿（点 AI 审核；证据不足时会明确提示）。结果不足，不能直接采用；也可以换一段页码重试，或在下方手动填写。'
                 : `结果不足，不能直接采用（仅 ${baseline.entries.length} 条有效条目${
@@ -412,11 +417,11 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
               {baseline.entries.map((entry, index) => (
                 <div
                   key={`${entry.printedPage}-${index}`}
-                  className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px]"
+                  className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-veil-whiteo60-stone-900o40 text-[11px]"
                 >
                   <span className="truncate">
                     {entry.title}
-                    <span className="ml-1 font-mono text-stone-400" title="教材印刷页（书内页码），不是 PDF 物理页">
+                    <span className="ml-1 font-mono text-ink-stone-400" title="教材印刷页（书内页码），不是 PDF 物理页">
                       印{entry.printedPage}页
                     </span>
                   </span>
@@ -432,7 +437,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
               ))}
             </div>
           )}
-          <p className="text-[10px] font-mono text-stone-400">
+          <p className="text-[10px] font-mono text-ink-stone-400">
             请求 {baseline.diagnostics.pagesRequested} 页 · OCR {baseline.diagnostics.pagesOcr} 页 · 接受{' '}
             {baseline.diagnostics.entriesAccepted} · 拒绝 {baseline.diagnostics.entriesRejected}
             {baseline.diagnostics.badTitle > 0 && ` · 标题不合 ${baseline.diagnostics.badTitle}`}
@@ -441,13 +446,13 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
               ` · ${baseline.diagnostics.unresolvedBlocks} 个标题未定位页码（待定，不猜）`}
           </p>
           {baseline.pageEvidence.length > 0 && (
-            <details className="text-[11px] text-stone-500 dark:text-stone-400">
+            <details className="text-[11px] text-ink-ghost">
               <summary className="cursor-pointer font-bold">查看 OCR 原文证据（每页截断，只读）</summary>
               <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1 pt-1">
                 {baseline.pageEvidence.map((evidence) => (
                   <div key={evidence.page} className="space-y-0.5">
-                    <p className="font-mono text-[10px] text-stone-400">PDF 第 {evidence.page} 页</p>
-                    <pre className="whitespace-pre-wrap break-words px-2 py-1 rounded-lg bg-white/60 dark:bg-stone-900/40 text-[11px] font-sans">
+                    <p className="font-mono text-[10px] text-ink-stone-400">PDF 第 {evidence.page} 页</p>
+                    <pre className="whitespace-pre-wrap break-words px-2 py-1 rounded-lg bg-veil-whiteo60-stone-900o40 text-[11px] font-sans">
                       {evidence.excerpt || '（本页无保留行）'}
                     </pre>
                   </div>
@@ -472,13 +477,13 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
             <span>{reviewing ? '审核中…' : 'AI 重建目录…'}</span>
           </Button>
           {(reviewDisabledReason ?? reviewSizeHint) && (
-            <span className="text-[11px] text-stone-400">{reviewDisabledReason ?? reviewSizeHint}</span>
+            <span className="text-[11px] text-ink-stone-400">{reviewDisabledReason ?? reviewSizeHint}</span>
           )}
         </div>
       )}
       {review && !review.embedded && review.draft && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/5 p-2">
-          <p className="text-[11px] text-stone-600 dark:text-stone-300">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-tone-amber-500o25 bg-wash-amber-500o5 p-2">
+          <p className="text-[11px] text-ink-faint">
             AI 草稿已就绪：基线 {review.diagnostics.baselineEntries} 条 → 合并 {review.diagnostics.draftEntries} 条
             {review.draft.diff.filter((d) => d.change !== 'keep').length > 0 &&
               `（含 ${review.draft.diff.filter((d) => d.change !== 'keep').length} 项变更）`}
@@ -490,17 +495,17 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
         </div>
       )}
       {reviewError && (
-        <p role="alert" className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-[11px] font-semibold text-ink-rose-600-rose-400">
           {reviewError}
         </p>
       )}
       {review && review.embedded && (
-        <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300">
+        <div className="p-2 rounded-xl border border-line-emerald-500o30 bg-wash-emerald-500o5 text-[11px] text-ink-faint">
           原生目录可用，本次没有触发 AI 审核（embedded=true），请直接用原生目录。
         </div>
       )}
       {review && !review.embedded && review.reviewStatus === 'unavailable' && (
-        <div className="p-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+        <div className="p-2 rounded-xl border border-line-amber-500o30 bg-wash-amber-500o5 text-[11px] text-ink-faint space-y-1">
           <p className="font-bold">AI 审核暂不可用：{review.reviewError?.userMessage ?? '模型输出不合要求，已保留基线'}</p>
           <p>基线仍在上方，可直接采用基线，或手动填写后确认（错误码 {review.reviewError?.code ?? 'E_TOC_REVIEW_TOOL_INVALID'}，未记录模型原文）。</p>
         </div>
@@ -522,7 +527,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
             </Button>
           )}
           {review && !review.embedded && review.draft && (
-            <span className="text-[11px] text-stone-400">AI 草稿请在结果大 Dialog 内逐条确认采用（上方按钮打开）。</span>
+            <span className="text-[11px] text-ink-stone-400">AI 草稿请在结果大 Dialog 内逐条确认采用（上方按钮打开）。</span>
           )}
           {baseline && !baseline.embedded && (
             <Button
@@ -552,8 +557,8 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
         </div>
       )}
       {adopted && (
-        <div className="rounded-xl border border-stone-200 dark:border-stone-700 p-2 space-y-1.5">
-          <p className="text-[11px] font-bold text-stone-700 dark:text-stone-200">
+        <div className="rounded-xl border border-line p-2 space-y-1.5">
+          <p className="text-[11px] font-bold text-ink-mute-deep">
             待确认：{adopted === 'ocr' ? 'OCR 基线' : adopted === 'ai' ? 'AI 草稿' : '手动填写'}（{editedEntries.length} 条，只改本地状态）
           </p>
           <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
@@ -624,7 +629,7 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-7 text-[11px] text-rose-600"
+                    className="h-7 text-[11px] text-ink-rose-600"
                     onClick={() => onRemoveEntry(entry.key)}
                     aria-label="删除本行"
                   >
@@ -659,9 +664,9 @@ export function TocReviewPanelView(props: TocReviewPanelViewProps): React.ReactE
         </div>
       )}
       {confirmed && confirmedSummary && (
-        <div className="p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
+        <div className="p-2 rounded-xl border border-line-emerald-500o30 bg-wash-emerald-500o5 text-[11px] text-ink-faint space-y-1">
           <p className="font-bold flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-tone-emerald-600" />
             {confirmedSummary}
           </p>
           <p>目录已在本次导入流程中确认；下一阶段才会生成教材结构。</p>
@@ -813,6 +818,18 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
 
   const [configOpen, setConfigOpen] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
+  // P3.5-FIX：本次模型覆盖只活页面 state；持久偏好走 zustand persist。
+  const savedTocModel = usePreferencesStore((s) => s.tocReviewModel);
+  const savedTocEffort = usePreferencesStore((s) => s.tocReviewEffort);
+  const setSavedTocModel = usePreferencesStore((s) => s.setTocReviewModel);
+  const setSavedTocEffort = usePreferencesStore((s) => s.setTocReviewEffort);
+  const [sessionTocModel, setSessionTocModel] = useState('');
+  const [sessionTocEffort, setSessionTocEffort] = useState('');
+  // P3.5-FIX：AI 采用回执只活页面 state（选中 id + 编辑）；Dialog 关闭再打开按此回显。
+  const [aiAdoption, setAiAdoption] = useState<{
+    ids: string[];
+    editedById: Record<string, EditableTocEntry>;
+  } | null>(null);
 
   const handleReview = (): void => {
     // P3.5：按钮只打开配置 Dialog，真正的 mutate 由配置确认触发。
@@ -827,7 +844,7 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
     setConfigOpen(true);
   };
 
-  const handleStartReview = (): void => {
+  const handleStartReview = (config?: TocModelConfig): void => {
     if (review.isPending) return;
     const decision = decideReviewRequest(
       source !== null,
@@ -837,9 +854,29 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
     );
     if (!decision.ok) return;
     if (!source) return;
+    // P3.5-FIX：本次显式 > 已保存偏好 > 缺席（缺席不传，后端走环境 > 适配器默认）。
+    const session = config
+      ? { model: config.model, effort: config.effort }
+      : { model: sessionTocModel, effort: sessionTocEffort };
+    if (config) {
+      setSessionTocModel(config.model);
+      setSessionTocEffort(config.effort);
+      if (config.remember) {
+        setSavedTocModel(config.model);
+        setSavedTocEffort(config.effort);
+      }
+    }
+    const modelOptions = resolveTocReviewModelRequest({
+      session,
+      saved: { model: savedTocModel, effort: savedTocEffort },
+    });
     setConfigOpen(false);
     review.mutate(
-      { source, range: { startPage: decision.from, endPage: decision.to } },
+      {
+        source,
+        range: { startPage: decision.from, endPage: decision.to },
+        ...(Object.keys(modelOptions).length > 0 ? { modelOptions } : {}),
+      },
       {
         onSuccess: (data) => {
           if (!data.embedded && data.draft) setResultOpen(true);
@@ -861,7 +898,27 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       dispatch({ type: 'adopt', source: 'ocr', entries: toEditableEntries(baseline.entries) });
       return;
     }
-    // P3.5：AI 草稿采用只在结果大 Dialog 内逐条确认（页面临时状态），此处不再处理。
+    // P3.5-FIX：AI 草稿采用只经结果大 Dialog 的 onAdopt 回执（见 handleAiAdopt），此处不再处理。
+  };
+
+  /**
+   * P3.5-FIX 父级采用链：Dialog 回传选中操作 + 当前编辑，父级以 baseline +
+   * 已确认操作构造完整有序 entries → 进入 AI adopted 态（可继续 anchor/preview）。
+   * 全程页面 state，零 DB/导入写入。
+   */
+  const handleAiAdopt = (report: TocAdoptReport): void => {
+    if (!baseline || baseline.embedded || !reviewData || !reviewData.draft) return;
+    const editedById: Record<string, EditableTocEntry> = {};
+    for (const row of report.edited) editedById[row.key] = row;
+    const entries = buildAiAdoptedEntries({
+      baselineEntries: baseline.entries,
+      diff: reviewData.draft.diff,
+      selectedIds: report.selectedIds,
+      editedById,
+    });
+    setAiAdoption({ ids: report.selectedIds, editedById });
+    dispatch({ type: 'adopt', source: 'ai', entries });
+    setResultOpen(false);
   };
 
   const handleStartManual = (): void => {
@@ -972,6 +1029,10 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
           }
           reviewDisabledReason={reviewDisabledReason}
           starting={review.isPending}
+          savedModel={savedTocModel}
+          savedEffort={savedTocEffort}
+          sessionModel={sessionTocModel}
+          sessionEffort={sessionTocEffort}
           onStart={handleStartReview}
           onClose={() => setConfigOpen(false)}
         />
@@ -984,6 +1045,8 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
           rangeText={rangeText}
           baselineCount={reviewData.baseline.entries.length}
           draft={reviewData.draft}
+          {...(aiAdoption ? { initialAdoption: aiAdoption } : {})}
+          onAdopt={handleAiAdopt}
         />
       )}
       {flow.confirmed && (

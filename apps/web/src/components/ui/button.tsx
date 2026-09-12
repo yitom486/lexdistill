@@ -8,19 +8,19 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-amber-500 text-stone-950 font-bold shadow-xs hover:bg-amber-600',
+          'bg-tone-amber-500 text-tone-stone-950 font-bold shadow-xs hover:bg-tone-amber-600',
         destructive:
-          'bg-rose-500 text-white shadow-xs hover:bg-rose-600',
+          'bg-tone-rose-500 text-tone-white shadow-xs hover:bg-ink-rose-600',
         outline:
-          'border border-stone-200 dark:border-stone-800 bg-white/80 dark:bg-[#1f1d1b] hover:bg-stone-100 dark:hover:bg-stone-800 hover:border-amber-500/40 text-stone-700 dark:text-stone-300',
+          'border border-line-soft bg-veil-whiteo80 dark:bg-surface-h1f1d1b hover:bg-line-stone-100-stone-800 hover:border-tone-amber-500o40 text-ink-mute',
         secondary:
-          'bg-stone-200/80 dark:bg-stone-800 text-stone-800 dark:text-stone-200 hover:bg-stone-300/80 dark:hover:bg-stone-700',
+          'bg-tone-stone-200o80-stone-800 text-ink-soft hover:bg-line-stone-300o80-stone-700',
         ghost:
-          'hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300',
+          'hover:bg-line-stone-100-stone-800 text-ink-faint',
         link:
-          'text-amber-700 dark:text-amber-400 underline-offset-4 hover:underline',
+          'text-accent-ink-warm underline-offset-4 hover:underline',
         amber:
-          'bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-300 hover:bg-amber-500/25',
+          'bg-wash-amber-500o15 border border-line-amber-500o30 text-ink-amber-900-amber-300 hover:bg-tone-amber-500o25',
       },
       size: {
         default: 'h-9 px-4 py-2',

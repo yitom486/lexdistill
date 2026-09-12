@@ -73,7 +73,7 @@ export function ChatComposer(props: ChatComposerProps) {
   } = props;
   return (
     <footer className="shrink-0 p-3 pt-1.5">
-      <div className="rounded-2xl border border-stone-700/70 bg-[#0e0f11] focus-within:border-stone-500/80">
+      <div className="rounded-2xl border border-line-stone-700o70 bg-surface-abyss-fixed focus-within:border-line-stone-500o80">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -89,13 +89,13 @@ export function ChatComposer(props: ChatComposerProps) {
               ? '生成中：Enter=steer；队列按钮=下一轮排队 · Shift+Enter 换行'
               : '输入消息，Enter 发送 · Shift+Enter 换行'
           }
-          className="w-full resize-none bg-transparent px-3 py-2.5 text-[13px] text-stone-100 placeholder:text-stone-600 outline-none min-h-[72px]"
+          className="w-full resize-none bg-transparent px-3 py-2.5 text-[13px] text-tone-stone-100 placeholder:text-tone-stone-600 outline-none min-h-[72px]"
         />
-        <div className="flex items-center gap-0.5 border-t border-stone-800/80 px-1.5 py-1">
+        <div className="flex items-center gap-0.5 border-t border-tone-stone-800o80 px-1.5 py-1">
           <Popover open={composerSettingsOpen} onOpenChange={setComposerSettingsOpen}>
             <PopoverTrigger
-              className={`relative inline-flex size-7 shrink-0 items-center justify-center rounded-md text-stone-400 hover:bg-stone-800/80 hover:text-stone-100 ${
-                composerSettingsOpen ? 'bg-stone-800 text-stone-100' : ''
+              className={`relative inline-flex size-7 shrink-0 items-center justify-center rounded-md text-ink-stone-400 hover:bg-tone-stone-800o80 hover:text-tone-stone-100 ${
+                composerSettingsOpen ? 'bg-tone-stone-800 text-tone-stone-100' : ''
               }`}
               title="Mode / 审批 / 思考"
               aria-label="会话设置"
@@ -103,22 +103,22 @@ export function ChatComposer(props: ChatComposerProps) {
             >
               <Settings2 className="size-3.5" />
               {composerSettingsNonDefault && !composerSettingsOpen ? (
-                <span className="absolute top-1 right-1 size-1.5 rounded-full bg-sky-400" />
+                <span className="absolute top-1 right-1 size-1.5 rounded-full bg-tone-sky-400" />
               ) : null}
             </PopoverTrigger>
             <PopoverContent
               align="start"
               sideOffset={8}
-              className="w-72 space-y-3 border-stone-700 bg-[#12141a] p-3 text-stone-100"
+              className="w-72 space-y-3 border-tone-stone-700 bg-panel-chat-fixed p-3 text-tone-stone-100"
             >
               <div>
-                <p className="text-xs font-medium text-stone-200">会话参数</p>
-                <p className="mt-0.5 text-[10px] text-stone-500">设置仅影响后续发送的消息</p>
+                <p className="text-xs font-medium text-ink-stone-200">会话参数</p>
+                <p className="mt-0.5 text-[10px] text-ink-stone-500">设置仅影响后续发送的消息</p>
               </div>
 
               <div className="space-y-2">
                 <div className="space-y-0.5">
-                  <span className="block px-0.5 text-[10px] text-stone-500">Mode</span>
+                  <span className="block px-0.5 text-[10px] text-ink-stone-500">Mode</span>
                   <Select
                     value={coachCollaborationMode || '__none__'}
                     onValueChange={(v) =>
@@ -129,7 +129,7 @@ export function ChatComposer(props: ChatComposerProps) {
                     <SelectTrigger className={compactSelect}>
                       <SelectValue>{coachCollaborationMode || '默认'}</SelectValue>
                     </SelectTrigger>
-                    <SelectContent className="bg-[#12141a] border-stone-700 text-stone-100">
+                    <SelectContent className="bg-panel-chat-fixed border-tone-stone-700 text-tone-stone-100">
                       <SelectItem value="__none__" className={darkMenuItem}>
                         Mode（默认）
                       </SelectItem>
@@ -155,7 +155,7 @@ export function ChatComposer(props: ChatComposerProps) {
                 </div>
 
                 <div className="space-y-0.5">
-                  <span className="block px-0.5 text-[10px] text-stone-500">审批</span>
+                  <span className="block px-0.5 text-[10px] text-ink-stone-500">审批</span>
                   <Select
                     value={coachApprovalPolicy || 'never'}
                     onValueChange={(v) => v && setCoachApprovalPolicy(String(v))}
@@ -167,7 +167,7 @@ export function ChatComposer(props: ChatComposerProps) {
                           'Approve for me'}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent className="bg-[#12141a] border-stone-700 text-stone-100">
+                    <SelectContent className="bg-panel-chat-fixed border-tone-stone-700 text-tone-stone-100">
                       {APPROVAL_OPTIONS.map((o) => (
                         <SelectItem key={o.value} value={o.value} className={darkMenuItem}>
                           {o.label}
@@ -178,7 +178,7 @@ export function ChatComposer(props: ChatComposerProps) {
                 </div>
 
                 <div className="space-y-0.5">
-                  <span className="block px-0.5 text-[10px] text-stone-500">思考深度</span>
+                  <span className="block px-0.5 text-[10px] text-ink-stone-500">思考深度</span>
                   <Select
                     value={coachEffort || 'medium'}
                     onValueChange={(v) => v && setCoachEffort(String(v))}
@@ -187,7 +187,7 @@ export function ChatComposer(props: ChatComposerProps) {
                     <SelectTrigger className={compactSelect}>
                       <SelectValue>{effortLabel(coachEffort || 'medium')}</SelectValue>
                     </SelectTrigger>
-                    <SelectContent className="bg-[#12141a] border-stone-700 text-stone-100">
+                    <SelectContent className="bg-panel-chat-fixed border-tone-stone-700 text-tone-stone-100">
                       {effortOptions.map((e) => (
                         <SelectItem key={e} value={e} className={darkMenuItem}>
                           {effortLabel(e)}
@@ -209,7 +209,7 @@ export function ChatComposer(props: ChatComposerProps) {
               <SelectTrigger className={`${compactSelect} max-w-[14rem]`}>
                 <SelectValue placeholder="Model">{modelLabel}</SelectValue>
               </SelectTrigger>
-              <SelectContent className="bg-[#12141a] border-stone-700 text-stone-100">
+              <SelectContent className="bg-panel-chat-fixed border-tone-stone-700 text-tone-stone-100">
                 <SelectItem value="__default__" className={darkMenuItem}>
                   本机默认
                 </SelectItem>
@@ -231,7 +231,7 @@ export function ChatComposer(props: ChatComposerProps) {
               <Button
                 type="button"
                 size="icon"
-                className="size-7 shrink-0 rounded-full bg-sky-600 hover:bg-sky-500"
+                className="size-7 shrink-0 rounded-full bg-tint-sky-600 hover:bg-tint-sky-500"
                 title="注入引导 (steer)"
                 disabled={!input.trim()}
                 onClick={() => void send(input)}
@@ -241,7 +241,7 @@ export function ChatComposer(props: ChatComposerProps) {
               <Button
                 type="button"
                 size="icon"
-                className="size-7 shrink-0 rounded-full bg-violet-700 hover:bg-violet-600"
+                className="size-7 shrink-0 rounded-full bg-tint-violet-700 hover:bg-tint-violet-600"
                 title="加入下一轮队列"
                 disabled={!input.trim() || !coachThreadId || queueMessage.isPending}
                 onClick={enqueueQueued}
@@ -252,7 +252,7 @@ export function ChatComposer(props: ChatComposerProps) {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="size-7 shrink-0 rounded-full border-stone-600"
+                className="size-7 shrink-0 rounded-full border-tone-stone-600"
                 title="停止"
                 onClick={interrupt}
               >
@@ -263,7 +263,7 @@ export function ChatComposer(props: ChatComposerProps) {
             <Button
               type="button"
               size="icon"
-              className="size-7 shrink-0 rounded-full bg-sky-600 hover:bg-sky-500"
+              className="size-7 shrink-0 rounded-full bg-tint-sky-600 hover:bg-tint-sky-500"
               title="发送"
               disabled={!input.trim()}
               onClick={() => void send(input)}
@@ -273,7 +273,7 @@ export function ChatComposer(props: ChatComposerProps) {
           )}
         </div>
       </div>
-      <p className="mt-1.5 px-1 text-[10px] text-stone-600">
+      <p className="mt-1.5 px-1 text-[10px] text-tone-stone-600">
         ~/.codex · queue/changed · compact · rateLimits
         {codexStatus?.message ? ` · ${codexStatus.message}` : ''}
       </p>
