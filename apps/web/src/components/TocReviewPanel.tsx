@@ -48,6 +48,7 @@ import {
   decideExtractRequest,
   decideReviewRequest,
   initialTocConfirmState,
+  resolveRememberWrite,
   resolveTocReviewModelRequest,
   toEditableEntries,
   tocConfirmReducer,
@@ -871,11 +872,10 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
       setSessionTocModelMode(config.modelMode);
       setSessionTocEffort(config.effort);
       setSessionTocEffortMode(config.effortMode);
-      if (config.remember) {
-        // 记住本次生效值；选默认即清空已保存（下次走服务端默认）。
-        setSavedTocModel(config.modelMode === 'explicit' ? config.model : '');
-        setSavedTocEffort(config.effortMode === 'explicit' ? config.effort : '');
-      }
+      // P3.5-FIX2-A1：inherit 不得写入/清空既有偏好；explicit 保存值；default 清空。
+      const write = resolveRememberWrite(config);
+      if (write.model !== undefined) setSavedTocModel(write.model);
+      if (write.effort !== undefined) setSavedTocEffort(write.effort);
     }
     const modelOptions = resolveTocReviewModelRequest({
       session,

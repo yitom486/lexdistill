@@ -187,7 +187,7 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
       })
     );
     expect(html).toContain('跟随偏好');
-    expect(html).toContain('使用默认');
+    expect(html).toContain('服务端默认');
     expect(html).toContain('指定模型');
     expect(html).toContain('思考等级');
     expect(html).toContain('记住为偏好');

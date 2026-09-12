@@ -660,6 +660,31 @@ export function resolveTocReviewModelRequest(options: {
   };
 }
 
+export interface TocRememberConfig {
+  remember: boolean;
+  model: string;
+  modelMode: TocReviewModelMode;
+  effort: string;
+  effortMode: TocReviewModelMode;
+}
+
+/**
+ * P3.5-FIX2-A1 remember 写语义（纯函数）：静默覆盖用户偏好是 P1 缺陷。
+ * - explicit → 保存本次指定值；
+ * - default → 清空已保存值（本次用服务端默认，下次亦然）；
+ * - inherit → 缺席：不得写入、不得清空任何既有偏好（返回对象缺该键）。
+ * 调用方只写返回对象中出现的键；remember 未勾选返回 {}。
+ */
+export function resolveRememberWrite(config: TocRememberConfig): { model?: string; effort?: string } {
+  if (!config.remember) return {};
+  const out: { model?: string; effort?: string } = {};
+  if (config.modelMode === 'explicit') out.model = config.model;
+  else if (config.modelMode === 'default') out.model = '';
+  if (config.effortMode === 'explicit') out.effort = config.effort;
+  else if (config.effortMode === 'default') out.effort = '';
+  return out;
+}
+
 export function toEditableEntries(
   entries: Array<{ title: string; printedPage: number; level: number; kind: TocBaselineEntryKind }>,
   confidences?: Array<TocDraftConfidence | null>

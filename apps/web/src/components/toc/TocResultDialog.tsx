@@ -159,6 +159,15 @@ export function TocResultDialogContent(props: TocResultDialogContentProps): Reac
     });
   };
 
+  const unmarkRow = (id: string): void => {
+    setAdopted((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
   const changedIds = visibleRows.filter((item) => item.diff.change !== 'keep').map((item) => item.diff.entryId);
 
   /**
@@ -318,17 +327,20 @@ export function TocResultDialogContent(props: TocResultDialogContentProps): Reac
                   </td>
                   <td className="px-2 py-1 align-top">
                     <p className="text-[14px] text-toc-strong">{diff.reason ?? '—'}</p>
-                    {diff.change !== 'keep' && !isAdopted && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-1 h-6 text-[10px]"
-                        onClick={() => adoptRows([diff.entryId])}
-                      >
-                        确认本条
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-1 h-6 text-[10px]"
+                      aria-pressed={isAdopted}
+                      aria-label={isAdopted ? `撤销确认 ${diff.entryId}` : `确认本条 ${diff.entryId}`}
+                      onClick={() => {
+                        if (isAdopted) unmarkRow(diff.entryId);
+                        else adoptRows([diff.entryId]);
+                      }}
+                    >
+                      {isAdopted ? '撤销确认' : '确认本条'}
+                    </Button>
                   </td>
                 </tr>
               );

@@ -58,9 +58,9 @@ describe('P3.5-FIX2 配置强制默认 DOM 回归', () => {
     });
     // 初始跟随偏好：来源行展示已保存值
     expect(document.body.textContent).toContain('m-saved');
-    // 切到使用默认（模型 radio）
-    clickByLabel('使用默认模型');
-    expect(document.body.textContent).toContain('不回退已保存偏好');
+    // 切到使用服务端默认（模型 radio）
+    clickByLabel('使用服务端默认模型');
+    expect(document.body.textContent).toContain('服务端默认配置');
     // 开始重建
     const startBtn = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('开始重建'));
     if (!startBtn) throw new Error('start button missing');

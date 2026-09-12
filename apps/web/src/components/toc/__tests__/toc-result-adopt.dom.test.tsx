@@ -111,6 +111,35 @@ describe('P3.5-FIX2 部分采用 DOM 交互', () => {
     expect(entries.find((e) => e.key === 'b1')?.title).toBe('第2課 文法まとめ');
   });
 
+  it('撤销确认是显式 toggle：aria-pressed 翻转，撤销后不进 report/preview', async () => {
+    handle = await setupDom();
+    const reports: TocAdoptReport[] = [];
+    renderContent({
+      rangeText: '1–2',
+      baselineCount: 3,
+      draft: DRAFT,
+      onClose: () => {},
+      onAdopt: (report) => reports.push(report),
+    });
+    const b1Row = inputByLabel('条目标题 b1').closest('tr');
+    if (!b1Row) throw new Error('b1 row missing');
+    // 确认 → toggle 显示撤销确认且 aria-pressed=true（键盘可达的原生 button）
+    clickByText('确认本条', b1Row);
+    const toggle = b1Row.querySelector('button[aria-pressed="true"]');
+    if (!(toggle instanceof HTMLElement)) throw new Error('toggle pressed state missing');
+    expect(toggle.textContent).toContain('撤销确认');
+    expect(toggle.tabIndex).toBeGreaterThanOrEqual(-1);
+    // 撤销 → 徽标消失、aria-pressed=false
+    clickByText('撤销确认', b1Row);
+    expect(b1Row.querySelector('button[aria-pressed="true"]')).toBeNull();
+    expect([...b1Row.querySelectorAll('button')].some((b) => b.textContent?.includes('确认本条'))).toBe(true);
+    // 无标记时“采用已确认”禁用（防空提交）；空选中本就等于纯基线（纯函数已覆盖）
+    const adoptBtn = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('采用已确认'));
+    if (!(adoptBtn instanceof HTMLButtonElement)) throw new Error('adopt button missing');
+    expect(adoptBtn.disabled).toBe(true);
+    expect(reports).toHaveLength(0);
+  });
+
   it('确认全部并采用：keep 保留 + update/add 生效 + remove 真删', async () => {
     handle = await setupDom();
     const reports: TocAdoptReport[] = [];

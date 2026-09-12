@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { resolveTocReviewModelRequest } from '../toc-confirm-flow.js';
+import { resolveRememberWrite, resolveTocReviewModelRequest } from '../toc-confirm-flow.js';
 
 /**
  * P3.5-FIX2 配置三态（失败测试先行）。
@@ -57,5 +57,37 @@ describe('P3.5-FIX2 resolveTocReviewModelRequest 三态', () => {
         saved: { model: 'm-saved', effort: 'high' },
       })
     ).toEqual({});
+  });
+});
+
+describe('P3.5-FIX2-A1 resolveRememberWrite', () => {
+  it('未勾选记住 → 空对象（不写）', () => {
+    expect(
+      resolveRememberWrite({ remember: false, model: 'm', modelMode: 'explicit', effort: 'high', effortMode: 'explicit' })
+    ).toEqual({});
+  });
+
+  it('explicit 保存指定值', () => {
+    expect(
+      resolveRememberWrite({ remember: true, model: 'm-once', modelMode: 'explicit', effort: 'low', effortMode: 'explicit' })
+    ).toEqual({ model: 'm-once', effort: 'low' });
+  });
+
+  it('default 清空已保存值', () => {
+    expect(
+      resolveRememberWrite({ remember: true, model: '', modelMode: 'default', effort: '', effortMode: 'default' })
+    ).toEqual({ model: '', effort: '' });
+  });
+
+  it('inherit 不得写入、不得清空（P1 回归）', () => {
+    expect(
+      resolveRememberWrite({ remember: true, model: '', modelMode: 'inherit', effort: '', effortMode: 'inherit' })
+    ).toEqual({});
+  });
+
+  it('混合模式只写非 inherit 项', () => {
+    expect(
+      resolveRememberWrite({ remember: true, model: 'm-once', modelMode: 'explicit', effort: '', effortMode: 'inherit' })
+    ).toEqual({ model: 'm-once' });
   });
 });

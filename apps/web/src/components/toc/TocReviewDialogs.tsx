@@ -68,6 +68,8 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
     return (TOC_EFFORT_CHOICES as readonly string[]).includes(current) ? current : '';
   });
   const [remember, setRemember] = React.useState<boolean>(false);
+  // P3.5-FIX2-A1：双跟随偏好时无可记住的内容，禁用复选框（而非勾选后静默无操作）。
+  const nothingToRemember = modelMode === 'inherit' && effortMode === 'inherit';
   const effectiveModel = modelMode === 'explicit' ? modelText.trim() : '';
   const effectiveEffort = effortMode === 'explicit' ? effort : '';
   const modelSourceLine =
@@ -76,13 +78,13 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
         ? `本次指定：${modelText.trim()}${remember ? '（将记住为偏好）' : '（仅本次）'}`
         : '已选指定模型但未填写 → 本次使用默认'
       : modelMode === 'default'
-        ? '本次强制使用默认（不回退已保存偏好）'
+        ? '本次使用服务端默认配置（忽略本地已保存偏好；按服务端环境变量 > 引擎默认）'
         : `跟随已保存偏好：${savedLabel(savedModel)}`;
   const effortSourceLine =
     effortMode === 'explicit'
       ? `本次指定：${effort || '（未选，按默认）'}${remember ? '（将记住为偏好）' : '（仅本次）'}`
       : effortMode === 'default'
-        ? '本次强制使用默认（不回退已保存偏好）'
+        ? '本次使用服务端默认配置（忽略本地已保存偏好）'
         : `跟随已保存偏好：${savedLabel(savedEffort)}`;
   return (
     <div className="space-y-2">
@@ -118,11 +120,11 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
             <input
               type="radio"
               name="toc-review-model-mode"
-              aria-label="使用默认模型"
+              aria-label="使用服务端默认模型"
               checked={modelMode === 'default'}
               onChange={() => setModelMode('default')}
             />
-            使用默认（不回退已保存偏好）
+            使用服务端默认（忽略本地偏好）
           </label>
           <label className="flex items-center gap-1">
             <input
@@ -171,7 +173,7 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
                 跟随偏好（{savedLabel(savedEffort)}）
               </SelectItem>
               <SelectItem value="default" className="text-[11px]">
-                默认
+                服务端默认
               </SelectItem>
               {TOC_EFFORT_CHOICES.map((choice) => (
                 <SelectItem key={choice} value={choice} className="text-[11px]">
@@ -185,10 +187,11 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
           <input
             type="checkbox"
             aria-label="记住为偏好"
-            checked={remember}
+            checked={remember && !nothingToRemember}
+            disabled={nothingToRemember}
             onChange={(e) => setRemember(e.target.checked)}
           />
-          记住为偏好（下次默认使用；选默认则清空已保存）
+          记住为偏好（{nothingToRemember ? '跟随偏好时无需记住' : '下次默认使用；选默认则清空已保存'}）
         </label>
         <p className="text-toc-muted" aria-live="polite">{modelSourceLine}</p>
         <p className="text-toc-muted" aria-live="polite">{effortSourceLine}</p>
@@ -202,7 +205,7 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
           size="sm"
           className="h-7 text-[11px]"
           disabled={starting || reviewDisabledReason !== null}
-          onClick={() => onStart({ model: effectiveModel, effort: effectiveEffort, modelMode, effortMode, remember })}
+          onClick={() => onStart({ model: effectiveModel, effort: effectiveEffort, modelMode, effortMode, remember: remember && !nothingToRemember })}
         >
           {starting ? '已开始…' : '开始重建'}
         </Button>

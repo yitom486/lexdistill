@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { arbitraryColorUtility, styleContextColor, utilityColorLiteral } from '../color-gate.js';
+import { arbitraryColorUtility, dynamicColorConcat, styleContextColor, utilityColorLiteral } from '../color-gate.js';
 
 /**
  * P3.5-FIX2 门禁匹配器单测（失败测试先行）。
@@ -38,5 +38,25 @@ describe('P3.5-FIX2 color-gate 匹配器', () => {
   it('识别 className/style 上下文 hex', () => {
     expect(styleContextColor('className="a bg-[#211e1b] b"')).toEqual(['className hex #211e1b']);
     expect(styleContextColor('style={{ color: "#fff" }}')).toEqual(['style hex #fff']);
+  });
+
+  it('识别 style 命名色与 hsl/oklch（P3.5-FIX2-A4）', () => {
+    expect(styleContextColor(`style={{ color: 'red' }}`)).toEqual(['style named red']);
+    expect(styleContextColor('style={{ background: "hsl(0, 0%, 100%)" }}')).toEqual(['style fn hsl(']);
+    expect(styleContextColor('style={{ borderColor: "oklch(50% 0.1 200)" }}')).toEqual(['style fn oklch(']);
+    // transparent 永远放行
+    expect(styleContextColor(`style={{ color: 'transparent' }}`)).toEqual([]);
+  });
+
+  it('识别 arbitrary 命名色（P3.5-FIX2-A4）', () => {
+    expect(arbitraryColorUtility('text-[red]')).toEqual(['text-[red]']);
+    expect(arbitraryColorUtility('text-[10px]')).toEqual([]);
+  });
+
+  it('识别动态 class 拼接（P3.5-FIX2-A4）', () => {
+    expect(dynamicColorConcat('`bg-${tone}`')).toHaveLength(1);
+    expect(dynamicColorConcat(`'text-' + size`)).toHaveLength(1);
+    expect(dynamicColorConcat('`text-base font-bold`')).toEqual([]);
+    expect(dynamicColorConcat(`'hello world'`)).toEqual([]);
   });
 });

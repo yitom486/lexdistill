@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { arbitraryColorUtility, styleContextColor, utilityColorLiteral } from '../../../lib/color-gate.js';
+import { arbitraryColorUtility, dynamicColorConcat, styleContextColor, utilityColorLiteral } from '../../../lib/color-gate.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC_ROOT = join(HERE, '..', '..', '..');
@@ -54,7 +54,7 @@ describe('P3.5-FIX 全仓颜色门禁', () => {
         })
         .join('\n');
       const seen = new Set<string>();
-      for (const hit of [...utilityColorLiteral(code), ...arbitraryColorUtility(code), ...styleContextColor(code)]) {
+      for (const hit of [...utilityColorLiteral(code), ...arbitraryColorUtility(code), ...styleContextColor(code), ...dynamicColorConcat(code)]) {
         if (seen.has(hit)) continue;
         seen.add(hit);
         problems.push(`${rel}: ${hit}`);
