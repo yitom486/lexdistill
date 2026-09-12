@@ -22,6 +22,7 @@ import {
   type TocPdfSource,
 } from '../queries/useLearnerQueries.js';
 import { DEFAULT_USER_ID } from '../queries/query-keys.js';
+import { useCodexModelsQuery } from '../queries/useCodexQueries.js';
 import {
   applyTocExtractStreamEvent,
   cancelledTocExtractProgress,
@@ -62,7 +63,7 @@ import {
   type TocReviewModelSession,
 } from '../lib/toc-confirm-flow.js';
 import type { TocAdoptReport } from '../lib/toc-result-view.js';
-import { TocReviewConfigDialog, TocReviewProgressDialog } from './toc/TocReviewDialogs.js';
+import { TocReviewConfigDialog, TocReviewProgressDialog, toTocModelOptions } from './toc/TocReviewDialogs.js';
 import type { TocModelConfig } from './toc/TocReviewDialogs.js';
 import { TocResultDialog } from './toc/TocResultDialog.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
@@ -821,6 +822,12 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
 
   const [configOpen, setConfigOpen] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
+  // 模型活列表：配置 Dialog 打开才取（5 分钟 stale 缓存；codex 未登录/失败走降级手填）。
+  const modelsQuery = useCodexModelsQuery(configOpen);
+  const tocModels = React.useMemo(
+    () => toTocModelOptions(modelsQuery.data),
+    [modelsQuery.data]
+  );
   // P3.5-FIX2 审核批次：每次 review 成功递增；结果 Dialog 以 key 重挂，
   // 新批次清空旧 rows/selected/filter/编辑，同批次关闭重开靠 aiAdoption 回显。
   const [reviewRunId, setReviewRunId] = useState(0);
@@ -1049,6 +1056,11 @@ export function TocReviewPanel({ file, filePath }: TocReviewPanelProps): React.R
           sessionModelMode={sessionTocModelMode}
           sessionEffort={sessionTocEffort}
           sessionEffortMode={sessionTocEffortMode}
+          models={tocModels}
+          modelsLoading={modelsQuery.isFetching}
+          modelsError={
+            modelsQuery.isError ? '模型列表获取失败，可手动填写模型 id' : null
+          }
           onStart={handleStartReview}
           onClose={() => setConfigOpen(false)}
         />

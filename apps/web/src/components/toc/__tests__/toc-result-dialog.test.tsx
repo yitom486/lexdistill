@@ -123,6 +123,10 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
     verdict: 'usable',
     pageEvidence: [{ page: 16, excerpt: 'x' }],
   } as unknown as TocBaselineData;
+  const models = [
+    { id: 'm-big', label: 'Big', supportedEfforts: ['low', 'medium', 'high'], defaultEffort: 'medium' },
+    { id: 'm-luna', label: 'Luna', supportedEfforts: ['low'], defaultEffort: 'low' },
+  ];
 
   it('配置 Dialog：范围/基线只读 + 开始重建（禁用态可断言）', () => {
     const html = renderToStaticMarkup(
@@ -139,6 +143,9 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
         sessionModelMode: 'inherit',
         sessionEffort: '',
         sessionEffortMode: 'inherit',
+        models,
+        modelsLoading: false,
+        modelsError: null,
         onStart: () => {},
         onClose: () => {},
       })
@@ -146,8 +153,8 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
     expect(html).toContain('AI 重建目录');
     expect(html).toContain('16–21');
     expect(html).toContain('开始重建');
-    // 无已保存偏好：触发器与预览双双指向服务端默认
-    expect(html).toContain('服务端默认');
+    // 无已保存：默认取尾巴小模型并明示
+    expect(html).toContain('m-luna');
     const disabled = renderToStaticMarkup(
       React.createElement(TocReviewConfigDialogContent, {
         rangeText: '16–21',
@@ -162,6 +169,9 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
         sessionModelMode: 'inherit',
         sessionEffort: '',
         sessionEffortMode: 'inherit',
+        models,
+        modelsLoading: false,
+        modelsError: null,
         onStart: () => {},
         onClose: () => {},
       })
@@ -169,7 +179,7 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
     expect(disabled).toContain('disabled');
   });
 
-  it('配置 Dialog：模型/思考等级显式下拉 + 记住偏好 + 本次生效预览', () => {
+  it('配置 Dialog：模型真下拉 + 思考等级 + 本次生效预览', () => {
     const html = renderToStaticMarkup(
       React.createElement(TocReviewConfigDialogContent, {
         rangeText: '16–21',
@@ -178,22 +188,24 @@ describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
         sizeHint: null,
         reviewDisabledReason: null,
         starting: false,
-        savedModel: 'm-saved',
-        savedEffort: 'high',
+        savedModel: 'm-luna',
+        savedEffort: 'low',
         sessionModel: '',
         sessionModelMode: 'inherit',
         sessionEffort: '',
         sessionEffortMode: 'inherit',
+        models,
+        modelsLoading: false,
+        modelsError: null,
         onStart: () => {},
         onClose: () => {},
       })
     );
     expect(html).toContain('模型');
     expect(html).toContain('思考等级');
-    expect(html).toContain('记住为偏好');
-    // 本次生效预览回显已保存值（跟随偏好态）
+    // 本次生效预览回显将发送的值（无暗态）
     expect(html).toContain('本次发送');
-    expect(html).toContain('m-saved');
+    expect(html).toContain('m-luna');
   });
 
   it('进度 Dialog：不定长进度 + 不可取消声明', () => {

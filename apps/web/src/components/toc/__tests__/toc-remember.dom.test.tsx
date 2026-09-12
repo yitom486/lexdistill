@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import * as React from 'react';
-import { TocReviewConfigDialogContent } from '../TocReviewDialogs.js';
+import { TocReviewConfigDialogContent, type TocModelOption } from '../TocReviewDialogs.js';
 import { resolveRememberWrite } from '../../../lib/toc-confirm-flow.js';
 import type { TocReviewModelMode } from '../../../lib/toc-confirm-flow.js';
 import { usePreferencesStore } from '../../../stores/usePreferencesStore.js';
@@ -8,10 +8,11 @@ import { act, setupDom, type DomHandle } from './dom-setup.js';
 import type { TocBaselineData } from '../../../lib/toc-confirm-flow.js';
 
 /**
- * P3.5-FIX2-A1 remember 语义 DOM 回归（真实组件 + 真实 zustand persist store）。
- * P1 缺陷：inherit + 记住曾清空已保存偏好。现在：
- * - inherit/inherit 下记住复选框禁用（无可记住内容）；
- * - 混合模式只写 explicit 项，inherit 项逐字不动。
+ * remember 语义 DOM 回归（真实组件 + 真实 zustand persist store）。
+ * 复选框已删除：开始即记住显式选择（zustand，下次默认使用）；
+ * 双默认不动已保存（无静默清空）。
+ *
+ * 基座限制见 toc-config-default.dom.test.tsx 头注：下拉点开不在 jsdom 里驱动。
  */
 
 let handle: DomHandle | null = null;
@@ -27,6 +28,12 @@ const BASELINE = {
   verdict: 'usable',
   pageEvidence: [{ page: 16, excerpt: 'x' }],
 } as unknown as TocBaselineData;
+
+const MODELS: TocModelOption[] = [
+  { id: 'm-big', label: 'Big', supportedEfforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'medium' },
+  { id: 'm-saved', label: 'Saved', supportedEfforts: [], defaultEffort: '' },
+  { id: 'm-luna', label: 'Luna', supportedEfforts: ['low', 'medium'], defaultEffort: 'low' },
+];
 
 function renderHarness(session?: {
   sessionModel: string;
@@ -62,6 +69,9 @@ function renderHarness(session?: {
           sessionModelMode: s.sessionModelMode,
           sessionEffort: s.sessionEffort,
           sessionEffortMode: s.sessionEffortMode,
+          models: MODELS,
+          modelsLoading: false,
+          modelsError: null,
           // 与 Panel handleStartReview 完全相同的 persist 应用逻辑
           onStart: (config) => {
             const write = resolveRememberWrite(config);
@@ -75,47 +85,43 @@ function renderHarness(session?: {
   });
 }
 
-function clickByLabel(label: string): void {
-  const el = document.querySelector(`[aria-label="${label}"]`);
-  if (!(el instanceof HTMLElement)) throw new Error(`control not found: ${label}`);
+function clickStart(): void {
+  const startBtn = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('开始重建'));
+  if (!startBtn) throw new Error('start button missing');
   act(() => {
-    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    startBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   });
 }
 
-describe('P3.5-FIX2-A1 remember 语义 DOM 回归', () => {
-  it('inherit/inherit 下记住复选框禁用（无可记住内容）', async () => {
+describe('remember 语义 DOM 回归', () => {
+  it('双默认开始 → store 逐字不动（无静默清空）', async () => {
     handle = await setupDom();
     usePreferencesStore.setState({ tocReviewModel: 'm-saved', tocReviewEffort: 'high' });
-    renderHarness();
-    const box = document.querySelector('input[aria-label="记住为偏好"]');
-    if (!(box instanceof HTMLInputElement)) throw new Error('remember checkbox missing');
-    expect(box.disabled).toBe(true);
-    expect(document.body.textContent).toContain('跟随偏好时无需记住');
+    renderHarness({
+      sessionModel: '',
+      sessionModelMode: 'default',
+      sessionEffort: '',
+      sessionEffortMode: 'default',
+    });
+    clickStart();
+    const state = usePreferencesStore.getState();
+    expect(state.tocReviewModel).toBe('m-saved');
+    expect(state.tocReviewEffort).toBe('high');
   });
 
-  it('混合模式记住：只写 explicit 项，inherit 项逐字不动', async () => {
+  it('显式模型开始 → 只写模型，默认思考档清空已保存（预览已明示）', async () => {
     handle = await setupDom();
     usePreferencesStore.setState({ tocReviewModel: 'm-saved', tocReviewEffort: 'high' });
-    // 指定模型态走本次覆盖 props 预置（与下拉点选同一条初始化路）；effort 保持跟随偏好
     renderHarness({
-      sessionModel: 'm-once',
+      sessionModel: 'm-luna',
       sessionModelMode: 'explicit',
       sessionEffort: '',
-      sessionEffortMode: 'inherit',
+      sessionEffortMode: 'default',
     });
-    // 记住此时可用（存在 explicit 项）
-    const box = document.querySelector('input[aria-label="记住为偏好"]');
-    if (!(box instanceof HTMLInputElement)) throw new Error('remember checkbox missing');
-    expect(box.disabled).toBe(false);
-    clickByLabel('记住为偏好');
-    const startBtn = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('开始重建'));
-    if (!startBtn) throw new Error('start button missing');
-    act(() => {
-      startBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    });
+    expect(document.body.textContent).toContain('将清空已保存思考等级偏好');
+    clickStart();
     const state = usePreferencesStore.getState();
-    expect(state.tocReviewModel).toBe('m-once');
-    expect(state.tocReviewEffort).toBe('high');
+    expect(state.tocReviewModel).toBe('m-luna');
+    expect(state.tocReviewEffort).toBe('');
   });
 });

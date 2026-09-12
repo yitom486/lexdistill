@@ -33,26 +33,92 @@ export const TOC_EFFORT_CHOICES = ['low', 'medium', 'high'] as const;
 export type TocEffortChoice = (typeof TOC_EFFORT_CHOICES)[number];
 
 /**
- * Inkdown 式显式选择：一个字段一个下拉，选什么发什么，值永远可见。
- * - 模型：网关没有"可用模型列表"端点，id 无法枚举，故不做假下拉；
- *   「指定模型」后手填 id + 本次生效预览，绝不出现"不知发了什么"的跟随态。
- * - 思考等级：low/medium/high 全枚举 + 费用提示，目录是简单任务，默认不选 high。
- * 对外契约不变：仍输出 TocModelConfig（model/effort 缺席 = 不发送 = 服务端默认），
+ * 真列表，不硬编码：模型与思考档全部来自网关活列表，对外契约不变
+ * （仍输出 TocModelConfig；model/effort 缺席 = 不发送 = 服务端默认），
  * panel 与 resolveRememberWrite 零改动。
  */
-type ModelSel = '__saved__' | '__default__' | '__custom__';
-type EffortSel = '__saved__' | '__default__' | TocEffortChoice;
-
-function asEffortChoice(value: string): TocEffortChoice | null {
-  return (TOC_EFFORT_CHOICES as readonly string[]).includes(value)
-    ? (value as TocEffortChoice)
-    : null;
+export interface TocModelOption {
+  /** 发送值（Codex model id）。 */
+  id: string;
+  /** 展示名（displayName || model || id）。 */
+  label: string;
+  /** 该模型支持的思考档（空 = 未知，走 TOC_EFFORT_CHOICES）。 */
+  supportedEfforts: string[];
+  /** 该模型的默认思考档（空 = 未知）。 */
+  defaultEffort: string;
 }
 
-function effortCostHint(value: TocEffortChoice): string {
+/** Codex 模型列表收窄（纯函数）：过滤 hidden/空 id，保持服务端顺序；读侧永不抛。 */
+export function toTocModelOptions(input: unknown): TocModelOption[] {
+  if (!Array.isArray(input)) return [];
+  const out: TocModelOption[] = [];
+  for (const item of input) {
+    if (typeof item !== 'object' || item === null) continue;
+    const rec = item as Record<string, unknown>;
+    if (rec.hidden === true) continue;
+    const id = [rec.id, rec.model].find(
+      (v): v is string => typeof v === 'string' && v.trim() !== ''
+    );
+    if (!id) continue;
+    const labelRaw = [rec.displayName, rec.model, rec.id].find(
+      (v): v is string => typeof v === 'string' && v.trim() !== ''
+    );
+    const supportedEfforts = Array.isArray(rec.supportedReasoningEfforts)
+      ? rec.supportedReasoningEfforts.filter(
+          (e): e is string => typeof e === 'string' && e.trim() !== ''
+        )
+      : [];
+    const defaultEffort =
+      typeof rec.defaultReasoningEffort === 'string' ? rec.defaultReasoningEffort : '';
+    out.push({
+      id: id.trim(),
+      label: (labelRaw ?? id).trim(),
+      supportedEfforts,
+      defaultEffort,
+    });
+  }
+  return out;
+}
+
+/**
+ * 模型默认选中（纯函数，无硬编码）：已保存命中 → 已保存；
+ * 否则取列表尾巴（服务端按大→小排，尾巴即便宜小模型）；空列表 → ''。
+ */
+export function resolveTocModelDefault(models: TocModelOption[], savedId: string): string {
+  const saved = savedId.trim();
+  if (saved && models.some((m) => m.id === saved)) return saved;
+  const tail = models[models.length - 1];
+  return tail ? tail.id : '';
+}
+
+/** 思考档候选（纯函数）：选中模型自带档优先，否则回退 low/medium/high。 */
+export function resolveTocEffortOptions(model: TocModelOption | null): string[] {
+  if (model && model.supportedEfforts.length > 0) return [...model.supportedEfforts];
+  return [...TOC_EFFORT_CHOICES];
+}
+
+/**
+ * 思考档默认（纯函数）：已保存命中 → 已保存；模型默认命中 → 它；
+ * low 命中 → low（便宜优先）；首项；空 → ''。
+ */
+export function resolveTocEffortDefault(
+  options: string[],
+  model: TocModelOption | null,
+  savedEffort: string
+): string {
+  const saved = savedEffort.trim();
+  if (saved && options.includes(saved)) return saved;
+  const modelDefault = model?.defaultEffort.trim() ?? '';
+  if (modelDefault && options.includes(modelDefault)) return modelDefault;
+  if (options.includes('low')) return 'low';
+  return options[0] ?? '';
+}
+
+function effortCostHint(value: string): string {
   if (value === 'low') return '（快速·便宜，目录任务一般够用）';
   if (value === 'medium') return '（均衡）';
-  return '（最强·最贵，目录任务一般不需要）';
+  if (value === 'high') return '（最强·最贵，目录任务一般不需要）';
+  return '';
 }
 
 export interface TocReviewConfigDialogContentProps {
@@ -70,6 +136,12 @@ export interface TocReviewConfigDialogContentProps {
   sessionModelMode: TocReviewModelMode;
   sessionEffort: string;
   sessionEffortMode: TocReviewModelMode;
+  /** 服务端活列表（panel 经 useCodexModelsQuery 现取；保持服务端顺序）。 */
+  models: TocModelOption[];
+  /** 列表拉取中（此时两下拉禁用）。 */
+  modelsLoading: boolean;
+  /** 列表失败文案（非空 → 降级手填模型 id，思考档回退三档）。 */
+  modelsError: string | null;
   onStart(config: TocModelConfig): void;
   onClose(): void;
 }
@@ -78,62 +150,149 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
   const {
     rangeText, baseline, evidencePages, sizeHint, reviewDisabledReason, starting,
     savedModel, savedEffort, sessionModel, sessionModelMode, sessionEffort, sessionEffortMode,
-    onStart, onClose,
+    models, modelsLoading, modelsError, onStart, onClose,
   } = props;
   const trimmedSavedModel = savedModel.trim();
   const trimmedSavedEffort = savedEffort.trim();
-  const [modelSel, setModelSel] = React.useState<ModelSel>(() =>
-    sessionModelMode === 'explicit'
-      ? '__custom__'
-      : sessionModelMode === 'default'
-        ? '__default__'
-        : trimmedSavedModel
-          ? '__saved__'
-          : '__default__');
-  const [modelText, setModelText] = React.useState<string>(() => sessionModel || savedModel);
-  const [effortSel, setEffortSel] = React.useState<EffortSel>(() => {
-    if (sessionEffortMode === 'explicit') return asEffortChoice(sessionEffort) ?? '__default__';
-    if (sessionEffortMode === 'default') return '__default__';
-    return trimmedSavedEffort ? '__saved__' : '__default__';
+  // 列表失败/空列表 → 降级手填（思考档回退三档）；平时绝不出现输入框。
+  const fallbackMode = modelsError !== null || (!modelsLoading && models.length === 0);
+  const findModel = (id: string): TocModelOption | null =>
+    models.find((m) => m.id === id) ?? null;
+
+  const sessionModelText = sessionModel.trim();
+  const sessionEffortText = sessionEffort.trim();
+  const [modelId, setModelId] = React.useState<string>(() => {
+    if (sessionModelMode === 'explicit' && sessionModelText) return sessionModelText;
+    if (sessionModelMode === 'default') return '';
+    return resolveTocModelDefault(models, trimmedSavedModel);
   });
-  const [remember, setRemember] = React.useState<boolean>(false);
-  // 双跟随已保存时无可记住的内容，禁用复选框（而非勾选后静默无操作）。
-  const nothingToRemember = modelSel === '__saved__' && effortSel === '__saved__';
-  const modelMode: TocReviewModelMode =
-    modelSel === '__custom__' ? 'explicit' : modelSel === '__default__' ? 'default' : 'inherit';
-  const effectiveModel = modelSel === '__custom__' ? modelText.trim() : '';
-  const effortMode: TocReviewModelMode =
-    effortSel === '__saved__' ? 'inherit' : effortSel === '__default__' ? 'default' : 'explicit';
-  const effectiveEffort = effortSel === '__saved__' || effortSel === '__default__' ? '' : effortSel;
-  // 本次生效预览：永远可见的一行真相——实际发什么、不发什么。
-  const modelPreview =
-    modelSel === '__custom__'
-      ? effectiveModel
-        ? `本次发送模型：${effectiveModel}（仅本次）`
-        : '指定了模型但未填写 → 本次不发送（服务端默认）'
-      : modelSel === '__saved__' && trimmedSavedModel
-        ? `本次发送已保存模型：${trimmedSavedModel}`
-        : '本次不发送模型（服务端默认，跟随网关配置）';
-  const effortPreview =
-    effortSel === '__saved__'
-      ? trimmedSavedEffort
-        ? `本次发送已保存思考等级：${trimmedSavedEffort}`
-        : '本次不发送思考等级（服务端默认）'
-      : effortSel === '__default__'
-        ? '本次不发送思考等级（服务端默认，跟随网关配置）'
-        : `本次发送思考等级：${effortSel}${effortCostHint(effortSel)}`;
-  const modelTriggerText =
-    modelSel === '__custom__'
-      ? modelText.trim() || '指定模型…'
-      : modelSel === '__saved__'
-        ? `跟随已保存（${trimmedSavedModel}）`
+  const touchedModelRef = React.useRef<boolean>(
+    sessionModelMode === 'explicit' && sessionModelText !== ''
+  );
+  const [customModel, setCustomModel] = React.useState<string>(() =>
+    sessionModelMode === 'explicit' ? sessionModel : ''
+  );
+  const touchedCustomRef = React.useRef<boolean>(
+    sessionModelMode === 'explicit' && sessionModelText !== ''
+  );
+  const [effort, setEffort] = React.useState<string>(() => {
+    if (sessionEffortMode === 'explicit' && sessionEffortText) return sessionEffortText;
+    if (sessionEffortMode === 'default') return '';
+    const initialModel = findModel(resolveTocModelDefault(models, trimmedSavedModel));
+    return resolveTocEffortDefault(
+      resolveTocEffortOptions(initialModel),
+      initialModel,
+      trimmedSavedEffort
+    );
+  });
+  const touchedEffortRef = React.useRef<boolean>(
+    sessionEffortMode === 'explicit' && sessionEffortText !== ''
+  );
+
+  // 列表后到达（打开即取）：没动手才跟进 本次覆盖 > 已保存 > 尾巴/模型默认 规则。
+  React.useEffect(() => {
+    if (fallbackMode || touchedModelRef.current) return;
+    if (sessionModelMode === 'explicit' && sessionModelText) {
+      if (!modelsLoading && !findModel(sessionModelText)) {
+        setModelId(resolveTocModelDefault(models, trimmedSavedModel));
+        return;
+      }
+      setModelId(sessionModelText);
+      return;
+    }
+    if (sessionModelMode === 'default') {
+      setModelId('');
+      return;
+    }
+    setModelId(resolveTocModelDefault(models, trimmedSavedModel));
+  }, [models, modelsLoading, fallbackMode, sessionModel, sessionModelMode, sessionModelText, trimmedSavedModel]);
+
+  React.useEffect(() => {
+    if (fallbackMode || touchedCustomRef.current) return;
+    if (sessionModelMode === 'explicit') setCustomModel(sessionModel);
+  }, [fallbackMode, sessionModel, sessionModelMode]);
+
+  const selectedModel = findModel(modelId);
+  const effortOptions = fallbackMode ? [...TOC_EFFORT_CHOICES] : resolveTocEffortOptions(selectedModel);
+  React.useEffect(() => {
+    if (sessionEffortMode === 'explicit' && sessionEffortText) {
+      if (!modelsLoading && !effortOptions.includes(sessionEffortText)) {
+        setEffort(
+          resolveTocEffortDefault(
+            effortOptions,
+            selectedModel,
+            touchedEffortRef.current ? '' : trimmedSavedEffort
+          )
+        );
+        return;
+      }
+      if (!touchedEffortRef.current) setEffort(sessionEffortText);
+      return;
+    }
+    if (sessionEffortMode === 'default') {
+      if (!touchedEffortRef.current) setEffort('');
+      return;
+    }
+    if (touchedEffortRef.current && effortOptions.includes(effort)) return;
+    const wanted = resolveTocEffortDefault(
+      effortOptions,
+      selectedModel,
+      touchedEffortRef.current ? '' : trimmedSavedEffort
+    );
+    if (wanted !== effort) setEffort(wanted);
+  }, [
+    effortOptions,
+    selectedModel,
+    effort,
+    modelsLoading,
+    sessionEffort,
+    sessionEffortMode,
+    sessionEffortText,
+    trimmedSavedEffort,
+  ]);
+
+  const chooseModel = (id: string): void => {
+    touchedModelRef.current = true;
+    setModelId(id);
+  };
+  const chooseEffort = (value: string): void => {
+    touchedEffortRef.current = true;
+    setEffort(value);
+  };
+
+  const effectiveModel = fallbackMode ? customModel.trim() : modelId;
+  const modelMode: TocReviewModelMode = effectiveModel ? 'explicit' : 'default';
+  const effectiveEffort = effort;
+  const effortMode: TocReviewModelMode = effectiveEffort ? 'explicit' : 'default';
+  // 有显式选择才记住（zustand，下次默认使用）；双默认不动已保存。
+  const remember = modelMode !== 'default' || effortMode !== 'default';
+
+  const modelLabel = selectedModel ? selectedModel.label : effectiveModel;
+  const clearsSavedModel = modelMode === 'default' && trimmedSavedModel !== '';
+  const clearsSavedEffort = effortMode === 'default' && trimmedSavedEffort !== '';
+  // 本次生效预览：永远可见的一行真相——实际发什么、不发什么、清什么。
+  const modelPreview = fallbackMode
+    ? effectiveModel
+      ? `本次发送模型：${effectiveModel}（${modelsError ?? '模型列表为空'}，已降级手填）`
+      : `本次不发送模型（服务端默认）${modelsError ? `；${modelsError}` : ''}`
+    : effectiveModel
+      ? `本次发送模型：${modelLabel}（${effectiveModel}）`
+      : `本次不发送模型（服务端默认）${clearsSavedModel ? '；将清空已保存模型偏好' : ''}`;
+  const effortPreview = effectiveEffort
+    ? `本次发送思考等级：${effectiveEffort}${effortCostHint(effectiveEffort)}`
+    : `本次不发送思考等级（服务端默认）${clearsSavedEffort ? '；将清空已保存思考等级偏好' : ''}`;
+  const modelTriggerText = modelsLoading
+    ? '拉取模型列表中…'
+    : fallbackMode
+      ? '手动填写'
+      : selectedModel
+        ? selectedModel.label
         : '服务端默认';
-  const effortTriggerText =
-    effortSel === '__saved__'
-      ? `跟随已保存（${trimmedSavedEffort}）`
-      : effortSel === '__default__'
-        ? '服务端默认'
-        : `${effortSel}${effortCostHint(effortSel)}`;
+  const effortTriggerText = modelsLoading
+    ? '拉取模型列表中…'
+    : effectiveEffort
+      ? `${effectiveEffort}${effortCostHint(effectiveEffort)}`
+      : '服务端默认';
   return (
     <div className="space-y-2">
       <DialogHeader>
@@ -153,44 +312,39 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
       </div>
       <fieldset className="space-y-1.5 rounded-xl border border-toc-border bg-toc-surface p-2 text-[11px] text-toc-strong">
         <legend className="px-1 text-[11px] font-bold text-toc-muted">模型（本次生效）</legend>
-        <Select
-          value={modelSel}
-          onValueChange={(v) => {
-            if (v === '__saved__' && trimmedSavedModel) {
-              setModelSel('__saved__');
-              return;
-            }
-            if (v === '__custom__') {
-              setModelSel('__custom__');
-              return;
-            }
-            setModelSel('__default__');
-          }}
-        >
-          <SelectTrigger className="h-7 w-full text-[11px]" aria-label="模型">
-            <SelectValue placeholder="选择模型">{modelTriggerText}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {trimmedSavedModel && (
-              <SelectItem value="__saved__" className="text-[11px]">
-                跟随已保存（{trimmedSavedModel}）
+        {!fallbackMode && (
+          <Select
+            value={modelId}
+            onValueChange={(v) => {
+              chooseModel(v === null ? '' : v);
+            }}
+            disabled={modelsLoading}
+          >
+            <SelectTrigger className="h-7 w-full text-[11px]" aria-label="模型">
+              <SelectValue placeholder="选择模型">{modelTriggerText}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="" className="text-[11px]">
+                服务端默认（跟随网关配置）
               </SelectItem>
-            )}
-            <SelectItem value="__default__" className="text-[11px]">
-              服务端默认（跟随网关配置）
-            </SelectItem>
-            <SelectItem value="__custom__" className="text-[11px]">
-              指定模型…
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        {modelSel === '__custom__' && (
+              {models.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="text-[11px]">
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {fallbackMode && (
           <input
             type="text"
             aria-label="模型 id"
             placeholder="如 gpt-5.3-codex（空=默认）"
-            value={modelText}
-            onChange={(e) => setModelText(e.target.value)}
+            value={customModel}
+            onChange={(e) => {
+              touchedCustomRef.current = true;
+              setCustomModel(e.target.value);
+            }}
             className="h-7 w-full rounded-lg border border-toc-border bg-toc-surface px-2 text-toc-strong outline-none"
           />
         )}
@@ -199,32 +353,20 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
       <fieldset className="space-y-1.5 rounded-xl border border-toc-border bg-toc-surface p-2 text-[11px] text-toc-strong">
         <legend className="px-1 text-[11px] font-bold text-toc-muted">思考等级（本次生效）</legend>
         <Select
-          value={effortSel}
+          value={effort}
           onValueChange={(v) => {
-            if (v === '__saved__' && trimmedSavedEffort) {
-              setEffortSel('__saved__');
-              return;
-            }
-            if (v === null || v === '__default__') {
-              setEffortSel('__default__');
-              return;
-            }
-            setEffortSel(asEffortChoice(v) ?? '__default__');
+            chooseEffort(v === null ? '' : v);
           }}
+          disabled={modelsLoading}
         >
           <SelectTrigger className="h-7 w-full text-[11px]" aria-label="思考等级">
             <SelectValue placeholder="选择思考等级">{effortTriggerText}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {trimmedSavedEffort && (
-              <SelectItem value="__saved__" className="text-[11px]">
-                跟随已保存（{trimmedSavedEffort}）
-              </SelectItem>
-            )}
-            <SelectItem value="__default__" className="text-[11px]">
+            <SelectItem value="" className="text-[11px]">
               服务端默认（跟随网关配置）
             </SelectItem>
-            {TOC_EFFORT_CHOICES.map((choice) => (
+            {effortOptions.map((choice) => (
               <SelectItem key={choice} value={choice} className="text-[11px]">
                 {choice}{effortCostHint(choice)}
               </SelectItem>
@@ -233,18 +375,6 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
         </Select>
         <p className="text-toc-muted" aria-live="polite">{effortPreview}</p>
       </fieldset>
-      <div className="space-y-1 rounded-xl border border-toc-border bg-toc-surface p-2 text-[11px] text-toc-strong">
-        <label className="flex items-center gap-1 text-toc-muted">
-          <input
-            type="checkbox"
-            aria-label="记住为偏好"
-            checked={remember && !nothingToRemember}
-            disabled={nothingToRemember}
-            onChange={(e) => setRemember(e.target.checked)}
-          />
-          记住为偏好（{nothingToRemember ? '跟随偏好时无需记住' : '下次默认使用；选默认则清空已保存'}）
-        </label>
-      </div>
       <DialogFooter>
         <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]" onClick={onClose}>
           取消
@@ -254,7 +384,7 @@ export function TocReviewConfigDialogContent(props: TocReviewConfigDialogContent
           size="sm"
           className="h-7 text-[11px]"
           disabled={starting || reviewDisabledReason !== null}
-          onClick={() => onStart({ model: effectiveModel, effort: effectiveEffort, modelMode, effortMode, remember: remember && !nothingToRemember })}
+          onClick={() => onStart({ model: effectiveModel, effort: effectiveEffort, modelMode, effortMode, remember })}
         >
           {starting ? '已开始…' : '开始重建'}
         </Button>
