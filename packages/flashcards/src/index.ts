@@ -60,3 +60,12 @@ export {
   type PreviewCardResult,
   type CardPreviewPorts,
 } from './card-preview.js';
+
+/** 卡片来源解析用例（最小 port + 业务映射；查询由调用方实现）。 */
+export {
+  resolveCardSource,
+  type ResolvableCard,
+  type ResolvedCardSource,
+  type CardSourceEntryRow,
+  type CardSourcePorts,
+} from './card-source.js';
