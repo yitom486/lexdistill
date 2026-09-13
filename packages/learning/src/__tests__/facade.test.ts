@@ -4,6 +4,9 @@ import {
   blueprintFor as blueprintViaFacade,
   buildLocalRunSummary as summaryViaFacade,
   gradeObjectiveAnswer as gradeViaFacade,
+  acceptedDbTypesForBlock as dbTypesViaFacade,
+  buildVocabQuestionsFromCards as vocabViaFacade,
+  buildTranslationQuestionsFromCards as translationViaFacade,
   summarizeLearningEvidence as summarizeViaFacade,
   recordSkillAttempt as recordViaFacade,
   buildProfileSnapshot as snapshotViaFacade,
@@ -14,6 +17,9 @@ import {
   blueprintFor as blueprintViaCore,
   buildLocalRunSummary as summaryViaCore,
   gradeObjectiveAnswer as gradeViaCore,
+  acceptedDbTypesForBlock as dbTypesViaCore,
+  buildVocabQuestionsFromCards as vocabViaCore,
+  buildTranslationQuestionsFromCards as translationViaCore,
 } from '@study-studio/practice-core';
 import {
   summarizeLearningEvidence as summarizeViaCore,
@@ -41,6 +47,12 @@ describe('learning facade', () => {
 
   it('客观题判题入口与 practice-core 同一实现（M7-15）', () => {
     expect(gradeViaFacade).toBe(gradeViaCore);
+  });
+
+  it('题构造入口与 practice-core 同一实现（M7-16）', () => {
+    expect(dbTypesViaFacade).toBe(dbTypesViaCore);
+    expect(vocabViaFacade).toBe(vocabViaCore);
+    expect(translationViaFacade).toBe(translationViaCore);
   });
 
   it('转出排程状态类型（编译期锁：缺失即 typecheck 失败）', () => {

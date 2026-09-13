@@ -8,3 +8,4 @@ export * from './assessment-blueprint.js';
 export * from './practice-plan.js';
 export * from './run-summary.js';
 export * from './objective-grading.js';
+export * from './question-assembly.js';
