@@ -31,6 +31,7 @@
         "@study-studio/dictionary-integrations": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/protocol": "workspace:*",
+        "@study-studio/review-core": "workspace:*",
         "@study-studio/shared": "workspace:*",
         "@study-studio/speech": "workspace:*",
         "@study-studio/tool-core": "workspace:*",
@@ -137,6 +138,7 @@
       "dependencies": {
         "@study-studio/learning-algorithms": "workspace:*",
         "@study-studio/protocol": "workspace:*",
+        "@study-studio/review-core": "workspace:*",
         "@study-studio/shared": "workspace:*",
       },
     },
@@ -154,6 +156,15 @@
       "dependencies": {
         "@study-studio/shared": "workspace:*",
         "zod": "^3.24.1",
+      },
+    },
+    "packages/review-core": {
+      "name": "@study-studio/review-core",
+      "version": "0.1.2",
+      "dependencies": {
+        "@study-studio/learning-algorithms": "workspace:*",
+        "@study-studio/protocol": "workspace:*",
+        "@study-studio/shared": "workspace:*",
       },
     },
     "packages/shared": {
@@ -400,6 +411,8 @@
     "@study-studio/learning-algorithms": ["@study-studio/learning-algorithms@workspace:packages/learning-algorithms"],
 
     "@study-studio/protocol": ["@study-studio/protocol@workspace:packages/protocol"],
+
+    "@study-studio/review-core": ["@study-studio/review-core@workspace:packages/review-core"],
 
     "@study-studio/shared": ["@study-studio/shared@workspace:packages/shared"],
 

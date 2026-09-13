@@ -7,6 +7,7 @@
   "dependencies": {
     "@study-studio/learning-algorithms": "workspace:*",
     "@study-studio/protocol": "workspace:*",
+    "@study-studio/review-core": "workspace:*",
     "@study-studio/shared": "workspace:*"
   },
   "scripts": {

@@ -1,7 +1,7 @@
 ﻿import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { isOk, BusinessError } from '@study-studio/shared';
-import { scheduleFsrsReviewV1 } from '@study-studio/learner-core';
+import { scheduleFsrsReviewV1 } from '@study-studio/review-core';
 import { FlashcardSchema } from '@study-studio/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';

@@ -17,7 +17,8 @@
     { "path": "../../packages/speech" },
     { "path": "../../packages/learning-algorithms" },
     { "path": "../../packages/dictionary-core" },
-    { "path": "../../packages/dictionary-integrations" }
+    { "path": "../../packages/dictionary-integrations" },
+    { "path": "../../packages/review-core" }
   ],
   "include": ["src/**/*"]
 }

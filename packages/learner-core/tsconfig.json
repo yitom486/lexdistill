@@ -8,7 +8,8 @@
   "references": [
     { "path": "../shared" },
     { "path": "../protocol" },
-    { "path": "../learning-algorithms" }
+    { "path": "../learning-algorithms" },
+    { "path": "../review-core" }
   ],
   "include": ["src/**/*"]
 }
