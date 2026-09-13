@@ -6,7 +6,8 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@study-studio/learning": "workspace:*",
-    "@study-studio/protocol": "workspace:*"
+    "@study-studio/protocol": "workspace:*",
+    "@study-studio/shared": "workspace:*"
   },
   "scripts": {
     "test": "bun test"

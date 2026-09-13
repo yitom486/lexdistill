@@ -8,6 +8,7 @@ import {
   buildAnalysisSnapshot,
   __resetAnalysisCacheForTest,
 } from '../modules/learning-progress/application/learning-analysis.js';
+import { ANALYSIS_SYSTEM_PROMPT } from '@study-studio/ai-content';
 
 // ---------- mock repo ----------
 function makeMockRepo(opts: {
@@ -78,10 +79,17 @@ function makeMockRepo(opts: {
 // ---------- mock adapter ----------
 type StreamScenario = { kind: 'success'; text: string } | { kind: 'error' } | { kind: 'create-fail' };
 
-function makeMockAdapter(scenario: StreamScenario): AgentAdapter {
+/** M7-9 修正：记录 ai-content port 输入落到 Adapter 的实况。 */
+export interface MockAdapterSpy {
+  createSessionInput?: unknown;
+  sendMessages?: unknown[];
+}
+
+function makeMockAdapter(scenario: StreamScenario, spy?: MockAdapterSpy): AgentAdapter {
   const session: AgentSession = {
     sessionId: 's1',
-    send: async function* () {
+    send: async function* (...args: unknown[]) {
+      spy?.sendMessages?.push(args[0]);
       if (scenario.kind === 'success') {
         yield { type: 'TEXT_DELTA' as const, delta: scenario.text };
         yield { type: 'COMPLETED' as const };
@@ -101,10 +109,12 @@ function makeMockAdapter(scenario: StreamScenario): AgentAdapter {
   return {
     id: 'mock',
     name: 'mock',
-    createSession: async () =>
-      scenario.kind === 'create-fail'
+    createSession: async (...args: unknown[]) => {
+      spy && (spy.createSessionInput = args[0]);
+      return scenario.kind === 'create-fail'
         ? err(new BusinessError('E_CODEX_SESSION_CREATE', '建会话失败', 'AGENT_RUNTIME'))
-        : ok(session),
+        : ok(session);
+    },
     resumeSession: async () => ok(session),
   };
 }
@@ -183,6 +193,34 @@ describe('runLearningAnalysis', () => {
     if (!isOk(res)) return;
     expect(res.value.source).toBe('ai');
     expect(res.value.summary).toBe('新分析');
+  });
+
+  it('ai-content 的 systemPrompt/message/tools 原样落到 Adapter', async () => {
+    const repo = makeMockRepo({});
+    const spy: MockAdapterSpy = { sendMessages: [] };
+    const adapter = makeMockAdapter(
+      {
+        kind: 'success',
+        text: JSON.stringify({ summary: 's', suggestions: [] }),
+      },
+      spy
+    );
+    const res = await runLearningAnalysis({ adapter, repo, userId: 'u1' });
+    expect(isOk(res)).toBe(true);
+    const created = spy.createSessionInput as {
+      systemPrompt?: unknown;
+      tools?: unknown;
+      userId?: unknown;
+      sessionId?: unknown;
+    };
+    // systemPrompt 与 tools 来自 ai-content（非 Gateway 自造）
+    expect(created.systemPrompt).toBe(ANALYSIS_SYSTEM_PROMPT);
+    expect(created.tools).toEqual([]);
+    expect(created.userId).toBe('u1');
+    expect(typeof created.sessionId).toBe('string');
+    const sent = spy.sendMessages?.[0] as { message?: unknown };
+    expect(String(sent?.message)).toContain('学习快照');
+    expect(String(sent?.message)).toContain('u1');
   });
 });
 

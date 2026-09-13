@@ -6,8 +6,8 @@ import type {
 } from '@study-studio/protocol';
 import { ok, err, isOk, type Result, BusinessError, translateToBusinessError, generateId } from '@study-studio/shared';
 import {
-  parseAnalysisJson,
   buildLocalRuleReport,
+  generateLearningAnalysisReport,
   type AnalysisSnapshot,
 } from '@study-studio/ai-content';
 
@@ -94,20 +94,6 @@ export async function buildAnalysisSnapshot(
   }
 }
 
-const ANALYSIS_SYSTEM_PROMPT = `你是 Lingua Studio 的学习分析助手。
-基于提供的学习快照，给出可解释、可执行的学习建议。
-严格只返回一个 JSON 对象，不要任何额外文字、不要 markdown 代码块：
-{
-  "summary": "一句话总览",
-  "suggestions": [
-    { "kind": "WEAKNESS|PLAN|TIP|ENCOURAGEMENT", "title": "简短标题", "detail": "具体建议", "skillId": "可选，关联技能 id" }
-  ]
-}
-约束：
-- 不得修改任何学习状态（分数、FSRS、掌握度）；只给建议。
-- suggestions 最多 5 条，按重要性排序。
-- 用与学习者母语一致的中文撰写。`;
-
 /** 运行学习分析：缓存 → AI → 回退（缓存/本地规则）。 */
 export async function runLearningAnalysis(
   opts: RunLearningAnalysisOptions
@@ -149,60 +135,57 @@ async function runAiAnalysis(
   snapshot: AnalysisSnapshot,
   model?: string
 ): Promise<Result<LearningAnalysisReport, BusinessError>> {
-  const sessionId = generateId('analysis');
-  const sessionRes = await adapter.createSession({
-    sessionId,
-    userId: snapshot.userId,
-    systemPrompt: ANALYSIS_SYSTEM_PROMPT,
-    // 不注入任何工具：AI 只能返回建议文本，无法直接改学习状态
-    tools: [],
-    ...(model ? { model } : {}),
-  });
-  if (!isOk(sessionRes)) {
-    return sessionRes;
-  }
-  const session = sessionRes.value;
-
-  try {
-    let text = '';
-    for await (const ev of session.send({ message: `学习快照：\n${JSON.stringify(snapshot, null, 2)}` })) {
-      if (ev.type === 'TEXT_DELTA') {
-        text += ev.delta;
-      } else if (ev.type === 'ERROR') {
-        return err(ev.error);
-      } else if (ev.type === 'COMPLETED') {
-        if (ev.finalOutput) text = ev.finalOutput;
-        break;
-      }
-    }
-    const parsed = parseAnalysisJson(text);
-    if (!parsed) {
-      return err(
-        new BusinessError(
-          'E_ANALYSIS_PARSE',
-          'AI 分析结果格式无法解析，已改用本地规则建议。',
-          'AGENT_RUNTIME',
-          true
-        )
-      );
-    }
-    return ok({
+  // 文本生成 port 的 Gateway 实现：ai-content 传入的 systemPrompt/message/tools
+  // 在此原样落到 AgentAdapter（session 创建 → 流式收集 → 关闭全在 port 内）。
+  const generateText = async (input: {
+    systemPrompt: string;
+    message: string;
+    tools: [];
+  }): Promise<Result<string, BusinessError>> => {
+    const sessionId = generateId('analysis');
+    const sessionRes = await adapter.createSession({
+      sessionId,
       userId: snapshot.userId,
-      language: snapshot.targetLanguage,
-      source: 'ai',
-      suggestions: parsed.suggestions.slice(0, 5),
-      summary: parsed.summary,
-      generatedAt: new Date().toISOString(),
+      systemPrompt: input.systemPrompt,
+      // 不注入任何工具：AI 只能返回建议文本，无法直接改学习状态
+      tools: input.tools,
       ...(model ? { model } : {}),
-      expiresAt: new Date(Date.now() + DEFAULT_TTL_MS).toISOString(),
     });
-  } catch (error) {
-    return err(
-      translateToBusinessError(error, { category: 'AGENT_RUNTIME', action: 'runAiAnalysis' })
-    );
-  } finally {
-    void session.close().catch(() => {});
-  }
+    if (!isOk(sessionRes)) {
+      return sessionRes;
+    }
+    const session = sessionRes.value;
+    try {
+      let text = '';
+      for await (const ev of session.send({ message: input.message })) {
+        if (ev.type === 'TEXT_DELTA') {
+          text += ev.delta;
+        } else if (ev.type === 'ERROR') {
+          return err(ev.error);
+        } else if (ev.type === 'COMPLETED') {
+          if (ev.finalOutput) text = ev.finalOutput;
+          break;
+        }
+      }
+      return ok(text);
+    } catch (error) {
+      return err(
+        translateToBusinessError(error, { category: 'AGENT_RUNTIME', action: 'runAiAnalysis' })
+      );
+    } finally {
+      void session.close().catch(() => {});
+    }
+  };
+  // 内容用例（解析/报告装配）走 ai-content；时间戳与模型名由 Gateway 提供。
+  return generateLearningAnalysisReport(
+    { generateText },
+    {
+      snapshot,
+      generatedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + DEFAULT_TTL_MS).toISOString(),
+      ...(model ? { model } : {}),
+    }
+  );
 }
 
 /** 仅供测试重置缓存。 */

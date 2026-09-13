@@ -6,3 +6,4 @@
  * provider-neutral：不依赖 AgentAdapter、Gateway、SQLite、Web 或具体模型 SDK。
  */
 export * from './analysis-rules.js';
+export * from './analysis-generate.js';
