@@ -27,6 +27,7 @@
         "@study-studio/agent-core": "workspace:*",
         "@study-studio/agent-responses": "workspace:*",
         "@study-studio/agent-runtime": "workspace:*",
+        "@study-studio/dictionary-core": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
@@ -117,6 +118,10 @@
         "@study-studio/agent-core": "workspace:*",
         "@study-studio/agent-responses": "workspace:*",
       },
+    },
+    "packages/dictionary-core": {
+      "name": "@study-studio/dictionary-core",
+      "version": "0.1.2",
     },
     "packages/learner-core": {
       "name": "@study-studio/learner-core",
@@ -375,6 +380,8 @@
     "@study-studio/agent-runtime": ["@study-studio/agent-runtime@workspace:packages/agent-runtime"],
 
     "@study-studio/desktop": ["@study-studio/desktop@workspace:apps/desktop"],
+
+    "@study-studio/dictionary-core": ["@study-studio/dictionary-core@workspace:packages/dictionary-core"],
 
     "@study-studio/gateway": ["@study-studio/gateway@workspace:apps/gateway"],
 

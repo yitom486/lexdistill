@@ -15,7 +15,8 @@
     { "path": "../../packages/agent-codex" },
     { "path": "../../packages/agent-runtime" },
     { "path": "../../packages/speech" },
-    { "path": "../../packages/learning-algorithms" }
+    { "path": "../../packages/learning-algorithms" },
+    { "path": "../../packages/dictionary-core" }
   ],
   "include": ["src/**/*"]
 }

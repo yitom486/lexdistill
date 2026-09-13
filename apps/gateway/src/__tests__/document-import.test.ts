@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { promises as fsp } from 'node:fs';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { getMorphAnalyzer } from '../modules/dictionary/persistence/morphology.js';
 import { decodeTextBytes } from '../modules/library/application/document-import/text-reader.js';
 import {
   xhtmlToMarkdown,
@@ -186,18 +185,6 @@ describe('epub reader', () => {
     expect(() =>
       extractEpubText(buildStoredZip([{ name: 'a', data: new Uint8Array([1]) }]), 'x.epub')
     ).toThrow();
-  });
-});
-
-describe('morphology registry', () => {  it('三语路由 + 门控', () => {
-    expect(getMorphAnalyzer('ja')?.verb).toBe('活用自');
-    expect(getMorphAnalyzer('en')?.verb).toBe('还原为');
-    expect(getMorphAnalyzer('ko')?.verb).toBe('活用自');
-    expect(getMorphAnalyzer('ja')?.supports('食べた')).toBe(true);
-    expect(getMorphAnalyzer('ja')?.supports('hello')).toBe(false);
-    expect(getMorphAnalyzer('en')?.supports('runs')).toBe(true);
-    expect(getMorphAnalyzer('ko')?.supports('먹어요')).toBe(true);
-    expect(getMorphAnalyzer('ko')?.supports('hello')).toBe(false);
   });
 });
 

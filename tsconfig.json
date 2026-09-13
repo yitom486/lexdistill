@@ -12,6 +12,7 @@
     { "path": "packages/agent-runtime" },
     { "path": "packages/speech" },
     { "path": "packages/learning-algorithms" },
+    { "path": "packages/dictionary-core" },
     { "path": "apps/gateway" },
     { "path": "apps/web" }
   ]

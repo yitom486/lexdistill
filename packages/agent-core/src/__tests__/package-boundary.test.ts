@@ -25,6 +25,7 @@ const PACKAGES = [
   'tts-core',
   'speech',
   'learning-algorithms',
+  'dictionary-core',
 ] as const;
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
@@ -39,6 +40,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'tts-core': ['@study-studio/shared'],
   'speech': ['@study-studio/tts-core'],
   'learning-algorithms': ['@study-studio/shared', '@study-studio/protocol'],
+  'dictionary-core': [],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -158,6 +160,38 @@ describe('M1-1 package 依赖方向', () => {
       /bun:sqlite|drizzle|Gateway|AgentAdapter|AgentSession|AgentEvent|openai|anthropic|agentclientprotocol|Repository|fetch\s*\(/i;
     const hits = await filesWith(join(repoRoot(), 'packages', 'learning-algorithms', 'src'), pattern);
     expect(hits).toEqual([]);
+  });
+
+  it('dictionary-core：纯形态学，导入目标仅限相对路径', async () => {
+    const dir = join(repoRoot(), 'packages', 'dictionary-core', 'src');
+    const files: string[] = [];
+    const walk = async (d: string): Promise<void> => {
+      const entries = await readdir(d, { withFileTypes: true });
+      const names = entries.map((e) => e.name).sort();
+      for (const name of names) {
+        const full = join(d, name);
+        const entry = entries.find((e) => e.name === name);
+        if (entry !== undefined && entry.isDirectory()) {
+          if (name === '__tests__') continue;
+          await walk(full);
+        } else if (name.endsWith('.ts')) {
+          files.push(full);
+        }
+      }
+    };
+    await walk(dir);
+    const bad: string[] = [];
+    for (const file of files) {
+      const text = await readFile(file, 'utf-8');
+      const targets = [
+        ...text.matchAll(/(?:import|export)[^'"]*?from\s*['"]([^'"]+)['"]/g),
+        ...text.matchAll(/import\(\s*['"]([^'"]+)['"]\s*\)/g),
+      ].map((m) => m[1] as string);
+      for (const target of targets) {
+        if (!target.startsWith('.')) bad.push(`${file} -> ${target}`);
+      }
+    }
+    expect(bad).toEqual([]);
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { coarsePosOfLabel, coarsePosName } from '../modules/dictionary/persistence/part-of-speech.js';
-import { stemEn } from '../modules/dictionary/persistence/en-stem.js';
+import { coarsePosOfLabel, coarsePosName } from '../index.js';
+import { stemEn } from '../index.js';
 
 function stemBases(word: string): string[] {
   return stemEn(word).map((c) => c.base);

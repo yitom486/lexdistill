@@ -8,10 +8,15 @@
  */
 
 import type { CoarsePos } from './part-of-speech.js';
-import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
 import { deinflectJa } from './deinflect.js';
 import { stemEn } from './en-stem.js';
 import { deinflectKo } from './ko-deinflect.js';
+
+/**
+ * 语种键（'ja' | 'en' | 'ko'，与 protocol TargetLanguageCode /
+ * infra TrackLanguage 同构；本包零依赖，故用内联字面量，M-lexicon 再收敛）。
+ */
+export type DictionaryLanguage = 'ja' | 'en' | 'ko';
 
 export interface MorphCandidate {
   base: string;
@@ -46,13 +51,13 @@ const KO_ANALYZER: MorphAnalyzer = {
   verb: '活用自',
 };
 
-const MORPH_ANALYZERS: Record<TrackLanguage, MorphAnalyzer | undefined> = {
+const MORPH_ANALYZERS: Record<DictionaryLanguage, MorphAnalyzer | undefined> = {
   ja: JA_ANALYZER,
   en: EN_ANALYZER,
   ko: KO_ANALYZER,
 };
 
 /** 取某语种的形态分析器（无登记返回 undefined，不抛）。 */
-export function getMorphAnalyzer(language: TrackLanguage): MorphAnalyzer | undefined {
+export function getMorphAnalyzer(language: DictionaryLanguage): MorphAnalyzer | undefined {
   return MORPH_ANALYZERS[language];
 }

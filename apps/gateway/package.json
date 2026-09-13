@@ -9,6 +9,7 @@
     "@study-studio/agent-core": "workspace:*",
     "@study-studio/agent-responses": "workspace:*",
     "@study-studio/agent-runtime": "workspace:*",
+    "@study-studio/dictionary-core": "workspace:*",
     "@study-studio/learner-core": "workspace:*",
     "@study-studio/protocol": "workspace:*",
     "@study-studio/shared": "workspace:*",
