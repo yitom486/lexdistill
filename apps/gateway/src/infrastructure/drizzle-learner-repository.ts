@@ -890,14 +890,34 @@ export class DrizzleLearnerRepository
   }
 
   /**
-   * 在独立事务中执行操作
+   * 在独立事务中执行操作（回调 resolve 即提交，throw 即整体回滚）。
+   * 实现用显式 SAVEPOINT 包裹 await 链：bun:sqlite 的 transaction() 回调
+   * 不支持跨 await 持有事务（M4-2 回滚测试实证部分提交），SAVEPOINT 才对
+   * 异步委托链生效；与 withSavepointSandbox 同口径但成功时提交。
+   * 调用方（finalizePracticePlanRun 等）签名与语义不变。
    */
   public async withTransaction<T>(
     fn: (repo: DrizzleLearnerRepository) => Promise<T>
   ): Promise<T> {
-    return this.sqlite.transaction(async () => {
-      return await fn(this);
-    })();
+    const savepoint = `tx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    this.sqlite.run(`SAVEPOINT ${savepoint};`);
+    try {
+      const value = await fn(this);
+      this.sqlite.run(`RELEASE ${savepoint};`);
+      return value;
+    } catch (e) {
+      try {
+        this.sqlite.run(`ROLLBACK TO ${savepoint};`);
+      } catch {
+        // 回滚语句自身失败已无可为，下面的 RELEASE 尽力清理
+      }
+      try {
+        this.sqlite.run(`RELEASE ${savepoint};`);
+      } catch {
+        // 清理失败可忽略：调用方收到的仍是原始错误
+      }
+      throw e;
+    }
   }
 
   /**
