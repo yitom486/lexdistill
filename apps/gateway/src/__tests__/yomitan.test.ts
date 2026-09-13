@@ -7,11 +7,9 @@ import {
 } from '../modules/dictionary/application/dictionary-packages.js';
 import {
   installYomitanFromBytes,
-  parseYomitanDictionary,
-  pitchPositionsLabel,
-  slugifyTitle,
   type YomitanInstallMeta,
 } from '../modules/dictionary/application/yomitan.js';
+import { parseYomitanDictionary } from '@study-studio/dictionary-integrations';
 import { initSchema } from '../infrastructure/db/index.js';
 
 function memDb(): Database {
@@ -121,53 +119,6 @@ function miniZip(): Uint8Array {
     { name: 'kanji_bank_1.json', content: MINI_KANJI },
   ]);
 }
-
-describe('yomitan bank v3 解析（clean-room）', () => {
-  it('解析词条/读音/词性/释义/声调/汉字，跳过纯图片词条', async () => {
-    const { extractZip } = await import(
-      '../modules/library/application/pdf-import/archive.js'
-    );
-    // 注：跨模块引用已在 module-boundaries allowlist 登记（复用解包器）
-    const files = extractZip(miniZip()).map((e) => ({ path: e.path, data: e.data }));
-    const parsed = parseYomitanDictionary(files, 'yt');
-    expect(parsed.index.title).toBe('MiniTest');
-    expect(parsed.entries.map((e) => e.headword)).toEqual(['雨', '食べる', '雨']);
-    const ame = parsed.entries.find((e) => e.headword === '雨' && e.reading === 'あめ');
-    expect(ame?.meanings).toEqual(['rain', 'precipitation']);
-    expect(ame?.partOfSpeech).toBe('名词');
-    const taberu = parsed.entries.find((e) => e.headword === '食べる');
-    // 相邻文本节点各自成义（不臆造拼接）
-    expect(taberu?.meanings).toEqual(['to eat', 'food']);
-    expect(taberu?.partOfSpeech).toBe('一段动词');
-    // 声调走覆盖行（安装时回填），解析阶段只出 pitchRows
-    const amePitch = parsed.pitchRows.find((r) => r.term === '雨');
-    expect(JSON.parse(amePitch?.pitchJson ?? '{}')).toMatchObject({ pitch: { label: '①' } });
-    expect(parsed.stats.pitchMeta).toBe(2);
-    expect(parsed.stats.freqMeta).toBe(1);
-    expect(parsed.stats.mediaSkipped).toBe(1);
-    expect(parsed.stats.kanji).toBe(1);
-    const kanji = parsed.entries.find((e) => e.headword === '雨' && e.partOfSpeech === 'kanji');
-    expect(kanji?.meanings).toEqual(['rain']);
-  });
-
-  it('拒绝非 v3 / 缺 index / 坏 bank', () => {
-    const files = (name: string, content: string) => [{ path: name, data: new TextEncoder().encode(content) }];
-    expect(() =>
-      parseYomitanDictionary(files('index.json', JSON.stringify({ title: 'x', format: 2, revision: 'r' })), 'yt')
-    ).toThrow();
-    expect(() => parseYomitanDictionary([], 'yt')).toThrow();
-    expect(() =>
-      parseYomitanDictionary(files('index.json', MINI_INDEX).concat([{ path: 'term_bank_1.json', data: new TextEncoder().encode('{{{') }]), 'yt')
-    ).toThrow();
-  });
-
-  it('pitchPositionsLabel：0→⓪，超范围保留数字', () => {
-    expect(pitchPositionsLabel([0])).toBe('⓪');
-    expect(pitchPositionsLabel([1, 3])).toBe('①/③');
-    expect(pitchPositionsLabel([])).toBe('？');
-    expect(slugifyTitle('Kanjium Pitch Accents')).toBe('kanjium-pitch-accents');
-  });
-});
 
 describe('yomitan 安装（事务替换 + 声调回填）', () => {
   const meta: YomitanInstallMeta = {

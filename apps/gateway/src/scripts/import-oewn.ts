@@ -2,10 +2,10 @@ import { createDrizzleDb } from '../infrastructure/db/index.js';
 import {
   installOewnPackage,
   OEWN_2025_URL,
-  parseOewnXml,
 } from '../modules/dictionary/application/dictionary-packages.js';
+import { parseOewnXml } from '@study-studio/dictionary-integrations';
 
-export { parseOewnXml } from '../modules/dictionary/application/dictionary-packages.js';
+export { parseOewnXml } from '@study-studio/dictionary-integrations';
 
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');

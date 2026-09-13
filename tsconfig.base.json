@@ -28,6 +28,7 @@
       "@study-studio/speech": ["./packages/speech/src/index.ts"],
       "@study-studio/learning-algorithms": ["./packages/learning-algorithms/src/index.ts"],
       "@study-studio/dictionary-core": ["./packages/dictionary-core/src/index.ts"],
+      "@study-studio/dictionary-integrations": ["./packages/dictionary-integrations/src/index.ts"],
       "@study-studio/gateway": ["./apps/gateway/src/index.ts"]
     }
   }

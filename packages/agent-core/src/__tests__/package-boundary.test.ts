@@ -26,6 +26,7 @@ const PACKAGES = [
   'speech',
   'learning-algorithms',
   'dictionary-core',
+  'dictionary-integrations',
 ] as const;
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
@@ -41,6 +42,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'speech': ['@study-studio/tts-core'],
   'learning-algorithms': ['@study-studio/shared', '@study-studio/protocol'],
   'dictionary-core': [],
+  'dictionary-integrations': ['@study-studio/shared'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -162,8 +164,8 @@ describe('M1-1 package 依赖方向', () => {
     expect(hits).toEqual([]);
   });
 
-  it('dictionary-core：纯形态学，导入目标仅限相对路径', async () => {
-    const dir = join(repoRoot(), 'packages', 'dictionary-core', 'src');
+  async function relativeImportsOnly(pkgDir: string, allowedPackages: string[]): Promise<string[]> {
+    const dir = join(repoRoot(), 'packages', pkgDir, 'src');
     const files: string[] = [];
     const walk = async (d: string): Promise<void> => {
       const entries = await readdir(d, { withFileTypes: true });
@@ -188,10 +190,27 @@ describe('M1-1 package 依赖方向', () => {
         ...text.matchAll(/import\(\s*['"]([^'"]+)['"]\s*\)/g),
       ].map((m) => m[1] as string);
       for (const target of targets) {
-        if (!target.startsWith('.')) bad.push(`${file} -> ${target}`);
+        if (target.startsWith('.')) continue;
+        if (allowedPackages.some((p) => target === p || target.startsWith(`${p}/`))) continue;
+        bad.push(`${file} -> ${target}`);
       }
     }
-    expect(bad).toEqual([]);
+    return bad;
+  }
+
+  it('dictionary-core：纯形态学，导入目标仅限相对路径', async () => {
+    expect(await relativeImportsOnly('dictionary-core', [])).toEqual([]);
+  });
+
+  it('dictionary-integrations：纯解析，导入目标仅限相对路径与 shared', async () => {
+    expect(await relativeImportsOnly('dictionary-integrations', ['@study-studio/shared'])).toEqual([]);
+  });
+
+  it('gateway manifest：必须声明 dictionary-integrations（M5-2 消费方）', async () => {
+    const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
+    const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
+    const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
+    expect(deps['@study-studio/dictionary-integrations']).toBe('workspace:*');
   });
 });
 

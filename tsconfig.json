@@ -13,6 +13,7 @@
     { "path": "packages/speech" },
     { "path": "packages/learning-algorithms" },
     { "path": "packages/dictionary-core" },
+    { "path": "packages/dictionary-integrations" },
     { "path": "apps/gateway" },
     { "path": "apps/web" }
   ]

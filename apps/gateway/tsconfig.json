@@ -16,7 +16,8 @@
     { "path": "../../packages/agent-runtime" },
     { "path": "../../packages/speech" },
     { "path": "../../packages/learning-algorithms" },
-    { "path": "../../packages/dictionary-core" }
+    { "path": "../../packages/dictionary-core" },
+    { "path": "../../packages/dictionary-integrations" }
   ],
   "include": ["src/**/*"]
 }
