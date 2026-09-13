@@ -69,3 +69,11 @@ export {
   type CardSourceEntryRow,
   type CardSourcePorts,
 } from './card-source.js';
+
+/** APKG 只读分析用例（模型草稿/牌组统计/媒体计数/映射/兼容性；不写库）。 */
+export {
+  analyzeParsedApkg,
+  type ApkgModelDraft,
+  type ApkgDeckSummary,
+  type ApkgAnalysis,
+} from './apkg-analyze.js';

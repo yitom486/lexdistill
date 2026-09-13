@@ -9,13 +9,15 @@ import {
   nowIso,
 } from '@study-studio/shared';
 import {
-  guessFieldMapping,
-  analyzeTemplateCompat,
+  analyzeParsedApkg,
   parseApkgEntries,
   extractMediaRefs,
-  type FieldMarker,
   type ParsedApkg,
+  type ApkgAnalysis,
 } from '@study-studio/flashcards';
+
+/** 分析类型兼容出口：定义已迁入 flashcards，此处重出以保持 Tool/测试链路不动。 */
+export type { ApkgModelDraft, ApkgDeckSummary, ApkgAnalysis } from '@study-studio/flashcards';
 // 跨模块复用（G5 已登记）：zip 安全解包（炸弹/加密守卫），不写盘、无路径穿越面。
 import { extractZip, normalizeZipEntryPaths } from '../../library/public.js';
 import { flashcards } from '../../../infrastructure/db/index.js';
@@ -33,33 +35,6 @@ import { normalizeTrackLanguage } from '../../../infrastructure/persistence/lang
 
 const MAX_APKG_FILE_BYTES = 300 * 1024 * 1024;
 const DEFAULT_MAX_NOTES = 5000;
-
-export interface ApkgModelDraft {
-  modelName: string;
-  ankiFields: string[];
-  front: string;
-  back: string;
-  css: string;
-  fieldMapping: Record<string, FieldMarker | null>;
-  compatIssues: string[];
-  exampleNoteCount: number;
-}
-
-export interface ApkgDeckSummary {
-  name: string;
-  noteCount: number;
-}
-
-export interface ApkgAnalysis {
-  fileLabel: string;
-  noteCount: number;
-  cardCount: number;
-  decks: ApkgDeckSummary[];
-  models: ApkgModelDraft[];
-  mediaFileCount: number;
-  mediaRefCount: number;
-  truncated: boolean;
-}
 
 export interface ApkgImportNotesOptions {
   userId: string;
@@ -131,43 +106,14 @@ function stripHtml(raw: string): string {
     .trim();
 }
 
-/** 分析（只读：牌组/笔记计数 + 模板草稿 + 映射推测 + 兼容性；不写库）。 */
+/** 分析（只读）：解包后委托 flashcards 纯用例；信封与翻译口径不变。 */
 export async function analyzeApkg(
   bytes: Uint8Array,
   fileLabel: string
 ): Promise<Result<ApkgAnalysis, BusinessError>> {
   try {
     const parsed = await parseApkgBytes(bytes);
-    const modelNoteCounts = new Map<string, number>();
-    for (const n of parsed.notes) {
-      modelNoteCounts.set(n.mid, (modelNoteCounts.get(n.mid) ?? 0) + 1);
-    }
-    const models: ApkgModelDraft[] = [];
-    for (const [mid, m] of parsed.models) {
-      models.push({
-        modelName: m.name,
-        ankiFields: m.fields,
-        front: m.front,
-        back: m.back,
-        css: m.css,
-        fieldMapping: guessFieldMapping(m.fields),
-        compatIssues: analyzeTemplateCompat(m.front, m.back, m.css),
-        exampleNoteCount: modelNoteCounts.get(mid) ?? 0,
-      });
-    }
-    models.sort((a, b) => b.exampleNoteCount - a.exampleNoteCount);
-    return ok({
-      fileLabel,
-      noteCount: parsed.notes.length,
-      cardCount: parsed.cardCount,
-      decks: [...parsed.decks.entries()]
-        .map(([name, noteCount]) => ({ name, noteCount }))
-        .sort((a, b) => b.noteCount - a.noteCount),
-      models,
-      mediaFileCount: parsed.mediaFileCount,
-      mediaRefCount: parsed.mediaRefCount,
-      truncated: false,
-    });
+    return analyzeParsedApkg(parsed, fileLabel);
   } catch (e) {
     if (e instanceof BusinessError) return err(e);
     return err(translateToBusinessError(e, 'analyzeApkg'));
