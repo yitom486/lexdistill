@@ -8,6 +8,8 @@ import {
   buildVocabQuestionsFromCards as vocabViaFacade,
   buildTranslationQuestionsFromCards as translationViaFacade,
   buildReadingQuestions as readingViaFacade,
+  mapPoolQuestion as poolViaFacade,
+  mapQuestionType as poolTypeViaFacade,
   summarizeLearningEvidence as summarizeViaFacade,
   recordSkillAttempt as recordViaFacade,
   buildProfileSnapshot as snapshotViaFacade,
@@ -22,6 +24,8 @@ import {
   buildVocabQuestionsFromCards as vocabViaCore,
   buildTranslationQuestionsFromCards as translationViaCore,
   buildReadingQuestions as readingViaCore,
+  mapPoolQuestion as poolViaCore,
+  mapQuestionType as poolTypeViaCore,
 } from '@study-studio/practice-core';
 import {
   summarizeLearningEvidence as summarizeViaCore,
@@ -56,6 +60,8 @@ describe('learning facade', () => {
     expect(vocabViaFacade).toBe(vocabViaCore);
     expect(translationViaFacade).toBe(translationViaCore);
     expect(readingViaFacade).toBe(readingViaCore);
+    expect(poolViaFacade).toBe(poolViaCore);
+    expect(poolTypeViaFacade).toBe(poolTypeViaCore);
   });
 
   it('转出排程状态类型（编译期锁：缺失即 typecheck 失败）', () => {

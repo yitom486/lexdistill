@@ -12,6 +12,8 @@ import {
   buildVocabQuestionsFromCards,
   buildTranslationQuestionsFromCards,
   buildReadingQuestions,
+  mapPoolQuestion,
+  type PoolQuestionRow,
 } from '@study-studio/learning';
 
 /**
@@ -64,6 +66,23 @@ export type ContentToolLike = {
 const isVocabBlock = (block: PracticeBlockSpec) =>
   block.kind === 'VOCAB_REVIEW' || block.kind === 'VOCAB_NEW';
 
+/** PersistableQuestion → 包结构化输入（仅取映射所需字段；持久化方言解耦）。 */
+function toPoolQuestionRow(q: PersistableQuestion): PoolQuestionRow {
+  return {
+    id: q.id,
+    type: q.type,
+    prompt: q.prompt,
+    content: q.content,
+    options: q.options,
+    correctAnswer: q.correctAnswer,
+    explanation: q.explanation,
+    testedSkill: q.testedSkill,
+    testedSkillId: q.testedSkillId,
+    difficulty: q.difficulty,
+    dictation: q.dictation,
+  };
+}
+
 /** 内容去重键（跨来源同一道题去重；考试防重复刷分，练习防重复体验）。 */
 function questionContentKey(q: { content?: unknown; correctAnswer?: unknown }): string {
   return `${String(q.content ?? '')}||${String(q.correctAnswer ?? '')}`;
@@ -108,7 +127,7 @@ async function collectBlueprintItems(
         skillIds: group.skillIds,
       });
       if (isOk(poolRes)) {
-        for (const q of (poolRes.value ?? []).map(mapPoolQuestion)) {
+        for (const q of (poolRes.value ?? []).map((row) => mapPoolQuestion(toPoolQuestionRow(row)))) {
           groupPool.push(q);
         }
       }
@@ -345,7 +364,7 @@ export async function assemblePracticeRun(
           if (relaxedPool.length > pool.length) pool = relaxedPool;
         }
       }
-      pushFresh(applyGate(pool.map(mapPoolQuestion)));
+      pushFresh(applyGate(pool.map((row) => mapPoolQuestion(toPoolQuestionRow(row)))));
     }
 
     // 3) 模板驱动生成补齐（不调 LLM；模板缺失自动跳过）
@@ -363,7 +382,7 @@ export async function assemblePracticeRun(
     // 4) 同语种任意题兜底（同样过门：兜底不是法外之地）
     if (candidates.length < block.count) {
       const anyRes = await repo.getQuestions(userId, block.count * 4 + 8, run.language);
-      if (isOk(anyRes)) pushFresh(applyGate((anyRes.value ?? []).map(mapPoolQuestion)));
+      if (isOk(anyRes)) pushFresh(applyGate((anyRes.value ?? []).map((row) => mapPoolQuestion(toPoolQuestionRow(row)))));
     }
 
     const selected = candidates.slice(0, block.count);
@@ -402,48 +421,4 @@ export async function assemblePracticeRun(
   }
 
   return ok({ run, blocks, totalItems, skippedBlocks });
-}
-
-/** 把 quiz_questions 池行映射为协议 GeneratedQuestion（含 P6-2 语料透传）。 */
-function mapPoolQuestion(q: PersistableQuestion): GeneratedQuestion {
-  // 语料：仅接受结构完整的 dictation（fullJapanese 必填），否则丢弃
-  const rawDictation =
-    q.dictation && typeof q.dictation === 'object'
-      ? (q.dictation as Record<string, unknown>)
-      : undefined;
-  const fullJapanese = rawDictation?.fullJapanese;
-  const dictation =
-    typeof fullJapanese === 'string'
-      ? {
-          fullJapanese,
-          ...(typeof rawDictation?.speaker === 'string' ? { speaker: rawDictation.speaker } : {}),
-          ...(typeof rawDictation?.chinese === 'string' ? { chinese: rawDictation.chinese } : {}),
-          ...(typeof rawDictation?.furiganaHint === 'string'
-            ? { furiganaHint: rawDictation.furiganaHint }
-            : {}),
-        }
-      : undefined;
-  return {
-    id: String(q.id ?? ''),
-    type: mapQuestionType(q.type),
-    prompt: String(q.prompt ?? ''),
-    content: String(q.content ?? ''),
-    options: Array.isArray(q.options) ? (q.options as string[]) : undefined,
-    correctAnswer: String(q.correctAnswer ?? ''),
-    explanation: String(q.explanation ?? ''),
-    testedSkillId: String(q.testedSkillId ?? q.testedSkill ?? 'review'),
-    difficultyTier: typeof q.difficulty === 'number' ? q.difficulty : 3,
-    ...(dictation ? { dictation } : {}),
-  };
-}
-
-/** 把 quiz_questions 的 UI 类型映射回协议 QuizQuestionType。 */
-function mapQuestionType(raw: unknown): GeneratedQuestion['type'] {
-  const t = String(typeof raw === 'string' ? raw : '').toUpperCase();
-  if (t === 'CHOICE' || t === 'MULTIPLE_CHOICE') return 'MULTIPLE_CHOICE';
-  if (t === 'FILL_BLANK' || t === 'FILL_IN_BLANK') return 'FILL_IN_BLANK';
-  if (t === 'REORDER' || t === 'SENTENCE_REORDER') return 'SENTENCE_REORDER';
-  if (t === 'TRANSLATION') return 'TRANSLATION';
-  if (t === 'LISTENING_DICTATION' || t === 'DICTATION') return 'LISTENING_DICTATION';
-  return 'MULTIPLE_CHOICE';
 }

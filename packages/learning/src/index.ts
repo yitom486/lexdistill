@@ -65,6 +65,9 @@ export {
   buildVocabQuestionsFromCards,
   buildTranslationQuestionsFromCards,
   buildReadingQuestions,
+  mapPoolQuestion,
+  mapQuestionType,
+  type PoolQuestionRow,
 } from '@study-studio/practice-core';
 
 /**
