@@ -29,6 +29,7 @@
         "@study-studio/agent-runtime": "workspace:*",
         "@study-studio/dictionary-core": "workspace:*",
         "@study-studio/dictionary-integrations": "workspace:*",
+        "@study-studio/flashcard-integrations": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/learning": "workspace:*",
         "@study-studio/protocol": "workspace:*",
@@ -127,6 +128,13 @@
     },
     "packages/dictionary-integrations": {
       "name": "@study-studio/dictionary-integrations",
+      "version": "0.1.2",
+      "dependencies": {
+        "@study-studio/shared": "workspace:*",
+      },
+    },
+    "packages/flashcard-integrations": {
+      "name": "@study-studio/flashcard-integrations",
       "version": "0.1.2",
       "dependencies": {
         "@study-studio/shared": "workspace:*",
@@ -422,6 +430,8 @@
     "@study-studio/dictionary-core": ["@study-studio/dictionary-core@workspace:packages/dictionary-core"],
 
     "@study-studio/dictionary-integrations": ["@study-studio/dictionary-integrations@workspace:packages/dictionary-integrations"],
+
+    "@study-studio/flashcard-integrations": ["@study-studio/flashcard-integrations@workspace:packages/flashcard-integrations"],
 
     "@study-studio/gateway": ["@study-studio/gateway@workspace:apps/gateway"],
 

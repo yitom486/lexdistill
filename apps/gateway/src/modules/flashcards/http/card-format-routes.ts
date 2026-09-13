@@ -76,7 +76,7 @@ export function createCardFormatRoutes(deps: GatewayDeps) {
           let ankiVersion: number | null = null;
           if (settings.enabled) {
             const { createAnkiClient, getAnkiVersion } = await import(
-              '../application/anki-connect.js'
+              '@study-studio/flashcard-integrations'
             );
             try {
               const probed = await getAnkiVersion(createAnkiClient(settings.endpoint));

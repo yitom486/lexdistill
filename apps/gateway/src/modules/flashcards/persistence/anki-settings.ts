@@ -9,47 +9,16 @@ import {
 } from '@study-studio/shared';
 import { ankiSettings } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+import {
+  ANKI_CONNECT_DEFAULT_ENDPOINT,
+  resolveAnkiEndpoint,
+} from '@study-studio/flashcard-integrations';
 
 /**
  * AnkiConnect 推送开关持久化（默认关闭；读侧永不抛，损坏行回退默认）。
- * endpoint 常量与校验落持久层（R4：上层 application 复用此处，不反向依赖）。
+ * endpoint 常量与校验自 M7-1 起归 flashcard-integrations（协议层契约），
+ * 此处只复用，不反向定义。
  */
-
-export const ANKI_CONNECT_DEFAULT_ENDPOINT = 'http://127.0.0.1:8765';
-
-/** endpoint 解析与收窄（仅 http(s) 本机回环；环境变量覆盖须同样收敛）。 */
-export function resolveAnkiEndpoint(raw: string | undefined): string {
-  const candidate = (raw ?? '').trim() || ANKI_CONNECT_DEFAULT_ENDPOINT;
-  let url: URL;
-  try {
-    url = new URL(candidate);
-  } catch {
-    throw new BusinessError(
-      'E_INVALID_INPUT',
-      'AnkiConnect 地址不正确，形如 http://127.0.0.1:8765',
-      'VALIDATION',
-      false
-    );
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new BusinessError(
-      'E_INVALID_INPUT',
-      'AnkiConnect 只允许 http(s) 本机地址',
-      'VALIDATION',
-      false
-    );
-  }
-  const host = url.hostname.toLowerCase();
-  if (host !== 'localhost' && host !== '127.0.0.1' && host !== '::1') {
-    throw new BusinessError(
-      'E_INVALID_INPUT',
-      'AnkiConnect 只允许连接本机 Anki（localhost/127.0.0.1），不访问远程地址',
-      'SECURITY',
-      false
-    );
-  }
-  return url.toString().replace(/\/$/, '');
-}
 
 export interface AnkiPushSettings {
   enabled: boolean;

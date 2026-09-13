@@ -14,6 +14,7 @@
     { "path": "packages/learning-algorithms" },
     { "path": "packages/dictionary-core" },
     { "path": "packages/dictionary-integrations" },
+    { "path": "packages/flashcard-integrations" },
     { "path": "packages/review-core" },
     { "path": "packages/practice-core" },
     { "path": "packages/learning" },

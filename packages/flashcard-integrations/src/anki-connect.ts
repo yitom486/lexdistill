@@ -4,9 +4,12 @@ import {
   type Result,
   BusinessError,
 } from '@study-studio/shared';
-import { resolveAnkiEndpoint } from '../persistence/anki-settings.js';
+import { resolveAnkiEndpoint } from './anki-endpoint.js';
 
 /**
+ * M7-1 自 Gateway `flashcards/application/anki-connect.ts` 迁入（行为不变；
+ * endpoint 解析改从本包 `./anki-endpoint.js` 导入，不再反向依赖 Gateway 持久层）。
+ *
  * AnkiConnect 协议客户端（桌面 Anki 本地插件接口，协议 v6）。
  * 纯传输层：fetch 可注入（单测桩），endpoint 仅放行本机回环（防 SSRF）。
  * 不实现 Anki 服务端；Anki 未打开/未装插件时返回可重试的友好错误。

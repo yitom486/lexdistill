@@ -31,7 +31,7 @@ import {
   addAnkiNote,
   getAnkiVersion,
   type FetchImpl,
-} from './anki-connect.js';
+} from '@study-studio/flashcard-integrations';
 
 /**
  * 生词卡推送 Anki 命令（HTTP 与 `flashcards.anki_push` Tool 共用）。

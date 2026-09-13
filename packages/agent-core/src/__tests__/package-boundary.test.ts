@@ -27,6 +27,7 @@ const PACKAGES = [
   'learning-algorithms',
   'dictionary-core',
   'dictionary-integrations',
+  'flashcard-integrations',
   'review-core',
   'practice-core',
   'learning',
@@ -46,6 +47,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'learning-algorithms': ['@study-studio/shared', '@study-studio/protocol'],
   'dictionary-core': [],
   'dictionary-integrations': ['@study-studio/shared'],
+  'flashcard-integrations': ['@study-studio/shared'],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
   'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
   'learning': ['@study-studio/learner-core', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
@@ -226,6 +228,10 @@ describe('M1-1 package 依赖方向', () => {
     expect(
       await relativeImportsOnly('practice-core', ['@study-studio/shared', '@study-studio/protocol'])
     ).toEqual([]);
+  });
+
+  it('flashcard-integrations：纯传输层，仅依赖 shared（禁 Gateway/learner-core/Agent/Web）', async () => {
+    expect(await relativeImportsOnly('flashcard-integrations', ['@study-studio/shared'])).toEqual([]);
   });
 
   it('learning：领域组合入口，仅组合 learner/algorithms/review/practice-core', async () => {
