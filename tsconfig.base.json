@@ -25,6 +25,7 @@
       "@study-studio/tts-core": ["./packages/tts-core/src/index.ts"],
       "@study-studio/agent-codex": ["./packages/agent-codex/src/index.ts"],
       "@study-studio/agent-runtime": ["./packages/agent-runtime/src/index.ts"],
+      "@study-studio/speech": ["./packages/speech/src/index.ts"],
       "@study-studio/gateway": ["./apps/gateway/src/index.ts"]
     }
   }

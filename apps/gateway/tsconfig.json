@@ -13,7 +13,8 @@
     { "path": "../../packages/tool-core" },
     { "path": "../../packages/tts-core" },
     { "path": "../../packages/agent-codex" },
-    { "path": "../../packages/agent-runtime" }
+    { "path": "../../packages/agent-runtime" },
+    { "path": "../../packages/speech" }
   ],
   "include": ["src/**/*"]
 }

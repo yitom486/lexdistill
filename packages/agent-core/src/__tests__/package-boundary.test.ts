@@ -23,6 +23,7 @@ const PACKAGES = [
   'agent-runtime',
   'learner-core',
   'tts-core',
+  'speech',
 ] as const;
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
@@ -35,6 +36,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'agent-runtime': ['@study-studio/agent-core', '@study-studio/agent-codex', '@study-studio/agent-responses'],
   'learner-core': ['@study-studio/shared', '@study-studio/protocol'],
   'tts-core': ['@study-studio/shared'],
+  'speech': ['@study-studio/tts-core'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];

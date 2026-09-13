@@ -11,7 +11,7 @@ import {
   openAiSpeechHeaders,
   type AzureVoiceOption,
   type TtsTrackLanguage,
-} from '@study-studio/tts-core';
+} from '@study-studio/speech';
 import {
   ok,
   err,

@@ -10,6 +10,7 @@
     { "path": "packages/agent-codex" },
     { "path": "packages/agent-responses" },
     { "path": "packages/agent-runtime" },
+    { "path": "packages/speech" },
     { "path": "apps/gateway" },
     { "path": "apps/web" }
   ]
