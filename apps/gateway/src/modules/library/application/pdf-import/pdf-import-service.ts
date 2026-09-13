@@ -6,7 +6,7 @@ import { classifyEmbeddedOutline } from './embedded-outline-quality.js';
 import { detectDocScript, markdownToAst, promoteLessonHeadings } from '@study-studio/document-ingest-pdf';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from '@study-studio/document-ingest-pdf';
 import { collectLayoutCandidates, layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from './layout-headings.js';
-import { buildPdfConvertReport, buildPdfMapReport, buildOcrOverflowError } from './pdf-import-report.js';
+import { buildPdfConvertReport, buildPdfMapReport, buildOcrOverflowError } from '@study-studio/document-ingest-pdf';
 import {
   analyzePagesWithAzure,
   AZURE_FALLBACK_MIN_CHARS,

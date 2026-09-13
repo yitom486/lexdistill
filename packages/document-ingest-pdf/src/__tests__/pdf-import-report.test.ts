@@ -3,7 +3,7 @@ import {
   buildOcrOverflowError,
   buildPdfConvertReport,
   buildPdfMapReport,
-} from '../application/pdf-import/pdf-import-report.js';
+} from '../index.js';
 
 describe('pdf-import-report', () => {
   it('未选页 = all；课标题进摘要、不含正文', () => {
