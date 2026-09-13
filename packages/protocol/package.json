@@ -5,6 +5,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
+    "@study-studio/document-model": "workspace:*",
     "@study-studio/shared": "workspace:*",
     "zod": "^3.24.1"
   },

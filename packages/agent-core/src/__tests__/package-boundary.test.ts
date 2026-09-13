@@ -35,11 +35,12 @@ const PACKAGES = [
   'review-core',
   'practice-core',
   'learning',
+  'document-model',
 ] as const;
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'shared': [],
-  'protocol': ['@study-studio/shared'],
+  'protocol': ['@study-studio/shared', '@study-studio/document-model'],
   'tool-core': ['@study-studio/shared', '@study-studio/protocol'],
   'agent-core': ['@study-studio/shared', '@study-studio/tool-core'],
   'agent-codex': ['@study-studio/shared', '@study-studio/agent-core', '@study-studio/tool-core'],
@@ -58,7 +59,8 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'lexicon': ['@study-studio/dictionary-core', '@study-studio/dictionary-integrations'],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
   'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
-  'learning': ['@study-studio/shared', '@study-studio/learner-core', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
+  'learning': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learner-core', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
+  'document-model': ['@study-studio/shared'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -238,6 +240,12 @@ describe('M1-1 package 依赖方向', () => {
     ).toEqual([]);
   });
 
+  it('document-model：教材 AST 正典，仅依赖 shared 与 zod（禁 Gateway/learner/Agent/Web/SQLite/Drizzle）', async () => {
+    expect(
+      await relativeImportsOnly('document-model', ['@study-studio/shared', 'zod'])
+    ).toEqual([]);
+  });
+
   it('flashcard-integrations：纯传输/解析层，仅依赖 shared 与解析必需运行时（禁 Gateway/learner-core/Agent/Web）', async () => {
     expect(
       await relativeImportsOnly('flashcard-integrations', [
@@ -275,10 +283,11 @@ describe('M1-1 package 依赖方向', () => {
     expect(text).toContain('@study-studio/ai-content');
   });
 
-  it('learning：领域组合入口 + 快照用例，仅组合 shared/learner/algorithms/review/practice-core', async () => {
+  it('learning：领域组合入口 + 快照/建议用例，仅组合 shared/protocol/learner/algorithms/review/practice-core', async () => {
     expect(
       await relativeImportsOnly('learning', [
         '@study-studio/shared',
+        '@study-studio/protocol',
         '@study-studio/learner-core',
         '@study-studio/learning-algorithms',
         '@study-studio/review-core',

@@ -6,7 +6,8 @@
     "outDir": "dist"
   },
   "references": [
-    { "path": "../shared" }
+    { "path": "../shared" },
+    { "path": "../document-model" }
   ],
   "include": ["src/**/*"]
 }
