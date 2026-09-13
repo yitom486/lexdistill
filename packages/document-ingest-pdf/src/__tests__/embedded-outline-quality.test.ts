@@ -4,30 +4,28 @@ import {
   MIN_SEMANTIC_TITLES,
   classifyEmbeddedOutline,
   isSemanticOutlineTitle,
-} from '../application/pdf-import/embedded-outline-quality.js';
-import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
+  type EmbeddedOutlineInspector,
+  type EmbeddedOutlineSource,
+} from '../index.js';
 
 /**
- * CMD-LINGUA-P2.2 内嵌目录质量门单测（纯内存桩，无私人教材）。
+ * M8-5：自 Gateway 迁入（CMD-LINGUA-P2.2 内嵌目录质量门单测，纯内存桩）。
  * 标题均为自撰通用形；断言只涉及状态/reason/计数，不含正文。
+ * 与 Gateway 版唯一差别：桩走新包最小契约（EmbeddedOutlineInspector），
+ * 不再拼装 Gateway PdfInspectorLike 的 processPdf/processPdfWithOcr。
  */
 
-function inspectorWith(outline: unknown): PdfInspectorLike {
+function inspectorWith(outline: unknown): EmbeddedOutlineInspector {
   return {
-    processPdf: () => ({ pdfType: 'TextBased', pageCount: 371, markdown: '', pagesNeedingOcr: [] }),
-    processPdfWithOcr: async () => ({ markdown: '', pages: [] }),
     extractEmbeddedOutline: () => {
       if (outline instanceof Error) throw outline;
-      return outline as import('../application/pdf-import/pdf-runtime.js').EmbeddedOutlineResult;
+      return outline as EmbeddedOutlineSource;
     },
   };
 }
 
-function noMethodInspector(): PdfInspectorLike {
-  return {
-    processPdf: () => ({ pdfType: 'TextBased', pageCount: 371, markdown: '', pagesNeedingOcr: [] }),
-    processPdfWithOcr: async () => ({ markdown: '', pages: [] }),
-  };
+function noMethodInspector(): EmbeddedOutlineInspector {
+  return {};
 }
 
 function mockBytes(): Uint8Array {

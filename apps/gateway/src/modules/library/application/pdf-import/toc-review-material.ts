@@ -6,7 +6,7 @@ import {
   validatePdfInput,
   type PdfImportServiceDeps,
 } from './pdf-import-service.js';
-import { classifyEmbeddedOutline } from './embedded-outline-quality.js';
+import { classifyEmbeddedOutline } from '@study-studio/document-ingest-pdf';
 
 /**
  * CMD-LINGUA-P4A-2：已确认目录页范围的 review material（只读，内部服务）。
