@@ -149,6 +149,7 @@
       "dependencies": {
         "@study-studio/flashcard-core": "workspace:*",
         "@study-studio/flashcard-integrations": "workspace:*",
+        "@study-studio/shared": "workspace:*",
       },
     },
     "packages/learner-core": {

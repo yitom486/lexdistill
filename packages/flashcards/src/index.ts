@@ -38,3 +38,12 @@ export {
   type FetchImpl,
   type ParsedApkg,
 } from '@study-studio/flashcard-integrations';
+
+/** 卡片预览应用用例（最小读取 port + 渲染链路；持久化仍归 Gateway）。 */
+export {
+  previewCard,
+  narrowCardSourceEntry,
+  type PreviewCardRequest,
+  type PreviewCardResult,
+  type CardPreviewPorts,
+} from './card-preview.js';

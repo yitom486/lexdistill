@@ -52,7 +52,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'dictionary-integrations': ['@study-studio/shared'],
   'flashcard-integrations': ['@study-studio/shared'],
   'flashcard-core': [],
-  'flashcards': ['@study-studio/flashcard-core', '@study-studio/flashcard-integrations'],
+  'flashcards': ['@study-studio/flashcard-core', '@study-studio/flashcard-integrations', '@study-studio/shared'],
   'lexicon': ['@study-studio/dictionary-core', '@study-studio/dictionary-integrations'],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
   'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
@@ -270,11 +270,12 @@ describe('M1-1 package 依赖方向', () => {
     ).toEqual([]);
   });
 
-  it('flashcards：卡片组合入口，仅组合 flashcard-core/integrations', async () => {
+  it('flashcards：卡片组合入口，仅组合 flashcard-core/integrations/shared', async () => {
     expect(
       await relativeImportsOnly('flashcards', [
         '@study-studio/flashcard-core',
         '@study-studio/flashcard-integrations',
+        '@study-studio/shared',
       ])
     ).toEqual([]);
   });
