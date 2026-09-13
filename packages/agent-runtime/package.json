@@ -1,0 +1,15 @@
+{
+  "name": "@study-studio/agent-runtime",
+  "version": "0.1.2",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@study-studio/agent-core": "workspace:*",
+    "@study-studio/agent-codex": "workspace:*",
+    "@study-studio/agent-responses": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}

@@ -2,8 +2,8 @@ import { SessionManager, type AgentLane } from '../session/session-manager.js';
 import { ContextBuilder } from '../context/context-builder.js';
 import { ToolRouter } from '../router/tool-router.js';
 import { ToolRegistry, ToolLocations } from '@study-studio/tool-core';
-import { CodexAdapter } from '@study-studio/agent-codex';
-import { ResponsesAdapter } from '@study-studio/agent-responses';
+import { CodexAdapter } from '@study-studio/agent-runtime';
+import { ResponsesAdapter } from '@study-studio/agent-runtime';
 import {
   type WsEnvelope,
   type EnrichJobSnapshot,

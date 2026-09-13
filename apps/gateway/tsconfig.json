@@ -12,7 +12,8 @@
     { "path": "../../packages/agent-core" },
     { "path": "../../packages/tool-core" },
     { "path": "../../packages/tts-core" },
-    { "path": "../../packages/agent-codex" }
+    { "path": "../../packages/agent-codex" },
+    { "path": "../../packages/agent-runtime" }
   ],
   "include": ["src/**/*"]
 }

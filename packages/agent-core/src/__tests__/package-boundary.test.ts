@@ -20,6 +20,7 @@ const PACKAGES = [
   'agent-core',
   'agent-codex',
   'agent-responses',
+  'agent-runtime',
   'learner-core',
   'tts-core',
 ] as const;
@@ -31,6 +32,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'agent-core': ['@study-studio/shared', '@study-studio/tool-core'],
   'agent-codex': ['@study-studio/shared', '@study-studio/agent-core', '@study-studio/tool-core'],
   'agent-responses': ['@study-studio/shared', '@study-studio/agent-core', '@study-studio/tool-core'],
+  'agent-runtime': ['@study-studio/agent-core', '@study-studio/agent-codex', '@study-studio/agent-responses'],
   'learner-core': ['@study-studio/shared', '@study-studio/protocol'],
   'tts-core': ['@study-studio/shared'],
 };
@@ -112,7 +114,8 @@ describe('M1-1 package 依赖方向', () => {
 
   it('agent-core：只含契约，不反向依赖适配器', async () => {
     const hits = await filesWith(pkgSrc('agent-core'), /@study-studio\/agent-(codex|responses)/);
-    expect(hits).toEqual([]);
+    // 单测自身的断言字面量除外（产品代码禁反向引用）
+    expect(hits.filter((f) => !f.includes('__tests__'))).toEqual([]);
   });
 
   it('tool-core/protocol/learner-core/shared：不触达适配器与厂商 SDK', async () => {
@@ -144,5 +147,23 @@ describe('M1-1 package 依赖方向', () => {
       /@study-studio\/agent-(codex|responses)|@agentclientprotocol|@anthropic\/|from\s+['"]openai['"]/i;
     const hits = await filesWith(join(repoRoot(), 'apps', 'web', 'src'), pattern);
     expect(hits).toEqual([]);
+  });
+});
+
+describe('M2-1 agent-runtime 外观', () => {
+  it('contracts/ 内无适配器与厂商 SDK 痕迹', async () => {
+    const pattern = /agent-codex|agent-responses|openai|anthropic|agentclientprotocol/i;
+    const hits = await filesWith(join(repoRoot(), 'packages', 'agent-runtime', 'src', 'contracts'), pattern);
+    expect(hits).toEqual([]);
+  });
+
+  it('网关装配走统一入口（不再直引适配器包）', async () => {
+    const text = await readFile(
+      join(repoRoot(), 'apps', 'gateway', 'src', 'runtime', 'gateway-runtime.ts'),
+      'utf-8'
+    );
+    expect(text).toContain('@study-studio/agent-runtime');
+    expect(text).not.toContain('@study-studio/agent-codex');
+    expect(text).not.toContain('@study-studio/agent-responses');
   });
 });

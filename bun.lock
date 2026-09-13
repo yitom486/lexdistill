@@ -26,6 +26,7 @@
         "@study-studio/agent-codex": "workspace:*",
         "@study-studio/agent-core": "workspace:*",
         "@study-studio/agent-responses": "workspace:*",
+        "@study-studio/agent-runtime": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
@@ -105,6 +106,15 @@
         "@study-studio/agent-core": "workspace:*",
         "@study-studio/shared": "workspace:*",
         "@study-studio/tool-core": "workspace:*",
+      },
+    },
+    "packages/agent-runtime": {
+      "name": "@study-studio/agent-runtime",
+      "version": "0.1.2",
+      "dependencies": {
+        "@study-studio/agent-codex": "workspace:*",
+        "@study-studio/agent-core": "workspace:*",
+        "@study-studio/agent-responses": "workspace:*",
       },
     },
     "packages/learner-core": {
@@ -344,6 +354,8 @@
     "@study-studio/agent-core": ["@study-studio/agent-core@workspace:packages/agent-core"],
 
     "@study-studio/agent-responses": ["@study-studio/agent-responses@workspace:packages/agent-responses"],
+
+    "@study-studio/agent-runtime": ["@study-studio/agent-runtime@workspace:packages/agent-runtime"],
 
     "@study-studio/desktop": ["@study-studio/desktop@workspace:apps/desktop"],
 
