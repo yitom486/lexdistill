@@ -11,6 +11,7 @@
     { "path": "packages/agent-responses" },
     { "path": "packages/agent-runtime" },
     { "path": "packages/speech" },
+    { "path": "packages/learning-algorithms" },
     { "path": "apps/gateway" },
     { "path": "apps/web" }
   ]

@@ -122,6 +122,15 @@
       "name": "@study-studio/learner-core",
       "version": "0.1.2",
       "dependencies": {
+        "@study-studio/learning-algorithms": "workspace:*",
+        "@study-studio/protocol": "workspace:*",
+        "@study-studio/shared": "workspace:*",
+      },
+    },
+    "packages/learning-algorithms": {
+      "name": "@study-studio/learning-algorithms",
+      "version": "0.1.2",
+      "dependencies": {
         "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
       },
@@ -370,6 +379,8 @@
     "@study-studio/gateway": ["@study-studio/gateway@workspace:apps/gateway"],
 
     "@study-studio/learner-core": ["@study-studio/learner-core@workspace:packages/learner-core"],
+
+    "@study-studio/learning-algorithms": ["@study-studio/learning-algorithms@workspace:packages/learning-algorithms"],
 
     "@study-studio/protocol": ["@study-studio/protocol@workspace:packages/protocol"],
 

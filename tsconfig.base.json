@@ -26,6 +26,7 @@
       "@study-studio/agent-codex": ["./packages/agent-codex/src/index.ts"],
       "@study-studio/agent-runtime": ["./packages/agent-runtime/src/index.ts"],
       "@study-studio/speech": ["./packages/speech/src/index.ts"],
+      "@study-studio/learning-algorithms": ["./packages/learning-algorithms/src/index.ts"],
       "@study-studio/gateway": ["./apps/gateway/src/index.ts"]
     }
   }

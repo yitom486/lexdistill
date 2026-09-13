@@ -24,6 +24,7 @@ const PACKAGES = [
   'learner-core',
   'tts-core',
   'speech',
+  'learning-algorithms',
 ] as const;
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
@@ -34,9 +35,10 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'agent-codex': ['@study-studio/shared', '@study-studio/agent-core', '@study-studio/tool-core'],
   'agent-responses': ['@study-studio/shared', '@study-studio/agent-core', '@study-studio/tool-core'],
   'agent-runtime': ['@study-studio/agent-core', '@study-studio/agent-codex', '@study-studio/agent-responses'],
-  'learner-core': ['@study-studio/shared', '@study-studio/protocol'],
+  'learner-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
   'tts-core': ['@study-studio/shared'],
   'speech': ['@study-studio/tts-core'],
+  'learning-algorithms': ['@study-studio/shared', '@study-studio/protocol'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -148,6 +150,13 @@ describe('M1-1 package 依赖方向', () => {
     const pattern =
       /@study-studio\/agent-(codex|responses)|@agentclientprotocol|@anthropic\/|from\s+['"]openai['"]/i;
     const hits = await filesWith(join(repoRoot(), 'apps', 'web', 'src'), pattern);
+    expect(hits).toEqual([]);
+  });
+
+  it('learning-algorithms：纯计算层，无存储/网络/Agent 依赖', async () => {
+    const pattern =
+      /bun:sqlite|drizzle|Gateway|AgentAdapter|AgentSession|AgentEvent|openai|anthropic|agentclientprotocol|Repository|fetch\s*\(/i;
+    const hits = await filesWith(join(repoRoot(), 'packages', 'learning-algorithms', 'src'), pattern);
     expect(hits).toEqual([]);
   });
 });
