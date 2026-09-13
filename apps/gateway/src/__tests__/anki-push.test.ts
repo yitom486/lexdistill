@@ -3,7 +3,7 @@ import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { FlashcardsAnkiPushTool } from '../modules/flashcards/tools/flashcards-anki-push-tool.js';
 
-/** M7-1：transport 用例已迁入 flashcard-integrations；此处仅保留设置/推送命令/Tool 测试。 */
+/** M7-1：transport 用例已迁入 flashcards（C5 起实现内聚）；此处仅保留设置/推送命令/Tool 测试。 */
 
 describe('anki settings', () => {
   let repo: DrizzleLearnerRepository;

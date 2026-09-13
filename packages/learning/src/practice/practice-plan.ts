@@ -9,7 +9,7 @@ import type {
 } from '@study-studio/protocol';
 
 /**
- * M6-2 自 learner-core 迁入 practice-core（字节一致，行为不变）。
+ * M6-2 自 learner-core 迁入（C6 起归属 learning/src/practice；字节一致，行为不变）。
  *
  * P5：可配置练习计划领域纯函数。
  *

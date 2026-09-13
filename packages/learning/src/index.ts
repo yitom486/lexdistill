@@ -46,19 +46,19 @@ export {
   parsePracticeBlockSpecs,
 } from './practice/index.js';
 
-/** 练习运行本地汇总（规范源 practice-core，只转出不复制实现）。 */
+/** 练习运行本地汇总（规范源 ./practice，只转出不复制实现）。 */
 export {
   buildLocalRunSummary,
   type RunSummaryReport,
 } from './practice/index.js';
 
-/** 客观题权威判题（规范源 practice-core，只转出不复制实现）。 */
+/** 客观题权威判题（规范源 ./practice，只转出不复制实现）。 */
 export {
   gradeObjectiveAnswer,
   type ObjectiveQuestionLike,
 } from './practice/index.js';
 
-/** 练习题构造纯规则（规范源 practice-core，只转出不复制实现）。 */
+/** 练习题构造纯规则（规范源 ./practice，只转出不复制实现）。 */
 export {
   acceptedDbTypesForBlock,
   buildVocabQuestionsFromCards,

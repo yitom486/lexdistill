@@ -1,5 +1,5 @@
 /**
- * M7-2 自 learner-core 迁入 flashcard-core（字节一致，行为不变）。
+ * M7-2 自 learner-core 迁入（C5 起归属 flashcards/render；字节一致，行为不变）。
  *
  * Anki 卡片双层模板（纯函数，无 IO，可被 Gateway / Web / 未来 Agent Tool 复用）。
  *

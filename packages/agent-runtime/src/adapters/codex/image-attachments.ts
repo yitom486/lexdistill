@@ -20,7 +20,7 @@ export interface MaterializedPngAttachments {
 }
 
 /**
- * 内存 PNG → 受控 OS 临时文件（仅 agent-codex 可做）。
+ * 内存 PNG → 受控 OS 临时文件（仅本 codex 适配器可做）。
  * - 随机命名（`lingua-img-<uuid>.png`），不含业务信息；
  * - 数量/体积先验后写，半截失败时已写文件一并清掉；
  * - 不记录路径、图片内容与任何业务信息到日志（本函数零日志）。

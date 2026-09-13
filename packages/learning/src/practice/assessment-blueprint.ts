@@ -1,7 +1,7 @@
 import type { LearnerLevel } from '@study-studio/protocol';
 
 /**
- * M6-2 自 learner-core 迁入 practice-core（字节一致，行为不变）。
+ * M6-2 自 learner-core 迁入（C6 起归属 learning/src/practice；字节一致，行为不变）。
  *
  * 阶段测评蓝图 v1（先定义考什么，再组卷）。
  * - 每档 = 若干技能组（组内技能 + 题数 + 答对线）+ 机动题 + 总分线；

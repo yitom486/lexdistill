@@ -1,5 +1,5 @@
 /**
- * M7-2 自 learner-core 迁入 flashcard-core（字节一致，行为不变）。
+ * M7-2 自 learner-core 迁入（C5 起归属 flashcards/render；字节一致，行为不变）。
  *
  * 声调阶梯 SVG 生成器（纯函数，自研视觉语言，未复制任何外部项目的渲染代码）。
  *

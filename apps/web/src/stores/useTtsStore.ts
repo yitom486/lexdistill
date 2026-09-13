@@ -11,7 +11,7 @@ export interface SpeakOptions {
   lang?: SupportedLanguage | undefined;
   gender?: TtsGender | undefined;
   rate?: number | undefined;
-  /** 朗读用途（听写更慢等），透传 tts-core 规约器；缺省 general。 */
+  /** 朗读用途（听写更慢等），透传 speech 规约器；缺省 general。 */
   purpose?: TtsPurpose | undefined;
   onStart?: (() => void) | undefined;
   onEnd?: (() => void) | undefined;

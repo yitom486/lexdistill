@@ -149,9 +149,8 @@ describe('M1-1 package 依赖方向', () => {
     expect(wiring.length).toBeGreaterThan(0);
   });
 
-  it('apps/web：不引用适配器包与厂商 SDK', async () => {
-    const pattern =
-      /@study-studio\/agent-(codex|responses)|@agentclientprotocol|@anthropic\/|from\s+['"]openai['"]/i;
+  it('apps/web：不引用厂商 SDK（适配器包引用由下条现存包集合锁覆盖）', async () => {
+    const pattern = /@agentclientprotocol|@anthropic\/|from\s+['"]openai['"]/i;
     const hits = await filesWith(join(repoRoot(), 'apps', 'web', 'src'), pattern);
     expect(hits).toEqual([]);
   });
@@ -271,12 +270,20 @@ describe('M1-1 package 依赖方向', () => {
     expect(integHits.filter((f) => !f.includes('__tests__'))).toEqual([]);
   });
 
-  it('learner-core 卡片兼容出口：垫片转出 flashcards（C5 后规范源；C6 删除）', async () => {
+  it('learner-core 卡片兼容出口：垫片只许引用 render 子入口（禁根入口的 Node-only APKG 链；R1 Web 构建回归锁）', async () => {
     for (const file of ['card-templates.ts', 'pitch-graph.ts']) {
       const text = await readFile(join(repoRoot(), 'packages', 'learner-core', 'src', file), 'utf-8');
-      expect(text).toContain('@study-studio/flashcards');
-      expect(text).not.toContain('@study-studio/flashcard-core');
+      expect(text).toContain('@study-studio/flashcards/render');
+      expect(text).not.toMatch(/from\s+['"]@study-studio\/flashcards['"]/);
     }
+  });
+
+  it('apps/web 禁直引 flashcards 根入口（含 Node-only APKG 链；一律经 learner-core 垫片）', async () => {
+    const hits = await filesWith(
+      join(repoRoot(), 'apps', 'web', 'src'),
+      /from\s+['"]@study-studio\/flashcards['"]/
+    );
+    expect(hits).toEqual([]);
   });
 
   it('ai-content：确定性内容规则，仅依赖 shared/learning/protocol（禁 AgentAdapter/Gateway/SQLite/Web/SDK）', async () => {
@@ -317,12 +324,7 @@ describe('M1-1 package 依赖方向', () => {
     ).toEqual([]);
   });
 
-  it('gateway 卡片统一入口：禁直引 flashcard-core/integrations，一律走 flashcards', async () => {
-    const hits = await filesWith(
-      join(repoRoot(), 'apps', 'gateway', 'src'),
-      /@study-studio\/flashcard-(core|integrations)/
-    );
-    expect(hits).toEqual([]);
+  it('gateway 卡片统一入口一律走 flashcards（删包即断链，安装与类型检查兜底）', async () => {
     for (const file of [
       'modules/flashcards/application/anki-push.ts',
       'modules/flashcards/application/apkg-import.ts',
@@ -340,8 +342,6 @@ describe('M1-1 package 依赖方向', () => {
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
     expect(deps['@study-studio/flashcards']).toBe('workspace:*');
-    expect(deps['@study-studio/flashcard-core']).toBeUndefined();
-    expect(deps['@study-studio/flashcard-integrations']).toBeUndefined();
   });
 
   it('lexicon：词典领域包，实现内聚，仅依赖 shared', async () => {
@@ -350,12 +350,7 @@ describe('M1-1 package 依赖方向', () => {
     ).toEqual([]);
   });
 
-  it('gateway 词典统一入口：禁直引 dictionary-core/integrations，一律走 lexicon', async () => {
-    const hits = await filesWith(
-      join(repoRoot(), 'apps', 'gateway', 'src'),
-      /@study-studio\/dictionary-(core|integrations)/
-    );
-    expect(hits).toEqual([]);
+  it('gateway 词典统一入口一律走 lexicon（删包即断链，安装与类型检查兜底）', async () => {
     for (const file of [
       'modules/dictionary/application/dictionary-packages.ts',
       'modules/dictionary/application/yomitan.ts',
@@ -372,8 +367,6 @@ describe('M1-1 package 依赖方向', () => {
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
     expect(deps['@study-studio/lexicon']).toBe('workspace:*');
-    expect(deps['@study-studio/dictionary-core']).toBeUndefined();
-    expect(deps['@study-studio/dictionary-integrations']).toBeUndefined();
   });
 
   it('gateway/web 教材统一入口：教材 AST 符号一律走 document-model，不走 protocol', async () => {
@@ -401,12 +394,7 @@ describe('M1-1 package 依赖方向', () => {
     expect(deps['@study-studio/document-model']).toBe('workspace:*');
   });
 
-  it('gateway 统一入口：禁直引 review-core/practice-core，一律走 learning', async () => {
-    const hits = await filesWith(
-      join(repoRoot(), 'apps', 'gateway', 'src'),
-      /@study-studio\/(review-core|practice-core)/
-    );
-    expect(hits).toEqual([]);
+  it('gateway 学习入口一律走 learning（删包即断链，安装与类型检查兜底）', async () => {
     for (const file of [
       'modules/review/http/review-routes.ts',
       'modules/review/__tests__/review-commit.test.ts',
@@ -444,8 +432,9 @@ describe('M1-1 package 依赖方向', () => {
 });
 
 describe('M2-1 agent-runtime 外观', () => {
-  it('contracts/ 内无适配器与厂商 SDK 痕迹', async () => {
-    const pattern = /agent-codex|agent-responses|openai|anthropic|agentclientprotocol/i;
+  it('contracts/ 实现内聚：仅相对路径与 shared/tool-core（禁适配器与厂商 SDK）', async () => {
+    const pattern =
+      /from\s+['"](?!\.|bun:test)(?!@study-studio\/shared['"]|@study-studio\/tool-core['"])/;
     const hits = await filesWith(join(repoRoot(), 'packages', 'agent-runtime', 'src', 'contracts'), pattern);
     expect(hits).toEqual([]);
   });
@@ -456,7 +445,5 @@ describe('M2-1 agent-runtime 外观', () => {
       'utf-8'
     );
     expect(text).toContain('@study-studio/agent-runtime');
-    expect(text).not.toContain('@study-studio/agent-codex');
-    expect(text).not.toContain('@study-studio/agent-responses');
   });
 });

@@ -12,8 +12,8 @@
 ### 1.1 业务与模型厂商强解耦 (Zero Provider Leak)
 - **禁止在核心业务中直接引用外部 SDK**：
   - `packages/learner-core`、`packages/tool-core`、`packages/protocol`、`apps/web` 绝对禁止 `import` 任何具体 AI 厂商库（如 `@openai/*`, `@anthropic/*`, `codex-*`, `acp-*`）。
-  - 外部模型交互**必须且仅能**通过 `packages/agent-core` 中定义的抽象契约：`AgentAdapter`、`AgentSession`、`AgentEvent`。
-  - 具体引擎代码（如 Codex App Server）必须完全封装在专有适配器中（如 `packages/agent-codex`）。
+  - 外部模型交互**必须且仅能**通过 `packages/agent-runtime/contracts` 中定义的抽象契约：`AgentAdapter`、`AgentSession`、`AgentEvent`。
+  - 具体引擎代码（如 Codex App Server）必须完全封装在专有适配器中（如 `packages/agent-runtime/adapters/codex`）。
 
 ### 1.2 客户端通信唯一屏障 (Gateway Boundary)
 - 客户端（Web 端 `apps/web`、桌面端 `apps/desktop`）**只连接系统自研的 Agent Gateway**（HTTP + WebSocket）。
@@ -34,8 +34,8 @@
 - **禁止事项**：前端不得直连数据库或任何 LLM/ACP 进程；业务包不得绕过 Gateway 私自起 Agent 会话。
 
 ### 1.5 Agent 引擎扩展与 ACP 接入方式 (Adapters & ACP)
-- **所有引擎只许落在 Adapter 包内**：实现 `packages/agent-core` 的 `AgentAdapter` / `AgentSession`，在 Gateway 内注册即可，**业务与前端零感知**。
-- **第一阶段主力**：`packages/agent-codex` → **Codex App Server 原生**能力（Thread / Turn / Item / dynamic tools / 审批），**禁止**用阉割版 ACP 去“兼容代替”Codex。
+- **所有引擎只许落在 Adapter 包内**：实现 `packages/agent-runtime/contracts` 的 `AgentAdapter` / `AgentSession`，在 Gateway 内注册即可，**业务与前端零感知**。
+- **第一阶段主力**：`packages/agent-runtime/adapters/codex` → **Codex App Server 原生**能力（Thread / Turn / Item / dynamic tools / 审批），**禁止**用阉割版 ACP 去“兼容代替”Codex。
 - **后续若需 ACP（Agent Client Protocol）**：
   1. 新增独立包（如 `packages/agent-acp`）实现 `ACPAdapter`；
   2. 在 Adapter 内完成 ACP 会话 ↔ 本系统 `AgentEvent` / `submitToolResult` 的双向翻译；
@@ -49,7 +49,7 @@
 - **MCP 仅限外部异构系统的可选桥接**（如 Anki / Notion 同步），落在 `ToolLocation.EXTERNAL`：
   - 不得用 MCP 重写本已可原生调用的学习域工具；
   - 不得把 MCP 当作默认 Agent 工具总线，或要求每个 Turn 多跳一次 MCP Server；
-  - 引入任何 MCP 依赖时，必须证明「目标系统无等价原生 API / 无本仓库内工具可覆盖」，并保持与 `agent-core` 契约隔离。
+  - 引入任何 MCP 依赖时，必须证明「目标系统无等价原生 API / 无本仓库内工具可覆盖」，并保持与 `agent-runtime` 契约隔离。
 - **违反判定**：凡学习域工具仅因“图省事”改走 MCP、导致额外进程/协议往返的，一律视为架构违规。
 
 ### 1.6b 专精会话的工具隔离 (Per-Agent Tool Isolation)

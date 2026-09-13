@@ -10,10 +10,8 @@ packages/
 ├── protocol           # 客户端 ↔ Gateway 的通信契约
 ├── learner-core       # 学习者领域规则和 Repository 契约
 ├── tool-core          # Agent Tool 契约、Schema、注册和权限
-├── agent-core         # Agent 统一抽象
-├── agent-codex        # Codex App Server 具体适配器
-├── agent-responses    # Responses API 具体适配器
-└── tts-core           # TTS 语音能力抽象和实现
+├── agent-runtime      # Agent 统一入口：contracts＋adapters
+└── speech             # TTS 语音能力抽象和实现
 ```
 
 ---
@@ -25,10 +23,10 @@ packages/
 | 分组 | Package | 解决的问题 |
 |---|---|---|
 | 公共基础 | `shared` | Result、业务错误、日志、ID 和时间等通用能力 |
-| 系统契约 | `protocol`、`agent-core`、`tool-core` | 定义模块之间稳定的类型和调用边界 |
+| 系统契约 | `protocol`、`agent-runtime`、`tool-core` | 定义模块之间稳定的类型和调用边界 |
 | 学习领域 | `learner-core` | FSRS、错题、画像、计划和 Repository 契约 |
-| 外部适配 | `agent-codex`、`agent-responses` | 把具体 Agent 厂商协议翻译成系统抽象 |
-| 语音能力 | `tts-core` | TTS 请求、语音引擎、插件和发音匹配 |
+| 外部适配 | `agent-runtime/adapters` | 把具体 Agent 厂商协议翻译成系统抽象 |
+| 语音能力 | `speech` | TTS 请求、语音引擎、插件和发音匹配 |
 
 整体依赖方向如下：
 
@@ -38,10 +36,10 @@ flowchart TD
     Protocol[protocol<br/>通信契约]
     Learner[learner-core<br/>学习者领域]
     Tools[tool-core<br/>工具契约]
-    AgentCore[agent-core<br/>Agent 抽象]
-    Codex[agent-codex<br/>Codex 适配器]
-    Responses[agent-responses<br/>Responses 适配器]
-    TTS[tts-core<br/>语音能力]
+    AgentRuntime[agent-runtime<br/>Agent 抽象+适配器]
+    Codex[adapters/codex<br/>Codex 适配器]
+    Responses[adapters/responses<br/>Responses 适配器]
+    TTS[speech<br/>语音能力]
     Gateway[apps/gateway]
     Web[apps/web]
 
@@ -50,22 +48,20 @@ flowchart TD
     Tools --> Protocol
     Learner --> Shared
     Learner --> Protocol
-    AgentCore --> Shared
-    AgentCore --> Tools
+    AgentRuntime --> Shared
+    AgentRuntime --> Tools
     Codex --> Shared
-    Codex --> AgentCore
+    Codex --> AgentRuntime
     Codex --> Tools
     Responses --> Shared
-    Responses --> AgentCore
+    Responses --> AgentRuntime
     Responses --> Tools
     TTS --> Shared
 
     Gateway --> Protocol
     Gateway --> Learner
     Gateway --> Tools
-    Gateway --> AgentCore
-    Gateway --> Codex
-    Gateway --> Responses
+    Gateway --> AgentRuntime
     Gateway --> TTS
     Web --> Protocol
     Web --> TTS
@@ -85,9 +81,9 @@ flowchart TD
 2. `protocol`：理解客户端、Gateway 和学习功能之间交换什么数据。
 3. `learner-core`：理解学习资产和领域规则由谁负责。
 4. `tool-core`：理解 Agent 可以调用哪些能力，以及权限如何控制。
-5. `agent-core`：理解所有 Agent 实现必须遵守的统一接口。
-6. `agent-codex` / `agent-responses`：最后看具体厂商协议如何被封装。
-7. `tts-core`：单独阅读语音请求和引擎插件体系。
+5. `agent-runtime/contracts`：理解所有 Agent 实现必须遵守的统一接口。
+6. `agent-runtime/adapters`：最后看具体厂商协议如何被封装。
+7. `speech`：单独阅读语音请求和引擎插件体系。
 
 每个包的入口都是：
 
@@ -341,12 +337,12 @@ MCP 只适合 Anki、Notion 等外部异构系统桥接，不应为了复用方�
 
 ---
 
-# 7. `agent-core`：所有 Agent 的统一抽象
+# 7. `agent-runtime/contracts`：所有 Agent 的统一抽象
 
 路径：
 
 ```text
-packages/agent-core/src/
+packages/agent-runtime/src/contracts/
 ```
 
 这是 Agent 层的“端口”（port），定义系统内部如何使用 Agent，但不包含 Codex 或其他厂商的具体协议。
@@ -414,15 +410,15 @@ COMPLETED
 
 ---
 
-# 8. `agent-codex`：Codex App Server 原生适配器
+# 8. `agent-runtime/adapters/codex`：Codex App Server 原生适配器
 
 路径：
 
 ```text
-packages/agent-codex/src/
+packages/agent-runtime/src/adapters/codex/
 ```
 
-这是当前主要的 Agent 适配器。它把 Codex App Server 的原生 Thread/Turn/Item/dynamic tools/approval 能力封装成 `agent-core` 的统一接口。
+这是当前主要的 Agent 适配器。它把 Codex App Server 的原生 Thread/Turn/Item/dynamic tools/approval 能力封装成 `agent-runtime` 的统一接口。
 
 | 文件/目录 | 作用 |
 |---|---|
@@ -451,9 +447,9 @@ packages/agent-codex/src/
 
 ## 架构边界
 
-`agent-codex` 可以依赖：
+Codex 适配器可以依赖：
 
-- `agent-core`；
+- `agent-runtime`（contracts）；
 - `tool-core`；
 - `shared`。
 
@@ -468,19 +464,19 @@ packages/agent-codex/src/
 
 ## 本地运行相关配置
 
-Codex 适配器会使用本机 Codex CLI/App Server。具体认证、沙箱、审批和模型配置见本包的 [`README.md`](./agent-codex/README.md)。
+Codex 适配器会使用本机 Codex CLI/App Server。具体认证、沙箱、审批和模型配置见适配器源码注释（`adapters/codex/`）。
 
 ---
 
-# 9. `agent-responses`：轻量 Responses 适配器
+# 9. `agent-runtime/adapters/responses`：轻量 Responses 适配器
 
 路径：
 
 ```text
-packages/agent-responses/src/
+packages/agent-runtime/src/adapters/responses/
 ```
 
-该包实现与 `agent-core` 相同的 Agent 抽象，但面向更轻量、短生命周期的 Responses API 场景。
+该包实现与 `agent-runtime` 相同的 Agent 抽象，但面向更轻量、短生命周期的 Responses API 场景。
 
 | 文件 | 作用 |
 |---|---|
@@ -500,15 +496,15 @@ packages/agent-responses/src/
 
 ---
 
-# 10. `tts-core`：文本转语音和发音能力
+# 10. `speech`：文本转语音和发音能力
 
 路径：
 
 ```text
-packages/tts-core/src/
+packages/speech/src/
 ```
 
-`tts-core` 把语音请求和具体语音引擎隔离开来，供 Web、Gateway 或桌面端复用。
+`speech` 把语音请求和具体语音引擎隔离开来，供 Web、Gateway 或桌面端复用。
 
 | 文件 | 作用 |
 |---|---|
@@ -527,7 +523,7 @@ packages/tts-core/src/
 ```text
 用户点击发音
   → TTS 请求
-  → tts-core Engine
+  → speech Engine
   → 浏览器/本地/Azure 等语音实现
 ```
 
@@ -545,10 +541,10 @@ packages/tts-core/src/
 | 客户端和 Gateway 之间传什么 JSON？ | `protocol` |
 | 用户的熟练度、错题、卡片或计划如何变化？ | `learner-core` |
 | Agent 能调用什么工具、工具有什么权限？ | `tool-core` |
-| 系统如何创建 Agent、消费事件和提交 Tool Result？ | `agent-core` |
-| 如何调用 Codex App Server？ | `agent-codex` |
-| 如何调用 Responses API？ | `agent-responses` |
-| 如何合成语音或匹配 Voice？ | `tts-core` |
+| 系统如何创建 Agent、消费事件和提交 Tool Result？ | `agent-runtime` |
+| 如何调用 Codex App Server？ | `agent-runtime/adapters/codex` |
+| 如何调用 Responses API？ | `agent-runtime/adapters/responses` |
+| 如何合成语音或匹配 Voice？ | `speech` |
 | 如何接 HTTP/WS、SQLite 或具体领域用例？ | `apps/gateway` |
 | 如何展示页面、管理查询缓存或 UI 偏好？ | `apps/web` |
 
@@ -572,8 +568,8 @@ apps/web
   → protocol: client.turn.send
   → apps/gateway: ContextBuilder
   → learner-core: 查询弱项摘要
-  → agent-core: AgentInput + ContextSnapshot
-  → agent-codex / agent-responses
+  → agent-runtime: AgentInput + ContextSnapshot
+  → agent-runtime/adapters （codex / responses 按路由选用）
   → tool-core: 原生 Tool Definition / Tool Call
   → apps/gateway: practice Tool 和 application
   → learner-core / protocol: 校验并返回结构化题包
@@ -587,8 +583,8 @@ apps/web
   → protocol: client.quiz.submit
   → apps/gateway: practice application
   → learner-core: 客观判题、记录学习事实
-  → agent-core: 需要深度诊断时发送 Agent Turn
-  → agent-codex: 流式解释和错因分析
+  → agent-runtime: 需要深度诊断时发送 Agent Turn
+  → adapters/codex: 流式解释和错因分析
   → tool-core: progress Tool
   → learner-core: 写入错题和技能指标
   → protocol: 批改卡、画像更新事件
@@ -598,14 +594,14 @@ apps/web
 
 ```text
 Agent
-  → agent-core: TOOL_CALL_REQUESTED
+  → agent-runtime: TOOL_CALL_REQUESTED
   → apps/gateway: ToolRouter
   → tool-core: 发现 ToolLocation.CLIENT
   → protocol: agent.tool.call
   → apps/web: 执行 ui.navigate / ui.present
   → protocol: client.tool.result
   → apps/gateway
-  → agent-core: submitToolResult()
+  → agent-runtime: submitToolResult()
 ```
 
 ---
@@ -621,7 +617,7 @@ learner-core / protocol / tool-core / apps/web
   ✕ 不得 import Codex、Responses、ACP 等具体厂商 SDK
 ```
 
-它们只能通过 `agent-core` 定义的抽象与 Agent 交互。具体实现完全封装在 `agent-codex`、`agent-responses` 或未来的其他 Adapter 中。
+它们只能通过 `agent-runtime` 定义的抽象与 Agent 交互。具体实现完全封装在 `agent-runtime/adapters` 或未来的其他 Adapter 中。
 
 ## 13.2 学习者模型是 SSOT
 
@@ -710,10 +706,8 @@ shared      = 所有人共用的基础设施
 protocol    = 系统之间怎么说话
 learner-core= 学习事实和学习规则
  tool-core  = Agent 能做什么以及能做到什么程度
-agent-core  = 所有 Agent 的统一插座
-agent-codex = Codex 插座的具体实现
-agent-resp  = Responses 插座的具体实现
-tts-core    = 语音能力的统一插座和引擎
+agent-runtime = 所有 Agent 的统一插座（含 contracts＋adapters）
+speech        = 语音能力的统一插座和引擎
 ```
 
 理解 `packages/` 的关键不是记住每个文件名，而是先判断一段代码属于哪种职责：

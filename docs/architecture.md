@@ -51,12 +51,12 @@ C4Container
 
     Container_Boundary(c_core, "核心领域引擎 (Domain Core Packages)")
         Component(learner_core, "Learner Core (packages/learner-core)", "TypeScript", "学习者画像、薄弱项统计、做题记录、错题本生命周期与 FSRS 算法")
-        Component(agent_core, "Agent Core (packages/agent-core)", "TypeScript", "统一 AgentAdapter, AgentSession, AgentEvent 纯抽象")
+        Component(agent_core, "Agent Runtime Contracts (packages/agent-runtime/src/contracts)", "TypeScript", "统一 AgentAdapter, AgentSession, AgentEvent 纯抽象")
         Component(tool_core, "Tool Core (packages/tool-core)", "TypeScript", "统一工具契约、Zod Schema 与权限定义")
     Container_Boundary_End()
 
     Container_Boundary(c_adapters, "Agent 适配器层 (Adapter Layer)")
-        Component(codex_adapter, "CodexAdapter (packages/agent-codex)", "TypeScript", "对接 Codex App Server 原生 Thread/Turn/Item 事件流")
+        Component(codex_adapter, "CodexAdapter (packages/agent-runtime/src/adapters/codex)", "TypeScript", "对接 Codex App Server 原生 Thread/Turn/Item 事件流")
         Component(resp_adapter, "ResponsesAdapter (预留)", "TypeScript", "轻量化单次问答与极速批改适配")
     Container_Boundary_End()
 

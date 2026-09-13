@@ -13,7 +13,7 @@ Lingua Studio 采用**模块化单体（Modular Monolith）**，不是把每个�
 ```mermaid
 flowchart TD
     Client["Web / Tauri 客户端"]
-    Adapters["agent-codex / agent-responses"]
+    Adapters["agent-runtime/adapters"]
     Learner["learner-core 学习资产 SSOT"]
 
     subgraph Gateway["Agent Gateway 模块化单体"]
@@ -54,7 +54,7 @@ Gateway 的四个核心职责是：
 - `modules/*/persistence/` 负责具体领域的数据库读写。
 - `infrastructure/` 负责数据库、Repository 门面和跨域基础设施。
 - `runtime/`、`router/`、`session/` 负责 Agent 运行时，不属于某个具体学习领域。
-- 具体模型厂商代码只能存在于 `packages/agent-*`，Gateway 只依赖 `agent-core` 抽象。
+- 具体模型厂商代码只能存在于 `packages/agent-runtime/adapters/*`，Gateway 只依赖 `agent-runtime` 抽象。
 
 ---
 
@@ -398,7 +398,7 @@ FSRS 算法由 `packages/learner-core` 掌握，本模块只调用领域契约�
 
 ### `modules/tts/`：Gateway 侧语音入口
 
-该目录包含 `application/` 和 `http/`，用于承接 Gateway 侧的语音请求。真正的语音引擎抽象位于 `packages/tts-core`；本模块负责把 HTTP/领域请求接到该抽象，不应在路由里直接实现 Azure 或其他厂商协议。
+该目录包含 `application/` 和 `http/`，用于承接 Gateway 侧的语音请求。真正的语音引擎抽象位于 `packages/speech`；本模块负责把 HTTP/领域请求接到该抽象，不应在路由里直接实现 Azure 或其他厂商协议。
 
 ---
 
@@ -586,7 +586,7 @@ Agent 负责解释和诊断；`learner-core` 与数据库负责长期事实记�
 | 是表结构、连接、路径、事务上下文吗？ | `infrastructure/` |
 | 是 Agent Session、Turn、流式事件或模型路由吗？ | `runtime/`、`session/`、`router/` |
 | 是所有模块都可能使用的错误、日志、ID、时间能力吗？ | `packages/shared` |
-| 是具体模型厂商 SDK 或协议转换吗？ | `packages/agent-codex`、`packages/agent-responses` 等适配器包 |
+| 是具体模型厂商 SDK 或协议转换吗？ | `packages/agent-runtime/adapters/*` 等适配器 |
 
 新增功能时优先遵循：
 
@@ -607,7 +607,7 @@ flowchart TD
 ## 12. 需要始终遵守的架构规则
 
 1. **客户端只连接 Gateway**：不直连 SQLite、LLM、Codex 或 ACP 进程。
-2. **Provider 零泄漏**：Gateway 业务层只使用 `agent-core` 抽象；具体厂商实现封装在 Adapter 包内。
+2. **Provider 零泄漏**：Gateway 业务层只使用 `agent-runtime` 抽象；具体厂商实现封装在 Adapter 包内。
 3. **Context 优先**：客户端/Gateway 已知事实放入不可变 `ContextSnapshot`，不新增反向 Read Tool。
 4. **原生 Tool 优先**：学习域能力通过 Tool Registry + ToolRouter 执行；MCP 只用于外部异构系统。
 5. **学习者数据以数据库为 SSOT**：模型 Thread 不能代替 `learner-core` 和 Repository。

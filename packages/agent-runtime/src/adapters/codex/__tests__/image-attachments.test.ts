@@ -80,7 +80,7 @@ async function drain(
   return seen;
 }
 
-describe('P4B 图片附件（agent-codex）', () => {
+describe('P4B 图片附件（adapters/codex）', () => {
   it('CodexAdapter 明确支持图片输入', () => {
     expect(new CodexAdapter().supportsImageInput()).toBe(true);
   });

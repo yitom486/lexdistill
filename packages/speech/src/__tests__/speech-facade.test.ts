@@ -17,7 +17,7 @@ import {
 import type { AzureVoiceOption, TtsTrackLanguage } from '@study-studio/speech';
 
 /**
- * C1 Speech 自检（所属包内断言，无反向边；原 tts-core 已并入本包）。
+ * C1 Speech 自检（所属包内断言，无反向边）。
  *
  * - 顶层出口透出 TTS 公共 API（值与类型编译期贯通；键集合与合并前一致）；
  * - speech/src 内无 Agent 相关引用（TTS 独立能力）；
@@ -78,10 +78,26 @@ describe('C1 speech 入口', () => {
     expect(table['@study-studio/speech']).toBe('workspace:*');
   });
 
-  it('apps/web 只经 speech 消费 TTS（禁直引 tts-core）', async () => {
+  it('apps/web 引用的 workspace 包必须现存（删包即断链；悬挂引用零容忍）', async () => {
     const { readdir } = await import('node:fs/promises');
+    const pkgEntries = await readdir(join(repoRoot(), 'packages'), { withFileTypes: true });
+    const live = new Set(pkgEntries.filter((e) => e.isDirectory()).map((e) => e.name));
     const roots = [join(repoRoot(), 'apps', 'web', 'src')];
-    const hits: string[] = [];
+    const bad: string[] = [];
+    const collect = (text: string, full: string): void => {
+      const patterns = [
+        /from\s+['"]@study-studio\/([^/'"]+)(?:\/[^'"]*)?['"]/g,
+        /import\(\s*['"]@study-studio\/([^/'"]+)(?:\/[^'"]*)?['"]/g,
+      ];
+      for (const pattern of patterns) {
+        for (const m of text.matchAll(pattern)) {
+          const pkg = m[1] as string;
+          // apps 内应用互引（web → gateway）走 tsconfig paths，不在 packages 集合内，属既有状态，此处放行。
+          if (pkg === 'gateway') continue;
+          if (!live.has(pkg)) bad.push(`${full}: @study-studio/${pkg}`);
+        }
+      }
+    };
     const walk = async (dir: string): Promise<void> => {
       const entries = await readdir(dir, { withFileTypes: true });
       const names = entries.map((e) => e.name).sort();
@@ -92,14 +108,13 @@ describe('C1 speech 入口', () => {
         if (entry !== undefined && entry.isDirectory()) {
           await walk(full);
         } else if (name.endsWith('.ts') || name.endsWith('.tsx')) {
-          const text = await readFile(full, 'utf-8');
-          if (text.includes('@study-studio/tts-core')) hits.push(full);
+          collect(await readFile(full, 'utf-8'), full);
         }
       }
     };
     for (const root of roots) {
       await walk(root);
     }
-    expect(hits).toEqual([]);
+    expect(bad).toEqual([]);
   });
 });

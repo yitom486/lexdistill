@@ -305,7 +305,7 @@ class SpeechStudioEngine {
     gender: TtsGender,
     lang: SupportedLanguage = 'EN'
   ): number {
-    // 音色名线索表收归 tts-core（分语言）；此处仅做平台类型适配，数学不变。
+    // 音色名线索表收归 speech（分语言）；此处仅做平台类型适配，数学不变。
     return scoreVoiceName(
       { name: voice.name, localService: voice.localService },
       normalizeTtsTrackLanguage(lang.toLowerCase()),
@@ -380,7 +380,7 @@ class SpeechStudioEngine {
       gender?: TtsGender;
       rate?: number;
       preferredVoiceURI?: string | null;
-      /** 朗读用途（听写更慢等），透传 tts-core 规约器；缺省 general。 */
+      /** 朗读用途（听写更慢等），透传 speech 规约器；缺省 general。 */
       purpose?: TtsPurpose;
       /** 人设昵称（Jenny / 七海 / Yuna…），用于音色名匹配与上下文记录。 */
       personaName?: string;
@@ -398,7 +398,7 @@ class SpeechStudioEngine {
 
     const lang = options?.lang || 'EN';
     const gender = options?.gender || this.gender;
-    // 分语言提示词 / 上下文 / 语速规约（tts-core 纯函数；用户语速设置优先）。
+    // 分语言提示词 / 上下文 / 语速规约（speech 纯函数；用户语速设置优先）。
     const request = resolveTtsSpeakRequest({
       text,
       trackLanguage: lang.toLowerCase(),

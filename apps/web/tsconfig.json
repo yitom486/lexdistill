@@ -22,7 +22,9 @@
       "@study-studio/document-model": ["../../packages/document-model/src/index.ts"],
       "@study-studio/protocol": ["../../packages/protocol/src/index.ts"],
       "@study-studio/learner-core": ["../../packages/learner-core/src/index.ts"],
-      "@study-studio/speech": ["../../packages/speech/src/index.ts"]
+      "@study-studio/speech": ["../../packages/speech/src/index.ts"],
+      "@study-studio/agent-runtime": ["../../packages/agent-runtime/src/index.ts"],
+      "@study-studio/learning": ["../../packages/learning/src/index.ts"]
     }
   },
   "references": [
@@ -31,6 +33,8 @@
     { "path": "../../packages/protocol" },
     { "path": "../../packages/learner-core" },
     { "path": "../../packages/speech" },
+    { "path": "../../packages/agent-runtime" },
+    { "path": "../../packages/learning" },
     { "path": "../gateway" }
   ],
   "include": ["src"]

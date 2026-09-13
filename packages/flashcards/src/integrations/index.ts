@@ -1,5 +1,5 @@
 /**
- * C5 外部闪卡集成公共入口（原 flashcard-integrations 已并入本目录）。
+ * C5 外部闪卡集成公共入口（服务端专用：含 Node-only 解析运行时）。
  * - AnkiConnect 协议客户端（桌面 Anki 本地插件接口，协议 v6）；
  * - endpoint 解析与收窄（仅本机回环，防 SSRF）。
  * - APKG 文件格式纯解析（已解包条目 → 笔记/模板/媒体引用）。

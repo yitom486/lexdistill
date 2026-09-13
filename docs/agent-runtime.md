@@ -1,12 +1,12 @@
 # Lingua Studio - Agent 运行时架构规格说明书 (Agent Runtime Specification)
 
 > **文档版本**：v1.0  
-> **所属包定义**：`packages/agent-core` (接口抽象) & `packages/agent-codex` (Codex 原生适配器)  
+> **所属包定义**：`packages/agent-runtime`（`src/contracts` 接口抽象 ＋ `src/adapters` Codex/Responses 适配器）
 > **核心原则**：核心领域与任何 AI SDK 物理隔离，Provider-Specific 代码 100% 封闭在 Adapter 内。
 
 ---
 
-## 一、统一领域接口抽象 (`packages/agent-core`)
+## 一、统一领域接口抽象 (`packages/agent-runtime/src/contracts`)
 
 业务层只认识系统内部的核心抽象，绝不直接调用任何具体大模型厂商的 API。
 
@@ -99,7 +99,7 @@ export type AgentEvent =
 
 ---
 
-## 三、CodexAdapter 原生对接实现机制 (`packages/agent-codex`)
+## 三、CodexAdapter 原生对接实现机制 (`packages/agent-runtime/src/adapters/codex`)
 
 第一阶段首要集成的 Agent 引擎是 **Codex App Server**。我们坚决拒绝用阉割的通用协议折损 Codex 的原生威力，而是通过 `CodexAdapter` 深度映射其特有能力：
 

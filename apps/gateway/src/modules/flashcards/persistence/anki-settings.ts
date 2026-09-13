@@ -16,7 +16,7 @@ import {
 
 /**
  * AnkiConnect 推送开关持久化（默认关闭；读侧永不抛，损坏行回退默认）。
- * endpoint 常量与校验自 M7-1 起归 flashcard-integrations（协议层契约），
+ * endpoint 常量与校验自 M7-1 起归 flashcards（协议层契约；C5 起实现内聚），
  * 此处只复用，不反向定义。
  */
 

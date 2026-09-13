@@ -39,7 +39,7 @@
 2. **第一阶段首发优先原生对接 Codex App Server**：
    - Codex App Server 是第一阶段的主力 Agent 运行时。
    - 不通过简化的 ACP 协议阉割 Codex App Server 的 Thread、Turn、Item、流式输出、动态工具与沙箱审批能力。
-   - 所有 Codex 原生能力由专有适配器 `packages/agent-codex` 进行双工桥接，绝不向业务层渗透。
+   - 所有 Codex 原生能力由专有适配器 `packages/agent-runtime/src/adapters/codex` 进行双工桥接，绝不向业务层渗透。
 3. **划分 Context Snapshot 与 Tool 调用的刚性边界**：
    - 高频已知状态（当前做题上下文、当前选中生词、学习者目标语言与能力等级）作为不可变快照随 Turn 发送。
    - Tool 仅用于“获取未知信息（如权威词典检索）”或“触发持久化状态变更（如错题写入、熟练度更新）”。

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { updateKanaPracticeMemory } from '../index.js';
 
 /**
- * M6-1 learner-core 兼容行为测试（纯版本化入口测试已迁入 review-core）。
+ * M6-1 learner-core 兼容行为测试（纯版本化入口测试已随实现迁入 learning）。
  * - kana 经兼容出口排程，结果与既有行为一致（含 10 分钟短重学覆盖）。
  */
 const NOW = new Date('2026-09-07T12:00:00.000Z');

@@ -19,10 +19,8 @@ packages/
   shared/         Result/BusinessError、ID/时间、logger 门面
   protocol/       WS 信封/事件 + Zod 契约（题目、批改、计划、阅读、词典…）
   learner-core/   纯领域规则：FSRS、日计划、练习计划、画像/错题生命周期
-  agent-core/     AgentAdapter / AgentSession / AgentEvent / ContextSnapshot 抽象
+  agent-runtime/  Agent 统一入口：contracts（抽象契约）＋ adapters/codex（主力通路）＋ adapters/responses（灰度/旁路）
   tool-core/      Tool 契约、权限分级、ToolRegistry
-  agent-codex/    Codex App Server 原生适配器（主力通路）
-  agent-responses/轻量 responses 适配器（灰度/旁路）
 docs/           架构、协议、学习者模型、MVP 路线等正式文档
 ```
 

@@ -24,7 +24,7 @@
 - **核心目标**：建立严格类型安全、单向依赖分明、开发运行极速的工程底座。
 - **交付物 (Deliverables)**：
   - `package.json`（配置 `bun workspaces`）与严格模式 `tsconfig.base.json`。
-  - 核心 Packages：`packages/protocol`, `packages/shared`, `packages/learner-core`, `packages/agent-core`, `packages/tool-core`, `packages/agent-codex`。
+  - 核心 Packages：`packages/protocol`, `packages/shared`, `packages/learner-core`, `packages/agent-runtime`, `packages/tool-core`, `packages/speech`。
   - 核心 Apps 骨架：`apps/gateway`, `apps/web`。
   - 单元测试与类型检查命令链。
 - **验收标准 (Acceptance Criteria)**：
@@ -108,7 +108,7 @@
 ## M6 之后：远期 Backlog（有明确需求或资源到位才排期）
 
 > 按 2026-09-06 取舍会记录；排序不分先后，进每一项之前必须先有产品确认（成本 / 触发策略 / 回退语义）。
-> **2026-09-06 决策落地**：TTS 接口（`packages/tts-core` + Web Speech 真机默认引擎 +
+> **2026-09-06 决策落地**：TTS 接口（`packages/speech`；C1 合并时由旧包更名）＋ Web Speech 真机默认引擎 +
 > 分语言提示词/上下文）、Readability 正文升级（一级抽取 + 启发式兜底）、词典保持用户手动一键按需安装
 > （设置页按 Gateway 目录渲染全语种包）——三项已实现，不再是远期。接入一律真机，stub 只允许出现在单测。
 

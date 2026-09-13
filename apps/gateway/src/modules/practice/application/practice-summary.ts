@@ -9,10 +9,10 @@ import { buildLocalRunSummary as buildLocalRunSummaryPure, type RunSummaryReport
  * 不变量：
  * - 只读：只读取 run + attempts，不写任何学习状态。
  * - 模型不可用不伪造：失败时回退本地规则汇总，`source` 标记为 `local`，`failureReason` 记录原因。
- * - 汇总实现已迁入 practice-core，此处只做读取/翻译/时间注入。
+ * - 汇总实现在 learning/src/practice，此处只做读取/翻译/时间注入。
  */
 
-/** 报告类型兼容出口：定义已迁入 practice-core，经 learning 转出以保持 Tool/测试链路不动。 */
+/** 报告类型兼容出口：定义在 learning/src/practice，经 learning 转出以保持 Tool/测试链路不动。 */
 export type { RunSummaryReport } from '@study-studio/learning';
 
 export interface SummarizeOptions {
@@ -47,7 +47,7 @@ export async function summarizePracticeRun(
 }
 
 /**
- * M7-14 兼容薄包装：实现已迁入 practice-core，此处只注入时间。
+ * M7-14 兼容薄包装：实现在 learning/src/practice，此处只注入时间。
  * 既有 `buildLocalRunSummary(run, attempts)` 调用方（测试等）无需修改。
  */
 export function buildLocalRunSummary(

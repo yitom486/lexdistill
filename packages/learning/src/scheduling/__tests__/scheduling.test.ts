@@ -3,7 +3,7 @@ import { isOk } from '@study-studio/shared';
 import { scheduleFsrsReviewV1 } from '../index.js';
 
 /**
- * M6-1 review-core 版本化复习排程应用入口（自 learner-core 迁入，行为不变）。
+ * M6-1 版本化复习排程应用入口（自 learner-core 迁入；C6 起归属 learning/src/scheduling，行为不变）。
  * - 输出含 fsrs/1.0.0 版本戳与确定性 trace；
  * - 不依赖 learner-core：此处不用 learner-core 旧裸函数作 oracle，
  *   只断言版本戳、trace 自洽（输入快照/输出/评估时刻）与确定性。

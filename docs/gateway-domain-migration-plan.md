@@ -219,7 +219,7 @@ persistence 实现 → DB + 核心契约
 | 完成练习与统计 | practice 发起 | 同一事务写 attempts/run 与学习进度；保留幂等 |
 | 每日计划展示运行进度 | learning-progress | 由组合层注入运行进度读取，避免与 practice 双向深层 import |
 | 批注/词条/练习题转卡 | 来源模块发起 | 调用 review 建卡能力，保留去重与用户/语种隔离 |
-| Agent 批改后入库 | practice | Agent 经 agent-core 抽象；HTTP/Tool 复用同一应用命令 |
+| Agent 批改后入库 | practice | Agent 经 agent-runtime 抽象；HTTP/Tool 复用同一应用命令 |
 
 ## 6. 分阶段执行与验收门槛
 

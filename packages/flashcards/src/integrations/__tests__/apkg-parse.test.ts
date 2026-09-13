@@ -7,7 +7,7 @@ import {
 } from '../index.js';
 
 /**
- * M7-3 flashcard-integrations APKG 解析测试（纯内存 SQLite 序列化，不碰业务库与文件）。
+ * M7-3 APKG 解析测试（纯内存 SQLite 序列化，不碰业务库与文件；C5 起归属 flashcards/integrations）。
  * Gateway 的 `apkg-import.test.ts` 未动；此处覆盖包级格式解析与错误口径。
  */
 

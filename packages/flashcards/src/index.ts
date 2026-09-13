@@ -6,6 +6,11 @@
  * 渲染只从 ./render 出，外部集成只从 ./integrations 出。
  * Gateway 继续负责卡片和媒体持久化、用户设置、事务、HTTP、Tool 与业务编排；
  * 本包不连业务数据库、不新增迁移。
+ *
+ * 入口划分（Web 构建回归 R1 锁定）：根入口为服务端入口（含 Node-only 的
+ * APKG/Anki 集成：bun:sqlite、node:fs/path，绝不可打包进 Web bundle）；
+ * `./render` 为浏览器安全子入口（零外部依赖），Web 与 learner-core 垫片
+ * 只许引用 render 子入口，禁引根入口。
  */
 
 /** 卡片模板渲染、预览与校验（纯逻辑；含 learner-core 垫片期兼容名）。 */

@@ -2,8 +2,8 @@
 .plan/
 .studio-internal/
 
-# Codex App Server generated protocol dump (optional reference)
-packages/agent-codex/protocol-gen/
+# Codex App Server generated protocol dump (optional reference;包已并入 agent-runtime/adapters/codex)
+packages/agent-runtime/src/adapters/codex/protocol-gen/
 
 
 # Dependencies
