@@ -11,3 +11,4 @@ export * from './objective-grading.js';
 export * from './question-assembly.js';
 export * from './reading-assembly.js';
 export * from './pool-mapping.js';
+export * from './textbook-quiz.js';

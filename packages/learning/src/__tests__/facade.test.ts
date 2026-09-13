@@ -8,6 +8,7 @@ import {
   buildVocabQuestionsFromCards as vocabViaFacade,
   buildTranslationQuestionsFromCards as translationViaFacade,
   buildReadingQuestions as readingViaFacade,
+  buildTextbookLessonQuestions as textbookViaFacade,
   mapPoolQuestion as poolViaFacade,
   mapQuestionType as poolTypeViaFacade,
   summarizeLearningEvidence as summarizeViaFacade,
@@ -26,6 +27,7 @@ import {
   buildReadingQuestions as readingViaCore,
   mapPoolQuestion as poolViaCore,
   mapQuestionType as poolTypeViaCore,
+  buildTextbookLessonQuestions as textbookViaCore,
 } from '@study-studio/practice-core';
 import {
   summarizeLearningEvidence as summarizeViaCore,
@@ -60,6 +62,7 @@ describe('learning facade', () => {
     expect(vocabViaFacade).toBe(vocabViaCore);
     expect(translationViaFacade).toBe(translationViaCore);
     expect(readingViaFacade).toBe(readingViaCore);
+    expect(textbookViaFacade).toBe(textbookViaCore);
     expect(poolViaFacade).toBe(poolViaCore);
     expect(poolTypeViaFacade).toBe(poolTypeViaCore);
   });

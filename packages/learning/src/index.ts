@@ -68,6 +68,7 @@ export {
   mapPoolQuestion,
   mapQuestionType,
   type PoolQuestionRow,
+  buildTextbookLessonQuestions,
 } from '@study-studio/practice-core';
 
 /**
