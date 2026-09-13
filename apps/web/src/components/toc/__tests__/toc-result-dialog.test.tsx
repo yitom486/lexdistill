@@ -2,8 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TocResultDialogContent } from '../TocResultDialog.js';
-import { TocReviewConfigDialogContent, TocReviewProgressDialogContent } from '../TocReviewDialogs.js';
-import type { TocBaselineData, TocReviewDraft } from '../../../lib/toc-confirm-flow.js';
+import type { TocReviewDraft } from '../../../lib/toc-confirm-flow.js';
 
 /**
  * CMD-LINGUA-P3.5 结果 Dialog SSR 断言（无 DOM、无网络）。
@@ -114,106 +113,5 @@ describe('P3.5 结果 Dialog 内容（SSR）', () => {
     expect(html).toContain('aria-label="印刷页码 n0"');
     expect(html).toContain('aria-label="层级 b1"');
     expect(html).toContain('确认本条');
-  });
-});
-
-describe('P3.5 配置/进度 Dialog 内容（SSR）', () => {
-  const baseline = {
-    entries: [{ title: '第1課', printedPage: 12, level: 1, kind: 'lesson' }],
-    verdict: 'usable',
-    pageEvidence: [{ page: 16, excerpt: 'x' }],
-  } as unknown as TocBaselineData;
-  const models = [
-    { id: 'm-big', label: 'Big', supportedEfforts: ['low', 'medium', 'high'], defaultEffort: 'medium' },
-    { id: 'm-luna', label: 'Luna', supportedEfforts: ['low'], defaultEffort: 'low' },
-  ];
-
-  it('配置 Dialog：范围/基线只读 + 开始重建（禁用态可断言）', () => {
-    const html = renderToStaticMarkup(
-      React.createElement(TocReviewConfigDialogContent, {
-        rangeText: '16–21',
-        baseline,
-        evidencePages: 1,
-        sizeHint: null,
-        reviewDisabledReason: null,
-        starting: false,
-        savedModel: '',
-        savedEffort: '',
-        sessionModel: '',
-        sessionModelMode: 'inherit',
-        sessionEffort: '',
-        sessionEffortMode: 'inherit',
-        models,
-        modelsLoading: false,
-        modelsError: null,
-        onStart: () => {},
-        onClose: () => {},
-      })
-    );
-    expect(html).toContain('AI 重建目录');
-    expect(html).toContain('16–21');
-    expect(html).toContain('开始重建');
-    // 无已保存：默认取尾巴小模型并明示
-    expect(html).toContain('m-luna');
-    const disabled = renderToStaticMarkup(
-      React.createElement(TocReviewConfigDialogContent, {
-        rangeText: '16–21',
-        baseline,
-        evidencePages: 1,
-        sizeHint: null,
-        reviewDisabledReason: '先提取目录基线',
-        starting: false,
-        savedModel: 'm-saved',
-        savedEffort: 'high',
-        sessionModel: '',
-        sessionModelMode: 'inherit',
-        sessionEffort: '',
-        sessionEffortMode: 'inherit',
-        models,
-        modelsLoading: false,
-        modelsError: null,
-        onStart: () => {},
-        onClose: () => {},
-      })
-    );
-    expect(disabled).toContain('disabled');
-  });
-
-  it('配置 Dialog：模型真下拉 + 思考等级 + 本次生效预览', () => {
-    const html = renderToStaticMarkup(
-      React.createElement(TocReviewConfigDialogContent, {
-        rangeText: '16–21',
-        baseline,
-        evidencePages: 1,
-        sizeHint: null,
-        reviewDisabledReason: null,
-        starting: false,
-        savedModel: 'm-luna',
-        savedEffort: 'low',
-        sessionModel: '',
-        sessionModelMode: 'inherit',
-        sessionEffort: '',
-        sessionEffortMode: 'inherit',
-        models,
-        modelsLoading: false,
-        modelsError: null,
-        onStart: () => {},
-        onClose: () => {},
-      })
-    );
-    expect(html).toContain('模型');
-    expect(html).toContain('思考等级');
-    // 本次生效预览回显将发送的值（无暗态）
-    expect(html).toContain('本次发送');
-    expect(html).toContain('m-luna');
-  });
-
-  it('进度 Dialog：不定长进度 + 不可取消声明', () => {
-    const html = renderToStaticMarkup(
-      React.createElement(TocReviewProgressDialogContent, { rangeText: '16–21' })
-    );
-    expect(html).toContain('正在重建');
-    expect(html).toContain('role="progressbar"');
-    expect(html).toContain('不可取消');
   });
 });

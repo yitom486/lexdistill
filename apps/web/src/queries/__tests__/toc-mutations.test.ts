@@ -1,13 +1,10 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import {
-  requestDiscoverToc,
   requestExecuteSessionChunk,
-  requestExtractTocBaseline,
   requestFolioCandidates,
   requestImportTocLesson,
   requestPrepareSession,
   requestPreviewTocSegments,
-  requestReviewToc,
   requestSessionStatus,
 } from '../textbooks-annotations.js';
 
@@ -62,147 +59,6 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
   calls.length = 0;
   nextResponse = { status: 200, payload: {} };
-});
-
-const DISCOVER_PAYLOAD = {
-  status: 'found',
-  candidates: [{ fromPage: 2, toPage: 4, score: 12 }],
-  pageCount: 100,
-  pagesScanned: [1, 2, 3],
-  ocrPages: [1, 2],
-  embedded: false,
-};
-
-const BASELINE_PAYLOAD = {
-  status: 'ok',
-  range: { fromPage: 2, toPage: 4 },
-  pageCount: 100,
-  entries: [{ title: '第1課', printedPage: 12, level: 1, source: 'text-fallback', kind: 'lesson' }],
-  diagnostics: {
-    pagesRequested: 3,
-    pagesOcr: 3,
-    linesConsidered: 10,
-    linesDroppedWash: 1,
-    entriesAccepted: 1,
-    entriesRejected: 0,
-  },
-  embedded: false,
-};
-
-const REVIEW_PAYLOAD = {
-  embedded: false,
-  range: { fromPage: 2, toPage: 4 },
-  pageCount: 100,
-  baseline: BASELINE_PAYLOAD,
-  draft: {
-    entries: [{ title: '第1課', printedPage: 12, level: 1, kind: 'lesson', confidence: 'high' }],
-    warnings: [],
-  },
-  diagnostics: { pagesRequested: 3, pagesRendered: 3, baselineEntries: 1, draftEntries: 1 },
-};
-
-describe('P4C 只读三专线请求层', () => {
-  it('discover：filePath 走 JSON，一次请求到 discover-toc', async () => {
-    installFetchStub();
-    nextResponse = { status: 200, payload: DISCOVER_PAYLOAD };
-    const res = await requestDiscoverToc('u1', { filePath: 'C:\\book\\a.pdf' });
-    expect(res.status).toBe('found');
-    expect(res.candidates).toEqual([{ fromPage: 2, toPage: 4, score: 12 }]);
-    expect(calls.length).toBe(1);
-    expect(calls[0]?.url).toContain('/api/documents/u1/discover-toc');
-    expect(calls[0]?.method).toBe('POST');
-    expect(calls[0]?.jsonBody).toMatchObject({ filePath: 'C:\\book\\a.pdf' });
-    expect(calls[0]?.jsonBody).not.toHaveProperty('startPage');
-  });
-
-  it('extract/review：File 走 multipart，范围参数齐备', async () => {
-    installFetchStub();
-    nextResponse = { status: 200, payload: BASELINE_PAYLOAD };
-    const file = new File(['%PDF-mock'], 'toc.pdf', { type: 'application/pdf' });
-    const baseline = await requestExtractTocBaseline('u1', { file }, { startPage: 2, endPage: 4 });
-    expect(baseline.entries.length).toBe(1);
-    expect(calls.length).toBe(1);
-    expect(calls[0]?.url).toContain('/extract-toc');
-    expect(calls[0]?.formFields).toMatchObject({ startPage: '2', endPage: '4' });
-    expect(typeof calls[0]?.formFields?.file).toBe('string');
-
-    nextResponse = { status: 200, payload: REVIEW_PAYLOAD };
-    const review = await requestReviewToc('u1', { filePath: 'C:\\book\\a.pdf' }, { startPage: 2, endPage: 4 });
-    expect(review.draft?.entries.length).toBe(1);
-    expect(calls.length).toBe(2);
-    expect(calls[1]?.url).toContain('/review-toc');
-    expect(calls[1]?.jsonBody).toMatchObject({ filePath: 'C:\\book\\a.pdf', startPage: 2, endPage: 4 });
-    // 缺席 modelOptions：一律不传（后端走环境变量 > 适配器默认）
-    expect(calls[1]?.jsonBody).not.toHaveProperty('model');
-    expect(calls[1]?.jsonBody).not.toHaveProperty('effort');
-  });
-
-  it('review：modelOptions 实际透传（显式）/ 空串不传', async () => {
-    installFetchStub();
-    nextResponse = { status: 200, payload: REVIEW_PAYLOAD };
-    await requestReviewToc(
-      'u1',
-      { filePath: 'C:\\book\\a.pdf' },
-      { startPage: 2, endPage: 4 },
-      { model: 'm-once', effort: 'high' }
-    );
-    expect(calls[0]?.jsonBody).toMatchObject({ model: 'm-once', effort: 'high' });
-
-    await requestReviewToc(
-      'u1',
-      { filePath: 'C:\\book\\a.pdf' },
-      { startPage: 2, endPage: 4 },
-      { model: '  ', effort: '' }
-    );
-    expect(calls[1]?.jsonBody).not.toHaveProperty('model');
-    expect(calls[1]?.jsonBody).not.toHaveProperty('effort');
-  });
-
-  it('后端错误：userMessage 原样透传，不抛原始栈', async () => {
-    installFetchStub();
-    nextResponse = {
-      status: 400,
-      payload: { success: false, error: { code: 'E_INVALID_INPUT', userMessage: '确认范围超出本书（本书共 100 页）', category: 'VALIDATION', retryable: false } },
-    };
-    const err = await requestExtractTocBaseline('u1', { filePath: 'C:\\x.pdf' }, { startPage: 1, endPage: 2 }).then(
-      () => null,
-      (e: unknown) => e
-    );
-    expect(err instanceof Error).toBe(true);
-    expect((err as Error).message).toBe('确认范围超出本书（本书共 100 页）');
-    expect((err as Error).message).not.toContain('HTTP 400');
-  });
-
-  it('畸形 200 负载：中性错误，不崩溃', async () => {
-    installFetchStub();
-    nextResponse = { status: 200, payload: { bogus: true } };
-    const err = await requestDiscoverToc('u1', { filePath: 'C:\\x.pdf' }).then(
-      () => null,
-      (e: unknown) => e
-    );
-    expect(err instanceof Error).toBe(true);
-    expect((err as Error).message).toBe('识别目录返回异常，请稍后重试');
-  });
-
-  it('三专线零写：URL 永不含写端点', async () => {
-    installFetchStub();
-    nextResponse = { status: 200, payload: DISCOVER_PAYLOAD };
-    await requestDiscoverToc('u1', { filePath: 'C:\\x.pdf' });
-    nextResponse = { status: 200, payload: BASELINE_PAYLOAD };
-    await requestExtractTocBaseline('u1', { filePath: 'C:\\x.pdf' }, { startPage: 1, endPage: 2 });
-    nextResponse = { status: 200, payload: REVIEW_PAYLOAD };
-    await requestReviewToc('u1', { filePath: 'C:\\x.pdf' }, { startPage: 1, endPage: 2 });
-    expect(calls.length).toBe(3);
-    for (const call of calls) {
-      expect(call.url).not.toContain('/import');
-      expect(call.url).not.toContain('/append');
-      expect(call.url).not.toContain('/save');
-      expect(call.url).not.toContain('/structure');
-    }
-    const bodies = JSON.stringify(calls.map((c) => c.jsonBody));
-    expect(bodies).not.toContain('base64');
-    expect(bodies).not.toContain('data:image');
-  });
 });
 
 const FOLIO_PAYLOAD = {
@@ -438,35 +294,4 @@ describe('P5D2D session 请求层', () => {
     expect((err as Error).message).toBe('分段预览已过期');
   });
 
-  it('review-toc 传输中断 + 网关存活 → 中断中文（重启误诊修复）', async () => {
-    globalThis.fetch = (async (input: string | URL | Request): Promise<Response> => {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      if (url.includes('/api/health')) {
-        return new Response(JSON.stringify({ status: 'ok', bootId: 'boot-9' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      throw new TypeError('Failed to fetch');
-    }) as typeof fetch;
-    const err = await requestReviewToc('u1', { filePath: 'C:\\book\\a.pdf' }, { startPage: 2, endPage: 4 }).then(
-      () => null,
-      (e: unknown) => e
-    );
-    expect((err as Error).message).toBe('网关连接中断（可能刚刚重启），本次请求没有完成，请重新发起。');
-    expect((err as { code?: unknown }).code).toBe('E_GATEWAY_RESTARTED');
-  });
-
-  it('review-toc 传输中断 + 网关仍死 → 保持不可达原文', async () => {
-    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-      void input;
-      void init;
-      throw new TypeError('Failed to fetch');
-    }) as typeof fetch;
-    const err = await requestReviewToc('u1', { filePath: 'C:\\book\\a.pdf' }, { startPage: 2, endPage: 4 }).then(
-      () => null,
-      (e: unknown) => e
-    );
-    expect((err as Error).message).toContain('网关没有响应');
-  });
 });

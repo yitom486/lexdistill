@@ -2,7 +2,6 @@ import { describe, expect, it, afterEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { extractTocEntries } from '../application/pdf-import/extract-headings.js';
-import { extractTocBaseline } from '../application/pdf-import/toc-baseline.js';
 import {
   appendPdfToDocument,
   convertPdfToAst,
@@ -156,26 +155,6 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     expect(dbRows.map((r) => r.n)).toEqual([1, 2, 3, 4, 5]);
     expect(dbRows.map((r) => r.s)).toEqual([1, 2, 3, 4, 5]);
   }, 180000);
-});
-
-describe('P3.2B 目录基线真 E2E（本机运行时，rich TOC 页）', () => {
-  it('同行有尾数走文本+span验证；J1 断行有页；前置頁碼只计 unresolved（不猜）', async () => {
-    const bytes = await bytesOf(RICH_URL);
-    const res = await extractTocBaseline({}, { userId: 'u1', filename: 'rich.pdf', bytes, fromPage: 1, toPage: 1 });
-    expect(isOk(res)).toBe(true);
-    if (!isOk(res)) return;
-    expect(res.value.verdict).toBe('usable');
-    expect(res.value.entries).toEqual([
-      { title: '第1課 はじめまして ................', printedPage: 2, level: 1, source: 'geometry-block', kind: 'lesson' },
-      { title: '第2課 これは本です ................', printedPage: 3, level: 1, source: 'geometry-block', kind: 'lesson' },
-      { title: '復習A ............................', printedPage: 4, level: 1, source: 'geometry-block', kind: 'lesson' },
-      { title: '付録 .............................', printedPage: 5, level: 2, source: 'geometry-block', kind: 'section' },
-      { title: '第3課 さんぽ …………………', printedPage: 30, level: 1, source: 'text-fallback', kind: 'lesson' },
-    ]);
-    // `31 第4課 てんき` 为同行前置页码（非 P3.2B 三形之列，不猜，只计未定位）
-    expect(res.value.diagnostics.unresolvedBlocks).toBe(1);
-    expect(res.value.diagnostics.entriesFromBlocks).toBe(0);
-  }, 120000);
 });
 
 describe('pdf-import 扫描页（本机 OCR 运行时）', () => {  it('无字形状页：走 OCR → 零产出友好失败，不崩不打云', async () => {

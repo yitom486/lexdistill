@@ -31,7 +31,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog.js';
-import { TocReviewPanel } from './TocReviewPanel.js';
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
 import {
@@ -957,10 +956,7 @@ export function TextbookImporterModal({
               <p className="text-[11px] font-bold text-ink-mute-deep">
                 目录识别与人工确认（只读，不入库；用上方已选 PDF / 路径）
               </p>
-              <TocReviewPanel
-                file={pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null}
-                filePath={stripPdfPathQuotes(pdfPath)}
-              />
+              <p className="text-[11px] text-ink-ghost">目录识别流程已下线重构，本区域暂不可用。</p>
             </div>
           </div>
 

@@ -28,11 +28,6 @@ import {
 import { LearningContentTool } from './learning-content-tool.js';
 import { LearningPlanTool } from './learning-plan-tool.js';
 import { UiNavigateTool, UiPresentTool } from './ui-command-tools.js';
-import {
-  TocDraftAddEntryTool,
-  TocDraftRemoveEntryTool,
-  TocDraftUpdateEntryTool,
-} from '../../modules/library/application/pdf-import/toc-draft-ops.js';
 
 /**
  * 网关 Tool 注册表装配（G3：由 GatewayServer 构造函数迁移而来，行为不变）。
@@ -75,9 +70,4 @@ export function registerGatewayTools(
   registry.register(new FlashcardsDraftDismissTool(drizzle));
   registry.register(new UiNavigateTool());
   registry.register(new UiPresentTool());
-  // P3.5：目录草稿增量三工具（adapter 执行链经全局 registry 解析；仅 review
-  // 会话声明，未声明会话的模型调不到；执行只写会话内存暂存，零持久化）。
-  registry.register(new TocDraftAddEntryTool());
-  registry.register(new TocDraftUpdateEntryTool());
-  registry.register(new TocDraftRemoveEntryTool());
 }
