@@ -11,6 +11,7 @@ import {
   acceptedDbTypesForBlock,
   buildVocabQuestionsFromCards,
   buildTranslationQuestionsFromCards,
+  buildReadingQuestions,
 } from '@study-studio/learning';
 
 /**
@@ -62,43 +63,6 @@ export type ContentToolLike = {
 
 const isVocabBlock = (block: PracticeBlockSpec) =>
   block.kind === 'VOCAB_REVIEW' || block.kind === 'VOCAB_NEW';
-
-/**
- * P5-E7：READING 块从最近一篇阅读套题装配（篇目随题携带，Runner 渲染可折叠面板）。
- * 选篇看难度：取最近一篇“档位内”（set.difficulty ≤ tier 上限）且有题的篇目；
- * 超纲篇目不硬上（由调用方回退链处理）。无可用套题时返回空数组。
- */
-async function buildReadingQuestions(
-  repo: Pick<ContentRepository, 'listReadingSets'> & LearnerRepository,
-  userId: string,
-  block: PracticeBlockSpec,
-  language: 'en' | 'ja' | 'ko'
-): Promise<GeneratedQuestion[]> {
-  const langUpper = language === 'ja' ? 'JA' : language === 'ko' ? 'KO' : 'EN';
-  const setsRes = await repo.listReadingSets(userId, undefined, langUpper);
-  if (!isOk(setsRes)) return [];
-  let cap = 5;
-  try {
-    const gate = await resolveStudyGate(repo, userId, language, null);
-    cap = tierCapForLevel(gate.level);
-  } catch {
-    cap = 5;
-  }
-  const set = (setsRes.value ?? []).find((s) => s.questions.length > 0 && s.difficulty <= cap);
-  if (!set) return [];
-  return set.questions.slice(0, block.count).map((rq) => ({
-    id: `read_${rq.id}`,
-    type: 'MULTIPLE_CHOICE' as const,
-    prompt: rq.prompt,
-    content: '',
-    options: rq.options.map((o) => `${o.key}. ${o.text}`),
-    correctAnswer: rq.correctAnswer,
-    explanation: rq.explanation,
-    testedSkillId: `${language === 'ja' ? 'jp' : language}.reading.comprehension`,
-    difficultyTier: set.difficulty,
-    reading: { setId: set.id, title: set.title, body: set.body },
-  }));
-}
 
 /** 内容去重键（跨来源同一道题去重；考试防重复刷分，练习防重复体验）。 */
 function questionContentKey(q: { content?: unknown; correctAnswer?: unknown }): string {
@@ -324,7 +288,20 @@ export async function assemblePracticeRun(
 
     // 1b) READING 块：从最近阅读套题装配（篇目随题携带；超纲篇目不过门）
     if (block.kind === 'READING') {
-      pushFresh(applyGate(await buildReadingQuestions(repo, userId, block, run.language)));
+      pushFresh(
+        applyGate(
+          await buildReadingQuestions(
+            {
+              listReadingSets: (input) => repo.listReadingSets(input.userId, undefined, input.language),
+              getTierCap: async () =>
+                tierCapForLevel((await resolveStudyGate(repo, userId, run.language, null)).level),
+            },
+            userId,
+            block,
+            run.language
+          )
+        )
+      );
     }
 
     // 1c) TRANSLATION 块：优先吃讲透句子卡；不够再走池/模板链（不断旧行为）。

@@ -64,6 +64,7 @@ export {
   acceptedDbTypesForBlock,
   buildVocabQuestionsFromCards,
   buildTranslationQuestionsFromCards,
+  buildReadingQuestions,
 } from '@study-studio/practice-core';
 
 /**

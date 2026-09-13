@@ -7,6 +7,7 @@ import {
   acceptedDbTypesForBlock as dbTypesViaFacade,
   buildVocabQuestionsFromCards as vocabViaFacade,
   buildTranslationQuestionsFromCards as translationViaFacade,
+  buildReadingQuestions as readingViaFacade,
   summarizeLearningEvidence as summarizeViaFacade,
   recordSkillAttempt as recordViaFacade,
   buildProfileSnapshot as snapshotViaFacade,
@@ -20,6 +21,7 @@ import {
   acceptedDbTypesForBlock as dbTypesViaCore,
   buildVocabQuestionsFromCards as vocabViaCore,
   buildTranslationQuestionsFromCards as translationViaCore,
+  buildReadingQuestions as readingViaCore,
 } from '@study-studio/practice-core';
 import {
   summarizeLearningEvidence as summarizeViaCore,
@@ -53,6 +55,7 @@ describe('learning facade', () => {
     expect(dbTypesViaFacade).toBe(dbTypesViaCore);
     expect(vocabViaFacade).toBe(vocabViaCore);
     expect(translationViaFacade).toBe(translationViaCore);
+    expect(readingViaFacade).toBe(readingViaCore);
   });
 
   it('转出排程状态类型（编译期锁：缺失即 typecheck 失败）', () => {
