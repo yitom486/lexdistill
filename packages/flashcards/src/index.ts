@@ -77,3 +77,12 @@ export {
   type ApkgDeckSummary,
   type ApkgAnalysis,
 } from './apkg-analyze.js';
+
+/** APKG 笔记导入用例（最小写 port + 编排；落库与媒体存储由调用方实现）。 */
+export {
+  importParsedApkgNotes,
+  type ImportParsedApkgNotesOptions,
+  type ApkgImportNotesResult,
+  type ApkgImportCardInput,
+  type ApkgImportPorts,
+} from './apkg-import.js';

@@ -5,26 +5,25 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
-  generateId,
   nowIso,
 } from '@study-studio/shared';
 import {
   analyzeParsedApkg,
+  importParsedApkgNotes,
   parseApkgEntries,
-  extractMediaRefs,
   type ParsedApkg,
   type ApkgAnalysis,
+  type ApkgImportNotesResult,
 } from '@study-studio/flashcards';
 
 /** 分析类型兼容出口：定义已迁入 flashcards，此处重出以保持 Tool/测试链路不动。 */
-export type { ApkgModelDraft, ApkgDeckSummary, ApkgAnalysis } from '@study-studio/flashcards';
+export type { ApkgModelDraft, ApkgDeckSummary, ApkgAnalysis, ApkgImportNotesResult } from '@study-studio/flashcards';
 // 跨模块复用（G5 已登记）：zip 安全解包（炸弹/加密守卫），不写盘、无路径穿越面。
 import { extractZip, normalizeZipEntryPaths } from '../../library/public.js';
 import { flashcards } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { storeMedia } from '../persistence/media-store.js';
 import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
-import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';
 
 /**
  * `.apkg` 导入（Boltzmann 搬家 + 网上模板提取）。
@@ -34,7 +33,6 @@ import { normalizeTrackLanguage } from '../../../infrastructure/persistence/lang
  */
 
 const MAX_APKG_FILE_BYTES = 300 * 1024 * 1024;
-const DEFAULT_MAX_NOTES = 5000;
 
 export interface ApkgImportNotesOptions {
   userId: string;
@@ -43,18 +41,6 @@ export interface ApkgImportNotesOptions {
   maxNotes?: number | undefined;
   /** 媒体根目录覆盖（单测注入临时目录；缺省用户媒体库）。 */
   mediaRoot?: string | undefined;
-}
-
-export interface ApkgImportNotesResult {
-  created: number;
-  skippedDuplicate: number;
-  skippedEmpty: number;
-  /** 引用了但包内无对应文件的媒体计数（S4 前全部落此；有文件则入库）。 */
-  mediaSkipped: number;
-  /** 已写入用户媒体库的文件数（内容寻址去重）。 */
-  mediaStored: number;
-  decks: string[];
-  truncated: boolean;
 }
 
 /** zip → 解析：安全解包仍走 library 共享守卫，格式解析委托新包（M7-3）。 */
@@ -93,19 +79,6 @@ export async function readApkgFileBytes(filePath: string): Promise<Result<Uint8A
   }
 }
 
-function stripHtml(raw: string): string {
-  return raw
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 /** 分析（只读）：解包后委托 flashcards 纯用例；信封与翻译口径不变。 */
 export async function analyzeApkg(
   bytes: Uint8Array,
@@ -127,83 +100,50 @@ export async function importApkgNotes(
   options: ApkgImportNotesOptions
 ): Promise<Result<ApkgImportNotesResult, BusinessError>> {
   try {
+    // 原始校验顺序：语种先行（非法直接拒，后续解包不再执行）。
     if (options.language !== 'ja' && options.language !== 'en' && options.language !== 'ko') {
       return err(new BusinessError('E_INVALID_INPUT', '导入语种须为 ja/en/ko（决定卡片归属，不可猜）', 'VALIDATION', false));
     }
-    const language = normalizeTrackLanguage(options.language);
-    const maxNotes = options.maxNotes ?? DEFAULT_MAX_NOTES;
-    const deckFilter = options.deckNames && options.deckNames.length > 0 ? new Set(options.deckNames) : undefined;
+    // 解包仍归 Gateway（安全守卫 + 归一化）；编排委托 flashcards 用例。
     const parsed = await parseApkgBytes(bytes);
-    // 去重集合经 sqlite 直查（front 无唯一约束，内存集合判定）。
-    const seen = new Set<string>();
-    const dupRows = deps.sqlite
-      .query<{ front: string }, [string]>('SELECT front FROM flashcards WHERE user_id = ?')
-      .all(options.userId);
-    for (const r of dupRows) seen.add(r.front);
-    const now = nowIso();
-    let created = 0;
-    let skippedDuplicate = 0;
-    let skippedEmpty = 0;
-    let mediaSkipped = 0;
-    let mediaStored = 0;
-    let truncated = false;
-    const decks = new Set<string>();
-    let processed = 0;
-    for (const note of parsed.notes) {
-      if (deckFilter && !deckFilter.has(note.deckName)) continue;
-      if (processed >= maxNotes) {
-        truncated = true;
-        break;
-      }
-      processed += 1;
-      const front = stripHtml(note.fields[0] ?? '');
-      const back = stripHtml(note.fields.slice(1).join('\n'));
-      if (!front) {
-        skippedEmpty += 1;
-        continue;
-      }
-      if (seen.has(front)) {
-        skippedDuplicate += 1;
-        continue;
-      }
-      seen.add(front);
-      // 媒体：包内有文件则入库（内容寻址去重），缺失只计数（卡片正文不臆造引用）。
-      for (const ref of extractMediaRefs(note.fields.join('\x1f'))) {
-        const blob = parsed.mediaBlobs.get(ref);
-        if (!blob) {
-          mediaSkipped += 1;
-          continue;
-        }
-        const stored = await storeMedia(deps, `apkg:${note.deckName}`, ref, blob, options.mediaRoot);
-        if (isOk(stored)) mediaStored += 1;
-        else mediaSkipped += 1;
-      }
-      const tags = [`Anki 导入：${note.deckName}`, ...note.tags].slice(0, 16);
-      await deps.db.insert(flashcards).values({
-        id: generateId('card_apkg'),
+    return await importParsedApkgNotes(
+      {
+        listExistingFronts: async (userId) =>
+          deps.sqlite
+            .query<{ front: string }, [string]>('SELECT front FROM flashcards WHERE user_id = ?')
+            .all(userId)
+            .map((r) => r.front),
+        createCard: async (card) => {
+          // 持久化方言在此收口：包内 tagsJson/fsrsJson → 表列 tags/fsrs。
+          await deps.db.insert(flashcards).values({
+            id: card.id,
+            userId: card.userId,
+            language: card.language,
+            type: 'VOCABULARY',
+            front: card.front,
+            back: card.back,
+            phonetic: null,
+            audioUrl: null,
+            sourceEntryId: null,
+            tags: card.tagsJson,
+            fsrs: card.fsrsJson,
+          });
+        },
+        storeMediaFile: async ({ collection, filename, blob, mediaRoot }) => {
+          const stored = await storeMedia(deps, collection, filename, blob, mediaRoot);
+          return isOk(stored) ? ok(undefined) : err(stored.error);
+        },
+      },
+      parsed,
+      {
         userId: options.userId,
-        language,
-        type: 'VOCABULARY',
-        front: front.slice(0, 2000),
-        back: (back || front).slice(0, 8000),
-        phonetic: null,
-        audioUrl: null,
-        sourceEntryId: null,
-        tags: JSON.stringify(tags),
-        fsrs: JSON.stringify({ stability: 1, difficulty: 5, reps: 0, lapses: 0, dueAt: now, state: 'NEW' }),
-      });
-      created += 1;
-      decks.add(note.deckName);
-    }
-    return ok({
-      created,
-      skippedDuplicate,
-      skippedEmpty,
-      mediaSkipped,
-      mediaStored,
-      decks: [...decks],
-      truncated,
-    });
+        language: options.language,
+        ...(options.deckNames ? { deckNames: options.deckNames } : {}),
+        ...(options.maxNotes !== undefined ? { maxNotes: options.maxNotes } : {}),
+        ...(options.mediaRoot ? { mediaRoot: options.mediaRoot } : {}),
+        now: nowIso(),
+      }
+    );
   } catch (e) {
     if (e instanceof BusinessError) return err(e);
     return err(translateToBusinessError(e, 'importApkgNotes'));
