@@ -1,7 +1,7 @@
 ﻿import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { isOk, BusinessError } from '@study-studio/shared';
-import { scheduleNextReview } from '@study-studio/learner-core';
+import { scheduleFsrsReviewV1 } from '@study-studio/learner-core';
 import { FlashcardSchema } from '@study-studio/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
@@ -78,7 +78,14 @@ export function createReviewRoutes(deps: GatewayDeps) {
             ? { lastReviewedAt: targetCard.fsrs.lastReviewedAt }
             : {}),
         };
-        const nextFsrs = scheduleNextReview(currentFsrs, rating);
+        // M3-3：复习排程经版本化入口（单次请求共用一个 now；版本门失败走
+        //  envelope 错误链返回，不抛原始异常、不静默回退；不持久化版本/trace）。
+        const now = new Date();
+        const scheduledRes = scheduleFsrsReviewV1({ state: currentFsrs, rating, now });
+        if (!isOk(scheduledRes)) {
+          return formatBusinessErrorResponse(c, scheduledRes.error, 'reviewCard');
+        }
+        const nextFsrs = scheduledRes.value.state;
         const saveRes = await deps.repo.saveCard({ ...targetCard, fsrs: nextFsrs });
         if (!isOk(saveRes)) return formatBusinessErrorResponse(c, saveRes.error, 'reviewCard');
         await deps.repo.recordDailyActivity(userId, { cards: 1 });
