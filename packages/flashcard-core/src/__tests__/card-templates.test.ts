@@ -15,7 +15,7 @@ import {
   validateCardTemplate,
   validateFieldTemplate,
   type CardContext,
-} from '../card-templates.js';
+} from '../index.js';
 
 const SAMPLE: CardContext = {
   expression: '食べる',

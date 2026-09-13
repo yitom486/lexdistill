@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { isOk } from '@study-studio/shared';
-import type { AnkiCardFormat } from '@study-studio/learner-core';
+import type { AnkiCardFormat } from '@study-studio/flashcard-core';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { narrowSaveCardFormatInput } from '../persistence/card-formats.js';
 import { narrowCardSourceEntry } from '../application/card-preview.js';

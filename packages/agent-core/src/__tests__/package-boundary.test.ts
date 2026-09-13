@@ -28,6 +28,7 @@ const PACKAGES = [
   'dictionary-core',
   'dictionary-integrations',
   'flashcard-integrations',
+  'flashcard-core',
   'review-core',
   'practice-core',
   'learning',
@@ -41,13 +42,14 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'agent-codex': ['@study-studio/shared', '@study-studio/agent-core', '@study-studio/tool-core'],
   'agent-responses': ['@study-studio/shared', '@study-studio/agent-core', '@study-studio/tool-core'],
   'agent-runtime': ['@study-studio/agent-core', '@study-studio/agent-codex', '@study-studio/agent-responses'],
-  'learner-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
+  'learner-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core', '@study-studio/flashcard-core'],
   'tts-core': ['@study-studio/shared'],
   'speech': ['@study-studio/tts-core'],
   'learning-algorithms': ['@study-studio/shared', '@study-studio/protocol'],
   'dictionary-core': [],
   'dictionary-integrations': ['@study-studio/shared'],
   'flashcard-integrations': ['@study-studio/shared'],
+  'flashcard-core': [],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
   'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
   'learning': ['@study-studio/learner-core', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
@@ -232,6 +234,17 @@ describe('M1-1 package 依赖方向', () => {
 
   it('flashcard-integrations：纯传输层，仅依赖 shared（禁 Gateway/learner-core/Agent/Web）', async () => {
     expect(await relativeImportsOnly('flashcard-integrations', ['@study-studio/shared'])).toEqual([]);
+  });
+
+  it('flashcard-core：纯模板渲染，零依赖（禁 Gateway/SQLite/Agent/Web/网络）', async () => {
+    expect(await relativeImportsOnly('flashcard-core', [])).toEqual([]);
+  });
+
+  it('learner-core 卡片兼容出口：垫片转出 flashcard-core（apkg-export 未迁移不断裂）', async () => {
+    for (const file of ['card-templates.ts', 'pitch-graph.ts']) {
+      const text = await readFile(join(repoRoot(), 'packages', 'learner-core', 'src', file), 'utf-8');
+      expect(text).toContain('@study-studio/flashcard-core');
+    }
   });
 
   it('learning：领域组合入口，仅组合 learner/algorithms/review/practice-core', async () => {

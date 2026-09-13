@@ -11,6 +11,7 @@
     "@study-studio/agent-runtime": "workspace:*",
     "@study-studio/dictionary-core": "workspace:*",
     "@study-studio/dictionary-integrations": "workspace:*",
+    "@study-studio/flashcard-core": "workspace:*",
     "@study-studio/flashcard-integrations": "workspace:*",
     "@study-studio/learner-core": "workspace:*",
     "@study-studio/learning": "workspace:*",

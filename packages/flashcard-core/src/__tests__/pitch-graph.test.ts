@@ -3,7 +3,7 @@ import {
   splitMorae,
   moraPitchPattern,
   buildPitchGraphSvg,
-} from '../pitch-graph.js';
+} from '../index.js';
 
 describe('splitMorae', () => {
   it('拗音合并；促音拨音长音独立', () => {

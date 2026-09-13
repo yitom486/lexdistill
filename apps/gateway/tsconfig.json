@@ -19,6 +19,7 @@
     { "path": "../../packages/dictionary-core" },
     { "path": "../../packages/dictionary-integrations" },
     { "path": "../../packages/flashcard-integrations" },
+    { "path": "../../packages/flashcard-core" },
     { "path": "../../packages/review-core" },
     { "path": "../../packages/practice-core" },
     { "path": "../../packages/learning" }

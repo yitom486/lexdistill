@@ -10,7 +10,7 @@ import {
 import {
   buildCardContext,
   renderCard,
-} from '@study-studio/learner-core';
+} from '@study-studio/flashcard-core';
 // 跨模块复用（G5 已登记）：TTS 合成只取音频字节，Key 仅本次调用内存，永不落盘。
 import {
   synthesizeViaProxy,

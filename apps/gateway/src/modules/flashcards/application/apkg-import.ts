@@ -15,7 +15,7 @@ import {
   guessFieldMapping,
   analyzeTemplateCompat,
   type FieldMarker,
-} from '@study-studio/learner-core';
+} from '@study-studio/flashcard-core';
 // 跨模块复用（G5 已登记）：zip 安全解包（炸弹/加密守卫），不写盘、无路径穿越面。
 import { extractZip, normalizeZipEntryPaths } from '../../library/public.js';
 import { flashcards } from '../../../infrastructure/db/index.js';

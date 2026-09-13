@@ -13,7 +13,7 @@ import {
   getBuiltinCardFormat,
   validateCardFormat,
   type AnkiCardFormat,
-} from '@study-studio/learner-core';
+} from '@study-studio/flashcard-core';
 import { ankiCardFormats } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
