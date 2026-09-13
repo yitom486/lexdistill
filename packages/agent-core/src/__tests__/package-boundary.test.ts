@@ -28,6 +28,7 @@ const PACKAGES = [
   'dictionary-core',
   'dictionary-integrations',
   'review-core',
+  'practice-core',
 ] as const;
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
@@ -38,13 +39,14 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'agent-codex': ['@study-studio/shared', '@study-studio/agent-core', '@study-studio/tool-core'],
   'agent-responses': ['@study-studio/shared', '@study-studio/agent-core', '@study-studio/tool-core'],
   'agent-runtime': ['@study-studio/agent-core', '@study-studio/agent-codex', '@study-studio/agent-responses'],
-  'learner-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms', '@study-studio/review-core'],
+  'learner-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
   'tts-core': ['@study-studio/shared'],
   'speech': ['@study-studio/tts-core'],
   'learning-algorithms': ['@study-studio/shared', '@study-studio/protocol'],
   'dictionary-core': [],
   'dictionary-integrations': ['@study-studio/shared'],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
+  'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -215,6 +217,12 @@ describe('M1-1 package 依赖方向', () => {
         '@study-studio/protocol',
         '@study-studio/learning-algorithms',
       ])
+    ).toEqual([]);
+  });
+
+  it('practice-core：纯规则，仅依赖 shared/protocol（禁反向依赖 learner-core）', async () => {
+    expect(
+      await relativeImportsOnly('practice-core', ['@study-studio/shared', '@study-studio/protocol'])
     ).toEqual([]);
   });
 

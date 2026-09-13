@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { evaluateExamVerdict, type GroupSubscore } from '../assessment-blueprint.js';
+import { evaluateExamVerdict, type GroupSubscore } from '../index.js';
 
 function group(over: Partial<GroupSubscore> = {}): GroupSubscore {
   return {

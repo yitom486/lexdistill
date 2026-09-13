@@ -15,6 +15,7 @@
     { "path": "packages/dictionary-core" },
     { "path": "packages/dictionary-integrations" },
     { "path": "packages/review-core" },
+    { "path": "packages/practice-core" },
     { "path": "apps/gateway" },
     { "path": "apps/web" }
   ]

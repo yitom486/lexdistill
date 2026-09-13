@@ -10,7 +10,7 @@ import {
   parsePracticeBlockSpec,
   parsePracticeBlockSpecs,
   SUBJECTIVE_BATCH_MAX_COUNT,
-} from '../practice-plan.js';
+} from '../index.js';
 
 function baseBlock(overrides: Partial<PracticeBlockSpec> = {}): PracticeBlockSpec {
   return {

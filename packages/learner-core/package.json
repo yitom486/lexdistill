@@ -6,6 +6,7 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@study-studio/learning-algorithms": "workspace:*",
+    "@study-studio/practice-core": "workspace:*",
     "@study-studio/protocol": "workspace:*",
     "@study-studio/review-core": "workspace:*",
     "@study-studio/shared": "workspace:*"

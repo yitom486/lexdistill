@@ -137,6 +137,7 @@
       "version": "0.1.2",
       "dependencies": {
         "@study-studio/learning-algorithms": "workspace:*",
+        "@study-studio/practice-core": "workspace:*",
         "@study-studio/protocol": "workspace:*",
         "@study-studio/review-core": "workspace:*",
         "@study-studio/shared": "workspace:*",
@@ -144,6 +145,14 @@
     },
     "packages/learning-algorithms": {
       "name": "@study-studio/learning-algorithms",
+      "version": "0.1.2",
+      "dependencies": {
+        "@study-studio/protocol": "workspace:*",
+        "@study-studio/shared": "workspace:*",
+      },
+    },
+    "packages/practice-core": {
+      "name": "@study-studio/practice-core",
       "version": "0.1.2",
       "dependencies": {
         "@study-studio/protocol": "workspace:*",
@@ -409,6 +418,8 @@
     "@study-studio/learner-core": ["@study-studio/learner-core@workspace:packages/learner-core"],
 
     "@study-studio/learning-algorithms": ["@study-studio/learning-algorithms@workspace:packages/learning-algorithms"],
+
+    "@study-studio/practice-core": ["@study-studio/practice-core@workspace:packages/practice-core"],
 
     "@study-studio/protocol": ["@study-studio/protocol@workspace:packages/protocol"],
 
