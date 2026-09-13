@@ -10,6 +10,7 @@ import {
   type Result,
   BusinessError,
   extractErrorText,
+  logger,
   translateToBusinessError,
 } from '@study-studio/shared';
 
@@ -88,8 +89,8 @@ export class JsonRpcStdioClient {
       child.stderr.on('data', (buf: Buffer) => {
         const text = buf.toString('utf8').trim();
         if (text) {
-          // stderr 常含启动日志；不中断会话
-          console.warn('[codex-app-server]', text.slice(0, 400));
+          // stderr 常含启动日志；不中断会话（截断后走统一诊断通道）
+          logger.warn('[codex-app-server]', { stderr: text.slice(0, 400) });
         }
       });
 
