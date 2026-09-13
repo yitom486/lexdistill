@@ -2,13 +2,14 @@ import { describe, expect, it } from 'bun:test';
 import {
   scheduleFsrsReviewV1 as viaFacade,
   blueprintFor as blueprintViaFacade,
+  buildLocalRunSummary as summaryViaFacade,
   summarizeLearningEvidence as summarizeViaFacade,
   recordSkillAttempt as recordViaFacade,
   buildProfileSnapshot as snapshotViaFacade,
   type FsrsState as FsrsStateViaFacade,
 } from '../index.js';
 import { scheduleFsrsReviewV1 as viaCore } from '@study-studio/review-core';
-import { blueprintFor as blueprintViaCore } from '@study-studio/practice-core';
+import { blueprintFor as blueprintViaCore, buildLocalRunSummary as summaryViaCore } from '@study-studio/practice-core';
 import {
   summarizeLearningEvidence as summarizeViaCore,
   recordSkillAttempt as recordViaCore,
@@ -27,6 +28,10 @@ describe('learning facade', () => {
     expect(summarizeViaFacade).toBe(summarizeViaCore);
     expect(recordViaFacade).toBe(recordViaCore);
     expect(snapshotViaFacade).toBe(snapshotViaCore);
+  });
+
+  it('运行汇总入口与 practice-core 同一实现（M7-14 修复）', () => {
+    expect(summaryViaFacade).toBe(summaryViaCore);
   });
 
   it('转出排程状态类型（编译期锁：缺失即 typecheck 失败）', () => {

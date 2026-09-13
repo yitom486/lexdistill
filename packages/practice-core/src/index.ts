@@ -6,3 +6,4 @@
  */
 export * from './assessment-blueprint.js';
 export * from './practice-plan.js';
+export * from './run-summary.js';

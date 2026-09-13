@@ -47,6 +47,12 @@ export {
   parsePracticeBlockSpecs,
 } from '@study-studio/practice-core';
 
+/** 练习运行本地汇总（规范源 practice-core，只转出不复制实现）。 */
+export {
+  buildLocalRunSummary,
+  type RunSummaryReport,
+} from '@study-studio/practice-core';
+
 /**
  * 学习进度纯计算（规范源 learner-core，本包只转出不复制实现）。
  * learner-core 仍是学习者状态与持久化事实源；状态、Repository 与数据库契约
