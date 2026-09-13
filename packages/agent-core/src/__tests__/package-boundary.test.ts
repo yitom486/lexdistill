@@ -254,6 +254,25 @@ describe('M1-1 package 依赖方向', () => {
     }
   });
 
+  it('gateway 学习进度 API：三纯函数走 learning 统一入口', async () => {
+    const cases: Array<[string, string[]]> = [
+      ['context/context-builder.ts', ['summarizeLearningEvidence']],
+      ['modules/learning-progress/application/learning-analysis.ts', ['summarizeLearningEvidence']],
+      ['runtime/handlers/learner-handlers.ts', ['recordSkillAttempt']],
+    ];
+    for (const [file, symbols] of cases) {
+      const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
+      expect(text).toContain('@study-studio/learning');
+      for (const line of text.split('\n')) {
+        for (const sym of symbols) {
+          if (line.includes(sym) && line.includes('from')) {
+            expect(line).toContain('@study-studio/learning');
+          }
+        }
+      }
+    }
+  });
+
   it('gateway manifest：必须声明 learning（M6-3 统一入口消费方）', async () => {
     const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');

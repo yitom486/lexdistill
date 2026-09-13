@@ -1,5 +1,6 @@
 import type { AgentAdapter } from '@study-studio/agent-core';
-import { summarizeLearningEvidence, type LearnerRepository, type LearnerProfileSnapshot } from '@study-studio/learner-core';
+import { summarizeLearningEvidence } from '@study-studio/learning';
+import { type LearnerRepository, type LearnerProfileSnapshot } from '@study-studio/learner-core';
 import type {
   LearningAnalysisReport,
   LearningSuggestion,

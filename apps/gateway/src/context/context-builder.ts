@@ -1,5 +1,6 @@
 import type { ContextSnapshot, ContextFocusItem } from '@study-studio/agent-core';
-import { summarizeLearningEvidence, COURSE_STAGES, type LearnerProfileSnapshot, type LearnerRepository } from '@study-studio/learner-core';
+import { summarizeLearningEvidence } from '@study-studio/learning';
+import { COURSE_STAGES, type LearnerProfileSnapshot, type LearnerRepository } from '@study-studio/learner-core';
 import type { GeneratedQuestion, Flashcard } from '@study-studio/protocol';
 import { isOk } from '@study-studio/shared';
 import {

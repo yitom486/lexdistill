@@ -12,9 +12,9 @@ import {
   isOk,
   nowIso,
 } from '@study-studio/shared';
+import { recordSkillAttempt } from '@study-studio/learning';
 import {
   createMistakeEntry,
-  recordSkillAttempt,
 } from '@study-studio/learner-core';
 import type { GatewayServer } from '../gateway-runtime.js';
 import { DrizzleLearnerRepository } from '../../infrastructure/drizzle-learner-repository.js';
