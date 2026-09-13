@@ -37,8 +37,8 @@ const LEXICON_METHODS = [
 const LEARNING_METHODS = [
   'getQuestions', 'saveQuestions', 'isPlacementRun', 'startPlacementExam',
   'finishPlacementExam', 'getPlacementByRunId', 'listContentTemplates', 'listPracticeCollections',
-  'listPracticeItems', 'convertPracticeItemsToCards', 'collectPracticeQuestions', 'resolveMistake',
-  'retryMistake', 'countPlacementAttempts',
+  'listPracticeItems',   'convertPracticeItemsToCards', 'collectPracticeQuestions', 'resolveMistake',
+  'retryMistake', 'countPlacementAttempts', 'commitReviewOutcome',
 ] as const;
 
 const FLASHCARDS_METHODS = [

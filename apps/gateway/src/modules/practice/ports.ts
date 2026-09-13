@@ -4,7 +4,10 @@ import type {
   LearnerLevel,
   PracticeCollection,
   PracticeItem,
+  Flashcard,
+  CardReviewRating,
 } from '@study-studio/protocol';
+import type { FsrsState, SchedulerOutput } from '@study-studio/learning-algorithms';
 import type { MistakeEntry, TargetLanguage } from '@study-studio/learner-core';
 import type { PersistableQuestion } from './persistence/questions.js';
 import type { PlacementExam, PlacementFinishResult } from './persistence/placement.js';
@@ -99,4 +102,15 @@ export interface LearningRepository {
     isCorrect: boolean
   ): Promise<Result<Pick<MistakeEntry, 'consecutiveCorrect' | 'isResolved' | 'retryCount'>, BusinessError>>;
   countPlacementAttempts(userId: string, targetLevel: string): Promise<number>;
+  /**
+   * M4-2 复习提交原子命令（review 域）：存卡片 FSRS state + 追加排程事件 +
+   * 每日 cards 计数，同一事务；任一步失败整体回滚。
+   * 调用方传入已计算的版本化排程结果（含版本戳/trace），本命令不重算。
+   */
+  commitReviewOutcome(input: {
+    userId: string;
+    card: Flashcard;
+    rating: CardReviewRating;
+    scheduled: SchedulerOutput<FsrsState>;
+  }): Promise<Result<{ cardId: string; eventId: string }, BusinessError>>;
 }

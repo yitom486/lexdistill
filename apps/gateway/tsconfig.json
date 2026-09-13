@@ -14,7 +14,8 @@
     { "path": "../../packages/tts-core" },
     { "path": "../../packages/agent-codex" },
     { "path": "../../packages/agent-runtime" },
-    { "path": "../../packages/speech" }
+    { "path": "../../packages/speech" },
+    { "path": "../../packages/learning-algorithms" }
   ],
   "include": ["src/**/*"]
 }

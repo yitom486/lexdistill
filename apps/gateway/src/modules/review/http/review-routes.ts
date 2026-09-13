@@ -86,9 +86,13 @@ export function createReviewRoutes(deps: GatewayDeps) {
           return formatBusinessErrorResponse(c, scheduledRes.error, 'reviewCard');
         }
         const nextFsrs = scheduledRes.value.state;
-        const saveRes = await deps.repo.saveCard({ ...targetCard, fsrs: nextFsrs });
-        if (!isOk(saveRes)) return formatBusinessErrorResponse(c, saveRes.error, 'reviewCard');
-        await deps.repo.recordDailyActivity(userId, { cards: 1 });
+        const commitRes = await deps.repo.commitReviewOutcome({
+          userId,
+          card: { ...targetCard, fsrs: nextFsrs },
+          rating,
+          scheduled: scheduledRes.value,
+        });
+        if (!isOk(commitRes)) return formatBusinessErrorResponse(c, commitRes.error, 'reviewCard');
         return c.json({
           success: true,
           cardId,
