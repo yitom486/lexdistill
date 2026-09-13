@@ -5,12 +5,9 @@
   "main": "./src/index.ts",
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
-    "@study-studio/agent-codex": "workspace:*",
-    "@study-studio/agent-core": "workspace:*",
-    "@study-studio/agent-responses": "workspace:*",
     "@study-studio/agent-runtime": "workspace:*",
+    "@study-studio/content": "workspace:*",
     "@study-studio/document-model": "workspace:*",
-    "@study-studio/document-ingest-pdf": "workspace:*",
     "@study-studio/ai-content": "workspace:*",
     "@study-studio/flashcards": "workspace:*",
     "@study-studio/learner-core": "workspace:*",
@@ -20,7 +17,6 @@
     "@study-studio/shared": "workspace:*",
     "@study-studio/speech": "workspace:*",
     "@study-studio/tool-core": "workspace:*",
-    "@study-studio/tts-core": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5",
     "jsdom": "^30.0.1"

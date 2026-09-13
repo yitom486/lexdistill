@@ -1,7 +1,7 @@
 import { ok, err, isOk, type Result, BusinessError, generateId } from '@study-studio/shared';
 import type { Flashcard, GeneratedQuestion, PracticeBlockSpec, PracticePlanRun, LearnerLevel } from '@study-studio/protocol';
 import { isLessonLocked, isQuestionAllowed, resolveStudyGate, tierCapForLevel } from '@study-studio/learner-core';
-import type { AssessmentBlueprint } from '@study-studio/learner-core';
+import type { AssessmentBlueprint } from '@study-studio/learning';
 import type { LearningRepository } from '../ports.js';
 import type { LearnerRepository } from '@study-studio/learner-core';
 import type { ContentRepository } from '../../library/ports.js';

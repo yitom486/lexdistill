@@ -21,8 +21,8 @@ import {
   summarizeDailyStudyPlan,
   appendPracticePlanStep,
   PRACTICE_PLAN_STEP_ID,
-  parsePracticeBlockSpecs,
 } from '@study-studio/learner-core';
+import { parsePracticeBlockSpecs } from '@study-studio/learning';
 import {
   studyActivityLogs,
   learnerLanguageProfiles,

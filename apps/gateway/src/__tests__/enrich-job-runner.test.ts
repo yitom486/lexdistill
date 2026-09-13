@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { BusinessError, isOk, ok } from '@study-studio/shared';
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-core';
+import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
 import type { DocumentItem } from '@study-studio/protocol';
 import type { TextbookAST } from '@study-studio/document-model';
 import {

@@ -1,4 +1,4 @@
-import type { ContextSnapshot, ContextFocusItem } from '@study-studio/agent-core';
+import type { ContextSnapshot, ContextFocusItem } from '@study-studio/agent-runtime';
 import { summarizeLearningEvidence } from '@study-studio/learning';
 import { COURSE_STAGES, type LearnerProfileSnapshot, type LearnerRepository } from '@study-studio/learner-core';
 import type { GeneratedQuestion, Flashcard } from '@study-studio/protocol';

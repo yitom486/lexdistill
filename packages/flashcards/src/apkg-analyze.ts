@@ -7,8 +7,8 @@ import {
   guessFieldMapping,
   analyzeTemplateCompat,
   type FieldMarker,
-} from '@study-studio/flashcard-core';
-import type { ParsedApkg } from '@study-studio/flashcard-integrations';
+} from './render/index.js';
+import type { ParsedApkg } from './integrations/index.js';
 
 /**
  * M7-12 自 Gateway `flashcards/application/apkg-import.ts` 迁入只读分析

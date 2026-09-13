@@ -2,11 +2,11 @@ import { BusinessError, err, generateId, isOk, logger, ok, type Result } from '@
 import { StructureClassSchema, type DocumentItem, type StructureClass } from '@study-studio/protocol';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
-import { classifyEmbeddedOutline, type EmbeddedOutlineEntry } from '@study-studio/document-ingest-pdf';
-import { detectDocScript, markdownToAst, promoteLessonHeadings } from '@study-studio/document-ingest-pdf';
-import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from '@study-studio/document-ingest-pdf';
+import { classifyEmbeddedOutline, type EmbeddedOutlineEntry } from '@study-studio/content';
+import { detectDocScript, markdownToAst, promoteLessonHeadings } from '@study-studio/content';
+import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from '@study-studio/content';
 import { collectLayoutCandidates, layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from './layout-headings.js';
-import { buildPdfConvertReport, buildPdfMapReport, buildOcrOverflowError } from '@study-studio/document-ingest-pdf';
+import { buildPdfConvertReport, buildPdfMapReport, buildOcrOverflowError } from '@study-studio/content';
 import {
   analyzePagesWithAzure,
   AZURE_FALLBACK_MIN_CHARS,
@@ -217,7 +217,7 @@ export interface PdfMapOutput {
 }
 
 /** 校验后的单条原生目录（M8-5 起由 canonical 出口定义，此处仅兼容重导出）。 */
-export type { EmbeddedOutlineEntry } from '@study-studio/document-ingest-pdf';
+export type { EmbeddedOutlineEntry } from '@study-studio/content';
 
 /**
  * CMD-LINGUA-P2.2：旧内置目录读取已收归 `embedded-outline-quality.ts` 的

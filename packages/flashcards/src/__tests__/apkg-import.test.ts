@@ -6,7 +6,7 @@ import {
   type ApkgImportCardInput,
   type ImportParsedApkgNotesOptions,
 } from '../index.js';
-import type { ParsedApkg } from '@study-studio/flashcard-integrations';
+import type { ParsedApkg } from '../integrations/index.js';
 
 /** M7-13 导入编排测试（fake ports，无数据库）。 */
 const NOW = '2026-09-07T12:00:00.000Z';

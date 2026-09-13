@@ -6,7 +6,7 @@ import {
   ASSESSMENT_BLUEPRINT_VERSION,
   attributeGroup,
   blueprintFor,
-} from '@study-studio/learner-core';
+} from '@study-studio/learning';
 
 /** 阶段测评蓝图 v1：先定义考什么，再组卷；分项计分；覆盖不足只报告不判线。 */
 describe('assessment blueprint', () => {

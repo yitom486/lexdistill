@@ -1,4 +1,4 @@
-import type { AgentAdapter } from '@study-studio/agent-core';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
 import { buildAnalysisSnapshot as buildAnalysisSnapshotUseCase } from '@study-studio/learning';
 import { type LearnerRepository } from '@study-studio/learner-core';
 import type {

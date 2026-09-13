@@ -4,8 +4,8 @@ import {
   analyzeParsedApkg,
   type ApkgAnalysis,
 } from '../index.js';
-import { getBuiltinCardFormat } from '@study-studio/flashcard-core';
-import type { ParsedApkg } from '@study-studio/flashcard-integrations';
+import { getBuiltinCardFormat } from '../render/index.js';
+import type { ParsedApkg } from '../integrations/index.js';
 
 /** M7-12 只读分析用例测试（手造 ParsedApkg，不碰解包/数据库）。 */
 function basicModel() {

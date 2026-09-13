@@ -6,15 +6,15 @@ import {
   resolveAnkiEndpoint as endpointViaFacade,
   parseApkgEntries as parseViaFacade,
 } from '../index.js';
-import { renderCard as renderViaCore, getBuiltinCardFormat as formatViaCore } from '@study-studio/flashcard-core';
+import { renderCard as renderViaCore, getBuiltinCardFormat as formatViaCore } from '../render/index.js';
 import {
   createAnkiClient as clientViaCore,
   resolveAnkiEndpoint as endpointViaCore,
   parseApkgEntries as parseViaCore,
-} from '@study-studio/flashcard-integrations';
+} from '../integrations/index.js';
 
-/** M7-5 facade 表面锁：具名导出即规范包的实现本身，不漂移、不包装。 */
-describe('flashcards facade', () => {
+/** C5 flashcards 表面锁：具名导出即本包子目录的实现本身，不漂移、不包装。 */
+describe('flashcards 入口', () => {
   it('渲染与集成入口与规范包同一实现', () => {
     expect(renderViaFacade).toBe(renderViaCore);
     expect(formatViaFacade).toBe(formatViaCore);

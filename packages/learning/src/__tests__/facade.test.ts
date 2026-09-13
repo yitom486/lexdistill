@@ -16,7 +16,7 @@ import {
   buildProfileSnapshot as snapshotViaFacade,
   type FsrsState as FsrsStateViaFacade,
 } from '../index.js';
-import { scheduleFsrsReviewV1 as viaCore } from '@study-studio/review-core';
+import { scheduleFsrsReviewV1 as viaCore } from '../scheduling/index.js';
 import {
   blueprintFor as blueprintViaCore,
   buildLocalRunSummary as summaryViaCore,
@@ -28,7 +28,7 @@ import {
   mapPoolQuestion as poolViaCore,
   mapQuestionType as poolTypeViaCore,
   buildTextbookLessonQuestions as textbookViaCore,
-} from '@study-studio/practice-core';
+} from '../practice/index.js';
 import {
   summarizeLearningEvidence as summarizeViaCore,
   recordSkillAttempt as recordViaCore,
@@ -36,8 +36,8 @@ import {
 } from '@study-studio/learner-core';
 import type { FsrsState as FsrsStateViaCore } from '@study-studio/learning-algorithms';
 
-/** M6-3 facade 表面锁：具名导出即规范包的实现本身，不漂移、不包装。 */
-describe('learning facade', () => {
+/** C6 learning 表面锁：具名导出即本包子目录的实现本身，不漂移、不包装。 */
+describe('learning 入口', () => {
   it('排程与蓝图入口与规范包同一实现', () => {
     expect(viaFacade).toBe(viaCore);
     expect(blueprintViaFacade).toBe(blueprintViaCore);
@@ -49,15 +49,15 @@ describe('learning facade', () => {
     expect(snapshotViaFacade).toBe(snapshotViaCore);
   });
 
-  it('运行汇总入口与 practice-core 同一实现（M7-14 修复）', () => {
+  it('运行汇总入口与 ./practice 同一实现（M7-14 修复）', () => {
     expect(summaryViaFacade).toBe(summaryViaCore);
   });
 
-  it('客观题判题入口与 practice-core 同一实现（M7-15）', () => {
+  it('客观题判题入口与 ./practice 同一实现（M7-15）', () => {
     expect(gradeViaFacade).toBe(gradeViaCore);
   });
 
-  it('题构造入口与 practice-core 同一实现（M7-16）', () => {
+  it('题构造入口与 ./practice 同一实现（M7-16）', () => {
     expect(dbTypesViaFacade).toBe(dbTypesViaCore);
     expect(vocabViaFacade).toBe(vocabViaCore);
     expect(translationViaFacade).toBe(translationViaCore);

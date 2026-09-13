@@ -1,27 +1,42 @@
 /**
- * M7-5 卡片领域统一对外 facade（领域组合入口，不复制实现）。
+ * C5 卡片领域统一对外入口（领域组合入口；实现已并入本包子目录）。
  *
- * 转出 Gateway 当前实际使用的卡片模板渲染、AnkiConnect、端点校验与 APKG 解析
- * API，一律具名重导出（不用 `export *`，避免命名冲突与语义漂移）；规范源唯一：
- * 渲染只从 flashcard-core 出，外部集成只从 flashcard-integrations 出。
+ * 转出卡片模板渲染、AnkiConnect、端点校验与 APKG 解析 API，一律具名重导出
+ * （不用 `export *`，避免命名冲突与语义漂移）；规范源唯一：
+ * 渲染只从 ./render 出，外部集成只从 ./integrations 出。
  * Gateway 继续负责卡片和媒体持久化、用户设置、事务、HTTP、Tool 与业务编排；
  * 本包不连业务数据库、不新增迁移。
  */
 
-/** 卡片模板渲染、预览与校验（纯逻辑）。 */
+/** 卡片模板渲染、预览与校验（纯逻辑；含 learner-core 垫片期兼容名）。 */
 export {
+  FIELD_MARKERS,
+  escapeHtml,
   buildCardContext,
+  renderFieldTemplate,
+  extractFieldMarkers,
+  validateFieldTemplate,
+  extractCardFields,
+  renderClozeText,
+  renderCardTemplate,
+  validateCardTemplate,
   renderCard,
   validateCardFormat,
   BUILTIN_CARD_FORMATS,
   getBuiltinCardFormat,
   guessFieldMapping,
   analyzeTemplateCompat,
-  type AnkiCardFormat,
-  type CardSourceEntry,
-  type RenderedCard,
+  splitMorae,
+  moraPitchPattern,
+  buildPitchGraphSvg,
   type FieldMarker,
-} from '@study-studio/flashcard-core';
+  type CardContext,
+  type CardSourceEntry,
+  type AnkiCardFormat,
+  type RenderedCard,
+  type CardRenderExtra,
+  type PitchGraphOptions,
+} from './render/index.js';
 
 /** AnkiConnect 协议客户端、端点校验与 APKG 解析（纯传输/解析层）。 */
 export {
@@ -37,7 +52,7 @@ export {
   extractMediaRefs,
   type FetchImpl,
   type ParsedApkg,
-} from '@study-studio/flashcard-integrations';
+} from './integrations/index.js';
 
 /** 卡片推送 Anki 应用用例（最小 port + 编排；设置/读取/合成由调用方实现）。 */
 export {

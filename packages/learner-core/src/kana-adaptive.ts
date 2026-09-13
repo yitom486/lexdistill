@@ -1,6 +1,11 @@
 import { initFsrsState, type FsrsState } from './fsrs.js';
 import { isOk } from '@study-studio/shared';
-import { scheduleFsrsReviewV1 } from './review-scheduling.js';
+import {
+  createFsrsSchedulerV1,
+  FSRS_ALGORITHM_ID,
+  FSRS_ALGORITHM_VERSION,
+} from '@study-studio/learning-algorithms';
+import type { CardReviewRating } from '@study-studio/protocol';
 
 export type KanaPracticeScriptType = 'HIRAGANA' | 'KATAKANA' | 'ROMAJI';
 
@@ -30,9 +35,16 @@ export function updateKanaPracticeMemory(
   isCorrect: boolean,
   now: Date = new Date()
 ): KanaPracticeMemory {
-  const scheduled = scheduleFsrsReviewV1({
+  // 与 `@study-studio/learning` 的 scheduleFsrsReviewV1 逐行同义（同内核、
+  // 同版本 pin、同入参）：kana-adaptive 留在 learner-core，直接调 learning 会
+  // 形成 learner-core → learning 项目引用环（tsc TS6202 禁止），故内联此 7 行
+  // 委托。版本升级时两处必须同步；行为一致性由 kana-adaptive.test.ts 锁定。
+  const rating: CardReviewRating = isCorrect ? 'GOOD' : 'AGAIN';
+  const scheduled = createFsrsSchedulerV1().schedule({
+    algorithmId: FSRS_ALGORITHM_ID,
+    algorithmVersion: FSRS_ALGORITHM_VERSION,
     state: current?.fsrs ?? initFsrsState(),
-    rating: isCorrect ? 'GOOD' : 'AGAIN',
+    rating,
     now,
   });
   if (!isOk(scheduled)) {

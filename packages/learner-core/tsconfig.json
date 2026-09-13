@@ -8,10 +8,8 @@
   "references": [
     { "path": "../shared" },
     { "path": "../protocol" },
-    { "path": "../flashcard-core" },
-    { "path": "../learning-algorithms" },
-    { "path": "../practice-core" },
-    { "path": "../review-core" }
+    { "path": "../flashcards" },
+    { "path": "../learning-algorithms" }
   ],
   "include": ["src/**/*"]
 }

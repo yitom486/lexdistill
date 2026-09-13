@@ -32,7 +32,7 @@ import {
   evaluateExamVerdict,
   type AssessmentBlueprint,
   type GroupSubscore,
-} from '@study-studio/learner-core';
+} from '@study-studio/learning';
 
 const LEVEL_SET: LearnerLevel[] = ['NOVICE', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 const EXAM_MIN_GRADED = LEVEL_THRESHOLDS.examVocabQuestions;

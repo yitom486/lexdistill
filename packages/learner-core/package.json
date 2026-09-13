@@ -5,11 +5,9 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
-    "@study-studio/flashcard-core": "workspace:*",
+    "@study-studio/flashcards": "workspace:*",
     "@study-studio/learning-algorithms": "workspace:*",
-    "@study-studio/practice-core": "workspace:*",
     "@study-studio/protocol": "workspace:*",
-    "@study-studio/review-core": "workspace:*",
     "@study-studio/shared": "workspace:*"
   },
   "scripts": {

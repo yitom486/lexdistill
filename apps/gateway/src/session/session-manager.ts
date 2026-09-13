@@ -1,6 +1,6 @@
 import { ok, err, type Result, BusinessError, generateId } from '@study-studio/shared';
 import type { TargetLanguage } from '@study-studio/learner-core';
-import type { AgentSession } from '@study-studio/agent-core';
+import type { AgentSession } from '@study-studio/agent-runtime';
 
 /** coach=聊天界面；learning=出题/批改/题目导师（与聊天隔离） */
 export type AgentLane = 'coach' | 'learning';

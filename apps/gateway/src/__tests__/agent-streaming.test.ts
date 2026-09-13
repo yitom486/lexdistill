@@ -3,8 +3,8 @@ import { GatewayServer } from '../runtime/gateway-runtime.js';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { WsEventTypes, type WsEnvelope } from '@study-studio/protocol';
 import { isOk, ok } from '@study-studio/shared';
-import type { AgentEvent, AgentSession } from '@study-studio/agent-core';
-import type { CodexAdapter } from '@study-studio/agent-codex';
+import type { AgentEvent, AgentSession } from '@study-studio/agent-runtime';
+import type { CodexAdapter } from '@study-studio/agent-runtime';
 import { LearningContentTool } from '../transport/tools/learning-content-tool.js';
 import { LearningAssessTool } from '../modules/practice/tools/learning-assess-tool.js';
 

@@ -1,9 +1,58 @@
 /**
- * M2-2 Speech 稳定公开入口（兼容外观，不含实现）。
+ * C1 Speech 稳定公开入口（含实现本体，原 tts-core 已并入本包）。
  *
- * 本包只转出 `@study-studio/tts-core` 的全部公共表面；TTS 行为、配置、
- * 网络请求与客户端协议一律不动，实现与兼容出口仍归 tts-core 所有。
- * 不变量：本包及 tts-core 不得依赖 Agent 侧包或厂商 SDK；
+ * TTS 行为、配置、网络请求与客户端协议一律不动（M2-2 表面逐项一致）。
+ * 不变量：本包不得依赖 Agent 侧包或厂商 SDK；
  * TTS 是独立能力，不归 Agent（单测锁定）。
  */
-export * from '@study-studio/tts-core';
+export {
+  voiceNameHints,
+  scoreVoiceName,
+  pickBestVoiceName,
+} from './voice-match.js';
+export type {
+  TtsGender,
+  TtsPurpose,
+  TtsTrackLanguage,
+  TtsNeuralOptions,
+  TtsSpeakHandle,
+  TtsSpeakInput,
+  TtsSpeakRequest,
+  TtsVoiceDescriptor,
+  TtsVoicePreference,
+} from './types.js';
+export {
+  TTS_STYLE_PROMPTS,
+  bcp47ForTrack,
+  normalizeTtsTrackLanguage,
+  resolveTtsSpeakRequest,
+} from './request.js';
+export {
+  __resetTtsEnginesForTest,
+  getActiveTtsEngine,
+  listTtsEngines,
+  registerTtsEngine,
+  setActiveTtsEngine,
+} from './engine.js';
+export type { TtsEngine } from './engine.js';
+export {
+  buildOpenAiSpeechPayload,
+  isHttpEndpoint,
+  openAiSpeechHeaders,
+} from './plugin.js';
+export type { OpenAiSpeechPayloadOptions } from './plugin.js';
+export {
+  AZURE_DEFAULT_VOICES,
+  AZURE_VOICE_LANG,
+  azureTtsEndpoint,
+  azureTtsHeaders,
+  azureVoicesEndpoint,
+  buildAzureSsml,
+  escapeXmlText,
+  mapAzureVoiceList,
+} from './azure.js';
+export type {
+  AzureVoiceListItem,
+  AzureVoiceOption,
+} from './azure.js';
+export { StubTtsEngine } from './stub.js';

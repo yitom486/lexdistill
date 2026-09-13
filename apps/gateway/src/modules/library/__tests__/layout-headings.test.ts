@@ -3,9 +3,8 @@ import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js'
 import { collectLayoutCandidates } from '../application/pdf-import/layout-headings.js';
 
 /**
- * M8-6：纯规则单测（layoutItemsToCandidates / mergeHeadingCandidates）已迁入
- * `@study-studio/document-ingest-pdf`；本文件只保留 collectLayoutCandidates
- * 的异常降级、空结果与运行时收窄行为。
+ * M8-6：纯规则单测已迁入 `@study-studio/content`（src/pdf）；
+ * 本文件只保留 collectLayoutCandidates 的异常降级、空结果与运行时收窄行为。
  */
 
 /** 原生层无类型保证：假实现故意返回脏数据，断言采集侧能收窄（仅测试用转型）。 */

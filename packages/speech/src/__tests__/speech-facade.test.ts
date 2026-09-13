@@ -17,9 +17,9 @@ import {
 import type { AzureVoiceOption, TtsTrackLanguage } from '@study-studio/speech';
 
 /**
- * M2-2 Speech 外观自检（所属包内断言，无反向边）。
+ * C1 Speech 自检（所属包内断言，无反向边；原 tts-core 已并入本包）。
  *
- * - 顶层出口透出 tts-core 当前所需 API（值与类型编译期贯通）；
+ * - 顶层出口透出 TTS 公共 API（值与类型编译期贯通；键集合与合并前一致）；
  * - speech/src 内无 Agent 相关引用（TTS 独立能力）；
  * - Gateway manifest 必须声明 speech（网关装配经统一入口）。
  */
@@ -27,7 +27,7 @@ function repoRoot(): string {
   return join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', '..', '..');
 }
 
-describe('M2-2 speech facade', () => {
+describe('C1 speech 入口', () => {
   it('顶层出口透出 TTS 公共 API', () => {
     expect(typeof AZURE_DEFAULT_VOICES).toBe('object');
     expect(typeof AZURE_DEFAULT_VOICES.en.FEMALE).toBe('string');

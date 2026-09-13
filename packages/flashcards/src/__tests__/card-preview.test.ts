@@ -6,7 +6,7 @@ import {
   type CardPreviewPorts,
   type PreviewCardRequest,
 } from '../index.js';
-import { getBuiltinCardFormat, type AnkiCardFormat, type CardSourceEntry } from '@study-studio/flashcard-core';
+import { getBuiltinCardFormat, type AnkiCardFormat, type CardSourceEntry } from '../render/index.js';
 
 /** M7-6 卡片预览用例测试（port 桩，不碰持久化）。 */
 function builtin(): AnkiCardFormat {

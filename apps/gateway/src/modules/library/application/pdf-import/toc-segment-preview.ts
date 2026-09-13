@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import { MAX_OCR_PAGES_PER_IMPORT } from './pdf-import-service.js';
-import { isSemanticOutlineTitle } from '@study-studio/document-ingest-pdf';
+import { isSemanticOutlineTitle } from '@study-studio/content';
 
 /**
  * CMD-LINGUA-P5A：已确认目录 → 物理页映射与分段预览（纯函数，零副作用）。

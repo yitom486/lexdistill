@@ -1,6 +1,6 @@
 import { ToolRegistry } from '@study-studio/tool-core';
 import type { LearnerRepository } from '@study-studio/learner-core';
-import type { AgentAdapter } from '@study-studio/agent-core';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
 import { DrizzleLearnerRepository } from '../../infrastructure/drizzle-learner-repository.js';
 import { GenerateAdaptiveQuizTool } from '../../modules/practice/tools/generate-adaptive-quiz.js';
 import { GradeSubjectiveQuizTool } from '../../modules/practice/tools/grade-subjective-quiz.js';

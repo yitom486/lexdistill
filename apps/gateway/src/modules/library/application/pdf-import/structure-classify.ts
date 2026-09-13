@@ -7,7 +7,7 @@ import {
   translateToBusinessError,
   logger,
 } from '@study-studio/shared';
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-core';
+import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
 import { listKnownSkillIds } from '@study-studio/learner-core';
 import {
   StructureClassSchema,

@@ -16,7 +16,7 @@ import {
   translateToBusinessError,
 } from '@study-studio/shared';
 import type { LearnerRepository } from '@study-studio/learner-core';
-import type { AgentAdapter } from '@study-studio/agent-core';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
 
 export const LearningAssessInputSchema = z.object({
   action: z.enum(['grade', 'diagnose', 'grade_batch']).optional(),

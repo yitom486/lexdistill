@@ -1,4 +1,4 @@
-import type { CardSourceEntry } from '@study-studio/flashcard-core';
+import type { CardSourceEntry } from './render/index.js';
 
 /**
  * M7-11 自 Gateway `flashcards/application/card-source.ts` 迁入（映射逻辑逐行一致）。

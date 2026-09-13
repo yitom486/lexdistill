@@ -22,7 +22,7 @@ import {
   validatePracticePlanTemplate,
   freezeRunFromTemplate,
   parsePracticeBlockSpecs,
-} from '@study-studio/learner-core';
+} from '@study-studio/learning';
 import {
   practicePlanTemplates,
   practicePlanRuns,

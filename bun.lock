@@ -23,12 +23,9 @@
       "version": "0.1.2",
       "dependencies": {
         "@mozilla/readability": "^0.6.0",
-        "@study-studio/agent-codex": "workspace:*",
-        "@study-studio/agent-core": "workspace:*",
-        "@study-studio/agent-responses": "workspace:*",
         "@study-studio/agent-runtime": "workspace:*",
         "@study-studio/ai-content": "workspace:*",
-        "@study-studio/document-ingest-pdf": "workspace:*",
+        "@study-studio/content": "workspace:*",
         "@study-studio/document-model": "workspace:*",
         "@study-studio/flashcards": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
@@ -38,7 +35,6 @@
         "@study-studio/shared": "workspace:*",
         "@study-studio/speech": "workspace:*",
         "@study-studio/tool-core": "workspace:*",
-        "@study-studio/tts-core": "workspace:*",
         "drizzle-orm": "^0.45.2",
         "hono": "^4.13.5",
         "jsdom": "^30.0.1",
@@ -54,10 +50,11 @@
       "version": "0.1.2",
       "dependencies": {
         "@base-ui-components/react": "^1.0.0-rc.0",
-        "@study-studio/agent-core": "workspace:*",
+        "@study-studio/agent-runtime": "workspace:*",
         "@study-studio/document-model": "workspace:*",
         "@study-studio/gateway": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
+        "@study-studio/learning": "workspace:*",
         "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
         "@study-studio/speech": "workspace:*",
@@ -90,39 +87,13 @@
         "vite": "^6.1.0",
       },
     },
-    "packages/agent-codex": {
-      "name": "@study-studio/agent-codex",
-      "version": "0.1.2",
-      "dependencies": {
-        "@study-studio/agent-core": "workspace:*",
-        "@study-studio/shared": "workspace:*",
-        "@study-studio/tool-core": "workspace:*",
-      },
-    },
-    "packages/agent-core": {
-      "name": "@study-studio/agent-core",
-      "version": "0.1.2",
-      "dependencies": {
-        "@study-studio/shared": "workspace:*",
-        "@study-studio/tool-core": "workspace:*",
-      },
-    },
-    "packages/agent-responses": {
-      "name": "@study-studio/agent-responses",
-      "version": "0.1.2",
-      "dependencies": {
-        "@study-studio/agent-core": "workspace:*",
-        "@study-studio/shared": "workspace:*",
-        "@study-studio/tool-core": "workspace:*",
-      },
-    },
     "packages/agent-runtime": {
       "name": "@study-studio/agent-runtime",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/agent-codex": "workspace:*",
-        "@study-studio/agent-core": "workspace:*",
-        "@study-studio/agent-responses": "workspace:*",
+        "@study-studio/shared": "workspace:*",
+        "@study-studio/tool-core": "workspace:*",
+        "zod": "^3.24.1",
       },
     },
     "packages/ai-content": {
@@ -134,20 +105,9 @@
         "@study-studio/shared": "workspace:*",
       },
     },
-    "packages/dictionary-core": {
-      "name": "@study-studio/dictionary-core",
-      "version": "0.1.2",
-    },
-    "packages/dictionary-integrations": {
-      "name": "@study-studio/dictionary-integrations",
-      "version": "0.1.2",
-      "dependencies": {
-        "@study-studio/shared": "workspace:*",
-      },
-    },
-    "packages/document-ingest-pdf": {
-      "name": "@study-studio/document-ingest-pdf",
-      "version": "0.1.2",
+    "packages/content": {
+      "name": "@study-studio/content",
+      "version": "0.1.0",
       "dependencies": {
         "@study-studio/document-model": "workspace:*",
         "@study-studio/protocol": "workspace:*",
@@ -162,23 +122,10 @@
         "zod": "^3.24.1",
       },
     },
-    "packages/flashcard-core": {
-      "name": "@study-studio/flashcard-core",
-      "version": "0.1.2",
-    },
-    "packages/flashcard-integrations": {
-      "name": "@study-studio/flashcard-integrations",
-      "version": "0.1.2",
-      "dependencies": {
-        "@study-studio/shared": "workspace:*",
-      },
-    },
     "packages/flashcards": {
       "name": "@study-studio/flashcards",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/flashcard-core": "workspace:*",
-        "@study-studio/flashcard-integrations": "workspace:*",
         "@study-studio/shared": "workspace:*",
       },
     },
@@ -186,11 +133,9 @@
       "name": "@study-studio/learner-core",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/flashcard-core": "workspace:*",
+        "@study-studio/flashcards": "workspace:*",
         "@study-studio/learning-algorithms": "workspace:*",
-        "@study-studio/practice-core": "workspace:*",
         "@study-studio/protocol": "workspace:*",
-        "@study-studio/review-core": "workspace:*",
         "@study-studio/shared": "workspace:*",
       },
     },
@@ -198,11 +143,10 @@
       "name": "@study-studio/learning",
       "version": "0.1.2",
       "dependencies": {
+        "@study-studio/document-model": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/learning-algorithms": "workspace:*",
-        "@study-studio/practice-core": "workspace:*",
         "@study-studio/protocol": "workspace:*",
-        "@study-studio/review-core": "workspace:*",
         "@study-studio/shared": "workspace:*",
       },
     },
@@ -218,16 +162,6 @@
       "name": "@study-studio/lexicon",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/dictionary-core": "workspace:*",
-        "@study-studio/dictionary-integrations": "workspace:*",
-      },
-    },
-    "packages/practice-core": {
-      "name": "@study-studio/practice-core",
-      "version": "0.1.2",
-      "dependencies": {
-        "@study-studio/document-model": "workspace:*",
-        "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
       },
     },
@@ -240,15 +174,6 @@
         "zod": "^3.24.1",
       },
     },
-    "packages/review-core": {
-      "name": "@study-studio/review-core",
-      "version": "0.1.2",
-      "dependencies": {
-        "@study-studio/learning-algorithms": "workspace:*",
-        "@study-studio/protocol": "workspace:*",
-        "@study-studio/shared": "workspace:*",
-      },
-    },
     "packages/shared": {
       "name": "@study-studio/shared",
       "version": "0.1.2",
@@ -257,7 +182,7 @@
       "name": "@study-studio/speech",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/tts-core": "workspace:*",
+        "@study-studio/shared": "workspace:*",
       },
     },
     "packages/tool-core": {
@@ -267,13 +192,6 @@
         "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
         "zod": "^3.24.1",
-      },
-    },
-    "packages/tts-core": {
-      "name": "@study-studio/tts-core",
-      "version": "0.1.2",
-      "dependencies": {
-        "@study-studio/shared": "workspace:*",
       },
     },
   },
@@ -472,27 +390,15 @@
 
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.63.1", "", { "os": "win32", "cpu": "x64" }, "sha512-at8QVep6S3h5Y6gSbdGU06bRY5WJkf6WUduM9YtvYMbYhB1MOFfUgc6kehitQXzOtMSaT70q7f9ydPhpqu821w=="],
 
-    "@study-studio/agent-codex": ["@study-studio/agent-codex@workspace:packages/agent-codex"],
-
-    "@study-studio/agent-core": ["@study-studio/agent-core@workspace:packages/agent-core"],
-
-    "@study-studio/agent-responses": ["@study-studio/agent-responses@workspace:packages/agent-responses"],
-
     "@study-studio/agent-runtime": ["@study-studio/agent-runtime@workspace:packages/agent-runtime"],
 
     "@study-studio/ai-content": ["@study-studio/ai-content@workspace:packages/ai-content"],
 
+    "@study-studio/content": ["@study-studio/content@workspace:packages/content"],
+
     "@study-studio/desktop": ["@study-studio/desktop@workspace:apps/desktop"],
 
-    "@study-studio/dictionary-core": ["@study-studio/dictionary-core@workspace:packages/dictionary-core"],
-
-    "@study-studio/dictionary-integrations": ["@study-studio/dictionary-integrations@workspace:packages/dictionary-integrations"],
-
     "@study-studio/document-model": ["@study-studio/document-model@workspace:packages/document-model"],
-
-    "@study-studio/flashcard-core": ["@study-studio/flashcard-core@workspace:packages/flashcard-core"],
-
-    "@study-studio/flashcard-integrations": ["@study-studio/flashcard-integrations@workspace:packages/flashcard-integrations"],
 
     "@study-studio/flashcards": ["@study-studio/flashcards@workspace:packages/flashcards"],
 
@@ -506,19 +412,13 @@
 
     "@study-studio/lexicon": ["@study-studio/lexicon@workspace:packages/lexicon"],
 
-    "@study-studio/practice-core": ["@study-studio/practice-core@workspace:packages/practice-core"],
-
     "@study-studio/protocol": ["@study-studio/protocol@workspace:packages/protocol"],
-
-    "@study-studio/review-core": ["@study-studio/review-core@workspace:packages/review-core"],
 
     "@study-studio/shared": ["@study-studio/shared@workspace:packages/shared"],
 
     "@study-studio/speech": ["@study-studio/speech@workspace:packages/speech"],
 
     "@study-studio/tool-core": ["@study-studio/tool-core@workspace:packages/tool-core"],
-
-    "@study-studio/tts-core": ["@study-studio/tts-core@workspace:packages/tts-core"],
 
     "@study-studio/web": ["@study-studio/web@workspace:apps/web"],
 

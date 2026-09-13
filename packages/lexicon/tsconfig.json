@@ -6,8 +6,7 @@
     "outDir": "dist"
   },
   "references": [
-    { "path": "../dictionary-core" },
-    { "path": "../dictionary-integrations" }
+    { "path": "../shared" }
   ],
   "include": ["src/**/*"]
 }

@@ -64,7 +64,7 @@ import {
   type RecordTermExposureInput,
   type RecordReadingExposuresInput,
 } from '../modules/dictionary/persistence/encountered-terms.js';
-import type { AgentAdapter } from '@study-studio/agent-core';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
 import type { FsrsState, SchedulerOutput } from '@study-studio/learning-algorithms';
 import { reviewScheduleEvents } from './db/schema.js';
 import type { ContentRepository } from '../modules/library/ports.js';

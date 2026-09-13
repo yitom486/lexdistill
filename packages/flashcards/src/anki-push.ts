@@ -11,7 +11,7 @@ import {
   renderCard,
   type AnkiCardFormat,
   type CardSourceEntry,
-} from '@study-studio/flashcard-core';
+} from './render/index.js';
 import {
   createAnkiClient,
   ensureAnkiDeck,
@@ -20,7 +20,7 @@ import {
   addAnkiNote,
   getAnkiVersion,
   type FetchImpl,
-} from '@study-studio/flashcard-integrations';
+} from './integrations/index.js';
 
 /**
  * M7-7 自 Gateway `flashcards/application/anki-push.ts` 迁入（行为不变）。

@@ -4,9 +4,9 @@ import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repo
 import { WsEventTypes, type WsEnvelope, type TurnExecutionSummary } from '@study-studio/protocol';
 import { isOk, ok, err, BusinessError } from '@study-studio/shared';
 import { buildTurnExecutionSummary, formatCodexLocalFallbackNote } from '../runtime/turn-summary-builder.js';
-import type { AgentEvent, AgentSession } from '@study-studio/agent-core';
+import type { AgentEvent, AgentSession } from '@study-studio/agent-runtime';
 import type { Result } from '@study-studio/shared';
-import { mapAppServerNotificationToEvents, type CodexAdapter } from '@study-studio/agent-codex';
+import { mapAppServerNotificationToEvents, type CodexAdapter } from '@study-studio/agent-runtime';
 
 // ---------------------------------------------------------------------------
 // 纯函数 builder 单测：覆盖 4 种场景的结构化摘要构造

@@ -6,8 +6,6 @@
     "outDir": "dist"
   },
   "references": [
-    { "path": "../flashcard-core" },
-    { "path": "../flashcard-integrations" },
     { "path": "../shared" }
   ],
   "include": ["src/**/*"]

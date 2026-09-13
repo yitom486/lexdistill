@@ -11,7 +11,7 @@ import {
   isOk,
 } from '@study-studio/shared';
 import type { GatewayServer } from '../gateway-runtime.js';
-import type { ContextSnapshot } from '@study-studio/agent-core';
+import type { ContextSnapshot } from '@study-studio/agent-runtime';
 import type { ToolDefinition } from '@study-studio/tool-core';
 import type { AgentLane, SessionManager } from '../../session/session-manager.js';
 import {
@@ -496,7 +496,7 @@ export async function handleQueueStart(
         sendQueued?: (opts?: {
           queuedSubmissionId?: string;
           approvalPolicy?: string;
-        }) => AsyncIterable<import('@study-studio/agent-core').AgentEvent>;
+        }) => AsyncIterable<import('@study-studio/agent-runtime').AgentEvent>;
       })
     | undefined;
   if (!agentSession) {

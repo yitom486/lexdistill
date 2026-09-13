@@ -6,9 +6,8 @@
     "outDir": "dist"
   },
   "references": [
-    { "path": "../agent-core" },
-    { "path": "../agent-codex" },
-    { "path": "../agent-responses" }
+    { "path": "../shared" },
+    { "path": "../tool-core" }
   ],
   "include": ["src/**/*"]
 }

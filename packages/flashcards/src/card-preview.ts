@@ -12,7 +12,7 @@ import {
   type AnkiCardFormat,
   type CardSourceEntry,
   type RenderedCard,
-} from '@study-studio/flashcard-core';
+} from './render/index.js';
 
 /**
  * M7-6 自 Gateway `flashcards/application/card-preview.ts` 迁入（行为不变）。

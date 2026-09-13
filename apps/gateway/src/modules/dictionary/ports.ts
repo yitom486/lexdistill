@@ -1,6 +1,6 @@
 import type { Result, BusinessError } from '@study-studio/shared';
 import type { TargetLanguage } from '@study-studio/learner-core';
-import type { AgentAdapter } from '@study-studio/agent-core';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
 import type {
   LocalDictionaryEntry,
   DictionaryEntryCollection,

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Sparkles, Send, Bot, User, Square, Wifi, WifiOff, RotateCcw, X, Reply } from 'lucide-react';
 import { toast } from 'sonner';
-import type { ContextSnapshot } from '@study-studio/agent-core';
+import type { ContextSnapshot } from '@study-studio/agent-runtime';
 import { sound } from '../utils/audio.js';
 import { useAgentGateway } from '../hooks/useAgentGateway.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';

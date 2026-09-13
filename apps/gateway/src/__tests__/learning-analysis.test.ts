@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { ok, err, isOk, type Result, BusinessError } from '@study-studio/shared';
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-core';
+import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
 import type { LearnerRepository, LearnerProfileSnapshot } from '@study-studio/learner-core';
 import type { Flashcard } from '@study-studio/protocol';
 import {

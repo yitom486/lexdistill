@@ -9,7 +9,7 @@ import {
 import {
   extractMediaRefs,
   type ParsedApkg,
-} from '@study-studio/flashcard-integrations';
+} from './integrations/index.js';
 
 /**
  * M7-13 自 Gateway `flashcards/application/apkg-import.ts` 迁入导入编排

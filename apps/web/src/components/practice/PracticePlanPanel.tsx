@@ -4,7 +4,7 @@ import { Plus, Pencil, Trash2, Play, Loader2, Sparkles, CopyPlus } from 'lucide-
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { Switch } from '../ui/switch.js';
-import { isTemplateDueOn } from '@study-studio/learner-core';
+import { isTemplateDueOn } from '@study-studio/learning';
 import { usePracticeTemplatesQuery, useDeletePracticeTemplateMutation, useStartPracticeRunMutation, useProposeTemplateMutation, useTogglePracticeTemplateMutation, useCopyPracticeTemplateMutation } from '../../queries/useLearnerQueries.js';
 import { PracticePlanEditor } from './PracticePlanEditor.js';
 import { PracticeRunWorkbench } from './PracticeRunWorkbench.js';

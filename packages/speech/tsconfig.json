@@ -6,7 +6,7 @@
     "outDir": "dist"
   },
   "references": [
-    { "path": "../tts-core" }
+    { "path": "../shared" }
   ],
   "include": ["src/**/*"]
 }

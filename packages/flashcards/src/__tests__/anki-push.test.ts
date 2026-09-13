@@ -6,7 +6,7 @@ import {
   type AnkiPushRequest,
   type FetchImpl,
 } from '../index.js';
-import { getBuiltinCardFormat, type AnkiCardFormat } from '@study-studio/flashcard-core';
+import { getBuiltinCardFormat, type AnkiCardFormat } from '../render/index.js';
 
 /**
  * M7-7 推送用例测试（port 桩 + AnkiConnect fetch 桩，不碰业务库/TTS 实现）。

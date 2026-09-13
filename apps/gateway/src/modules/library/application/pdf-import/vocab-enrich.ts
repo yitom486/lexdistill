@@ -1,4 +1,4 @@
-import type { AgentAdapter } from '@study-studio/agent-core';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
 import { BusinessError, err, isOk, logger, ok, translateToBusinessError, type Result } from '@study-studio/shared';
 import {
   TextbookGrammarSchema,

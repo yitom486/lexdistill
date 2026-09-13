@@ -11,7 +11,7 @@ import { CodexAdapter, ResponsesAdapter, type AgentAdapter } from '@study-studio
  * - 顶层出口透出两适配器；契约类型编译期贯通；
  * - Codex 专有动态工具桥禁上浮到根入口（toolsToDynamicSpecs /
  *   sanitizeToolName / resolveToolName / zodToJsonSchema / DynamicToolsBridge
- *   只能留在 adapters/codex 或旧 agent-codex 包内）；
+ *   只能留在 adapters/codex 内）；
  * - Gateway manifest 必须声明 agent-runtime（装配经统一入口）。
  */
 const FORBIDDEN_ROOT_BRIDGE = [
