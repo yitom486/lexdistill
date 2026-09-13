@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { isOk, isErr } from '@study-studio/shared';
-import type { AnalysisSnapshot } from '../../learning-progress/application/learning-analysis.js';
+import type { AnalysisSnapshot } from '../../learning-progress/public.js';
 import {
   proposeTemplateFromSnapshot,
   createProposal,

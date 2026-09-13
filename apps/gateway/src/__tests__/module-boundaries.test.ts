@@ -24,33 +24,36 @@ const ASSEMBLERS = new Set([
   'transport/websocket/websocket-handler.ts',
 ]);
 
-const LP_APP = 'modules/learning-progress/application/learning-analysis.js';
-const LP_PROFILE_INTERNALS = 'modules/learning-progress/persistence/profile-internals.js';
-
 /** 过渡例外：from -> to（src 相对路径，.js 后缀归一后比较） */
+// M1-2：跨模块统一走各域 public.ts / ports.ts，不再登记深路径。
 const CROSS_MODULE_ALLOWLIST = new Set([
-  `modules/review/persistence/cards.ts -> ${LP_PROFILE_INTERNALS}`,
-  `modules/practice/persistence/practice.ts -> ${LP_PROFILE_INTERNALS}`,
-  `modules/practice/persistence/questions.ts -> ${LP_PROFILE_INTERNALS}`,
-  `modules/practice/application/practice-proposal.ts -> ${LP_APP}`,
-  `modules/practice/http/practice-routes.ts -> ${LP_APP}`,
-  `modules/practice/__tests__/practice-phase-d.test.ts -> ${LP_APP}`,
+  'modules/review/persistence/cards.ts -> modules/learning-progress/public.js',
+  'modules/practice/persistence/practice.ts -> modules/learning-progress/public.js',
+  'modules/practice/persistence/questions.ts -> modules/learning-progress/public.js',
+  'modules/practice/application/practice-proposal.ts -> modules/learning-progress/public.js',
+  'modules/practice/http/practice-routes.ts -> modules/learning-progress/public.js',
+  'modules/practice/__tests__/practice-phase-d.test.ts -> modules/learning-progress/public.js',
   'modules/practice/application/practice-assembly.ts -> transport/tools/learning-content-tool.js',
   'modules/practice/__tests__/practice-assembly.test.ts -> transport/tools/learning-content-tool.js',
   // Yomitan zip 解包复用 library 的 archive.ts（纯函数，无状态；避免重复实现）。
-  'modules/dictionary/application/yomitan.ts -> modules/library/application/pdf-import/archive.js',
+  'modules/dictionary/application/yomitan.ts -> modules/library/public.js',
   // Anki 推送复用 tts-proxy 合成（只取音频字节；Key 随调用来、用完即弃，永不落盘）。
   'modules/flashcards/application/anki-push.ts -> modules/tts/application/tts-proxy.js',
   // apkg 解包复用 library 的 extractZip（zip 炸弹/加密守卫；不写盘）。
-  'modules/flashcards/application/apkg-import.ts -> modules/library/application/pdf-import/archive.js',
+  'modules/flashcards/application/apkg-import.ts -> modules/library/public.js',
   // flashcards.collect 复用词典 collect 的输出类型（type-only；与查词面板同一命令）。
-  'modules/flashcards/tools/flashcards-collect-tool.ts -> modules/dictionary/persistence/dictionary.js',
+  'modules/flashcards/tools/flashcards-collect-tool.ts -> modules/dictionary/public.js',
   // 草稿域复用相遇词 term_key 归一 + 回填（同键跨包稳定；accept 与 collect 同级信号）。
-  'modules/flashcards/persistence/card-drafts.ts -> modules/dictionary/persistence/encountered-terms.js',
+  'modules/flashcards/persistence/card-drafts.ts -> modules/dictionary/public.js',
   // 批注转卡复用相遇词 collect 信号（短 quote 才记；语种取所属文档）。
-  'modules/library/persistence/documents-annotations.ts -> modules/dictionary/persistence/encountered-terms.js',
+  'modules/library/persistence/documents-annotations.ts -> modules/dictionary/public.js',
   // 定级考复用档位写入（跳级通道；run/装配仍走 practice 自家）。
-  'modules/practice/persistence/placement.ts -> modules/learning-progress/persistence/level.js',
+  'modules/practice/persistence/placement.ts -> modules/learning-progress/public.js',
+  // M1-2 仓储能力接口：上层经 ports 消费，不再直连 Drizzle 实现类。
+  'modules/curriculum/tools/learning-curriculum-tool.ts -> modules/library/ports.js',
+  'modules/flashcards/tools/flashcards-collect-tool.ts -> modules/dictionary/ports.js',
+  'modules/learning-progress/tools/mistakes-resolve-tool.ts -> modules/practice/ports.js',
+  'modules/practice/application/practice-assembly.ts -> modules/library/ports.js',
   // EPUB 解包复用 library 的 extractZip（同 apkg：炸弹/加密守卫，只读内存）。
   'modules/library/application/document-import/epub-reader.ts -> modules/library/application/pdf-import/archive.js',
   // 网页正文复用新闻管线的 Readability 抽取纯函数（抓取层自备 SSRF 防护）。

@@ -13,7 +13,7 @@ import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.
 import {
   buildTermKey,
   recordTermExposure,
-} from '../../dictionary/persistence/encountered-terms.js';
+} from '../../dictionary/public.js';
 import { CardTypeSchema, type CardType } from '@study-studio/protocol';
 
 /**

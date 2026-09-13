@@ -7,7 +7,7 @@ import {
 } from '@study-studio/tool-core';
 import { ok, isOk, type Result, type BusinessError } from '@study-studio/shared';
 import type { MistakeEntry } from '@study-studio/learner-core';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LearnerRepository } from '@study-studio/learner-core';
 
 export const MistakesListInputSchema = z.object({
   userId: z.string().min(1).max(64),
@@ -30,7 +30,7 @@ export class MistakesListTool implements ToolDefinition<MistakesListInput, Mista
   public readonly permission = ToolPermissions.READ;
   public readonly schema = MistakesListInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: LearnerRepository) {}
 
   public async execute(
     input: MistakesListInput,

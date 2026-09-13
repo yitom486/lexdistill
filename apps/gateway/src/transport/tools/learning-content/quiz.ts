@@ -9,7 +9,8 @@ import {
   resolveStudyGate,
   tierCapForLevel,
 } from '@study-studio/learner-core';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LearningRepository } from '../../../modules/practice/ports.js';
+import type { LearnerRepository } from '@study-studio/learner-core';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
 import {
   MSG,
@@ -20,7 +21,7 @@ import {
 } from './shared.js';
 
 export async function handleQuizAction(
-  repo: DrizzleLearnerRepository,
+  repo: LearningRepository & LearnerRepository,
   context: ToolExecutionContext,
   input: LearningContentInput,
   language: 'ja' | 'en' | 'ko'
@@ -108,7 +109,7 @@ export async function handleQuizAction(
 }
 
 export async function buildDictation(
-  repo: DrizzleLearnerRepository,
+  repo: LearningRepository & LearnerRepository,
   context: ToolExecutionContext,
   input: LearningContentInput,
   language: string

@@ -6,8 +6,8 @@ import {
   ToolLocations,
 } from '@study-studio/tool-core';
 import { ok, isOk, type Result, type BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import type { DictionaryEntryCollection } from '../../dictionary/persistence/dictionary.js';
+import type { LexiconRepository } from '../../dictionary/ports.js';
+import type { DictionaryEntryCollection } from '../../dictionary/public.js';
 
 export const FlashcardsCollectInputSchema = z.object({
   userId: z.string().min(1).max(64),
@@ -31,7 +31,7 @@ export class FlashcardsCollectTool
   public readonly permission = ToolPermissions.WRITE;
   public readonly schema = FlashcardsCollectInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: LexiconRepository) {}
 
   public async execute(
     input: FlashcardsCollectInput,

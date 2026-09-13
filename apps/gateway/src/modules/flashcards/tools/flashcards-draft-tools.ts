@@ -6,7 +6,7 @@ import {
   ToolLocations,
 } from '@study-studio/tool-core';
 import { ok, isOk, type Result, type BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { FlashcardsRepository } from '../ports.js';
 import type {
   CardDraft,
   ProposeCardDraftInput,
@@ -50,7 +50,7 @@ export class FlashcardsDraftProposeTool
   public readonly permission = ToolPermissions.WRITE;
   public readonly schema = DraftProposeSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: FlashcardsRepository) {}
 
   public async execute(
     input: FlashcardsDraftProposeInput,
@@ -90,7 +90,7 @@ export class FlashcardsDraftsListTool
   public readonly permission = ToolPermissions.READ;
   public readonly schema = DraftsListSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: FlashcardsRepository) {}
 
   public async execute(
     input: FlashcardsDraftsListInput,
@@ -125,7 +125,7 @@ export class FlashcardsDraftAcceptTool
     draftId: z.string().min(1).max(64),
   });
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: FlashcardsRepository) {}
 
   public async execute(
     input: { userId: string; draftId: string },
@@ -151,7 +151,7 @@ export class FlashcardsDraftDismissTool
     draftId: z.string().min(1).max(64),
   });
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: FlashcardsRepository) {}
 
   public async execute(
     input: { userId: string; draftId: string },

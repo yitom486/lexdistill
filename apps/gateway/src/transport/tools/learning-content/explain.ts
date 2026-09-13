@@ -1,10 +1,10 @@
 import { err, isOk, ok, type Result, BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LearningRepository } from '../../../modules/practice/ports.js';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
 import { MSG, loadTemplates } from './shared.js';
 
 export async function handleExampleSetAction(
-  repo: DrizzleLearnerRepository,
+  repo: LearningRepository,
   input: LearningContentInput,
   language: 'ja' | 'en' | 'ko'
 ): Promise<Result<LearningContentOutput, BusinessError>> {
@@ -31,7 +31,7 @@ export async function handleExampleSetAction(
 }
 
 export async function handleExplainAction(
-  repo: DrizzleLearnerRepository,
+  repo: LearningRepository,
   input: LearningContentInput,
   language: 'ja' | 'en' | 'ko'
 ): Promise<Result<LearningContentOutput, BusinessError>> {

@@ -22,7 +22,7 @@ import { documents, annotations, textbookLessons, textbookLines, textbookVocab, 
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { shredIntoTransaction } from './textbook-shred.js';
 import { markSessionsTargetDeletedInTx } from './toc-import-sessions.js';
-import { recordTermExposure } from '../../dictionary/persistence/encountered-terms.js';
+import { recordTermExposure } from '../../dictionary/public.js';
 
 /**
  * 文档/批注域（由 DrizzleLearnerRepository 搬迁而来，行为不变）。

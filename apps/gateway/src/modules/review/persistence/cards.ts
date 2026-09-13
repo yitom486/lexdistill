@@ -15,7 +15,7 @@ import {
 } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';
-import { resolveActiveLanguage } from '../../learning-progress/persistence/profile-internals.js';
+import { resolveActiveLanguage } from '../../learning-progress/public.js';
 
 /**
  * 复习域持久化：FSRS 闪卡存取（G4：由 repository/domains/cards-questions.ts 拆分而来，行为不变）。

@@ -7,7 +7,7 @@ import {
 } from '@study-studio/tool-core';
 import { ok, err, type Result, BusinessError, isOk } from '@study-studio/shared';
 import type { HangulItem, KanaItem } from '@study-studio/protocol';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { ContentRepository } from '../../library/ports.js';
 import { lookupPitchEntries, PITCH_LEXICON, type PitchLexiconEntry } from '../../../infrastructure/db/seeds/pitch-seed.js';
 
 export const LearningCurriculumInputSchema = z.object({
@@ -48,7 +48,7 @@ export class LearningCurriculumTool
   public readonly permission = ToolPermissions.READ;
   public readonly schema = LearningCurriculumInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: ContentRepository) {}
 
   public async execute(
     input: LearningCurriculumInput,

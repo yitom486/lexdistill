@@ -6,7 +6,7 @@ import {
   ToolLocations,
 } from '@study-studio/tool-core';
 import { ok, err, isOk, type Result, BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { ContentRepository } from '../ports.js';
 import { readDocumentFileBytes } from '../application/document-import/document-import-service.js';
 import type { ImportTask } from '../persistence/import-tasks.js';
 
@@ -49,7 +49,7 @@ export class LibraryImportTool implements ToolDefinition<LibraryImportInput, Lib
   public readonly permission = ToolPermissions.WRITE;
   public readonly schema = LibraryImportInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: ContentRepository) {}
 
   public async execute(
     input: LibraryImportInput,

@@ -16,7 +16,7 @@ import {
   normalizeTrackLanguage,
   inferLanguageFromSkillId,
 } from '../../../infrastructure/persistence/language.js';
-import { resolveActiveLanguage } from '../../learning-progress/persistence/profile-internals.js';
+import { resolveActiveLanguage } from '../../learning-progress/public.js';
 
 /**
  * 练习域持久化：题库读写与作答记录（G4：由 repository/domains/cards-questions.ts 拆分而来，行为不变）。

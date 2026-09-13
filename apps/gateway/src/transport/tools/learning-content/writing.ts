@@ -1,12 +1,13 @@
 import type { ToolExecutionContext } from '@study-studio/tool-core';
 import type { GeneratedQuestion } from '@study-studio/protocol';
 import { err, generateId, isOk, type Result, BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LearningRepository } from '../../../modules/practice/ports.js';
+import type { LearnerRepository } from '@study-studio/learner-core';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
 import { MSG, loadTemplates, maybeCollect, pickCycled } from './shared.js';
 
 export async function handleWritingPromptAction(
-  repo: DrizzleLearnerRepository,
+  repo: LearningRepository & LearnerRepository,
   context: ToolExecutionContext,
   input: LearningContentInput,
   language: 'ja' | 'en' | 'ko'

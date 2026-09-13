@@ -17,7 +17,7 @@ import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.
 import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
 import {
   setTrackLevel,
-} from '../../learning-progress/persistence/level.js';
+} from '../../learning-progress/public.js';
 import {
   startPracticePlanRun,
   finalizePracticePlanRun,

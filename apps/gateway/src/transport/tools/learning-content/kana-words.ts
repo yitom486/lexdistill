@@ -1,6 +1,6 @@
 import type { ToolExecutionContext } from '@study-studio/tool-core';
 import { err, generateId, isOk, ok, type Result, BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LexiconRepository } from '../../../modules/dictionary/ports.js';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
 
 export interface KanaWord {
@@ -26,7 +26,7 @@ const HIRAGANA_RE = /[\u3040-\u309F]/;
  * 系统随机出题（零成本即时）；主观写作批改仍走 learning.assess。
  */
 export async function handleKanaWordsAction(
-  repo: DrizzleLearnerRepository,
+  repo: LexiconRepository,
   context: ToolExecutionContext,
   input: LearningContentInput
 ): Promise<Result<LearningContentOutput, BusinessError>> {

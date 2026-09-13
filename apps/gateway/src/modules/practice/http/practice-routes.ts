@@ -9,7 +9,7 @@ import { gradeObjectiveAnswer } from '../application/practice-grading.js';
 import { createProposal, consumeProposal } from '../application/practice-proposal.js';
 import { summarizePracticeRun } from '../application/practice-summary.js';
 import type { PersistableQuestion } from '../persistence/questions.js';
-import { buildAnalysisSnapshot } from '../../learning-progress/application/learning-analysis.js';
+import { buildAnalysisSnapshot } from '../../learning-progress/public.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 
 /** 练习域路由：模板、运行、题目集合、题库（G2 迁移，行为不变）。 */

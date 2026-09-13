@@ -6,11 +6,9 @@ import {
   ToolLocations,
 } from '@study-studio/tool-core';
 import { ok, type Result, BusinessError, isOk } from '@study-studio/shared';
-import {
-  DrizzleLearnerRepository,
-  type LocalDictionaryEntry,
-  type TrackLanguage,
-} from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LexiconRepository } from '../ports.js';
+import type { LocalDictionaryEntry } from '../persistence/dictionary.js';
+import type { TargetLanguage } from '@study-studio/learner-core';
 import { buildOjadSearchUrl } from '../application/dictionary-external-links.js';
 
 export const DictionaryLookupInputSchema = z.object({
@@ -46,14 +44,14 @@ export class DictionaryLookupTool
   public readonly permission = ToolPermissions.READ;
   public readonly schema = DictionaryLookupInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: LexiconRepository) {}
 
   public async execute(
     input: DictionaryLookupInput,
     context: ToolExecutionContext
   ): Promise<Result<DictionaryLookupOutput, BusinessError>> {
     const result = await this.learnerRepo.searchLocalDictionary(
-      input.language as TrackLanguage,
+      input.language as TargetLanguage,
       input.query
     );
     if (!isOk(result)) return result;
@@ -65,7 +63,7 @@ export class DictionaryLookupTool
       void this.learnerRepo
         .recordDictionarySearch(
           context.userId,
-          input.language as TrackLanguage,
+          input.language as TargetLanguage,
           input.query,
           entries.length,
           entries[0]?.id

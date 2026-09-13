@@ -6,7 +6,7 @@ import {
   ToolLocations,
 } from '@study-studio/tool-core';
 import { ok, type Result, type BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { FlashcardsRepository } from '../ports.js';
 import type { AnkiPushResult } from '../application/anki-push.js';
 
 const AnkiPushTtsSchema = z.object({
@@ -45,7 +45,7 @@ export class FlashcardsAnkiPushTool
   public readonly permission = ToolPermissions.WRITE;
   public readonly schema = FlashcardsAnkiPushInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: FlashcardsRepository) {}
 
   public async execute(
     input: FlashcardsAnkiPushInput,

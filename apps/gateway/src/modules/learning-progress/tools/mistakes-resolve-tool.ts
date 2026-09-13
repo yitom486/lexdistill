@@ -6,7 +6,8 @@ import {
   ToolLocations,
 } from '@study-studio/tool-core';
 import { ok, err, isOk, type Result, BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LearningRepository } from '../../practice/ports.js';
+import type { LearnerRepository } from '@study-studio/learner-core';
 
 export const MistakesResolveInputSchema = z.object({
   userId: z.string().min(1).max(64),
@@ -28,7 +29,7 @@ export class MistakesResolveTool
   public readonly permission = ToolPermissions.WRITE;
   public readonly schema = MistakesResolveInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: LearningRepository & LearnerRepository) {}
 
   public async execute(
     input: MistakesResolveInput,

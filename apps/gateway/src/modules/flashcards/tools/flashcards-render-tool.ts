@@ -7,7 +7,7 @@ import {
 } from '@study-studio/tool-core';
 import { ok, err, type Result, BusinessError } from '@study-studio/shared';
 import type { RenderedCard, AnkiCardFormat } from '@study-studio/learner-core';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { FlashcardsRepository } from '../ports.js';
 import { narrowCardSourceEntry } from '../application/card-preview.js';
 import { narrowSaveCardFormatInput } from '../persistence/card-formats.js';
 
@@ -51,7 +51,7 @@ export class FlashcardsRenderTool
   public readonly permission = ToolPermissions.READ;
   public readonly schema = FlashcardsRenderInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: FlashcardsRepository) {}
 
   public async execute(
     input: FlashcardsRenderInput,

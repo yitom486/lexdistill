@@ -6,7 +6,7 @@ import {
   ToolLocations,
 } from '@study-studio/tool-core';
 import { ok, isOk, type Result, type BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LearnerRepository } from '@study-studio/learner-core';
 
 export const FlashcardsDueInputSchema = z.object({
   userId: z.string().min(1).max(64),
@@ -38,7 +38,7 @@ export class FlashcardsDueTool implements ToolDefinition<FlashcardsDueInput, Due
   public readonly permission = ToolPermissions.READ;
   public readonly schema = FlashcardsDueInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: LearnerRepository) {}
 
   public async execute(
     input: FlashcardsDueInput,

@@ -3,10 +3,11 @@ import type { GeneratedQuestion } from '@study-studio/protocol';
 import { ok, isOk, nowIso, type Result, type BusinessError } from '@study-studio/shared';
 import type { LearnerRepository } from '@study-studio/learner-core';
 import {
-  DrizzleLearnerRepository,
   inferLanguageFromSkillId,
   normalizeTrackLanguage,
-} from '../../../infrastructure/drizzle-learner-repository.js';
+} from '../../../infrastructure/persistence/language.js';
+import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LearningRepository } from '../../../modules/practice/ports.js';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
 
 export type TemplateRow = {
@@ -101,7 +102,7 @@ export function pickCycled<T>(items: T[], count: number): T[] {
 }
 
 export async function loadTemplates(
-  repo: DrizzleLearnerRepository,
+  repo: LearningRepository,
   options: {
     action: string;
     language: string;

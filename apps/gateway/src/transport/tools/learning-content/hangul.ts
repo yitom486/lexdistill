@@ -1,7 +1,8 @@
 import type { ToolExecutionContext } from '@study-studio/tool-core';
 import type { GeneratedQuestion, HangulType } from '@study-studio/protocol';
 import { err, generateId, isOk, type Result, BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { ContentRepository } from '../../../modules/library/ports.js';
+import type { LearnerRepository } from '@study-studio/learner-core';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
 import { MSG, maybeCollect } from './shared.js';
 
@@ -18,7 +19,7 @@ const HANGUL_SKILL_BY_TYPE: Record<HangulType, string> = {
  * 题干约束全部来自课程表种子，模型不得自造字母。
  */
 export async function handleHangulDrillAction(
-  repo: DrizzleLearnerRepository,
+  repo: ContentRepository & LearnerRepository,
   context: ToolExecutionContext,
   input: LearningContentInput
 ): Promise<Result<LearningContentOutput, BusinessError>> {

@@ -2,7 +2,9 @@ import { ok, err, isOk, type Result, BusinessError, generateId } from '@study-st
 import type { Flashcard, GeneratedQuestion, PracticeBlockSpec, PracticePlanRun, LearnerLevel } from '@study-studio/protocol';
 import { isLessonLocked, isQuestionAllowed, resolveStudyGate, tierCapForLevel } from '@study-studio/learner-core';
 import type { AssessmentBlueprint } from '@study-studio/learner-core';
-import type { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LearningRepository } from '../ports.js';
+import type { LearnerRepository } from '@study-studio/learner-core';
+import type { ContentRepository } from '../../library/ports.js';
 import type { PersistableQuestion } from '../persistence/questions.js';
 import type { LearningContentInput, LearningContentOutput } from '../../../transport/tools/learning-content-tool.js';
 
@@ -97,7 +99,7 @@ const isVocabBlock = (block: PracticeBlockSpec) =>
  * 超纲篇目不硬上（由调用方回退链处理）。无可用套题时返回空数组。
  */
 async function buildReadingQuestions(
-  repo: DrizzleLearnerRepository,
+  repo: Pick<ContentRepository, 'listReadingSets'> & LearnerRepository,
   userId: string,
   block: PracticeBlockSpec,
   language: 'en' | 'ja' | 'ko'
@@ -209,7 +211,7 @@ function questionContentKey(q: { content?: unknown; correctAnswer?: unknown }): 
  * 定级考豁免档位/讲义门（使命就是往上探），但沿用跨块去重。
  */
 async function collectBlueprintItems(
-  repo: DrizzleLearnerRepository,
+  repo: LearningRepository,
   userId: string,
   language: 'en' | 'ja' | 'ko',
   blueprint: AssessmentBlueprint,
@@ -226,19 +228,8 @@ async function collectBlueprintItems(
     localContent.has(questionContentKey(q));
   // 重考轮换：按该目标档已完成场次偏移候选顺序（题池有余量时换题面；
   // 无余量时同一套，不伪装成平行卷，distinct 可见）。
-  let rotation = 0;
-  try {
-    const row = repo
-      .getRawDb()
-      .query(
-        `SELECT COUNT(*) AS n FROM placement_exams
-         WHERE user_id = ? AND target_level = ? AND status IN ('passed', 'failed')`
-      )
-      .get(userId, blueprint.targetLevel) as { n: number } | null;
-    rotation = row?.n ?? 0;
-  } catch {
-    rotation = 0;
-  }
+  // M1-2：计数走 LearningRepository 能力，不再内联 SQL/碰 raw 句柄。
+  const rotation = await repo.countPlacementAttempts(userId, blueprint.targetLevel);
   const rotateBy = <T>(arr: T[]): T[] => {
     if (arr.length === 0 || rotation === 0) return arr;
     const k = rotation % arr.length;
@@ -342,7 +333,7 @@ async function collectBlueprintItems(
 }
 
 export async function assemblePracticeRun(
-  repo: DrizzleLearnerRepository,
+  repo: LearningRepository & LearnerRepository & Pick<ContentRepository, 'listReadingSets'>,
   userId: string,
   runId: string,
   contentTool?: ContentToolLike | undefined

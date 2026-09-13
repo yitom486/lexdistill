@@ -63,6 +63,10 @@ import {
   type RecordReadingExposuresInput,
 } from '../modules/dictionary/persistence/encountered-terms.js';
 import type { AgentAdapter } from '@study-studio/agent-core';
+import type { ContentRepository } from '../modules/library/ports.js';
+import type { LexiconRepository } from '../modules/dictionary/ports.js';
+import type { LearningRepository } from '../modules/practice/ports.js';
+import type { FlashcardsRepository } from '../modules/flashcards/ports.js';
 import {
   getTermExamples as getTermExamplesDomain,
   type TermExampleItem,
@@ -305,7 +309,9 @@ export {
   defaultLanguageProfileSeed,
 };
 
-export class DrizzleLearnerRepository implements LearnerRepository {
+export class DrizzleLearnerRepository
+  implements LearnerRepository, ContentRepository, LexiconRepository, LearningRepository, FlashcardsRepository
+{
   private readonly db: DrizzleDb;
   private readonly sqlite: Database;
 
@@ -632,6 +638,24 @@ export class DrizzleLearnerRepository implements LearnerRepository {
   /** 按 run 取考试（含冻结蓝图；查不到返回 null）。 */
   public async getPlacementByRunId(runId: string): Promise<PlacementExam | null> {
     return getPlacementByRunIdDomain(this.deps, runId);
+  }
+
+  /**
+   * M1-2 学习域能力：已终结定级考计数（passed/failed；装配轮换偏移用，查不到计 0）。
+   * 收敛 practice-assembly 内联 SQL，使上层只依赖能力接口。
+   */
+  public async countPlacementAttempts(userId: string, targetLevel: string): Promise<number> {
+    try {
+      const row = this.sqlite
+        .query(
+          `SELECT COUNT(*) AS n FROM placement_exams
+           WHERE user_id = ? AND target_level = ? AND status IN ('passed', 'failed')`
+        )
+        .get(userId, targetLevel) as { n: number } | null;
+      return row?.n ?? 0;
+    } catch {
+      return 0;
+    }
   }
 
   /** 保存阅读位置（每用户每文档一条 upsert）。实现已下沉 library 域，此处仅委托。 */

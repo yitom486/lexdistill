@@ -8,7 +8,7 @@ import {
 import { ok, err, type Result, BusinessError, isOk } from '@study-studio/shared';
 import type { DocumentItem, AnnotationItem, NewsTopic } from '@study-studio/protocol';
 import { listNewsTopics } from '@study-studio/protocol';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { ContentRepository } from '../ports.js';
 
 export const LearningLibraryInputSchema = z.object({
   action: z.enum([
@@ -45,7 +45,7 @@ export class LearningLibraryTool
   public readonly permission = ToolPermissions.READ;
   public readonly schema = LearningLibraryInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: ContentRepository) {}
 
   public async execute(
     input: LearningLibraryInput,

@@ -1,6 +1,6 @@
 import { ok, err, type Result, BusinessError, generateId } from '@study-studio/shared';
 import type { PracticeBlockSpec } from '@study-studio/protocol';
-import type { AnalysisSnapshot } from '../../learning-progress/application/learning-analysis.js';
+import type { AnalysisSnapshot } from '../../learning-progress/public.js';
 
 /**
  * P5-PhaseD：AI 计划建议（propose）+ 用户确认式 apply。

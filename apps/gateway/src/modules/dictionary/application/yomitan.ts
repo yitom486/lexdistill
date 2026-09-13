@@ -15,7 +15,7 @@ import {
   type DictionaryPackageManifest,
   type ParsedEntry,
 } from './dictionary-packages.js';
-import { extractZip } from '../../library/application/pdf-import/archive.js';
+import { extractZip } from '../../library/public.js';
 
 /**
  * Yomitan 词典包导入（clean-room 实现，未复制 Yomitan GPL 代码）。

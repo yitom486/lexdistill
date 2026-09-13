@@ -6,7 +6,7 @@ import {
   ToolLocations,
 } from '@study-studio/tool-core';
 import { ok, isOk, type Result, type BusinessError } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import type { LexiconRepository } from '../ports.js';
 
 export const LearningEncountersInputSchema = z.object({
   userId: z.string().min(1).max(64),
@@ -51,7 +51,7 @@ export class LearningEncountersTool
   public readonly permission = ToolPermissions.READ;
   public readonly schema = LearningEncountersInputSchema;
 
-  constructor(private readonly learnerRepo: DrizzleLearnerRepository) {}
+  constructor(private readonly learnerRepo: LexiconRepository) {}
 
   public async execute(
     input: LearningEncountersInput,
