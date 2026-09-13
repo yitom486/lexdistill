@@ -9,7 +9,7 @@ import {
   installYomitanFromBytes,
   type YomitanInstallMeta,
 } from '../modules/dictionary/application/yomitan.js';
-import { parseYomitanDictionary } from '@study-studio/dictionary-integrations';
+import { parseYomitanDictionary } from '@study-studio/lexicon';
 import { initSchema } from '../infrastructure/db/index.js';
 
 function memDb(): Database {

@@ -9,7 +9,7 @@ import {
 import {
   parseOewnXml,
   type ParsedEntry,
-} from '@study-studio/dictionary-integrations';
+} from '@study-studio/lexicon';
 
 // ---------------------------------------------------------------------------
 // P3-A：词典包 manifest/catalog（受类型约束的包元数据目录）

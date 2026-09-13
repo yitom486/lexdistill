@@ -3,9 +3,9 @@ import {
   installOewnPackage,
   OEWN_2025_URL,
 } from '../modules/dictionary/application/dictionary-packages.js';
-import { parseOewnXml } from '@study-studio/dictionary-integrations';
+import { parseOewnXml } from '@study-studio/lexicon';
 
-export { parseOewnXml } from '@study-studio/dictionary-integrations';
+export { parseOewnXml } from '@study-studio/lexicon';
 
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');

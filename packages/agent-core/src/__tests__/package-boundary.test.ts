@@ -29,6 +29,7 @@ const PACKAGES = [
   'dictionary-integrations',
   'flashcard-integrations',
   'flashcard-core',
+  'lexicon',
   'review-core',
   'practice-core',
   'learning',
@@ -50,6 +51,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'dictionary-integrations': ['@study-studio/shared'],
   'flashcard-integrations': ['@study-studio/shared'],
   'flashcard-core': [],
+  'lexicon': ['@study-studio/dictionary-core', '@study-studio/dictionary-integrations'],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
   'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
   'learning': ['@study-studio/learner-core', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
@@ -266,6 +268,41 @@ describe('M1-1 package 依赖方向', () => {
     ).toEqual([]);
   });
 
+  it('lexicon：词典组合入口，仅组合 dictionary-core/integrations', async () => {
+    expect(
+      await relativeImportsOnly('lexicon', [
+        '@study-studio/dictionary-core',
+        '@study-studio/dictionary-integrations',
+      ])
+    ).toEqual([]);
+  });
+
+  it('gateway 词典统一入口：禁直引 dictionary-core/integrations，一律走 lexicon', async () => {
+    const hits = await filesWith(
+      join(repoRoot(), 'apps', 'gateway', 'src'),
+      /@study-studio\/dictionary-(core|integrations)/
+    );
+    expect(hits).toEqual([]);
+    for (const file of [
+      'modules/dictionary/application/dictionary-packages.ts',
+      'modules/dictionary/application/yomitan.ts',
+      'modules/dictionary/persistence/dictionary.ts',
+      'scripts/import-oewn.ts',
+    ]) {
+      const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
+      expect(text).toContain('@study-studio/lexicon');
+    }
+  });
+
+  it('gateway manifest：必须声明 lexicon（M7-4 统一入口消费方）', async () => {
+    const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
+    const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
+    const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
+    expect(deps['@study-studio/lexicon']).toBe('workspace:*');
+    expect(deps['@study-studio/dictionary-core']).toBeUndefined();
+    expect(deps['@study-studio/dictionary-integrations']).toBeUndefined();
+  });
+
   it('gateway 统一入口：禁直引 review-core/practice-core，一律走 learning', async () => {
     const hits = await filesWith(
       join(repoRoot(), 'apps', 'gateway', 'src'),
@@ -305,13 +342,6 @@ describe('M1-1 package 依赖方向', () => {
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
     expect(deps['@study-studio/learning']).toBe('workspace:*');
-  });
-
-  it('gateway manifest：必须声明 dictionary-integrations（M5-2 消费方）', async () => {
-    const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
-    const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
-    const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
-    expect(deps['@study-studio/dictionary-integrations']).toBe('workspace:*');
   });
 });
 

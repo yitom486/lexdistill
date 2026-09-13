@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { deinflectJa } from '@study-studio/dictionary-core';
+import { deinflectJa } from '@study-studio/lexicon';
 
 describe('searchLocalDictionary 活用形回退', () => {
   let repo: DrizzleLearnerRepository;

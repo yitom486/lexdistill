@@ -80,8 +80,8 @@ type LocalDictionaryRow = typeof localDictionaryEntries.$inferSelect;
   return entry;
 }
 
-import { getMorphAnalyzer, type MorphCandidate } from '@study-studio/dictionary-core';
-import { coarsePosOfLabel, coarsePosName } from '@study-studio/dictionary-core';
+import { getMorphAnalyzer, type MorphCandidate } from '@study-studio/lexicon';
+import { coarsePosOfLabel, coarsePosName } from '@study-studio/lexicon';
 
 /**
  * 查询本地、可再分发的词典资产。第三方词典只可作为外链兜底，绝不在此抓取。

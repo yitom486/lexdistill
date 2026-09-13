@@ -20,7 +20,7 @@ import {
   parseYomitanDictionary,
   slugifyTitle,
   type YomitanPitchRow,
-} from '@study-studio/dictionary-integrations';
+} from '@study-studio/lexicon';
 
 /**
  * Yomitan 词典包导入（clean-room 实现，未复制 Yomitan GPL 代码）。
