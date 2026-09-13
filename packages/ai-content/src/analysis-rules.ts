@@ -1,48 +1,22 @@
-import type { summarizeLearningEvidence } from '@study-studio/learning';
 import type {
   LearningAnalysisReport,
   LearningSuggestion,
   LearningSuggestionKind,
 } from '@study-studio/protocol';
+import type { AnalysisSnapshot } from '@study-studio/learning';
 
 /**
  * M7-8 自 Gateway `learning-progress/application/learning-analysis.ts` 迁入
  * （逻辑字节一致，仅 `buildLocalRuleReport` 的时间戳改为调用方传入——
  * 本包不读当前时间，单测完全确定性）。
  *
- * 学习分析中的确定性内容规则：快照纯数据类型、模型 JSON 宽容解析、
- * 本地规则回退。快照组装、缓存、Agent 会话、模型调用、错误翻译仍归 Gateway。
+ * 学习分析中的确定性内容规则：模型 JSON 宽容解析、本地规则回退。
+ * 快照类型正典自 M7-10 起归 `@study-studio/learning`（此处重出不断链）；
+ * 快照组装、缓存、Agent 会话、模型调用、错误翻译仍归 Gateway。
  */
 
-export interface AnalysisSnapshot {
-  practiceEvidence?: ReturnType<typeof summarizeLearningEvidence>;
-  userId: string;
-  targetLanguage: string;
-  overallLevel: string;
-  learnerLevel?: string | undefined;
-  studyGoal?: string | undefined;
-  streakDays?: number | undefined;
-  dailyGoalQuizzes?: number | undefined;
-  dailyGoalCards?: number | undefined;
-  strengths: { skillId: string; name: string; proficiency: number }[];
-  weaknesses: {
-    skillId: string;
-    name: string;
-    proficiency: number;
-    consecutiveErrors: number;
-  }[];
-  dailyTask?:
-    | {
-        quizzesCount: number;
-        cardsReviewedCount: number;
-        readingCount: number;
-        mistakesResolvedCount: number;
-      }
-    | undefined;
-  dueCardsCount: number;
-  unresolvedMistakesCount: number;
-  assembledAt: string;
-}
+/** 快照类型正典（learning）；重出以保持既有消费链路不动。 */
+export type { AnalysisSnapshot } from '@study-studio/learning';
 
 export interface ParsedAnalysis {
   summary: string;

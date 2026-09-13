@@ -58,7 +58,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'lexicon': ['@study-studio/dictionary-core', '@study-studio/dictionary-integrations'],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
   'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
-  'learning': ['@study-studio/learner-core', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
+  'learning': ['@study-studio/shared', '@study-studio/learner-core', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -275,9 +275,10 @@ describe('M1-1 package 依赖方向', () => {
     expect(text).toContain('@study-studio/ai-content');
   });
 
-  it('learning：领域组合入口，仅组合 learner/algorithms/review/practice-core', async () => {
+  it('learning：领域组合入口 + 快照用例，仅组合 shared/learner/algorithms/review/practice-core', async () => {
     expect(
       await relativeImportsOnly('learning', [
+        '@study-studio/shared',
         '@study-studio/learner-core',
         '@study-studio/learning-algorithms',
         '@study-studio/review-core',

@@ -8,7 +8,8 @@
     "@study-studio/learner-core": "workspace:*",
     "@study-studio/learning-algorithms": "workspace:*",
     "@study-studio/practice-core": "workspace:*",
-    "@study-studio/review-core": "workspace:*"
+    "@study-studio/review-core": "workspace:*",
+    "@study-studio/shared": "workspace:*"
   },
   "scripts": {
     "test": "bun test"

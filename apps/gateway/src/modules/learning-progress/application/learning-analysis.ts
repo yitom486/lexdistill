@@ -1,6 +1,6 @@
 import type { AgentAdapter } from '@study-studio/agent-core';
-import { summarizeLearningEvidence } from '@study-studio/learning';
-import { type LearnerRepository, type LearnerProfileSnapshot } from '@study-studio/learner-core';
+import { buildAnalysisSnapshot as buildAnalysisSnapshotUseCase } from '@study-studio/learning';
+import { type LearnerRepository } from '@study-studio/learner-core';
 import type {
   LearningAnalysisReport,
 } from '@study-studio/protocol';
@@ -41,52 +41,31 @@ export interface RunLearningAnalysisOptions {
   model?: string | undefined;
 }
 
-/** 组装不可变学习快照（供分析与本地规则回退共用）。 */
+/**
+ * M7-10 组装不可变学习快照（兼容签名：供分析与本地规则回退共用）。
+ * 映射逻辑已迁入 `@study-studio/learning`；此处只做 port 配接（Repository 调用）、
+ * 时间注入与底层异常翻译。容错语义不变：profile 失败原样返回，
+ * 到期卡/错题失败计数为 0。
+ */
 export async function buildAnalysisSnapshot(
   repo: LearnerRepository,
   userId: string
 ): Promise<Result<AnalysisSnapshot, BusinessError>> {
   try {
-    const profileRes = await repo.getProfileSnapshot(userId);
-    if (!isOk(profileRes)) return profileRes;
-    const profile = profileRes.value;
-
-    const [dueRes, mistakesRes] = await Promise.all([
-      repo.getDueCards(userId, 200, { dueOnly: true, language: profile.targetLanguage }),
-      repo.getMistakes(userId, { resolved: false, language: profile.targetLanguage }),
-    ]);
-    const dueCardsCount = isOk(dueRes) ? dueRes.value.length : 0;
-    const unresolvedMistakesCount = isOk(mistakesRes) ? mistakesRes.value.length : 0;
-
-    return ok({
-      userId,
-      targetLanguage: profile.targetLanguage,
-      overallLevel: '未进行标准化能力评测',
-      practiceEvidence: summarizeLearningEvidence(profile.allMetrics, profile.targetLanguage),
-      learnerLevel: profile.profile?.learnerLevel,
-      studyGoal: profile.profile?.studyGoal,
-      streakDays: profile.profile?.streakDays,
-      dailyGoalQuizzes: profile.profile?.dailyGoalQuizzes,
-      dailyGoalCards: profile.profile?.dailyGoalCards,
-      strengths: profile.strengths.map((m) => ({ skillId: m.id, name: m.name, proficiency: m.proficiency })),
-      weaknesses: profile.weaknesses.map((m) => ({
-        skillId: m.id,
-        name: m.name,
-        proficiency: m.proficiency,
-        consecutiveErrors: m.consecutiveErrors,
-      })),
-      dailyTask: profile.dailyTask
-        ? {
-            quizzesCount: profile.dailyTask.quizzesCount,
-            cardsReviewedCount: profile.dailyTask.cardsReviewedCount,
-            readingCount: profile.dailyTask.readingCount,
-            mistakesResolvedCount: profile.dailyTask.mistakesResolvedCount,
-          }
-        : undefined,
-      dueCardsCount,
-      unresolvedMistakesCount,
-      assembledAt: new Date().toISOString(),
-    });
+    return await buildAnalysisSnapshotUseCase(
+      {
+        getProfileSnapshot: () => repo.getProfileSnapshot(userId),
+        getDueCardsCount: async (language) => {
+          const res = await repo.getDueCards(userId, 200, { dueOnly: true, language });
+          return isOk(res) ? ok(res.value.length) : res;
+        },
+        getUnresolvedMistakesCount: async (language) => {
+          const res = await repo.getMistakes(userId, { resolved: false, language });
+          return isOk(res) ? ok(res.value.length) : res;
+        },
+      },
+      { userId, assembledAt: new Date().toISOString() }
+    );
   } catch (error) {
     return err(
       translateToBusinessError(error, { category: 'DATABASE', action: 'buildAnalysisSnapshot' })

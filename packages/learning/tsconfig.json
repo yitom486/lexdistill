@@ -6,6 +6,7 @@
     "outDir": "dist"
   },
   "references": [
+    { "path": "../shared" },
     { "path": "../learner-core" },
     { "path": "../learning-algorithms" },
     { "path": "../review-core" },

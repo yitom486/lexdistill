@@ -10,6 +10,7 @@
  * - 规范源唯一：蓝图/计划类名字只从 practice-core 出，排程只从 review-core 出，
  *   排程状态类型只从 learning-algorithms 出，
  *   绝不经 learner-core 兼容垫片转出（行为虽一致，但垫片只是过渡）。
+ * - M7-10 起含快照组装用例（最小读取 port + 确定性映射；时钟与异常翻译归调用方）。
  */
 
 /** 版本化复习排程（FSRS v1，纯排程不写库）。 */
@@ -59,3 +60,11 @@ export {
   type TargetLanguage,
   type LearnerProfileSnapshot,
 } from '@study-studio/learner-core';
+
+/** 学习分析快照组装（最小读取 port + 确定性映射；不读时钟）。 */
+export {
+  buildAnalysisSnapshot,
+  type AnalysisSnapshot,
+  type AnalysisSnapshotPorts,
+  type AssembleSnapshotInput,
+} from './analysis-snapshot.js';
