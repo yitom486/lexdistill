@@ -1,7 +1,6 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
-import { scheduleFsrsReviewV1 } from '@study-studio/review-core';
-import type { FsrsState } from '@study-studio/learner-core';
+import { scheduleFsrsReviewV1, type FsrsState } from '@study-studio/learning';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import type { Flashcard } from '@study-studio/protocol';
 

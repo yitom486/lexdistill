@@ -31,6 +31,7 @@
       "@study-studio/dictionary-integrations": ["./packages/dictionary-integrations/src/index.ts"],
       "@study-studio/review-core": ["./packages/review-core/src/index.ts"],
       "@study-studio/practice-core": ["./packages/practice-core/src/index.ts"],
+      "@study-studio/learning": ["./packages/learning/src/index.ts"],
       "@study-studio/gateway": ["./apps/gateway/src/index.ts"]
     }
   }

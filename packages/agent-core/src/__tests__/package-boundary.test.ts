@@ -29,6 +29,7 @@ const PACKAGES = [
   'dictionary-integrations',
   'review-core',
   'practice-core',
+  'learning',
 ] as const;
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
@@ -47,6 +48,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'dictionary-integrations': ['@study-studio/shared'],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
   'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
+  'learning': ['@study-studio/learner-core', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -226,11 +228,37 @@ describe('M1-1 package 依赖方向', () => {
     ).toEqual([]);
   });
 
-  it('gateway manifest：必须声明 review-core（M6-1 消费方）', async () => {
+  it('learning：领域组合入口，仅组合 learner/algorithms/review/practice-core', async () => {
+    expect(
+      await relativeImportsOnly('learning', [
+        '@study-studio/learner-core',
+        '@study-studio/learning-algorithms',
+        '@study-studio/review-core',
+        '@study-studio/practice-core',
+      ])
+    ).toEqual([]);
+  });
+
+  it('gateway 统一入口：禁直引 review-core/practice-core，一律走 learning', async () => {
+    const hits = await filesWith(
+      join(repoRoot(), 'apps', 'gateway', 'src'),
+      /@study-studio\/(review-core|practice-core)/
+    );
+    expect(hits).toEqual([]);
+    for (const file of [
+      'modules/review/http/review-routes.ts',
+      'modules/review/__tests__/review-commit.test.ts',
+    ]) {
+      const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
+      expect(text).toContain('@study-studio/learning');
+    }
+  });
+
+  it('gateway manifest：必须声明 learning（M6-3 统一入口消费方）', async () => {
     const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
-    expect(deps['@study-studio/review-core']).toBe('workspace:*');
+    expect(deps['@study-studio/learning']).toBe('workspace:*');
   });
 
   it('gateway manifest：必须声明 dictionary-integrations（M5-2 消费方）', async () => {

@@ -1,0 +1,16 @@
+{
+  "name": "@study-studio/learning",
+  "version": "0.1.2",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@study-studio/learner-core": "workspace:*",
+    "@study-studio/learning-algorithms": "workspace:*",
+    "@study-studio/practice-core": "workspace:*",
+    "@study-studio/review-core": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}

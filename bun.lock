@@ -30,8 +30,8 @@
         "@study-studio/dictionary-core": "workspace:*",
         "@study-studio/dictionary-integrations": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
+        "@study-studio/learning": "workspace:*",
         "@study-studio/protocol": "workspace:*",
-        "@study-studio/review-core": "workspace:*",
         "@study-studio/shared": "workspace:*",
         "@study-studio/speech": "workspace:*",
         "@study-studio/tool-core": "workspace:*",
@@ -141,6 +141,16 @@
         "@study-studio/protocol": "workspace:*",
         "@study-studio/review-core": "workspace:*",
         "@study-studio/shared": "workspace:*",
+      },
+    },
+    "packages/learning": {
+      "name": "@study-studio/learning",
+      "version": "0.1.2",
+      "dependencies": {
+        "@study-studio/learner-core": "workspace:*",
+        "@study-studio/learning-algorithms": "workspace:*",
+        "@study-studio/practice-core": "workspace:*",
+        "@study-studio/review-core": "workspace:*",
       },
     },
     "packages/learning-algorithms": {
@@ -416,6 +426,8 @@
     "@study-studio/gateway": ["@study-studio/gateway@workspace:apps/gateway"],
 
     "@study-studio/learner-core": ["@study-studio/learner-core@workspace:packages/learner-core"],
+
+    "@study-studio/learning": ["@study-studio/learning@workspace:packages/learning"],
 
     "@study-studio/learning-algorithms": ["@study-studio/learning-algorithms@workspace:packages/learning-algorithms"],
 
