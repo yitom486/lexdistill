@@ -1,5 +1,5 @@
 import type { HeadingCandidate } from '@study-studio/protocol';
-import type { PageHeading } from './extract-headings.js';
+import type { PageHeading } from '@study-studio/document-ingest-pdf';
 import type { PdfInspectorLike } from './pdf-runtime.js';
 
 /**

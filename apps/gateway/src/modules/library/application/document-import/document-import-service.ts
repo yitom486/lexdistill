@@ -10,7 +10,7 @@ import {
 } from '@study-studio/shared';
 import type { DocumentItem } from '@study-studio/protocol';
 import type { TextbookAST } from '@study-studio/document-model';
-import { markdownToAst } from '../pdf-import/markdown-to-ast.js';
+import { markdownToAst } from '@study-studio/document-ingest-pdf';
 import { convertPdfToAst } from '../pdf-import/pdf-import-service.js';
 import type { PdfImportServiceDeps } from '../pdf-import/pdf-import-service.js';
 import {

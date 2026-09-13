@@ -36,6 +36,7 @@ const PACKAGES = [
   'practice-core',
   'learning',
   'document-model',
+  'document-ingest-pdf',
 ] as const;
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
@@ -61,6 +62,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'practice-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/document-model'],
   'learning': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learner-core', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
   'document-model': ['@study-studio/shared'],
+  'document-ingest-pdf': ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -244,6 +246,39 @@ describe('M1-1 package 依赖方向', () => {
     expect(
       await relativeImportsOnly('document-model', ['@study-studio/shared', 'zod'])
     ).toEqual([]);
+  });
+
+  it('document-ingest-pdf：纯解析层，仅依赖 shared/document-model/protocol（禁 Gateway/SQLite/Drizzle/learner-core/Agent/Web/网络/PDF runtime）', async () => {
+    expect(
+      await relativeImportsOnly('document-ingest-pdf', ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol'])
+    ).toEqual([]);
+  });
+
+  it('gateway PDF 摄取统一入口：原实现文件仅为兼容出口，消费者走 canonical 包', async () => {
+    for (const file of [
+      'modules/library/application/pdf-import/extract-headings.ts',
+      'modules/library/application/pdf-import/markdown-to-ast.ts',
+    ]) {
+      const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
+      expect(text).toContain('@study-studio/document-ingest-pdf');
+      expect(text).not.toMatch(/^export function /m);
+      expect(text).not.toMatch(/^function /m);
+    }
+    for (const file of [
+      'modules/library/application/document-import/document-import-service.ts',
+      'modules/library/application/pdf-import/layout-headings.ts',
+      'modules/library/application/pdf-import/pdf-import-service.ts',
+    ]) {
+      const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
+      expect(text).toContain('@study-studio/document-ingest-pdf');
+    }
+  });
+
+  it('gateway manifest：必须声明 document-ingest-pdf（M8-3）', async () => {
+    const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
+    const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
+    const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
+    expect(deps['@study-studio/document-ingest-pdf']).toBe('workspace:*');
   });
 
   it('flashcard-integrations：纯传输/解析层，仅依赖 shared 与解析必需运行时（禁 Gateway/learner-core/Agent/Web）', async () => {

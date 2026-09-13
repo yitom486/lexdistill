@@ -3,8 +3,8 @@ import { StructureClassSchema, type DocumentItem, type StructureClass } from '@s
 import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
 import { classifyEmbeddedOutline } from './embedded-outline-quality.js';
-import { detectDocScript, markdownToAst, promoteLessonHeadings } from './markdown-to-ast.js';
-import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from './extract-headings.js';
+import { detectDocScript, markdownToAst, promoteLessonHeadings } from '@study-studio/document-ingest-pdf';
+import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from '@study-studio/document-ingest-pdf';
 import { collectLayoutCandidates, layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from './layout-headings.js';
 import { buildPdfConvertReport, buildPdfMapReport, buildOcrOverflowError } from './pdf-import-report.js';
 import {

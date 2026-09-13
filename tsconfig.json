@@ -19,6 +19,7 @@
     { "path": "packages/flashcards" },
     { "path": "packages/ai-content" },
     { "path": "packages/document-model" },
+    { "path": "packages/document-ingest-pdf" },
     { "path": "packages/lexicon" },
     { "path": "packages/review-core" },
     { "path": "packages/practice-core" },
