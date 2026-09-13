@@ -39,6 +39,19 @@ export {
   type ParsedApkg,
 } from '@study-studio/flashcard-integrations';
 
+/** 卡片推送 Anki 应用用例（最小 port + 编排；设置/读取/合成由调用方实现）。 */
+export {
+  pushCardToAnki,
+  type AnkiPushTts,
+  type AnkiPushRequest,
+  type AnkiPushResult,
+  type AnkiPushSettings,
+  type AnkiPushCard,
+  type AnkiPushTtsRequest,
+  type AnkiPushAudio,
+  type AnkiPushPorts,
+} from './anki-push.js';
+
 /** 卡片预览应用用例（最小读取 port + 渲染链路；持久化仍归 Gateway）。 */
 export {
   previewCard,
