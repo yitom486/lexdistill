@@ -232,8 +232,16 @@ describe('M1-1 package 依赖方向', () => {
     ).toEqual([]);
   });
 
-  it('flashcard-integrations：纯传输层，仅依赖 shared（禁 Gateway/learner-core/Agent/Web）', async () => {
-    expect(await relativeImportsOnly('flashcard-integrations', ['@study-studio/shared'])).toEqual([]);
+  it('flashcard-integrations：纯传输/解析层，仅依赖 shared 与解析必需运行时（禁 Gateway/learner-core/Agent/Web）', async () => {
+    expect(
+      await relativeImportsOnly('flashcard-integrations', [
+        '@study-studio/shared',
+        'bun:sqlite',
+        'node:fs',
+        'node:os',
+        'node:path',
+      ])
+    ).toEqual([]);
   });
 
   it('flashcard-core：纯模板渲染，零依赖（禁 Gateway/SQLite/Agent/Web/网络）', async () => {
