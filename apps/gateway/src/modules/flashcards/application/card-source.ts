@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { localDictionaryEntries, dictionaryTermMeta } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { CardSourceEntry } from '@study-studio/flashcard-core';
+import type { CardSourceEntry } from '@study-studio/flashcards';
 
 /**
  * 生词卡 → CardSourceEntry（推送/导出共用）。

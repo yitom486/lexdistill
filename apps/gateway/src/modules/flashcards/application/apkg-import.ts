@@ -11,13 +11,11 @@ import {
 import {
   guessFieldMapping,
   analyzeTemplateCompat,
-  type FieldMarker,
-} from '@study-studio/flashcard-core';
-import {
   parseApkgEntries,
   extractMediaRefs,
+  type FieldMarker,
   type ParsedApkg,
-} from '@study-studio/flashcard-integrations';
+} from '@study-studio/flashcards';
 // 跨模块复用（G5 已登记）：zip 安全解包（炸弹/加密守卫），不写盘、无路径穿越面。
 import { extractZip, normalizeZipEntryPaths } from '../../library/public.js';
 import { flashcards } from '../../../infrastructure/db/index.js';

@@ -1,5 +1,5 @@
 import type { Result, BusinessError } from '@study-studio/shared';
-import type { AnkiCardFormat } from '@study-studio/flashcard-core';
+import type { AnkiCardFormat } from '@study-studio/flashcards';
 import type {
   CardDraft,
   CardDraftStatus,

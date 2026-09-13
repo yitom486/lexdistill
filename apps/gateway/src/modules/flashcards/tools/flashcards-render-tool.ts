@@ -6,7 +6,7 @@ import {
   ToolLocations,
 } from '@study-studio/tool-core';
 import { ok, err, type Result, BusinessError } from '@study-studio/shared';
-import type { RenderedCard, AnkiCardFormat } from '@study-studio/flashcard-core';
+import type { RenderedCard, AnkiCardFormat } from '@study-studio/flashcards';
 import type { FlashcardsRepository } from '../ports.js';
 import { narrowCardSourceEntry } from '../application/card-preview.js';
 import { narrowSaveCardFormatInput } from '../persistence/card-formats.js';

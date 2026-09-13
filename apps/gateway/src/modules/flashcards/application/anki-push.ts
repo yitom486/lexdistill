@@ -10,7 +10,7 @@ import {
 import {
   buildCardContext,
   renderCard,
-} from '@study-studio/flashcard-core';
+} from '@study-studio/flashcards';
 // 跨模块复用（G5 已登记）：TTS 合成只取音频字节，Key 仅本次调用内存，永不落盘。
 import {
   synthesizeViaProxy,
@@ -31,7 +31,7 @@ import {
   addAnkiNote,
   getAnkiVersion,
   type FetchImpl,
-} from '@study-studio/flashcard-integrations';
+} from '@study-studio/flashcards';
 
 /**
  * 生词卡推送 Anki 命令（HTTP 与 `flashcards.anki_push` Tool 共用）。

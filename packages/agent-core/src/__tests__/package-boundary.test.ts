@@ -29,6 +29,7 @@ const PACKAGES = [
   'dictionary-integrations',
   'flashcard-integrations',
   'flashcard-core',
+  'flashcards',
   'lexicon',
   'review-core',
   'practice-core',
@@ -51,6 +52,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'dictionary-integrations': ['@study-studio/shared'],
   'flashcard-integrations': ['@study-studio/shared'],
   'flashcard-core': [],
+  'flashcards': ['@study-studio/flashcard-core', '@study-studio/flashcard-integrations'],
   'lexicon': ['@study-studio/dictionary-core', '@study-studio/dictionary-integrations'],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
   'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
@@ -266,6 +268,42 @@ describe('M1-1 package 依赖方向', () => {
         '@study-studio/practice-core',
       ])
     ).toEqual([]);
+  });
+
+  it('flashcards：卡片组合入口，仅组合 flashcard-core/integrations', async () => {
+    expect(
+      await relativeImportsOnly('flashcards', [
+        '@study-studio/flashcard-core',
+        '@study-studio/flashcard-integrations',
+      ])
+    ).toEqual([]);
+  });
+
+  it('gateway 卡片统一入口：禁直引 flashcard-core/integrations，一律走 flashcards', async () => {
+    const hits = await filesWith(
+      join(repoRoot(), 'apps', 'gateway', 'src'),
+      /@study-studio\/flashcard-(core|integrations)/
+    );
+    expect(hits).toEqual([]);
+    for (const file of [
+      'modules/flashcards/application/anki-push.ts',
+      'modules/flashcards/application/apkg-import.ts',
+      'modules/flashcards/application/card-preview.ts',
+      'modules/flashcards/persistence/card-formats.ts',
+      'modules/flashcards/persistence/anki-settings.ts',
+    ]) {
+      const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
+      expect(text).toContain('@study-studio/flashcards');
+    }
+  });
+
+  it('gateway manifest：必须声明 flashcards 且移除两旧直依赖（M7-5）', async () => {
+    const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
+    const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
+    const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
+    expect(deps['@study-studio/flashcards']).toBe('workspace:*');
+    expect(deps['@study-studio/flashcard-core']).toBeUndefined();
+    expect(deps['@study-studio/flashcard-integrations']).toBeUndefined();
   });
 
   it('lexicon：词典组合入口，仅组合 dictionary-core/integrations', async () => {

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { isOk } from '@study-studio/shared';
-import type { AnkiCardFormat } from '@study-studio/flashcard-core';
+import type { AnkiCardFormat } from '@study-studio/flashcards';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { narrowSaveCardFormatInput } from '../persistence/card-formats.js';
 import { narrowCardSourceEntry } from '../application/card-preview.js';
@@ -76,7 +76,7 @@ export function createCardFormatRoutes(deps: GatewayDeps) {
           let ankiVersion: number | null = null;
           if (settings.enabled) {
             const { createAnkiClient, getAnkiVersion } = await import(
-              '@study-studio/flashcard-integrations'
+              '@study-studio/flashcards'
             );
             try {
               const probed = await getAnkiVersion(createAnkiClient(settings.endpoint));

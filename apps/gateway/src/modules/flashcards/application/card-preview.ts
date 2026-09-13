@@ -13,7 +13,7 @@ import {
   type AnkiCardFormat,
   type CardSourceEntry,
   type RenderedCard,
-} from '@study-studio/flashcard-core';
+} from '@study-studio/flashcards';
 import {
   getCardFormat,
   narrowSaveCardFormatInput,

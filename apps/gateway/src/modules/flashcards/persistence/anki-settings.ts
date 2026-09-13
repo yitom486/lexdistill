@@ -12,7 +12,7 @@ import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.
 import {
   ANKI_CONNECT_DEFAULT_ENDPOINT,
   resolveAnkiEndpoint,
-} from '@study-studio/flashcard-integrations';
+} from '@study-studio/flashcards';
 
 /**
  * AnkiConnect 推送开关持久化（默认关闭；读侧永不抛，损坏行回退默认）。

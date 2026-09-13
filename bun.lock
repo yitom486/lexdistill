@@ -27,8 +27,7 @@
         "@study-studio/agent-core": "workspace:*",
         "@study-studio/agent-responses": "workspace:*",
         "@study-studio/agent-runtime": "workspace:*",
-        "@study-studio/flashcard-core": "workspace:*",
-        "@study-studio/flashcard-integrations": "workspace:*",
+        "@study-studio/flashcards": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/learning": "workspace:*",
         "@study-studio/lexicon": "workspace:*",
@@ -142,6 +141,14 @@
       "version": "0.1.2",
       "dependencies": {
         "@study-studio/shared": "workspace:*",
+      },
+    },
+    "packages/flashcards": {
+      "name": "@study-studio/flashcards",
+      "version": "0.1.2",
+      "dependencies": {
+        "@study-studio/flashcard-core": "workspace:*",
+        "@study-studio/flashcard-integrations": "workspace:*",
       },
     },
     "packages/learner-core": {
@@ -447,6 +454,8 @@
     "@study-studio/flashcard-core": ["@study-studio/flashcard-core@workspace:packages/flashcard-core"],
 
     "@study-studio/flashcard-integrations": ["@study-studio/flashcard-integrations@workspace:packages/flashcard-integrations"],
+
+    "@study-studio/flashcards": ["@study-studio/flashcards@workspace:packages/flashcards"],
 
     "@study-studio/gateway": ["@study-studio/gateway@workspace:apps/gateway"],
 

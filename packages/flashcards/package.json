@@ -1,0 +1,14 @@
+{
+  "name": "@study-studio/flashcards",
+  "version": "0.1.2",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@study-studio/flashcard-core": "workspace:*",
+    "@study-studio/flashcard-integrations": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}
