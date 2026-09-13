@@ -637,6 +637,34 @@ export const tocImportChunks = sqliteTable(
 );
 
 /**
+ * 复习排程事件（v22；只追加、不更新不删除）。
+ * - 一行 = 一次排程计算：身份（user/card/language）+ 算法版本 + 评分 +
+ *   输入/输出 FSRS 快照（JSON）+ evaluatedAt（输入 now，非 wall-clock）；
+ * - 与 ddl.ts 的建表 SQL 一字对齐，SSOT 是 ddl.ts；
+ * - 写入与同事务提交留给后续任务，本文件只定形状。
+ */
+export const reviewScheduleEvents = sqliteTable(
+  'review_schedule_events',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    cardId: text('card_id').notNull(),
+    language: text('language').notNull(),
+    algorithmId: text('algorithm_id').notNull(),
+    algorithmVersion: text('algorithm_version').notNull(),
+    rating: text('rating').notNull(),
+    inputStateJson: text('input_state_json').notNull(),
+    outputStateJson: text('output_state_json').notNull(),
+    evaluatedAt: text('evaluated_at').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('idx_review_schedule_user_card_time').on(table.userId, table.cardId, table.createdAt),
+    index('idx_review_schedule_card_time').on(table.cardId, table.createdAt),
+  ]
+);
+
+/**
  * 教材 shred 行表（v14/v16/v17；与 ddl.ts 的建表 SQL 一字对齐，SSOT 是 ddl.ts）。
  * - 查询面：组卷/检索/统计读这里，不读 ast_json；
  * - 底稿 documents.ast_json 改后由 shredDocument 同事务全删全插重建；

@@ -474,6 +474,21 @@ export function initSchema(sqlite: Database): void {
       PRIMARY KEY (session_id, ordinal)
     );
     CREATE INDEX IF NOT EXISTS idx_toc_import_chunks_session ON toc_import_chunks(session_id, ordinal);
+    CREATE TABLE IF NOT EXISTS review_schedule_events (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      card_id TEXT NOT NULL,
+      language TEXT NOT NULL,
+      algorithm_id TEXT NOT NULL,
+      algorithm_version TEXT NOT NULL,
+      rating TEXT NOT NULL,
+      input_state_json TEXT NOT NULL,
+      output_state_json TEXT NOT NULL,
+      evaluated_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_review_schedule_user_card_time ON review_schedule_events(user_id, card_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_review_schedule_card_time ON review_schedule_events(card_id, created_at);
   `);
 
   // 增量列：已有库补字段
