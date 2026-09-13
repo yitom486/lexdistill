@@ -92,3 +92,6 @@ export {
   type AnalysisSnapshotPorts,
   type AssembleSnapshotInput,
 } from './analysis-snapshot.js';
+
+/** 练习计划建议草案（快照确定性规则；令牌/存储/时钟归调用方）。 */
+export { proposeTemplateFromSnapshot } from './practice-proposal.js';
