@@ -1,4 +1,6 @@
-import { initFsrsState, scheduleNextReview, type FsrsState } from './fsrs.js';
+import { initFsrsState, type FsrsState } from './fsrs.js';
+import { isOk } from '@study-studio/shared';
+import { scheduleFsrsReviewV1 } from './review-scheduling.js';
 
 export type KanaPracticeScriptType = 'HIRAGANA' | 'KATAKANA' | 'ROMAJI';
 
@@ -28,11 +30,17 @@ export function updateKanaPracticeMemory(
   isCorrect: boolean,
   now: Date = new Date()
 ): KanaPracticeMemory {
-  const nextFsrs = scheduleNextReview(
-    current?.fsrs ?? initFsrsState(),
-    isCorrect ? 'GOOD' : 'AGAIN',
-    now
-  );
+  const scheduled = scheduleFsrsReviewV1({
+    state: current?.fsrs ?? initFsrsState(),
+    rating: isCorrect ? 'GOOD' : 'AGAIN',
+    now,
+  });
+  if (!isOk(scheduled)) {
+    // 版本门失败属契约错误：同步返回形状无法承载 Result，直接抛出，
+    // 绝不静默回退裸算（正常路径版本恒匹配，此分支不可达）。
+    throw scheduled.error;
+  }
+  const nextFsrs = scheduled.value.state;
 
   if (!isCorrect) {
     return {

@@ -9,6 +9,7 @@ export * from './assessment-blueprint.js';
 export * from './practice-plan.js';
 export * from './profile.js';
 export * from './fsrs.js';
+export * from './review-scheduling.js';
 export * from './kana-adaptive.js';
 export * from './mistake.js';
 export * from './repository.js';
