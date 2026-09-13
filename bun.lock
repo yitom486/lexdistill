@@ -27,6 +27,7 @@
         "@study-studio/agent-core": "workspace:*",
         "@study-studio/agent-responses": "workspace:*",
         "@study-studio/agent-runtime": "workspace:*",
+        "@study-studio/ai-content": "workspace:*",
         "@study-studio/flashcards": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/learning": "workspace:*",
@@ -119,6 +120,14 @@
         "@study-studio/agent-codex": "workspace:*",
         "@study-studio/agent-core": "workspace:*",
         "@study-studio/agent-responses": "workspace:*",
+      },
+    },
+    "packages/ai-content": {
+      "name": "@study-studio/ai-content",
+      "version": "0.1.2",
+      "dependencies": {
+        "@study-studio/learning": "workspace:*",
+        "@study-studio/protocol": "workspace:*",
       },
     },
     "packages/dictionary-core": {
@@ -445,6 +454,8 @@
     "@study-studio/agent-responses": ["@study-studio/agent-responses@workspace:packages/agent-responses"],
 
     "@study-studio/agent-runtime": ["@study-studio/agent-runtime@workspace:packages/agent-runtime"],
+
+    "@study-studio/ai-content": ["@study-studio/ai-content@workspace:packages/ai-content"],
 
     "@study-studio/desktop": ["@study-studio/desktop@workspace:apps/desktop"],
 

@@ -30,6 +30,7 @@ const PACKAGES = [
   'flashcard-integrations',
   'flashcard-core',
   'flashcards',
+  'ai-content',
   'lexicon',
   'review-core',
   'practice-core',
@@ -53,6 +54,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'flashcard-integrations': ['@study-studio/shared'],
   'flashcard-core': [],
   'flashcards': ['@study-studio/flashcard-core', '@study-studio/flashcard-integrations', '@study-studio/shared'],
+  'ai-content': ['@study-studio/learning', '@study-studio/protocol'],
   'lexicon': ['@study-studio/dictionary-core', '@study-studio/dictionary-integrations'],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
   'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
@@ -257,6 +259,20 @@ describe('M1-1 package 依赖方向', () => {
       const text = await readFile(join(repoRoot(), 'packages', 'learner-core', 'src', file), 'utf-8');
       expect(text).toContain('@study-studio/flashcard-core');
     }
+  });
+
+  it('ai-content：确定性内容规则，仅依赖 learning/protocol（禁 AgentAdapter/Gateway/SQLite/Web/SDK）', async () => {
+    expect(
+      await relativeImportsOnly('ai-content', ['@study-studio/learning', '@study-studio/protocol'])
+    ).toEqual([]);
+  });
+
+  it('gateway 学习分析：纯规则走 ai-content（快照/缓存/会话仍归 Gateway）', async () => {
+    const text = await readFile(
+      join(repoRoot(), 'apps', 'gateway', 'src', 'modules', 'learning-progress', 'application', 'learning-analysis.ts'),
+      'utf-8'
+    );
+    expect(text).toContain('@study-studio/ai-content');
   });
 
   it('learning：领域组合入口，仅组合 learner/algorithms/review/practice-core', async () => {

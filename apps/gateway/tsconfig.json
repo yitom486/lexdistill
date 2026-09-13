@@ -17,6 +17,7 @@
     { "path": "../../packages/speech" },
     { "path": "../../packages/learning-algorithms" },
     { "path": "../../packages/flashcards" },
+    { "path": "../../packages/ai-content" },
     { "path": "../../packages/lexicon" },
     { "path": "../../packages/review-core" },
     { "path": "../../packages/practice-core" },

@@ -1,0 +1,14 @@
+{
+  "name": "@study-studio/ai-content",
+  "version": "0.1.2",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@study-studio/learning": "workspace:*",
+    "@study-studio/protocol": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}

@@ -4,12 +4,9 @@ import type { AgentAdapter, AgentSession } from '@study-studio/agent-core';
 import type { LearnerRepository, LearnerProfileSnapshot } from '@study-studio/learner-core';
 import type { Flashcard } from '@study-studio/protocol';
 import {
-  parseAnalysisJson,
-  buildLocalRuleReport,
   runLearningAnalysis,
   buildAnalysisSnapshot,
   __resetAnalysisCacheForTest,
-  type AnalysisSnapshot,
 } from '../modules/learning-progress/application/learning-analysis.js';
 
 // ---------- mock repo ----------
@@ -111,88 +108,6 @@ function makeMockAdapter(scenario: StreamScenario): AgentAdapter {
     resumeSession: async () => ok(session),
   };
 }
-
-describe('parseAnalysisJson', () => {
-  it('parses plain JSON', () => {
-    const res = parseAnalysisJson(
-      JSON.stringify({
-        summary: '总览',
-        suggestions: [{ kind: 'WEAKNESS', title: 't', detail: 'd', skillId: 's1' }],
-      })
-    );
-    expect(res?.summary).toBe('总览');
-    expect(res?.suggestions[0]?.kind).toBe('WEAKNESS');
-  });
-
-  it('strips markdown fences and surrounding text', () => {
-    const raw = '好的，分析如下：\n```json\n{"summary":"s","suggestions":[]}\n```\n以上。';
-    const res = parseAnalysisJson(raw);
-    expect(res?.summary).toBe('s');
-  });
-
-  it('rejects garbage and missing suggestions', () => {
-    expect(parseAnalysisJson('not json at all')).toBeNull();
-    expect(parseAnalysisJson('{"summary":"s"}')).toBeNull();
-  });
-
-  it('drops suggestions with invalid kind or missing fields', () => {
-    const res = parseAnalysisJson(
-      JSON.stringify({
-        summary: 's',
-        suggestions: [
-          { kind: 'BOGUS', title: 't', detail: 'd' },
-          { kind: 'TIP', title: 'ok', detail: 'd' },
-          { kind: 'TIP', title: 'no detail' },
-        ],
-      })
-    );
-    expect(res?.suggestions.length).toBe(1);
-    expect(res?.suggestions[0]?.kind).toBe('TIP');
-  });
-});
-
-describe('buildLocalRuleReport', () => {
-  it('generates deterministic suggestions from snapshot', () => {
-    const snapshot: AnalysisSnapshot = {
-      userId: 'u1',
-      targetLanguage: 'en',
-      overallLevel: 'B1',
-      streakDays: 3,
-      dailyGoalQuizzes: 5,
-      strengths: [],
-      weaknesses: [{ skillId: 'en.grammar.tense', name: '时态', proficiency: 0.3, consecutiveErrors: 2 }],
-      dueCardsCount: 8,
-      unresolvedMistakesCount: 2,
-      dailyTask: { quizzesCount: 2, cardsReviewedCount: 0, readingCount: 0, mistakesResolvedCount: 0 },
-      assembledAt: new Date().toISOString(),
-    };
-    const report = buildLocalRuleReport(snapshot);
-    expect(report.source).toBe('local-rules');
-    const kinds = report.suggestions.map((s) => s.kind);
-    expect(kinds).toContain('WEAKNESS');
-    expect(kinds).toContain('PLAN');
-    expect(kinds).toContain('TIP');
-    expect(kinds).toContain('ENCOURAGEMENT');
-    expect(report.suggestions.length).toBeLessThanOrEqual(5);
-  });
-
-  it('handles empty snapshot gracefully', () => {
-    const snapshot: AnalysisSnapshot = {
-      userId: 'u1',
-      targetLanguage: 'en',
-      overallLevel: 'B1',
-      strengths: [],
-      weaknesses: [],
-      dueCardsCount: 0,
-      unresolvedMistakesCount: 0,
-      assembledAt: new Date().toISOString(),
-    };
-    const report = buildLocalRuleReport(snapshot);
-    expect(report.source).toBe('local-rules');
-    expect(report.suggestions.length).toBe(0);
-    expect(report.summary.length).toBeGreaterThan(0);
-  });
-});
 
 describe('runLearningAnalysis', () => {
   beforeEach(() => __resetAnalysisCacheForTest());
