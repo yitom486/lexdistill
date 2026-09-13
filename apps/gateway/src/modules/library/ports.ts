@@ -2,7 +2,6 @@ import type { Result, BusinessError } from '@study-studio/shared';
 import type { AdaptiveKanaQueueOptions } from '@study-studio/learner-core';
 import type {
   DocumentItem,
-  TextbookAST,
   Flashcard,
   AnnotationItem,
   KanaItem,
@@ -11,6 +10,7 @@ import type {
   ReadingPassageSet,
   SubmitReadingPractice,
 } from '@study-studio/protocol';
+import type { TextbookAST } from '@study-studio/document-model';
 import type { ImportTask, ImportTaskStatus } from './persistence/import-tasks.js';
 import type {
   PrepareTocImportSessionInput,

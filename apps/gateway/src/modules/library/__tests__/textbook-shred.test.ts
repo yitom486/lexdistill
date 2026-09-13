@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
-import type { TextbookAST } from '@study-studio/protocol';
+import type { TextbookAST } from '@study-studio/document-model';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { tryParseTextbookAst } from '../persistence/textbook-shred.js';
 

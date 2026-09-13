@@ -13,6 +13,7 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@study-studio/agent-core": "workspace:*",
+    "@study-studio/document-model": "workspace:*",
     "@study-studio/gateway": "workspace:*",
     "@study-studio/learner-core": "workspace:*",
     "@study-studio/protocol": "workspace:*",

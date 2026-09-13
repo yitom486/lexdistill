@@ -19,6 +19,7 @@
       "@/*": ["./src/*"],
       "@study-studio/gateway": ["../gateway/src/index.ts"],
       "@study-studio/shared": ["../../packages/shared/src/index.ts"],
+      "@study-studio/document-model": ["../../packages/document-model/src/index.ts"],
       "@study-studio/protocol": ["../../packages/protocol/src/index.ts"],
       "@study-studio/learner-core": ["../../packages/learner-core/src/index.ts"],
       "@study-studio/speech": ["../../packages/speech/src/index.ts"]
@@ -26,6 +27,7 @@
   },
   "references": [
     { "path": "../../packages/shared" },
+    { "path": "../../packages/document-model" },
     { "path": "../../packages/protocol" },
     { "path": "../../packages/learner-core" },
     { "path": "../../packages/speech" },

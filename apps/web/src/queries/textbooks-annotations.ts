@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { logger } from '@study-studio/shared';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,

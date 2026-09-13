@@ -1,4 +1,5 @@
-import type { GeneratedQuestion, TextbookLesson } from '@study-studio/protocol';
+import type { GeneratedQuestion } from '@study-studio/protocol';
+import type { TextbookLesson } from '@study-studio/document-model';
 import { type Result, type BusinessError } from '@study-studio/shared';
 import { buildTextbookLessonQuestions as buildTextbookLessonQuestionsCore } from '@study-studio/learning';
 

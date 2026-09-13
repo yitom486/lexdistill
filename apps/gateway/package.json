@@ -9,6 +9,7 @@
     "@study-studio/agent-core": "workspace:*",
     "@study-studio/agent-responses": "workspace:*",
     "@study-studio/agent-runtime": "workspace:*",
+    "@study-studio/document-model": "workspace:*",
     "@study-studio/ai-content": "workspace:*",
     "@study-studio/flashcards": "workspace:*",
     "@study-studio/learner-core": "workspace:*",

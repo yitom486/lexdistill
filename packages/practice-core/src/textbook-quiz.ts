@@ -1,5 +1,6 @@
 import { ok, err, type Result, BusinessError, generateId } from '@study-studio/shared';
-import type { GeneratedQuestion, TextbookLesson } from '@study-studio/protocol';
+import type { GeneratedQuestion } from '@study-studio/protocol';
+import type { TextbookLesson } from '@study-studio/document-model';
 
 /**
  * M7-19 自 Gateway `library/application/textbook-lesson-quiz.ts` 迁入

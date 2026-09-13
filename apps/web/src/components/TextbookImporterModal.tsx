@@ -12,7 +12,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { useImportPdfMutation, useMapPdfMutation, useAppendPdfMutation, useImportDocumentMutation, useClassifyStructureMutation, useSaveDocumentStructureMutation, type StructureClassItem, type StructureHeading } from '../queries/useLearnerQueries.js';
 import { useOcrStore } from '../stores/useOcrStore.js';
 import { useCodexModelsQuery } from '../queries/useCodexQueries.js';

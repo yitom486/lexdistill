@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { BusinessError, isOk, logger } from '@study-studio/shared';
-import { parseTextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST } from '@study-studio/document-model';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { enrichBookLessons } from '../application/pdf-import/vocab-enrich.js';

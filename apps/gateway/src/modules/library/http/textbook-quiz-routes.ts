@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { BusinessError, isOk } from '@study-studio/shared';
-import { parseTextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST } from '@study-studio/document-model';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { buildTextbookLessonQuestions, canQuizDocument } from '../application/textbook-lesson-quiz.js';

@@ -1,5 +1,5 @@
 import { BusinessError } from '@study-studio/shared';
-import { TextbookASTSchema } from '@study-studio/protocol';
+import { TextbookASTSchema } from '@study-studio/document-model';
 import { count, eq, sql } from 'drizzle-orm';
 import {
   documents,

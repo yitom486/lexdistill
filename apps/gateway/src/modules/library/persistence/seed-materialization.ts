@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { Database } from 'bun:sqlite';
 import { BusinessError, err, ok, type Result, nowIso } from '@study-studio/shared';
-import type { TextbookAST } from '@study-studio/protocol';
+import type { TextbookAST } from '@study-studio/document-model';
 import { documents, seedMaterialization } from '../../../infrastructure/db/schema.js';
 import { shredIntoTransaction, termMapDedupKey } from './textbook-shred.js';
 import { fingerprintCanonical } from '../../../infrastructure/db/canonical-fingerprint.js';

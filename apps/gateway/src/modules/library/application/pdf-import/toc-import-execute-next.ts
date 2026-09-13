@@ -7,7 +7,8 @@ import {
   translateToBusinessError,
   type Result,
 } from '@study-studio/shared';
-import type { DocumentItem, TextbookAST } from '@study-studio/protocol';
+import type { DocumentItem } from '@study-studio/protocol';
+import type { TextbookAST } from '@study-studio/document-model';
 import {
   convertPdfToAst,
   rangePages,

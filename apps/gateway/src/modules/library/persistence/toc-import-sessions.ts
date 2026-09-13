@@ -13,7 +13,7 @@ import { tocImportChunks, tocImportSessions } from '../../../infrastructure/db/i
 import { documents } from '../../../infrastructure/db/index.js';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { ShredTx } from './textbook-shred.js';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { shredIntoTransaction } from './textbook-shred.js';
 
 /** 文本摘要（确定性，无 IO；与指纹函数同口径，均为 UTF-8 字节）。 */

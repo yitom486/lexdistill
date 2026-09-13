@@ -28,6 +28,7 @@
         "@study-studio/agent-responses": "workspace:*",
         "@study-studio/agent-runtime": "workspace:*",
         "@study-studio/ai-content": "workspace:*",
+        "@study-studio/document-model": "workspace:*",
         "@study-studio/flashcards": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/learning": "workspace:*",
@@ -53,6 +54,7 @@
       "dependencies": {
         "@base-ui-components/react": "^1.0.0-rc.0",
         "@study-studio/agent-core": "workspace:*",
+        "@study-studio/document-model": "workspace:*",
         "@study-studio/gateway": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/protocol": "workspace:*",
@@ -214,6 +216,7 @@
       "name": "@study-studio/practice-core",
       "version": "0.1.2",
       "dependencies": {
+        "@study-studio/document-model": "workspace:*",
         "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
       },

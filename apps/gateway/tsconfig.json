@@ -7,6 +7,7 @@
   },
   "references": [
     { "path": "../../packages/shared" },
+    { "path": "../../packages/document-model" },
     { "path": "../../packages/protocol" },
     { "path": "../../packages/learner-core" },
     { "path": "../../packages/agent-core" },

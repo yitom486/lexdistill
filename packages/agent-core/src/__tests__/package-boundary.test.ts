@@ -58,7 +58,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'ai-content': ['@study-studio/shared', '@study-studio/learning', '@study-studio/protocol'],
   'lexicon': ['@study-studio/dictionary-core', '@study-studio/dictionary-integrations'],
   'review-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms'],
-  'practice-core': ['@study-studio/shared', '@study-studio/protocol'],
+  'practice-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/document-model'],
   'learning': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learner-core', '@study-studio/learning-algorithms', '@study-studio/review-core', '@study-studio/practice-core'],
   'document-model': ['@study-studio/shared'],
 };
@@ -234,9 +234,9 @@ describe('M1-1 package 依赖方向', () => {
     ).toEqual([]);
   });
 
-  it('practice-core：纯规则，仅依赖 shared/protocol（禁反向依赖 learner-core）', async () => {
+  it('practice-core：纯规则，仅依赖 shared/protocol/document-model（禁反向依赖 learner-core）', async () => {
     expect(
-      await relativeImportsOnly('practice-core', ['@study-studio/shared', '@study-studio/protocol'])
+      await relativeImportsOnly('practice-core', ['@study-studio/shared', '@study-studio/protocol', '@study-studio/document-model'])
     ).toEqual([]);
   });
 
@@ -366,6 +366,31 @@ describe('M1-1 package 依赖方向', () => {
     expect(deps['@study-studio/lexicon']).toBe('workspace:*');
     expect(deps['@study-studio/dictionary-core']).toBeUndefined();
     expect(deps['@study-studio/dictionary-integrations']).toBeUndefined();
+  });
+
+  it('gateway/web 教材统一入口：教材 AST 符号一律走 document-model，不走 protocol', async () => {
+    const sym =
+      /parseTextbookAST|TextbookASTSchema|TextbookAST|TextbookLesson|TextbookVocabulary|TextbookGrammar|DialogueLine|ExerciseItem/;
+    const hits: string[] = [];
+    for (const root of [join(repoRoot(), 'apps', 'gateway', 'src'), join(repoRoot(), 'apps', 'web', 'src')]) {
+      const files = await filesWith(root, sym);
+      for (const file of files) {
+        const text = await readFile(file, 'utf-8');
+        for (const line of text.split('\n')) {
+          if (sym.test(line) && line.includes(`from '@study-studio/protocol'`)) {
+            hits.push(`${file}: ${line.trim()}`);
+          }
+        }
+      }
+    }
+    expect(hits).toEqual([]);
+  });
+
+  it('gateway manifest：必须声明 document-model（M8-2 教材统一入口消费方）', async () => {
+    const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
+    const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
+    const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
+    expect(deps['@study-studio/document-model']).toBe('workspace:*');
   });
 
   it('gateway 统一入口：禁直引 review-core/practice-core，一律走 learning', async () => {

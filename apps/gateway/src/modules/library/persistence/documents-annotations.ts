@@ -10,8 +10,9 @@ import {
   nowIso,
   logger,
 } from '@study-studio/shared';
-import type { DocumentItem, AnnotationItem, Flashcard, TextbookAST } from '@study-studio/protocol';
-import { parseTextbookAST } from '@study-studio/protocol';
+import type { DocumentItem, AnnotationItem, Flashcard } from '@study-studio/protocol';
+import type { TextbookAST } from '@study-studio/document-model';
+import { parseTextbookAST } from '@study-studio/document-model';
 import {
   AnnotationKindSchema,
   type AnnotationKind,

@@ -35,8 +35,8 @@ import type {
   PracticeBlockSpec,
   PracticeRunStatus,
   LearnerLevel,
-  TextbookAST,
 } from '@study-studio/protocol';
+import type { TextbookAST } from '@study-studio/document-model';
 
 // P0-1 拆分：语种 / 词典 / 通用工具已下沉 domains；本地 import 供剩余方法使用，
 // 底部 export 保持对外契约不变（index.ts 经 export * 转出）。

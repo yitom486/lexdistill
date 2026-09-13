@@ -1,5 +1,6 @@
 import { ok, err, BusinessError, type Result } from '@study-studio/shared';
-import type { StructureClass, TextbookAST } from '@study-studio/protocol';
+import type { StructureClass } from '@study-studio/protocol';
+import type { TextbookAST } from '@study-studio/document-model';
 import type { PageHeading, TocEntry } from './extract-headings.js';
 
 /**

@@ -10,14 +10,16 @@ import {
   type Result,
 } from '@study-studio/shared';
 import {
-  parseTextbookAST,
   WsEventTypes,
   type DocumentItem,
   type EnrichJobFailedLesson,
   type EnrichJobSnapshot,
-  type TextbookAST,
   type WsEnvelope,
 } from '@study-studio/protocol';
+import {
+  parseTextbookAST,
+  type TextbookAST,
+} from '@study-studio/document-model';
 import { enrichCancelledError, enrichLessonVocab } from './vocab-enrich.js';
 
 /** 课本语种（JA/EN/KO）→ 用户轨道语种（ja/en/ko）；未知回 null（AST 照存，草稿跳过）。 */

@@ -6,7 +6,7 @@ import {
   type TextbookAST,
   type TextbookGrammar,
   type TextbookVocabulary,
-} from '@study-studio/protocol';
+} from '@study-studio/document-model';
 
 /**
  * AI 生词/文法抽取（PDF 导入第二刀）。

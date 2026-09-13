@@ -7,7 +7,7 @@ import {
   shouldSkipSeedMaterialization,
   SEED_MATERIALIZER_VERSION,
 } from '../modules/library/persistence/seed-materialization.js';
-import { parseTextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST } from '@study-studio/document-model';
 import { isOk, logger } from '@study-studio/shared';
 import { dbPath } from './config.js';
 

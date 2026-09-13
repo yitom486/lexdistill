@@ -7,7 +7,7 @@ import {
 } from '@study-studio/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { reconcileLessons, summarizeReconciliation, type ReconLessonInput } from '../lesson-reconciliation.js';
 import { tryParseTextbookAst } from '../persistence/textbook-shred.js';
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { isOk, isErr } from '@study-studio/shared';
-import type { TextbookLesson } from '@study-studio/protocol';
+import type { TextbookLesson } from '@study-studio/document-model';
 import { buildTextbookLessonQuestions } from '../index.js';
 
 /**

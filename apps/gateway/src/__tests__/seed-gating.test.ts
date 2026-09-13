@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { isOk } from '@study-studio/shared';
-import { parseTextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST } from '@study-studio/document-model';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { shredSeedTextbooks } from '../bootstrap/create-gateway.js';
 import { TEXTBOOK_BOOKS } from '../infrastructure/db/seeds/textbook-seed.js';
@@ -56,7 +56,7 @@ function parseBook(id: string): Exclude<ReturnType<typeof tryParse>, null> {
   return tryParse(raw);
 }
 
-function tryParse(raw: unknown): import('@study-studio/protocol').TextbookAST {
+function tryParse(raw: unknown): import('@study-studio/document-model').TextbookAST {
   const p = parseTextbookAST(JSON.parse(JSON.stringify(raw)));
   if (!p.ok) throw new Error(`种子 AST 非法: ${p.error.code}`);
   return p.value;

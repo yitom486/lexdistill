@@ -11,7 +11,7 @@ import {
 import { summarizeReconciliation, reconcileLessons } from '../modules/library/lesson-reconciliation.js';
 import { markdownToAst } from '../modules/library/application/pdf-import/markdown-to-ast.js';
 import { appendPdfToDocument } from '../modules/library/application/pdf-import/pdf-import-service.js';
-import type { TextbookAST } from '@study-studio/protocol';
+import type { TextbookAST } from '@study-studio/document-model';
 
 /**
  * P1-C0.8：ownership 边界 + authorized replacement shadow（只观察）。

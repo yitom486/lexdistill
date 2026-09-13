@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
-import type { TextbookAST } from '@study-studio/protocol';
+import type { TextbookAST } from '@study-studio/document-model';
 import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
 import type { PdfAstOutput } from '../application/pdf-import/pdf-import-service.js';
 import {

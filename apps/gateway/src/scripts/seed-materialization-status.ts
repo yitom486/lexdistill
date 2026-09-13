@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { Database } from 'bun:sqlite';
-import { parseTextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST } from '@study-studio/document-model';
 import { TEXTBOOK_BOOKS } from '../infrastructure/db/seeds/textbook-seed.js';
 import {
   describeSeedStatus,

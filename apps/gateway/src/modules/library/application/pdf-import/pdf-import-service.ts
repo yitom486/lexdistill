@@ -1,5 +1,6 @@
 import { BusinessError, err, generateId, isOk, logger, ok, type Result } from '@study-studio/shared';
-import { parseTextbookAST, StructureClassSchema, type DocumentItem, type TextbookAST, type StructureClass } from '@study-studio/protocol';
+import { StructureClassSchema, type DocumentItem, type StructureClass } from '@study-studio/protocol';
+import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
 import { classifyEmbeddedOutline } from './embedded-outline-quality.js';
 import { detectDocScript, markdownToAst, promoteLessonHeadings } from './markdown-to-ast.js';

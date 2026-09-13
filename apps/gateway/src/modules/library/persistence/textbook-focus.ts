@@ -5,7 +5,7 @@ import {
   BusinessError,
   translateToBusinessError,
 } from '@study-studio/shared';
-import { parseTextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST } from '@study-studio/document-model';
 import { and, desc, eq, isNotNull, or } from 'drizzle-orm';
 import {
   documents,

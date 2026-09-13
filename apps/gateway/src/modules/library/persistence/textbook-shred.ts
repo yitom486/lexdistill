@@ -1,5 +1,5 @@
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/protocol';
+import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { eq, sql } from 'drizzle-orm';
 import {
   textbookExercises,
