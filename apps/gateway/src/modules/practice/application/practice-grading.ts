@@ -1,27 +1,18 @@
-/** P5：客观题服务端权威判题纯函数（可单测）。 */
+import {
+  gradeObjectiveAnswer as gradeObjectiveAnswerCore,
+  type ObjectiveQuestionLike,
+} from '@study-studio/learning';
 
-export interface ObjectiveQuestionLike {
-  type?: string;
-  correctAnswer?: string;
-  acceptableVariants?: string[];
-}
+/**
+ * M7-15 客观题判题兼容薄包装：实现已迁入练习核心包（经 learning 统一入口转出），
+ * 此处只保留原公开签名。
+ * `practice-routes` 等调用方无需修改；Gateway 不得直引核心包。
+ */
+export type { ObjectiveQuestionLike } from '@study-studio/learning';
 
 export function gradeObjectiveAnswer(
   question: ObjectiveQuestionLike | undefined,
   userAnswer: string,
 ): { isCorrect: boolean; authoritative: boolean } {
-  if (!question || typeof question.correctAnswer !== 'string') {
-    return { isCorrect: false, authoritative: false };
-  }
-  const norm = (s: string) => s.trim();
-  const ans = norm(userAnswer ?? '');
-  const key = norm(question.correctAnswer);
-  if (question.type === 'FILL_IN_BLANK') {
-    const ok =
-      ans === key ||
-      (Array.isArray(question.acceptableVariants) &&
-        question.acceptableVariants.some((v) => norm(v) === ans));
-    return { isCorrect: ok, authoritative: true };
-  }
-  return { isCorrect: ans === key, authoritative: true };
+  return gradeObjectiveAnswerCore(question, userAnswer);
 }

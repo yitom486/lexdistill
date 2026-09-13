@@ -3,13 +3,18 @@ import {
   scheduleFsrsReviewV1 as viaFacade,
   blueprintFor as blueprintViaFacade,
   buildLocalRunSummary as summaryViaFacade,
+  gradeObjectiveAnswer as gradeViaFacade,
   summarizeLearningEvidence as summarizeViaFacade,
   recordSkillAttempt as recordViaFacade,
   buildProfileSnapshot as snapshotViaFacade,
   type FsrsState as FsrsStateViaFacade,
 } from '../index.js';
 import { scheduleFsrsReviewV1 as viaCore } from '@study-studio/review-core';
-import { blueprintFor as blueprintViaCore, buildLocalRunSummary as summaryViaCore } from '@study-studio/practice-core';
+import {
+  blueprintFor as blueprintViaCore,
+  buildLocalRunSummary as summaryViaCore,
+  gradeObjectiveAnswer as gradeViaCore,
+} from '@study-studio/practice-core';
 import {
   summarizeLearningEvidence as summarizeViaCore,
   recordSkillAttempt as recordViaCore,
@@ -32,6 +37,10 @@ describe('learning facade', () => {
 
   it('运行汇总入口与 practice-core 同一实现（M7-14 修复）', () => {
     expect(summaryViaFacade).toBe(summaryViaCore);
+  });
+
+  it('客观题判题入口与 practice-core 同一实现（M7-15）', () => {
+    expect(gradeViaFacade).toBe(gradeViaCore);
   });
 
   it('转出排程状态类型（编译期锁：缺失即 typecheck 失败）', () => {
