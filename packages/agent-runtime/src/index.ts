@@ -8,6 +8,31 @@
  * 不变量：contracts 内禁 provider/厂商内容（单测锁定）；具体厂商实现
  * 只许位于 adapters 各包内部；Codex 专有动态工具桥禁上浮到本入口；
  * TTS 不并入（保持 speech 包独立）。
+ * 本入口一律具名重导出（禁 `export *`，表面由 runtime-facade.test.ts 锁定）。
  */
-export * from './contracts/index.js';
-export * from './adapters/index.js';
+export type {
+  AgentAdapter,
+  CreateSessionOptions,
+  AgentImageAttachment,
+  AgentInput,
+  ContextFocusItem,
+  ContextSnapshot,
+  LearnerDigest,
+  LearnerWeaknessDigest,
+  AgentEvent,
+  AgentSession,
+  ApprovalDecision,
+} from './contracts/index.js';
+export {
+  CodexAdapter,
+  CodexSession,
+  buildLearnerContextEntry,
+  mapAppServerNotificationToEvents,
+  ResponsesAdapter,
+  ResponsesSession,
+  buildLightweightReply,
+} from './adapters/index.js';
+export type {
+  CodexAdapterOptions,
+  ExternalToolExecutor,
+} from './adapters/index.js';

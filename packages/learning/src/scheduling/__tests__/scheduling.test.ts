@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { isOk } from '@study-studio/shared';
+import { updateKanaPracticeMemory } from '@study-studio/learner-core';
 import { scheduleFsrsReviewV1 } from '../index.js';
 
 /**
@@ -41,5 +42,29 @@ describe('M6-1 scheduleFsrsReviewV1', () => {
     expect(isOk(second)).toBe(true);
     if (!isOk(first) || !isOk(second)) return;
     expect(second.value).toEqual(first.value);
+  });
+});
+
+/**
+ * C6 一致性锁：learner-core/kana-adaptive 内联的 7 行 FSRS 委托必须与正典入口
+ * 逐行同义（同内核、同版本 pin、同入参）。方向注意：此处以正典入口为 oracle
+ * 断言 kana 侧（与文件头“不用 learner-core 作 oracle”不冲突——被测对象是入口，
+ * kana 只是内联正确性的见证方）。
+ */
+describe('C6 kana-adaptive 内联委托与正典入口一致', () => {
+  it('答对路径：kana 透传的 fsrs 与正典入口输出全等', () => {
+    const memory = updateKanaPracticeMemory({ fsrs: INIT, consecutiveErrors: 0 }, true, NOW);
+    const direct = scheduleFsrsReviewV1({ state: INIT, rating: 'GOOD', now: NOW });
+    expect(isOk(direct)).toBe(true);
+    if (!isOk(direct)) return;
+    expect(memory.fsrs).toEqual(direct.value.state);
+    expect(memory.consecutiveErrors).toBe(0);
+  });
+
+  it('答错路径：短重学覆盖 10 分钟且首轮为 LEARNING', () => {
+    const memory = updateKanaPracticeMemory({ fsrs: INIT, consecutiveErrors: 0 }, false, NOW);
+    expect(memory.fsrs.state).toBe('LEARNING');
+    expect(memory.fsrs.dueAt).toBe(new Date(NOW.getTime() + 10 * 60 * 1000).toISOString());
+    expect(memory.consecutiveErrors).toBe(1);
   });
 });
