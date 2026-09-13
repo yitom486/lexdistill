@@ -77,4 +77,29 @@ describe('M2-2 speech facade', () => {
     const table = deps as Record<string, unknown>;
     expect(table['@study-studio/speech']).toBe('workspace:*');
   });
+
+  it('apps/web 只经 speech 消费 TTS（禁直引 tts-core）', async () => {
+    const { readdir } = await import('node:fs/promises');
+    const roots = [join(repoRoot(), 'apps', 'web', 'src')];
+    const hits: string[] = [];
+    const walk = async (dir: string): Promise<void> => {
+      const entries = await readdir(dir, { withFileTypes: true });
+      const names = entries.map((e) => e.name).sort();
+      for (const name of names) {
+        if (name === 'node_modules' || name === 'dist') continue;
+        const full = join(dir, name);
+        const entry = entries.find((e) => e.name === name);
+        if (entry !== undefined && entry.isDirectory()) {
+          await walk(full);
+        } else if (name.endsWith('.ts') || name.endsWith('.tsx')) {
+          const text = await readFile(full, 'utf-8');
+          if (text.includes('@study-studio/tts-core')) hits.push(full);
+        }
+      }
+    };
+    for (const root of roots) {
+      await walk(root);
+    }
+    expect(hits).toEqual([]);
+  });
 });

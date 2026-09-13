@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { TtsPurpose } from '@study-studio/tts-core';
+import type { TtsPurpose } from '@study-studio/speech';
 import {
   speechStudio,
   type TtsGender,

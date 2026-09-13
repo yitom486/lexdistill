@@ -17,7 +17,7 @@
     "@study-studio/learner-core": "workspace:*",
     "@study-studio/protocol": "workspace:*",
     "@study-studio/shared": "workspace:*",
-    "@study-studio/tts-core": "workspace:*",
+    "@study-studio/speech": "workspace:*",
     "@tanstack/react-query": "^5.102.8",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",

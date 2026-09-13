@@ -10,7 +10,7 @@ import {
   resolveTtsSpeakRequest,
   scoreVoiceName,
   type TtsPurpose,
-} from '@study-studio/tts-core';
+} from '@study-studio/speech';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 
 export type TtsGender = 'FEMALE' | 'MALE';

@@ -10,7 +10,7 @@ import {
   type TtsEngine,
   type TtsSpeakHandle,
   type TtsSpeakRequest,
-} from '@study-studio/tts-core';
+} from '@study-studio/speech';
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import { speechStudio, type SupportedLanguage } from '../utils/audio.js';
 

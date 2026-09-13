@@ -53,7 +53,7 @@
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
-        "@study-studio/tts-core": "workspace:*",
+        "@study-studio/speech": "workspace:*",
         "@tanstack/react-query": "^5.102.8",
         "@tauri-apps/plugin-process": "^2.3.1",
         "@tauri-apps/plugin-updater": "^2.10.1",
