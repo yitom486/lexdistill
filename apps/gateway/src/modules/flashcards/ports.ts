@@ -6,16 +6,16 @@ import type {
   ProposeCardDraftInput,
   UpdateCardDraftPatch,
 } from './persistence/card-drafts.js';
-import type { SaveCardFormatInput } from './persistence/card-formats.js';
+import type { SaveCardFormatInput } from '@study-studio/storage-sqlite';
 import type { PreviewCardRequest, PreviewCardResult } from './application/card-preview.js';
-import type { AnkiPushSettings } from './persistence/anki-settings.js';
+import type { AnkiPushSettings } from '@study-studio/storage-sqlite';
 import type { AnkiPushRequest, AnkiPushResult } from './application/anki-push.js';
 import type {
   ApkgImportNotesOptions,
   ApkgImportNotesResult,
 } from './application/apkg-import.js';
 import type { ApkgExportOptions, ApkgExportResult } from './application/apkg-export.js';
-import type { StoredMedia } from './persistence/media-store.js';
+import type { StoredMedia } from '@study-studio/storage-sqlite';
 
 /**
  * M1-2 卡片（flashcards）领域仓储能力契约。

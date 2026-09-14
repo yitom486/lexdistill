@@ -12,7 +12,7 @@ import {
 } from '@study-studio/shared';
 import { z } from 'zod';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { buildTermKey } from '../persistence/encountered-terms.js';
+import { buildTermKey } from '@study-studio/storage-sqlite';
 
 /**
  * 词条例句库（AI 按需生成 + 永久缓存，供讲透卡/练习复用）。

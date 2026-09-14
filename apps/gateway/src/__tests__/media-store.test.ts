@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { promises as fsp } from 'node:fs';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { detectMediaType } from '../modules/flashcards/persistence/media-store.js';
+import { detectMediaType } from '@study-studio/storage-sqlite';
 
 describe('detectMediaType', () => {
   it('魔数优先：jpeg/png/mp3/wav/ogg', () => {

@@ -43,6 +43,40 @@ export {
 } from './lesson-ordering.js';
 export { canonicalJson, fingerprintCanonical } from './canonical-fingerprint.js';
 export {
+  getAnkiSettings,
+  saveAnkiSettings,
+  type AnkiPushSettings,
+} from './adapters/flashcards/anki-settings.js';
+export {
+  toCardFormat,
+  ensureBuiltinCardFormats,
+  listCardFormats,
+  narrowSaveCardFormatInput,
+  saveCardFormat,
+  resetCardFormat,
+  getCardFormat,
+  type SaveCardFormatInput,
+} from './adapters/flashcards/card-formats.js';
+export {
+  storeMedia,
+  readMediaBytes,
+  detectMediaType,
+  type StoredMedia,
+} from './adapters/flashcards/media-store.js';
+export {
+  recordTermExposure,
+  listEncounteredTerms,
+  backfillEncounteredTermsFromHistory,
+  recordReadingExposures,
+  buildTermKey,
+  type TermExposureSource,
+  type EncounteredTermStatus,
+  type EncounteredTerm,
+  type RecordTermExposureInput,
+  type ReadingExposureTerm,
+  type RecordReadingExposuresInput,
+} from './adapters/dictionary/encountered-terms.js';
+export {
   KANA_SEEDS,
   HANGUL_SEEDS,
   INITIAL_READING_SEEDS,

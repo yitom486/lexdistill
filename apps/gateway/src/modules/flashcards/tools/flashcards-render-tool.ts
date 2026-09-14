@@ -9,7 +9,7 @@ import { ok, err, type Result, BusinessError } from '@study-studio/shared';
 import type { RenderedCard, AnkiCardFormat } from '@study-studio/flashcards';
 import type { FlashcardsRepository } from '../ports.js';
 import { narrowCardSourceEntry } from '../application/card-preview.js';
-import { narrowSaveCardFormatInput } from '../persistence/card-formats.js';
+import { narrowSaveCardFormatInput } from '@study-studio/storage-sqlite';
 
 export const FlashcardsRenderInputSchema = z.object({
   /** 已存模板 id（与 inlineFormat 二选一；都不给则用内置 study-basic）。 */

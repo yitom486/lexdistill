@@ -22,7 +22,7 @@ export type { ApkgModelDraft, ApkgDeckSummary, ApkgAnalysis, ApkgImportNotesResu
 import { extractZip, normalizeZipEntryPaths } from '../../library/public.js';
 import { flashcards } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { storeMedia } from '../persistence/media-store.js';
+import { storeMedia } from '@study-studio/storage-sqlite';
 import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
 
 /**

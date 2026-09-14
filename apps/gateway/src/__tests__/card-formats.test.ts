@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { narrowSaveCardFormatInput } from '../modules/flashcards/persistence/card-formats.js';
+import { narrowSaveCardFormatInput } from '@study-studio/storage-sqlite';
 import { FlashcardsRenderTool } from '../modules/flashcards/tools/flashcards-render-tool.js';
 
 let repo: DrizzleLearnerRepository;

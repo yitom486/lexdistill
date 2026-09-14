@@ -7,7 +7,9 @@
   },
   "references": [
     { "path": "../document-model" },
-    { "path": "../protocol" }
+    { "path": "../flashcards" },
+    { "path": "../protocol" },
+    { "path": "../shared" }
   ],
   "include": ["src/**/*"]
 }

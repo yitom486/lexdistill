@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { isOk } from '@study-studio/shared';
 import type { AnkiCardFormat } from '@study-studio/flashcards';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
-import { narrowSaveCardFormatInput } from '../persistence/card-formats.js';
+import { narrowSaveCardFormatInput } from '@study-studio/storage-sqlite';
 import { narrowCardSourceEntry } from '../application/card-preview.js';
 import { toDetachedArrayBuffer } from './response-bytes.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';

@@ -8,10 +8,13 @@ import {
   nowIso,
 } from '@study-studio/shared';
 import type { Database } from 'bun:sqlite';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 /**
  * 相遇词（EncounteredTerm）域：用户在查词/收藏/阅读中真实见过的词。
+ *
+ * D3 起家在 storage-sqlite（前身 gateway modules/dictionary/persistence/encountered-terms.ts，
+ * 逻辑不变）。参数收窄为 `{ sqlite }`（本文件只用原生连接，不用 drizzle/repo 回指）：
+ * 调用方传完整 RepoDeps 依然兼容（结构化类型）。
  * - term_key 用「表记 + 读音」归一化，跨词典包稳定（entryId 换包即变，不可用）；
  * - encountered_terms 是聚合（幂等 upsert），term_occurrences 是审计（只插不改）；
  * - 记录失败走 Result 由调用方定级：收藏漏斗内降级为 warn（不挡建卡），
@@ -158,7 +161,7 @@ function applyExposure(sqlite: Database, e: AppliedExposure): void {
 
 /** 记录一次相遇：聚合 upsert + 审计插入同事务（调用方决定失败定级）。 */
 export async function recordTermExposure(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   input: RecordTermExposureInput
 ): Promise<Result<EncounteredTerm, BusinessError>> {
   const userId = input.userId.trim();
@@ -224,7 +227,7 @@ export async function recordTermExposure(
 
 /** 相遇词列表（按最近相遇倒序，供仪表盘热力与复习选题消费）。 */
 export async function listEncounteredTerms(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   userId: string,
   language: string,
   limit = 50
@@ -277,7 +280,7 @@ interface HistoryBackfillRow {
  * - 已有相遇词的行跳过计数合并（回填只做一次，重复调用幂等无害）。
  */
 export async function backfillEncounteredTermsFromHistory(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   userId: string,
   language: string
 ): Promise<Result<{ terms: number; occurrences: number }, BusinessError>> {
@@ -370,7 +373,7 @@ export interface RecordReadingExposuresInput {
  * - 单课上限 50 词；已收藏的不降级（与单条同一 SQL 语义）。
  */
 export async function recordReadingExposures(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   input: RecordReadingExposuresInput
 ): Promise<Result<{ recorded: number; skipped: boolean }, BusinessError>> {
   const uid = input.userId.trim();

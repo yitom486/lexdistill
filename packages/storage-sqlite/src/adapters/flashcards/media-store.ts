@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
 import { eq } from 'drizzle-orm';
@@ -11,13 +12,17 @@ import {
   generateId,
   nowIso,
 } from '@study-studio/shared';
-import { dictionaryMedia } from '@study-studio/storage-sqlite';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { defaultMediaDir } from '../../../infrastructure/persistence/app-paths.js';
+import { dictionaryMedia } from '../../schema.js';
+import type { DrizzleDb } from '../../connection.js';
 
 /**
  * 用户媒体库（内容寻址落盘 + SQLite 登记）。
  * 小文件亦落盘（BLOB 膨胀主库得不偿失）；调用方按 file_hash 去重，path 相对媒体根。
+ *
+ * D3 起家在 storage-sqlite（前身 gateway modules/flashcards/persistence/media-store.ts，
+ * 逻辑不变）。参数收窄为 `{ db }`；媒体根目录解析内联于此（SSOT 仍是 gateway 侧
+ * `infrastructure/persistence/app-paths.ts`，E2 搬迁 pdf-runtime 连带 app-paths 时
+ * 在此改回引用，届时删除本文件内联实现——双源禁长期并存）。
  */
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024;
@@ -34,6 +39,16 @@ const MEDIA_EXTENSIONS: Record<string, string> = {
   'audio/mp4': 'm4a',
   'audio/webm': 'webm',
 };
+
+/** 默认媒体根（内联自 app-paths，见文件头注记；E2 重逢后改回引用）。 */
+function resolveDefaultMediaDir(): string {
+  const override = process.env.STUDY_STUDIO_RUNTIME_DIR;
+  const runtime =
+    override && override.trim()
+      ? override.trim()
+      : path.join(homedir(), '.study-studio', 'runtime');
+  return path.join(runtime, 'media');
+}
 
 export interface StoredMedia {
   id: string;
@@ -56,7 +71,9 @@ export function detectMediaType(filename: string, bytes: Uint8Array): string | u
   ) {
     return 'image/png';
   }
-  if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) {
+  if (
+    bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46
+  ) {
     return 'image/gif';
   }
   if (
@@ -88,7 +105,7 @@ export function detectMediaType(filename: string, bytes: Uint8Array): string | u
 
 /** 媒体入库（同哈希复用文件；返回登记行）。 */
 export async function storeMedia(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   sourceId: string,
   filename: string,
   bytes: Uint8Array,
@@ -108,7 +125,7 @@ export async function storeMedia(
     }
     const ext = MEDIA_EXTENSIONS[mediaType] ?? 'bin';
     const hash = createHash('sha256').update(bytes).digest('hex');
-    const root = mediaRoot ?? defaultMediaDir();
+    const root = mediaRoot ?? resolveDefaultMediaDir();
     const relPath = `${hash.slice(0, 2)}/${hash}.${ext}`;
     const existing = await deps.db
       .select()
@@ -153,7 +170,7 @@ export async function storeMedia(
 
 /** 按哈希读媒体字节（服务路由用；路径穿越无关——路径恒由哈希派生）。 */
 export async function readMediaBytes(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   fileHash: string,
   mediaRoot?: string
 ): Promise<Result<{ bytes: Uint8Array; mediaType: string }, BusinessError>> {
@@ -170,7 +187,7 @@ export async function readMediaBytes(
     if (!row) {
       return err(new BusinessError('E_NOT_FOUND', '媒体不存在', 'LEARNER_STATE', false));
     }
-    const root = mediaRoot ?? defaultMediaDir();
+    const root = mediaRoot ?? resolveDefaultMediaDir();
     const data = await fsp.readFile(path.join(root, row.path));
     return ok({ bytes: new Uint8Array(data), mediaType: row.mediaType });
   } catch (e) {

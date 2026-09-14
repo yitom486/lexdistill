@@ -63,7 +63,7 @@ import {
   type EncounteredTerm,
   type RecordTermExposureInput,
   type RecordReadingExposuresInput,
-} from '../modules/dictionary/persistence/encountered-terms.js';
+} from '@study-studio/storage-sqlite';
 import type { AgentAdapter } from '@study-studio/agent-runtime';
 import type { FsrsState, SchedulerOutput } from '@study-studio/learning-algorithms';
 import { reviewScheduleEvents } from '@study-studio/storage-sqlite';
@@ -111,7 +111,7 @@ import {
   saveCardFormat as saveCardFormatDomain,
   resetCardFormat as resetCardFormatDomain,
   type SaveCardFormatInput,
-} from '../modules/flashcards/persistence/card-formats.js';
+} from '@study-studio/storage-sqlite';
 import {
   listLessons as listLessonsDomain,
   completeLesson as completeLessonDomain,
@@ -154,7 +154,7 @@ import {
   getAnkiSettings as getAnkiSettingsDomain,
   saveAnkiSettings as saveAnkiSettingsDomain,
   type AnkiPushSettings,
-} from '../modules/flashcards/persistence/anki-settings.js';
+} from '@study-studio/storage-sqlite';
 import {
   pushCardToAnki as pushCardToAnkiDomain,
   type AnkiPushRequest,
@@ -172,9 +172,9 @@ import {
 } from '../modules/flashcards/application/apkg-export.js';
 import {
   readMediaBytes as readMediaBytesDomain,
-} from '../modules/flashcards/persistence/media-store.js';
-import { storeMedia as storeMediaDomain } from '../modules/flashcards/persistence/media-store.js';
-import type { StoredMedia } from '../modules/flashcards/persistence/media-store.js';
+} from '@study-studio/storage-sqlite';
+import { storeMedia as storeMediaDomain } from '@study-studio/storage-sqlite';
+import type { StoredMedia } from '@study-studio/storage-sqlite';
 import type { AnkiCardFormat } from '@study-studio/learner-core';
 import {
   resolveActiveLanguage as resolveActiveLanguageDomain,

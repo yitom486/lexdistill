@@ -15,7 +15,7 @@ import { localDictionaryEntries, flashcards, dictionarySearchHistory, dictionary
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
 import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';
-import { recordTermExposure, buildTermKey } from './encountered-terms.js';
+import { recordTermExposure, buildTermKey } from '@study-studio/storage-sqlite';
 
 /**
  * 词典域（由 DrizzleLearnerRepository 搬迁而来，行为不变）。

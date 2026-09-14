@@ -44,7 +44,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'learning': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/document-model', '@study-studio/learner-core', '@study-studio/learning-algorithms'],
   'document-model': ['@study-studio/shared'],
   'content': ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol'],
-  'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model'],
+  'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model', '@study-studio/shared', '@study-studio/flashcards'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -326,13 +326,14 @@ describe('M1-1 package 依赖方向', () => {
     ).toEqual([]);
   });
 
+  // D3 注：`persistence/anki-settings.ts`、`persistence/card-formats.ts`、
+  // `persistence/media-store.ts` 已迁入 storage-sqlite/adapters（本名单移除）；
+  // 其对 flashcards 的依赖改由 storage-sqlite 内聚测试锁定，删包依然断链。
   it('gateway 卡片统一入口一律走 flashcards（删包即断链，安装与类型检查兜底）', async () => {
     for (const file of [
       'modules/flashcards/application/anki-push.ts',
       'modules/flashcards/application/apkg-import.ts',
       'modules/flashcards/application/card-preview.ts',
-      'modules/flashcards/persistence/card-formats.ts',
-      'modules/flashcards/persistence/anki-settings.ts',
     ]) {
       const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
       expect(text).toContain('@study-studio/flashcards');
@@ -432,14 +433,23 @@ describe('M1-1 package 依赖方向', () => {
     expect(deps['@study-studio/learning']).toBe('workspace:*');
   });
 
-  it('storage-sqlite：SQLite 适配层，仅依赖 protocol/document-model + drizzle/bun:sqlite/node（禁 Gateway/领域/Agent/Web）', async () => {
+  // D3 叶子规则（2026-09-14 修订，原“禁依赖领域模块”作废）：
+  // flashcards 为当前唯一许可的纯叶子领域包（定义：仅依赖 shared、无存储/网络/Agent、
+  // 无厂商 SDK、禁反向依赖 storage，由 flashcards 自身内聚测试锁定，无循环可能）。
+  // 新增叶子依赖必须同步修订 10 号卡＋包 README＋本白名单三处；禁只放宽白名单。
+  it('storage-sqlite：SQLite 适配层，仅依赖 protocol/document-model/shared/纯领域包 + drizzle/bun:sqlite/node（禁 Gateway/ports/编排/Agent/Web）', async () => {
     expect(
       await relativeImportsOnly('storage-sqlite', [
         '@study-studio/protocol',
         '@study-studio/document-model',
+        '@study-studio/shared',
+        '@study-studio/flashcards',
         'drizzle-orm',
         'bun:sqlite',
         'node:crypto',
+        'node:fs',
+        'node:os',
+        'node:path',
       ])
     ).toEqual([]);
   });

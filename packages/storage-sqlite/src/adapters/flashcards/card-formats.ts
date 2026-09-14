@@ -14,12 +14,16 @@ import {
   validateCardFormat,
   type AnkiCardFormat,
 } from '@study-studio/flashcards';
-import { ankiCardFormats } from '@study-studio/storage-sqlite';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+import { ankiCardFormats } from '../../schema.js';
+import type { DrizzleDb } from '../../connection.js';
 
 /**
  * 卡片模板包持久化（由 DrizzleLearnerRepository 委托调用）。
  * 模板是呈现资产：内置行懒播种；用户改过（user_modified=1）的行永不被内置升级覆盖。
+ *
+ * D3 起家在 storage-sqlite（前身 gateway modules/flashcards/persistence/card-formats.ts，
+ * 逻辑不变）。参数收窄为 `{ db }`：调用方传完整 RepoDeps 依然兼容（结构化类型），
+ * 本文件永不触碰 `repo` 回指与上层编排。
  */
 
 type CardFormatRow = typeof ankiCardFormats.$inferSelect;
@@ -55,7 +59,7 @@ export function toCardFormat(row: CardFormatRow): AnkiCardFormat {
 
 /** 内置模板懒播种（缺哪行补哪行；用户行不动；未改过的旧版行自动跟进内置）。 */
 export async function ensureBuiltinCardFormats(
-  deps: RepoDeps
+  deps: { db: DrizzleDb }
 ): Promise<Result<void, BusinessError>> {
   try {
     const rows = await deps.db.select().from(ankiCardFormats);
@@ -104,7 +108,7 @@ export async function ensureBuiltinCardFormats(
 }
 
 export async function listCardFormats(
-  deps: RepoDeps
+  deps: { db: DrizzleDb }
 ): Promise<Result<AnkiCardFormat[], BusinessError>> {
   try {
     const seeded = await ensureBuiltinCardFormats(deps);
@@ -178,7 +182,7 @@ export function narrowSaveCardFormatInput(input: unknown): SaveCardFormatInput |
 
 /** 保存模板（新建或覆盖；一律标 user_modified=1；校验不通过拒绝写入）。 */
 export async function saveCardFormat(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   input: SaveCardFormatInput
 ): Promise<Result<AnkiCardFormat, BusinessError>> {
   try {
@@ -241,7 +245,7 @@ export async function saveCardFormat(
 
 /** 恢复内置（仅内置 id 可恢复；自定义模板无内置可回，拒绝并明说）。 */
 export async function resetCardFormat(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   id: string
 ): Promise<Result<AnkiCardFormat, BusinessError>> {
   try {
@@ -276,7 +280,7 @@ export async function resetCardFormat(
 
 /** 按 id 取模板（读侧永不抛；找不到返回 undefined，由调用方决定报错）。 */
 export async function getCardFormat(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   id: string
 ): Promise<AnkiCardFormat | undefined> {
   try {

@@ -10,7 +10,7 @@ import type {
   EncounteredTerm,
   RecordTermExposureInput,
   RecordReadingExposuresInput,
-} from './persistence/encountered-terms.js';
+} from '@study-studio/storage-sqlite';
 import type { TermExampleItem } from './application/term-examples.js';
 import type { WordlistGroup } from './persistence/wordlists.js';
 

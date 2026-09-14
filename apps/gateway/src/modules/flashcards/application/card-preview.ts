@@ -9,7 +9,7 @@ import {
 import {
   getCardFormat,
   narrowSaveCardFormatInput,
-} from '../persistence/card-formats.js';
+} from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 /**

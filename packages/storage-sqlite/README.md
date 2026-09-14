@@ -104,6 +104,18 @@ canonical seed AST + 词典命中切片 + materializer version
 
 ---
 
+## 依赖策略（D3 叶子规则，2026-09-14 修订）
+
+- 基座：`shared`、`protocol`、`document-model`、`drizzle-orm`（外加 `bun:sqlite` / `node:` 运行时）。
+- 例外：允许依赖经白名单明确列出的**纯叶子领域包**（定义：仅依赖 shared、
+  无存储/网络/Agent、无厂商 SDK，且禁反向依赖本包——由该包自身的相对内聚测试锁定）。
+  当前唯一许可：`flashcards`（adapter 持久化的正是其语义：Anki 端点常量与校验、
+  内置模板种子与模板校验、模板类型；实测其依赖仅 shared，无循环可能）。
+- 禁止：Gateway、ports、编排、上层、Agent、Web。新增叶子依赖必须同步更新
+  10 号卡＋本 README＋边界测试三处，缺一视为未完成。
+
+---
+
 ## 附：`migrations/` 维护约（随包搬迁，原文合并）
 
 本目录是 **已发布** 的 SQLite 升级步骤。`ddl.ts` 的 `initSchema()` 仍负责新库一次建成最新结构；本目录负责把**旧库**一步步升到同一版本。`runMigrations()` 从包入口 `index.ts` 的 `SCHEMA_MIGRATIONS` 调度。

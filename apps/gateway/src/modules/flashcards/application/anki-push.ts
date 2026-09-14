@@ -16,8 +16,8 @@ import {
 } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { resolveCardSourceEntry } from './card-source.js';
-import { getCardFormat } from '../persistence/card-formats.js';
-import { getAnkiSettings } from '../persistence/anki-settings.js';
+import { getCardFormat } from '@study-studio/storage-sqlite';
+import { getAnkiSettings } from '@study-studio/storage-sqlite';
 
 /**
  * M7-7 生词卡推送 Anki 薄组合层：编排已迁入 `@study-studio/flashcards`，
