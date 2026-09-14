@@ -36,6 +36,10 @@ export interface EncounteredTerm {
   reading?: string | undefined;
   status: EncounteredTermStatus;
   exposureCount: number;
+  /** CI-2：lookup 事件数（source='lookup'）。 */
+  lookupCount: number;
+  /** CI-2：read 事件数（source IN ('reading','import')；'collect' 只贡献 exposure）。 */
+  readCount: number;
   firstSeenAt: string;
   lastSeenAt: string;
   flashcardId?: string | undefined;
@@ -68,6 +72,8 @@ interface EncounteredTermRow {
   reading: string | null;
   status: string;
   exposure_count: number;
+  lookup_count: number;
+  read_count: number;
   first_seen_at: string;
   last_seen_at: string;
   flashcard_id: string | null;
@@ -84,6 +90,8 @@ function toEncounteredTerm(row: EncounteredTermRow): EncounteredTerm {
     headword: row.headword,
     status,
     exposureCount: row.exposure_count,
+    lookupCount: row.lookup_count,
+    readCount: row.read_count,
     firstSeenAt: row.first_seen_at,
     lastSeenAt: row.last_seen_at,
   };
@@ -109,6 +117,9 @@ interface AppliedExposure {
   source: TermExposureSource;
   documentId: string | null;
   quote: string;
+  /** CI-2 分计数增量（由调用方按 source 折算，applyExposure 只做加法）。 */
+  lookupInc: number;
+  readInc: number;
   now: string;
 }
 
@@ -121,10 +132,13 @@ function applyExposure(sqlite: Database, e: AppliedExposure): void {
     .query(
       `INSERT INTO encountered_terms
          (user_id, language, term_key, headword, reading, status,
-          exposure_count, first_seen_at, last_seen_at, flashcard_id)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+          exposure_count, lookup_count, read_count,
+          first_seen_at, last_seen_at, flashcard_id)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
        ON CONFLICT(user_id, language, term_key) DO UPDATE SET
          exposure_count = encountered_terms.exposure_count + 1,
+         lookup_count = encountered_terms.lookup_count + excluded.lookup_count,
+         read_count = encountered_terms.read_count + excluded.read_count,
          last_seen_at = excluded.last_seen_at,
          status = CASE WHEN excluded.status = 'collected'
            THEN 'collected' ELSE encountered_terms.status END,
@@ -137,6 +151,8 @@ function applyExposure(sqlite: Database, e: AppliedExposure): void {
       e.headword,
       e.reading ? e.reading : null,
       e.status,
+      e.lookupInc,
+      e.readInc,
       e.now,
       e.now,
       e.flashcardId
@@ -183,6 +199,9 @@ export async function recordTermExposure(
   const termKey = buildTermKey(headword, reading);
   const now = nowIso();
   const nextStatus: EncounteredTermStatus = input.markCollected ? 'collected' : 'new';
+  // CI-2：分计数由事件来源折算（'collect' 只贡献 exposure）。
+  const lookupInc = input.source === 'lookup' ? 1 : 0;
+  const readInc = input.source === 'reading' || input.source === 'import' ? 1 : 0;
   try {
     const tx = deps.sqlite.transaction(() => {
       applyExposure(deps.sqlite, {
@@ -196,6 +215,8 @@ export async function recordTermExposure(
         source: input.source,
         documentId: input.documentId ?? null,
         quote,
+        lookupInc,
+        readInc,
         now,
       });
     });
@@ -203,7 +224,8 @@ export async function recordTermExposure(
     const row = deps.sqlite
       .query(
         `SELECT user_id, language, term_key, headword, reading, status,
-                exposure_count, first_seen_at, last_seen_at, flashcard_id
+                exposure_count, lookup_count, read_count,
+                first_seen_at, last_seen_at, flashcard_id
          FROM encountered_terms
          WHERE user_id = ? AND language = ? AND term_key = ?`
       )
@@ -244,7 +266,8 @@ export async function listEncounteredTerms(
     const rows = deps.sqlite
       .query(
         `SELECT user_id, language, term_key, headword, reading, status,
-                exposure_count, first_seen_at, last_seen_at, flashcard_id
+                exposure_count, lookup_count, read_count,
+                first_seen_at, last_seen_at, flashcard_id
          FROM encountered_terms
          WHERE user_id = ? AND language = ?
          ORDER BY last_seen_at DESC, rowid DESC LIMIT ?`
@@ -321,8 +344,9 @@ export async function backfillEncounteredTermsFromHistory(
             .query(
               `INSERT INTO encountered_terms
                  (user_id, language, term_key, headword, reading, status,
-                  exposure_count, first_seen_at, last_seen_at, flashcard_id)
-               VALUES (?, ?, ?, ?, ?, 'new', ?, ?, ?, NULL)`
+                  exposure_count, lookup_count, read_count,
+                  first_seen_at, last_seen_at, flashcard_id)
+               VALUES (?, ?, ?, ?, ?, 'new', ?, 1, 0, ?, ?, NULL)`
             )
             .run(
               uid,
@@ -427,6 +451,8 @@ export async function recordReadingExposures(
           source: 'reading',
           documentId: docRef,
           quote: '',
+          lookupInc: 0,
+          readInc: 1,
           now,
         });
       }

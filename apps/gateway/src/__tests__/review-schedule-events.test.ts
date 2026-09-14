@@ -72,10 +72,10 @@ const ROW = {
 };
 
 describe('v22 review-schedule-events migration', () => {
-  it('版本目录末位即 v22（名/号锁定）', () => {
+  it('版本目录末位即 v27（名/号锁定；v22 断言已随 P1-3 前移）', () => {
     const last = SCHEMA_MIGRATIONS[SCHEMA_MIGRATIONS.length - 1];
-    expect(last?.version).toBe(22);
-    expect(last?.name).toBe('review-schedule-events');
+    expect(last?.version).toBe(27);
+    expect(last?.name).toBe('encountered-term-counts');
   });
 
   it('新库：表/列/索引齐备，drizzle 写入后可按用户/卡片/时间查回', () => {

@@ -214,3 +214,23 @@ export {
   formatPitchLexiconCoachReply,
   type PitchLexiconEntry,
 } from './seeds/index.js';
+export {
+  projectContentSegments,
+  listContentSegments,
+  segmentHash,
+  type ContentSegment,
+  type ContentSegmentKind,
+  type ProjectSegmentsInput,
+} from './adapters/library/content-segments.js';
+export {
+  ensureCanonicalContentSources,
+  interpretSourceKind,
+  getContentSource,
+  type ContentSource,
+  type InterpretedSourceKind,
+} from './adapters/library/content-sources.js';
+export {
+  captureSelectionContext,
+  type SelectionContext,
+  type CaptureSelectionInput,
+} from './adapters/library/selection-contexts.js';

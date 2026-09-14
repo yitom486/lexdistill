@@ -12,6 +12,11 @@ import {
   toProtocolQuizType,
   PracticePlanScheduleSchema,
   PracticePlanTemplateSchema,
+  ContentSegmentSchema,
+  ContentSourceSchema,
+  SelectionContextSchema,
+  EncounteredTermSchema,
+  TermOccurrenceSchema,
 } from '../index.js';
 
 
@@ -245,6 +250,81 @@ describe('Protocol Package Schemas', () => {
         schedule: { kind: 'weekly', weekdays: [] },
       }).success
     ).toBe(false);
+  });
+});
+
+describe('P1-3 content index schemas', () => {
+  it('ContentSegment：空 lesson 允许，ord 非负', () => {
+    const base = {
+      id: 'seg_1',
+      documentId: 'd1',
+      lessonId: '',
+      ord: 0,
+      kind: 'paragraph',
+      text: '你好',
+      hash: 'h',
+      createdAt: '2026-09-14T00:00:00.000Z',
+    };
+    expect(ContentSegmentSchema.safeParse(base).success).toBe(true);
+    expect(ContentSegmentSchema.safeParse({ ...base, ord: -1 }).success).toBe(false);
+    expect(ContentSegmentSchema.safeParse({ ...base, kind: 'audio' }).success).toBe(false);
+  });
+
+  it('ContentSource／SelectionContext／EncounteredTerm／TermOccurrence 形状', () => {
+    expect(
+      ContentSourceSchema.safeParse({
+        id: 'csrc-user-pdf',
+        format: 'pdf',
+        origin: 'user_import',
+        displayName: '用户 PDF 导入',
+        capabilitiesJson: '{}',
+        createdAt: 't',
+      }).success
+    ).toBe(true);
+    expect(
+      SelectionContextSchema.safeParse({
+        id: 'sel_1',
+        userId: 'u1',
+        language: 'ja',
+        surface: '曖昧',
+        normalizedText: '曖昧',
+        createdAt: 't',
+      }).success
+    ).toBe(true);
+    expect(
+      SelectionContextSchema.safeParse({
+        id: 'sel_1',
+        userId: 'u1',
+        language: 'fr',
+        surface: 'x',
+        normalizedText: 'x',
+        createdAt: 't',
+      }).success
+    ).toBe(false);
+    expect(
+      EncounteredTermSchema.safeParse({
+        userId: 'u1',
+        language: 'ja',
+        termKey: 'k',
+        headword: '曖昧',
+        status: 'new',
+        exposureCount: 1,
+        lookupCount: 1,
+        readCount: 0,
+        firstSeenAt: 't',
+        lastSeenAt: 't',
+      }).success
+    ).toBe(true);
+    expect(
+      TermOccurrenceSchema.safeParse({
+        id: 'tocc_1',
+        userId: 'u1',
+        language: 'ja',
+        termKey: 'k',
+        source: 'lookup',
+        createdAt: 't',
+      }).success
+    ).toBe(true);
   });
 });
 

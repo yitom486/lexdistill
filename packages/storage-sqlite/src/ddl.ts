@@ -489,6 +489,49 @@ export function initSchema(sqlite: Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_review_schedule_user_card_time ON review_schedule_events(user_id, card_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_review_schedule_card_time ON review_schedule_events(card_id, created_at);
+    CREATE TABLE IF NOT EXISTS content_segments (
+      id TEXT PRIMARY KEY,
+      document_id TEXT NOT NULL,
+      lesson_id TEXT NOT NULL DEFAULT '',
+      ord INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      text TEXT NOT NULL,
+      start_offset INTEGER,
+      end_offset INTEGER,
+        hash TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_content_segments_scope
+        ON content_segments(document_id, lesson_id, ord);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_content_segments_hash ON content_segments(hash);
+      CREATE INDEX IF NOT EXISTS idx_content_segments_doc ON content_segments(document_id, lesson_id, ord);
+    CREATE TABLE IF NOT EXISTS content_sources (
+      id TEXT PRIMARY KEY,
+      format TEXT NOT NULL,
+      origin TEXT NOT NULL,
+      origin_ref TEXT NOT NULL DEFAULT '',
+      display_name TEXT NOT NULL,
+      license TEXT,
+      attribution TEXT,
+        capabilities_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_content_sources_identity
+        ON content_sources(format, origin, origin_ref);
+    CREATE TABLE IF NOT EXISTS selection_contexts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      language TEXT NOT NULL,
+      document_id TEXT,
+      segment_id TEXT,
+      surface TEXT NOT NULL,
+      normalized_text TEXT NOT NULL,
+      start_offset INTEGER,
+      end_offset INTEGER,
+      surrounding_text TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_selection_ctx_user ON selection_contexts(user_id, language, created_at);
   `);
 
   // 增量列：已有库补字段

@@ -803,3 +803,72 @@ export const documentStructures = sqliteTable('document_structure', {
   dropped: integer('dropped').notNull().default(0),
   createdAt: text('created_at').notNull(),
 });
+
+/**
+ * 内容段地址（v23；与 ddl.ts 建表 SQL 一字对齐，SSOT 是 ddl.ts）。
+ * - lesson_id='' 即文档直属段，明确无外键（与真实 lesson_id 互斥）；
+ * - hash 为作用域身份（document/lesson/ord/text），UNIQUE(hash) 保并发投影零重复；
+ * - 用户隔离经 documents 行继承，查询一律带 document 归属。
+ */
+export const contentSegments = sqliteTable(
+  'content_segments',
+  {
+    id: text('id').primaryKey(),
+    documentId: text('document_id').notNull(),
+    lessonId: text('lesson_id').notNull().default(''),
+    ord: integer('ord').notNull(),
+    kind: text('kind').notNull(),
+    text: text('text').notNull(),
+    startOffset: integer('start_offset'),
+    endOffset: integer('end_offset'),
+    hash: text('hash').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_content_segments_scope').on(table.documentId, table.lessonId, table.ord),
+    uniqueIndex('idx_content_segments_hash').on(table.hash),
+    index('idx_content_segments_doc').on(table.documentId, table.lessonId, table.ord),
+  ]
+);
+
+/**
+ * 统一来源登记（v24；SSOT 是 ddl.ts）。
+ * display_name 可变展示列，不进唯一键；身份＝(format, origin, origin_ref)。
+ */
+export const contentSources = sqliteTable(
+  'content_sources',
+  {
+    id: text('id').primaryKey(),
+    format: text('format').notNull(),
+    origin: text('origin').notNull(),
+    originRef: text('origin_ref').notNull().default(''),
+    displayName: text('display_name').notNull(),
+    license: text('license'),
+    attribution: text('attribution'),
+    capabilitiesJson: text('capabilities_json').notNull().default('{}'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [uniqueIndex('idx_content_sources_identity').on(table.format, table.origin, table.originRef)]
+);
+
+/**
+ * 选区上下文（v25；SSOT 是 ddl.ts）。
+ * SI-1/SI-2/SI-3 由 Repository 层执行，本表保持列可空以容纳自由文本选区。
+ */
+export const selectionContexts = sqliteTable(
+  'selection_contexts',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    language: text('language').notNull(),
+    documentId: text('document_id'),
+    segmentId: text('segment_id'),
+    surface: text('surface').notNull(),
+    normalizedText: text('normalized_text').notNull(),
+    startOffset: integer('start_offset'),
+    endOffset: integer('end_offset'),
+    surroundingText: text('surrounding_text'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('idx_selection_ctx_user').on(table.userId, table.language, table.createdAt)]
+);

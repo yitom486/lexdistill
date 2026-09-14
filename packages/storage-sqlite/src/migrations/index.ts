@@ -19,12 +19,17 @@ import { migration as v019 } from './v019-toc-import-sessions.js';
 import { migration as v020 } from './v020-toc-import-session-document.js';
 import { migration as v021 } from './v021-toc-import-session-ast-fp.js';
 import { migration as v022 } from './v022-review-schedule-events.js';
+import { migration as v023 } from './v023-content-segments.js';
+import { migration as v024 } from './v024-content-sources.js';
+import { migration as v025 } from './v025-selection-contexts.js';
+import { migration as v026 } from './v026-term-occurrence-segments.js';
+import { migration as v027 } from './v027-encountered-term-counts.js';
 import type { SchemaMigration } from './types.js';
 
 export type { SchemaMigration } from './types.js';
 
 /**
- * 已发布迁移目录（v2–v22）。v1 = runMigrations 写入的 legacy-baseline，无独立文件。
+ * 已发布迁移目录（v2–v27）。v1 = runMigrations 写入的 legacy-baseline，无独立文件。
  * 新增：加 vNNN-name.ts，并按 version 登记到本数组末尾。禁止改既有条目。
  * `ddl.ts` 的 runMigrations 从此数组调度。
  */
@@ -50,5 +55,10 @@ export const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
   v020,
   v021,
   v022,
+  v023,
+  v024,
+  v025,
+  v026,
+  v027,
 ];
 
