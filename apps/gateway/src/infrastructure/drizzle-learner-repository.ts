@@ -143,6 +143,8 @@ import {
   findDocumentsMissingSegments as findDocumentsMissingSegmentsDomain,
   projectLinesSegments as projectLinesSegmentsDomain,
   findDocumentsMissingLineSegments as findDocumentsMissingLineSegmentsDomain,
+  listContentSegments as listContentSegmentsDomain,
+  type ContentSegment,
   type ShredStats,
 } from '@study-studio/storage-sqlite';
 import {
@@ -608,6 +610,15 @@ export class DrizzleLearnerRepository
     userId?: string | undefined
   ): Promise<Result<Array<{ id: string; userId: string; sourceKind: string }>, BusinessError>> {
     return findDocumentsMissingLineSegmentsDomain(this.deps, userId);
+  }
+
+  /**
+   * 列段（P3-2 文档 GET opt-in 桥）：只读，无隐式写入；未投影即空数组。
+   */
+  public async listContentSegments(
+    documentId: string
+  ): Promise<Result<ContentSegment[], BusinessError>> {
+    return listContentSegmentsDomain(this.deps, documentId);
   }
 
   /**

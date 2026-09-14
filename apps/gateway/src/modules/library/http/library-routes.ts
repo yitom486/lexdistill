@@ -13,6 +13,9 @@ import { tryParseTextbookAst } from '@study-studio/storage-sqlite';
 
 /** 文库域路由：文档与批注（G2 迁移，行为不变）。 */
 
+/** P3-2 段文本预览上限（响应防膨胀；完整文本走段投影源，不经文档 GET）。 */
+const SEGMENT_TEXT_PREVIEW = 200;
+
 export type AstJsonClass =
   | { kind: 'none' }
   | { kind: 'textbook'; book: TextbookAST }
@@ -187,6 +190,20 @@ export function createLibraryRoutes(deps: GatewayDeps) {
           c,
           new BusinessError('E_NOT_FOUND', '未找到指定的教材或文档', 'LEARNER_STATE')
         );
+      }
+      // P3-2 opt-in segments 桥：默认关闭（形状不变）；开启时附段地址，
+      // 文本截断防膨胀（SEGMENT_TEXT_PREVIEW），跨用户口径与上同。
+      if (c.req.query('includeSegments') === 'true') {
+        const segs = await deps.repo.listContentSegments(documentId);
+        if (!isOk(segs)) return formatBusinessErrorResponse(c, segs.error, 'documentSegments');
+        return c.json({
+          ...res.value,
+          segments: segs.value.map((s) => ({
+            ...s,
+            text: s.text.length > SEGMENT_TEXT_PREVIEW ? s.text.slice(0, SEGMENT_TEXT_PREVIEW) : s.text,
+            truncated: s.text.length > SEGMENT_TEXT_PREVIEW,
+          })),
+        });
       }
       return c.json(res.value);
     }
