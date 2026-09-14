@@ -166,6 +166,14 @@
 
 实现 Agent **必须先读上述文档再改相关模块**；不得与 `AGENTS.md` §1 铁律冲突。
 
+### 5.2 当前执行计划卡（执行期必读，完成后删除引用）
+
+| 当前计划 | 链接 | 覆盖范围 | 清理条件 |
+| :--- | :--- | :--- | :--- |
+| M4/M5 存储与内容迁移 | [`.plan/10-m4-m5-storage-content-migration-plan.md`](.plan/10-m4-m5-storage-content-migration-plan.md) | storage-sqlite 剩余搬迁（连接/schema/DDL/migrations/Repository/doctor）与 content 剩余迁移（library 本体 document·PDF·OCR·curriculum·news、native 依赖移出、兼容 façade） | M4/M5 按 06 验收关闭后删除本小节引用 |
+
+实现 Agent 在动 M4/M5 相关模块前**必须先读本卡**；本卡是 M4/M5 剩余工作的唯一任务来源（06 原文件不动），不得与 `AGENTS.md` §1 铁律冲突。
+
 ---
 
 ## 6. 前端现代基建与组件选型铁律 (UI & State Infrastructure Invariants)
