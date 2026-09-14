@@ -23,7 +23,7 @@ import {
   ensureLanguageProfile,
   mirrorLanguageProfileToMain,
   resolveActiveLanguage,
-} from './profile-internals.js';
+} from '@study-studio/storage-sqlite';
 
 /**
  * 等级状态机（网关侧）：

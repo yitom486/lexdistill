@@ -22,7 +22,7 @@ import {
   documents,
 } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { readKanaPracticeMemories } from '../../../infrastructure/persistence/kana-practice-state.js';
+import { readKanaPracticeMemories } from '@study-studio/storage-sqlite';
 import { normalizeTrackLanguage } from '@study-studio/shared';
 
 /**

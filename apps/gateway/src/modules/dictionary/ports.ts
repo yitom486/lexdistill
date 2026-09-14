@@ -12,7 +12,7 @@ import type {
   RecordReadingExposuresInput,
 } from '@study-studio/storage-sqlite';
 import type { TermExampleItem } from './application/term-examples.js';
-import type { WordlistGroup } from './persistence/wordlists.js';
+import type { WordlistGroup } from '@study-studio/storage-sqlite';
 
 /**
  * M1-2 词典（lexicon）领域仓储能力契约。

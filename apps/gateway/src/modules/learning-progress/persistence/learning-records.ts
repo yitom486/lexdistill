@@ -17,7 +17,7 @@ import { kanaPracticeStates, skillMetrics } from '@study-studio/storage-sqlite';
 import {
   parseKanaPracticeMemory,
   saveKanaPracticeMemory,
-} from '../../../infrastructure/persistence/kana-practice-state.js';
+} from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 /**

@@ -45,7 +45,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'learning': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/document-model', '@study-studio/learner-core', '@study-studio/learning-algorithms'],
   'document-model': ['@study-studio/shared'],
   'content': ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol', '@study-studio/archive'],
-  'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model', '@study-studio/shared', '@study-studio/flashcards', '@study-studio/content'],
+  'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model', '@study-studio/shared', '@study-studio/flashcards', '@study-studio/content', '@study-studio/learner-core', '@study-studio/learning'],
   'archive': ['@study-studio/shared'],
 };
 
@@ -472,6 +472,8 @@ describe('M1-1 package 依赖方向', () => {
         '@study-studio/shared',
         '@study-studio/flashcards',
         '@study-studio/content',
+        '@study-studio/learner-core',
+        '@study-studio/learning',
         'drizzle-orm',
         'bun:sqlite',
         'node:crypto',
@@ -480,6 +482,61 @@ describe('M1-1 package 依赖方向', () => {
         'node:path',
       ])
     ).toEqual([]);
+  });
+
+  it('storage-sqlite 对 learner-core 的引用仅限 course-route 声明符号（kana 仅 type 边另锁；禁放宽）', async () => {
+    const dir = join(repoRoot(), 'packages', 'storage-sqlite', 'src');
+    const hits = await filesWith(dir, /from\s+['"]@study-studio\/learner-core['"]/);
+    expect(hits).toEqual([
+      join(dir, 'adapters', 'learning-progress', 'course-route.ts'),
+      join(dir, 'adapters', 'learning-progress', 'kana-practice-state.ts'),
+    ]);
+    const text = await readFile(join(dir, 'adapters', 'learning-progress', 'course-route.ts'), 'utf-8');
+    const m = text.match(/import\s*\{([^}]*)\}\s*from\s*['"]@study-studio\/learner-core['"]/);
+    expect(m).not.toBeNull();
+    const syms = (m as RegExpMatchArray)[1]!
+      .split(',')
+      .map((s) => s.trim().replace(/^type\s+/, ''))
+      .filter((s) => s.length > 0);
+    expect(syms.length).toBeGreaterThan(0);
+    for (const s of syms) {
+      expect(['resolveCourseRoute', 'CourseRouteSnapshot', 'UnitEvidence']).toContain(s);
+    }
+  });
+
+  it('storage-sqlite 对 learning 的引用仅限 practice-plan 声明符号（禁放宽）', async () => {
+    const dir = join(repoRoot(), 'packages', 'storage-sqlite', 'src');
+    const hits = await filesWith(dir, /from\s+['"]@study-studio\/learning['"]/);
+    expect(hits).toEqual([
+      join(dir, 'adapters', 'practice', 'practice-plan.ts'),
+    ]);
+    const text = await readFile(hits[0] as string, 'utf-8');
+    const mm = [...text.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]@study-studio\/learning['"]/g)];
+    expect(mm.length).toBeGreaterThan(0);
+    for (const one of mm) {
+      const syms = one[1]!
+        .split(',')
+        .map((s) => s.trim().replace(/^type\s+/, ''))
+        .filter((s) => s.length > 0);
+      for (const s of syms) {
+        expect([
+          'validatePracticePlanTemplate',
+          'freezeRunFromTemplate',
+          'parsePracticeBlockSpecs',
+        ]).toContain(s);
+      }
+    }
+  });
+
+  it('kana-practice-state 对 learner-core 只许 import type（禁值导入；course-route 值引用由上条锁定）', async () => {
+    const file = join(
+      repoRoot(), 'packages', 'storage-sqlite', 'src',
+      'adapters', 'learning-progress', 'kana-practice-state.ts'
+    );
+    const text = await readFile(file, 'utf-8');
+    expect(text).toContain("from '@study-studio/learner-core'");
+    const valueImports = [...text.matchAll(/^import\s(?!\s*type\s)\{[^}]*\}\s*from\s*['"]@study-studio\/learner-core['"]/gm)];
+    expect(valueImports.map((v) => v[0])).toEqual([]);
   });
 
   it('storage-sqlite 对 content 的引用仅限文档种类纯表面（import-tasks 例外；禁放宽整个 content）', async () => {
@@ -493,7 +550,8 @@ describe('M1-1 package 依赖方向', () => {
     expect(m).not.toBeNull();
     const syms = (m as RegExpMatchArray)[1]!
       .split(',')
-      .map((s) => s.trim().replace(/^type\s+/, ''));
+      .map((s) => s.trim().replace(/^type\s+/, ''))
+      .filter((s) => s.length > 0);
     expect(syms.length).toBeGreaterThan(0);
     for (const s of syms) {
       expect(['DOCUMENT_SOURCE_KINDS', 'DocumentSourceKind']).toContain(s);

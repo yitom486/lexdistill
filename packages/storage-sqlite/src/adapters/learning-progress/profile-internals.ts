@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import { nowIso } from '@study-studio/shared';
-import { learnerProfiles, learnerLanguageProfiles } from '@study-studio/storage-sqlite';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+import { learnerProfiles, learnerLanguageProfiles } from '../../schema.js';
+import type { DrizzleDb } from '../../connection.js';
 import type { TrackLanguage } from '@study-studio/shared';
 import { normalizeTrackLanguage } from '@study-studio/shared';
 import { defaultLanguageProfileSeed } from '@study-studio/shared';
@@ -9,10 +9,13 @@ import { defaultLanguageProfileSeed } from '@study-studio/shared';
 /**
  * 画像域内部 helpers（由 DrizzleLearnerRepository 私有方法搬迁而来，行为不变）。
  * 跨域复用时从这里 import；外观类保留同名 thin  wrapper 供尚未搬迁的方法调用。
+ *
+ * D3 起家在 storage-sqlite（前身 gateway modules/learning-progress/persistence/profile-internals.ts，
+ * 逻辑不变）。参数收窄为 `{ db }`。
  */
 
 export async function resolveActiveLanguage(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   userId: string
 ): Promise<TrackLanguage> {
   const rows = await deps.db
@@ -24,7 +27,7 @@ export async function resolveActiveLanguage(
 }
 
 export async function ensureLanguageProfile(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   userId: string,
   language: TrackLanguage,
   seed?: Partial<{
@@ -79,7 +82,7 @@ export async function ensureLanguageProfile(
 }
 
 export async function mirrorLanguageProfileToMain(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   userId: string,
   language: TrackLanguage,
   langRow: typeof learnerLanguageProfiles.$inferSelect,

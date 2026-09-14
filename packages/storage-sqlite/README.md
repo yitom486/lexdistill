@@ -112,7 +112,11 @@ canonical seed AST + 词典命中切片 + materializer version
   当前许可其二：`flashcards`（adapter 持久化的正是其语义：Anki 端点常量与校验、
   内置模板种子与模板校验、模板类型；实测其依赖仅 shared，无循环可能）；
   `content`（**仅文档种类纯表面**：`DOCUMENT_SOURCE_KINDS` 值＋`DocumentSourceKind`
-  类型，供 import-tasks 校验落库值；禁引 content 其他符号，由边界测试符号级锁定）。
+  类型，供 import-tasks 校验落库值；禁引 content 其他符号，由边界测试符号级锁定）；
+  `learner-core`（course-route 的 `resolveCourseRoute` 值＋两类型；
+  kana-practice-state 仅 `import type` 三类型；禁其他，符号级测试分别锁定）；
+  `learning`（practice-plan 的 validate/freeze/parse 三纯函数；禁其他，
+  符号级测试锁定）。四者均无存储/网络/Agent、无反向依赖（各包内聚测试为证）。
 - 禁止：Gateway、ports、编排、上层、Agent、Web。新增叶子依赖必须同步更新
   10 号卡＋本 README＋边界测试三处，缺一视为未完成。
 

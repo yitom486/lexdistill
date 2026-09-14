@@ -7,11 +7,16 @@ import {
   nowIso,
 } from '@study-studio/shared';
 import type { LearnerLevel } from '@study-studio/protocol';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+import type { Database } from 'bun:sqlite';
 import {
   normalizeTrackLanguage,
   type TrackLanguage,
 } from '@study-studio/shared';
+
+/**
+ * D3 起家在 storage-sqlite（前身 gateway modules/curriculum/persistence/lessons.ts，
+ * 逻辑不变）。参数收窄为 `{ sqlite }`（本文件只用原生连接，不用 drizzle/repo 回指）。
+ */
 
 export interface LessonSection {
   heading: string;
@@ -91,7 +96,7 @@ function parseBody(raw: string): { sections: LessonSection[]; examples: LessonEx
   }
 }
 
-async function completedMap(deps: RepoDeps, userId: string): Promise<Map<string, string>> {
+async function completedMap(deps: { sqlite: Database }, userId: string): Promise<Map<string, string>> {
   const rows = deps.sqlite
     .query('SELECT skill_id AS skillId, completed_at AS completedAt FROM lesson_progress WHERE user_id = ?')
     .all(userId) as Array<{ skillId: string; completedAt: string }>;
@@ -100,7 +105,7 @@ async function completedMap(deps: RepoDeps, userId: string): Promise<Map<string,
 
 /** 讲义列表（含学完态；损坏 body 读侧回空，不抛）。 */
 export async function listLessons(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   userId: string,
   language: string
 ): Promise<Result<Lesson[], BusinessError>> {
@@ -140,7 +145,7 @@ export async function listLessons(
 
 /** 学完打卡（用户明确点的“学完了”；幂等，已完成直接返回）。 */
 export async function completeLesson(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   userId: string,
   skillId: string
 ): Promise<Result<{ skillId: string; completedAt: string }, BusinessError>> {
@@ -173,7 +178,7 @@ export async function completeLesson(
 
 /** 已学完技能 id（难度门消费）。 */
 export async function listCompletedLessonSkills(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   userId: string
 ): Promise<Result<string[], BusinessError>> {
   try {
@@ -192,7 +197,7 @@ export async function listCompletedLessonSkills(
 
 /** 本轨道有讲义的技能 id（难度门消费：有讲义未学完 = 锁定）。 */
 export async function listLessonSkills(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   language: string
 ): Promise<Result<string[], BusinessError>> {
   try {

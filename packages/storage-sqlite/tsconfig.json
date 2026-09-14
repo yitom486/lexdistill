@@ -9,6 +9,8 @@
     { "path": "../content" },
     { "path": "../document-model" },
     { "path": "../flashcards" },
+    { "path": "../learner-core" },
+    { "path": "../learning" },
     { "path": "../protocol" },
     { "path": "../shared" }
   ],

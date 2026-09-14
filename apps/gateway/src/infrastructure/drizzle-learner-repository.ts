@@ -118,19 +118,19 @@ import {
   listCompletedLessonSkills as listCompletedLessonSkillsDomain,
   listLessonSkills as listLessonSkillsDomain,
   type Lesson,
-} from '../modules/curriculum/persistence/lessons.js';
+} from '@study-studio/storage-sqlite';
 import {
   getTextbookFocus as getTextbookFocusDomain,
   type TextbookFocus,
 } from '@study-studio/storage-sqlite';
 import {
   getCourseRoute as getCourseRouteDomain,
-} from '../modules/learning-progress/persistence/course-route.js';
+} from '@study-studio/storage-sqlite';
 import type { CourseRouteSnapshot } from '@study-studio/learner-core';
 import {
   listWordlists as listWordlistsDomain,
   type WordlistGroup,
-} from '../modules/dictionary/persistence/wordlists.js';
+} from '@study-studio/storage-sqlite';
 import {
   saveDocumentStructure as saveDocumentStructureDomain,
   getDocumentStructure as getDocumentStructureDomain,
@@ -181,7 +181,7 @@ import {
   resolveActiveLanguage as resolveActiveLanguageDomain,
   ensureLanguageProfile as ensureLanguageProfileDomain,
   mirrorLanguageProfileToMain as mirrorLanguageProfileToMainDomain,
-} from '../modules/learning-progress/persistence/profile-internals.js';
+} from '@study-studio/storage-sqlite';
 import {
   getLearnerProfile as getLearnerProfileDomain,
   updateLearnerProfile as updateLearnerProfileDomain,
@@ -289,8 +289,8 @@ import {
   submitPracticeItem as submitPracticeItemDomain,
   listPracticeItemAttempts as listPracticeItemAttemptsDomain,
   getPracticeRunItems as getPracticeRunItemsDomain,
-  finalizePracticePlanRun as finalizePracticePlanRunDomain,
-} from '../modules/practice/persistence/practice-plan.js';
+} from '@study-studio/storage-sqlite';
+import { finalizePracticePlanRun as finalizePracticePlanRunDomain } from '../modules/practice/persistence/practice-plan.js';
 import {
   getTodayString,
   getYesterdayString,

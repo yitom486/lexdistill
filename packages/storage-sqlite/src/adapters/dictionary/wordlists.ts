@@ -5,11 +5,16 @@ import {
   BusinessError,
   translateToBusinessError,
 } from '@study-studio/shared';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+import type { Database } from 'bun:sqlite';
 import {
   normalizeTrackLanguage,
   type TrackLanguage,
 } from '@study-studio/shared';
+
+/**
+ * D3 起家在 storage-sqlite（前身 gateway modules/dictionary/persistence/wordlists.ts，
+ * 逻辑不变）。参数收窄为 `{ sqlite }`（本文件只用原生连接，不用 drizzle/repo 回指）。
+ */
 
 export interface WordlistWord {
   entryId: string;
@@ -45,7 +50,7 @@ interface WordRow {
  * 韩/英轨道暂只有各自 starter 组（N5 百词为日语专属）。
  */
 export async function listWordlists(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   userId: string,
   language: string
 ): Promise<Result<WordlistGroup[], BusinessError>> {

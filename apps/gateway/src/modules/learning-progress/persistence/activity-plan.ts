@@ -36,7 +36,7 @@ import { normalizeTrackLanguage } from '@study-studio/shared';
 import {
   ensureLanguageProfile,
   mirrorLanguageProfileToMain,
-} from './profile-internals.js';
+} from '@study-studio/storage-sqlite';
 import { getTodayString, getYesterdayString, safeJsonParse } from '@study-studio/shared';
 
 /**

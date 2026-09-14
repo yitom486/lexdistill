@@ -25,7 +25,7 @@ import { normalizeTrackLanguage, inferLanguageFromSkillId } from '@study-studio/
 import {
   ensureLanguageProfile,
   mirrorLanguageProfileToMain,
-} from './profile-internals.js';
+} from '@study-studio/storage-sqlite';
 
 /**
  * 画像域（由 DrizzleLearnerRepository 搬迁而来，行为不变）。

@@ -191,6 +191,29 @@ describe('gateway module boundaries (G5)', () => {
     expect(violations).toEqual([]);
   });
 
+  it('getRawDb 原生直通仅限三处 legacy（禁新增生产调用方）', () => {
+    // D3 getRawDb 决议：方法保留作测试/装配/词典包管理逃生口；
+    // 新增生产调用必须先走 ports 评审（词典包管理收口为 ports 方法）。
+    // 允许集合：门面定义本身、启动装配、词典路由三处 legacy 直通；
+    // 测试与脚本不在此断言（测试探针另有归属，脚本走包导入）。
+    const allowed = new Set([
+      'bootstrap/create-gateway.ts',
+      'modules/dictionary/http/dictionary-routes.ts',
+      'infrastructure/drizzle-learner-repository.ts',
+    ]);
+    const bad: string[] = [];
+    for (const file of files) {
+      const rel = relative(SRC, file).split(sep).join('/');
+      if (rel.includes('/__tests__/') || rel.endsWith('.test.ts')) continue;
+      if (rel.startsWith('scripts/')) continue;
+      const text = readFileSync(file, 'utf-8');
+      if (text.includes('getRawDb()') && !allowed.has(rel)) {
+        bad.push(rel);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
   it('documents every cross-module exception', () => {
     // 例外表条目必须真实存在，防止过期条目掩盖新增违规。
     // 按去后缀基名比对，src 与 dist 编译副本都能跑。

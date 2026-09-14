@@ -20,11 +20,11 @@ import {
 } from '../../learning-progress/public.js';
 import {
   startPracticePlanRun,
-  finalizePracticePlanRun,
   listPracticeItemAttempts,
   getPracticePlanRun,
   getPracticeRunItems,
-} from './practice-plan.js';
+} from '@study-studio/storage-sqlite';
+import { finalizePracticePlanRun } from './practice-plan.js';
 import { LEVEL_THRESHOLDS } from '@study-studio/learner-core';
 import {
   blueprintFor,

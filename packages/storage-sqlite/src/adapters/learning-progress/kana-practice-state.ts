@@ -4,7 +4,14 @@ import type {
   KanaPracticeScriptType,
   FsrsState,
 } from '@study-studio/learner-core';
-import { kanaPracticeStates, type DrizzleDb } from '@study-studio/storage-sqlite';
+import { kanaPracticeStates } from '../../schema.js';
+import type { DrizzleDb } from '../../connection.js';
+
+/**
+ * D3 起家在 storage-sqlite（前身 gateway infrastructure/persistence/kana-practice-state.ts，
+ * 逻辑不变）。签名已是 `DrizzleDb` 显式参数，零改动；learner-core 仅 type-only
+ * 引用（commander 特批计入类型边，见包 README）。
+ */
 
 function parseFsrsState(value: unknown): FsrsState['state'] | undefined {
   if (value === 'NEW' || value === 'LEARNING' || value === 'REVIEW' || value === 'RELEARNING') {

@@ -129,6 +129,46 @@ export {
   summarizeReconciliation,
   type ReconLessonInput,
 } from './adapters/document/lesson-reconciliation.js';
+export { getCourseRoute } from './adapters/learning-progress/course-route.js';
+export {
+  savePracticePlanTemplate,
+  listPracticePlanTemplates,
+  getPracticePlanTemplate,
+  deletePracticePlanTemplate,
+  setPracticePlanTemplateEnabled,
+  copyPracticePlanTemplate,
+  startPracticePlanRun,
+  getPracticePlanRun,
+  listPracticePlanRuns,
+  savePracticeItemDraft,
+  submitPracticeItem,
+  listPracticeItemAttempts,
+  getPracticeRunItems,
+} from './adapters/practice/practice-plan.js';
+export {
+  parseKanaPracticeMemory,
+  readKanaPracticeMemories,
+  saveKanaPracticeMemory,
+} from './adapters/learning-progress/kana-practice-state.js';
+export {
+  listWordlists,
+  type WordlistWord,
+  type WordlistGroup,
+} from './adapters/dictionary/wordlists.js';
+export {
+  listLessons,
+  completeLesson,
+  listCompletedLessonSkills,
+  listLessonSkills,
+  type LessonSection,
+  type LessonExample,
+  type Lesson,
+} from './adapters/curriculum/lessons.js';
+export {
+  resolveActiveLanguage,
+  ensureLanguageProfile,
+  mirrorLanguageProfileToMain,
+} from './adapters/learning-progress/profile-internals.js';
 export {
   prepareTocImportSession,
   getTocImportSession,

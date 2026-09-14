@@ -5,6 +5,6 @@
  *（R5 allowlist 登记到 public.js，不再登记深路径）；本文件只转出已查证符号，
  * 不搬业务实现。学习域仓储契约见 `modules/practice/ports.ts`（LearningRepository）。
  */
-export { resolveActiveLanguage } from './persistence/profile-internals.js';
+export { resolveActiveLanguage } from '@study-studio/storage-sqlite';
 export { buildAnalysisSnapshot, type AnalysisSnapshot } from './application/learning-analysis.js';
 export { setTrackLevel } from './persistence/level.js';

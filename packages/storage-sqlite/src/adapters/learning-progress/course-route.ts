@@ -11,11 +11,17 @@ import {
   type CourseRouteSnapshot,
   type UnitEvidence,
 } from '@study-studio/learner-core';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+import type { Database } from 'bun:sqlite';
 import {
   normalizeTrackLanguage,
   type TrackLanguage,
 } from '@study-studio/shared';
+
+/**
+ * D3 起家在 storage-sqlite（前身 gateway modules/learning-progress/persistence/course-route.ts，
+ * 逻辑不变）。参数收窄为 `{ sqlite }`（本文件只用原生连接）。
+ * learner-core 引用经 commander 特批（resolveCourseRoute 值＋两类型；见包 README）。
+ */
 
 /**
  * 课程路线（长期路线，不随每日重置；每日计划从中取任务）。
@@ -42,7 +48,7 @@ function fsrsReps(fsrsJson: unknown): number {
 }
 
 async function collectEvidence(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   userId: string,
   track: TrackLanguage
 ): Promise<UnitEvidence> {
@@ -104,7 +110,7 @@ async function collectEvidence(
   };
 }
 
-function wordGroupIds(deps: RepoDeps, track: TrackLanguage): Record<string, string[]> {
+function wordGroupIds(deps: { sqlite: Database }, track: TrackLanguage): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   const groups: Array<[string, string]> =
     track === 'ja'
@@ -124,7 +130,7 @@ function wordGroupIds(deps: RepoDeps, track: TrackLanguage): Record<string, stri
 
 /** 路线求值 + 新掌握写档（幂等；写档失败只 warn，不挡返回）。 */
 export async function getCourseRoute(
-  deps: RepoDeps,
+  deps: { sqlite: Database },
   userId: string,
   language: string
 ): Promise<Result<CourseRouteSnapshot, BusinessError>> {
