@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { BusinessError, isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { clampEnrichConcurrency } from '../application/pdf-import/enrich-job-runner.js';
 
 /**

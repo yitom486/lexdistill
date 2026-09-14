@@ -10,7 +10,7 @@ import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.j
 import { executeTocImportFirst } from '../application/pdf-import/toc-import-execute.js';
 import { executeTocImportNext } from '../application/pdf-import/toc-import-execute-next.js';
 import { toTocImportSessionView } from '@study-studio/storage-sqlite';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
 /**

@@ -1,4 +1,4 @@
-﻿import { Hono } from 'hono';
+import { Hono } from 'hono';
 import { isOk, BusinessError } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import {
@@ -6,7 +6,7 @@ import {
   listDictionaryPackages,
 } from '../application/dictionary-packages.js';
 import { buildCustomMeta, installYomitanFromBytes } from '../application/yomitan.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 
 // 词典安装任务表：进程级单例（随模块常驻，不随请求重建），G2 迁移时原样搬入本域。
 const dictionaryInstallTasks = new Map<string, ReturnType<typeof installDictionaryPackage>>();

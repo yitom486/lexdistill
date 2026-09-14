@@ -5,7 +5,7 @@ import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.
 import { narrowSaveCardFormatInput } from '@study-studio/storage-sqlite';
 import { narrowCardSourceEntry } from '../application/card-preview.js';
 import { toDetachedArrayBuffer } from './response-bytes.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 
 /** 卡片模板域路由（呈现资产 CRUD + 预览；FSRS 调度仍走 review 域）。 */
 export function createCardFormatRoutes(deps: GatewayDeps) {

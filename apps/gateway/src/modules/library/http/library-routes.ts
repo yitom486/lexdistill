@@ -1,4 +1,4 @@
-﻿import { Hono } from 'hono';
+import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { isOk, BusinessError, generateId, logger } from '@study-studio/shared';
 import {
@@ -6,7 +6,7 @@ import {
   DocumentSourceKindSchema,
 } from '@study-studio/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { reconcileLessons, summarizeReconciliation, type ReconLessonInput } from '@study-studio/storage-sqlite';
 import { tryParseTextbookAst } from '@study-studio/storage-sqlite';

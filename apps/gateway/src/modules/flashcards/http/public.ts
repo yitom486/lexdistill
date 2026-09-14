@@ -1,0 +1,7 @@
+/**
+ * E4a 卡片域 HTTP 公共表面：只转出 route factory，供 Gateway composition（create-app）挂载。
+ * 业务实现与仓储契约走 ports.ts / persistence / application；本文件禁业务逻辑。
+ */
+export { createCardFormatRoutes } from './card-format-routes.js';
+export { createCardDraftRoutes } from './card-draft-routes.js';
+export { createMediaRoutes } from './media-routes.js';

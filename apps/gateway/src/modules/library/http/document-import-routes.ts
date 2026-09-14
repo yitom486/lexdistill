@@ -7,7 +7,7 @@ import {
   type DocumentSourceKind,
 } from '@study-studio/content';
 import { readDocumentFileBytes } from '../application/document-import/document-import-service.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 
 /**
  * 文档统一导入路由（PDF/EPUB/文本同一命令；任务落库可轮询）。

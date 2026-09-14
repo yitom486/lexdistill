@@ -2,26 +2,32 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { BusinessError } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../errors/http-error-handler.js';
-import type { GatewayDeps } from './gateway-deps.js';
+import type { GatewayDeps } from '../../composition/gateway-deps.js';
 import { createHealthRoutes } from './health-routes.js';
 import { createAgentRoutes } from './agent-routes.js';
 import { createLearningCompatRoutes } from './learning-routes.js';
-import { createDictionaryRoutes } from '../../modules/dictionary/http/dictionary-routes.js';
-import { createCardFormatRoutes } from '../../modules/flashcards/http/card-format-routes.js';
-import { createCardDraftRoutes } from '../../modules/flashcards/http/card-draft-routes.js';
-import { createMediaRoutes } from '../../modules/flashcards/http/media-routes.js';
-import { createLearningProgressRoutes } from '../../modules/learning-progress/http/learning-progress-routes.js';
-import { createPracticeRoutes } from '../../modules/practice/http/practice-routes.js';
-import { createPlacementRoutes } from '../../modules/practice/http/placement-routes.js';
-import { createReviewRoutes } from '../../modules/review/http/review-routes.js';
-import { createLibraryRoutes } from '../../modules/library/http/library-routes.js';
-import { createDocumentImportRoutes } from '../../modules/library/http/document-import-routes.js';
-import { createDocumentEnrichRoutes } from '../../modules/library/http/document-enrich-routes.js';
-import { createEnrichJobRoutes } from '../../modules/library/http/enrich-job-routes.js';
-import { createDocumentStructureRoutes } from '../../modules/library/http/document-structure-routes.js';
-import { createTextbookQuizRoutes } from '../../modules/library/http/textbook-quiz-routes.js';
-import { createPdfImportRoutes } from '../../modules/library/http/pdf-import-routes.js';
-import { createCurriculumRoutes } from '../../modules/curriculum/http/curriculum-routes.js';
+import { createDictionaryRoutes } from '../../modules/dictionary/http/public.js';
+import {
+  createCardFormatRoutes,
+  createCardDraftRoutes,
+  createMediaRoutes,
+} from '../../modules/flashcards/http/public.js';
+import { createLearningProgressRoutes } from '../../modules/learning-progress/http/public.js';
+import {
+  createPracticeRoutes,
+  createPlacementRoutes,
+} from '../../modules/practice/http/public.js';
+import { createReviewRoutes } from '../../modules/review/http/public.js';
+import {
+  createLibraryRoutes,
+  createDocumentImportRoutes,
+  createDocumentEnrichRoutes,
+  createEnrichJobRoutes,
+  createDocumentStructureRoutes,
+  createTextbookQuizRoutes,
+  createPdfImportRoutes,
+} from '../../modules/library/http/public.js';
+import { createCurriculumRoutes } from '../../modules/curriculum/http/public.js';
 import { createTtsRoutes } from '../../modules/tts/http/tts-routes.js';
 
 /**

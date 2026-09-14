@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { toDetachedArrayBuffer } from './response-bytes.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 
 /**
  * 用户媒体库读路由（内容寻址；哈希即权限——知道哈希才能取，不可枚举）。

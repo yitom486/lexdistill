@@ -7,7 +7,7 @@ import type {
   ProposeCardDraftInput,
   UpdateCardDraftPatch,
 } from '../persistence/card-drafts.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 
 const DRAFT_SOURCES = new Set(['ai-enrich', 'agent', 'import']);
 const DRAFT_STATUSES = new Set(['pending', 'accepted', 'dismissed']);

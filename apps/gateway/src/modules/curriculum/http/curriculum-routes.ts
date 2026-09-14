@@ -1,4 +1,4 @@
-﻿import { Hono } from 'hono';
+import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { isOk, BusinessError, generateId } from '@study-studio/shared';
 import {
@@ -16,7 +16,7 @@ import {
   normalizeContentLanguage,
   DEFAULT_CONTENT_LANGUAGE,
 } from '../../../services/learning-language-policy.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import type { KanaPracticeScriptType } from '@study-studio/learner-core';
 
 function parseKanaQueueLimit(value: string | undefined): number {

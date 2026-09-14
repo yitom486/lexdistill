@@ -1,4 +1,4 @@
-﻿import { Hono } from 'hono';
+import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { isOk, BusinessError, generateId } from '@study-studio/shared';
 import type { PracticeBlockSpec } from '@study-studio/protocol';
@@ -10,7 +10,7 @@ import { createProposal, consumeProposal } from '../application/practice-proposa
 import { summarizePracticeRun } from '../application/practice-summary.js';
 import type { PersistableQuestion } from '../persistence/questions.js';
 import { buildAnalysisSnapshot } from '../../learning-progress/public.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 
 /** 练习域路由：模板、运行、题目集合、题库（G2 迁移，行为不变）。 */
 export function createPracticeRoutes(deps: GatewayDeps) {

@@ -1,8 +1,8 @@
-﻿import { Hono } from 'hono';
+import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { isOk, BusinessError } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../errors/http-error-handler.js';
-import type { GatewayDeps } from './gateway-deps.js';
+import type { GatewayDeps } from '../../composition/gateway-deps.js';
 
 /** Codex Agent 管理路由（G2：由 index.ts 链式注册迁移而来，行为不变）。 */
 export function createAgentRoutes(deps: GatewayDeps) {

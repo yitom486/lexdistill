@@ -1,6 +1,6 @@
-﻿import { randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
-import type { GatewayDeps } from './gateway-deps.js';
+import type { GatewayDeps } from '../../composition/gateway-deps.js';
 
 /**
  * 进程身份（AGENTS §7.3 服务端身份握手）：模块级常量，随进程启动一次生成。

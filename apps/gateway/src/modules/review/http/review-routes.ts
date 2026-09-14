@@ -1,10 +1,10 @@
-﻿import { Hono } from 'hono';
+import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { isOk, BusinessError } from '@study-studio/shared';
 import { scheduleFsrsReviewV1 } from '@study-studio/learning';
 import { FlashcardSchema } from '@study-studio/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 
 /** 复习域路由：FSRS 闪卡存取与复习（G2 迁移，行为不变）。 */
 export function createReviewRoutes(deps: GatewayDeps) {

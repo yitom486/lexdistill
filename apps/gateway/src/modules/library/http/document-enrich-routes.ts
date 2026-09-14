@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { BusinessError, isOk, logger } from '@study-studio/shared';
 import { parseTextbookAST } from '@study-studio/document-model';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { enrichBookLessons } from '../application/pdf-import/vocab-enrich.js';
 
 /** 课本语种（JA/EN/KO）→ 用户轨道语种（ja/en/ko）；未知回 null（AST 照存，草稿跳过）。 */

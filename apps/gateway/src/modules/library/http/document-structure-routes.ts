@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { BusinessError, isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import {
   classifyStructure,
   type AllowedSkill,

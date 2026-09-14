@@ -3,7 +3,7 @@ import { validator } from 'hono/validator';
 import { BusinessError, isOk } from '@study-studio/shared';
 import { parseTextbookAST } from '@study-studio/document-model';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { buildTextbookLessonQuestions, canQuizDocument } from '../application/textbook-lesson-quiz.js';
 import { normalizeTrackLanguage } from '@study-studio/shared';
 

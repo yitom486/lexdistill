@@ -141,7 +141,7 @@ infrastructure/drizzle-learner-repository.ts
 | 文件 | 作用 |
 |---|---|
 | `create-app.ts` | 创建 Hono 应用，配置 CORS、404、统一错误兜底，并挂载各域路由。导入它本身不会打开真实数据库。 |
-| `gateway-deps.ts` | 定义 HTTP 路由可使用的 `GatewayDeps`，是 repo、runtime/server 等依赖的统一来源。 |
+| `../composition/gateway-deps.ts` | 定义 HTTP 路由可使用的 `GatewayDeps`，是 repo、runtime/server 等依赖的统一来源（E4a 起家于此）。 |
 | `health-routes.ts` | 健康检查和运行状态接口。 |
 | `agent-routes.ts` | Agent Session/Turn 等 Agent 管理接口。 |
 | `learning-routes.ts` | 历史兼容入口；将跨域的 `learning.content`、`learning.assess` 请求委托给 Tool/领域能力。 |

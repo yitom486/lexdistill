@@ -3,7 +3,7 @@ import { validator } from 'hono/validator';
 import { BusinessError, isOk } from '@study-studio/shared';
 import type { LearnerLevel } from '@study-studio/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
-import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
+import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 
 const LEVELS: LearnerLevel[] = ['NOVICE', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 

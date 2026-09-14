@@ -19,7 +19,7 @@ const ASSEMBLERS = new Set([
   'bootstrap/create-gateway.ts',
   'bootstrap/start-gateway.ts',
   'transport/http/create-app.ts',
-  'transport/http/gateway-deps.ts',
+  'composition/gateway-deps.ts',
   'transport/tools/register-tools.ts',
   'transport/websocket/websocket-handler.ts',
 ]);
