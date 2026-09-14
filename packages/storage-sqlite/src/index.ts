@@ -220,6 +220,8 @@ export {
   reprojectDocumentSegments,
   findDocumentsMissingSegments,
   chunkTextToSegments,
+  isProjectionEligible,
+  resolveProjectionEligibility,
   segmentHash,
   type ContentSegment,
   type ContentSegmentKind,

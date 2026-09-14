@@ -5,8 +5,11 @@ import { initSchema, runMigrations } from '../ddl.js';
 import {
   projectContentSegments,
   listContentSegments,
+  reprojectDocumentSegments,
+  findDocumentsMissingSegments,
   segmentHash,
   chunkTextToSegments,
+  isProjectionEligible,
 } from '../adapters/library/content-segments.js';
 import {
   ensureCanonicalContentSources,
@@ -446,5 +449,64 @@ describe('P1-3a 文档隔离（自有／跨用户／公共／不一致／孤儿�
     });
     expect(codeOf(s)).toBe('E_NOT_FOUND');
     expect(db.query('SELECT COUNT(*) AS n FROM content_segments').get()).toEqual({ n: 0 });
+  });
+});
+
+describe('P2-1a 投影资格闭环（PDF／长文本／普通文本）', () => {
+  let db: Database;
+  beforeEach(() => {
+    db = freshDb();
+  });
+
+  function seedPdfDoc(docId: string, userId: string): void {
+    seedDoc(db, docId, userId, 'user_import');
+    db.prepare(
+      `INSERT INTO document_imports
+         (id, user_id, source_kind, filename, status, document_id, created_at, updated_at)
+       VALUES ('import_pdf_1', ?, 'pdf', 'a.pdf', 'done', ?, 't', 't')`
+    ).run(userId, docId);
+  }
+
+  it('资格判定：课程／PDF 否决，其余通过', () => {
+    expect(isProjectionEligible('curriculum_textbook', null)).toBe(false);
+    expect(isProjectionEligible('user_import', 'pdf')).toBe(false);
+    expect(isProjectionEligible('user_import', 'epub')).toBe(true);
+    expect(isProjectionEligible('user_import', null)).toBe(true);
+  });
+
+  it('PDF：不进 missing 列表，重放拒绝', async () => {
+    seedPdfDoc('dPdf', 'u1');
+    const missing = await findDocumentsMissingSegments({ sqlite: db }, 'u1');
+    expect(isOk(missing)).toBe(true);
+    if (!isOk(missing)) return;
+    expect(missing.value.find((m) => m.id === 'dPdf')).toBe(undefined);
+    const replay = await reprojectDocumentSegments({ sqlite: db }, { userId: 'u1', documentId: 'dPdf' });
+    expect(isOk(replay)).toBe(false);
+    if (isOk(replay)) return;
+    expect(replay.error.code).toBe('E_INVALID_INPUT');
+  });
+
+  it('满切片长文本：无长度门，重放成功', async () => {
+    db.prepare(
+      `INSERT INTO documents (id, user_id, title, source_kind, language, content, created_at, updated_at)
+       VALUES ('dLong', 'u1', 'T', 'user_import', 'ja', ?, 't', 't')`
+    ).run('甲'.repeat(2000));
+    const replay = await reprojectDocumentSegments({ sqlite: db }, { userId: 'u1', documentId: 'dLong' });
+    expect(isOk(replay)).toBe(true);
+    if (!isOk(replay)) return;
+    expect(replay.value.inserted).toBeGreaterThan(0);
+  });
+
+  it('普通文本：missing 检出→重放→消失', async () => {
+    seedDoc(db, 'dN', 'u1', 'user_import');
+    db.prepare('UPDATE documents SET content = ? WHERE id = ?').run('第一段\n\n第二段', 'dN');
+    const before = await findDocumentsMissingSegments({ sqlite: db }, 'u1');
+    expect(isOk(before) && before.value.find((m) => m.id === 'dN')).toBeTruthy();
+    const replay = await reprojectDocumentSegments({ sqlite: db }, { userId: 'u1', documentId: 'dN' });
+    expect(isOk(replay)).toBe(true);
+    const after = await findDocumentsMissingSegments({ sqlite: db }, 'u1');
+    expect(isOk(after)).toBe(true);
+    if (!isOk(after)) return;
+    expect(after.value.find((m) => m.id === 'dN')).toBe(undefined);
   });
 });

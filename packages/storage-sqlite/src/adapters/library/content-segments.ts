@@ -75,6 +75,38 @@ export function chunkTextToSegments(content: string): TextChunk[] {
   return chunks;
 }
 
+/**
+ * 投影资格（P2-1a）：首次投影／missing／reproject 三处共用同一判定。
+ * - 课程文档（curriculum_textbook）→ P2-2 lines 投影，本批不碰；
+ * - PDF 导入件（任务行为 pdf）→ P2-2，本批不碰；
+ * - 其余 user_import（无任务行视为 pilot 文本，显式宽容）→ 本批投影。
+ * 纯函数（无 DB），DB 解释见 resolveProjectionEligibility。
+ */
+export function isProjectionEligible(sourceKind: string, importFormat: string | null): boolean {
+  if (sourceKind === 'curriculum_textbook') return false;
+  if (importFormat === 'pdf') return false;
+  return true;
+}
+
+/** DB 解释：读文档行＋最新 done 任务格式（无任务行即 pilot 文本）。 */
+export function resolveProjectionEligibility(
+  deps: { sqlite: Database },
+  documentId: string
+): { eligible: boolean; sourceKind: string; importFormat: string | null } | null {
+  const doc = deps.sqlite
+    .query('SELECT source_kind AS sourceKind FROM documents WHERE id = ?')
+    .get(documentId) as { sourceKind: string } | null;
+  if (!doc) return null;
+  const task = deps.sqlite
+    .query(
+      `SELECT source_kind AS sourceKind FROM document_imports
+       WHERE document_id = ? AND status = 'done' ORDER BY updated_at DESC LIMIT 1`
+    )
+    .get(documentId) as { sourceKind: string } | null;
+  const importFormat = task ? task.sourceKind : null;
+  return { eligible: isProjectionEligible(doc.sourceKind, importFormat), sourceKind: doc.sourceKind, importFormat };
+}
+
 /** 作用域段 hash（P1-2a R3＋P1-3 硬约束）：相同文本跨文档永不冲突。 */
 export function segmentHash(documentId: string, lessonId: string, ord: number, text: string): string {
   return createHash('sha256')
@@ -231,6 +263,13 @@ export async function reprojectDocumentSegments(
   if (!visible) {
     return err(new BusinessError('E_NOT_FOUND', '未找到指定的文档', 'LEARNER_STATE'));
   }
+  // P2-1a：无资格文档拒绝重放（存在性已由可见性确认，此处可给原因）。
+  const eligibility = resolveProjectionEligibility(deps, documentId);
+  if (!eligibility || !eligibility.eligible) {
+    return err(
+      new BusinessError('E_INVALID_INPUT', '该文档暂不支持段投影（PDF／课程文档走 P2-2）', 'VALIDATION')
+    );
+  }
   const row = deps.sqlite
     .query('SELECT content AS content FROM documents WHERE id = ?')
     .get(documentId) as { content: string } | null;
@@ -258,20 +297,24 @@ export async function findDocumentsMissingSegments(
   userId?: string | undefined
 ): Promise<Result<Array<{ id: string; userId: string; sourceKind: string }>, BusinessError>> {
   try {
+    // P2-1a：PDF／课程文档不得进入待投影列表（与首次投影／重放同一资格）。
+    const pdfGuard = `AND d.source_kind != 'curriculum_textbook'
+      AND NOT EXISTS (SELECT 1 FROM document_imports t
+        WHERE t.document_id = d.id AND t.source_kind = 'pdf' AND t.status = 'done')`;
     const rows =
       userId === undefined
         ? (deps.sqlite
             .query(
               `SELECT d.id AS id, d.user_id AS userId, d.source_kind AS sourceKind
                FROM documents d LEFT JOIN content_segments s ON s.document_id = d.id
-               WHERE s.id IS NULL`
+               WHERE s.id IS NULL ${pdfGuard}`
             )
             .all() as Array<{ id: string; userId: string; sourceKind: string }>)
         : (deps.sqlite
             .query(
               `SELECT d.id AS id, d.user_id AS userId, d.source_kind AS sourceKind
                FROM documents d LEFT JOIN content_segments s ON s.document_id = d.id
-               WHERE s.id IS NULL AND d.user_id = ?`
+               WHERE s.id IS NULL AND d.user_id = ? ${pdfGuard}`
             )
             .all(userId) as Array<{ id: string; userId: string; sourceKind: string }>);
     return ok(rows);

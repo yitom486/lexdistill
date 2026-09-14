@@ -29,6 +29,7 @@ import {
   updateImportTask,
   chunkTextToSegments,
   projectContentSegments,
+  isProjectionEligible,
   type ImportTask,
 } from '@study-studio/storage-sqlite';
 import { saveCanonicalAst } from '../../persistence/documents-annotations.js';
@@ -239,8 +240,9 @@ export async function importDocument(
     if (!isOk(saved)) throw saved.error;
     // P2-1 段投影（提交后显式步骤，非同一事务；失败只 warn 不挡导入，
     // 重试信号见 findDocumentsMissingSegments，重放见 reprojectDocumentSegments）。
-    // PDF 分支与超大文档跳过（P2-2 文件化课题）；输入即持久化 content 切片。
-    if (kind !== 'pdf' && saved.value.content.length <= 200_000) {
+    // 资格与 missing／重放共用 isProjectionEligible（P2-1a）；输入即持久化
+    // content 切片（入库恒截 2000 字，超大跳过语义已删除，无双语义）。
+    if (isProjectionEligible(saved.value.sourceKind, kind)) {
       const chunks = chunkTextToSegments(saved.value.content);
       const projected = await projectContentSegments(deps, {
         userId: input.userId,
