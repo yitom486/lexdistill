@@ -30,7 +30,7 @@ import {
   practiceCollections,
   practiceItems,
   quizAttempts,
-} from '../../../infrastructure/db/index.js';
+} from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { safeJsonParse } from '../../../infrastructure/persistence/repo-utils.js';
 

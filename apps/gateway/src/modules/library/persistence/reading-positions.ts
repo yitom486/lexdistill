@@ -7,7 +7,7 @@ import {
   nowIso,
 } from '@study-studio/shared';
 import { and, eq } from 'drizzle-orm';
-import { readingPositions } from '../../../infrastructure/db/schema.js';
+import { readingPositions } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 /**

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { ensureDictionaryFts } from '../infrastructure/db/ddl.js';
+import { ensureDictionaryFts } from '@study-studio/storage-sqlite';
 import { searchDictionaryMeanings } from '../modules/dictionary/persistence/dictionary.js';
 
 function seedEntry(

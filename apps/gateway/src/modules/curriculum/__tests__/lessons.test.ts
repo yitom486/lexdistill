@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { LESSON_SEEDS } from '../../../infrastructure/db/seeds/lesson-seed.js';
-import { N5_WORD_SEEDS } from '../../../infrastructure/db/seeds/n5-words-seed.js';
+import { LESSON_SEEDS } from '@study-studio/storage-sqlite';
+import { N5_WORD_SEEDS } from '@study-studio/storage-sqlite';
 
 describe('curriculum lessons（先讲后测讲义）', () => {
   let repo: DrizzleLearnerRepository;

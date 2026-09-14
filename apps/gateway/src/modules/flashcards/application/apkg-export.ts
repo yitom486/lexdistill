@@ -8,7 +8,7 @@ import {
   translateToBusinessError,
 } from '@study-studio/shared';
 import { buildCardContext, renderCard } from '@study-studio/learner-core';
-import { flashcards } from '../../../infrastructure/db/index.js';
+import { flashcards } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
 import { getCardFormat } from '../persistence/card-formats.js';

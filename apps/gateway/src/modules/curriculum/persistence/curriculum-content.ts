@@ -20,7 +20,7 @@ import {
   curriculumHangul,
   learningContentTemplates,
   documents,
-} from '../../../infrastructure/db/index.js';
+} from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { readKanaPracticeMemories } from '../../../infrastructure/persistence/kana-practice-state.js';
 import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';

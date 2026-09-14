@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { Database } from 'bun:sqlite';
-import { planLessonOrdering, formatOrderingPlan } from '../infrastructure/db/lesson-ordering.js';
+import { planLessonOrdering, formatOrderingPlan } from '@study-studio/storage-sqlite';
 
 /**
  * lesson-ordering dry-run CLI：只读输出回填计划。

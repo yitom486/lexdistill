@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import type { DrizzleDb } from '../db/index.js';
+import type { DrizzleDb } from '@study-studio/storage-sqlite';
 import type { DrizzleLearnerRepository } from '../drizzle-learner-repository.js';
 
 /**

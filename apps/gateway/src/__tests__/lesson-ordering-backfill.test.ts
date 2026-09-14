@@ -4,7 +4,7 @@ import {
   planLessonOrdering,
   applyLessonOrdering,
   verifyDense,
-} from '../infrastructure/db/lesson-ordering.js';
+} from '@study-studio/storage-sqlite';
 
 const dbs: Database[] = [];
 afterEach(() => {

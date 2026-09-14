@@ -27,7 +27,7 @@ import type {
   GeneratedQuestion,
   CardReviewRating,
 } from '@study-studio/protocol';
-import { createDrizzleDb, type DrizzleDb, learnerLanguageProfiles } from './db/index.js';
+import { createDrizzleDb, type DrizzleDb, learnerLanguageProfiles } from '@study-studio/storage-sqlite';
 import type {
   PracticePlanTemplate,
   PracticePlanRun,
@@ -66,7 +66,7 @@ import {
 } from '../modules/dictionary/persistence/encountered-terms.js';
 import type { AgentAdapter } from '@study-studio/agent-runtime';
 import type { FsrsState, SchedulerOutput } from '@study-studio/learning-algorithms';
-import { reviewScheduleEvents } from './db/schema.js';
+import { reviewScheduleEvents } from '@study-studio/storage-sqlite';
 import type { ContentRepository } from '../modules/library/ports.js';
 import type { LexiconRepository } from '../modules/dictionary/ports.js';
 import type { LearningRepository } from '../modules/practice/ports.js';

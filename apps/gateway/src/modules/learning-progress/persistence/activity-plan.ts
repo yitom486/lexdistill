@@ -29,7 +29,7 @@ import {
   dailyStudyPlans,
   practicePlanRuns,
   practiceItemAttempts,
-} from '../../../infrastructure/db/index.js';
+} from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
 import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';

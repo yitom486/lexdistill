@@ -8,7 +8,7 @@ import {
   generateId,
   nowIso,
 } from '@study-studio/shared';
-import { documentImports } from '../../../infrastructure/db/index.js';
+import { documentImports } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { DOCUMENT_SOURCE_KINDS, type DocumentSourceKind } from './document-kinds.js';
 

@@ -17,7 +17,7 @@ import { createApp } from '../../../transport/http/create-app.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 import { Database } from 'bun:sqlite';
-import { initSchema, runMigrations } from '../../../infrastructure/db/ddl.js';
+import { initSchema, runMigrations } from '@study-studio/storage-sqlite';
 
 /**
  * CMD-LINGUA-P5D2A 整书导入 prepare（mock inspector + :memory: 真库）。

@@ -7,7 +7,7 @@ import {
   BusinessError,
   translateToBusinessError,
 } from '@study-studio/shared';
-import { quizAttempts, studyActivityLogs } from '../../../infrastructure/db/index.js';
+import { quizAttempts, studyActivityLogs } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
 import { getTodayString } from '../../../infrastructure/persistence/repo-utils.js';

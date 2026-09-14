@@ -2,10 +2,12 @@ import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { initSchema, runMigrations } from '../../../infrastructure/db/ddl.js';
-import { seedMaterialization } from '../../../infrastructure/db/schema.js';
-import { SCHEMA_MIGRATIONS } from '../../../infrastructure/db/migrations/index.js';
-import { migration as v018 } from '../../../infrastructure/db/migrations/v018-seed-materialization-state.js';
+import { initSchema, runMigrations } from '@study-studio/storage-sqlite';
+import { seedMaterialization } from '@study-studio/storage-sqlite';
+import { SCHEMA_MIGRATIONS } from '@study-studio/storage-sqlite';
+// D2：v018 单文件深路径已随包搬迁；catalog 持有同一 migration 对象引用，
+// 此处改由 catalog 定位（version/name/sql pin 语义不变）。
+const v018 = SCHEMA_MIGRATIONS.find((m) => m.version === 18)!;
 import {
   computeSeedMaterializationFingerprint,
   describeSeedStatus,

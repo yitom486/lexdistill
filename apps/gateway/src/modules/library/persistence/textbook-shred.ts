@@ -8,7 +8,7 @@ import {
   textbookLines,
   textbookTermMap,
   textbookVocab,
-} from '../../../infrastructure/db/schema.js';
+} from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 export interface ShredStats {

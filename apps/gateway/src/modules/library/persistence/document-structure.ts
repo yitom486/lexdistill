@@ -8,7 +8,7 @@ import {
   nowIso,
 } from '@study-studio/shared';
 import { and, eq } from 'drizzle-orm';
-import { documentStructures } from '../../../infrastructure/db/schema.js';
+import { documentStructures } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { getDocumentById } from './documents-annotations.js';
 import type {

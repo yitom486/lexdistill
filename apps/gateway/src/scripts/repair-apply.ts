@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { Database } from 'bun:sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import * as schema from '../infrastructure/db/schema.js';
-import { runDoctor, formatDoctorReport } from '../infrastructure/db/doctor.js';
-import { applyOrphanCleanup, formatOrphanApplyReport, applySeedSourceFix } from '../infrastructure/db/repair-apply.js';
+import * as schema from '@study-studio/storage-sqlite';
+import { runDoctor, formatDoctorReport } from '@study-studio/storage-sqlite';
+import { applyOrphanCleanup, formatOrphanApplyReport, applySeedSourceFix } from '@study-studio/storage-sqlite';
 import { applySeedAstMigration } from '../modules/library/persistence/seed-repair.js';
 
 /**

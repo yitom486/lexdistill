@@ -47,7 +47,7 @@ export function pitchMeaningToGlosses(meaning: string): string[] {
 export function seedInitialData(sqlite: Database): void {
   // 将主档案镜像迁入当前语种行（仅当该语种行尚不存在）
   try {
-    sqlite.exec(`
+    sqlite.run(`
       INSERT OR IGNORE INTO learner_language_profiles (
         user_id, language, study_goal, learner_level, overall_level, overall_proficiency,
         streak_days, max_streak_days, last_active_date, retention_rate,

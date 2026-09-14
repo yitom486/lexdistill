@@ -9,8 +9,8 @@ import {
   generateId,
   nowIso,
 } from '@study-studio/shared';
-import { tocImportChunks, tocImportSessions } from '../../../infrastructure/db/index.js';
-import { documents } from '../../../infrastructure/db/index.js';
+import { tocImportChunks, tocImportSessions } from '@study-studio/storage-sqlite';
+import { documents } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { ShredTx } from './textbook-shred.js';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';

@@ -19,7 +19,7 @@ import {
   learnerProfiles,
   learnerLanguageProfiles,
   skillMetrics,
-} from '../../../infrastructure/db/index.js';
+} from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { normalizeTrackLanguage, inferLanguageFromSkillId } from '../../../infrastructure/persistence/language.js';
 import {

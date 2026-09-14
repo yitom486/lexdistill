@@ -12,8 +12,8 @@ import { executeTocImportFirst } from '../application/pdf-import/toc-import-exec
 import { executeTocImportNext } from '../application/pdf-import/toc-import-execute-next.js';
 import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { initSchema, runMigrations } from '../../../infrastructure/db/ddl.js';
-import { runDoctor } from '../../../infrastructure/db/doctor.js';
+import { initSchema, runMigrations } from '@study-studio/storage-sqlite';
+import { runDoctor } from '@study-studio/storage-sqlite';
 
 /**
  * CMD-LINGUA-P5D2C 下一个 chunk 追加（mock converter + :memory: 真库）。

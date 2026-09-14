@@ -7,7 +7,7 @@ import {
   translateToBusinessError,
   nowIso,
 } from '@study-studio/shared';
-import { ankiSettings } from '../../../infrastructure/db/index.js';
+import { ankiSettings } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import {
   ANKI_CONNECT_DEFAULT_ENDPOINT,

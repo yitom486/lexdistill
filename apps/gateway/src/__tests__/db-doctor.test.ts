@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { runDoctor } from '../infrastructure/db/doctor.js';
+import { runDoctor } from '@study-studio/storage-sqlite';
 
 /**
  * db doctor 规则测试：内存库手造脏数据，断言每条规则命中。

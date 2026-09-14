@@ -13,7 +13,7 @@ import {
   type KanaPracticeScriptType,
 } from '@study-studio/learner-core';
 import type { HangulScriptType, SubmitReadingPractice } from '@study-studio/protocol';
-import { kanaPracticeStates, skillMetrics } from '../../../infrastructure/db/index.js';
+import { kanaPracticeStates, skillMetrics } from '@study-studio/storage-sqlite';
 import {
   parseKanaPracticeMemory,
   saveKanaPracticeMemory,

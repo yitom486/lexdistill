@@ -1,4 +1,4 @@
-import { createDrizzleDb } from '../infrastructure/db/index.js';
+import { createDrizzleDb } from '@study-studio/storage-sqlite';
 import {
   installOewnPackage,
   OEWN_2025_URL,

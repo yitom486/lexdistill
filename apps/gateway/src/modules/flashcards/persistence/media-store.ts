@@ -11,7 +11,7 @@ import {
   generateId,
   nowIso,
 } from '@study-studio/shared';
-import { dictionaryMedia } from '../../../infrastructure/db/index.js';
+import { dictionaryMedia } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { defaultMediaDir } from '../../../infrastructure/persistence/app-paths.js';
 

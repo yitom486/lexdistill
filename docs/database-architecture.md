@@ -1,7 +1,7 @@
 # Database Architecture Map（P0 事实地图）
 
-> 生成方式：逐表对照 `apps/gateway/src/infrastructure/db/ddl.ts`（建表 SSOT）、
-> `db/schema.ts`（drizzle 类型）、`modules/*/persistence/*.ts`（writer/reader），
+> 生成方式：逐表对照 `packages/storage-sqlite/src/ddl.ts`（建表 SSOT）、
+> `packages/storage-sqlite/src/schema.ts`（drizzle 类型）、`modules/*/persistence/*.ts`（writer/reader），
 > 行数为例行线上库（`study-studio.db`）快照。
 > 原则：**无 FOREIGN KEY**（全库 0 条约束），关系靠列名约定 + 应用层保证。
 > 本轮 P0 只记录事实，不做 schema 重构。

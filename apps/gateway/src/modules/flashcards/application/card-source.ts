@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { localDictionaryEntries, dictionaryTermMeta } from '../../../infrastructure/db/index.js';
+import { localDictionaryEntries, dictionaryTermMeta } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import {
   resolveCardSource as resolveCardSourceUseCase,

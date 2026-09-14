@@ -11,7 +11,7 @@ import {
   logger,
 } from '@study-studio/shared';
 import type { Flashcard } from '@study-studio/protocol';
-import { localDictionaryEntries, flashcards, dictionarySearchHistory, dictionarySources, dictionaryTermMeta } from '../../../infrastructure/db/index.js';
+import { localDictionaryEntries, flashcards, dictionarySearchHistory, dictionarySources, dictionaryTermMeta } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
 import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';

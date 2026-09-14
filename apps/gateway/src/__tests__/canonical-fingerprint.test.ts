@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { canonicalJson, fingerprintCanonical } from '../infrastructure/db/canonical-fingerprint.js';
-import { TEXTBOOK_BOOKS } from '../infrastructure/db/seeds/textbook-seed.js';
+import { canonicalJson, fingerprintCanonical } from '@study-studio/storage-sqlite';
+import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
 
 /**
  * P1-D0 Task 6：canonical fingerprint 原型（纯函数，未接生产）。

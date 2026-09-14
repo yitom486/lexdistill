@@ -2,9 +2,9 @@ import { sql } from 'drizzle-orm';
 import type { Database } from 'bun:sqlite';
 import { BusinessError, err, ok, type Result, nowIso } from '@study-studio/shared';
 import type { TextbookAST } from '@study-studio/document-model';
-import { documents, seedMaterialization } from '../../../infrastructure/db/schema.js';
+import { documents, seedMaterialization } from '@study-studio/storage-sqlite';
 import { shredIntoTransaction, termMapDedupKey } from './textbook-shred.js';
-import { fingerprintCanonical } from '../../../infrastructure/db/canonical-fingerprint.js';
+import { fingerprintCanonical } from '@study-studio/storage-sqlite';
 import { eq } from 'drizzle-orm';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 

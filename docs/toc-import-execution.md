@@ -4,7 +4,7 @@
 > - 表：`toc_import_sessions` / `toc_import_chunks`（`schema.ts` + `ddl.ts` + `migrations/v019`）；
 > - 持久化：`apps/gateway/src/modules/library/persistence/toc-import-sessions.ts`；
 > - 服务：`application/pdf-import/toc-import-prepare.ts`，端点 `POST /api/documents/:userId/prepare-toc-import`；
-> - doctor 规则：`toc-import:*`（`infrastructure/db/doctor.ts` §8b）。
+> - doctor 规则：`toc-import:*`（`packages/storage-sqlite/src/doctor.ts` §8b）。
 >
 > 标签含义：**Verified fact**（代码/实测支撑）/ **设计决策**（本轮选定，改需更新本文）/
 > **Unresolved risk**（已知未解，不得据此自动决策）。

@@ -34,6 +34,7 @@
         "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
         "@study-studio/speech": "workspace:*",
+        "@study-studio/storage-sqlite": "workspace:*",
         "@study-studio/tool-core": "workspace:*",
         "drizzle-orm": "^0.45.2",
         "hono": "^4.13.5",
@@ -183,6 +184,15 @@
       "version": "0.1.2",
       "dependencies": {
         "@study-studio/shared": "workspace:*",
+      },
+    },
+    "packages/storage-sqlite": {
+      "name": "@study-studio/storage-sqlite",
+      "version": "0.1.0",
+      "dependencies": {
+        "@study-studio/document-model": "workspace:*",
+        "@study-studio/protocol": "workspace:*",
+        "drizzle-orm": "^0.45.2",
       },
     },
     "packages/tool-core": {
@@ -417,6 +427,8 @@
     "@study-studio/shared": ["@study-studio/shared@workspace:packages/shared"],
 
     "@study-studio/speech": ["@study-studio/speech@workspace:packages/speech"],
+
+    "@study-studio/storage-sqlite": ["@study-studio/storage-sqlite@workspace:packages/storage-sqlite"],
 
     "@study-studio/tool-core": ["@study-studio/tool-core@workspace:packages/tool-core"],
 

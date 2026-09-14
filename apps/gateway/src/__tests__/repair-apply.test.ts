@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { applyOrphanCleanup, applySeedSourceFix, REPAIR_ALLOWLIST } from '../infrastructure/db/repair-apply.js';
+import { applyOrphanCleanup, applySeedSourceFix, REPAIR_ALLOWLIST } from '@study-studio/storage-sqlite';
 
 /** R1-A：首次 apply 有修改，第二次为 0；白名单之外不动。 */
 const open: Database[] = [];

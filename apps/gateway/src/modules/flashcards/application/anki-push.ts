@@ -13,7 +13,7 @@ import {
 } from '../../tts/application/tts-proxy.js';
 import {
   flashcards,
-} from '../../../infrastructure/db/index.js';
+} from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { resolveCardSourceEntry } from './card-source.js';
 import { getCardFormat } from '../persistence/card-formats.js';

@@ -7,7 +7,7 @@ import {
   groundVocabsForTest,
 } from './vocab-grammar-forensic-helpers.js';
 import { appendPdfToDocument } from '../application/pdf-import/pdf-import-service.js';
-import { TEXTBOOK_BOOKS } from '../../../infrastructure/db/seeds/textbook-seed.js';
+import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
 
 /**
  * P1-D0 Vocab/Grammar Identity 取证（只调查不迁移）。

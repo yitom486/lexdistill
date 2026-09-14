@@ -4,7 +4,7 @@ import {
   extractPitchQueryTokens,
   lookupPitchEntries,
   tryPitchLexiconCoachReply,
-} from '../infrastructure/db/seeds/pitch-seed.js';
+} from '@study-studio/storage-sqlite';
 import { buildOjadSearchUrl } from '../modules/dictionary/application/dictionary-external-links.js';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { DictionaryLookupTool } from '../modules/dictionary/tools/dictionary-lookup-tool.js';

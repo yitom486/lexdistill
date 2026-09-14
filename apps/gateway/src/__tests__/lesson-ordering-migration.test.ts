@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { runMigrations, initSchema } from '../infrastructure/db/ddl.js';
+import { runMigrations, initSchema } from '@study-studio/storage-sqlite';
 
 const dbs: Database[] = [];
 afterEach(() => {

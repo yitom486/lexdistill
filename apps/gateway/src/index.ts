@@ -8,7 +8,7 @@ export * from './session/session-manager.js';
 export * from './context/context-builder.js';
 export * from './router/tool-router.js';
 export * from './router/agent-router.js';
-export * from './infrastructure/db/index.js';
+export * from '@study-studio/storage-sqlite';
 export * from './infrastructure/drizzle-learner-repository.js';
 export * from './errors/http-error-handler.js';
 

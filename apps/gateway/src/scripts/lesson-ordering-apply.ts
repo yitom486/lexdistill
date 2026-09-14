@@ -4,7 +4,7 @@ import {
   planLessonOrdering,
   applyLessonOrdering,
   formatOrderingPlan,
-} from '../infrastructure/db/lesson-ordering.js';
+} from '@study-studio/storage-sqlite';
 
 /**
  * lesson-ordering apply CLI：回填 textbook_lessons.sort_order。

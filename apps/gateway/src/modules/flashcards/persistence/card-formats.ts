@@ -14,7 +14,7 @@ import {
   validateCardFormat,
   type AnkiCardFormat,
 } from '@study-studio/flashcards';
-import { ankiCardFormats } from '../../../infrastructure/db/index.js';
+import { ankiCardFormats } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 /**

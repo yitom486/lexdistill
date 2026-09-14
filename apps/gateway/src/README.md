@@ -109,7 +109,7 @@ persistence/  →  数据库读写
 ### 第五步：最后看基础设施
 
 ```text
-infrastructure/db/
+packages/storage-sqlite/          # M4/D2 起：SQLite 适配层（schema/迁移/种子/诊断）
 infrastructure/persistence/
 infrastructure/drizzle-learner-repository.ts
 ```
@@ -406,15 +406,16 @@ FSRS 算法由 `packages/learner-core` 掌握，本模块只调用领域契约�
 
 基础设施层不拥有学习业务含义，只负责把领域契约落到具体技术上。
 
-### `infrastructure/db/`
+### `@study-studio/storage-sqlite`（M4/D2 起，前身 `infrastructure/db/`）
 
 | 路径 | 作用 |
 |---|---|
-| `schema.ts` | SQLite/Drizzle 表结构定义。 |
-| `ddl.ts` | 建表、迁移或 DDL 辅助。 |
-| `index.ts` | 数据库连接和初始化入口。 |
-| `seed-bootstrap.ts` | 开发/安装阶段的 seed 初始化和自愈逻辑。 |
-| `seeds/` | 静态课程或开发数据的种子资源。 |
+| `src/schema.ts` | SQLite/Drizzle 表结构定义。 |
+| `src/ddl.ts` | 建表、迁移或 DDL 辅助。 |
+| `src/connection.ts` | 数据库连接和初始化入口（`createDrizzleDb`）。 |
+| `src/seed-bootstrap.ts` | 开发/安装阶段的 seed 初始化和自愈逻辑。 |
+| `src/seeds/` | 静态课程或开发数据的种子资源。 |
+| `src/index.ts` | 包唯一公共出口（白名单制）。 |
 
 ### `infrastructure/persistence/`
 

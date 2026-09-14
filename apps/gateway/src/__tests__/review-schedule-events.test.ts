@@ -3,9 +3,9 @@ import { Database } from 'bun:sqlite';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { initSchema, runMigrations } from '../infrastructure/db/ddl.js';
-import { SCHEMA_MIGRATIONS } from '../infrastructure/db/migrations/index.js';
-import { reviewScheduleEvents } from '../infrastructure/db/schema.js';
+import { initSchema, runMigrations } from '@study-studio/storage-sqlite';
+import { SCHEMA_MIGRATIONS } from '@study-studio/storage-sqlite';
+import { reviewScheduleEvents } from '@study-studio/storage-sqlite';
 
 const dbs: Database[] = [];
 afterEach(() => {
@@ -126,7 +126,7 @@ describe('v22 review-schedule-events migration', () => {
   });
 
   it('schema.ts 与 ddl.ts 对应（表名/列/索引名一字对齐）', () => {
-    const raw = readFileSync(join(import.meta.dir, '../infrastructure/db/schema.ts'), 'utf-8');
+    const raw = readFileSync(join(import.meta.dir, '../../../../packages/storage-sqlite/src/schema.ts'), 'utf-8');
     const text = raw.replace(/\r\n/g, '\n');
     expect(text).toContain(`sqliteTable(\n  'review_schedule_events',`);
     for (const col of EXPECTED_COLUMNS) {

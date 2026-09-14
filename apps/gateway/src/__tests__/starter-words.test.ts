@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { LearningContentTool } from '../transport/tools/learning-content-tool.js';
-import { STARTER_WORD_SEEDS } from '../infrastructure/db/seeds/starter-words-seed.js';
+import { STARTER_WORD_SEEDS } from '@study-studio/storage-sqlite';
 import { isOk } from '@study-studio/shared';
 
 describe('starter word pack (out-of-box vocabulary)', () => {

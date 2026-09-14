@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { Database } from 'bun:sqlite';
-import { runDoctor, formatDoctorReport } from '../infrastructure/db/doctor.js';
+import { runDoctor, formatDoctorReport } from '@study-studio/storage-sqlite';
 
 /**
  * db doctor CLI：只读检查，无 FK 架构下的完整性巡检。

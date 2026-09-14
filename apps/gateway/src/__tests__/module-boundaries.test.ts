@@ -143,10 +143,11 @@ describe('gateway module boundaries (G5)', () => {
         }
       }
 
-      // R3：共享基础设施（persistence/db）不得反向依赖领域模块。
-      // 注：infrastructure/ 根门面是过渡期兼容委托方，豁免。
+      // R3：共享基础设施 persistence 不得反向依赖领域模块。
+      // 注：infrastructure/ 根门面是过渡期兼容委托方，豁免；
+      // `infrastructure/db/` 已于 M4/D2 整体迁入 `@study-studio/storage-sqlite`，本仓不再存在。
       if (
-        (rel.startsWith('infrastructure/persistence/') || rel.startsWith('infrastructure/db/')) &&
+        rel.startsWith('infrastructure/persistence/') &&
         normTarget.startsWith('modules/')
       ) {
         violations.push(`R3 ${rel} -> ${normTarget}（基础设施不得依赖领域模块）`);

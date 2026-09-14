@@ -30,6 +30,7 @@
       "@study-studio/document-model": ["./packages/document-model/src/index.ts"],
       "@study-studio/lexicon": ["./packages/lexicon/src/index.ts"],
       "@study-studio/learning": ["./packages/learning/src/index.ts"],
+      "@study-studio/storage-sqlite": ["./packages/storage-sqlite/src/index.ts"],
       "@study-studio/gateway": ["./apps/gateway/src/index.ts"]
     }
   }

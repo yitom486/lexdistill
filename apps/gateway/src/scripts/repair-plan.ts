@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { Database } from 'bun:sqlite';
-import { buildRepairPlan, formatRepairPlan } from '../infrastructure/db/repair-plan.js';
+import { buildRepairPlan, formatRepairPlan } from '@study-studio/storage-sqlite';
 
 /**
  * repair-plan dry-run CLI：只读输出历史修复候选，不写库、无 apply。

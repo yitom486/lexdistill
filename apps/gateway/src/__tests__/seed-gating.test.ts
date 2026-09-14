@@ -4,14 +4,14 @@ import { isOk } from '@study-studio/shared';
 import { parseTextbookAST } from '@study-studio/document-model';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { shredSeedTextbooks } from '../bootstrap/create-gateway.js';
-import { TEXTBOOK_BOOKS } from '../infrastructure/db/seeds/textbook-seed.js';
+import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
 import {
   computeSeedMaterializationFingerprint,
   shouldSkipSeedMaterialization,
   isTextbookProjectionHealthy,
   SEED_MATERIALIZER_VERSION,
 } from '../modules/library/persistence/seed-materialization.js';
-import { runMigrations } from '../infrastructure/db/ddl.js';
+import { runMigrations } from '@study-studio/storage-sqlite';
 
 /**
  * P1-D1 seed gating 矩阵（全临时 :memory: 库，真库零接触）。
@@ -281,7 +281,7 @@ describe('P1-D1 seed gating', () => {
   });
 
   it('v18 migration：新库即有 state 表；模拟旧库（删表+抹登记）可升级重建（仅临时库）', async () => {
-    const { initSchema, runMigrations } = await import('../infrastructure/db/ddl.js');
+    const { initSchema, runMigrations } = await import('@study-studio/storage-sqlite');
     const raw = new Database(':memory:');
     try {
       initSchema(raw);

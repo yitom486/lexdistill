@@ -10,7 +10,7 @@ import {
 import { executeTocImportFirst } from '../application/pdf-import/toc-import-execute.js';
 import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { runDoctor } from '../../../infrastructure/db/doctor.js';
+import { runDoctor } from '@study-studio/storage-sqlite';
 
 /**
  * CMD-LINGUA-P5D2B 首 chunk 执行（mock converter + :memory: 真库）。

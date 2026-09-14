@@ -7,9 +7,9 @@ import {
   formatPitchLexiconCoachReply,
   lookupPitchEntries,
   extractPitchQueryTokens,
-} from '../infrastructure/db/seeds/pitch-seed.js';
-import { KANA_SEEDS } from '../infrastructure/db/seeds/kana-seed.js';
-import { HANGUL_SEEDS } from '../infrastructure/db/seeds/hangul-seed.js';
+} from '@study-studio/storage-sqlite';
+import { KANA_SEEDS } from '@study-studio/storage-sqlite';
+import { HANGUL_SEEDS } from '@study-studio/storage-sqlite';
 
 export type LiteTrack = 'ja' | 'en' | 'ko';
 

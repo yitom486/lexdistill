@@ -1,6 +1,6 @@
 import { eq, and } from 'drizzle-orm';
 import { nowIso } from '@study-studio/shared';
-import { learnerProfiles, learnerLanguageProfiles } from '../../../infrastructure/db/index.js';
+import { learnerProfiles, learnerLanguageProfiles } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
 import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';

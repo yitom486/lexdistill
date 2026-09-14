@@ -4,7 +4,7 @@ import type {
   KanaPracticeScriptType,
   FsrsState,
 } from '@study-studio/learner-core';
-import { kanaPracticeStates, type DrizzleDb } from '../db/index.js';
+import { kanaPracticeStates, type DrizzleDb } from '@study-studio/storage-sqlite';
 
 function parseFsrsState(value: unknown): FsrsState['state'] | undefined {
   if (value === 'NEW' || value === 'LEARNING' || value === 'REVIEW' || value === 'RELEARNING') {

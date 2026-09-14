@@ -7,7 +7,7 @@ G4 迁移：持久层实现已归位 **infrastructure/**（门面）与 **module
 | `infrastructure/drizzle-learner-repository.ts` | 门面：实现 `learner-core` Repository 契约，向各域 persistence 委托；保持事务边界 |
 | `infrastructure/sqlite-learner-repository.ts` | 旧兼容门面（deprecated） |
 | `infrastructure/persistence/` | 共享基础：repo-context、repo-utils、language（语种去重待评审，见迁移计划） |
-| `infrastructure/db/` | schema、连接、迁移、seed（整体搬入，未拆表） |
+| `@study-studio/storage-sqlite`（M4/D2 起） | schema、连接、迁移、seed（整体迁入，未拆表；前身 `infrastructure/db/`） |
 | `modules/practice/persistence/` | practice-plan、practice、questions（题库读写与作答记录） |
 | `modules/learning-progress/persistence/` | profile、profile-internals、mistakes、activity-plan、learning-records |
 | `modules/review/persistence/` | cards（FSRS 闪卡） |

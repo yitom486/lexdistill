@@ -12,7 +12,7 @@ import {
   flashcards,
   INITIAL_CARD_SEEDS,
   INITIAL_EN_CARD_SEEDS,
-} from '../../../infrastructure/db/index.js';
+} from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';
 import { resolveActiveLanguage } from '../../learning-progress/public.js';

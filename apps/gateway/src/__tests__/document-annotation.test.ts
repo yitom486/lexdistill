@@ -360,7 +360,7 @@ describe('deleteDocument 生命周期（P0.5）', () => {
   }
 
   it('删除清掉 shred/FTS/位置/批注/结构，doctor 无孤儿', async () => {
-    const { runDoctor } = await import('../infrastructure/db/doctor.js');
+    const { runDoctor } = await import('@study-studio/storage-sqlite');
     await seedFullDoc('doc_life_01');
     expect(countFor('doc_life_01', 'textbook_vocab')).toBe(1);
     expect(countFor('doc_life_01', 'textbook_fts')).toBe(2);

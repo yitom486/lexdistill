@@ -1,6 +1,6 @@
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../runtime/gateway-runtime.js';
-import { TEXTBOOK_BOOKS } from '../infrastructure/db/seeds/textbook-seed.js';
+import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
 import { tryParseTextbookAst } from '../modules/library/persistence/textbook-shred.js';
 import {
   computeSeedMaterializationFingerprint,

@@ -9,9 +9,9 @@ import {
   textbookLines,
   textbookTermMap,
   textbookVocab,
-} from '../../../infrastructure/db/schema.js';
-import type { DrizzleDb } from '../../../infrastructure/db/index.js';
-import { TEXTBOOK_BOOKS } from '../../../infrastructure/db/seeds/textbook-seed.js';
+} from '@study-studio/storage-sqlite';
+import type { DrizzleDb } from '@study-studio/storage-sqlite';
+import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
 import { shredIntoTransaction } from './textbook-shred.js';
 import { nowIso } from '@study-studio/shared';
 

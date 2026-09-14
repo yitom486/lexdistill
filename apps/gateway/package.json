@@ -16,6 +16,7 @@
     "@study-studio/protocol": "workspace:*",
     "@study-studio/shared": "workspace:*",
     "@study-studio/speech": "workspace:*",
+    "@study-studio/storage-sqlite": "workspace:*",
     "@study-studio/tool-core": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5",

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 /**
  * M1-1 package 公共边界锁（静态依赖检查，无运行时、无网络）：
- * - 8 个包的 workspace 依赖白名单（方向：base → contracts → adapters）；
+ * - 各包的 workspace 依赖白名单（方向：base → contracts → adapters）；
  * - 全仓无厂商 SDK 包依赖；
  * - agent-runtime/contracts 只含契约，不反向依赖适配器；
  * - tool-core/protocol/learner-core/shared 不触达适配器与厂商 SDK；
@@ -27,6 +27,7 @@ const PACKAGES = [
   'learning',
   'document-model',
   'content',
+  'storage-sqlite',
 ] as const;
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
@@ -43,6 +44,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'learning': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/document-model', '@study-studio/learner-core', '@study-studio/learning-algorithms'],
   'document-model': ['@study-studio/shared'],
   'content': ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol'],
+  'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -428,6 +430,25 @@ describe('M1-1 package 依赖方向', () => {
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
     expect(deps['@study-studio/learning']).toBe('workspace:*');
+  });
+
+  it('storage-sqlite：SQLite 适配层，仅依赖 protocol/document-model + drizzle/bun:sqlite/node（禁 Gateway/领域/Agent/Web）', async () => {
+    expect(
+      await relativeImportsOnly('storage-sqlite', [
+        '@study-studio/protocol',
+        '@study-studio/document-model',
+        'drizzle-orm',
+        'bun:sqlite',
+        'node:crypto',
+      ])
+    ).toEqual([]);
+  });
+
+  it('gateway manifest：必须声明 storage-sqlite（M4/D2 统一入口消费方）', async () => {
+    const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
+    const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
+    const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
+    expect(deps['@study-studio/storage-sqlite']).toBe('workspace:*');
   });
 });
 

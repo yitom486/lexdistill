@@ -15,7 +15,7 @@ import type {
   GeneratedQuestion,
   Flashcard,
 } from '@study-studio/protocol';
-import { practiceCollections, practiceItems } from '../../../infrastructure/db/index.js';
+import { practiceCollections, practiceItems } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { resolveActiveLanguage } from '../../learning-progress/public.js';
 

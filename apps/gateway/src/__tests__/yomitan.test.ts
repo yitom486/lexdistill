@@ -10,7 +10,7 @@ import {
   type YomitanInstallMeta,
 } from '../modules/dictionary/application/yomitan.js';
 import { parseYomitanDictionary } from '@study-studio/lexicon';
-import { initSchema } from '../infrastructure/db/index.js';
+import { initSchema } from '@study-studio/storage-sqlite';
 
 function memDb(): Database {
   const sqlite = new Database(':memory:');

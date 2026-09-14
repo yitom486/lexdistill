@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import type { Database } from 'bun:sqlite';
 import { eq } from 'drizzle-orm';
-import { createDrizzleDb } from '../infrastructure/db/index.js';
-import type { DrizzleDb } from '../infrastructure/db/index.js';
-import { documents } from '../infrastructure/db/schema.js';
-import { TEXTBOOK_BOOKS } from '../infrastructure/db/seeds/textbook-seed.js';
+import { createDrizzleDb } from '@study-studio/storage-sqlite';
+import type { DrizzleDb } from '@study-studio/storage-sqlite';
+import { documents } from '@study-studio/storage-sqlite';
+import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
 import { applySeedAstMigration } from '../modules/library/persistence/seed-repair.js';
-import { runDoctor } from '../infrastructure/db/doctor.js';
+import { runDoctor } from '@study-studio/storage-sqlite';
 
 /**
  * R1-C：白名单种子文档的方言 AST 迁移 + shred 原子落库。

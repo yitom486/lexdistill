@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { runDoctor } from '../infrastructure/db/doctor.js';
+import { runDoctor } from '@study-studio/storage-sqlite';
 import { sha256HexText } from '../modules/library/persistence/toc-import-sessions.js';
 
 /**

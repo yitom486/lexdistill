@@ -10,7 +10,7 @@ import { and, desc, eq, isNotNull, or } from 'drizzle-orm';
 import {
   documents,
   readingPositions,
-} from '../../../infrastructure/db/schema.js';
+} from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import {
   normalizeTrackLanguage,

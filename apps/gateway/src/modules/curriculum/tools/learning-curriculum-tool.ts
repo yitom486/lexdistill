@@ -8,7 +8,7 @@ import {
 import { ok, err, type Result, BusinessError, isOk } from '@study-studio/shared';
 import type { HangulItem, KanaItem } from '@study-studio/protocol';
 import type { ContentRepository } from '../../library/ports.js';
-import { lookupPitchEntries, PITCH_LEXICON, type PitchLexiconEntry } from '../../../infrastructure/db/seeds/pitch-seed.js';
+import { lookupPitchEntries, PITCH_LEXICON, type PitchLexiconEntry } from '@study-studio/storage-sqlite';
 
 export const LearningCurriculumInputSchema = z.object({
   action: z.enum([

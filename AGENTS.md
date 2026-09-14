@@ -66,7 +66,7 @@
 ### 1.8 静态表结构与行表达动态 (Static Schema, Rows for Dynamics)
 
 - **禁止运行时动态建表**：任何"新教材 / 新用户 / 新内容"的需求一律用**加行**表达（`documents` / `textbook_*` 按 `document_id`、`user_id` 扩展行），绝不 `CREATE TABLE book_xxx` / `user_123_progress`。动态表名意味着 SQL 字符串拼接（注入风险）、迁移不可管、drizzle 类型不可见（只能 `as any` 糊，直接违反 §2.3）。
-- **新维度才值得一次版本化迁移**：只有"以前从没存过的一类信息"（如文法例句列、自带习题表）才允许 `ALTER TABLE` / 新表，且必须走 `schema_migrations` 版本登记（`ddl.ts` 的 `runMigrations` 可重放、可断言；升级 SQL 放 `apps/gateway/src/infrastructure/db/migrations/`），随发版一次性升级，不在导入某本书的瞬间现造。禁止改已发布迁移的 version / name / sql，修复用更高 version 前向迁移。
+- **新维度才值得一次版本化迁移**：只有"以前从没存过的一类信息"（如文法例句列、自带习题表）才允许 `ALTER TABLE` / 新表，且必须走 `schema_migrations` 版本登记（`ddl.ts` 的 `runMigrations` 可重放、可断言；升级 SQL 放 `packages/storage-sqlite/src/migrations/`），随发版一次性升级，不在导入某本书的瞬间现造。禁止改已发布迁移的 version / name / sql，修复用更高 version 前向迁移。
 - **教材六层模型对号入座**（新增教材相关表必须能映射进这六层，映射不进就说明设计错了）：
   - `material/document` → `documents`（`source_kind` 区分私产 `user_import` / 公共种子）；
   - `section` → `textbook_lessons`；`content_block` → `textbook_lines`；
@@ -82,7 +82,7 @@
 - **drizzle builder 是惰性的**：同步事务里必须显式 `.run()`（或 `await`），光 `tx.insert(...).values(...)` 不执行也不报错——静默零写是最阴的 bug，写完必须有行数断言的单测覆盖。
 - **原生 sql 查询只用 `db.all(...)[0]`**：`db.get(sql`…`)` 在 bun-sqlite 会话上返回形状不对（实测回 `[0]`），COUNT 查出来是 0——静默误报，同样要单测锁。
 - **禁止新的双源漂移**：新增表必须同时落 `ddl.ts`（最新建表）、`schema.ts`（类型）和 `migrations/vNNN-*.ts`（旧库升级），缺一边即视为未完成。
-- **`sqliteTable` 第三参数只许返回数组**（Drizzle 0.45）：`(table) => ({ pk: primaryKey(...) })` 命中已废弃的 `SQLiteTableExtraConfig` 对象签名，IDE 会报 deprecated。正确写法是 `(table) => [primaryKey({ columns: [...] }), index('idx_...').on(...)]`。对象键名没有运行时意义；约束/索引名写在 `primaryKey` / `index()` / `uniqueIndex()` 里。全仓库表定义只许在 `apps/gateway/src/infrastructure/db/schema.ts`；无复合主键/索引的表不要硬加第三参数。本条只约束 TypeScript schema，不改 `ddl.ts`。
+- **`sqliteTable` 第三参数只许返回数组**（Drizzle 0.45）：`(table) => ({ pk: primaryKey(...) })` 命中已废弃的 `SQLiteTableExtraConfig` 对象签名，IDE 会报 deprecated。正确写法是 `(table) => [primaryKey({ columns: [...] }), index('idx_...').on(...)]`。对象键名没有运行时意义；约束/索引名写在 `primaryKey` / `index()` / `uniqueIndex()` 里。全仓库表定义只许在 `packages/storage-sqlite/src/schema.ts`；无复合主键/索引的表不要硬加第三参数。本条只约束 TypeScript schema，不改 `ddl.ts`。
 
 ---
 

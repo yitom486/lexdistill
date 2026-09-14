@@ -1,8 +1,8 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { isOk } from '@study-studio/shared';
-import { runDoctor } from '../../../infrastructure/db/doctor.js';
-import { initSchema, runMigrations } from '../../../infrastructure/db/ddl.js';
+import { runDoctor } from '@study-studio/storage-sqlite';
+import { initSchema, runMigrations } from '@study-studio/storage-sqlite';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 
 /**

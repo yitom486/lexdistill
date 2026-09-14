@@ -18,7 +18,8 @@
     { "path": "../../packages/content" },
     { "path": "../../packages/ai-content" },
     { "path": "../../packages/lexicon" },
-    { "path": "../../packages/learning" }
+    { "path": "../../packages/learning" },
+    { "path": "../../packages/storage-sqlite" }
   ],
   "include": ["src/**/*"]
 }
