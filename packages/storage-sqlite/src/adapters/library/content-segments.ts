@@ -99,8 +99,9 @@ export function resolveProjectionEligibility(
   if (!doc) return null;
   const task = deps.sqlite
     .query(
+      // P2-1b：与 missing 查询同一排序（updated_at DESC, id DESC），双执行零漂移。
       `SELECT source_kind AS sourceKind FROM document_imports
-       WHERE document_id = ? AND status = 'done' ORDER BY updated_at DESC LIMIT 1`
+       WHERE document_id = ? AND status = 'done' ORDER BY updated_at DESC, id DESC LIMIT 1`
     )
     .get(documentId) as { sourceKind: string } | null;
   const importFormat = task ? task.sourceKind : null;
@@ -297,10 +298,13 @@ export async function findDocumentsMissingSegments(
   userId?: string | undefined
 ): Promise<Result<Array<{ id: string; userId: string; sourceKind: string }>, BusinessError>> {
   try {
-    // P2-1a：PDF／课程文档不得进入待投影列表（与首次投影／重放同一资格）。
+    // P2-1b：与 resolveProjectionEligibility 同一资格（最新 done 任务语义）。
+    // SQL 无法调用 TS 纯函数，故此处编码同一规则，漂移由三历史序列测试锁定：
+    // 最新 done 为 pdf → 排除；无任务（NULL IS NOT 'pdf' 为真）→ 纳入。
     const pdfGuard = `AND d.source_kind != 'curriculum_textbook'
-      AND NOT EXISTS (SELECT 1 FROM document_imports t
-        WHERE t.document_id = d.id AND t.source_kind = 'pdf' AND t.status = 'done')`;
+      AND (SELECT t.source_kind FROM document_imports t
+        WHERE t.document_id = d.id AND t.status = 'done'
+        ORDER BY t.updated_at DESC, t.id DESC LIMIT 1) IS NOT 'pdf'`;
     const rows =
       userId === undefined
         ? (deps.sqlite

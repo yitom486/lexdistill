@@ -474,6 +474,41 @@ describe('P2-1a 投影资格闭环（PDF／长文本／普通文本）', () => {
     expect(isProjectionEligible('user_import', null)).toBe(true);
   });
 
+  it('P2-1b 历史序列：旧PDF→新文本纳入，旧文本→新PDF排除，无任务纳入', async () => {
+    // 旧 PDF done → 新文本 done：最新为文本 → 可投影（missing 纳入＋重放成功）。
+    seedDoc(db, 'dSeq1', 'u1', 'user_import');
+    db.prepare(
+      `INSERT INTO document_imports
+         (id, user_id, source_kind, filename, status, document_id, created_at, updated_at)
+       VALUES ('t-old-pdf', 'u1', 'pdf', 'a.pdf', 'done', 'dSeq1', 't1', 't1'),
+              ('t-new-text', 'u1', 'text', 'b.txt', 'done', 'dSeq1', 't2', 't2')`
+    ).run();
+    // 旧文本 → 新 PDF：最新为 pdf → 排除＋重放拒绝。
+    seedDoc(db, 'dSeq2', 'u1', 'user_import');
+    db.prepare(
+      `INSERT INTO document_imports
+         (id, user_id, source_kind, filename, status, document_id, created_at, updated_at)
+       VALUES ('t-old-text', 'u1', 'text', 'b.txt', 'done', 'dSeq2', 't1', 't1'),
+              ('t-new-pdf', 'u1', 'pdf', 'a.pdf', 'done', 'dSeq2', 't2', 't2')`
+    ).run();
+    // 无任务行：纳入（显式宽容）。
+    seedDoc(db, 'dSeq3', 'u1', 'user_import');
+    const missing = await findDocumentsMissingSegments({ sqlite: db }, 'u1');
+    expect(isOk(missing)).toBe(true);
+    if (!isOk(missing)) return;
+    const ids = missing.value.map((m) => m.id);
+    expect(ids).toContain('dSeq1');
+    expect(ids).not.toContain('dSeq2');
+    expect(ids).toContain('dSeq3');
+    // 双执行一致：resolve 与 missing 同结论。
+    const r1 = await reprojectDocumentSegments({ sqlite: db }, { userId: 'u1', documentId: 'dSeq1' });
+    expect(isOk(r1)).toBe(true);
+    const r2 = await reprojectDocumentSegments({ sqlite: db }, { userId: 'u1', documentId: 'dSeq2' });
+    expect(isOk(r2)).toBe(false);
+    if (isOk(r2)) return;
+    expect(r2.error.code).toBe('E_INVALID_INPUT');
+  });
+
   it('PDF：不进 missing 列表，重放拒绝', async () => {
     seedPdfDoc('dPdf', 'u1');
     const missing = await findDocumentsMissingSegments({ sqlite: db }, 'u1');
