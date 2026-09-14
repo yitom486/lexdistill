@@ -5,6 +5,7 @@ import { tryParseTextbookAst } from '@study-studio/storage-sqlite';
 import {
   computeSeedMaterializationFingerprint,
   shouldSkipSeedMaterialization,
+  ensureCanonicalContentSources,
   SEED_MATERIALIZER_VERSION,
 } from '@study-studio/storage-sqlite';
 import { parseTextbookAST } from '@study-studio/document-model';
@@ -19,7 +20,25 @@ export async function createGateway(db: string = dbPath) {
   const repo = new DrizzleLearnerRepository(db);
   const server = new GatewayServer(repo);
   await shredSeedTextbooks(repo);
+  await ensureContentSourcesAtBoot(repo);
   return { repo, server };
+}
+
+/**
+ * 启动期来源登记（P2-2b；单测友好小函数）。
+ * 6 行规范来源幂等写入；失败只结构化 warn，不阻断启动（沿种子语义）。
+ */
+export async function ensureContentSourcesAtBoot(
+  repo: DrizzleLearnerRepository
+): Promise<{ ensured: number }> {
+  const res = await ensureCanonicalContentSources({ sqlite: repo.getRawDb() });
+  if (!isOk(res)) {
+    logger.warn('[boot] content sources ensure 失败（已记录，启动继续）', {
+      code: res.error.code,
+    });
+    return { ensured: 0 };
+  }
+  return { ensured: res.value.ensured };
 }
 
 /**
