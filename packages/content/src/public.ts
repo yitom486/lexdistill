@@ -1,8 +1,19 @@
 /**
  * M5.1 Content 领域包公共表面（白名单制）。
- * 首片仅含 `src/pdf`（PDF 摄取纯规则）；新增导出必须同步更新
+ * 首片仅含 `src/pdf`（PDF 摄取纯规则）；E2a 起含 `src/document`
+ * （通用文档导入纯解析：来源抽象/种类、mobi/text 解码）；新增导出必须同步更新
  * `__tests__/public-surface.test.ts` 的锁定集合，防表面无声膨胀。
  */
+export { DOCUMENT_SOURCE_KINDS } from './document/document-kinds.js';
+export type { DocumentSourceKind } from './document/document-kinds.js';
+export {
+  guessSourceKind,
+  type DocumentImporter,
+  type ExtractedText,
+  type ExtractorInput,
+} from './document/document-source.js';
+export { extractMobiText } from './document/mobi-reader.js';
+export { decodeTextBytes } from './document/text-reader.js';
 export {
   extractHeadingsFromMarkdown,
   extractTocEntries,

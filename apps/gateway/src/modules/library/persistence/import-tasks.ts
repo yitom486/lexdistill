@@ -10,7 +10,7 @@ import {
 } from '@study-studio/shared';
 import { documentImports } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { DOCUMENT_SOURCE_KINDS, type DocumentSourceKind } from './document-kinds.js';
+import { DOCUMENT_SOURCE_KINDS, type DocumentSourceKind } from '@study-studio/content';
 
 /**
  * 文档导入任务持久化（状态机 processing → done/failed；读侧永不抛）。

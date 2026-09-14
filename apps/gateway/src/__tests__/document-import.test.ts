@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { promises as fsp } from 'node:fs';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { decodeTextBytes } from '../modules/library/application/document-import/text-reader.js';
+import { decodeTextBytes } from '@study-studio/content';
 import {
   xhtmlToMarkdown,
   extractEpubText,
@@ -14,9 +14,9 @@ import {
 import {
   guessSourceKind,
   DOCUMENT_SOURCE_KINDS,
-} from '../modules/library/application/document-import/document-source.js';
+} from '@study-studio/content';
 import { LibraryImportTool } from '../modules/library/tools/library-import-tool.js';
-import { extractMobiText } from '../modules/library/application/document-import/mobi-reader.js';
+import { extractMobiText } from '@study-studio/content';
 import {
   assertPublicWebUrl,
   fetchPublicWebText,

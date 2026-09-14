@@ -28,7 +28,7 @@ import type {
 import type { SavedDocumentStructure } from './persistence/document-structure.js';
 import type { ShredStats } from './persistence/textbook-shred.js';
 import type { MaterializeSeedInput } from './persistence/seed-materialization.js';
-import type { ReadingPosition } from './persistence/reading-positions.js';
+import type { ReadingPosition } from '@study-studio/storage-sqlite';
 
 /**
  * M1-2 内容（content）领域仓储能力契约（文档/教材/课程底座/导入任务）。

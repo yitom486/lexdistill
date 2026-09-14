@@ -4,11 +4,13 @@
  * 上层（HTTP 路由 / Tool / 未来 WS 任务）只认 DocumentImporter：
  * 给定来源字节 → 产出 {title, markdown} → 统一走 markdownToAst + 入库 + 任务记录。
  * OCR/运行时是源之外的能力层（pdf-runtime），不在本抽象内——与词语链路无关。
+ *
+ * E2a 起家在 content/src/document（前身 gateway modules/library/...；逻辑不变）。
  */
 
-export type { DocumentSourceKind } from '../../persistence/document-kinds.js';
-export { DOCUMENT_SOURCE_KINDS } from '../../persistence/document-kinds.js';
-import type { DocumentSourceKind } from '../../persistence/document-kinds.js';
+export type { DocumentSourceKind } from './document-kinds.js';
+export { DOCUMENT_SOURCE_KINDS } from './document-kinds.js';
+import type { DocumentSourceKind } from './document-kinds.js';
 
 export interface ExtractedText {  title: string;
   markdown: string;

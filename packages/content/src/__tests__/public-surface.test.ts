@@ -8,6 +8,8 @@ import * as pub from '../public.js';
  * Gateway facade 与消费者（防悬挂引用）。
  */
 const EXPECTED_RUNTIME_KEYS = new Set([
+  // E2a 起含 src/document（来源抽象/种类、mobi/text 解码）。
+  'DOCUMENT_SOURCE_KINDS',
   'FOLIO_CANDIDATE_MAX_PAGES',
   'FOLIO_OCR_MIN_CONFIDENCE',
   'MIN_SEMANTIC_RATIO',
@@ -16,13 +18,16 @@ const EXPECTED_RUNTIME_KEYS = new Set([
   'buildPdfConvertReport',
   'buildPdfMapReport',
   'classifyEmbeddedOutline',
+  'decodeTextBytes',
   'detectDocScript',
   'detectFolioCandidates',
   'extractHeadingsFromMarkdown',
+  'extractMobiText',
   'extractTocEntries',
   'groundClassesByTitle',
   'groupSectionsByClasses',
   'groupSectionsByLesson',
+  'guessSourceKind',
   'isSemanticOutlineTitle',
   'layoutItemsToCandidates',
   'markdownToAst',
@@ -33,7 +38,7 @@ const EXPECTED_RUNTIME_KEYS = new Set([
 ]);
 
 describe('content public surface', () => {
-  it('运行时导出不多不少（22 项）', () => {
+  it('运行时导出不多不少（26 项）', () => {
     const actual = new Set(Object.keys(pub));
     expect(actual.size).toBe(EXPECTED_RUNTIME_KEYS.size);
     for (const key of actual) {

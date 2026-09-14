@@ -5,7 +5,7 @@ import {
   DOCUMENT_SOURCE_KINDS,
   guessSourceKind,
   type DocumentSourceKind,
-} from '../application/document-import/document-source.js';
+} from '@study-studio/content';
 import { readDocumentFileBytes } from '../application/document-import/document-import-service.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 

@@ -77,6 +77,12 @@ export {
   type RecordReadingExposuresInput,
 } from './adapters/dictionary/encountered-terms.js';
 export {
+  saveReadingPosition,
+  getReadingPosition,
+  listDocumentLessonRefs,
+  type ReadingPosition,
+} from './adapters/document/reading-positions.js';
+export {
   KANA_SEEDS,
   HANGUL_SEEDS,
   INITIAL_READING_SEEDS,

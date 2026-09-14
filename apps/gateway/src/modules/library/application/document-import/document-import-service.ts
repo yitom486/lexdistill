@@ -18,10 +18,10 @@ import {
   guessSourceKind,
   type DocumentSourceKind,
   type DocumentImporter,
-} from './document-source.js';
-import { decodeTextBytes } from './text-reader.js';
+} from '@study-studio/content';
+import { decodeTextBytes } from '@study-studio/content';
 import { extractEpubText } from './epub-reader.js';
-import { extractMobiText } from './mobi-reader.js';
+import { extractMobiText } from '@study-studio/content';
 import { extractWebArticle } from './url-reader.js';
 import {
   createImportTask,

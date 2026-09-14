@@ -105,7 +105,7 @@ import {
   getReadingPosition as getReadingPositionDomain,
   listDocumentLessonRefs as listDocumentLessonRefsDomain,
   type ReadingPosition,
-} from '../modules/library/persistence/reading-positions.js';
+} from '@study-studio/storage-sqlite';
 import {
   listCardFormats as listCardFormatsDomain,
   saveCardFormat as saveCardFormatDomain,

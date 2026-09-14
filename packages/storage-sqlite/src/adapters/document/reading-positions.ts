@@ -7,12 +7,15 @@ import {
   nowIso,
 } from '@study-studio/shared';
 import { and, eq } from 'drizzle-orm';
-import { readingPositions } from '@study-studio/storage-sqlite';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+import { readingPositions } from '../../schema.js';
+import type { DrizzleDb } from '../../connection.js';
 
 /**
  * 阅读位置域：每用户每文档一条（upsert），locator 为不透明 JSON（lessonId/offset/page 由前端组装）。
  * 只记“看到哪”，不解析语义；quote 级锚定仍走 annotations 表。
+ *
+ * D3 起家在 storage-sqlite（前身 gateway modules/library/persistence/reading-positions.ts，
+ * 逻辑不变）。参数收窄为 `{ db }`：调用方传完整 RepoDeps 依然兼容（结构化类型）。
  */
 
 export interface ReadingPosition {
@@ -37,7 +40,7 @@ function parseLocator(raw: string | null): Record<string, unknown> {
 
 /** 保存阅读位置（narrow 失败拒绝；document 归属不校验——位置是私有游标，错 id 只影响自己）。 */
 export async function saveReadingPosition(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   userId: string,
   documentId: string,
   locator: unknown
@@ -76,7 +79,7 @@ export async function saveReadingPosition(
 }
 
 /** 读取阅读位置（无记录返回 null，不算错）。 */
-export async function getReadingPosition(  deps: RepoDeps,
+export async function getReadingPosition(  deps: { db: DrizzleDb },
   userId: string,
   documentId: string
 ): Promise<Result<ReadingPosition | null, BusinessError>> {
@@ -120,7 +123,7 @@ export async function getReadingPosition(  deps: RepoDeps,
  * 只返回 lessonId 字符串集合，不返回用户身份；坏 locator 静默跳过。
  */
 export async function listDocumentLessonRefs(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   documentId: string
 ): Promise<Result<string[], BusinessError>> {
   const docId = documentId.trim();
