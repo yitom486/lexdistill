@@ -26,6 +26,14 @@ function freshDb(): Database {
   return db;
 }
 
+/** P1-3a：documents 行播种（投影／选区的前置归属）。 */
+function seedDoc(db: Database, id: string, userId: string, sourceKind: string): void {
+  db.prepare(
+    `INSERT INTO documents (id, user_id, title, source_kind, language, content, created_at, updated_at)
+     VALUES (?, ?, 'T', ?, 'ja', 'c', 't', 't')`
+  ).run(id, userId, sourceKind);
+}
+
 describe('P1-3 content-segments', () => {
   let db: Database;
   beforeEach(() => {
@@ -33,7 +41,9 @@ describe('P1-3 content-segments', () => {
   });
 
   it('投影→列表：ord 致密，hash 作用域化', async () => {
+    seedDoc(db, 'd1', 'u1', 'user_import');
     const res = await projectContentSegments({ sqlite: db }, {
+      userId: 'u1',
       documentId: 'd1',
       texts: ['第一段', '第二段', '第三段'],
     });
@@ -48,7 +58,8 @@ describe('P1-3 content-segments', () => {
   });
 
   it('重跑幂等：同 hash 全跳过，零重复行', async () => {
-    const input = { documentId: 'd1', texts: ['甲', '乙'] };
+    seedDoc(db, 'd1', 'u1', 'user_import');
+    const input = { userId: 'u1', documentId: 'd1', texts: ['甲', '乙'] };
     const first = await projectContentSegments({ sqlite: db }, input);
     expect(isOk(first) && first.value.inserted).toBe(2);
     const second = await projectContentSegments({ sqlite: db }, input);
@@ -60,8 +71,10 @@ describe('P1-3 content-segments', () => {
   });
 
   it('相同文本跨文档不冲突（作用域 hash）', async () => {
-    await projectContentSegments({ sqlite: db }, { documentId: 'd1', texts: ['同文'] });
-    const res = await projectContentSegments({ sqlite: db }, { documentId: 'd2', texts: ['同文'] });
+    seedDoc(db, 'd1', 'u1', 'user_import');
+    seedDoc(db, 'd2', 'u1', 'user_import');
+    await projectContentSegments({ sqlite: db }, { userId: 'u1', documentId: 'd1', texts: ['同文'] });
+    const res = await projectContentSegments({ sqlite: db }, { userId: 'u1', documentId: 'd2', texts: ['同文'] });
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.inserted).toBe(1);
@@ -69,8 +82,9 @@ describe('P1-3 content-segments', () => {
   });
 
   it('同作用域不同文本即漂移 fail-closed', async () => {
-    await projectContentSegments({ sqlite: db }, { documentId: 'd1', texts: ['原文'] });
-    const res = await projectContentSegments({ sqlite: db }, { documentId: 'd1', texts: ['改文'] });
+    seedDoc(db, 'd1', 'u1', 'user_import');
+    await projectContentSegments({ sqlite: db }, { userId: 'u1', documentId: 'd1', texts: ['原文'] });
+    const res = await projectContentSegments({ sqlite: db }, { userId: 'u1', documentId: 'd1', texts: ['改文'] });
     expect(isOk(res)).toBe(false);
     if (isOk(res)) return;
     expect(res.error.code).toBe('E_SEGMENT_SCOPE_CONFLICT');
@@ -139,7 +153,8 @@ describe('P1-3 selection-contexts（SI-1/2/3）', () => {
   });
 
   it('段选区：document 缺省时以段归属回填', async () => {
-    await projectContentSegments({ sqlite: db }, { documentId: 'd9', texts: ['可点文本'] });
+    seedDoc(db, 'd9', 'u1', 'user_import');
+    await projectContentSegments({ sqlite: db }, { userId: 'u1', documentId: 'd9', texts: ['可点文本'] });
     const segs = await listContentSegments({ sqlite: db }, 'd9');
     if (!isOk(segs)) return;
     const res = await captureSelectionContext({ sqlite: db }, {
@@ -165,7 +180,9 @@ describe('P1-3 selection-contexts（SI-1/2/3）', () => {
   });
 
   it('SI-2：归属不一致拒绝；未知段拒绝', async () => {
-    await projectContentSegments({ sqlite: db }, { documentId: 'd9', texts: ['文本'] });
+    seedDoc(db, 'd9', 'u1', 'user_import');
+    seedDoc(db, 'other-doc', 'u1', 'user_import');
+    await projectContentSegments({ sqlite: db }, { userId: 'u1', documentId: 'd9', texts: ['文本'] });
     const segs = await listContentSegments({ sqlite: db }, 'd9');
     if (!isOk(segs)) return;
     const clash = await captureSelectionContext({ sqlite: db }, {
@@ -287,5 +304,110 @@ describe('P1-3 encountered-term counts（CI-1/2/3/5）', () => {
       .query('SELECT lookup_count AS l, read_count AS r FROM encountered_terms')
       .get() as { l: number; r: number };
     expect(again).toEqual({ l: 1, r: 1 });
+  });
+});
+
+describe('P1-3a 文档隔离（自有／跨用户／公共／不一致／孤儿）', () => {
+  let db: Database;
+  beforeEach(() => {
+    db = freshDb();
+    seedDoc(db, 'dA', 'uA', 'user_import');
+    seedDoc(db, 'dC', 'default_user', 'curriculum_textbook');
+    seedDoc(db, 'dB', 'uB', 'user_import');
+  });
+
+  function codeOf(r: unknown): string {
+    return !isOk(r as never) ? (r as { error: { code: string } }).error.code : 'OK';
+  }
+
+  it('自有：投影＋选区通过', async () => {
+    const p = await projectContentSegments({ sqlite: db }, {
+      userId: 'uA',
+      documentId: 'dA',
+      texts: ['自有文本'],
+    });
+    expect(isOk(p)).toBe(true);
+    const s = await captureSelectionContext({ sqlite: db }, {
+      userId: 'uA',
+      language: 'ja',
+      documentId: 'dA',
+      surface: '自有',
+      normalizedText: '自有文本',
+    });
+    expect(isOk(s)).toBe(true);
+  });
+
+  it('跨用户：投影／文档选区／段选区统一 E_NOT_FOUND', async () => {
+    await projectContentSegments({ sqlite: db }, { userId: 'uA', documentId: 'dA', texts: ['t'] });
+    const segs = await listContentSegments({ sqlite: db }, 'dA');
+    if (!isOk(segs)) return;
+    const p = await projectContentSegments({ sqlite: db }, { userId: 'uB', documentId: 'dA', texts: ['t'] });
+    expect(codeOf(p)).toBe('E_NOT_FOUND');
+    const sDoc = await captureSelectionContext({ sqlite: db }, {
+      userId: 'uB',
+      language: 'ja',
+      documentId: 'dA',
+      surface: 'x',
+      normalizedText: 'y',
+    });
+    expect(codeOf(sDoc)).toBe('E_NOT_FOUND');
+    const sSeg = await captureSelectionContext({ sqlite: db }, {
+      userId: 'uB',
+      language: 'ja',
+      segmentId: segs.value[0]!.id,
+      surface: 'x',
+      normalizedText: 'y',
+    });
+    expect(codeOf(sSeg)).toBe('E_NOT_FOUND');
+  });
+
+  it('公共教材：他用户投影＋选区通过', async () => {
+    const p = await projectContentSegments({ sqlite: db }, {
+      userId: 'uB',
+      documentId: 'dC',
+      texts: ['公共课文'],
+    });
+    expect(isOk(p)).toBe(true);
+    const s = await captureSelectionContext({ sqlite: db }, {
+      userId: 'uB',
+      language: 'ja',
+      documentId: 'dC',
+      surface: '公共',
+      normalizedText: '公共课文',
+    });
+    expect(isOk(s)).toBe(true);
+  });
+
+  it('归属不一致：文档与段分属两主拒绝', async () => {
+    await projectContentSegments({ sqlite: db }, { userId: 'uB', documentId: 'dB', texts: ['乙文本'] });
+    const segs = await listContentSegments({ sqlite: db }, 'dB');
+    if (!isOk(segs)) return;
+    const res = await captureSelectionContext({ sqlite: db }, {
+      userId: 'uA',
+      language: 'ja',
+      documentId: 'dA',
+      segmentId: segs.value[0]!.id,
+      surface: 'x',
+      normalizedText: 'y',
+    });
+    expect(isOk(res)).toBe(false);
+  });
+
+  it('孤儿：未知文档投影／选区统一 E_NOT_FOUND', async () => {
+    const p = await projectContentSegments({ sqlite: db }, {
+      userId: 'uA',
+      documentId: 'ghost-doc',
+      texts: ['t'],
+    });
+    expect(codeOf(p)).toBe('E_NOT_FOUND');
+    const s = await captureSelectionContext({ sqlite: db }, {
+      userId: 'uA',
+      language: 'ja',
+      documentId: 'ghost-doc',
+      surface: 'x',
+      normalizedText: 'y',
+    });
+    expect(codeOf(s)).toBe('E_NOT_FOUND');
+    expect(db.query('SELECT COUNT(*) AS n FROM content_segments').get()).toEqual({ n: 0 });
   });
 });

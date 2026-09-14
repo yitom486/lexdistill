@@ -9,6 +9,7 @@ import {
   nowIso,
 } from '@study-studio/shared';
 import type { Database } from 'bun:sqlite';
+import { getVisibleDocument } from './document-visibility.js';
 
 /**
  * 内容段地址（P1-3；v23）。
@@ -80,6 +81,8 @@ function toContentSegment(row: ContentSegmentRow): ContentSegment {
 }
 
 export interface ProjectSegmentsInput {
+  /** 投影发起用户：文档不存在或不可见一律拒绝（P1-3a，防孤儿段＋防跨用户）。 */
+  userId: string;
   documentId: string;
   /** ''＝文档直属段；否则对应 lesson 行（P1-2a R3：'' 明确无外键）。 */
   lessonId?: string | undefined;
@@ -98,9 +101,17 @@ export async function projectContentSegments(
   deps: { sqlite: Database },
   input: ProjectSegmentsInput
 ): Promise<Result<{ inserted: number; skipped: number }, BusinessError>> {
+  const userId = input.userId.trim();
+  if (!userId || userId.length > 64) {
+    return err(new BusinessError('E_INVALID_INPUT', 'userId 非法', 'VALIDATION'));
+  }
   const documentId = input.documentId.trim();
   if (!documentId) {
     return err(new BusinessError('E_INVALID_INPUT', 'documentId 非法', 'VALIDATION'));
+  }
+  // P1-3a：孤儿拒绝＋可见性（不存在与不可见统一 E_NOT_FOUND，不泄露存在性）。
+  if (!getVisibleDocument(deps.sqlite, userId, documentId)) {
+    return err(new BusinessError('E_NOT_FOUND', '未找到指定的文档', 'LEARNER_STATE'));
   }
   const lessonId = (input.lessonId ?? '').trim();
   const kind = input.kind ?? SEGMENT_KIND_FALLBACK;

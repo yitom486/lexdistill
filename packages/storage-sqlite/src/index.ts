@@ -234,3 +234,4 @@ export {
   type SelectionContext,
   type CaptureSelectionInput,
 } from './adapters/library/selection-contexts.js';
+export { getVisibleDocument, type VisibleDocument } from './adapters/library/document-visibility.js';

@@ -8,6 +8,7 @@ import {
   nowIso,
 } from '@study-studio/shared';
 import type { Database } from 'bun:sqlite';
+import { getVisibleDocument } from './document-visibility.js';
 
 /**
  * 选区上下文（P1-3；v25）。
@@ -15,7 +16,8 @@ import type { Database } from 'bun:sqlite';
  * - SI-1：禁止 document／segment／normalized_text 三空记录；
  * - SI-2：segment 非空 ⇒ 段行存在；document 与 segment 同时非空 ⇒
  *   段归属必须等于 selection.document_id；document 为空则写时以段归属回填；
- * - SI-3：user／language 必填（与 document 归属一致性由调用域保证）。
+ * - SI-3：user／language 必填；文档可见性（自有或公共教材）由本层按
+ *   P1-C0.8 规则执行，不存在与不可见统一 E_NOT_FOUND。
  */
 
 const SUPPORTED_LANGUAGES = new Set(['ja', 'en', 'ko']);
@@ -117,6 +119,11 @@ export async function captureSelectionContext(
         );
       }
       if (!doc) doc = seg.document_id;
+    }
+    // P1-3a：三路径统一可见性（document-only／segment-only／两者并存皆经此门；
+    // 不存在与不可见统一 E_NOT_FOUND，不泄露存在性）。
+    if (!doc || !getVisibleDocument(deps.sqlite, userId, doc)) {
+      return err(new BusinessError('E_NOT_FOUND', '未找到指定的文档', 'LEARNER_STATE'));
     }
     const now = nowIso();
     const id = generateId('sel');
