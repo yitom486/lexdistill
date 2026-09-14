@@ -19,7 +19,7 @@ import {
   DocumentSourceKindSchema,
   type DocumentSourceKind,
 } from '@study-studio/protocol';
-import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, textbookTermMap, documentStructures, readingPositions } from '@study-studio/storage-sqlite';
+import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, textbookTermMap, documentStructures, readingPositions, captureSelectionContext } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { shredIntoTransaction } from '@study-studio/storage-sqlite';
 import { markSessionsTargetDeletedInTx } from '@study-studio/storage-sqlite';
@@ -340,6 +340,33 @@ export async function saveAnnotation(
       flashcardId: ann.flashcardId ?? null,
       createdAt: ann.createdAt || nowIso(),
     });
+
+    // P3-1 选区接线：批注成功后显式 capture（文档语种就地解析；失败只 warn，
+    // 批注本身已成功——绝不伪报 capture 成功，也不推翻批注）。
+    const docRes = await getDocumentById(deps, ann.documentId);
+    const docLang = isOk(docRes) && docRes.value ? docRes.value.language : null;
+    if (docLang === 'ja' || docLang === 'en' || docLang === 'ko') {
+      const captured = await captureSelectionContext({ sqlite: deps.sqlite }, {
+        userId: ann.userId,
+        language: docLang,
+        documentId: ann.documentId,
+        surface: ann.quote.slice(0, 500),
+        normalizedText: ann.quote,
+        startOffset: ann.startOffset,
+        endOffset: ann.endOffset,
+      });
+      if (!isOk(captured)) {
+        logger.warn('[annotations] selection capture failed', {
+          code: captured.error.code,
+          annotationId: ann.id,
+        });
+      }
+    } else {
+      logger.warn('[annotations] selection capture skipped', {
+        reason: 'document-missing-or-language',
+        annotationId: ann.id,
+      });
+    }
 
     return ok(ann);
   } catch (error) {

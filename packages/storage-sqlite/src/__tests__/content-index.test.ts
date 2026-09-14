@@ -300,6 +300,10 @@ describe('P1-3 encountered-term counts（CI-1/2/3/5）', () => {
 
   it('分计数按来源折算：lookup/read/collect', async () => {
     const deps = { sqlite: db };
+    db.prepare(
+      `INSERT INTO documents (id, user_id, title, source_kind, language, content, created_at, updated_at)
+       VALUES ('d1', 'u1', 'T', 'user_import', 'ja', 'c', 't', 't')`
+    ).run();
     await recordTermExposure(deps, { userId: 'u1', language: 'ja', headword: '曖昧', reading: 'あいまい', source: 'lookup' });
     await recordTermExposure(deps, { userId: 'u1', language: 'ja', headword: '曖昧', reading: 'あいまい', source: 'lookup' });
     await recordTermExposure(deps, { userId: 'u1', language: 'ja', headword: '曖昧', reading: 'あいまい', source: 'reading', documentId: 'd1' });
@@ -334,6 +338,10 @@ describe('P1-3 encountered-term counts（CI-1/2/3/5）', () => {
 
   it('v027 回填：清零后重放恢复，重跑稳定', async () => {
     const deps = { sqlite: db };
+    db.prepare(
+      `INSERT INTO documents (id, user_id, title, source_kind, language, content, created_at, updated_at)
+       VALUES ('d1', 'u1', 'T', 'user_import', 'ja', 'c', 't', 't')`
+    ).run();
     await recordTermExposure(deps, { userId: 'u1', language: 'ja', headword: '曖昧', source: 'lookup' });
     await recordTermExposure(deps, { userId: 'u1', language: 'ja', headword: '曖昧', source: 'import', documentId: 'd1' });
     // 模拟 v027 前历史行：计数清零。

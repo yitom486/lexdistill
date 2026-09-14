@@ -8,6 +8,7 @@ import {
   nowIso,
 } from '@study-studio/shared';
 import type { Database } from 'bun:sqlite';
+import { getVisibleDocument } from '../library/document-visibility.js';
 
 /**
  * 相遇词（EncounteredTerm）域：用户在查词/收藏/阅读中真实见过的词。
@@ -194,6 +195,12 @@ export async function recordTermExposure(
   if (!headword) {
     return err(new BusinessError('E_INVALID_INPUT', 'headword 为空', 'VALIDATION'));
   }
+  // P3-1：带 documentId 即验可见性（自有或公共教材；不存在与不可见统一
+  // E_NOT_FOUND，不泄露存在性）。无 documentId 调用（收藏／历史回填）不受影响。
+  const documentId = (input.documentId ?? '').trim().slice(0, 128) || null;
+  if (documentId && !getVisibleDocument(deps.sqlite, userId, documentId)) {
+    return err(new BusinessError('E_NOT_FOUND', '未找到指定的文档', 'LEARNER_STATE'));
+  }
   const reading = (input.reading ?? '').trim().slice(0, 64);
   const quote = (input.quote ?? '').trim().slice(0, 500);
   const termKey = buildTermKey(headword, reading);
@@ -213,7 +220,7 @@ export async function recordTermExposure(
         status: nextStatus,
         flashcardId: input.flashcardId ?? null,
         source: input.source,
-        documentId: input.documentId ?? null,
+        documentId,
         quote,
         lookupInc,
         readInc,

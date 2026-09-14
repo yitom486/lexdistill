@@ -161,11 +161,16 @@ export function createDictionaryRoutes(deps: GatewayDeps) {
   })
   // 本地词典优先；仅在日语本地未命中时提供 OJAD 外链，不代理或抓取 OJAD。
   .get('/api/dictionary/:language', async (c) => {
+    // P3-1 阅读上下文透传（可选 query param；Tool 名／权限不变）。
+    const lookupDocumentId = c.req.query('documentId')?.trim() || undefined;
+    const lookupQuote = c.req.query('quote')?.trim() || undefined;
     const result = await deps.server.toolRegistry.execute(
       'dictionary.lookup',
       {
         language: c.req.param('language'),
         query: c.req.query('q') ?? '',
+        ...(lookupDocumentId ? { documentId: lookupDocumentId } : {}),
+        ...(lookupQuote ? { quote: lookupQuote } : {}),
       },
       { userId: c.req.query('userId') || 'dictionary_http', sessionId: 'dictionary_http' }
     );

@@ -21,6 +21,7 @@ interface PopupState {
   language: LookupLanguage;
   x: number;
   y: number;
+  documentId?: string | undefined;
 }
 
 /** 选中目标是否可触发（输入框/浮层自身/手动工具栏容器一律跳过）。 */
@@ -50,7 +51,8 @@ export function SelectionLookupPopup() {
   const collect = useCollectDictionaryEntryMutation();
   const lookup = useDictionaryLookupQuery(
     popup?.language ?? 'ja',
-    popup?.text ?? ''
+    popup?.text ?? '',
+    popup?.documentId
   );
 
   useEffect(() => subscribeLookupPopup((req) => setPopup(req)), []);

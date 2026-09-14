@@ -12,6 +12,8 @@ export interface LookupPopupRequest {
   /** 视口坐标（fixed 定位用）。 */
   x: number;
   y: number;
+  /** P3-1 阅读上下文（可选）：阅读器透传当前文档，无则保持旧语义。 */
+  documentId?: string | undefined;
 }
 
 type LookupPopupListener = (request: LookupPopupRequest | null) => void;

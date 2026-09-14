@@ -197,6 +197,8 @@ export function InteractivePdfReader({
       language,
       x: selectionPopupPosition.x + 280,
       y: selectionPopupPosition.y,
+      // P3-1 阅读上下文：查词 occurrence 带文档归属。
+      documentId: book.documentId ?? book.id,
     });
   };
 

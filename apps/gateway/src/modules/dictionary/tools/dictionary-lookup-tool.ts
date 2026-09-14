@@ -14,6 +14,9 @@ import { buildOjadSearchUrl } from '../application/dictionary-external-links.js'
 export const DictionaryLookupInputSchema = z.object({
   language: z.enum(['ja', 'en', 'ko']),
   query: z.string().trim().min(1).max(64),
+  /** P3-1 阅读上下文（可选）：阅读中查词透传文档与选区引用；缺省保持旧语义。 */
+  documentId: z.string().trim().min(1).max(128).optional(),
+  quote: z.string().trim().min(1).max(500).optional(),
 });
 
 export type DictionaryLookupInput = z.infer<typeof DictionaryLookupInputSchema>;
@@ -78,6 +81,9 @@ export class DictionaryLookupTool
             headword: top.headword,
             ...(top.reading ? { reading: top.reading } : {}),
             source: 'lookup',
+            // P3-1：阅读上下文直达 occurrence（可见性由 Repository 层校验）。
+            ...(input.documentId ? { documentId: input.documentId } : {}),
+            ...(input.quote ? { quote: input.quote } : {}),
           })
           .catch(() => {});
       }

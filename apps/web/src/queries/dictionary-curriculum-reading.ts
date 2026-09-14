@@ -445,16 +445,23 @@ export function useCollectDictionaryEntryMutation(userId = DEFAULT_USER_ID) {
 /** 通用本地词典查询；日语未命中时由 Gateway 返回 OJAD 外链，前端不直接请求 OJAD。 */
 export function useDictionaryLookupQuery(
   language: 'ja' | 'en' | 'ko',
-  query: string
+  query: string,
+  /** P3-1 阅读上下文（可选）：透传后 occurrence 带文档归属，无则旧语义。 */
+  documentId?: string | undefined
 ) {
   const normalized = query.trim();
   const profileUserId = useUserProfileStore((s) => s.profile.userId || DEFAULT_USER_ID);
   return useQuery<DictionaryLookupResult>({
-    queryKey: [...QUERY_KEYS.DICTIONARY, language, normalized],
+    queryKey: [...QUERY_KEYS.DICTIONARY, language, normalized, documentId ?? ''],
     enabled: Boolean(normalized),
     queryFn: async () => {
+      const params = new URLSearchParams({
+        q: normalized,
+        userId: profileUserId,
+        ...(documentId ? { documentId, quote: normalized } : {}),
+      });
       const response = await fetch(
-        `${GATEWAY_BASE_URL}/api/dictionary/${language}?q=${encodeURIComponent(normalized)}&userId=${encodeURIComponent(profileUserId)}`
+        `${GATEWAY_BASE_URL}/api/dictionary/${language}?${params.toString()}`
       );
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
