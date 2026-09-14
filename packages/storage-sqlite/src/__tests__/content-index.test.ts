@@ -6,6 +6,7 @@ import {
   projectContentSegments,
   listContentSegments,
   segmentHash,
+  chunkTextToSegments,
 } from '../adapters/library/content-segments.js';
 import {
   ensureCanonicalContentSources,
@@ -33,6 +34,42 @@ function seedDoc(db: Database, id: string, userId: string, sourceKind: string): 
      VALUES (?, ?, 'T', ?, 'ja', 'c', 't', 't')`
   ).run(id, userId, sourceKind);
 }
+
+describe('P2-1 chunkTextToSegments（换行／Unicode 偏移／空段）', () => {
+  it('空行分段＋偏移回代一致', () => {
+    const content = '第一段内容\n\n第二段内容';
+    const chunks = chunkTextToSegments(content);
+    expect(chunks.length).toBe(2);
+    for (const c of chunks) {
+      expect(content.slice(c.start, c.end)).toBe(c.text);
+    }
+    expect(chunks[0]).toMatchObject({ text: '第一段内容', start: 0 });
+  });
+
+  it('\\r\\n 与空白行统一处理，空段丢弃不占位', () => {
+    const content = 'A\r\n\r\n   \r\nB\n\n\nC';
+    const chunks = chunkTextToSegments(content);
+    expect(chunks.map((c) => c.text)).toEqual(['A', 'B', 'C']);
+    for (const c of chunks) {
+      expect(content.slice(c.start, c.end)).toBe(c.text);
+    }
+  });
+
+  it('emoji／代理对偏移一致（UTF-16 码元语义）', () => {
+    const content = '你好🌸世界\n\n第二段🎉';
+    const chunks = chunkTextToSegments(content);
+    expect(chunks.length).toBe(2);
+    for (const c of chunks) {
+      expect(content.slice(c.start, c.end)).toBe(c.text);
+    }
+    expect(chunks[1]!.text).toBe('第二段🎉');
+  });
+
+  it('纯空白输入得零段', () => {
+    expect(chunkTextToSegments('   \n\n  ')).toEqual([]);
+    expect(chunkTextToSegments('')).toEqual([]);
+  });
+});
 
 describe('P1-3 content-segments', () => {
   let db: Database;

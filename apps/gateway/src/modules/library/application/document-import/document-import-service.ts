@@ -7,6 +7,7 @@ import {
   translateToBusinessError,
   generateId,
   nowIso,
+  logger,
 } from '@study-studio/shared';
 import type { DocumentItem } from '@study-studio/protocol';
 import type { TextbookAST } from '@study-studio/document-model';
@@ -26,6 +27,8 @@ import { extractWebArticle } from './url-reader.js';
 import {
   createImportTask,
   updateImportTask,
+  chunkTextToSegments,
+  projectContentSegments,
   type ImportTask,
 } from '@study-studio/storage-sqlite';
 import { saveCanonicalAst } from '../../persistence/documents-annotations.js';
@@ -234,6 +237,24 @@ export async function importDocument(
       updatedAt: now,
     }, book);
     if (!isOk(saved)) throw saved.error;
+    // P2-1 段投影（提交后显式步骤，非同一事务；失败只 warn 不挡导入，
+    // 重试信号见 findDocumentsMissingSegments，重放见 reprojectDocumentSegments）。
+    // PDF 分支与超大文档跳过（P2-2 文件化课题）；输入即持久化 content 切片。
+    if (kind !== 'pdf' && saved.value.content.length <= 200_000) {
+      const chunks = chunkTextToSegments(saved.value.content);
+      const projected = await projectContentSegments(deps, {
+        userId: input.userId,
+        documentId: saved.value.id,
+        texts: chunks.map((c) => c.text),
+        offsets: chunks.map((c) => ({ start: c.start, end: c.end })),
+      });
+      if (!isOk(projected)) {
+        logger.warn('[document-import] segment projection failed', {
+          documentId: saved.value.id,
+          code: projected.error.code,
+        });
+      }
+    }
     const lessons = book.lessons.length;
     const done = await updateImportTask(deps, task.id, {
       status: 'done',

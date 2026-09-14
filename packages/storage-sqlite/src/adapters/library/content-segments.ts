@@ -42,6 +42,39 @@ export interface ContentSegment {
   createdAt: string;
 }
 
+/**
+ * 纯切分（P2-1）：按空行分段，丢弃空白段；偏移为 UTF-16 码元下标，
+ * 相对输入文本（调用方保证输入即持久化底稿，见 reproject）。
+ * - 换行：\n 与 \r\n 统一处理；段内换行保留；
+ * - 空段：trim 后为空即丢弃，不占 ord；
+ * - 长段：不截断（大文档上限由调用方按字符数控制）。
+ */
+export interface TextChunk {
+  text: string;
+  start: number;
+  end: number;
+}
+
+export function chunkTextToSegments(content: string): TextChunk[] {
+  const chunks: TextChunk[] = [];
+  const re = /\r?\n[ \t]*\r?\n/g;
+  let segStart = 0;
+  const push = (raw: string, base: number): void => {
+    const leading = raw.length - raw.trimStart().length;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const start = base + leading;
+    chunks.push({ text: trimmed, start, end: start + trimmed.length });
+  };
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    push(content.slice(segStart, m.index), segStart);
+    segStart = m.index + m[0].length;
+  }
+  push(content.slice(segStart), segStart);
+  return chunks;
+}
+
 /** 作用域段 hash（P1-2a R3＋P1-3 硬约束）：相同文本跨文档永不冲突。 */
 export function segmentHash(documentId: string, lessonId: string, ord: number, text: string): string {
   return createHash('sha256')
@@ -177,6 +210,74 @@ export async function projectContentSegments(
   } catch (error) {
     return err(
       translateToBusinessError(error, { category: 'DATABASE', action: 'projectContentSegments' })
+    );
+  }
+}
+
+/**
+ * 显式重放（P2-1 恢复路径）：读行 content→切分→project，与首次投影同一输入源，
+ * hash 幂等全覆盖。调用方：脚本／测试／未来装配；不配路由／Tool，不挂读路径。
+ */
+export async function reprojectDocumentSegments(
+  deps: { sqlite: Database },
+  input: { userId: string; documentId: string }
+): Promise<Result<{ inserted: number; skipped: number }, BusinessError>> {
+  const userId = input.userId.trim();
+  const documentId = input.documentId.trim();
+  if (!userId || !documentId) {
+    return err(new BusinessError('E_INVALID_INPUT', 'userId 或 documentId 非法', 'VALIDATION'));
+  }
+  const visible = getVisibleDocument(deps.sqlite, userId, documentId);
+  if (!visible) {
+    return err(new BusinessError('E_NOT_FOUND', '未找到指定的文档', 'LEARNER_STATE'));
+  }
+  const row = deps.sqlite
+    .query('SELECT content AS content FROM documents WHERE id = ?')
+    .get(documentId) as { content: string } | null;
+  if (!row) {
+    return err(new BusinessError('E_NOT_FOUND', '未找到指定的文档', 'LEARNER_STATE'));
+  }
+  const chunks = chunkTextToSegments(row.content);
+  return projectContentSegments(
+    deps,
+    {
+      userId,
+      documentId,
+      texts: chunks.map((c) => c.text),
+      offsets: chunks.map((c) => ({ start: c.start, end: c.end })),
+    }
+  );
+}
+
+/**
+ * 待投影查询（P2-1 重试信号）：有文档无段的行；课程文档天然无段，
+ * 调用方按 sourceKind 过滤 user_import。本函数只读，不触发投影。
+ */
+export async function findDocumentsMissingSegments(
+  deps: { sqlite: Database },
+  userId?: string | undefined
+): Promise<Result<Array<{ id: string; userId: string; sourceKind: string }>, BusinessError>> {
+  try {
+    const rows =
+      userId === undefined
+        ? (deps.sqlite
+            .query(
+              `SELECT d.id AS id, d.user_id AS userId, d.source_kind AS sourceKind
+               FROM documents d LEFT JOIN content_segments s ON s.document_id = d.id
+               WHERE s.id IS NULL`
+            )
+            .all() as Array<{ id: string; userId: string; sourceKind: string }>)
+        : (deps.sqlite
+            .query(
+              `SELECT d.id AS id, d.user_id AS userId, d.source_kind AS sourceKind
+               FROM documents d LEFT JOIN content_segments s ON s.document_id = d.id
+               WHERE s.id IS NULL AND d.user_id = ?`
+            )
+            .all(userId) as Array<{ id: string; userId: string; sourceKind: string }>);
+    return ok(rows);
+  } catch (error) {
+    return err(
+      translateToBusinessError(error, { category: 'DATABASE', action: 'findDocumentsMissingSegments' })
     );
   }
 }

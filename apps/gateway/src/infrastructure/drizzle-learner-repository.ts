@@ -139,6 +139,8 @@ import {
 import {
   shredDocument as shredDocumentDomain,
   shredIntoTransaction as shredIntoTransactionDomain,
+  reprojectDocumentSegments as reprojectDocumentSegmentsDomain,
+  findDocumentsMissingSegments as findDocumentsMissingSegmentsDomain,
   type ShredStats,
 } from '@study-studio/storage-sqlite';
 import {
@@ -564,6 +566,26 @@ export class DrizzleLearnerRepository
     book: TextbookAST
   ): Promise<Result<ShredStats, BusinessError>> {
     return shredDocumentDomain(this.deps, documentId, book);
+  }
+
+  /**
+   * 段显式重放（P2-1 恢复路径）：读行 content→切分→投影，hash 幂等；
+   * 供脚本／测试／未来装配显式调用，不配路由／Tool。
+   */
+  public async reprojectDocumentSegments(
+    userId: string,
+    documentId: string
+  ): Promise<Result<{ inserted: number; skipped: number }, BusinessError>> {
+    return reprojectDocumentSegmentsDomain(this.deps, { userId, documentId });
+  }
+
+  /**
+   * 待投影查询（P2-1 重试信号）：只读，不触发投影。
+   */
+  public async findDocumentsMissingSegments(
+    userId?: string | undefined
+  ): Promise<Result<Array<{ id: string; userId: string; sourceKind: string }>, BusinessError>> {
+    return findDocumentsMissingSegmentsDomain(this.deps, userId);
   }
 
   /**

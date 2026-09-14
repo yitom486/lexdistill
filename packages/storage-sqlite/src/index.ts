@@ -217,10 +217,14 @@ export {
 export {
   projectContentSegments,
   listContentSegments,
+  reprojectDocumentSegments,
+  findDocumentsMissingSegments,
+  chunkTextToSegments,
   segmentHash,
   type ContentSegment,
   type ContentSegmentKind,
   type ProjectSegmentsInput,
+  type TextChunk,
 } from './adapters/library/content-segments.js';
 export {
   ensureCanonicalContentSources,
