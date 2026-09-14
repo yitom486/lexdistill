@@ -59,6 +59,10 @@ const CROSS_MODULE_ALLOWLIST = new Set([
   // 新闻管线复用 URL 导入的 SSRF 守卫（公网断言/重定向复检/限流读取同一口径）。
   'modules/curriculum/infrastructure/news-article-fetch.ts -> modules/library/application/document-import/web-url.js',
   'modules/curriculum/infrastructure/news-rss.ts -> modules/library/application/document-import/web-url.js',
+  // E4b registrar 跨模块仓储契约类型（type-only；构造仍由装配根注入实例）。
+  'modules/learning-progress/tools/register-learning-progress-tools.ts -> modules/practice/ports.js',
+  'modules/curriculum/tools/register-curriculum-tools.ts -> modules/library/ports.js',
+  'modules/flashcards/tools/register-flashcards-tools.ts -> modules/dictionary/ports.js',
 ]);
 
 function collectTs(dir: string, out: string[] = []): string[] {
