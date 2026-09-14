@@ -11,7 +11,7 @@ import type { MistakeEntry } from '@study-studio/learner-core';
 import type { GeneratedQuestion } from '@study-studio/protocol';
 import { mistakes } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { normalizeTrackLanguage, inferLanguageFromSkillId } from '../../../infrastructure/persistence/language.js';
+import { normalizeTrackLanguage, inferLanguageFromSkillId } from '@study-studio/shared';
 import { resolveActiveLanguage } from './profile-internals.js';
 
 /**

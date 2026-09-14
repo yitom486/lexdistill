@@ -12,7 +12,7 @@ import {
   computeSeedMaterializationFingerprint,
   describeSeedStatus,
   SEED_MATERIALIZER_VERSION,
-} from '../persistence/seed-materialization.js';
+} from '@study-studio/storage-sqlite';
 import { formatSeedStatusLine } from '../../../scripts/seed-materialization-status.js';
 
 /**

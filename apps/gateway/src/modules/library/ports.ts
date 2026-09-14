@@ -26,8 +26,8 @@ import type {
   DocumentImportDeps,
 } from './application/document-import/document-import-service.js';
 import type { SavedDocumentStructure } from './persistence/document-structure.js';
-import type { ShredStats } from './persistence/textbook-shred.js';
-import type { MaterializeSeedInput } from './persistence/seed-materialization.js';
+import type { ShredStats } from '@study-studio/storage-sqlite';
+import type { MaterializeSeedInput } from '@study-studio/storage-sqlite';
 import type { ReadingPosition } from '@study-studio/storage-sqlite';
 
 /**

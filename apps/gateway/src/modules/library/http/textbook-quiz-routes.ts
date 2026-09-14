@@ -5,7 +5,7 @@ import { parseTextbookAST } from '@study-studio/document-model';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { buildTextbookLessonQuestions, canQuizDocument } from '../application/textbook-lesson-quiz.js';
-import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';
+import { normalizeTrackLanguage } from '@study-studio/shared';
 
 /**
  * 教材本课真出题：POST /api/textbook-quiz/:userId { documentId, lessonId, count? }。

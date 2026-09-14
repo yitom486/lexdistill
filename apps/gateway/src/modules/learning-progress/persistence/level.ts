@@ -17,8 +17,8 @@ import {
 } from '@study-studio/learner-core';
 import { flashcards, learnerLanguageProfiles } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
-import { getTodayString } from '../../../infrastructure/persistence/repo-utils.js';
+import type { TrackLanguage } from '@study-studio/shared';
+import { getTodayString } from '@study-studio/shared';
 import {
   ensureLanguageProfile,
   mirrorLanguageProfileToMain,

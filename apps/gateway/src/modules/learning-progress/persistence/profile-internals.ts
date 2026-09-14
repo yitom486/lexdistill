@@ -2,9 +2,9 @@ import { eq, and } from 'drizzle-orm';
 import { nowIso } from '@study-studio/shared';
 import { learnerProfiles, learnerLanguageProfiles } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
-import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';
-import { defaultLanguageProfileSeed } from '../../../infrastructure/persistence/repo-utils.js';
+import type { TrackLanguage } from '@study-studio/shared';
+import { normalizeTrackLanguage } from '@study-studio/shared';
+import { defaultLanguageProfileSeed } from '@study-studio/shared';
 
 /**
  * 画像域内部 helpers（由 DrizzleLearnerRepository 私有方法搬迁而来，行为不变）。

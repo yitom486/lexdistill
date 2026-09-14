@@ -8,8 +8,8 @@ import {
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
-import { reconcileLessons, summarizeReconciliation, type ReconLessonInput } from '../lesson-reconciliation.js';
-import { tryParseTextbookAst } from '../persistence/textbook-shred.js';
+import { reconcileLessons, summarizeReconciliation, type ReconLessonInput } from '@study-studio/storage-sqlite';
+import { tryParseTextbookAst } from '@study-studio/storage-sqlite';
 
 /** 文库域路由：文档与批注（G2 迁移，行为不变）。 */
 

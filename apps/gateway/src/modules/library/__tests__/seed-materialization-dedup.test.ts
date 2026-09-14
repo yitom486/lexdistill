@@ -7,7 +7,7 @@ import {
   isTextbookProjectionHealthy,
   shouldSkipSeedMaterialization,
   SEED_MATERIALIZER_VERSION,
-} from '../persistence/seed-materialization.js';
+} from '@study-studio/storage-sqlite';
 
 /**
  * P1-D1a：term-map dedup 与 seed materialization 契约对齐（全临时 :memory: 库，真库零接触）。

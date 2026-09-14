@@ -6,7 +6,7 @@ import {
   describeSeedStatus,
   SEED_MATERIALIZER_VERSION,
   type SeedStatusEntry,
-} from '../modules/library/persistence/seed-materialization.js';
+} from '@study-studio/storage-sqlite';
 
 /**
  * seed materialization 状态检查 CLI（只读）。

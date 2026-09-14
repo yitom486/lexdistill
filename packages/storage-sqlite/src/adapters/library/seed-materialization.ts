@@ -2,11 +2,16 @@ import { sql } from 'drizzle-orm';
 import type { Database } from 'bun:sqlite';
 import { BusinessError, err, ok, type Result, nowIso } from '@study-studio/shared';
 import type { TextbookAST } from '@study-studio/document-model';
-import { documents, seedMaterialization } from '@study-studio/storage-sqlite';
-import { shredIntoTransaction, termMapDedupKey } from './textbook-shred.js';
-import { fingerprintCanonical } from '@study-studio/storage-sqlite';
+import { documents, seedMaterialization } from '../../schema.js';
+import { shredIntoTransaction, termMapDedupKey, type ShredTx } from './textbook-shred.js';
+import { fingerprintCanonical } from '../../canonical-fingerprint.js';
 import { eq } from 'drizzle-orm';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+
+/**
+ * D3 起家在 storage-sqlite（前身 gateway modules/library/persistence/seed-materialization.ts，
+ * 逻辑不变）。`ShredTx` 取自同目录 shred（同源 DrizzleDb）；本文件函数取显式
+ * db/sqlite/tx 参数，无 RepoDeps 签名。
+ */
 
 /**
  * Seed materialization gating（P1-D1）。
@@ -332,7 +337,7 @@ export interface MaterializeSeedInput {
  * 复用 shredIntoTransaction，不复制 shred 实现；禁止 save-then-commit-then-shred。
  */
 export function materializeSeedIntoTransaction(
-  tx: Parameters<Parameters<RepoDeps['db']['transaction']>[0]>[0],
+  tx: ShredTx,
   input: MaterializeSeedInput
 ): void {
   const { docBase, book, fingerprint, materializerVersion } = input;

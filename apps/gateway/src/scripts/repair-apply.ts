@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/bun-sqlite';
 import * as schema from '@study-studio/storage-sqlite';
 import { runDoctor, formatDoctorReport } from '@study-studio/storage-sqlite';
 import { applyOrphanCleanup, formatOrphanApplyReport, applySeedSourceFix } from '@study-studio/storage-sqlite';
-import { applySeedAstMigration } from '../modules/library/persistence/seed-repair.js';
+import { applySeedAstMigration } from '@study-studio/storage-sqlite';
 
 /**
  * R1 历史修复 apply（写库！只读 dry-run 见 repair-plan.ts）。

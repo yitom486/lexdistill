@@ -23,7 +23,7 @@ import {
 } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { readKanaPracticeMemories } from '../../../infrastructure/persistence/kana-practice-state.js';
-import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';
+import { normalizeTrackLanguage } from '@study-studio/shared';
 
 /**
  * 课程域持久化：假名底座、内容模板、阅读篇目读写（G4：由 repository/domains/curriculum-reading.ts

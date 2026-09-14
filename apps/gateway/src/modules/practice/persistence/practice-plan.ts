@@ -32,7 +32,7 @@ import {
   quizAttempts,
 } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { safeJsonParse } from '../../../infrastructure/persistence/repo-utils.js';
+import { safeJsonParse } from '@study-studio/shared';
 
 /**
  * 练习计划域（由 DrizzleLearnerRepository 搬迁而来，行为不变）。

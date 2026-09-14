@@ -5,7 +5,7 @@ import type { LearnerRepository } from '@study-studio/learner-core';
 import {
   inferLanguageFromSkillId,
   normalizeTrackLanguage,
-} from '../../../infrastructure/persistence/language.js';
+} from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import type { LearningRepository } from '../../../modules/practice/ports.js';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';

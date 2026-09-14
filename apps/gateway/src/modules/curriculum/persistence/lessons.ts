@@ -11,7 +11,7 @@ import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.
 import {
   normalizeTrackLanguage,
   type TrackLanguage,
-} from '../../../infrastructure/persistence/language.js';
+} from '@study-studio/shared';
 
 export interface LessonSection {
   heading: string;

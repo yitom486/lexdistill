@@ -15,7 +15,7 @@ import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.
 import {
   normalizeTrackLanguage,
   inferLanguageFromSkillId,
-} from '../../../infrastructure/persistence/language.js';
+} from '@study-studio/shared';
 import { resolveActiveLanguage } from '../../learning-progress/public.js';
 
 /**

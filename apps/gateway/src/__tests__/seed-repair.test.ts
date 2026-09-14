@@ -5,7 +5,7 @@ import { createDrizzleDb } from '@study-studio/storage-sqlite';
 import type { DrizzleDb } from '@study-studio/storage-sqlite';
 import { documents } from '@study-studio/storage-sqlite';
 import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
-import { applySeedAstMigration } from '../modules/library/persistence/seed-repair.js';
+import { applySeedAstMigration } from '@study-studio/storage-sqlite';
 import { runDoctor } from '@study-studio/storage-sqlite';
 
 /**

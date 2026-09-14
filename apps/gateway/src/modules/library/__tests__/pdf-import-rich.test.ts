@@ -8,7 +8,7 @@ import {
   importPdfDocument,
   mapPdfPages,
 } from '../application/pdf-import/pdf-import-service.js';
-import { tryParseTextbookAst } from '../persistence/textbook-shred.js';
+import { tryParseTextbookAst } from '@study-studio/storage-sqlite';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 
 /**

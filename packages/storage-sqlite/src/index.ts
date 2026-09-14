@@ -90,6 +90,46 @@ export {
   type ImportTaskStatus,
 } from './adapters/document/import-tasks.js';
 export {
+  shredDocument,
+  shredIntoTransaction,
+  tryParseTextbookAst,
+  termMapDedupKey,
+  type ShredStats,
+  type ShredTx,
+} from './adapters/library/textbook-shred.js';
+export {
+  materializeSeedIntoTransaction,
+  computeSeedMaterializationFingerprint,
+  computeSeedMapping,
+  buildSeedMaterializationInput,
+  fingerprintSeedMaterialization,
+  shouldSkipSeedMaterialization,
+  describeSeedStatus,
+  expectedTermMapCountForLesson,
+  isTextbookProjectionHealthy,
+  SEED_MATERIALIZER_VERSION,
+  type SeedMaterializationInput,
+  type MaterializeSeedInput,
+  type ProjectionHealth,
+  type SeedStatusEntry,
+  type SeedSkipDecision,
+} from './adapters/library/seed-materialization.js';
+export {
+  applySeedAstMigration,
+  type SeedMigrationDocReport,
+  type SeedMigrationReport,
+} from './adapters/library/seed-repair.js';
+export {
+  getTextbookFocus,
+  type TextbookFocus,
+} from './adapters/document/textbook-focus.js';
+export { normalizeLessonDisplayTitle } from './adapters/document/lesson-display-title.js';
+export {
+  reconcileLessons,
+  summarizeReconciliation,
+  type ReconLessonInput,
+} from './adapters/document/lesson-reconciliation.js';
+export {
   prepareTocImportSession,
   getTocImportSession,
   getTocImportSessionById,
@@ -102,7 +142,6 @@ export {
   fingerprintTocChunk,
   sha256HexText,
   toTocImportSessionView,
-  type ShredTx,
   type TocImportSessionStatus,
   type TocImportChunkStatus,
   type TocImportSession,

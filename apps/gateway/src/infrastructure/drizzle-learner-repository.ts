@@ -40,8 +40,8 @@ import type { TextbookAST } from '@study-studio/document-model';
 
 // P0-1 拆分：语种 / 词典 / 通用工具已下沉 domains；本地 import 供剩余方法使用，
 // 底部 export 保持对外契约不变（index.ts 经 export * 转出）。
-import type { TrackLanguage } from './persistence/language.js';
-import { normalizeTrackLanguage, inferLanguageFromSkillId } from './persistence/language.js';
+import type { TrackLanguage } from '@study-studio/shared';
+import { normalizeTrackLanguage, inferLanguageFromSkillId } from '@study-studio/shared';
 import type {
   LocalDictionaryEntry,
   DictionaryEntryCollection,
@@ -122,7 +122,7 @@ import {
 import {
   getTextbookFocus as getTextbookFocusDomain,
   type TextbookFocus,
-} from '../modules/library/persistence/textbook-focus.js';
+} from '@study-studio/storage-sqlite';
 import {
   getCourseRoute as getCourseRouteDomain,
 } from '../modules/learning-progress/persistence/course-route.js';
@@ -140,11 +140,11 @@ import {
   shredDocument as shredDocumentDomain,
   shredIntoTransaction as shredIntoTransactionDomain,
   type ShredStats,
-} from '../modules/library/persistence/textbook-shred.js';
+} from '@study-studio/storage-sqlite';
 import {
   materializeSeedIntoTransaction,
   type MaterializeSeedInput,
-} from '../modules/library/persistence/seed-materialization.js';
+} from '@study-studio/storage-sqlite';
 import type { StudyGateSnapshot } from '@study-studio/learner-core';
 import {
   previewCard as previewCardDomain,
@@ -296,7 +296,7 @@ import {
   getYesterdayString,
   safeJsonParse,
   defaultLanguageProfileSeed,
-} from './persistence/repo-utils.js';
+} from '@study-studio/shared';
 import type { RepoDeps } from './persistence/repo-context.js';
 
 export type {

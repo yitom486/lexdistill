@@ -14,7 +14,7 @@ import {
   INITIAL_EN_CARD_SEEDS,
 } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';
+import { normalizeTrackLanguage } from '@study-studio/shared';
 import { resolveActiveLanguage } from '../../learning-progress/public.js';
 
 /**

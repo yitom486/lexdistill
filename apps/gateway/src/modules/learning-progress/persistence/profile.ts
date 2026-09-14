@@ -21,7 +21,7 @@ import {
   skillMetrics,
 } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { normalizeTrackLanguage, inferLanguageFromSkillId } from '../../../infrastructure/persistence/language.js';
+import { normalizeTrackLanguage, inferLanguageFromSkillId } from '@study-studio/shared';
 import {
   ensureLanguageProfile,
   mirrorLanguageProfileToMain,

@@ -9,8 +9,8 @@ import {
 } from '@study-studio/shared';
 import { quizAttempts, studyActivityLogs } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
-import { getTodayString } from '../../../infrastructure/persistence/repo-utils.js';
+import type { TrackLanguage } from '@study-studio/shared';
+import { getTodayString } from '@study-studio/shared';
 
 /**
  * 新手带路（Beginner Trail）：零基础按天解锁的分阶段清单。

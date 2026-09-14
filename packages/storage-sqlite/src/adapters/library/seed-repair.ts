@@ -9,11 +9,16 @@ import {
   textbookLines,
   textbookTermMap,
   textbookVocab,
-} from '@study-studio/storage-sqlite';
-import type { DrizzleDb } from '@study-studio/storage-sqlite';
-import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
+} from '../../schema.js';
+import type { DrizzleDb } from '../../connection.js';
+import { TEXTBOOK_BOOKS } from '../../seeds/textbook-seed.js';
 import { shredIntoTransaction } from './textbook-shred.js';
 import { nowIso } from '@study-studio/shared';
+
+/**
+ * D3 起家在 storage-sqlite（前身 gateway modules/library/persistence/seed-repair.ts，
+ * 逻辑不变）。签名已是 `DrizzleDb`/`Database` 显式参数，无需收窄。
+ */
 
 export interface SeedMigrationDocReport {
   documentId: string;

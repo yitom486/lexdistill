@@ -8,8 +8,13 @@ import {
   textbookLines,
   textbookTermMap,
   textbookVocab,
-} from '@study-studio/storage-sqlite';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+} from '../../schema.js';
+import type { DrizzleDb } from '../../connection.js';
+
+/**
+ * D3 起家在 storage-sqlite（前身 gateway modules/library/persistence/textbook-shred.ts，
+ * 逻辑不变）。参数收窄为 `{ db }`；`ShredTx` 本地定义（同源 DrizzleDb）。
+ */
 
 export interface ShredStats {
   lessons: number;
@@ -57,7 +62,7 @@ export function tryParseTextbookAst(raw: unknown): TextbookAST | null {
  * - skill_id v1 恒为 NULL（能力映射靠分类结果，另行落盘，不在此臆造边）；
  * - 课文行（lines）只进 FTS，不进 term_map（行级映射粒度另议，不膨胀）。
  */
-export type ShredTx = Parameters<Parameters<RepoDeps['db']['transaction']>[0]>[0];
+export type ShredTx = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];
 
 /**
  * P1-D1 term_map 去重键 = 持久化完整主键（截断/清洗之后计算）。
@@ -68,7 +73,7 @@ export function termMapDedupKey(documentId: string, lessonId: string, kind: stri
 }
 
 export function shredDocument(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   documentId: string,
   book: TextbookAST
 ): Result<ShredStats, BusinessError> {

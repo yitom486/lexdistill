@@ -10,13 +10,18 @@ import { and, desc, eq, isNotNull, or } from 'drizzle-orm';
 import {
   documents,
   readingPositions,
-} from '@study-studio/storage-sqlite';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+} from '../../schema.js';
+import type { DrizzleDb } from '../../connection.js';
 import {
   normalizeTrackLanguage,
   type TrackLanguage,
-} from '../../../infrastructure/persistence/language.js';
-import { normalizeLessonDisplayTitle } from '../lesson-display-title.js';
+} from '@study-studio/shared';
+import { normalizeLessonDisplayTitle } from './lesson-display-title.js';
+
+/**
+ * D3 起家在 storage-sqlite（前身 gateway modules/library/persistence/textbook-focus.ts，
+ * 逻辑不变）。参数收窄为 `{ db }`。
+ */
 
 export interface TextbookFocus {
   documentId: string;
@@ -37,7 +42,7 @@ export interface TextbookFocus {
  * 无记录/课次对不上返回 null（计划保持原样，不挡主路径）。
  */
 export async function getTextbookFocus(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   userId: string,
   language: string
 ): Promise<Result<TextbookFocus | null, BusinessError>> {

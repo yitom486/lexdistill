@@ -13,8 +13,8 @@ import {
 import type { Flashcard } from '@study-studio/protocol';
 import { localDictionaryEntries, flashcards, dictionarySearchHistory, dictionarySources, dictionaryTermMeta } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
-import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';
+import type { TrackLanguage } from '@study-studio/shared';
+import { normalizeTrackLanguage } from '@study-studio/shared';
 import { recordTermExposure, buildTermKey } from '@study-studio/storage-sqlite';
 
 /**

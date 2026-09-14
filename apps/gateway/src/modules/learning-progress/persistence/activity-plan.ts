@@ -31,13 +31,13 @@ import {
   practiceItemAttempts,
 } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
-import { normalizeTrackLanguage } from '../../../infrastructure/persistence/language.js';
+import type { TrackLanguage } from '@study-studio/shared';
+import { normalizeTrackLanguage } from '@study-studio/shared';
 import {
   ensureLanguageProfile,
   mirrorLanguageProfileToMain,
 } from './profile-internals.js';
-import { getTodayString, getYesterdayString, safeJsonParse } from '../../../infrastructure/persistence/repo-utils.js';
+import { getTodayString, getYesterdayString, safeJsonParse } from '@study-studio/shared';
 
 /**
  * 足迹/计划域（由 DrizzleLearnerRepository 搬迁而来，行为不变）。

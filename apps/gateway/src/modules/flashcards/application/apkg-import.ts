@@ -23,7 +23,7 @@ import { extractZip, normalizeZipEntryPaths } from '@study-studio/archive';
 import { flashcards } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { storeMedia } from '@study-studio/storage-sqlite';
-import type { TrackLanguage } from '../../../infrastructure/persistence/language.js';
+import type { TrackLanguage } from '@study-studio/shared';
 
 /**
  * `.apkg` 导入（Boltzmann 搬家 + 网上模板提取）。

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { normalizeLessonDisplayTitle } from '../lesson-display-title.js';
+import { normalizeLessonDisplayTitle } from '@study-studio/storage-sqlite';
 
 /**
  * P1-B1 display-title 原型回归（纯函数，未接入业务）。

@@ -21,7 +21,7 @@ import {
 } from '@study-studio/protocol';
 import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, textbookTermMap, documentStructures, readingPositions } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { shredIntoTransaction } from './textbook-shred.js';
+import { shredIntoTransaction } from '@study-studio/storage-sqlite';
 import { markSessionsTargetDeletedInTx } from '@study-studio/storage-sqlite';
 import { recordTermExposure } from '../../dictionary/public.js';
 

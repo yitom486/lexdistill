@@ -1,12 +1,12 @@
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../runtime/gateway-runtime.js';
 import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
-import { tryParseTextbookAst } from '../modules/library/persistence/textbook-shred.js';
+import { tryParseTextbookAst } from '@study-studio/storage-sqlite';
 import {
   computeSeedMaterializationFingerprint,
   shouldSkipSeedMaterialization,
   SEED_MATERIALIZER_VERSION,
-} from '../modules/library/persistence/seed-materialization.js';
+} from '@study-studio/storage-sqlite';
 import { parseTextbookAST } from '@study-studio/document-model';
 import { isOk, logger } from '@study-studio/shared';
 import { dbPath } from './config.js';

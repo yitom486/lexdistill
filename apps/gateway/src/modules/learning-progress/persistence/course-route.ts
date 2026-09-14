@@ -15,7 +15,7 @@ import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.
 import {
   normalizeTrackLanguage,
   type TrackLanguage,
-} from '../../../infrastructure/persistence/language.js';
+} from '@study-studio/shared';
 
 /**
  * 课程路线（长期路线，不随每日重置；每日计划从中取任务）。

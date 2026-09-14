@@ -10,7 +10,7 @@ import {
   shouldSkipSeedMaterialization,
   isTextbookProjectionHealthy,
   SEED_MATERIALIZER_VERSION,
-} from '../modules/library/persistence/seed-materialization.js';
+} from '@study-studio/storage-sqlite';
 import { runMigrations } from '@study-studio/storage-sqlite';
 
 /**
