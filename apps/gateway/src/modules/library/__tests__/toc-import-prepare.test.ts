@@ -7,12 +7,12 @@ import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-r
 import {
   fingerprintTocPlan,
   sha256HexBytes,
-} from '../application/pdf-import/toc-segment-preview.js';
+} from '@study-studio/content';
 import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
 import {
   computeTocRequestKey,
   fingerprintTocChunk,
-} from '../persistence/toc-import-sessions.js';
+} from '@study-studio/storage-sqlite';
 import { createApp } from '../../../transport/http/create-app.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';

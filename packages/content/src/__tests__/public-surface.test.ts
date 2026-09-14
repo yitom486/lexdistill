@@ -9,11 +9,14 @@ import * as pub from '../public.js';
  */
 const EXPECTED_RUNTIME_KEYS = new Set([
   // E2a 起含 src/document（来源抽象/种类、mobi/text 解码）。
+  // E2c 起含 src/pdf/toc-segment-preview（纯映射/指纹/分段）。
   'DOCUMENT_SOURCE_KINDS',
   'FOLIO_CANDIDATE_MAX_PAGES',
   'FOLIO_OCR_MIN_CONFIDENCE',
   'MIN_SEMANTIC_RATIO',
   'MIN_SEMANTIC_TITLES',
+  'TOC_SEGMENT_CHUNK_PAGES',
+  'TOC_SEGMENT_MIN_ENTRIES',
   'buildOcrOverflowError',
   'buildPdfConvertReport',
   'buildPdfMapReport',
@@ -24,6 +27,7 @@ const EXPECTED_RUNTIME_KEYS = new Set([
   'extractHeadingsFromMarkdown',
   'extractMobiText',
   'extractTocEntries',
+  'fingerprintTocPlan',
   'groundClassesByTitle',
   'groupSectionsByClasses',
   'groupSectionsByLesson',
@@ -33,12 +37,14 @@ const EXPECTED_RUNTIME_KEYS = new Set([
   'markdownToAst',
   'mergeHeadingCandidates',
   'newProvisionalBookId',
+  'previewTocSegments',
   'promoteLessonHeadings',
+  'sha256HexBytes',
   'splitInlineChinese',
 ]);
 
 describe('content public surface', () => {
-  it('运行时导出不多不少（26 项）', () => {
+  it('运行时导出不多不少（31 项）', () => {
     const actual = new Set(Object.keys(pub));
     expect(actual.size).toBe(EXPECTED_RUNTIME_KEYS.size);
     for (const key of actual) {

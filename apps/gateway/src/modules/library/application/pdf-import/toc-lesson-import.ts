@@ -22,7 +22,7 @@ import {
   fingerprintTocPlan,
   sha256HexBytes,
   TOC_SEGMENT_CHUNK_PAGES,
-} from './toc-segment-preview.js';
+} from '@study-studio/content';
 
 /**
  * CMD-LINGUA-P5D1：导入一课已验证完整 lesson（本轮唯一写入口）。

@@ -75,6 +75,25 @@ export {
   FOLIO_OCR_MIN_CONFIDENCE,
   detectFolioCandidates,
 } from './pdf/toc-folio-candidates.js';
+export {
+  TOC_SEGMENT_CHUNK_PAGES,
+  TOC_SEGMENT_MIN_ENTRIES,
+  fingerprintTocPlan,
+  previewTocSegments,
+  sha256HexBytes,
+  type TocLessonMappingReason,
+  type TocLessonMappingStatus,
+  type TocLessonSegment,
+  type TocMappingRegion,
+  type TocPlanFingerprintInput,
+  type TocSegmentAnchor,
+  type TocSegmentAnchorEvidence,
+  type TocSegmentChunk,
+  type TocSegmentDiagnostics,
+  type TocSegmentPreviewInput,
+  type TocSegmentPreviewOutput,
+  type TocSegmentTocEntry,
+} from './pdf/toc-segment-preview.js';
 export type {
   FolioCandidate,
   FolioConfidence,

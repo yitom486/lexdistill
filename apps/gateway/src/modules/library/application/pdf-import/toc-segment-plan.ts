@@ -20,7 +20,7 @@ import {
   type TocSegmentAnchor,
   type TocSegmentPreviewOutput,
   type TocSegmentTocEntry,
-} from './toc-segment-preview.js';
+} from '@study-studio/content';
 
 /**
  * CMD-LINGUA-P5C：用户确认 anchor → 分段预览编排（只读）。

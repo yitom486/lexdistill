@@ -7,7 +7,7 @@ import type { PdfAstOutput } from '../application/pdf-import/pdf-import-service.
 import {
   fingerprintTocPlan,
   sha256HexBytes,
-} from '../application/pdf-import/toc-segment-preview.js';
+} from '@study-studio/content';
 import { executeTocImportFirst } from '../application/pdf-import/toc-import-execute.js';
 import { executeTocImportNext } from '../application/pdf-import/toc-import-execute-next.js';
 import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
@@ -215,7 +215,7 @@ describe('P5D2C executeTocImportNext（mock converter + :memory:）', () => {
     const session = await h.repo.getTocImportSessionById(h.sessionId);
     const currentJson = h.repo.getRawDb().query('SELECT ast_json AS ast FROM documents WHERE id = ?').get(first.value.documentId) as { ast: string };
     expect(session?.session.astFingerprint).not.toBe(beforeFp);
-    const { sha256HexText } = await import('../persistence/toc-import-sessions.js');
+    const { sha256HexText } = await import('@study-studio/storage-sqlite');
     expect(session?.session.astFingerprint).toBe(sha256HexText(currentJson.ast));
     // chunk1 completed，session 仍 running（还有第3課）
     expect(session?.chunks.find((c) => c.ordinal === 1)?.status).toBe('completed');

@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runDoctor } from '@study-studio/storage-sqlite';
-import { sha256HexText } from '../modules/library/persistence/toc-import-sessions.js';
+import { sha256HexText } from '@study-studio/storage-sqlite';
 
 /**
  * CMD-LINGUA-P5D2A doctor 规则：toc_import_sessions / toc_import_chunks。

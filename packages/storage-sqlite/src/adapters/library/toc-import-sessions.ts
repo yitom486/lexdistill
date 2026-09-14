@@ -9,12 +9,19 @@ import {
   generateId,
   nowIso,
 } from '@study-studio/shared';
-import { tocImportChunks, tocImportSessions } from '@study-studio/storage-sqlite';
-import { documents } from '@study-studio/storage-sqlite';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { ShredTx } from './textbook-shred.js';
+import { tocImportChunks, tocImportSessions, documents } from '../../schema.js';
+import type { DrizzleDb } from '../../connection.js';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
-import { shredIntoTransaction } from './textbook-shred.js';
+
+/**
+ * D3 起家在 storage-sqlite（前身 gateway modules/library/persistence/toc-import-sessions.ts）。
+ * - 参数收窄为 `{ db }`（调用方传完整 RepoDeps 依然兼容）；
+ * - shred 拆分注入：commit 系函数经参数接收 `shredIntoTransaction`
+ *   （实现留守 Gateway，由门面装配；本文件永不直引 Gateway）；
+ * - `ShredTx` 在此本地定义（与 textbook-shred.ts 的同名类型同构，
+ *   同源 DrizzleDb，赋值兼容）。
+ */
+export type ShredTx = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];
 
 /** 文本摘要（确定性，无 IO；与指纹函数同口径，均为 UTF-8 字节）。 */
 export function sha256HexText(text: string): string {
@@ -233,7 +240,7 @@ function rowsMatchPlan(
  * 并发冲突（UNIQUE）走“查到即复用”，查不到才抛源错。
  */
 export async function prepareTocImportSession(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   input: PrepareTocImportSessionInput
 ): Promise<Result<PreparedTocImportSession, BusinessError>> {
   const now = nowIso();
@@ -331,7 +338,7 @@ export async function prepareTocImportSession(
 
 /** 按 id 取 session + chunks（读侧永不抛；不存在返回 undefined；归属由调用方校验）。 */
 export async function getTocImportSessionById(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   sessionId: string
 ): Promise<{ session: TocImportSession; chunks: TocImportChunk[] } | undefined> {
   try {
@@ -350,7 +357,7 @@ export async function getTocImportSessionById(
 
 /** 按 key 取 session + chunks（读侧永不抛；不存在返回 undefined）。 */
 export async function getTocImportSession(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   userId: string,
   requestKey: string
 ): Promise<{ session: TocImportSession; chunks: TocImportChunk[] } | undefined> {
@@ -384,7 +391,7 @@ export async function getTocImportSession(
  * - 单事务内校验 + 写入。
  */
 export async function bindTocImportSessionDocument(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   input: { sessionId: string; userId: string; documentId: string }
 ): Promise<Result<TocImportSession, BusinessError>> {
   try {
@@ -474,14 +481,15 @@ function mapBookLanguage(language: string): string {
  * chunk 的废弃 document_id 列恒不写（NULL）。
  */
 export async function commitTocFirstChunk(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   input: {
     sessionId: string;
     userId: string;
     docTitle: string;
     book: TextbookAST;
     range: { fromPage: number; toPage: number };
-  }
+  },
+  shredIntoTransaction: (tx: ShredTx, documentId: string, book: TextbookAST) => unknown
 ): Promise<Result<TocFirstChunkResult, BusinessError>> {
   const checked = parseTextbookAST(JSON.parse(JSON.stringify(input.book)));
   if (!checked.ok) return err(checked.error);
@@ -594,7 +602,7 @@ export async function commitTocFirstChunk(
  * 归属不符即 E_NOT_FOUND，无任何写。
  */
 export async function recordTocChunkFailure(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   input: { sessionId: string; userId: string; ordinal: number; errorCode: string }
 ): Promise<Result<void, BusinessError>> {
   try {
@@ -645,14 +653,15 @@ export interface TocAppendChunkResult {
  * 任一步失败整体回滚；chunk 的废弃 document_id 列恒不写。
  */
 export async function commitTocAppendChunk(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   input: {
     sessionId: string;
     userId: string;
     ordinal: number;
     book: TextbookAST;
     range: { fromPage: number; toPage: number };
-  }
+  },
+  shredIntoTransaction: (tx: ShredTx, documentId: string, book: TextbookAST) => unknown
 ): Promise<Result<TocAppendChunkResult, BusinessError>> {
   const checked = parseTextbookAST(JSON.parse(JSON.stringify(input.book)));
   if (!checked.ok) return err(checked.error);

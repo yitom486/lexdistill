@@ -7,7 +7,7 @@ import type { PdfAstOutput } from '../application/pdf-import/pdf-import-service.
 import {
   fingerprintTocPlan,
   sha256HexBytes,
-} from '../application/pdf-import/toc-segment-preview.js';
+} from '@study-studio/content';
 import {
   importTocLesson,
   type TocLessonImportDeps,

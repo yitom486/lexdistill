@@ -22,16 +22,16 @@ import {
   sha256HexBytes,
   TOC_SEGMENT_CHUNK_PAGES,
   type TocSegmentPreviewOutput,
-} from './toc-segment-preview.js';
+} from '@study-studio/content';
 import {
   computeTocRequestKey,
   sha256HexText,
-} from '../../persistence/toc-import-sessions.js';
+} from '@study-studio/storage-sqlite';
 import type {
   TocAppendChunkResult,
   TocImportChunk,
   TocImportSession,
-} from '../../persistence/toc-import-sessions.js';
+} from '@study-studio/storage-sqlite';
 
 /**
  * CMD-LINGUA-P5D2C：执行下一个完整 chunk（append 到同一 target document）。

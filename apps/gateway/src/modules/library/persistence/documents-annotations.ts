@@ -22,7 +22,7 @@ import {
 import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, textbookTermMap, documentStructures, readingPositions } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { shredIntoTransaction } from './textbook-shred.js';
-import { markSessionsTargetDeletedInTx } from './toc-import-sessions.js';
+import { markSessionsTargetDeletedInTx } from '@study-studio/storage-sqlite';
 import { recordTermExposure } from '../../dictionary/public.js';
 
 /**

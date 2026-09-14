@@ -6,7 +6,7 @@ import type { PdfAstOutput } from '../application/pdf-import/pdf-import-service.
 import {
   fingerprintTocPlan,
   sha256HexBytes,
-} from '../application/pdf-import/toc-segment-preview.js';
+} from '@study-studio/content';
 import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
 import { executeTocImportFirst } from '../application/pdf-import/toc-import-execute.js';
 import { createApp } from '../../../transport/http/create-app.js';

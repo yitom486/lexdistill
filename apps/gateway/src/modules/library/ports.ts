@@ -19,7 +19,7 @@ import type {
   TocImportChunk,
   TocAppendChunkResult,
   TocFirstChunkResult,
-} from './persistence/toc-import-sessions.js';
+} from '@study-studio/storage-sqlite';
 import type {
   DocumentImportInput,
   DocumentImportOutput,

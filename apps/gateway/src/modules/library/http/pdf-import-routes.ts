@@ -9,7 +9,7 @@ import { importTocLesson } from '../application/pdf-import/toc-lesson-import.js'
 import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
 import { executeTocImportFirst } from '../application/pdf-import/toc-import-execute.js';
 import { executeTocImportNext } from '../application/pdf-import/toc-import-execute-next.js';
-import { toTocImportSessionView } from '../persistence/toc-import-sessions.js';
+import { toTocImportSessionView } from '@study-studio/storage-sqlite';
 import type { GatewayDeps } from '../../../transport/http/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 

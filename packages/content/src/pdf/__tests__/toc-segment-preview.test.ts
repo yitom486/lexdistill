@@ -3,8 +3,9 @@ import { isOk } from '@study-studio/shared';
 import {
   TOC_SEGMENT_CHUNK_PAGES,
   previewTocSegments,
+  sha256HexBytes,
   type TocSegmentPreviewInput,
-} from '../application/pdf-import/toc-segment-preview.js';
+} from '../toc-segment-preview.js';
 
 /**
  * CMD-LINGUA-P5A：印刷页 → 物理页映射与分段预览（纯函数，零副作用）。
@@ -281,5 +282,18 @@ describe('P5A previewTocSegments', () => {
     expect(isOk(badKind)).toBe(false);
     if (isOk(badKind)) return;
     expect(badKind.error.code).toBe('E_INVALID_INPUT');
+  });
+
+  it('内联 SHA-256 与 node:crypto 同口径（NIST 向量；改实现先跑本用例）', () => {
+    const enc = new TextEncoder();
+    expect(sha256HexBytes(new Uint8Array(0))).toBe(
+      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+    );
+    expect(sha256HexBytes(enc.encode('abc'))).toBe(
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
+    );
+    expect(sha256HexBytes(enc.encode('The quick brown fox jumps over the lazy dog'))).toBe(
+      'd7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592'
+    );
   });
 });

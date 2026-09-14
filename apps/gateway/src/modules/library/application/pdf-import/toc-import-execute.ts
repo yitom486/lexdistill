@@ -22,13 +22,13 @@ import {
   sha256HexBytes,
   TOC_SEGMENT_CHUNK_PAGES,
   type TocSegmentPreviewOutput,
-} from './toc-segment-preview.js';
-import { computeTocRequestKey } from '../../persistence/toc-import-sessions.js';
+} from '@study-studio/content';
+import { computeTocRequestKey } from '@study-studio/storage-sqlite';
 import type {
   TocFirstChunkResult,
   TocImportChunk,
   TocImportSession,
-} from '../../persistence/toc-import-sessions.js';
+} from '@study-studio/storage-sqlite';
 
 /**
  * CMD-LINGUA-P5D2B：执行 session 首个完整 chunk（恰一次）。

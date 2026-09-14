@@ -17,12 +17,12 @@ import {
   sha256HexBytes,
   TOC_SEGMENT_CHUNK_PAGES,
   type TocSegmentPreviewOutput,
-} from './toc-segment-preview.js';
+} from '@study-studio/content';
 import {
   computeTocRequestKey,
   fingerprintTocChunk,
   type PreparedTocImportSession,
-} from '../../persistence/toc-import-sessions.js';
+} from '@study-studio/storage-sqlite';
 import type { PdfImportServiceDeps } from './pdf-import-service.js';
 
 /**

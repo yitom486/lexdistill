@@ -138,6 +138,7 @@ import {
 } from '../modules/library/persistence/document-structure.js';
 import {
   shredDocument as shredDocumentDomain,
+  shredIntoTransaction as shredIntoTransactionDomain,
   type ShredStats,
 } from '../modules/library/persistence/textbook-shred.js';
 import {
@@ -244,7 +245,7 @@ import {
   type TocFirstChunkResult,
   type TocImportSession,
   type TocImportChunk,
-} from '../modules/library/persistence/toc-import-sessions.js';
+} from '@study-studio/storage-sqlite';
 import {
   importDocument as importDocumentDomain,
   type DocumentImportInput,
@@ -1298,7 +1299,7 @@ export class DrizzleLearnerRepository
     book: TextbookAST;
     range: { fromPage: number; toPage: number };
   }): Promise<Result<TocFirstChunkResult, BusinessError>> {
-    return commitTocFirstChunkDomain(this.deps, input);
+    return commitTocFirstChunkDomain(this.deps, input, shredIntoTransactionDomain);
   }
 
   /**
@@ -1312,7 +1313,7 @@ export class DrizzleLearnerRepository
     book: TextbookAST;
     range: { fromPage: number; toPage: number };
   }): Promise<Result<TocAppendChunkResult, BusinessError>> {
-    return commitTocAppendChunkDomain(this.deps, input);
+    return commitTocAppendChunkDomain(this.deps, input, shredIntoTransactionDomain);
   }
 
   /**

@@ -6,7 +6,7 @@ import type { PdfAstOutput } from '../application/pdf-import/pdf-import-service.
 import {
   fingerprintTocPlan,
   sha256HexBytes,
-} from '../application/pdf-import/toc-segment-preview.js';
+} from '@study-studio/content';
 import { executeTocImportFirst } from '../application/pdf-import/toc-import-execute.js';
 import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
