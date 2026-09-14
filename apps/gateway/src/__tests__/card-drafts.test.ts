@@ -85,9 +85,26 @@ describe('card-drafts（生词草稿）', () => {
     expect(accepted.value.draft.flashcardId).toBe(accepted.value.cardId);
     const card = repo
       .getRawDb()
-      .query<{ front: string }, [string]>('SELECT front AS front FROM flashcards WHERE id = ?')
+      .query<{ front: string; fsrs: string; studied_at: string }, [string]>(
+        'SELECT front AS front, fsrs AS fsrs, studied_at AS studied_at FROM flashcards WHERE id = ?'
+      )
       .get(accepted.value.cardId);
     expect(card!.front).toBe('曖昧');
+    // M6：草稿接受建卡 NEW 初始化与旧字面量语义一致，且 dueAt 与 studied_at 同一时钟
+    const fsrs = JSON.parse(card!.fsrs) as {
+      stability: number;
+      difficulty: number;
+      reps: number;
+      lapses: number;
+      dueAt: string;
+      state: string;
+    };
+    expect(fsrs.stability).toBe(1);
+    expect(fsrs.difficulty).toBe(5);
+    expect(fsrs.reps).toBe(0);
+    expect(fsrs.lapses).toBe(0);
+    expect(fsrs.state).toBe('NEW');
+    expect(fsrs.dueAt).toBe(card!.studied_at);
     const terms = await repo.listEncounteredTerms('u1', 'ja');
     if (!isOk(terms)) return;
     expect(terms.value[0]?.status).toBe('collected');

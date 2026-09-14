@@ -16,6 +16,7 @@ import type {
   Flashcard,
 } from '@study-studio/protocol';
 import { practiceCollections, practiceItems } from '@study-studio/storage-sqlite';
+import { initFsrsState } from '@study-studio/learning-algorithms';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { resolveActiveLanguage } from '../../learning-progress/public.js';
 
@@ -288,13 +289,7 @@ function practiceItemToFlashcard(item: PracticeItem): Flashcard {
     front,
     back,
     tags,
-    fsrs: {
-      stability: 1.0,
-      difficulty: 5.0,
-      reps: 0,
-      lapses: 0,
-      dueAt: nowIso(),
-      state: 'NEW',
-    },
+    // M6：NEW 初始化走 canonical initFsrsState（与原字面量逐字段同义）。
+    fsrs: initFsrsState(),
   };
 }

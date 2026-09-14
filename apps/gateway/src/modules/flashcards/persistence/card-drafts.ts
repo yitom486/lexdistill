@@ -15,6 +15,7 @@ import {
   recordTermExposure,
 } from '../../dictionary/public.js';
 import { CardTypeSchema, type CardType } from '@study-studio/protocol';
+import { initFsrsState } from '@study-studio/learning-algorithms';
 
 /**
  * 生词草稿（CardDraft）域：AI/导入提议 → 用户逐字段确认 → 入库成卡。
@@ -467,14 +468,9 @@ export async function acceptCardDraft(
     const draft = toCardDraft(row);
     const now = nowIso();
     const cardId = generateId('card_draft');
-    const fsrs = JSON.stringify({
-      stability: 1,
-      difficulty: 5,
-      reps: 0,
-      lapses: 0,
-      dueAt: now,
-      state: 'NEW',
-    });
+    // M6：NEW 初始化走 canonical initFsrsState；dueAt 沿用本函数同一 now
+    //（与 studied_at/updated_at 同一时钟，避免三处时间戳毫秒漂移）。
+    const fsrs = JSON.stringify({ ...initFsrsState(), dueAt: now });
     const tx = deps.sqlite.transaction(() => {
       deps.sqlite
         .query(

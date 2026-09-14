@@ -85,6 +85,13 @@ describe('practice collections / collect', () => {
     expect(pqCards[0]!.tags).toContain('练习队列');
     expect(pqCards[0]!.front.length).toBeGreaterThan(0);
     expect(pqCards[0]!.back.length).toBeGreaterThan(0);
+    // M6：转卡 NEW 初始化与旧字面量语义一致（canonical initFsrsState 形状）
+    expect(pqCards[0]!.fsrs.stability).toBe(1);
+    expect(pqCards[0]!.fsrs.difficulty).toBe(5);
+    expect(pqCards[0]!.fsrs.reps).toBe(0);
+    expect(pqCards[0]!.fsrs.lapses).toBe(0);
+    expect(pqCards[0]!.fsrs.state).toBe('NEW');
+    expect(Number.isFinite(Date.parse(pqCards[0]!.fsrs.dueAt))).toBe(true);
   });
 
   it('rejects empty to-cards HTTP body with validation error', async () => {
