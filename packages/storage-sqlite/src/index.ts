@@ -83,6 +83,13 @@ export {
   type ReadingPosition,
 } from './adapters/document/reading-positions.js';
 export {
+  createImportTask,
+  updateImportTask,
+  getImportTask,
+  type ImportTask,
+  type ImportTaskStatus,
+} from './adapters/document/import-tasks.js';
+export {
   prepareTocImportSession,
   getTocImportSession,
   getTocImportSessionById,

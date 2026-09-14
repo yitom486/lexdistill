@@ -8,7 +8,7 @@ import {
 import { ok, err, isOk, type Result, BusinessError } from '@study-studio/shared';
 import type { ContentRepository } from '../ports.js';
 import { readDocumentFileBytes } from '../application/document-import/document-import-service.js';
-import type { ImportTask } from '../persistence/import-tasks.js';
+import type { ImportTask } from '@study-studio/storage-sqlite';
 
 export const LibraryImportInputSchema = z.object({
   userId: z.string().min(1).max(64),

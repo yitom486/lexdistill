@@ -27,7 +27,7 @@ import {
   createImportTask,
   updateImportTask,
   type ImportTask,
-} from '../../persistence/import-tasks.js';
+} from '@study-studio/storage-sqlite';
 import { saveCanonicalAst } from '../../persistence/documents-annotations.js';
 import type { RepoDeps } from '../../../../infrastructure/persistence/repo-context.js';
 

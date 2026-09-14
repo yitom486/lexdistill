@@ -109,8 +109,10 @@ canonical seed AST + 词典命中切片 + materializer version
 - 基座：`shared`、`protocol`、`document-model`、`drizzle-orm`（外加 `bun:sqlite` / `node:` 运行时）。
 - 例外：允许依赖经白名单明确列出的**纯叶子领域包**（定义：仅依赖 shared、
   无存储/网络/Agent、无厂商 SDK，且禁反向依赖本包——由该包自身的相对内聚测试锁定）。
-  当前唯一许可：`flashcards`（adapter 持久化的正是其语义：Anki 端点常量与校验、
-  内置模板种子与模板校验、模板类型；实测其依赖仅 shared，无循环可能）。
+  当前许可其二：`flashcards`（adapter 持久化的正是其语义：Anki 端点常量与校验、
+  内置模板种子与模板校验、模板类型；实测其依赖仅 shared，无循环可能）；
+  `content`（**仅文档种类纯表面**：`DOCUMENT_SOURCE_KINDS` 值＋`DocumentSourceKind`
+  类型，供 import-tasks 校验落库值；禁引 content 其他符号，由边界测试符号级锁定）。
 - 禁止：Gateway、ports、编排、上层、Agent、Web。新增叶子依赖必须同步更新
   10 号卡＋本 README＋边界测试三处，缺一视为未完成。
 

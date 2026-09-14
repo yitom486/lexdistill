@@ -230,7 +230,7 @@ import {
   getImportTask as getImportTaskDomain,
   type ImportTask,
   type ImportTaskStatus,
-} from '../modules/library/persistence/import-tasks.js';
+} from '@study-studio/storage-sqlite';
 import {
   prepareTocImportSession as prepareTocImportSessionDomain,
   getTocImportSession as getTocImportSessionDomain,

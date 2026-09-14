@@ -6,6 +6,7 @@
     "outDir": "dist"
   },
   "references": [
+    { "path": "../content" },
     { "path": "../document-model" },
     { "path": "../flashcards" },
     { "path": "../protocol" },

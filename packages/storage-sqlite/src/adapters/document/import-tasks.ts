@@ -8,12 +8,16 @@ import {
   generateId,
   nowIso,
 } from '@study-studio/shared';
-import { documentImports } from '@study-studio/storage-sqlite';
-import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
+import { documentImports } from '../../schema.js';
+import type { DrizzleDb } from '../../connection.js';
 import { DOCUMENT_SOURCE_KINDS, type DocumentSourceKind } from '@study-studio/content';
 
 /**
  * 文档导入任务持久化（状态机 processing → done/failed；读侧永不抛）。
+ *
+ * 方案 A 起家在 storage-sqlite（前身 gateway modules/library/persistence/import-tasks.ts，
+ * 逻辑不变）。参数收窄为 `{ db }`；文档种类值＋类型取自 `@study-studio/content`
+ * 纯表面（commander 特批例外，见包 README 依赖策略；禁引 content 其他符号）。
  */
 
 export type ImportTaskStatus = 'processing' | 'done' | 'failed';
@@ -54,7 +58,7 @@ function toImportTask(row: ImportTaskRow): ImportTask {
 }
 
 export async function createImportTask(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   input: { userId: string; sourceKind: DocumentSourceKind; filename: string }
 ): Promise<Result<ImportTask, BusinessError>> {
   try {
@@ -79,7 +83,7 @@ export async function createImportTask(
 }
 
 export async function updateImportTask(
-  deps: RepoDeps,
+  deps: { db: DrizzleDb },
   id: string,
   patch: { status: ImportTaskStatus; documentId?: string; lessons?: number; error?: string }
 ): Promise<Result<ImportTask, BusinessError>> {
@@ -104,7 +108,7 @@ export async function updateImportTask(
 }
 
 /** 取任务（读侧永不抛；不存在返回 undefined）。 */
-export async function getImportTask(deps: RepoDeps, id: string): Promise<ImportTask | undefined> {
+export async function getImportTask(deps: { db: DrizzleDb }, id: string): Promise<ImportTask | undefined> {
   try {
     const rows = await deps.db.select().from(documentImports).where(eq(documentImports.id, id));
     const row = rows[0];

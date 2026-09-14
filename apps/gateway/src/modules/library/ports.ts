@@ -11,7 +11,7 @@ import type {
   SubmitReadingPractice,
 } from '@study-studio/protocol';
 import type { TextbookAST } from '@study-studio/document-model';
-import type { ImportTask, ImportTaskStatus } from './persistence/import-tasks.js';
+import type { ImportTask, ImportTaskStatus } from '@study-studio/storage-sqlite';
 import type {
   PrepareTocImportSessionInput,
   PreparedTocImportSession,

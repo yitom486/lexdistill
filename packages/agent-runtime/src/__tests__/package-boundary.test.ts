@@ -45,7 +45,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'learning': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/document-model', '@study-studio/learner-core', '@study-studio/learning-algorithms'],
   'document-model': ['@study-studio/shared'],
   'content': ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol', '@study-studio/archive'],
-  'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model', '@study-studio/shared', '@study-studio/flashcards'],
+  'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model', '@study-studio/shared', '@study-studio/flashcards', '@study-studio/content'],
   'archive': ['@study-studio/shared'],
 };
 
@@ -471,6 +471,7 @@ describe('M1-1 package 依赖方向', () => {
         '@study-studio/document-model',
         '@study-studio/shared',
         '@study-studio/flashcards',
+        '@study-studio/content',
         'drizzle-orm',
         'bun:sqlite',
         'node:crypto',
@@ -479,6 +480,24 @@ describe('M1-1 package 依赖方向', () => {
         'node:path',
       ])
     ).toEqual([]);
+  });
+
+  it('storage-sqlite 对 content 的引用仅限文档种类纯表面（import-tasks 例外；禁放宽整个 content）', async () => {
+    const dir = join(repoRoot(), 'packages', 'storage-sqlite', 'src');
+    const hits = await filesWith(dir, /from\s+['"]@study-studio\/content['"]/);
+    expect(hits).toEqual([
+      join(dir, 'adapters', 'document', 'import-tasks.ts'),
+    ]);
+    const text = await readFile(hits[0] as string, 'utf-8');
+    const m = text.match(/import\s*\{([^}]*)\}\s*from\s*['"]@study-studio\/content['"]/);
+    expect(m).not.toBeNull();
+    const syms = (m as RegExpMatchArray)[1]!
+      .split(',')
+      .map((s) => s.trim().replace(/^type\s+/, ''));
+    expect(syms.length).toBeGreaterThan(0);
+    for (const s of syms) {
+      expect(['DOCUMENT_SOURCE_KINDS', 'DocumentSourceKind']).toContain(s);
+    }
   });
 
   it('gateway manifest：必须声明 storage-sqlite（M4/D2 统一入口消费方）', async () => {

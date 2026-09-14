@@ -199,6 +199,7 @@
       "name": "@study-studio/storage-sqlite",
       "version": "0.1.0",
       "dependencies": {
+        "@study-studio/content": "workspace:*",
         "@study-studio/document-model": "workspace:*",
         "@study-studio/flashcards": "workspace:*",
         "@study-studio/protocol": "workspace:*",
