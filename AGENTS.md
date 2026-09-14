@@ -219,7 +219,7 @@
 
 ### 7.3 前端必须验证服务端身份 (Server Identity Handshake)
 - **禁止写死单端口、无探测、无握手**：Web 启动后必须先调 `/api/health`（响应必须携带 `bootId` + 进程启动时间 + 版本号），关键 Turn 前核对 `bootId`；变化必须显式提示用户刷新/重连，**禁止静默绑僵尸**。
-- **所有流式请求必须有首字节超时与 stall 超时**：超时统一转为可读 `BusinessError` 并退出 busy。只靠用户点“取消”等于无容错——本次“准备 PDF…”永久卡死即此缺失的直接后果（验收：`textbooks-annotations.ts` 流式函数含 `AbortSignal.timeout` 或等效首字节计时；grep `timeout` 非零命中）。
+- **所有流式请求必须有首字节超时与 stall 超时**：超时统一转为可读 `BusinessError` 并退出 busy。只靠用户点“取消”等于无容错——本次“准备 PDF…”永久卡死即此缺失的直接后果（验收：现存 WS 流表面 `apps/web/src/components/agent-chat/use-chat-turn.ts`（turn 超时原因处理）与 `apps/web/src/lib/gateway-client.ts`（重连退避）含超时语义，`probeGatewayBootId` 含 `AbortSignal.timeout`；grep `timeout` 非零命中。注：旧 `textbooks-annotations.ts` 已随 M5 删除，不再作为验收指针）。
 
 ### 7.4 Agent 与运行中服务的互斥 (Agent/Dev Mutual Exclusion)
 - Agent（含人类工程师）在用户 live dev（`bun --watch` / Vite HMR）运行时**落盘改文件前必须先声明**：watch 重载会掐断用户正在点的请求流，HMR 会重置前端世代守门（`runId` 失配导致迟到结算被丢弃）。能暂停 dev 则暂停；不能暂停则分批小步保存，并在任务报告里写明保存时间窗。

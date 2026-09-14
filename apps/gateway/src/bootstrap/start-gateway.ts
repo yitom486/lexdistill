@@ -55,8 +55,11 @@ export function startGateway(app: CreatedApp, server: GatewayServer, port = PORT
   return started;
 }
 
-/** Bun.serve 监听失败载荷收窄：errno 口径 + 文案口径双判（跨版本稳健）。 */
-function isAddressInUse(rawError: unknown): boolean {
+/**
+ * Bun.serve 监听失败载荷收窄：errno 口径 + 文案口径双判（跨版本稳健）。
+ * 导出仅供单测锁定双判语义；生产调用点仍是 startGateway 内 EADDRINUSE 分支。
+ */
+export function isAddressInUse(rawError: unknown): boolean {
   if (!rawError || typeof rawError !== 'object') return false;
   const rec = rawError as Record<string, unknown>;
   if (rec.code === 'EADDRINUSE') return true;
