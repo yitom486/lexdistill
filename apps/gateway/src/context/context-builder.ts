@@ -2,7 +2,7 @@ import type { ContextSnapshot, ContextFocusItem } from '@study-studio/agent-runt
 import { summarizeLearningEvidence } from '@study-studio/learning';
 import { COURSE_STAGES, type LearnerProfileSnapshot, type LearnerRepository } from '@study-studio/learner-core';
 import type { GeneratedQuestion, Flashcard } from '@study-studio/protocol';
-import { isOk } from '@study-studio/shared';
+import { isOk, type Result, type BusinessError } from '@study-studio/shared';
 import {
   buildTrackCoachMetadata,
   normalizeTrackLanguage,
@@ -54,6 +54,90 @@ function resolveTrack(
   profileLang?: string | null
 ): TrackLanguage {
   return normalizeTrackLanguage(client?.targetLanguage || profileLang);
+}
+
+/**
+ * P3-3 快照文本上限（防每 turn prompt 膨胀；超长截断，turn 继续）。
+ */
+export const FOCUS_SURFACE_MAX = 500;
+export const SELECTED_WORD_MAX = 200;
+
+/**
+ * focus 可见性校验所需的最小仓储面（结构化类型；完整门面天然满足，
+ * mock／窄仓储缺方法时调用方回退为透传，见 sanitizeSnapshotReading）。
+ */
+export interface FocusValidationDeps {
+  getDocumentById(
+    documentId: string
+  ): Promise<Result<{ userId: string; sourceKind: string } | null, BusinessError>>;
+  listContentSegments(
+    documentId: string
+  ): Promise<Result<Array<{ id: string }>, BusinessError>>;
+}
+
+function hasFocusValidation(
+  repo: unknown
+): repo is FocusValidationDeps {
+  if (!repo || typeof repo !== 'object') return false;
+  const r = repo as Record<string, unknown>;
+  return (
+    typeof r.getDocumentById === 'function' && typeof r.listContentSegments === 'function'
+  );
+}
+
+function isDocumentVisibleToUser(
+  doc: { userId: string; sourceKind: string } | null,
+  userId: string
+): boolean {
+  return !!doc && (doc.userId === userId || doc.sourceKind === 'curriculum_textbook');
+}
+
+/**
+ * P3-3 快照阅读消毒（turn-handlers 在 buildTurnSnapshot 之后调用）：
+ * - selectedWord／focus.surface 超长截断；
+ * - 无 documentId／segmentId 的 focus 原样透传（非阅读类型不受影响）；
+ * - 有归属的 focus 必经可见性校验：文档不存在／不可见、segment 缺失或
+ *   归属不符、segmentId 无 documentId，一律丢弃整个 focus，turn 继续；
+ * - 仓储面缺失（mock／窄仓储）时回退透传，不阻断 turn。
+ */
+export async function sanitizeSnapshotReading(
+  repo: unknown,
+  userId: string,
+  snapshot: ContextSnapshot
+): Promise<ContextSnapshot> {
+  let { focus } = snapshot;
+  const selectedWord =
+    typeof snapshot.selectedWord === 'string' && snapshot.selectedWord.length > SELECTED_WORD_MAX
+      ? snapshot.selectedWord.slice(0, SELECTED_WORD_MAX)
+      : snapshot.selectedWord;
+  if (focus && focus.surface.length > FOCUS_SURFACE_MAX) {
+    focus = { ...focus, surface: focus.surface.slice(0, FOCUS_SURFACE_MAX) };
+  }
+  if (!focus) {
+    return selectedWord === snapshot.selectedWord ? snapshot : { ...snapshot, selectedWord };
+  }
+  const documentId = focus.documentId?.trim() || undefined;
+  const segmentId = focus.segmentId?.trim() || undefined;
+  if (!documentId && !segmentId) return focus === snapshot.focus && selectedWord === snapshot.selectedWord
+    ? snapshot
+    : { ...snapshot, focus, selectedWord };
+  if (!hasFocusValidation(repo)) return { ...snapshot, focus, selectedWord };
+  if (segmentId && !documentId) return { ...snapshot, focus: undefined, selectedWord };
+  const docRes = await (repo as FocusValidationDeps).getDocumentById(documentId as string);
+  const doc = isOk(docRes) ? docRes.value : null;
+  if (!isDocumentVisibleToUser(doc, userId)) {
+    return { ...snapshot, focus: undefined, selectedWord };
+  }
+  if (segmentId) {
+    const segsRes = await (repo as FocusValidationDeps).listContentSegments(documentId as string);
+    const hit = isOk(segsRes) ? segsRes.value.some((s) => s.id === segmentId) : false;
+    if (!hit) return { ...snapshot, focus: undefined, selectedWord };
+  }
+  return {
+    ...snapshot,
+    focus: { ...focus, ...(documentId ? { documentId } : {}), ...(segmentId ? { segmentId } : {}) },
+    selectedWord,
+  };
 }
 
 export class ContextBuilder {

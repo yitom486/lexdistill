@@ -13,6 +13,12 @@ export interface ContextFocusItem {
   correctAnswer?: string | undefined;
   explanation?: string | undefined;
   skillTag?: string | undefined;
+  /**
+   * P3-3 阅读归属（可选加法；既有消费者只读 surface/skillTag，不受影响）。
+   * 服务端会对 documentId 做可见性校验，不可见即丢弃整个 focus。
+   */
+  documentId?: string | undefined;
+  segmentId?: string | undefined;
 }
 
 export interface LearnerDigest {

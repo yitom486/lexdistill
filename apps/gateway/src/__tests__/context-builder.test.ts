@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { ContextBuilder, deriveRecentErrorTags } from '../context/context-builder.js';
+import {
+  ContextBuilder,
+  deriveRecentErrorTags,
+  sanitizeSnapshotReading,
+} from '../context/context-builder.js';
+import type { ContextSnapshot } from '@study-studio/agent-runtime';
 import type { LearnerRepository, LearnerProfile, LearnerProfileSnapshot } from '@study-studio/learner-core';
 import type { Flashcard } from '@study-studio/protocol';
 import { ok, err, BusinessError } from '@study-studio/shared';
@@ -302,4 +307,98 @@ it('异语种画像不可作为当前语种等级或计划', async () => {
   const snapshot = await new ContextBuilder().buildTurnSnapshot('u1', mockRepo({ targetLanguage: 'ja' }), { targetLanguage: 'en', learnerLevel: 'B2' });
   expect(snapshot.learnerLevel).toBe('UNKNOWN');
   expect(snapshot.learnerDigest?.dailyPlanRemaining).toBeUndefined();
+});
+
+describe('sanitizeSnapshotReading (P3-3)', () => {
+  const base: ContextSnapshot = {
+    targetLanguage: 'ja',
+    learnerLevel: 'BEGINNER',
+  };
+  // 最小验证面 fake（结构化类型，非完整门面）。
+  const fakeRepo = (
+    docs: Record<string, { userId: string; sourceKind: string }>,
+    segs: Record<string, string[]>
+  ) => ({
+    getDocumentById: async (id: string) => {
+      const d = docs[id];
+      return ok(d ? { userId: d.userId, sourceKind: d.sourceKind } : null);
+    },
+    listContentSegments: async (documentId: string) =>
+      ok((segs[documentId] ?? []).map((id) => ({ id }))),
+  });
+
+  it('可见 focus 保留（含段归属一致）', async () => {
+    const repo = fakeRepo({ dA: { userId: 'u1', sourceKind: 'user_import' } }, { dA: ['seg1'] });
+    const out = await sanitizeSnapshotReading(repo, 'u1', {
+      ...base,
+      focus: { kind: 'READING_PASSAGE', surface: '第一段', documentId: 'dA', segmentId: 'seg1' },
+    });
+    expect(out.focus).toEqual({
+      kind: 'READING_PASSAGE',
+      surface: '第一段',
+      documentId: 'dA',
+      segmentId: 'seg1',
+    });
+  });
+
+  it('不可见 focus 丢弃整段且 turn 字段其余不变', async () => {
+    const repo = fakeRepo({ dA: { userId: 'uA', sourceKind: 'user_import' } }, { dA: ['seg1'] });
+    const out = await sanitizeSnapshotReading(
+      repo,
+      'uB',
+      {
+        ...base,
+        focus: { kind: 'READING_PASSAGE', surface: '偷看', documentId: 'dA' },
+        selectedWord: 'w',
+      }
+    );
+    expect(out.focus).toBeUndefined();
+    // turn 继续：快照其余字段完整。
+    expect(out.targetLanguage).toBe('ja');
+    expect(out.selectedWord).toBe('w');
+  });
+
+  it('segment 缺失／无 documentId／幽灵文档一律丢弃', async () => {
+    const repo = fakeRepo({ dA: { userId: 'u1', sourceKind: 'user_import' } }, { dA: ['seg1'] });
+    const missSeg = await sanitizeSnapshotReading(repo, 'u1', {
+      ...base,
+      focus: { kind: 'READING_PASSAGE', surface: 'x', documentId: 'dA', segmentId: 'segX' },
+    });
+    expect(missSeg.focus).toBeUndefined();
+    const noDoc = await sanitizeSnapshotReading(repo, 'u1', {
+      ...base,
+      focus: { kind: 'READING_PASSAGE', surface: 'x', segmentId: 'seg1' },
+    });
+    expect(noDoc.focus).toBeUndefined();
+    const ghost = await sanitizeSnapshotReading(repo, 'u1', {
+      ...base,
+      focus: { kind: 'READING_PASSAGE', surface: 'x', documentId: 'ghost' },
+    });
+    expect(ghost.focus).toBeUndefined();
+  });
+
+  it('截断及旧请求兼容：超长截断，无 focus 原样，非归属 focus 仅截断', async () => {
+    const repo = fakeRepo({}, {});
+    const long = '字'.repeat(600);
+    const out = await sanitizeSnapshotReading(repo, 'u1', {
+      ...base,
+      focus: { kind: 'QUESTION', surface: long },
+      selectedWord: '词'.repeat(300),
+    });
+    expect(out.focus?.surface.length).toBe(500);
+    expect(out.focus?.kind).toBe('QUESTION');
+    expect(out.selectedWord?.length).toBe(200);
+    // 旧请求（无 focus、无超长）形状不变。
+    const legacy = await sanitizeSnapshotReading(repo, 'u1', { ...base });
+    expect(legacy.focus).toBeUndefined();
+    expect(legacy.targetLanguage).toBe('ja');
+  });
+
+  it('窄仓储回退透传（mock LearnerRepository 无验证面不断 turn）', async () => {
+    const out = await sanitizeSnapshotReading(mockRepo({}), 'u1', {
+      ...base,
+      focus: { kind: 'READING_PASSAGE', surface: 'x', documentId: 'dA' },
+    });
+    expect(out.focus?.documentId).toBe('dA');
+  });
 });

@@ -22,6 +22,7 @@ import {
   type TextbookVocabulary,
 } from '../models/textbook.js';
 import { sound } from '../utils/audio.js';
+import { useReadingFocusStore } from '../stores/useReadingFocusStore.js';
 import { ShimmerButton } from './magicui/index.js';
 import { InteractivePdfReader } from './InteractivePdfReader.js';
 import { TextbookImporterModal } from './TextbookImporterModal.js';
@@ -101,6 +102,22 @@ export function TextbookCurriculum({
     pickDefaultTextbook(filteredBooks, languageFilter) ??
     pickDefaultTextbook(booksList, languageFilter);
   const currentLesson = currentBook?.lessons.find((l) => l.id === selectedLessonId) ?? currentBook?.lessons[0];
+
+  // P3-3 阅读焦点：打开某书某课即登记，离开教材页（卸载）即清空；
+  // chat 仅凭此 store 决定是否附阅读 focus，其他页面保持 undefined。
+  const setReadingFocus = useReadingFocusStore((s) => s.setReadingFocus);
+  const clearReadingFocus = useReadingFocusStore((s) => s.clearReadingFocus);
+  React.useEffect(() => {
+    const docId = currentBook?.documentId ?? currentBook?.id;
+    if (docId && currentLesson) {
+      setReadingFocus({
+        documentId: docId,
+        lessonId: currentLesson.id,
+        surface: `${currentBook?.shortTitle ?? ''} · ${currentLesson.title}`,
+      });
+    }
+    return () => clearReadingFocus();
+  }, [currentBook, currentLesson, setReadingFocus, clearReadingFocus]);
 
   // 本课真出题（自包含：mutation + 题库前插 + 切 QUIZ；App 传的旧假跳转仅作无 documentId 防御回退）。
   const lessonQuiz = useTextbookLessonQuizMutation();

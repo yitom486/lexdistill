@@ -39,6 +39,7 @@ import { ChatPanelHeader } from './agent-chat/ChatPanelHeader.js';
 import { ChatMessageList } from './agent-chat/ChatMessageList.js';
 import { ChatComposer } from './agent-chat/ChatComposer.js';
 import { useChatTurn } from './agent-chat/use-chat-turn.js';
+import { useReadingFocusStore } from '../stores/useReadingFocusStore.js';
 import {
   FALLBACK_EFFORTS,
   type ChatMessage,
@@ -177,6 +178,9 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
     }
   }, [selectedModel, effortOptions, coachEffort, setCoachEffort]);
 
+  // P3-3：标量订阅（稳定引用，防重渲染循环）；仅阅读页 store 非空才附 focus。
+  const readingDocumentId = useReadingFocusStore((s) => s.documentId);
+  const readingSurface = useReadingFocusStore((s) => s.surface);
   const snapshot = useCallback(() => {
     return {
       targetLanguage: track,
@@ -184,8 +188,19 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
       locale: 'zh-CN' as const,
       ui: { activeTab, openTutor: true },
       userIntentHint: 'FREE_COACH' as const,
+      // P3-3：仅阅读页（store 非空，即教材阅读器开着某书某课）附阅读 focus，
+      // 其他页面保持 undefined；可见性由服务端校验。
+      ...(readingDocumentId
+        ? {
+            focus: {
+              kind: 'READING_PASSAGE' as const,
+              surface: readingSurface ?? '阅读中',
+              documentId: readingDocumentId,
+            },
+          }
+        : {}),
     };
-  }, [track, profile.overallLevel, activeTab]);
+  }, [track, profile.overallLevel, activeTab, readingDocumentId, readingSurface]);
 
   /** 显式新建会话（清空 thread，下次 turn 会 start 新 thread） */
   const startNewChat = () => {

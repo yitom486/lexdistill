@@ -12,6 +12,7 @@ import {
 } from '@study-studio/shared';
 import type { GatewayServer } from '../gateway-runtime.js';
 import type { ContextSnapshot } from '@study-studio/agent-runtime';
+import { sanitizeSnapshotReading } from '../../context/context-builder.js';
 import type { ToolDefinition } from '@study-studio/tool-core';
 import type { AgentLane, SessionManager } from '../../session/session-manager.js';
 import {
@@ -117,11 +118,13 @@ export async function handleTurnSend(
         : undefined;
 
   // 1. 组装不可变学情快照
-  const snapshot = await server.contextBuilder.buildTurnSnapshot(
+  const rawSnapshot = await server.contextBuilder.buildTurnSnapshot(
     userId,
     server.learnerRepo,
     payload.contextSnapshot
   );
+  // P3-3 阅读消毒：截断超长文本，不可见归属丢弃整个 focus，turn 继续。
+  const snapshot = await sanitizeSnapshotReading(server.learnerRepo, userId, rawSnapshot);
 
   // 2. 发出回合启动通知
   const intent = payload.intent || snapshot.userIntentHint || 'EXPLAIN';
