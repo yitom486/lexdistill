@@ -4,18 +4,10 @@ import { layoutItemsToCandidates } from '@study-studio/content';
 import type { LayoutStructRole, LayoutTextItem } from '@study-studio/content';
 
 /**
- * M8-6：纯规则（layoutItemsToCandidates / mergeHeadingCandidates 与所需
- * 类型/helper）已迁入 `@study-studio/content`，本文件保留防御性
- * 采集运行时实现（collectLayoutCandidates：版式接口缺席/异常/空信号一律降级
- * 为空数组），并具名重导出 canonical 纯规则，既有消费者行为不变。
+ * E2g 清扫后：本文件仅保留防御性采集运行时实现（collectLayoutCandidates：
+ * 版式接口缺席/异常/空信号一律降级为空数组）；纯规则已迁 `@study-studio/content`，
+ * 旧具名重导出块已删除，消费者直引 canonical 出口。
  */
-export {
-  layoutItemsToCandidates,
-  mergeHeadingCandidates,
-  type LayoutHeadingsOptions,
-  type LayoutStructRole,
-  type LayoutTextItem,
-} from '@study-studio/content';
 
 /**
  * 防御性采集：解析器有版式接口才跑；任何异常/无信号都返回空数组，

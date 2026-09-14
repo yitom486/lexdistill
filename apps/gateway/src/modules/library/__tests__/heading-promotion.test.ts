@@ -3,7 +3,7 @@ import { isOk } from '@study-studio/shared';
 import {
   markdownToAst,
   promoteLessonHeadings,
-} from '../application/pdf-import/markdown-to-ast.js';
+} from '@study-studio/content';
 import { convertPdfToAst } from '../application/pdf-import/pdf-import-service.js';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 

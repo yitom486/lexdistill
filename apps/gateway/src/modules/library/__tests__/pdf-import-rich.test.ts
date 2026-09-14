@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { extractTocEntries } from '../application/pdf-import/extract-headings.js';
+import { extractTocEntries } from '@study-studio/content';
 import {
   appendPdfToDocument,
   convertPdfToAst,

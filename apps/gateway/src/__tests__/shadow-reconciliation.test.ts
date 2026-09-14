@@ -9,7 +9,7 @@ import {
   SHADOW_OBSERVE_CONSTANTS,
 } from '../modules/library/http/library-routes.js';
 import { summarizeReconciliation, reconcileLessons } from '@study-studio/storage-sqlite';
-import { markdownToAst } from '../modules/library/application/pdf-import/markdown-to-ast.js';
+import { markdownToAst } from '@study-studio/content';
 import { appendPdfToDocument } from '../modules/library/application/pdf-import/pdf-import-service.js';
 import type { TextbookAST } from '@study-studio/document-model';
 

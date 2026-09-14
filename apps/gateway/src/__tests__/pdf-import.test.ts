@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { gzipSync } from 'node:zlib';
-import { detectDocScript, markdownToAst } from '../modules/library/application/pdf-import/markdown-to-ast.js';
+import { detectDocScript, markdownToAst } from '@study-studio/content';
 import {
   extractHeadingsFromMarkdown,
   extractTocEntries,
-} from '../modules/library/application/pdf-import/extract-headings.js';
+} from '@study-studio/content';
 import {
   appendPdfToDocument,
   convertPdfToAst,

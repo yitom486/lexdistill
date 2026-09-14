@@ -5,7 +5,7 @@ import {
   markdownToAst,
   groupSectionsByClasses,
   groundClassesByTitle,
-} from '../application/pdf-import/markdown-to-ast.js';
+} from '@study-studio/content';
 import { convertPdfToAst } from '../application/pdf-import/pdf-import-service.js';
 import { extractRequestClasses } from '../http/pdf-import-routes.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';

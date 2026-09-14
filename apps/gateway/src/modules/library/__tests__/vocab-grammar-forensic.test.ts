@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { markdownToAst } from '../application/pdf-import/markdown-to-ast.js';
+import { markdownToAst } from '@study-studio/content';
 import {
   groundGrammarsForTest,
   groundVocabsForTest,

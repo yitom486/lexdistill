@@ -5,7 +5,8 @@ import { ensurePdfRuntime, type PdfInspectorLike } from '../../../../infrastruct
 import { classifyEmbeddedOutline, type EmbeddedOutlineEntry } from '@study-studio/content';
 import { detectDocScript, markdownToAst, promoteLessonHeadings } from '@study-studio/content';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from '@study-studio/content';
-import { collectLayoutCandidates, layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from './layout-headings.js';
+import { collectLayoutCandidates } from './layout-headings.js';
+import { layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from '@study-studio/content';
 import { buildPdfConvertReport, buildPdfMapReport, buildOcrOverflowError } from '@study-studio/content';
 import {
   analyzePagesWithAzure,

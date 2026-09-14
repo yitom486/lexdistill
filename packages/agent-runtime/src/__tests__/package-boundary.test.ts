@@ -259,16 +259,9 @@ describe('M1-1 package 依赖方向', () => {
     expect(deps['@study-studio/archive']).toBe('workspace:*');
   });
 
+  // E2g：extract-headings.ts / markdown-to-ast.ts 薄垫片已删除（消费者直引包）；
+  // layout-headings.ts 去垫片化后仍含 content 引用（运行时采集），保留在名单。
   it('gateway PDF 摄取统一入口：原实现文件仅为兼容出口，消费者走 canonical 包（M5.1 起 canonical 为 content）', async () => {
-    for (const file of [
-      'modules/library/application/pdf-import/extract-headings.ts',
-      'modules/library/application/pdf-import/markdown-to-ast.ts',
-    ]) {
-      const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
-      expect(text).toContain('@study-studio/content');
-      expect(text).not.toMatch(/^export function /m);
-      expect(text).not.toMatch(/^function /m);
-    }
     for (const file of [
       'modules/library/application/document-import/document-import-service.ts',
       'modules/library/application/pdf-import/layout-headings.ts',
