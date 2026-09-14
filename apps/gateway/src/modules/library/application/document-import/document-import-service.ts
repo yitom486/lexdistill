@@ -20,7 +20,7 @@ import {
   type DocumentImporter,
 } from '@study-studio/content';
 import { decodeTextBytes } from '@study-studio/content';
-import { extractEpubText } from './epub-reader.js';
+import { extractEpubText } from '@study-studio/content/document';
 import { extractMobiText } from '@study-studio/content';
 import { extractWebArticle } from './url-reader.js';
 import {

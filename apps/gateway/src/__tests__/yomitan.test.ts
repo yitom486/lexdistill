@@ -253,7 +253,7 @@ describe('Kanjium 真包（live，网络可达时）', () => {
       console.warn('[yomitan-test] 无网络，跳过 live 断言');
       return;
     }
-    const { extractZip } = await import('../modules/library/application/pdf-import/archive.js');
+    const { extractZip } = await import('@study-studio/archive');
     const files = extractZip(zipBytes).map((e) => ({ path: e.path, data: e.data }));
     const parsed = parseYomitanDictionary(files, 'yt');
     expect(parsed.index.format).toBe(3);

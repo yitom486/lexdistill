@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { mapPdfPages } from '../application/pdf-import/pdf-import-service.js';
-import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
+import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 
 /**
  * CMD-LINGUA-P1A map 内置目录优先（mock，不碰原生；标题均为虚构通用词）。
@@ -23,7 +23,7 @@ function outlineMock(outline: unknown, calls: { classify: Array<readonly number[
     // 故意喂畸形 native 负载时才需要断言（有注释）；正常用例均为合法形状。
     extractEmbeddedOutline: () => {
       if (outline instanceof Error) throw outline;
-      return outline as import('../application/pdf-import/pdf-runtime.js').EmbeddedOutlineResult;
+      return outline as import('../../../infrastructure/pdf-runtime/pdf-runtime.js').EmbeddedOutlineResult;
     },
   };
 }

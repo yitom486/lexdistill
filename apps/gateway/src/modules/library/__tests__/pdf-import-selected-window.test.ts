@@ -4,7 +4,7 @@ import {
   convertPdfToAst,
   mapPdfPages,
 } from '../application/pdf-import/pdf-import-service.js';
-import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
+import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 
 /**
  * CMD-P0.1 已选页开窗锁（mock，不碰原生，禁止私人书）。

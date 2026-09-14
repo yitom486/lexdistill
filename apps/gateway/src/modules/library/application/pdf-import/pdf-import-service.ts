@@ -1,7 +1,7 @@
 import { BusinessError, err, generateId, isOk, logger, ok, type Result } from '@study-studio/shared';
 import { StructureClassSchema, type DocumentItem, type StructureClass } from '@study-studio/protocol';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
-import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
+import { ensurePdfRuntime, type PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { classifyEmbeddedOutline, type EmbeddedOutlineEntry } from '@study-studio/content';
 import { detectDocScript, markdownToAst, promoteLessonHeadings } from '@study-studio/content';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from '@study-studio/content';

@@ -15,6 +15,7 @@
     { "path": "packages/lexicon" },
     { "path": "packages/learning" },
     { "path": "packages/storage-sqlite" },
+    { "path": "packages/archive" },
     { "path": "apps/gateway" },
     { "path": "apps/web" }
   ]

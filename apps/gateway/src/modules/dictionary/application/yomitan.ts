@@ -14,7 +14,7 @@ import {
   type DictionaryPackage,
   type DictionaryPackageManifest,
 } from './dictionary-packages.js';
-import { extractZip } from '../../library/public.js';
+import { extractZip } from '@study-studio/archive';
 import {
   parseIndex,
   parseYomitanDictionary,

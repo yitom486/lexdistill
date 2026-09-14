@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { isOk } from '@study-studio/shared';
-import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
+import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import {
   TOC_REVIEW_MAX_PAGES,
   prepareTocReviewMaterial,
@@ -49,7 +49,7 @@ function materialMock(args: {
     extractEmbeddedOutline: () => {
       if (args.outline?.value instanceof Error) throw args.outline.value;
       // 故意喂畸形 native 负载时才需要断言（有注释）；正常用例均为合法形状。
-      return args.outline?.value as import('../application/pdf-import/pdf-runtime.js').EmbeddedOutlineResult;
+      return args.outline?.value as import('../../../infrastructure/pdf-runtime/pdf-runtime.js').EmbeddedOutlineResult;
     },
   };
 }

@@ -1,9 +1,11 @@
 import { BusinessError } from '@study-studio/shared';
-// 跨模块复用（G5 登记）：zip 安全解包（炸弹/加密守卫）；只读内存，不写盘。
-import { extractZip, normalizeZipEntryPaths } from '../pdf-import/archive.js';
+// zip 安全解包（炸弹/加密守卫）走 @study-studio/archive 唯一实现；只读内存，不写盘。
+import { extractZip, normalizeZipEntryPaths } from '@study-studio/archive';
 
 /**
  * EPUB 文本提取（clean-room，自研解析）。
+ * E2b 起家在 content/src/document（前身 gateway modules/library/...；逻辑不变；
+ * 走 document 子入口：用 Buffer 全局，禁入浏览器安全根表面）。
  * EPUB = zip：container.xml 定 OPF → manifest/spine 定章节顺序 → XHTML 脱衣成 markdown。
  * 只取正文（跳封面/NCX/样式/字体/图片）；章节上限 200，总字符上限 2MB（后级 markdownToAst 另有上限）。
  */

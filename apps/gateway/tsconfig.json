@@ -19,7 +19,8 @@
     { "path": "../../packages/ai-content" },
     { "path": "../../packages/lexicon" },
     { "path": "../../packages/learning" },
-    { "path": "../../packages/storage-sqlite" }
+    { "path": "../../packages/storage-sqlite" },
+    { "path": "../../packages/archive" }
   ],
   "include": ["src/**/*"]
 }

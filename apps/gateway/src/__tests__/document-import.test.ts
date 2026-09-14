@@ -10,7 +10,7 @@ import {
   extractEpubText,
   parseNcxToc,
   parseNavToc,
-} from '../modules/library/application/document-import/epub-reader.js';
+} from '@study-studio/content/document';
 import {
   guessSourceKind,
   DOCUMENT_SOURCE_KINDS,

@@ -1,5 +1,5 @@
 import { BusinessError, err, logger, ok, type Result } from '@study-studio/shared';
-import { ensurePdfRuntime, type PdfInspectorLike } from './pdf-runtime.js';
+import { ensurePdfRuntime, type PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import {
   probePdfPageCount,
   validatePdfInput,

@@ -6,6 +6,7 @@
     "outDir": "dist"
   },
   "references": [
+    { "path": "../archive" },
     { "path": "../shared" },
     { "path": "../document-model" },
     { "path": "../protocol" }

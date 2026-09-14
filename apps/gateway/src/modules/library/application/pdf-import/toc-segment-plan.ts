@@ -7,7 +7,7 @@ import {
   translateToBusinessError,
   type Result,
 } from '@study-studio/shared';
-import { ensurePdfRuntime } from './pdf-runtime.js';
+import { ensurePdfRuntime } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import {
   probePdfPageCount,
   validatePdfInput,

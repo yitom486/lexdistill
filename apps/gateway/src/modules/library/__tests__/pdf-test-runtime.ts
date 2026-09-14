@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { BusinessError } from '@study-studio/shared';
-import { ensurePdfRuntime, type PdfInspectorLike, type PdfRuntimePaths } from '../application/pdf-import/pdf-runtime.js';
+import { ensurePdfRuntime, type PdfInspectorLike, type PdfRuntimePaths } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 
 /**
  * PDF native E2E 测试运行时（测试拥有，显式 bootstrap，永不静默 skip）。

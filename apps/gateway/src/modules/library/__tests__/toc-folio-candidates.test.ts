@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { unlink } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
 import { isOk, logger } from '@study-studio/shared';
-import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
+import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import {
   extractFolioCandidates,
   type FolioGeometryItem,
@@ -75,7 +75,7 @@ function folioMock(args: {
           out.push({ ...s, page, width: 20, fontSize: 12, isBold: false });
         }
       }
-      return out as unknown as import('../application/pdf-import/pdf-runtime.js').LayoutTextItemLike[];
+      return out as unknown as import('../../../infrastructure/pdf-runtime/pdf-runtime.js').LayoutTextItemLike[];
     },
   };
 }

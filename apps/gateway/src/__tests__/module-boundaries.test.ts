@@ -35,12 +35,10 @@ const CROSS_MODULE_ALLOWLIST = new Set([
   'modules/practice/__tests__/practice-phase-d.test.ts -> modules/learning-progress/public.js',
   'modules/practice/application/practice-assembly.ts -> transport/tools/learning-content-tool.js',
   'modules/practice/__tests__/practice-assembly.test.ts -> transport/tools/learning-content-tool.js',
-  // Yomitan zip 解包复用 library 的 archive.ts（纯函数，无状态；避免重复实现）。
-  'modules/dictionary/application/yomitan.ts -> modules/library/public.js',
+  // E2b：yomitan 改直引 @study-studio/archive，library/public 中转边消除。
   // Anki 推送复用 tts-proxy 合成（只取音频字节；Key 随调用来、用完即弃，永不落盘）。
   'modules/flashcards/application/anki-push.ts -> modules/tts/application/tts-proxy.js',
-  // apkg 解包复用 library 的 extractZip（zip 炸弹/加密守卫；不写盘）。
-  'modules/flashcards/application/apkg-import.ts -> modules/library/public.js',
+  // E2b：apkg-import 改直引 @study-studio/archive，library/public 中转边消除。
   // flashcards.collect 复用词典 collect 的输出类型（type-only；与查词面板同一命令）。
   'modules/flashcards/tools/flashcards-collect-tool.ts -> modules/dictionary/public.js',
   // 草稿域复用相遇词 term_key 归一 + 回填（同键跨包稳定；accept 与 collect 同级信号）。
@@ -54,8 +52,8 @@ const CROSS_MODULE_ALLOWLIST = new Set([
   'modules/flashcards/tools/flashcards-collect-tool.ts -> modules/dictionary/ports.js',
   'modules/learning-progress/tools/mistakes-resolve-tool.ts -> modules/practice/ports.js',
   'modules/practice/application/practice-assembly.ts -> modules/library/ports.js',
-  // EPUB 解包复用 library 的 extractZip（同 apkg：炸弹/加密守卫，只读内存）。
-  'modules/library/application/document-import/epub-reader.ts -> modules/library/application/pdf-import/archive.js',
+  // E2b：epub-reader 已迁入 @study-studio/content/document，archive 走包引用，
+  // 跨模块深路径边消除（删包由 content/document 内聚测试兜底）。
   // 网页正文复用新闻管线的 Readability 抽取纯函数（抓取层自备 SSRF 防护）。
   'modules/library/application/document-import/url-reader.ts -> modules/curriculum/infrastructure/news-article-fetch.js',
   // 新闻管线复用 URL 导入的 SSRF 守卫（公网断言/重定向复检/限流读取同一口径）。

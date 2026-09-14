@@ -148,9 +148,7 @@ describe('apkg analyze', () => {
   });
 
   it('Windows 产包反斜杠路径归一化', async () => {
-    const { normalizeZipEntryPaths } = await import(
-      '../modules/library/application/pdf-import/archive.js'
-    );
+    const { normalizeZipEntryPaths } = await import('@study-studio/archive');
     const normed = normalizeZipEntryPaths([
       { path: 'sub\\collection.anki2', data: new Uint8Array([1]) },
       { path: 'ok/media', data: new Uint8Array([2]) },

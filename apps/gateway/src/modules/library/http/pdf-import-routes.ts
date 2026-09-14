@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { BusinessError, isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
-import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
+import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { extractFolioCandidates } from '../application/pdf-import/toc-folio-candidates.js';
 import { planTocSegments } from '../application/pdf-import/toc-segment-plan.js';
 import { importTocLesson } from '../application/pdf-import/toc-lesson-import.js';

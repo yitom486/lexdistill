@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { unlink } from 'node:fs/promises';
 import { isOk, logger } from '@study-studio/shared';
-import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
+import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { previewTocSegments, fingerprintTocPlan, sha256HexBytes } from '../application/pdf-import/toc-segment-preview.js';
 import { planTocSegments } from '../application/pdf-import/toc-segment-plan.js';
 import { createApp } from '../../../transport/http/create-app.js';

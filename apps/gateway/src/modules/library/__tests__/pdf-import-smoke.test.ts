@@ -6,7 +6,7 @@ import {
   importPdfDocument,
   mapPdfPages,
 } from '../application/pdf-import/pdf-import-service.js';
-import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
+import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 
 /**

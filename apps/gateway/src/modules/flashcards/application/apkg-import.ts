@@ -19,7 +19,7 @@ import {
 /** 分析类型兼容出口：定义已迁入 flashcards，此处重出以保持 Tool/测试链路不动。 */
 export type { ApkgModelDraft, ApkgDeckSummary, ApkgAnalysis, ApkgImportNotesResult } from '@study-studio/flashcards';
 // 跨模块复用（G5 已登记）：zip 安全解包（炸弹/加密守卫），不写盘、无路径穿越面。
-import { extractZip, normalizeZipEntryPaths } from '../../library/public.js';
+import { extractZip, normalizeZipEntryPaths } from '@study-studio/archive';
 import { flashcards } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { storeMedia } from '@study-studio/storage-sqlite';

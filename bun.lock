@@ -25,6 +25,7 @@
         "@mozilla/readability": "^0.6.0",
         "@study-studio/agent-runtime": "workspace:*",
         "@study-studio/ai-content": "workspace:*",
+        "@study-studio/archive": "workspace:*",
         "@study-studio/content": "workspace:*",
         "@study-studio/document-model": "workspace:*",
         "@study-studio/flashcards": "workspace:*",
@@ -106,10 +107,18 @@
         "@study-studio/shared": "workspace:*",
       },
     },
+    "packages/archive": {
+      "name": "@study-studio/archive",
+      "version": "0.1.0",
+      "dependencies": {
+        "@study-studio/shared": "workspace:*",
+      },
+    },
     "packages/content": {
       "name": "@study-studio/content",
       "version": "0.1.0",
       "dependencies": {
+        "@study-studio/archive": "workspace:*",
         "@study-studio/document-model": "workspace:*",
         "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
@@ -405,6 +414,8 @@
     "@study-studio/agent-runtime": ["@study-studio/agent-runtime@workspace:packages/agent-runtime"],
 
     "@study-studio/ai-content": ["@study-studio/ai-content@workspace:packages/ai-content"],
+
+    "@study-studio/archive": ["@study-studio/archive@workspace:packages/archive"],
 
     "@study-studio/content": ["@study-studio/content@workspace:packages/content"],
 

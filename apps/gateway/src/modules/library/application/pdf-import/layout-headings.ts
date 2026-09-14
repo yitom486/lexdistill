@@ -1,5 +1,5 @@
 import type { HeadingCandidate } from '@study-studio/protocol';
-import type { PdfInspectorLike } from './pdf-runtime.js';
+import type { PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { layoutItemsToCandidates } from '@study-studio/content';
 import type { LayoutStructRole, LayoutTextItem } from '@study-studio/content';
 

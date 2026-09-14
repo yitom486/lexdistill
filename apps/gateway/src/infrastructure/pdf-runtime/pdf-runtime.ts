@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
 import { BusinessError, logger, ok, err, type Result } from '@study-studio/shared';
-import { defaultRuntimeDir } from '../../../../infrastructure/persistence/app-paths.js';
+import { defaultRuntimeDir } from '../persistence/app-paths.js';
 import {
   PDF_INSPECTOR_MAIN,
   PDF_INSPECTOR_VERSION,
@@ -12,7 +12,7 @@ import {
   currentRuntimePlatform,
   type PdfRuntimePlatform,
 } from './pdf-artifacts.js';
-import { extractTarGz, extractZip, type ArchiveEntry } from './archive.js';
+import { extractTarGz, extractZip, type ArchiveEntry } from '@study-studio/archive';
 
 /**
  * PDF 运行时管理器（按需下载，不进安装包）。

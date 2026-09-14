@@ -13,9 +13,9 @@ import {
 } from '../modules/library/application/pdf-import/pdf-import-service.js';
 import { readLocalPdfFile } from '../modules/library/application/pdf-import/local-file.js';
 import type { DocumentItem } from '@study-studio/protocol';
-import { extractTarGz, extractZip } from '../modules/library/application/pdf-import/archive.js';
-import { assertArtifactUrlAllowed, currentRuntimePlatform } from '../modules/library/application/pdf-import/pdf-artifacts.js';
-import { fetchRuntimeArtifact, napiDirName } from '../modules/library/application/pdf-import/pdf-runtime.js';import { isOk } from '@study-studio/shared';
+import { extractTarGz, extractZip } from '@study-studio/archive';
+import { assertArtifactUrlAllowed, currentRuntimePlatform } from '../infrastructure/pdf-runtime/pdf-artifacts.js';
+import { fetchRuntimeArtifact, napiDirName } from '../infrastructure/pdf-runtime/pdf-runtime.js';import { isOk } from '@study-studio/shared';
 
 const JA_MD = `# 第 1 课
 李さん：はじめまして。李です。

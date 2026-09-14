@@ -28,6 +28,7 @@ const PACKAGES = [
   'document-model',
   'content',
   'storage-sqlite',
+  'archive',
 ] as const;
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
@@ -43,8 +44,9 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'lexicon': ['@study-studio/shared'],
   'learning': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/document-model', '@study-studio/learner-core', '@study-studio/learning-algorithms'],
   'document-model': ['@study-studio/shared'],
-  'content': ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol'],
+  'content': ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol', '@study-studio/archive'],
   'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model', '@study-studio/shared', '@study-studio/flashcards'],
+  'archive': ['@study-studio/shared'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -164,8 +166,13 @@ describe('M1-1 package 依赖方向', () => {
     expect(hits).toEqual([]);
   });
 
-  async function relativeImportsOnly(pkgDir: string, allowedPackages: string[]): Promise<string[]> {
-    const dir = join(repoRoot(), 'packages', pkgDir, 'src');
+  async function relativeImportsOnly(
+    pkgDir: string,
+    allowedPackages: string[],
+    excludeDirs: string[] = ['__tests__'],
+    subDir = ''
+  ): Promise<string[]> {
+    const dir = join(repoRoot(), 'packages', pkgDir, 'src', subDir);
     const files: string[] = [];
     const walk = async (d: string): Promise<void> => {
       const entries = await readdir(d, { withFileTypes: true });
@@ -174,7 +181,7 @@ describe('M1-1 package 依赖方向', () => {
         const full = join(d, name);
         const entry = entries.find((e) => e.name === name);
         if (entry !== undefined && entry.isDirectory()) {
-          if (name === '__tests__') continue;
+          if (excludeDirs.includes(name)) continue;
           await walk(full);
         } else if (name.endsWith('.ts')) {
           files.push(full);
@@ -227,9 +234,29 @@ describe('M1-1 package 依赖方向', () => {
   });
 
   it('content：Content 域纯解析层，仅依赖 shared/document-model/protocol（禁 Gateway/SQLite/Drizzle/learner-core/Agent/Web/网络/PDF runtime）', async () => {
+    // E2b：src/document 为 Node-only 子入口（archive 依赖），由下条用例单独锁定，此处排除。
     expect(
-      await relativeImportsOnly('content', ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol'])
+      await relativeImportsOnly('content', ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol'], ['__tests__', 'document'])
     ).toEqual([]);
+  });
+
+  it('content/document：Node-only 文档子入口，仅依赖 shared/archive（禁 drizzle/bun:sqlite/Gateway/网络直引；epub 符号禁上浮由 document-surface 测试锁）', async () => {
+    expect(
+      await relativeImportsOnly('content', ['@study-studio/shared', '@study-studio/archive'], ['__tests__'], 'document')
+    ).toEqual([]);
+  });
+
+  it('archive：最小解包器，仅依赖 shared（禁领域/Gateway/网络/drizzle；第二实现禁令见包 README）', async () => {
+    expect(
+      await relativeImportsOnly('archive', ['@study-studio/shared', 'node:zlib'])
+    ).toEqual([]);
+  });
+
+  it('gateway manifest：必须声明 archive（E2b 跨域复用统一入口消费方）', async () => {
+    const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
+    const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
+    const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
+    expect(deps['@study-studio/archive']).toBe('workspace:*');
   });
 
   it('gateway PDF 摄取统一入口：原实现文件仅为兼容出口，消费者走 canonical 包（M5.1 起 canonical 为 content）', async () => {

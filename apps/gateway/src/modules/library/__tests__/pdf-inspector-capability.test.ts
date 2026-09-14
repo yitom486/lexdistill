@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { PDF_INSPECTOR_VERSION } from '../application/pdf-import/pdf-artifacts.js';
+import { PDF_INSPECTOR_VERSION } from '../../../infrastructure/pdf-runtime/pdf-artifacts.js';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime, testRuntimeDir } from './pdf-test-runtime.js';
 
 /**

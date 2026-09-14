@@ -6,6 +6,7 @@
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@study-studio/agent-runtime": "workspace:*",
+    "@study-studio/archive": "workspace:*",
     "@study-studio/content": "workspace:*",
     "@study-studio/document-model": "workspace:*",
     "@study-studio/ai-content": "workspace:*",

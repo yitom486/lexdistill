@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { PdfInspectorLike } from '../application/pdf-import/pdf-runtime.js';
+import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { collectLayoutCandidates } from '../application/pdf-import/layout-headings.js';
 
 /**

@@ -7,8 +7,8 @@ import {
   PDF_INSPECTOR_MAIN,
   PDF_INSPECTOR_VERSION,
   currentRuntimePlatform,
-} from '../application/pdf-import/pdf-artifacts.js';
-import { ensurePdfRuntime } from '../application/pdf-import/pdf-runtime.js';
+} from '../../../infrastructure/pdf-runtime/pdf-artifacts.js';
+import { ensurePdfRuntime } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { testRuntimeDir } from './pdf-test-runtime.js';
 
 /**
