@@ -222,11 +222,16 @@ export {
   chunkTextToSegments,
   isProjectionEligible,
   resolveProjectionEligibility,
+  listTextbookLines,
+  isLinesProjectionEligible,
+  projectLinesSegments,
+  findDocumentsMissingLineSegments,
   segmentHash,
   type ContentSegment,
   type ContentSegmentKind,
   type ProjectSegmentsInput,
   type TextChunk,
+  type TextbookLineRef,
 } from './adapters/library/content-segments.js';
 export {
   ensureCanonicalContentSources,

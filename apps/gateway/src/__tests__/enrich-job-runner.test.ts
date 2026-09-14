@@ -130,6 +130,10 @@ function makeRepo(doc: DocumentItem): EnrichJobRepo & { saved: DocumentItem[]; s
       state.shreds += 1;
       return ok(full);
     },
+    // P2-2a：生产即完整 repo 门面；fake 不投影（persistLesson 的 hook 由 pdf 单测覆盖）。
+    projectLinesSegments: async (_userId: string, _documentId: string) => {
+      return ok({ inserted: 0, skipped: 0 });
+    },
     shredDocument: async () => {
       state.shreds += 1;
       return ok({ lessons: 1, vocab: 1, lines: 1, mappedEntries: 0, unmapped: 0 });

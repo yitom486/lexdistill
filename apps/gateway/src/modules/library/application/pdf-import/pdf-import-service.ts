@@ -6,6 +6,7 @@ import { classifyEmbeddedOutline, type EmbeddedOutlineEntry } from '@study-studi
 import { detectDocScript, markdownToAst, promoteLessonHeadings } from '@study-studio/content';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from '@study-studio/content';
 import { collectLayoutCandidates } from './layout-headings.js';
+import { fireLinesProjection, type LinesProjectionHook } from '../lines-projection-hook.js';
 import { layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from '@study-studio/content';
 import { buildPdfConvertReport, buildPdfMapReport, buildOcrOverflowError } from '@study-studio/content';
 import {
@@ -121,11 +122,16 @@ export interface PdfAstOutput {
 export interface PdfImportServiceDeps {
   saveDocument: (doc: DocumentItem) => Promise<Result<DocumentItem, BusinessError>>;
   /**
-   * 唯一 canonical AST 写入口（必需，无退化）：
+   * 唯一 canonical AST 写入口（必需，无退化）。
    * append/import 必须经此保存（documents 写回 + shred 同一事务），缺失即调用方装配错误。
    * 测试必须显式提供 atomic fake（内存实现或 repo.saveCanonicalAst）。
    */
   saveCanonicalAst: (docBase: Omit<DocumentItem, 'astJson'>, book: TextbookAST) => Promise<Result<DocumentItem, BusinessError>>;
+  /**
+   * lines 投影钩子（必需，无静默跳过；P2-2a）。
+   * 生产装配 repo.projectLinesSegments；测试显式提供 recorder 或真实现。
+   */
+  projectLinesSegments: LinesProjectionHook;
   /** 测试注入：跳过真实下载/原生绑定 */
   loadInspector?: () => Promise<PdfInspectorLike>;
   runtimeDir?: string;
@@ -842,6 +848,8 @@ export async function importPdfDocument(
     book
   );
   if (!isOk(saved)) return err(saved.error);
+  // P2-2a：提交后显式 lines 投影（失败只 warn，不挡导入）。
+  await fireLinesProjection(deps.projectLinesSegments, 'pdf-import', input.userId, saved.value.id);
   return ok({ document: saved.value, book, classification, stats });
 }
 
@@ -905,6 +913,8 @@ export async function appendPdfToDocument(
     rechecked.value
   );
   if (!isOk(saved)) return err(saved.error);
+  // P2-2a：接力追加后显式 lines 投影（整单事务化，hash 幂等覆盖新增课）。
+  await fireLinesProjection(deps.projectLinesSegments, 'pdf-append', input.userId, saved.value.id);
   const addedDialogues = appended.reduce((acc, l) => acc + l.dialogues.length, 0);
   logger.warn('[pdf-import] 接力完成', {
     documentId: input.documentId,

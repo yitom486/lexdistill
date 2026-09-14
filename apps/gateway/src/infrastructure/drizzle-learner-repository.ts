@@ -141,6 +141,8 @@ import {
   shredIntoTransaction as shredIntoTransactionDomain,
   reprojectDocumentSegments as reprojectDocumentSegmentsDomain,
   findDocumentsMissingSegments as findDocumentsMissingSegmentsDomain,
+  projectLinesSegments as projectLinesSegmentsDomain,
+  findDocumentsMissingLineSegments as findDocumentsMissingLineSegmentsDomain,
   type ShredStats,
 } from '@study-studio/storage-sqlite';
 import {
@@ -586,6 +588,26 @@ export class DrizzleLearnerRepository
     userId?: string | undefined
   ): Promise<Result<Array<{ id: string; userId: string; sourceKind: string }>, BusinessError>> {
     return findDocumentsMissingSegmentsDomain(this.deps, userId);
+  }
+
+  /**
+   * lines → segments 投影（P2-2a；提交后显式步骤，整单事务化；
+   * 已有段整单跳过）。供 PDF／TOC／enrich／种子装配显式调用。
+   */
+  public async projectLinesSegments(
+    userId: string,
+    documentId: string
+  ): Promise<Result<{ inserted: number; skipped: number; note?: string }, BusinessError>> {
+    return projectLinesSegmentsDomain(this.deps, { userId, documentId });
+  }
+
+  /**
+   * 待投影（lines）查询：有资格、lines＞0、尚无 segments。只读。
+   */
+  public async findDocumentsMissingLineSegments(
+    userId?: string | undefined
+  ): Promise<Result<Array<{ id: string; userId: string; sourceKind: string }>, BusinessError>> {
+    return findDocumentsMissingLineSegmentsDomain(this.deps, userId);
   }
 
   /**

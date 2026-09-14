@@ -120,6 +120,7 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
       {
         saveDocument: (doc) => repo.saveDocument(doc),
         saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
+        projectLinesSegments: (userId, documentId) => repo.projectLinesSegments(userId, documentId),
       },
       { userId: 'u1', filename: 'smoke.pdf', bytes: smokeBytes }
     );
@@ -130,6 +131,7 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
         saveDocument: (doc) => repo.saveDocument(doc),
         saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
         getDocument: (id) => repo.getDocumentById(id),
+        projectLinesSegments: (userId, documentId) => repo.projectLinesSegments(userId, documentId),
       },
       { userId: 'u1', filename: 'rich.pdf', bytes: richBytes, documentId: first.value.document.id }
     );

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   ok,
   err,
+  isOk,
   type Result,
   BusinessError,
   translateToBusinessError,
@@ -325,6 +326,173 @@ export async function findDocumentsMissingSegments(
   } catch (error) {
     return err(
       translateToBusinessError(error, { category: 'DATABASE', action: 'findDocumentsMissingSegments' })
+    );
+  }
+}
+
+/**
+ * lines 读取（P2-2a）：按 (lesson,ord) 排序；只读，不触发投影。
+ */
+export interface TextbookLineRef {
+  lessonId: string;
+  ord: number;
+  speaker: string | null;
+  ja: string;
+}
+
+export async function listTextbookLines(
+  deps: { sqlite: Database },
+  documentId: string
+): Promise<Result<TextbookLineRef[], BusinessError>> {
+  const doc = documentId.trim();
+  if (!doc) {
+    return err(new BusinessError('E_INVALID_INPUT', 'documentId 非法', 'VALIDATION'));
+  }
+  try {
+    const rows = deps.sqlite
+      .query(
+        `SELECT lesson_id AS lessonId, ord AS ord, speaker AS speaker, ja AS ja
+         FROM textbook_lines WHERE document_id = ? ORDER BY lesson_id, ord`
+      )
+      .all(doc) as TextbookLineRef[];
+    return ok(rows);
+  } catch (error) {
+    return err(
+      translateToBusinessError(error, { category: 'DATABASE', action: 'listTextbookLines' })
+    );
+  }
+}
+
+/**
+ * lines 投影资格（P2-2a；与 pilot 谓词并存，互不相交由调用方按来源选择）。
+ * 课程文档，或 user_import＋最新 done 任务为 pdf；且 lines 行数＞0。
+ */
+export function isLinesProjectionEligible(
+  sourceKind: string,
+  importFormat: string | null,
+  lineCount: number
+): boolean {
+  if (lineCount <= 0) return false;
+  if (sourceKind === 'curriculum_textbook') return true;
+  if (sourceKind === 'user_import' && importFormat === 'pdf') return true;
+  return false;
+}
+
+/**
+ * lines → segments 投影（P2-2a；提交后显式步骤，整单事务化）。
+ * - 来源唯一：lines 行（真实 lesson/ord；speaker 有无→dialogue/paragraph；offsets NULL）；
+ * - 文档已有任意 segments 即整单跳过（ok＋note，不删不合并）；
+ * - 可见性沿 P1-3a（自有或公共教材，不存在与不可见统一 E_NOT_FOUND）。
+ */
+export async function projectLinesSegments(
+  deps: { sqlite: Database },
+  input: { userId: string; documentId: string }
+): Promise<Result<{ inserted: number; skipped: number; note?: string }, BusinessError>> {
+  const userId = input.userId.trim();
+  const documentId = input.documentId.trim();
+  if (!userId || !documentId) {
+    return err(new BusinessError('E_INVALID_INPUT', 'userId 或 documentId 非法', 'VALIDATION'));
+  }
+  if (!getVisibleDocument(deps.sqlite, userId, documentId)) {
+    return err(new BusinessError('E_NOT_FOUND', '未找到指定的文档', 'LEARNER_STATE'));
+  }
+  const eligibility = resolveProjectionEligibility(deps, documentId);
+  if (!eligibility) {
+    return err(new BusinessError('E_NOT_FOUND', '未找到指定的文档', 'LEARNER_STATE'));
+  }
+  const linesRes = await listTextbookLines(deps, documentId);
+  if (!isOk(linesRes)) return err(linesRes.error);
+  if (!isLinesProjectionEligible(eligibility.sourceKind, eligibility.importFormat, linesRes.value.length)) {
+    return err(
+      new BusinessError('E_INVALID_INPUT', '该文档不适用 lines 投影（P2-1 pilot 或无 lines）', 'VALIDATION')
+    );
+  }
+  const existing = deps.sqlite
+    .query('SELECT id AS id FROM content_segments WHERE document_id = ? LIMIT 1')
+    .get(documentId) as { id: string } | null;
+  if (existing) {
+    return ok({ inserted: 0, skipped: 0, note: 'existing-segments-kept' });
+  }
+  const now = nowIso();
+  let inserted = 0;
+  try {
+    const tx = deps.sqlite.transaction(() => {
+      linesRes.value.forEach((line) => {
+        const text = line.ja.trim();
+        if (!text) return;
+        const hash = segmentHash(documentId, line.lessonId, line.ord, text);
+        const hit = deps.sqlite
+          .query('SELECT id AS id FROM content_segments WHERE hash = ?')
+          .get(hash) as { id: string } | null;
+        if (hit) return;
+        deps.sqlite
+          .query(
+            `INSERT INTO content_segments
+               (id, document_id, lesson_id, ord, kind, text,
+                start_offset, end_offset, hash, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`
+          )
+          .run(
+            generateId('seg'),
+            documentId,
+            line.lessonId,
+            line.ord,
+            line.speaker && line.speaker.trim() ? 'dialogue' : 'paragraph',
+            text,
+            hash,
+            now
+          );
+        inserted += 1;
+      });
+    });
+    tx();
+    return ok({ inserted, skipped: 0 });
+  } catch (error) {
+    return err(
+      translateToBusinessError(error, { category: 'DATABASE', action: 'projectLinesSegments' })
+    );
+  }
+}
+
+/**
+ * 待投影（lines）查询：有资格、lines＞0、尚无 segments。只读，不触发投影。
+ */
+export async function findDocumentsMissingLineSegments(
+  deps: { sqlite: Database },
+  userId?: string | undefined
+): Promise<Result<Array<{ id: string; userId: string; sourceKind: string }>, BusinessError>> {
+  try {
+    const userGuard = userId === undefined ? '' : 'AND d.user_id = ?';
+    const rows = (
+      userId === undefined
+        ? deps.sqlite.query(
+            `SELECT d.id AS id, d.user_id AS userId, d.source_kind AS sourceKind
+             FROM documents d
+             WHERE NOT EXISTS (SELECT 1 FROM content_segments s WHERE s.document_id = d.id)
+               AND EXISTS (SELECT 1 FROM textbook_lines l WHERE l.document_id = d.id)
+               AND (d.source_kind = 'curriculum_textbook'
+                 OR (d.source_kind = 'user_import'
+                   AND (SELECT t.source_kind FROM document_imports t
+                     WHERE t.document_id = d.id AND t.status = 'done'
+                     ORDER BY t.updated_at DESC, t.id DESC LIMIT 1) = 'pdf'))`
+          ).all()
+        : deps.sqlite.query(
+            `SELECT d.id AS id, d.user_id AS userId, d.source_kind AS sourceKind
+             FROM documents d
+             WHERE NOT EXISTS (SELECT 1 FROM content_segments s WHERE s.document_id = d.id)
+               AND EXISTS (SELECT 1 FROM textbook_lines l WHERE l.document_id = d.id)
+               AND (d.source_kind = 'curriculum_textbook'
+                 OR (d.source_kind = 'user_import'
+                   AND (SELECT t.source_kind FROM document_imports t
+                     WHERE t.document_id = d.id AND t.status = 'done'
+                     ORDER BY t.updated_at DESC, t.id DESC LIMIT 1) = 'pdf'))
+               ${userGuard}`
+          ).all(userId)
+    ) as Array<{ id: string; userId: string; sourceKind: string }>;
+    return ok(rows);
+  } catch (error) {
+    return err(
+      translateToBusinessError(error, { category: 'DATABASE', action: 'findDocumentsMissingLineSegments' })
     );
   }
 }

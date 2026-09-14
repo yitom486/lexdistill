@@ -142,6 +142,10 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
           const { ok } = await import('@study-studio/shared');
           return ok({ ...baseDoc });
         },
+        projectLinesSegments: async () => {
+          const { ok } = await import('@study-studio/shared');
+          return ok({ inserted: 0, skipped: 0 });
+        },
         loadInspector: stubMarkdownInspector(MD_V2_DELETE),
       },
       { userId: 'u1', filename: 'part2.pdf', bytes: PDF_HEAD, documentId: 'doc1' }
@@ -171,6 +175,7 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
         saveDocument: (doc) => repo.saveDocument(doc),
         saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
         getDocument: (id) => repo.getDocumentById(id),
+        projectLinesSegments: (userId, documentId) => repo.projectLinesSegments(userId, documentId),
         loadInspector: stubMarkdownInspector(MD_V2_DELETE),
       },
       { userId: 'u1', filename: 'part2.pdf', bytes: PDF_HEAD, documentId: 'doc1' }
@@ -229,6 +234,10 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
           const { ok } = await import('@study-studio/shared');
           return ok({ ...baseDoc });
         },
+        projectLinesSegments: async () => {
+          const { ok } = await import('@study-studio/shared');
+          return ok({ inserted: 0, skipped: 0 });
+        },
         loadInspector: stubMarkdownInspector(MD_V2_DELETE),
       },
       { userId: 'u1', filename: 'part2.pdf', bytes: PDF_HEAD, documentId: 'doc1' }
@@ -256,6 +265,10 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
         getDocument: async () => {
           const { ok } = await import('@study-studio/shared');
           return ok({ ...baseDoc });
+        },
+        projectLinesSegments: async () => {
+          const { ok } = await import('@study-studio/shared');
+          return ok({ inserted: 0, skipped: 0 });
         },
         loadInspector: stubMarkdownInspector(MD_V2_DELETE),
       },

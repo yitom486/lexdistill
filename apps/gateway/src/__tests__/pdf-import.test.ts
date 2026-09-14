@@ -381,6 +381,7 @@ describe('importPdfDocument', () => {
 
   test('转换 + 经仓储入库（单写路径不断言库实现）', async () => {
     const saved: unknown[] = [];
+    const projected: Array<{ userId: string; documentId: string }> = [];
     const res = await importPdfDocument(
       {
         saveDocument: async (doc) => {
@@ -395,12 +396,21 @@ describe('importPdfDocument', () => {
           const { ok } = await import('@study-studio/shared');
           return ok(full);
         },
+        // P2-2a recorder：断言提交后显式调用（成功与否不挡导入由服务保证）。
+        projectLinesSegments: async (userId: string, documentId: string) => {
+          projected.push({ userId, documentId });
+          const { ok } = await import('@study-studio/shared');
+          return ok({ inserted: 1, skipped: 0 });
+        },
         loadInspector: stubInspector({ pdfType: 'TextBased', pageCount: 1, markdown: JA_MD }),
       },
       { userId: 'u1', filename: '标日.pdf', bytes: PDF_HEAD }
     );
     expect(isOk(res)).toBe(true);
     expect(saved.length).toBe(1);
+    // P2-2a：提交后显式调用 lines 投影钩子（用户＋文档对齐）。
+    if (!isOk(res)) return;
+    expect(projected).toEqual([{ userId: 'u1', documentId: res.value.document.id }]);
   });
 });
 
@@ -447,6 +457,10 @@ describe('appendPdfToDocument（接力）', () => {
     getDocument: async () => {
       const { ok } = await import('@study-studio/shared');
       return ok({ ...baseDoc });
+    },
+    projectLinesSegments: async (_userId: string, _documentId: string) => {
+      const { ok } = await import('@study-studio/shared');
+      return ok({ inserted: 0, skipped: 0 });
     },
     loadInspector: stubInspector({ pdfType: 'TextBased', pageCount: 2, markdown: '李さん：はじめまして。' }),
   };

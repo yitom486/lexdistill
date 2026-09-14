@@ -212,6 +212,7 @@ describe('smoke 入库集成（:memory:，跑完即弃）', () => {
       {
         saveDocument: (doc) => repo.saveDocument(doc),
         saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
+        projectLinesSegments: (userId, documentId) => repo.projectLinesSegments(userId, documentId),
       },
       { userId: 'u1', filename: 'smoke.pdf', bytes }
     );

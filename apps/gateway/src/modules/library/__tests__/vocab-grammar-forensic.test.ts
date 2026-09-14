@@ -121,6 +121,10 @@ describe('P1-D0 取证：append 与 enrich 语义', () => {
           const { ok } = await import('@study-studio/shared');
           return ok({ ...baseDoc });
         },
+        projectLinesSegments: async () => {
+          const { ok } = await import('@study-studio/shared');
+          return ok({ inserted: 0, skipped: 0 });
+        },
         loadInspector: stubInspector('# 第2課\nB：さようなら。'),
       },
       { userId: 'u1', filename: 'p2.pdf', bytes: PDF_HEAD, documentId: 'doc1' }

@@ -427,6 +427,8 @@ describe('P1-C0.8a 负向：append / enrich 不输出 shadow', () => {
           saveDocument: (doc) => repo.saveDocument(doc),
           saveCanonicalAst: (docBase, bk) => repo.saveCanonicalAst(docBase, bk),
           getDocument: (id) => repo.getDocumentById(id),
+          projectLinesSegments: (userId, documentId) =>
+            repo.projectLinesSegments(userId, documentId),
           loadInspector: stubInspector,
         },
         {

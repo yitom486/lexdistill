@@ -116,6 +116,7 @@ function baseDeps(repo: CountingRepo | ThrowingRepo, convert: TocLessonImportDep
   return {
     loadInspector: async () => mockInspector(100),
     saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
+    projectLinesSegments: (userId, documentId) => repo.projectLinesSegments(userId, documentId),
     ...(convert ? { convertRange: convert } : {}),
   };
 }
@@ -349,6 +350,7 @@ describe('P5D1 importTocLesson（mock converter + :memory:）', () => {
       {
         loadInspector: async () => mockInspector(100),
         saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
+        projectLinesSegments: (userId, documentId) => repo.projectLinesSegments(userId, documentId),
         convertRange: async () => ({ ok: true as const, value: astOutput(oneLessonBook()) }),
       },
       {

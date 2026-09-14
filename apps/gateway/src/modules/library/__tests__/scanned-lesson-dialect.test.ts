@@ -90,6 +90,7 @@ describe('E. 入库行数 == AST 课数', () => {
       {
         saveDocument: (doc) => repo.saveDocument(doc),
         saveCanonicalAst: (docBase, book) => repo.saveCanonicalAst(docBase, book),
+        projectLinesSegments: (userId, documentId) => repo.projectLinesSegments(userId, documentId),
       },
       { userId: 'u1', filename: 'scan-dialect.pdf', bytes }
     );

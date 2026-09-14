@@ -97,6 +97,11 @@ export async function shredSeedTextbooks(repo: DrizzleLearnerRepository): Promis
     const res = await repo.materializeSeedDocument(docBase, book, fingerprint, SEED_MATERIALIZER_VERSION);
     if (isOk(res)) {
       shredded++;
+      // P2-2a：种子落库后显式 lines 投影（owner 身份；失败只 warn，下次启动重投）。
+      const projected = await repo.projectLinesSegments(docBase.userId, bookId);
+      if (!isOk(projected)) {
+        logger.warn('[shred-seed] 种子段投影失败（课文已存）', { bookId, code: projected.error.code });
+      }
     } else {
       skipped++;
       logger.warn('[shred-seed] 种子书 materialize 失败（已回滚）', {

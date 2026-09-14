@@ -367,6 +367,9 @@ export function createPdfImportRoutes(
           {
             // 唯一写能力：canonical 入口（id 服务端生成，不读他人文档，不调普通保存）。
             saveCanonicalAst: (docBase, book) => deps.repo.saveCanonicalAst(docBase, book),
+            // P2-2a：提交后显式 lines 投影。
+            projectLinesSegments: (userId, documentId) =>
+              deps.repo.projectLinesSegments(userId, documentId),
           },
           {
             userId,
@@ -403,6 +406,9 @@ export function createPdfImportRoutes(
             // 唯一 canonical 写入口（AST + shred 同一事务；失败整体回滚并 err）。
             saveCanonicalAst: (docBase, book) => deps.repo.saveCanonicalAst(docBase, book),
             getDocument: (id) => deps.repo.getDocumentById(id),
+            // P2-2a：提交后显式 lines 投影。
+            projectLinesSegments: (userId, documentId) =>
+              deps.repo.projectLinesSegments(userId, documentId),
           },
           {
             userId,

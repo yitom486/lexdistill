@@ -119,6 +119,10 @@ describe('vocab/grammar id 生成事实', () => {
           const { ok } = await import('@study-studio/shared');
           return ok({ ...baseDoc });
         },
+        projectLinesSegments: async () => {
+          const { ok } = await import('@study-studio/shared');
+          return ok({ inserted: 0, skipped: 0 });
+        },
         loadInspector: async () => ({
           processPdf: () => ({
             pdfType: 'TextBased', pageCount: 1,

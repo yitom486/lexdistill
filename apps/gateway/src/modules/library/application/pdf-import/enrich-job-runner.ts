@@ -21,6 +21,7 @@ import {
   type TextbookAST,
 } from '@study-studio/document-model';
 import { enrichCancelledError, enrichLessonVocab } from './vocab-enrich.js';
+import { fireLinesProjection, type LinesProjectionHook } from '../lines-projection-hook.js';
 
 /** 课本语种（JA/EN/KO）→ 用户轨道语种（ja/en/ko）；未知回 null（AST 照存，草稿跳过）。 */
 export function toTrackLanguage(bookLanguage: unknown): 'ja' | 'en' | 'ko' | null {
@@ -55,6 +56,8 @@ export interface EnrichJobRepo {
       partOfSpeech?: string;
     }>
   ): Promise<Result<unknown[], BusinessError>>;
+  /** lines 投影（必需；P2-2a）。生产即完整 repo 门面，测试 fake 显式提供。 */
+  projectLinesSegments: LinesProjectionHook;
 }
 
 export interface EnrichJobRunnerDeps {
@@ -370,6 +373,9 @@ export class EnrichJobRegistry {
     const saved = await deps.repo.saveCanonicalAst(docBase, book);
     if (!isOk(saved)) {
       logger.warn('[enrich-job] 取消收尾写库失败', { code: saved.error.code });
+    } else {
+      // P2-2a：收尾写回后显式 lines 投影（失败只 warn）。
+      await fireLinesProjection(deps.repo.projectLinesSegments, 'enrich-finalize', doc.userId, saved.value.id);
     }
   }
 
@@ -391,6 +397,8 @@ export class EnrichJobRegistry {
       book
     );
     if (!isOk(saved)) return err(saved.error);
+    // P2-2a：单课落库后显式 lines 投影（失败只 warn，不中断任务）。
+    await fireLinesProjection(deps.repo.projectLinesSegments, 'enrich-lesson', input.userId, saved.value.id);
     if (trackLanguage && vocabularies.length > 0) {
       const proposed = await deps.repo.proposeCardDrafts(
         vocabularies.map((v) => ({

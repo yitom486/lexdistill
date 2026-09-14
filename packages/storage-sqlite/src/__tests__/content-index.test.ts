@@ -5,6 +5,10 @@ import { initSchema, runMigrations } from '../ddl.js';
 import {
   projectContentSegments,
   listContentSegments,
+  listTextbookLines,
+  isLinesProjectionEligible,
+  projectLinesSegments,
+  findDocumentsMissingLineSegments,
   reprojectDocumentSegments,
   findDocumentsMissingSegments,
   segmentHash,
@@ -543,5 +547,133 @@ describe('P2-1a 投影资格闭环（PDF／长文本／普通文本）', () => {
     expect(isOk(after)).toBe(true);
     if (!isOk(after)) return;
     expect(after.value.find((m) => m.id === 'dN')).toBe(undefined);
+  });
+});
+
+describe('P2-2a lines 投影（PDF／课程）', () => {
+  let db: Database;
+  beforeEach(() => {
+    db = freshDb();
+  });
+
+  function seedLines(docId: string, lessonId: string, rows: Array<[number, string | null, string]>): void {
+    const stmt = db.prepare(
+      'INSERT INTO textbook_lines (document_id, lesson_id, ord, speaker, ja, zh) VALUES (?, ?, ?, ?, ?, NULL)'
+    );
+    for (const [ord, speaker, ja] of rows) stmt.run(docId, lessonId, ord, speaker, ja);
+  }
+
+  function seedPdfDoc(docId: string, userId: string): void {
+    seedDoc(db, docId, userId, 'user_import');
+    db.prepare(
+      `INSERT INTO document_imports
+         (id, user_id, source_kind, filename, status, document_id, created_at, updated_at)
+       VALUES ('import_' || ?, ?, 'pdf', 'a.pdf', 'done', ?, 't', 't')`
+    ).run(docId, userId, docId);
+  }
+
+  it('资格真值表：课程／PDF＋lines 通过，其余拒绝', () => {
+    expect(isLinesProjectionEligible('curriculum_textbook', null, 3)).toBe(true);
+    expect(isLinesProjectionEligible('user_import', 'pdf', 2)).toBe(true);
+    expect(isLinesProjectionEligible('user_import', 'pdf', 0)).toBe(false);
+    expect(isLinesProjectionEligible('user_import', 'epub', 5)).toBe(false);
+    expect(isLinesProjectionEligible('user_import', null, 5)).toBe(false);
+    // pilot 谓词不动：pdf 仍被 pilot 拒绝（双谓词互补）。
+    expect(isProjectionEligible('user_import', 'pdf')).toBe(false);
+  });
+
+  it('PDF：lines→段（真实 lesson／ord，speaker 判 dialogue，offsets NULL）', async () => {
+    seedPdfDoc('dPdf', 'u1');
+    seedLines('dPdf', 'l1', [[0, 'A', 'こんにちは'], [1, null, '見出し文']]);
+    const res = await projectLinesSegments({ sqlite: db }, { userId: 'u1', documentId: 'dPdf' });
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.inserted).toBe(2);
+    const segs = await listContentSegments({ sqlite: db }, 'dPdf');
+    expect(isOk(segs)).toBe(true);
+    if (!isOk(segs)) return;
+    expect(segs.value.map((s) => [s.lessonId, s.ord, s.kind])).toEqual([
+      ['l1', 0, 'dialogue'],
+      ['l1', 1, 'paragraph'],
+    ]);
+    expect(segs.value.every((s) => s.startOffset === undefined)).toBe(true);
+    const lines = await listTextbookLines({ sqlite: db }, 'dPdf');
+    expect(isOk(lines) && lines.value.length).toBe(2);
+  });
+
+  it('课程种子：default_user 以外用户亦可投影（公共可见）', async () => {
+    seedDoc(db, 'dSeed', 'default_user', 'curriculum_textbook');
+    seedLines('dSeed', 's-l1', [[0, null, '课文首句']]);
+    const res = await projectLinesSegments({ sqlite: db }, { userId: 'u9', documentId: 'dSeed' });
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.inserted).toBe(1);
+  });
+
+  it('已有 pilot 段：整单跳过不删不合并', async () => {
+    seedPdfDoc('dPdf', 'u1');
+    seedLines('dPdf', 'l1', [[0, 'A', 'こんにちは']]);
+    const first = await projectContentSegments({ sqlite: db }, {
+      userId: 'u1',
+      documentId: 'dPdf',
+      texts: ['旧切片段'],
+    });
+    expect(isOk(first)).toBe(true);
+    const res = await projectLinesSegments({ sqlite: db }, { userId: 'u1', documentId: 'dPdf' });
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.note).toBe('existing-segments-kept');
+    const segs = await listContentSegments({ sqlite: db }, 'dPdf');
+    expect(isOk(segs)).toBe(true);
+    if (!isOk(segs)) return;
+    expect(segs.value.length).toBe(1);
+    expect(segs.value[0]!.text).toBe('旧切片段');
+  });
+
+  it('空 lines：拒绝（E_INVALID_INPUT）', async () => {
+    seedPdfDoc('dPdf', 'u1');
+    const res = await projectLinesSegments({ sqlite: db }, { userId: 'u1', documentId: 'dPdf' });
+    expect(isOk(res)).toBe(false);
+    if (isOk(res)) return;
+    expect(res.error.code).toBe('E_INVALID_INPUT');
+  });
+
+  it('重复调用幂等：二次零插入', async () => {
+    seedPdfDoc('dPdf', 'u1');
+    seedLines('dPdf', 'l1', [[0, 'A', 'こんにちは']]);
+    const first = await projectLinesSegments({ sqlite: db }, { userId: 'u1', documentId: 'dPdf' });
+    expect(isOk(first)).toBe(true);
+    // 首轮后已有段 → 次轮走整单跳过（与 hash 幂等同效，零重复行）。
+    const second = await projectLinesSegments({ sqlite: db }, { userId: 'u1', documentId: 'dPdf' });
+    expect(isOk(second)).toBe(true);
+    if (!isOk(second)) return;
+    expect(second.value.note).toBe('existing-segments-kept');
+    const n = db.query('SELECT COUNT(*) AS n FROM content_segments').get() as { n: number };
+    expect(n.n).toBe(1);
+  });
+
+  it('missing-lines：仅“有资格＋有 lines＋无段”', async () => {
+    seedPdfDoc('dPdf', 'u1');
+    seedLines('dPdf', 'l1', [[0, 'A', 'こんにちは']]);
+    seedDoc(db, 'dPdfEmpty', 'u1', 'user_import');
+    db.prepare(
+      `INSERT INTO document_imports
+         (id, user_id, source_kind, filename, status, document_id, created_at, updated_at)
+       VALUES ('import_empty', 'u1', 'pdf', 'b.pdf', 'done', 'dPdfEmpty', 't', 't')`
+    ).run();
+    seedDoc(db, 'dText', 'u1', 'user_import');
+    const missing = await findDocumentsMissingLineSegments({ sqlite: db }, 'u1');
+    expect(isOk(missing)).toBe(true);
+    if (!isOk(missing)) return;
+    const ids = missing.value.map((m) => m.id);
+    expect(ids).toContain('dPdf');
+    expect(ids).not.toContain('dPdfEmpty');
+    expect(ids).not.toContain('dText');
+    // 投影后消失。
+    await projectLinesSegments({ sqlite: db }, { userId: 'u1', documentId: 'dPdf' });
+    const after = await findDocumentsMissingLineSegments({ sqlite: db }, 'u1');
+    expect(isOk(after)).toBe(true);
+    if (!isOk(after)) return;
+    expect(after.value.map((m) => m.id)).not.toContain('dPdf');
   });
 });

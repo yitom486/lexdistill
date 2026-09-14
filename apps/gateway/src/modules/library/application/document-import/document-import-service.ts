@@ -242,7 +242,16 @@ export async function importDocument(
     // 重试信号见 findDocumentsMissingSegments，重放见 reprojectDocumentSegments）。
     // 资格与 missing／重放共用 isProjectionEligible（P2-1a）；输入即持久化
     // content 切片（入库恒截 2000 字，超大跳过语义已删除，无双语义）。
-    if (isProjectionEligible(saved.value.sourceKind, kind)) {
+    // P2-2a：统一命令 PDF 分支走 lines 投影（与 pdf-import-service 同形）。
+    if (kind === 'pdf') {
+      const linesProjected = await deps.repo.projectLinesSegments(input.userId, saved.value.id);
+      if (!isOk(linesProjected)) {
+        logger.warn('[document-import] lines projection failed', {
+          documentId: saved.value.id,
+          code: linesProjected.error.code,
+        });
+      }
+    } else if (isProjectionEligible(saved.value.sourceKind, kind)) {
       const chunks = chunkTextToSegments(saved.value.content);
       const projected = await projectContentSegments(deps, {
         userId: input.userId,

@@ -18,6 +18,7 @@ import {
   type PdfImportServiceDeps,
 } from './pdf-import-service.js';
 import { narrowPlanAnchors, narrowPlanEntries, planTocSegments } from './toc-segment-plan.js';
+import { fireLinesProjection, type LinesProjectionHook } from '../lines-projection-hook.js';
 import {
   fingerprintTocPlan,
   sha256HexBytes,
@@ -49,6 +50,8 @@ export interface TocLessonImportDeps extends Pick<PdfImportServiceDeps, 'loadIns
     docBase: Omit<DocumentItem, 'astJson'>,
     book: TextbookAST
   ) => Promise<Result<DocumentItem, BusinessError>>;
+  /** lines 投影钩子（必需；P2-2a）。生产装配 repo.projectLinesSegments。 */
+  projectLinesSegments: LinesProjectionHook;
   /**
    * 测试注入：替代既有 convert 路径（默认调 convertPdfToAst）。
    * 生产恒走真实路径；测试用它精确断言喂入页窗与判定分支。
@@ -210,6 +213,8 @@ export async function importTocLesson(
   } catch (e) {
     return err(translateToBusinessError(e, 'TOC_LESSON_IMPORT:save'));
   }
+  // P2-2a：提交后显式 lines 投影（失败只 warn，不挡导入）。
+  await fireLinesProjection(deps.projectLinesSegments, 'toc-lesson-import', input.userId, saved.id);
 
   // 只记计数：不记标题、folio、anchor、路径、用户。
   logger.warn('[toc-lesson-import] 完成', {
