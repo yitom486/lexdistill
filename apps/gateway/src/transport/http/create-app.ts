@@ -52,7 +52,7 @@ export function createApp(deps: GatewayDeps) {
     .notFound((c) => {
       return formatBusinessErrorResponse(
         c,
-        new BusinessError('E_NOT_FOUND', '请求的 API 资源不存在或已被迁移。', 'LEARNER_STATE'),
+        new BusinessError('E_NOT_FOUND', '请求的 API 资源不存在或已被迁移。', 'ROUTING'),
         'HONO_NOT_FOUND',
       );
     })

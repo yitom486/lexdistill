@@ -9,6 +9,7 @@ export type ErrorCategory =
   | 'DATABASE'          // 数据库与持久化仓储异常
   | 'NETWORK'           // 网络与长连接通信异常
   | 'SECURITY'          // 权限拒绝或未授权
+  | 'ROUTING'           // 未知路由/API 资源不存在（与学习数据无关）
   | 'INTERNAL';         // 系统未捕获的未知异常
 
 /**

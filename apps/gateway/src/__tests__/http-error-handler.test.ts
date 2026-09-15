@@ -8,6 +8,7 @@ describe('Gateway Unified HTTP Error Handler', () => {
     expect(mapCategoryToHttpStatus('VALIDATION')).toBe(400);
     expect(mapCategoryToHttpStatus('SECURITY')).toBe(403);
     expect(mapCategoryToHttpStatus('LEARNER_STATE')).toBe(404);
+    expect(mapCategoryToHttpStatus('ROUTING')).toBe(404);
     expect(mapCategoryToHttpStatus('TOOL_EXECUTION')).toBe(422);
     expect(mapCategoryToHttpStatus('AGENT_RUNTIME')).toBe(502);
     expect(mapCategoryToHttpStatus('NETWORK')).toBe(504);
@@ -22,6 +23,7 @@ describe('Gateway Unified HTTP Error Handler', () => {
     expect(body.success).toBe(false);
     expect(body.error).toBeDefined();
     expect(body.error.code).toBe('E_NOT_FOUND');
+    expect(body.error.category).toBe('ROUTING');
     expect(body.error.userMessage).toContain('不存在');
   });
 

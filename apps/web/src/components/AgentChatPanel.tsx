@@ -82,19 +82,23 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   const queryClient = useQueryClient();
 
   const { data: codexStatus, refetch: refetchCodexStatus } = useCodexStatusQuery();
+  // 次级探测门控：等 status 确认已联动再发。避免未联动/启动期 6 路打空，
+  // 与后端 ensureConnection single-flight 形成双保险（启动期只 spawn 一次）。
+  const codexProbesReady =
+    Boolean(gateway.isConnected) && codexStatus?.linked === true;
   const { data: models = [], isFetching: modelsLoading } = useCodexModelsQuery(
-    Boolean(gateway.isConnected)
+    codexProbesReady
   );
   const { data: threadsData, refetch: refetchThreads } = useCodexThreadsQuery(
-    Boolean(gateway.isConnected)
+    codexProbesReady
   );
   const threads = threadsData?.threads ?? [];
   const { data: collabModes = [] } = useCodexCollaborationModesQuery(
-    Boolean(gateway.isConnected)
+    codexProbesReady
   );
   const { data: threadItems = [], isFetched: threadItemsFetched } = useCodexThreadItemsQuery(
     coachThreadId || null,
-    Boolean(coachThreadId) && Boolean(gateway.isConnected)
+    Boolean(coachThreadId) && codexProbesReady
   );
   const archiveThread = useArchiveCodexThreadMutation();
   const compactThread = useCompactCodexThreadMutation();
@@ -104,11 +108,11 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   const deleteQueueItem = useDeleteCodexQueueItemMutation();
   const { data: queueItems = [] } = useCodexQueueQuery(
     coachThreadId || null,
-    Boolean(coachThreadId) && Boolean(gateway.isConnected)
+    Boolean(coachThreadId) && codexProbesReady
   );
-  const { data: skills = [] } = useCodexSkillsQuery(Boolean(gateway.isConnected));
-  const { data: rateLimits } = useCodexRateLimitsQuery(Boolean(gateway.isConnected));
-  const { data: mcpServers = [] } = useCodexMcpServersQuery(Boolean(gateway.isConnected));
+  const { data: skills = [] } = useCodexSkillsQuery(codexProbesReady);
+  const { data: rateLimits } = useCodexRateLimitsQuery(codexProbesReady);
+  const { data: mcpServers = [] } = useCodexMcpServersQuery(codexProbesReady);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [composerSettingsOpen, setComposerSettingsOpen] = useState(false);

@@ -127,6 +127,10 @@ export class CodexAppServerConnection {
     return normalizeApprovalPolicy(this.config.approvalPolicy);
   }
 
+  private connectAttempt: Promise<Result<void, BusinessError>> | null = null;
+  /** Server 请求回调只装一次（重试复装会叠加执行）。 */
+  private serverRequestsWired = false;
+
   public async connect(): Promise<Result<void, BusinessError>> {
     if (this.config.enabled === false) {
       return err(
@@ -138,6 +142,22 @@ export class CodexAppServerConnection {
       );
     }
     if (this.rpc.isConnected && this.initialized) return ok(undefined);
+    // 连接级 single-flight：并发 connect 共享同一次 spawn+initialize，
+    // 避免同一连接被重复 start（旧行为回 E_CODEX_ALREADY_STARTED 误报）。
+    if (!this.connectAttempt) {
+      const attempt = this.connectInner();
+      this.connectAttempt = attempt;
+      //  settled 后清槽（以身份比对防后一次尝试被前一次的 settled 误删）；
+      // then(clear, clear) 双分支处理，避免派生 promise 产生 unhandled rejection。
+      const clear = (): void => {
+        if (this.connectAttempt === attempt) this.connectAttempt = null;
+      };
+      attempt.then(clear, clear);
+    }
+    return this.connectAttempt;
+  }
+
+  private async connectInner(): Promise<Result<void, BusinessError>> {
 
     const startOpts: {
       command: string;
@@ -153,8 +173,11 @@ export class CodexAppServerConnection {
     const startRes = await this.rpc.start(startOpts);
     if (!isOk(startRes)) return startRes;
 
-    this.rpc.onServerRequest(async (req) => {
-      if (req.method === 'item/tool/call') {
+    // Server 请求 handler 只装一次：close() 不清此集合，重试复装会叠加回调。
+    if (!this.serverRequestsWired) {
+      this.serverRequestsWired = true;
+      this.rpc.onServerRequest(async (req) => {
+        if (req.method === 'item/tool/call') {
         const params = req.params as DynamicToolCallParams;
         if (!this.toolCallHandler) {
           return {
@@ -197,7 +220,8 @@ export class CodexAppServerConnection {
         `未处理的 App Server 请求：${req.method}`,
         'AGENT_RUNTIME'
       );
-    });
+      });
+    }
 
     const initRes = await this.rpc.request('initialize', {
       clientInfo: {
@@ -209,10 +233,18 @@ export class CodexAppServerConnection {
         experimentalApi: true,
       },
     });
-    if (!isOk(initRes)) return initRes;
+    // initialize/notify 失败时子进程已存在：就地关闭，不留孤儿
+    //（close 幂等；start 失败分支无子进程，无需清理）。
+    if (!isOk(initRes)) {
+      await this.close();
+      return initRes;
+    }
 
     const notified = this.rpc.notify('initialized');
-    if (!isOk(notified)) return notified;
+    if (!isOk(notified)) {
+      await this.close();
+      return notified;
+    }
 
     this.initialized = true;
     if (!this.idleNotifyUnsub) {

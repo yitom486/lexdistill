@@ -17,6 +17,7 @@ import {
   translateToBusinessError,
 } from '@study-studio/shared';
 import { CodexAppServerConnection } from './app-server-client.js';
+import { CodexConnectionManager } from './codex-connection-manager.js';
 import { unlink } from 'node:fs/promises';
 import { buildTurnInputItems, materializePngAttachments } from './image-attachments.js';
 import {
@@ -44,7 +45,11 @@ import type {
   DynamicToolCallParams,
   DynamicToolCallResponse,
 } from './app-server-protocol.js';
-import { normalizeApprovalPolicy } from './app-server-protocol.js';
+import {
+  normalizeApprovalPolicy,
+  resolveCodexBinary,
+  resolveCodexHome,
+} from './app-server-protocol.js';
 
 export type ExternalToolExecutor = (
   toolName: string,
@@ -462,7 +467,9 @@ export class CodexAdapter implements AgentAdapter {
     return true;
   }
 
-  private connection: CodexAppServerConnection | null = null;
+  private readonly connectionManager: CodexConnectionManager;
+  /** 当前连接上的旁路通知订阅；连接实例本身由 Manager 拥有。 */
+  private notificationConnection: CodexAppServerConnection | null = null;
   private readonly options: CodexAdapterOptions;
   private readonly threadBySession = new Map<
     string,
@@ -483,7 +490,10 @@ export class CodexAdapter implements AgentAdapter {
 
   constructor(options: CodexAdapterOptions = {}) {
     this.options = options;
-    if (options.connection) this.connection = options.connection;
+    this.connectionManager = new CodexConnectionManager({
+      createConnection: () => this.createConnection(),
+      ...(options.connection ? { initialConnection: options.connection } : {}),
+    });
     if (options.onNotification) {
       this.notificationHandler = options.onNotification;
     }
@@ -647,7 +657,7 @@ export class CodexAdapter implements AgentAdapter {
     handler: ((method: string, params: unknown) => void) | null
   ): void {
     this.notificationHandler = handler;
-    this.wireNotificationHandler();
+    this.wireNotificationHandler(this.notificationConnection);
   }
 
   public async createSession(
@@ -965,16 +975,24 @@ export class CodexAdapter implements AgentAdapter {
   public async getAccountStatus(): Promise<Result<CodexAccountStatus, BusinessError>> {
     const conn = await this.ensureConnection();
     if (!isOk(conn)) {
-      // connect 失败也尽量返回结构化状态
-      const fallback = new CodexAppServerConnection(this.options.config);
-      return fallback.readAccountStatus();
+      // 连接失败不再另起进程做 fallback（旧行为：readAccountStatus 内再
+      // connect → 启动第二个 App Server，加剧启动期进程竞争）。
+      // 直接由失败原因拼结构化未联动状态：零 spawn。
+      const binary = this.options.config?.command || resolveCodexBinary();
+      const codexHome = resolveCodexHome(this.options.config?.codexHome);
+      const status: CodexAccountStatus = {
+        linked: false,
+        requiresOpenaiAuth: true,
+        binary,
+        message: conn.error.userMessage || conn.error.message,
+      };
+      if (codexHome) status.codexHome = codexHome;
+      return ok(status);
     }
     return conn.value.readAccountStatus();
   }
 
   public async shutdown(): Promise<Result<void, BusinessError>> {
-    const c = this.connection;
-    this.connection = null;
     this.threadBySession.clear();
     // 清扫全部路由记录的 pending 审批（会话可能未来得及 close；取唯一集防重入）。
     const seen = new Set<SessionToolRoute>();
@@ -991,32 +1009,35 @@ export class CodexAdapter implements AgentAdapter {
     this.toolRouteByThread.clear();
     this.toolRouteByTurn.clear();
     this.toolRouterConn = null;
-    this.notificationUnsub?.();
-    this.notificationUnsub = null;
-    if (!c) return ok(undefined);
-    return c.close();
+    this.wireNotificationHandler(null);
+    return this.connectionManager.shutdown();
   }
 
-  private wireNotificationHandler(): void {
+  private wireNotificationHandler(conn: CodexAppServerConnection | null): void {
+    this.notificationConnection = conn;
     this.notificationUnsub?.();
     this.notificationUnsub = null;
-    if (!this.connection || !this.notificationHandler) return;
+    if (!conn || !this.notificationHandler) return;
     const handler = this.notificationHandler;
-    this.notificationUnsub = this.connection.onNotification((method, params) => {
+    this.notificationUnsub = conn.onNotification((method, params) => {
       handler(method, params);
     });
+  }
+
+  /**
+   * 可覆盖的连接工厂（生产 spawn 真进程；测试注入计数替身）。
+   * 拆出此工厂是为回归测试让路，不改变生产装配。
+   */
+  protected createConnection(): CodexAppServerConnection {
+    return new CodexAppServerConnection(this.options.config);
   }
 
   private async ensureConnection(): Promise<
     Result<CodexAppServerConnection, BusinessError>
   > {
-    if (this.connection) return ok(this.connection);
-    const conn = new CodexAppServerConnection(this.options.config);
-    const ready = await conn.connect();
-    if (!isOk(ready)) return ready;
-    this.connection = conn;
-    this.wireNotificationHandler();
-    return ok(conn);
+    const result = await this.connectionManager.getOrConnect();
+    if (isOk(result)) this.wireNotificationHandler(result.value);
+    return result;
   }
 }
 

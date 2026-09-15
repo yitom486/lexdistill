@@ -14,6 +14,8 @@ import {
   translateToBusinessError,
 } from '@study-studio/shared';
 
+const CODEX_CLOSE_TIMEOUT_MS = 15_000;
+
 export type JsonRpcId = number | string;
 
 export interface JsonRpcRequest {
@@ -57,6 +59,8 @@ export interface StdioClientOptions {
 
 export class JsonRpcStdioClient {
   private child: ChildProcessWithoutNullStreams | null = null;
+  private childExitPromise: Promise<void> | null = null;
+  private closeAttempt: Promise<Result<void, BusinessError>> | null = null;
   private nextId = 1;
   private readonly pending = new Map<string, Pending>();
   private readonly notificationHandlers = new Set<(msg: JsonRpcNotification) => void>();
@@ -80,6 +84,17 @@ export class JsonRpcStdioClient {
       });
       this.child = child;
       this.closed = false;
+      this.closeAttempt = null;
+      this.childExitPromise = new Promise<void>((resolve) => {
+        let settled = false;
+        const settle = (): void => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        child.once('exit', settle);
+        child.once('error', settle);
+      });
 
       const rl = createInterface({ input: child.stdout });
       rl.on('line', (line) => {
@@ -214,18 +229,64 @@ export class JsonRpcStdioClient {
   }
 
   public async close(): Promise<Result<void, BusinessError>> {
+    if (this.closeAttempt) return this.closeAttempt;
+
+    const attempt = this.closeInner();
+    this.closeAttempt = attempt;
+    attempt.then((result) => {
+      if (!result.ok && this.closeAttempt === attempt) this.closeAttempt = null;
+    });
+    return attempt;
+  }
+
+  private async closeInner(): Promise<Result<void, BusinessError>> {
     this.closed = true;
     this.failAll(
       new BusinessError('E_CODEX_CLOSED', 'Codex App Server 连接已关闭。', 'AGENT_RUNTIME')
     );
+    const child = this.child;
+    if (!child) return ok(undefined);
+
     try {
-      this.child?.stdin.end();
-      this.child?.kill();
-      this.child = null;
+      if (child.exitCode === null && child.signalCode === null) {
+        if (child.stdin.writable) child.stdin.end();
+        if (!child.killed) child.kill();
+      }
+
+      const exited = await this.waitForChildExit(child, CODEX_CLOSE_TIMEOUT_MS);
+      if (!exited) {
+        return err(
+          new BusinessError(
+            'E_CODEX_CLOSE_TIMEOUT',
+            'Codex App Server 关闭超时，系统未继续启动新的连接，请稍后重试。',
+            'AGENT_RUNTIME',
+            true,
+            { pid: child.pid }
+          )
+        );
+      }
+      if (this.child === child) this.child = null;
       return ok(undefined);
     } catch (e) {
       return err(translateToBusinessError(e, 'CODEX_CLOSE'));
     }
+  }
+
+  private async waitForChildExit(
+    child: ChildProcessWithoutNullStreams,
+    timeoutMs: number
+  ): Promise<boolean> {
+    if (child.exitCode !== null || child.signalCode !== null) return true;
+    const exitPromise = this.childExitPromise;
+    if (!exitPromise) return true;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeout = new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
+    });
+    const exited = await Promise.race([exitPromise.then(() => true), timeout]);
+    if (timer) clearTimeout(timer);
+    return exited;
   }
 
   private write(obj: unknown): void {

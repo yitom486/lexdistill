@@ -16,6 +16,7 @@ export function mapCategoryToHttpStatus(category: ErrorCategory): ContentfulStat
     case 'SECURITY':
       return 403;
     case 'LEARNER_STATE':
+    case 'ROUTING':
       return 404;
     case 'TOOL_EXECUTION':
       return 422;
