@@ -60,21 +60,29 @@ describe('selectTurnTools', () => {
   });
 });
 
-describe('P3.4B-ISO 目录工具隔离：主 lane 永不声明 toc 工具', () => {
-  it('全意图 × 目录相关提示词都不含 toc_draft_replace_all', () => {
+const RETIRED_TOC_TOOL_NAMES = [
+  'toc_draft_replace_all',
+  'toc_draft_add_entry',
+  'toc_draft_update_entry',
+  'toc_draft_remove_entry',
+] as const;
+
+describe('P3.5 目录工具隔离：当前主 lane 不声明已下线目录工具', () => {
+  it('全意图 × 目录相关提示词都不含 toc_draft 命名空间', () => {
     const intents = ['FREE_COACH', 'EXPLAIN', 'GENERATE_QUIZ', 'GRADE', 'REVIEW_MISTAKES', 'SOME_FUTURE_INTENT', ''];
     const prompts = [
       '随便聊聊',
       '帮我看看这本书的目录',
       '审核一下目录草稿',
-      'toc_draft_replace_all',
+      ...RETIRED_TOC_TOOL_NAMES,
       '把目录导出来',
       '第1課 12',
     ];
     for (const intent of intents) {
       for (const userPrompt of prompts) {
         const tools = selectTurnTools({ intent, userPrompt });
-        expect(tools.includes('toc_draft_replace_all')).toBe(false);
+        expect(tools.filter((name) => name.startsWith('toc_draft_'))).toEqual([]);
+        for (const name of RETIRED_TOC_TOOL_NAMES) expect(tools.includes(name)).toBe(false);
       }
     }
   });
