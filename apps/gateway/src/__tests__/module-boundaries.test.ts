@@ -15,6 +15,8 @@ const SRC = resolve(import.meta.dir, '..');
 
 const ASSEMBLERS = new Set([
   'index.ts',
+  // Desktop sidecar is a second process entrypoint, not a domain module.
+  'sidecar.ts',
   'bootstrap/config.ts',
   'bootstrap/create-gateway.ts',
   'bootstrap/start-gateway.ts',
