@@ -14,6 +14,13 @@ import {
   type HeadingCandidate,
   type StructureClass,
 } from '@study-studio/protocol';
+import {
+  groundStructureClassifications,
+} from '../../domain/document-structure.js';
+import {
+  toDomainHeadingCandidates,
+  toProtocolStructureClasses,
+} from './structure-classify-mapping.js';
 
 /**
  * 标题结构分类（mini 模型分流任务）。
@@ -62,47 +69,26 @@ export function groundClassifications(
   candidates: HeadingCandidate[],
   allowedSkillIds: Set<string>
 ): { classes: StructureClass[]; dropped: number } {
+  const grounded = groundStructureClassifications(
+    items,
+    toDomainHeadingCandidates(candidates),
+    allowedSkillIds
+  );
+  const mapped = toProtocolStructureClasses(grounded.classes);
   const classes: StructureClass[] = [];
-  let dropped = 0;
-  const byText = new Map<string, number>();
-  for (const c of candidates) {
-    if (!byText.has(c.text)) byText.set(c.text, c.page);
-  }
-  const list = Array.isArray(items) ? items : [];
-  for (const raw of list) {
-    const r = asRecord(raw);
-    if (!r) {
-      dropped += 1;
-      continue;
-    }
-    const text = typeof r.text === 'string' ? r.text : '';
-    const page = byText.get(text);
-    if (!text || page === undefined) {
-      dropped += 1;
-      continue;
-    }
-    const kind = typeof r.kind === 'string' ? r.kind : '';
-    if (kind !== 'lesson' && kind !== 'section' && kind !== 'toc' && kind !== 'noise') {
-      dropped += 1;
-      continue;
-    }
-    const lessonNo = typeof r.lessonNo === 'string' ? r.lessonNo.slice(0, 16) : null;
-    const skillRaw = typeof r.skillId === 'string' ? r.skillId : null;
-    const skillId = skillRaw && allowedSkillIds.has(skillRaw) ? skillRaw : null;
-    const parsed = StructureClassSchema.safeParse({
-      text,
-      page,
-      kind,
-      lessonNo,
-      skillId,
-    });
+  let mappingDropped = 0;
+  for (const structureClass of mapped) {
+    const parsed = StructureClassSchema.safeParse(structureClass);
     if (!parsed.success) {
-      dropped += 1;
+      mappingDropped += 1;
       continue;
     }
     classes.push(parsed.data);
   }
-  return { classes, dropped };
+  return {
+    classes,
+    dropped: grounded.dropped + mappingDropped,
+  };
 }
 
 export const STRUCTURE_CLASSIFY_SYSTEM_PROMPT = [
