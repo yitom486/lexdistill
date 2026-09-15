@@ -285,4 +285,90 @@ describe('card-drafts 句子类型（课文收句子）', () => {
     if (!isOk(terms)) return;
     expect(terms.value.some((t) => t.headword === SENTENCE)).toBe(false);
   });
+
+  describe('P4-1 草稿选区关联', () => {
+    async function seedSelection(
+      id: string,
+      userId: string,
+      documentId: string | null
+    ): Promise<void> {
+      repo
+        .getRawDb()
+        .prepare(
+          `INSERT INTO selection_contexts
+             (id, user_id, language, document_id, surface, normalized_text, created_at)
+           VALUES (?, ?, 'ja', ?, '表层', '归一', 't')`
+        )
+        .run(id, userId, documentId);
+    }
+
+    it('自有选区：提议建链，接受保留', async () => {
+      repo
+        .getRawDb()
+        .prepare(
+          `INSERT INTO documents (id, user_id, title, source_kind, language, content, created_at, updated_at)
+           VALUES ('dSel', 'u1', 'T', 'user_import', 'ja', 'c', 't', 't')`
+        )
+        .run();
+      await seedSelection('sel1', 'u1', 'dSel');
+      const proposed = await repo.proposeCardDrafts([
+        {
+          userId: 'u1',
+          language: 'ja',
+          headword: '選区語',
+          meanings: ['释义'],
+          source: 'agent',
+          selectionContextId: 'sel1',
+        },
+      ]);
+      expect(isOk(proposed)).toBe(true);
+      if (!isOk(proposed)) return;
+      expect(proposed.value[0]!.selectionContextId).toBe('sel1');
+      const accepted = await repo.acceptCardDraft('u1', proposed.value[0]!.id);
+      expect(isOk(accepted)).toBe(true);
+      if (!isOk(accepted)) return;
+      // 同一事务保留关联（列未被接受流程覆盖）。
+      expect(accepted.value.draft.selectionContextId).toBe('sel1');
+      const row = repo
+        .getRawDb()
+        .query<{ sel: string | null }, [string]>(
+          'SELECT selection_context_id AS sel FROM card_drafts WHERE id = ?'
+        )
+        .get(proposed.value[0]!.id);
+      expect(row!.sel).toBe('sel1');
+    });
+
+    it('跨用户／幽灵选区：拒绝建链，无草稿残留', async () => {
+      await seedSelection('sel-other', 'uB', null);
+      const cross = await repo.proposeCardDrafts([
+        {
+          userId: 'u1',
+          language: 'ja',
+          headword: '跨用户詞',
+          meanings: ['释义'],
+          source: 'agent',
+          selectionContextId: 'sel-other',
+        },
+      ]);
+      expect(isOk(cross)).toBe(false);
+      if (isOk(cross)) return;
+      expect(cross.error.code).toBe('E_NOT_FOUND');
+      const ghost = await repo.proposeCardDrafts([
+        {
+          userId: 'u1',
+          language: 'ja',
+          headword: '幽灵詞',
+          meanings: ['释义'],
+          source: 'agent',
+          selectionContextId: 'sel-ghost',
+        },
+      ]);
+      expect(isOk(ghost)).toBe(false);
+      const n = repo
+        .getRawDb()
+        .query<{ n: number }, []>('SELECT COUNT(*) AS n FROM card_drafts')
+        .get();
+      expect(n!.n).toBe(0);
+    });
+  });
 });

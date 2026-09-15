@@ -16,6 +16,7 @@ import {
 } from '../../dictionary/public.js';
 import { CardTypeSchema, type CardType } from '@study-studio/protocol';
 import { initFsrsState } from '@study-studio/learning-algorithms';
+import { getVisibleDocument } from '@study-studio/storage-sqlite';
 
 /**
  * 生词草稿（CardDraft）域：AI/导入提议 → 用户逐字段确认 → 入库成卡。
@@ -58,6 +59,8 @@ export interface CardDraft {
   status: CardDraftStatus;
   editedFields: string[];
   flashcardId?: string | undefined;
+  /** P4-1 选区关联（提议时校验归属，接受时原样保留）。 */
+  selectionContextId?: string | undefined;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,6 +76,7 @@ export interface ProposeCardDraftInput {
   sourceRef?: string | undefined;
   kind?: CardDraftKind | undefined;
   cardType?: CardType | undefined;
+  selectionContextId?: string | undefined;
 }
 
 interface CardDraftRow {
@@ -91,6 +95,7 @@ interface CardDraftRow {
   status: string;
   edited_fields_json: string;
   flashcard_id: string | null;
+  selection_context_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -133,11 +138,12 @@ function toCardDraft(row: CardDraftRow): CardDraft {
   if (row.part_of_speech) draft.partOfSpeech = row.part_of_speech;
   if (row.source_ref) draft.sourceRef = row.source_ref;
   if (row.flashcard_id) draft.flashcardId = row.flashcard_id;
+  if (row.selection_context_id) draft.selectionContextId = row.selection_context_id;
   return draft;
 }
 
 const DRAFT_COLUMNS = `id, user_id, language, term_key, headword, reading, meanings_json,
-  part_of_speech, source, source_ref, kind, card_type, status, edited_fields_json, flashcard_id, created_at, updated_at`;
+  part_of_speech, source, source_ref, kind, card_type, status, edited_fields_json, flashcard_id, selection_context_id, created_at, updated_at`;
 
 interface NarrowedPropose {
   userId: string;
@@ -150,6 +156,7 @@ interface NarrowedPropose {
   sourceRef?: string | undefined;
   kind: CardDraftKind;
   cardType: CardType;
+  selectionContextId?: string | undefined;
 }
 
 function narrowProposeInput(
@@ -196,6 +203,7 @@ function narrowProposeInput(
       error: new BusinessError('E_INVALID_INPUT', 'meanings 至少一条', 'VALIDATION'),
     };
   }
+  const selectionContextId = (input.selectionContextId ?? '').trim() || undefined;
   return {
     ok: true,
     value: {
@@ -205,10 +213,11 @@ function narrowProposeInput(
       meanings,
       source: input.source,
       kind,
-      cardType,
+      cardType: cardType,
       ...(input.reading !== undefined ? { reading: input.reading } : {}),
       ...(input.partOfSpeech !== undefined ? { partOfSpeech: input.partOfSpeech } : {}),
       ...(input.sourceRef !== undefined ? { sourceRef: input.sourceRef } : {}),
+      ...(selectionContextId ? { selectionContextId } : {}),
     },
   };
 }
@@ -243,14 +252,29 @@ export async function proposeCardDrafts(
           )
           .get(value.userId, value.language, termKey, sourceRef) as { id: string } | null;
         if (existing) continue;
+        // P4-1 选区归属校验：选区须存在且归属提议用户；带文档即验可见性。
+        // 跨用户／幽灵选区统一 E_NOT_FOUND，不泄露存在性。
+        if (value.selectionContextId) {
+          const sel = deps.sqlite
+            .query(
+              'SELECT user_id AS userId, document_id AS documentId FROM selection_contexts WHERE id = ?'
+            )
+            .get(value.selectionContextId) as { userId: string; documentId: string | null } | null;
+          if (!sel || sel.userId !== value.userId) {
+            throw new BusinessError('E_NOT_FOUND', '未找到指定的选区', 'LEARNER_STATE');
+          }
+          if (sel.documentId && !getVisibleDocument(deps.sqlite, value.userId, sel.documentId)) {
+            throw new BusinessError('E_NOT_FOUND', '未找到指定的选区', 'LEARNER_STATE');
+          }
+        }
         const id = generateId('cdraft');
         deps.sqlite
           .query(
             `INSERT INTO card_drafts
                (id, user_id, language, term_key, headword, reading, meanings_json,
                 part_of_speech, source, source_ref, kind, card_type, status, edited_fields_json,
-                flashcard_id, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '[]', NULL, ?, ?)`
+                flashcard_id, selection_context_id, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '[]', NULL, ?, ?, ?)`
           )
           .run(
             id,
@@ -265,6 +289,7 @@ export async function proposeCardDrafts(
             sourceRef ? sourceRef : null,
             value.kind,
             value.cardType,
+            value.selectionContextId ?? null,
             now,
             now
           );

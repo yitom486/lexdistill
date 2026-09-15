@@ -532,6 +532,20 @@ export function initSchema(sqlite: Database): void {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_selection_ctx_user ON selection_contexts(user_id, language, created_at);
+    CREATE TABLE IF NOT EXISTS ai_artifact_runs (
+      id TEXT PRIMARY KEY,
+      action TEXT NOT NULL,
+      input_snapshot_hash TEXT NOT NULL,
+      adapter TEXT NOT NULL,
+      model TEXT NOT NULL,
+      prompt_version TEXT NOT NULL,
+      schema_version TEXT NOT NULL,
+      status TEXT NOT NULL,
+      error_code TEXT,
+      created_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_artifact_action_time ON ai_artifact_runs(action, created_at);
   `);
 
   // 增量列：已有库补字段

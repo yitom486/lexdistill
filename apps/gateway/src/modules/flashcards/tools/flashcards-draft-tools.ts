@@ -26,6 +26,8 @@ const DraftItemSchema = z.object({
   sourceRef: z.string().max(256).optional(),
   kind: DraftKindSchema,
   cardType: DraftCardTypeSchema,
+  /** P4-1 选区关联（可选；归属由 Repository 校验）。 */
+  selectionContextId: z.string().min(1).max(64).optional(),
 });
 
 const DraftProposeSchema = z.object({
@@ -66,6 +68,7 @@ export class FlashcardsDraftProposeTool
       ...(d.reading !== undefined ? { reading: d.reading } : {}),
       ...(d.partOfSpeech !== undefined ? { partOfSpeech: d.partOfSpeech } : {}),
       ...(d.sourceRef !== undefined ? { sourceRef: d.sourceRef } : {}),
+      ...(d.selectionContextId !== undefined ? { selectionContextId: d.selectionContextId } : {}),
     }));
     return this.learnerRepo.proposeCardDrafts(withUser);
   }

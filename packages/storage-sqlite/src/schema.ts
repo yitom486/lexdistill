@@ -872,3 +872,25 @@ export const selectionContexts = sqliteTable(
   },
   (table) => [index('idx_selection_ctx_user').on(table.userId, table.language, table.createdAt)]
 );
+
+/**
+ * AI 运行审计（v28；只插不改；SSOT 是 ddl.ts）。
+ * 输入只存快照 hash（不存原文/作答），读口另批。
+ */
+export const aiArtifactRuns = sqliteTable(
+  'ai_artifact_runs',
+  {
+    id: text('id').primaryKey(),
+    action: text('action').notNull(),
+    inputSnapshotHash: text('input_snapshot_hash').notNull(),
+    adapter: text('adapter').notNull(),
+    model: text('model').notNull(),
+    promptVersion: text('prompt_version').notNull(),
+    schemaVersion: text('schema_version').notNull(),
+    status: text('status').notNull(),
+    errorCode: text('error_code'),
+    createdAt: text('created_at').notNull(),
+    completedAt: text('completed_at'),
+  },
+  (table) => [index('idx_ai_artifact_action_time').on(table.action, table.createdAt)]
+);

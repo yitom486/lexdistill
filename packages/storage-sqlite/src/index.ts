@@ -146,6 +146,13 @@ export {
   getPracticeRunItems,
 } from './adapters/practice/practice-plan.js';
 export {
+  recordAiArtifactRun,
+  artifactInputHash,
+  type AiArtifactStatus,
+  type AiArtifactRun,
+  type RecordAiArtifactInput,
+} from './adapters/practice/ai-artifact-runs.js';
+export {
   parseKanaPracticeMemory,
   readKanaPracticeMemories,
   saveKanaPracticeMemory,

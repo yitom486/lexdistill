@@ -17,6 +17,9 @@ import {
 } from '@study-studio/shared';
 import type { LearnerRepository } from '@study-studio/learner-core';
 import type { AgentAdapter } from '@study-studio/agent-runtime';
+import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
+import { artifactInputHash } from '@study-studio/storage-sqlite';
+import { logger } from '@study-studio/shared';
 
 export const LearningAssessInputSchema = z.object({
   action: z.enum(['grade', 'diagnose', 'grade_batch']).optional(),
@@ -373,6 +376,10 @@ export class LearningAssessTool
     });
     if (!isOk(sessionRes)) return err(sessionRes.error);
     const session = sessionRes.value;
+    let outcome: Result<
+      Array<Omit<LearningAssessOutput, 'source' | 'accuracyRate'> & { itemId?: string | undefined }>,
+      BusinessError
+    >;
     try {
       const numbered = items
         .map(
@@ -385,23 +392,72 @@ export class LearningAssessTool
           ? `请批改下面这道题，只返回 JSON：\n${numbered}`
           : `请逐题批改下面 ${items.length} 道题，只返回 JSON（results 数组按 itemId 对齐）：\n${numbered}`;
       let text = '';
+      let streamError: BusinessError | undefined;
       for await (const ev of session.send({ message })) {
         if (ev.type === 'TEXT_DELTA') {
           text += ev.delta;
         } else if (ev.type === 'ERROR') {
-          return err(ev.error);
+          streamError = ev.error;
+          break;
         } else if (ev.type === 'COMPLETED') {
           if (ev.finalOutput) text = ev.finalOutput;
           break;
         }
       }
-      return parseAiGradingResults(text, items.length);
+      outcome = streamError ? err(streamError) : parseAiGradingResults(text, items.length);
     } catch (error) {
-      return err(
+      outcome = err(
         translateToBusinessError(error, { category: 'AGENT_RUNTIME', action: 'requestAiGrading' })
       );
     } finally {
       void session.close().catch(() => {});
+    }
+    // P4-1 artifact：成功失败都记一行（只插不改）；artifact 自身失败只 warn，
+    // 绝不推翻批改结果（不伪造成功，也不用 artifact 错误覆盖业务错误）。
+    await this.recordGradeArtifact(items, outcome);
+    return outcome;
+  }
+
+  /**
+   * P4-1 批改运行审计：输入只记快照 hash（不记原文/作答/回复）。
+   * 非 Drizzle 仓储（单测 mock）跳过，不阻断批改。
+   */
+  private async recordGradeArtifact(
+    items: Array<{
+      itemId?: string | undefined;
+      prompt: string;
+      standardAnswer: string;
+      userSubmission: string;
+      testedSkillId: string;
+      language: 'en' | 'ja' | 'ko';
+    }>,
+    outcome: Result<unknown, BusinessError>
+  ): Promise<void> {
+    // G5 边界：经门面写入，不直调 getRawDb；非 Drizzle（单测 mock）跳过。
+    if (!(this.learnerRepo instanceof DrizzleLearnerRepository)) return;
+    const res = await this.learnerRepo.recordAiArtifactRun(
+      {
+        action: items.length === 1 ? 'grade' : 'grade_batch',
+        inputSnapshot: JSON.stringify(
+          items.map((it) => [
+            it.itemId ?? null,
+            it.prompt,
+            it.standardAnswer,
+            it.userSubmission,
+            it.testedSkillId,
+            it.language,
+          ])
+        ),
+        adapter: this.adapter?.id ?? 'none',
+        model: 'adapter-default',
+        promptVersion: artifactInputHash(GRADING_SYSTEM_PROMPT).slice(0, 16),
+        schemaVersion: 'AiGradingJson/1',
+        status: isOk(outcome) ? 'completed' : 'failed',
+        ...(isOk(outcome) ? {} : { errorCode: outcome.error.code }),
+      }
+    );
+    if (!isOk(res)) {
+      logger.warn('[assess] artifact 记录失败（批改结果不受影响）', { code: res.error.code });
     }
   }
 }

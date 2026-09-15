@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok, err, isOk, BusinessError } from '@study-studio/shared';
 import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
 import type { LearnerRepository } from '@study-studio/learner-core';
+import type { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import {
   LearningAssessTool,
   parseAiGradingResults,
@@ -227,5 +228,124 @@ describe('learning.assess mode routing (P6-3)', () => {
     expect(out.results[0]?.grading.source).toBe('ai');
     expect(out.results[1]?.grading.source).toBe('rule-fallback');
     expect(out.summary.total).toBe(2);
+  });
+});
+
+describe('P4-1 AIArtifactRun 最小写入', () => {
+  const CANARY = '作答UNIQUE_CANARY_9f8e';
+
+  function artifactRows(repo: DrizzleLearnerRepository): Array<{
+    action: string;
+    status: string;
+    error_code: string | null;
+    adapter: string;
+    input_snapshot_hash: string;
+    prompt_version: string;
+    schema_version: string;
+  }> {
+    return repo
+      .getRawDb()
+      .query(
+        `SELECT action AS action, status AS status, error_code AS error_code,
+                adapter AS adapter, input_snapshot_hash AS input_snapshot_hash,
+                prompt_version AS prompt_version, schema_version AS schema_version
+         FROM ai_artifact_runs`
+      )
+      .all() as Array<{
+      action: string;
+      status: string;
+      error_code: string | null;
+      adapter: string;
+      input_snapshot_hash: string;
+      prompt_version: string;
+      schema_version: string;
+    }>;
+  }
+
+  it('grade_batch 成功记 completed 行：hash 可对账，原文不入库', async () => {
+    const { DrizzleLearnerRepository: Repo } = await import(
+      '../../../infrastructure/drizzle-learner-repository.js'
+    );
+    const drepo = new Repo(':memory:');
+    const AI_TWO_JSON = JSON.stringify({
+      results: [
+        {
+          itemId: 'q1',
+          isCorrect: true,
+          score: 90,
+          grammarFeedback: '好。',
+          nativeNuanceAdvice: '好。',
+          refinementSuggestion: '标准1',
+          mistakeDetected: false,
+        },
+        {
+          itemId: 'q2',
+          isCorrect: false,
+          score: 40,
+          grammarFeedback: '差。',
+          nativeNuanceAdvice: '差。',
+          refinementSuggestion: '标准2',
+          mistakeDetected: true,
+        },
+      ],
+    });
+    const tool2 = new LearningAssessTool(
+      drepo,
+      makeMockAdapter({ kind: 'success', text: AI_TWO_JSON })
+    );
+    const res = await tool2.execute(
+      {
+        action: 'grade_batch',
+        mode: 'ai',
+        items: [
+          { itemId: 'q1', prompt: 'p1', standardAnswer: '标准1', userSubmission: CANARY, language: 'en' as const },
+          { itemId: 'q2', prompt: 'p2', standardAnswer: '标准2', userSubmission: '作答2', language: 'en' as const },
+        ],
+      },
+      ctx
+    );
+    expect(isOk(res)).toBe(true);
+    const rows = artifactRows(drepo);
+    expect(rows.length).toBe(1);
+    expect(rows[0]).toMatchObject({ action: 'grade_batch', status: 'completed', adapter: 'mock' });
+    expect(rows[0]!.input_snapshot_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(rows[0]!.prompt_version.length).toBeGreaterThan(0);
+    expect(rows[0]!.schema_version).toBe('AiGradingJson/1');
+    // 输入只记 hash：原文作答在表中无残留。
+    const dump = JSON.stringify(
+      drepo.getRawDb().query('SELECT * FROM ai_artifact_runs').all()
+    );
+    expect(dump).not.toContain('UNIQUE_CANARY_9f8e');
+    drepo.getRawDb().close();
+  });
+
+  it('模型失败记 failed 行且批改照常回退（不伪造成功）', async () => {
+    const { DrizzleLearnerRepository: Repo } = await import(
+      '../../../infrastructure/drizzle-learner-repository.js'
+    );
+    const drepo = new Repo(':memory:');
+    const tool = new LearningAssessTool(drepo, makeMockAdapter({ kind: 'error' }));
+    const res = await tool.execute(
+      {
+        action: 'grade',
+        mode: 'ai',
+        prompt: 'p',
+        standardAnswer: 's',
+        userSubmission: 'u',
+        language: 'en' as const,
+      },
+      ctx
+    );
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) {
+      drepo.getRawDb().close();
+      return;
+    }
+    expect((res.value as { source?: string }).source).toBe('rule-fallback');
+    const rows = artifactRows(drepo);
+    expect(rows.length).toBe(1);
+    expect(rows[0]).toMatchObject({ action: 'grade', status: 'failed' });
+    expect(rows[0]!.error_code).toBe('E_CODEX_TURN');
+    drepo.getRawDb().close();
   });
 });

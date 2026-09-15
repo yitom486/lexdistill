@@ -144,7 +144,10 @@ import {
   projectLinesSegments as projectLinesSegmentsDomain,
   findDocumentsMissingLineSegments as findDocumentsMissingLineSegmentsDomain,
   listContentSegments as listContentSegmentsDomain,
+  recordAiArtifactRun as recordAiArtifactRunDomain,
   type ContentSegment,
+  type RecordAiArtifactInput,
+  type AiArtifactRun,
   type ShredStats,
 } from '@study-studio/storage-sqlite';
 import {
@@ -619,6 +622,16 @@ export class DrizzleLearnerRepository
     documentId: string
   ): Promise<Result<ContentSegment[], BusinessError>> {
     return listContentSegmentsDomain(this.deps, documentId);
+  }
+
+  /**
+   * AI 运行审计写入（P4-1；只插不改）。供批改等 Tool 经门面调用，
+   * Tool 不得直调 getRawDb（G5 边界锁）。
+   */
+  public async recordAiArtifactRun(
+    input: RecordAiArtifactInput
+  ): Promise<Result<AiArtifactRun, BusinessError>> {
+    return recordAiArtifactRunDomain(this.deps, input);
   }
 
   /**

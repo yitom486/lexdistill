@@ -24,12 +24,13 @@ import { migration as v024 } from './v024-content-sources.js';
 import { migration as v025 } from './v025-selection-contexts.js';
 import { migration as v026 } from './v026-term-occurrence-segments.js';
 import { migration as v027 } from './v027-encountered-term-counts.js';
+import { migration as v028 } from './v028-ai-artifact-runs.js';
 import type { SchemaMigration } from './types.js';
 
 export type { SchemaMigration } from './types.js';
 
 /**
- * 已发布迁移目录（v2–v27）。v1 = runMigrations 写入的 legacy-baseline，无独立文件。
+ * 已发布迁移目录（v2–v28）。v1 = runMigrations 写入的 legacy-baseline，无独立文件。
  * 新增：加 vNNN-name.ts，并按 version 登记到本数组末尾。禁止改既有条目。
  * `ddl.ts` 的 runMigrations 从此数组调度。
  */
@@ -60,5 +61,6 @@ export const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
   v025,
   v026,
   v027,
+  v028,
 ];
 

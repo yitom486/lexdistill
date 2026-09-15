@@ -276,7 +276,7 @@ describe('P1-3 v22 旧库升级 v23–v27', () => {
               ('o2', 'u9', 'ja', 'k', 'reading', 'd1', NULL, 't2')`
     );
     const res = runMigrations(db);
-    expect(res.applied).toEqual([23, 24, 25, 26, 27]);
+    expect(res.applied).toEqual([23, 24, 25, 26, 27, 28]);
     const row = db
       .query(
         'SELECT exposure_count AS e, lookup_count AS l, read_count AS r FROM encountered_terms'
