@@ -286,6 +286,44 @@ describe('card-drafts 句子类型（课文收句子）', () => {
     expect(terms.value.some((t) => t.headword === SENTENCE)).toBe(false);
   });
 
+  describe('P4-3 改后接受：卡面用改后值，edited 保留，事务语义不变', () => {
+    it('提议→改 headword/meanings→接受：卡面为改后值', async () => {
+      const proposed = await repo.proposeCardDrafts([DRAFT]);
+      if (!isOk(proposed)) return;
+      const id = proposed.value[0]!.id;
+      const updated = await repo.updateCardDraft('u1', id, {
+        headword: '明確',
+        reading: 'めいかく',
+        meanings: ['明确', '清晰'],
+      });
+      expect(isOk(updated)).toBe(true);
+      if (!isOk(updated)) return;
+      expect(updated.value.editedFields.sort()).toEqual(['headword', 'meanings', 'reading']);
+      const accepted = await repo.acceptCardDraft('u1', id);
+      expect(isOk(accepted)).toBe(true);
+      if (!isOk(accepted)) return;
+      // 卡面使用改后值（front＝改后表记，back＝改后释义）。
+      const card = repo
+        .getRawDb()
+        .query<{ front: string; back: string; studied: string | null }, [string]>(
+          'SELECT front AS front, back AS back, studied_at AS studied FROM flashcards WHERE id = ?'
+        )
+        .get(accepted.value.cardId);
+      expect(card!.front).toBe('明確');
+      expect(card!.back).toBe('明确；清晰');
+      expect(card!.studied).not.toBeNull();
+      // edited 标记保留（接受不清除）。
+      expect(accepted.value.draft.editedFields.sort()).toEqual(['headword', 'meanings', 'reading']);
+      // accepted 状态＋flashcard 链接。
+      expect(accepted.value.draft.status).toBe('accepted');
+      expect(accepted.value.draft.flashcardId).toBe(accepted.value.cardId);
+      // 相遇回填语义不变（单词链记相遇）。
+      const terms = await repo.listEncounteredTerms('u1', 'ja');
+      if (!isOk(terms)) return;
+      expect(terms.value.some((t) => t.headword === '明確')).toBe(true);
+    });
+  });
+
   describe('P4-1 草稿选区关联', () => {
     async function seedSelection(
       id: string,
