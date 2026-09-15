@@ -22,7 +22,7 @@ interface RecordedCall {
   userId: string;
 }
 
-const KNOWN_TOOLS = new Set(['learning.content', 'toc_draft_replace_all']);
+const KNOWN_TOOLS = new Set(['learning.content', 'session_review.synthetic_tool']);
 
 function toolDef(name: string): ToolDefinition {
   return {
@@ -93,10 +93,10 @@ function makeAdapter(fake: FakeConn): CodexAdapter {
     executeTool: async (toolName: string, _input: Record<string, unknown>, ctx: { sessionId: string; userId: string }) => {
       fake.calls.push({ toolName, sessionId: ctx.sessionId, userId: ctx.userId });
       if (!KNOWN_TOOLS.has(toolName)) throw new Error(`tool not found: ${toolName}`);
-      // 忠实建模生产行为：toc_draft_replace_all 自带会话登记门
+      // 忠实建模审核工具自带会话登记门
       //（P3.4B-ISO 注册检查），未登记会话在执行侧拒绝。
-      if (toolName === 'toc_draft_replace_all' && ctx.sessionId !== 'sess-review') {
-        throw new Error('E_TOC_DRAFT_SESSION');
+      if (toolName === 'session_review.synthetic_tool' && ctx.sessionId !== 'sess-review') {
+        throw new Error('E_SYNTHETIC_TOOL_SESSION');
       }
       return { executed: toolName };
     },
@@ -130,7 +130,7 @@ describe('P3.4B-FIX 单连接并发工具路由', () => {
     const reviewRes = await adapter.createSession({
       sessionId: 'sess-review',
       userId: 'u-review',
-      tools: [toolDef('toc_draft_replace_all')],
+      tools: [toolDef('session_review.synthetic_tool')],
       ephemeral: true,
     });
     expect(isOk(mainRes)).toBe(true);
@@ -140,18 +140,18 @@ describe('P3.4B-FIX 单连接并发工具路由', () => {
 
     // 交错：主→审→主→审（旧设计下全部走后创建的 review 身份）
     const r1 = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-m1', tool: 'learning.content' });
-    const r2 = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r1', tool: 'toc_draft_replace_all' });
+    const r2 = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r1', tool: 'session_review.synthetic_tool' });
     const r3 = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-m2', tool: 'learning.content' });
-    const r4 = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r2', tool: 'toc_draft_replace_all' });
+    const r4 = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r2', tool: 'session_review.synthetic_tool' });
     for (const r of [r1, r2, r3, r4]) expect(r.success).toBe(true);
     expect(fake.calls).toEqual([
       { toolName: 'learning.content', sessionId: 'sess-main', userId: 'u-main' },
-      { toolName: 'toc_draft_replace_all', sessionId: 'sess-review', userId: 'u-review' },
+      { toolName: 'session_review.synthetic_tool', sessionId: 'sess-review', userId: 'u-review' },
       { toolName: 'learning.content', sessionId: 'sess-main', userId: 'u-main' },
-      { toolName: 'toc_draft_replace_all', sessionId: 'sess-review', userId: 'u-review' },
+      { toolName: 'session_review.synthetic_tool', sessionId: 'sess-review', userId: 'u-review' },
     ]);
     // 成功回执只含执行结果计数形负载（本替身回 executed 标记），无对方会话痕迹
-    expect(JSON.parse(r2.text)).toEqual({ executed: 'toc_draft_replace_all' });
+    expect(JSON.parse(r2.text)).toEqual({ executed: 'session_review.synthetic_tool' });
 
     await mainRes.value.close();
     await reviewRes.value.close();
@@ -169,7 +169,7 @@ describe('P3.4B-FIX 单连接并发工具路由', () => {
     const reviewRes = await adapter.createSession({
       sessionId: 'sess-review',
       userId: 'u-review',
-      tools: [toolDef('toc_draft_replace_all')],
+      tools: [toolDef('session_review.synthetic_tool')],
       ephemeral: true,
     });
     expect(isOk(mainRes)).toBe(true);
@@ -178,19 +178,19 @@ describe('P3.4B-FIX 单连接并发工具路由', () => {
 
     // 主 lane 未声明目录工具：adapter 层直接拒绝，executeTool 零调用。
     //（旧设计会把候选名逐个送进全局执行；P3.4B-FIX2 起归一后必须命中声明集。）
-    const denied = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-mx', tool: 'toc_draft_replace_all' });
+    const denied = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-mx', tool: 'session_review.synthetic_tool' });
     expect(denied.success).toBe(false);
-    expect(fake.calls.filter((c) => c.sessionId === 'sess-main' && c.toolName === 'toc_draft_replace_all')).toEqual([]);
+    expect(fake.calls.filter((c) => c.sessionId === 'sess-main' && c.toolName === 'session_review.synthetic_tool')).toEqual([]);
     // 主 lane 伪造调用任意未声明的全局 WRITE 工具：同样零调用
     const deniedGlobal = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-my', tool: 'flashcards.collect' });
     expect(deniedGlobal.success).toBe(false);
     expect(fake.calls.filter((c) => c.sessionId === 'sess-main')).toEqual([]);
     // 目录工具不进主 lane：声明 allowlist 之外的调用在执行侧发不出来
-    const allowed = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-rx', tool: 'toc_draft_replace_all' });
+    const allowed = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-rx', tool: 'session_review.synthetic_tool' });
     expect(allowed.success).toBe(true);
     // review 会话恰好一次成功执行（主会话的变体名尝试全部失败在前，不影响）
     expect(fake.calls.filter((c) => c.sessionId === 'sess-review')).toEqual([
-      { toolName: 'toc_draft_replace_all', sessionId: 'sess-review', userId: 'u-review' },
+      { toolName: 'session_review.synthetic_tool', sessionId: 'sess-review', userId: 'u-review' },
     ]);
 
     await mainRes.value.close();
@@ -232,29 +232,29 @@ describe('P3.4B-FIX 单连接并发工具路由', () => {
     const reviewRes = await adapter.createSession({
       sessionId: 'sess-review',
       userId: 'u-review',
-      tools: [toolDef('toc_draft_replace_all')],
+      tools: [toolDef('session_review.synthetic_tool')],
       ephemeral: true,
     });
     expect(isOk(mainRes)).toBe(true);
     expect(isOk(reviewRes)).toBe(true);
     if (!isOk(mainRes) || !isOk(reviewRes)) return;
 
-    const first = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-learned', tool: 'toc_draft_replace_all' });
+    const first = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-learned', tool: 'session_review.synthetic_tool' });
     expect(first.success).toBe(true);
     // thread 换了个未知值，但 turn 已学到 → 仍归属 review 会话
-    const viaTurn = await toolCall(fake, { threadId: 'thread-unknown', turnId: 'turn-learned', tool: 'toc_draft_replace_all' });
+    const viaTurn = await toolCall(fake, { threadId: 'thread-unknown', turnId: 'turn-learned', tool: 'session_review.synthetic_tool' });
     expect(viaTurn.success).toBe(true);
     expect(fake.calls[fake.calls.length - 1]).toEqual({
-      toolName: 'toc_draft_replace_all',
+      toolName: 'session_review.synthetic_tool',
       sessionId: 'sess-review',
       userId: 'u-review',
     });
 
     // 关闭审核会话：thread 键与已学 turn 键同时失效，主会话不受影响
     await reviewRes.value.close();
-    const afterCloseThread = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r9', tool: 'toc_draft_replace_all' });
+    const afterCloseThread = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r9', tool: 'session_review.synthetic_tool' });
     expect(afterCloseThread.success).toBe(false);
-    const afterCloseTurn = await toolCall(fake, { threadId: 'thread-unknown', turnId: 'turn-learned', tool: 'toc_draft_replace_all' });
+    const afterCloseTurn = await toolCall(fake, { threadId: 'thread-unknown', turnId: 'turn-learned', tool: 'session_review.synthetic_tool' });
     expect(afterCloseTurn.success).toBe(false);
     const mainStill = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-m9', tool: 'learning.content' });
     expect(mainStill.success).toBe(true);
@@ -315,7 +315,7 @@ describe('P3.4B-FIX2 单连接审批路由', () => {
     const reviewRes = await adapter.createSession({
       sessionId: 'sess-review',
       userId: 'u-review',
-      tools: [toolDef('toc_draft_replace_all')],
+      tools: [toolDef('session_review.synthetic_tool')],
       approvalPolicy: 'on-request',
       ephemeral: true,
     });
@@ -376,7 +376,7 @@ describe('P3.4B-FIX2 单连接审批路由', () => {
     const reviewRes = await adapter.createSession({
       sessionId: 'sess-review',
       userId: 'u-review',
-      tools: [toolDef('toc_draft_replace_all')],
+      tools: [toolDef('session_review.synthetic_tool')],
       approvalPolicy: 'on-request',
       ephemeral: true,
     });
@@ -504,7 +504,7 @@ describe('P3.4B-FIX3 工具 thread/turn 矛盾 fail-closed', () => {
     const reviewRes = await adapter.createSession({
       sessionId: 'sess-review',
       userId: 'u-review',
-      tools: [toolDef('toc_draft_replace_all')],
+      tools: [toolDef('session_review.synthetic_tool')],
       ephemeral: true,
     });
     expect(isOk(mainRes)).toBe(true);
@@ -512,7 +512,7 @@ describe('P3.4B-FIX3 工具 thread/turn 矛盾 fail-closed', () => {
     if (!isOk(mainRes) || !isOk(reviewRes)) return;
 
     // 先让 review 学到 turn-r7（合法调用，成功）
-    const learned = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r7', tool: 'toc_draft_replace_all' });
+    const learned = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r7', tool: 'session_review.synthetic_tool' });
     expect(learned.success).toBe(true);
     const callsBefore = fake.calls.length;
     expect(callsBefore).toBeGreaterThan(0);
@@ -532,7 +532,7 @@ describe('P3.4B-FIX3 工具 thread/turn 矛盾 fail-closed', () => {
     // 双会话功能不受影响：之后各自合法调用依然成功
     const mainOk = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-m9', tool: 'learning.content' });
     expect(mainOk.success).toBe(true);
-    const reviewOk = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r7', tool: 'toc_draft_replace_all' });
+    const reviewOk = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r7', tool: 'session_review.synthetic_tool' });
     expect(reviewOk.success).toBe(true);
     expect(fake.calls[fake.calls.length - 2]).toEqual({
       toolName: 'learning.content',
@@ -540,7 +540,7 @@ describe('P3.4B-FIX3 工具 thread/turn 矛盾 fail-closed', () => {
       userId: 'u-main',
     });
     expect(fake.calls[fake.calls.length - 1]).toEqual({
-      toolName: 'toc_draft_replace_all',
+      toolName: 'session_review.synthetic_tool',
       sessionId: 'sess-review',
       userId: 'u-review',
     });
