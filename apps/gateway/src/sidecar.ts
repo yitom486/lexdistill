@@ -6,5 +6,26 @@
  * 避免单测与 Hono RPC 导入时误起端口）。
  */
 import { startGatewayServer } from './index.js';
+import {
+  attachShutdownSignals,
+  attachShutdownStdin,
+  createShutdownController,
+} from './bootstrap/shutdown-control.js';
 
-startGatewayServer();
+const listener = startGatewayServer();
+const shutdown = createShutdownController({
+  stop: (closeActiveConnections) => listener.stop(closeActiveConnections),
+  exit: (code) => process.exit(code),
+  reportError: (error) => {
+    console.error(`[gateway] 关闭监听失败：${error instanceof Error ? error.message : String(error)}`);
+  },
+});
+
+attachShutdownStdin(process.stdin, () => {
+  console.log('[gateway] 收到 sidecar shutdown 命令，正在关闭监听并退出…');
+  shutdown.request('stdin');
+});
+attachShutdownSignals(process, (signal) => {
+  console.log(`[gateway] 收到 ${signal}，正在关闭监听并退出…`);
+  shutdown.request(signal);
+});

@@ -2,6 +2,10 @@ import { createGateway } from './bootstrap/create-gateway.js';
 import { createApp } from './transport/http/create-app.js';
 import { startGateway } from './bootstrap/start-gateway.js';
 import { PORT } from './bootstrap/config.js';
+import {
+  attachShutdownSignals,
+  createShutdownController,
+} from './bootstrap/shutdown-control.js';
 
 export * from './runtime/gateway-runtime.js';
 export * from './session/session-manager.js';
@@ -46,15 +50,15 @@ if (import.meta.main) {
   // 关监听 → 掐长连接（含 WS/流式）→ 退出。存量 Turn 走已有 signal 检查点停扫。
   // 限制：Windows 直接关终端窗口不投递任何信号，仍会留孤儿——必须配合
   // `bun run dev:clean` 定期核对，禁止要求用户逐个杀进程。
-  const shutdown = (signal: string): void => {
+  const shutdown = createShutdownController({
+    stop: (closeActiveConnections) => listener.stop(closeActiveConnections),
+    exit: (code) => process.exit(code),
+    reportError: (error) => {
+      console.error(`[gateway] 关闭监听失败：${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+  attachShutdownSignals(process, (signal) => {
     console.log(`[gateway] 收到 ${signal}，正在关闭监听并退出…`);
-    try {
-      listener.stop(true);
-    } catch {
-      // 关闭期错误不掩盖退出意图
-    }
-    process.exit(0);
-  };
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
+    shutdown.request(signal);
+  });
 }
