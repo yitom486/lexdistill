@@ -13,6 +13,11 @@ export { SCHEMA_MIGRATIONS, type SchemaMigration } from './migrations/index.js';
 export { seedInitialData, pitchMeaningToGlosses } from './seed-bootstrap.js';
 export { runDoctor, formatDoctorReport, type DoctorFinding, type DoctorReport } from './doctor.js';
 export {
+  exportDatabaseSnapshot,
+  type ExportDatabaseSnapshotInput,
+  type DatabaseSnapshotInfo,
+} from './adapters/maintenance/db-backup.js';
+export {
   buildRepairPlan,
   formatRepairPlan,
   type OrphanTarget,

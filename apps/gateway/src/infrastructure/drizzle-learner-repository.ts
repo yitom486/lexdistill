@@ -107,6 +107,10 @@ import {
   type ReadingPosition,
 } from '@study-studio/storage-sqlite';
 import {
+  exportDatabaseSnapshot as exportDatabaseSnapshotDomain,
+  type DatabaseSnapshotInfo,
+} from '@study-studio/storage-sqlite';
+import {
   listCardFormats as listCardFormatsDomain,
   saveCardFormat as saveCardFormatDomain,
   resetCardFormat as resetCardFormatDomain,
@@ -330,11 +334,14 @@ export class DrizzleLearnerRepository
 {
   private readonly db: DrizzleDb;
   private readonly sqlite: Database;
+  /** 建库路径（':memory:' 或外部传入 Database 时为标记值；备份导出需真实文件路径）。 */
+  private readonly dbPath: string;
 
   constructor(dbOrPath: Database | string = ':memory:') {
     const instance = createDrizzleDb(dbOrPath);
     this.db = instance.db;
     this.sqlite = instance.sqlite;
+    this.dbPath = typeof dbOrPath === 'string' ? dbOrPath : ':memory:';
   }
 
   public getRawDb(): Database {
@@ -643,6 +650,19 @@ export class DrizzleLearnerRepository
     input: ListAiArtifactRunsInput
   ): Promise<Result<AiArtifactRun[], BusinessError>> {
     return listAiArtifactRunsDomain(this.deps, input);
+  }
+
+  /**
+   * 整库只读快照导出（P5-1）：检查点＋拷贝＋校验＋原子落盘。
+   * 目标路径由调用方（桌面 save-dialog）提供；取消即不调用，零副作用。
+   */
+  public async exportDatabaseSnapshot(
+    targetPath: string
+  ): Promise<Result<DatabaseSnapshotInfo, BusinessError>> {
+    return exportDatabaseSnapshotDomain(this.deps, {
+      sourcePath: this.dbPath,
+      targetPath,
+    });
   }
 
   /**
