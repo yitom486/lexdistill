@@ -1,7 +1,13 @@
-use std::net::TcpListener;
 use std::io::{BufRead, BufReader};
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
@@ -51,7 +57,10 @@ async fn platform_save_text_file(
 }
 
 fn get_extension(filename: &str) -> &str {
-    filename.rsplit_once('.').map(|(_, ext)| ext).unwrap_or("txt")
+    filename
+        .rsplit_once('.')
+        .map(|(_, ext)| ext)
+        .unwrap_or("txt")
 }
 
 // ---------------------------------------------------------------------------
@@ -70,18 +79,68 @@ fn gateway_db_path(app: &AppHandle) -> std::path::PathBuf {
 }
 
 /// sidecar 子进程句柄：保活至应用退出（Tauri 退出时自动回收）。
-#[allow(dead_code)]
 struct GatewaySidecar(std::sync::Mutex<Option<Child>>);
+
+impl GatewaySidecar {
+    const FORCE_REAP_TIMEOUT: Duration = Duration::from_millis(750);
+    const REAP_POLL_INTERVAL: Duration = Duration::from_millis(20);
+
+    /// 停止 sidecar；重复调用安全，窗口关闭和应用析构可以同时兜底。
+    fn shutdown(&self) {
+        let child = match self.0.lock() {
+            Ok(mut guard) => guard.take(),
+            Err(_) => None,
+        };
+
+        let Some(mut child) = child else {
+            return;
+        };
+
+        // Gateway 当前只在进程信号上实现优雅关闭，没有桌面端可调用的 shutdown
+        // IPC；Windows 下 CREATE_NO_WINDOW 也不能安全依赖控制台 Ctrl+C。因此不
+        // 引入未经审计的 FFI 或 shell taskkill，直接使用 Child::kill 作为可移植的
+        // 强制回收兜底，并把 wait 限制在固定窗口内，避免 Tauri 关闭被卡住。
+        match child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) => {}
+            Err(error) => {
+                eprintln!("[sidecar] 检查网关退出状态失败：{error}");
+            }
+        }
+
+        if let Err(error) = child.kill() {
+            eprintln!("[sidecar] 强制停止网关失败：{error}");
+        }
+        Self::wait_for_exit(&mut child);
+    }
+
+    fn wait_for_exit(child: &mut Child) {
+        let deadline = Instant::now() + Self::FORCE_REAP_TIMEOUT;
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => return,
+                Ok(None) if Instant::now() < deadline => {
+                    std::thread::sleep(Self::REAP_POLL_INTERVAL);
+                }
+                Ok(None) => {
+                    eprintln!(
+                        "[sidecar] 网关未在 {:?} 内退出，放弃等待以避免阻塞桌面关闭",
+                        Self::FORCE_REAP_TIMEOUT
+                    );
+                    return;
+                }
+                Err(error) => {
+                    eprintln!("[sidecar] 回收网关进程失败：{error}");
+                    return;
+                }
+            }
+        }
+    }
+}
 
 impl Drop for GatewaySidecar {
     fn drop(&mut self) {
-        let Ok(mut guard) = self.0.lock() else {
-            return;
-        };
-        if let Some(mut child) = guard.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+        self.shutdown();
     }
 }
 
@@ -168,6 +227,8 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
         .env("GATEWAY_PORT", port.to_string())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW); // 后台 sidecar 不创建控制台窗口
     match command.spawn() {
         Ok(mut child) => {
             println!(
@@ -257,6 +318,13 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                if let Some(sidecar) = window.app_handle().try_state::<GatewaySidecar>() {
+                    sidecar.shutdown();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             platform_open_external_url,
             platform_clipboard_write_text,
@@ -278,4 +346,52 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Lingua Studio desktop application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::GatewaySidecar;
+    use std::process::{Child, Command};
+
+    fn spawn_long_lived_child() -> Child {
+        #[cfg(windows)]
+        {
+            Command::new("cmd")
+                .args(["/C", "ping", "127.0.0.1", "-n", "6"])
+                .spawn()
+                .expect("spawn test child")
+        }
+
+        #[cfg(not(windows))]
+        {
+            Command::new("sh")
+                .args(["-c", "sleep 5"])
+                .spawn()
+                .expect("spawn test child")
+        }
+    }
+
+    #[test]
+    fn shutdown_is_idempotent_and_reaps_the_owned_child() {
+        let sidecar = GatewaySidecar(std::sync::Mutex::new(Some(spawn_long_lived_child())));
+
+        sidecar.shutdown();
+        sidecar.shutdown();
+
+        assert!(sidecar.0.lock().expect("sidecar lock").is_none());
+    }
+
+    #[test]
+    fn shutdown_does_not_wait_for_a_child_that_already_exited() {
+        let mut child = Command::new(if cfg!(windows) { "cmd" } else { "true" });
+        #[cfg(windows)]
+        let child = child.args(["/C", "exit", "0"]);
+        let mut child = child.spawn().expect("spawn exited test child");
+        let _ = child.wait();
+
+        let sidecar = GatewaySidecar(std::sync::Mutex::new(Some(child)));
+        sidecar.shutdown();
+
+        assert!(sidecar.0.lock().expect("sidecar lock").is_none());
+    }
 }
