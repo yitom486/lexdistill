@@ -164,7 +164,9 @@ export async function exportApkgFromCards(
     // collection 经内存 SQLite 组装（与单测同一技术路线，无文件中转）。
     const db = new Database(':memory:');
     try {
-      db.exec(colSql.join('\n'));
+      // Bun Database.run intentionally accepts this fixed semicolon-separated DDL batch.
+      // Parameterized single-row writes below use prepare(...).run(...) instead.
+      db.run(colSql.join('\n'));
       db.prepare('INSERT INTO col (id, crt, mod, models, decks, conf, dconf, tags) VALUES (1, ?, ?, ?, ?, ?, ?, ?)').run(
         now,
         now,

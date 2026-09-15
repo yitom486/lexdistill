@@ -384,7 +384,7 @@ describe('deleteDocument 生命周期（P0.5）', () => {
   it('事务中途失败整体回滚，不留半删除', async () => {
     await seedFullDoc('doc_life_02');
     // 破坏一张子表：事务内必抛，验证原子性
-    repo.getRawDb().exec('DROP TABLE textbook_lines');
+    repo.getRawDb().run('DROP TABLE textbook_lines');
     const del = await repo.deleteDocument('doc_life_02', testUserId);
     expect(isOk(del)).toBe(false);
     // documents 本行与批注都在（回滚了）

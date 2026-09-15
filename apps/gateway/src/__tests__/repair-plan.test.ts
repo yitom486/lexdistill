@@ -14,6 +14,8 @@ function mem(): Database {
   return db;
 }
 
+// The fixtures use run() for fixed multi-statement SQL; parameterized writes use query(...).run(...).
+
 function snapshot(db: Database): string {
   return JSON.stringify(
     (db.query("SELECT name AS n FROM sqlite_master WHERE type='table' ORDER BY n").all() as Array<{ n: string }>).map(
@@ -28,7 +30,7 @@ function snapshot(db: Database): string {
 describe('repair-plan dry-run', () => {
   it('孤儿按 invariant 发现（不硬编码 doc id），库只读未改', () => {
     const db = mem();
-    db.exec(`
+    db.run(`
       CREATE TABLE documents (id TEXT PRIMARY KEY);
       CREATE TABLE textbook_lessons (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, PRIMARY KEY (document_id, lesson_id));
       CREATE TABLE textbook_lines (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, ja TEXT NOT NULL, PRIMARY KEY (document_id, lesson_id, ord));
@@ -50,7 +52,7 @@ describe('repair-plan dry-run', () => {
 
   it('审计行进 needs-decision 而非删除候选', () => {
     const db = mem();
-    db.exec(`
+    db.run(`
       CREATE TABLE documents (id TEXT PRIMARY KEY);
       CREATE TABLE document_imports (id TEXT PRIMARY KEY, filename TEXT NOT NULL, status TEXT NOT NULL, document_id TEXT);
       INSERT INTO document_imports VALUES ('i1','a.pdf','done','gone-doc');
@@ -63,7 +65,7 @@ describe('repair-plan dry-run', () => {
 
   it('source_id 候选按“现值+语言”规则推导', () => {
     const db = mem();
-    db.exec(`
+    db.run(`
       CREATE TABLE documents (id TEXT PRIMARY KEY);
       CREATE TABLE dictionary_sources (id TEXT PRIMARY KEY);
       CREATE TABLE local_dictionary_entries (id TEXT PRIMARY KEY, language TEXT NOT NULL, headword TEXT NOT NULL, source_id TEXT);
@@ -81,7 +83,7 @@ describe('repair-plan dry-run', () => {
 
   it('种子 shred 候选只收教材形（新闻形排除）', () => {
     const db = mem();
-    db.exec(`
+    db.run(`
       CREATE TABLE documents (id TEXT PRIMARY KEY, title TEXT NOT NULL, ast_json TEXT);
       CREATE TABLE textbook_lessons (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, PRIMARY KEY (document_id, lesson_id));
       INSERT INTO documents VALUES ('seed1','种子书','{"lessons":[{},{}]}');

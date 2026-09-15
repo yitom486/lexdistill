@@ -1,5 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
+import { Database } from 'bun:sqlite';
 import { isOk } from '@study-studio/shared';
+import { extractZip } from '@study-studio/archive';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { analyzeApkg } from '../modules/flashcards/application/apkg-import.js';
 import { buildStoredZip } from '../modules/flashcards/application/apkg-export.js';
@@ -42,6 +44,26 @@ describe('apkg export', () => {
     expect(back.value.cardCount).toBe(2);
     expect(back.value.models[0]?.modelName).toBe('Lingua Basic');
     expect(back.value.decks).toEqual([{ name: 'Lingua Studio', noteCount: 2 }]);
+
+    const collectionEntry = extractZip(res.value.bytes).find((entry) => entry.path === 'collection.anki2');
+    expect(collectionEntry).toBeDefined();
+    if (!collectionEntry) return;
+    const collection = Database.deserialize(collectionEntry.data);
+    try {
+      const tables = collection
+        .query<{ name: string }, []>(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('col', 'notes', 'cards') ORDER BY name"
+        )
+        .all()
+        .map((row) => row.name);
+      expect(tables).toEqual(['cards', 'col', 'notes']);
+      for (const table of ['col', 'notes', 'cards']) {
+        const row = collection.query<{ count: number }, []>(`SELECT COUNT(*) AS count FROM ${table}`).get();
+        expect(row?.count).toBeGreaterThan(0);
+      }
+    } finally {
+      collection.close();
+    }
   });
 
   it('空集合导出合法空包；上限截断如实标记', async () => {

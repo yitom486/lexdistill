@@ -11,7 +11,8 @@ afterEach(() => {
 function seed(): Database {
   const db = new Database(':memory:');
   open.push(db);
-  db.exec(`
+  // Fixed schema/data fixture: run() executes the intentional multi-statement batch.
+  db.run(`
     CREATE TABLE documents (id TEXT PRIMARY KEY);
     CREATE TABLE textbook_lessons (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, PRIMARY KEY (document_id, lesson_id));
     CREATE TABLE textbook_lines (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, ja TEXT NOT NULL, PRIMARY KEY (document_id, lesson_id, ord));
@@ -62,7 +63,8 @@ describe('R1-A orphan apply', () => {
 describe('R1-B seed source fix', () => {
   function seedOldStyle(): Database {
     const db = new Database(':memory:');
-    db.exec(`
+    // Fixed schema fixture: run() executes the intentional multi-statement DDL/data batch.
+    db.run(`
       CREATE TABLE dictionary_sources (id TEXT PRIMARY KEY, language TEXT NOT NULL, provider TEXT NOT NULL, version TEXT NOT NULL, source_url TEXT NOT NULL, license_name TEXT NOT NULL, license_url TEXT NOT NULL, attribution TEXT NOT NULL, entry_count INTEGER NOT NULL DEFAULT 0, imported_at TEXT NOT NULL);
       CREATE TABLE local_dictionary_entries (id TEXT PRIMARY KEY, language TEXT NOT NULL, headword TEXT NOT NULL, source_id TEXT);
       INSERT INTO dictionary_sources VALUES ('study-studio-starter-v1-ja','ja','Lingua Studio','v1','u','l','u','a',24,'t');
