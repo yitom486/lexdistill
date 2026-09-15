@@ -414,7 +414,7 @@ export class LearningAssessTool
     }
     // P4-1 artifact：成功失败都记一行（只插不改）；artifact 自身失败只 warn，
     // 绝不推翻批改结果（不伪造成功，也不用 artifact 错误覆盖业务错误）。
-    await this.recordGradeArtifact(items, outcome);
+    await this.recordGradeArtifact(items, outcome, context.userId);
     return outcome;
   }
 
@@ -431,12 +431,14 @@ export class LearningAssessTool
       testedSkillId: string;
       language: 'en' | 'ja' | 'ko';
     }>,
-    outcome: Result<unknown, BusinessError>
+    outcome: Result<unknown, BusinessError>,
+    userId: string
   ): Promise<void> {
     // G5 边界：经门面写入，不直调 getRawDb；非 Drizzle（单测 mock）跳过。
     if (!(this.learnerRepo instanceof DrizzleLearnerRepository)) return;
     const res = await this.learnerRepo.recordAiArtifactRun(
       {
+        userId,
         action: items.length === 1 ? 'grade' : 'grade_batch',
         inputSnapshot: JSON.stringify(
           items.map((it) => [

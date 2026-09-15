@@ -249,13 +249,14 @@ describe('P1-3 selection-contexts（SI-1/2/3）', () => {
   });
 });
 
-describe('P1-3 v22 旧库升级 v23–v27', () => {
-  it('旧库应用 23–27：新表/加列/回填一次到位，重跑零重复', () => {
+describe('P1-3 v22 旧库升级 v23–v29', () => {
+  it('旧库应用 23–29：新表/加列/回填一次到位，重跑零重复', () => {
     const db = freshDb();
     // 退回 v22 时代形状。
     db.run('DROP TABLE content_segments');
     db.run('DROP TABLE content_sources');
     db.run('DROP TABLE selection_contexts');
+    db.run('DROP TABLE ai_artifact_runs');
     db.run('ALTER TABLE card_drafts DROP COLUMN selection_context_id');
     db.run('ALTER TABLE term_occurrences DROP COLUMN segment_id');
     db.run('ALTER TABLE term_occurrences DROP COLUMN lesson_id');
@@ -276,7 +277,7 @@ describe('P1-3 v22 旧库升级 v23–v27', () => {
               ('o2', 'u9', 'ja', 'k', 'reading', 'd1', NULL, 't2')`
     );
     const res = runMigrations(db);
-    expect(res.applied).toEqual([23, 24, 25, 26, 27, 28]);
+    expect(res.applied).toEqual([23, 24, 25, 26, 27, 28, 29]);
     const row = db
       .query(
         'SELECT exposure_count AS e, lookup_count AS l, read_count AS r FROM encountered_terms'

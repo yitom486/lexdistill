@@ -145,8 +145,10 @@ import {
   findDocumentsMissingLineSegments as findDocumentsMissingLineSegmentsDomain,
   listContentSegments as listContentSegmentsDomain,
   recordAiArtifactRun as recordAiArtifactRunDomain,
+  listAiArtifactRuns as listAiArtifactRunsDomain,
   type ContentSegment,
   type RecordAiArtifactInput,
+  type ListAiArtifactRunsInput,
   type AiArtifactRun,
   type ShredStats,
 } from '@study-studio/storage-sqlite';
@@ -632,6 +634,15 @@ export class DrizzleLearnerRepository
     input: RecordAiArtifactInput
   ): Promise<Result<AiArtifactRun, BusinessError>> {
     return recordAiArtifactRunDomain(this.deps, input);
+  }
+
+  /**
+   * AI 运行审计只读（P4-2 item2）：按 userId 精确过滤，未接路由／Tool。
+   */
+  public async listAiArtifactRuns(
+    input: ListAiArtifactRunsInput
+  ): Promise<Result<AiArtifactRun[], BusinessError>> {
+    return listAiArtifactRunsDomain(this.deps, input);
   }
 
   /**

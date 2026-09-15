@@ -308,6 +308,15 @@ describe('P4-1 AIArtifactRun 最小写入', () => {
     const rows = artifactRows(drepo);
     expect(rows.length).toBe(1);
     expect(rows[0]).toMatchObject({ action: 'grade_batch', status: 'completed', adapter: 'mock' });
+    // P4-2 item2：新写入带归属；同用户可读。
+    const listed = await drepo.listAiArtifactRuns({ userId: 'u1' });
+    expect(isOk(listed)).toBe(true);
+    if (!isOk(listed)) {
+      drepo.getRawDb().close();
+      return;
+    }
+    expect(listed.value.length).toBe(1);
+    expect(listed.value[0]!.userId).toBe('u1');
     expect(rows[0]!.input_snapshot_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(rows[0]!.prompt_version.length).toBeGreaterThan(0);
     expect(rows[0]!.schema_version).toBe('AiGradingJson/1');
@@ -347,5 +356,53 @@ describe('P4-1 AIArtifactRun 最小写入', () => {
     expect(rows[0]).toMatchObject({ action: 'grade', status: 'failed' });
     expect(rows[0]!.error_code).toBe('E_CODEX_TURN');
     drepo.getRawDb().close();
+  });
+
+  it('P4-2 item2 隔离：跨用户不可读，历史未知行不可见，空用户拒绝', async () => {
+    const { DrizzleLearnerRepository: Repo } = await import(
+      '../../../infrastructure/drizzle-learner-repository.js'
+    );
+    const drepo = new Repo(':memory:');
+    try {
+      // 历史行（无 user_id → 回填 ''）。
+      drepo
+        .getRawDb()
+        .prepare(
+          `INSERT INTO ai_artifact_runs
+             (id, action, input_snapshot_hash, adapter, model,
+              prompt_version, schema_version, status, created_at)
+           VALUES ('legacy1', 'grade', 'h', 'mock', 'm', 'p', 's', 'completed', 't')`
+        )
+        .run();
+      const tool = new LearningAssessTool(drepo, makeMockAdapter({ kind: 'success', text: AI_SINGLE_JSON }));
+      const res = await tool.execute(
+        {
+          action: 'grade',
+          mode: 'ai',
+          prompt: 'p',
+          standardAnswer: 's',
+          userSubmission: 'u',
+          language: 'en' as const,
+        },
+        ctx
+      );
+      expect(isOk(res)).toBe(true);
+      // 本人只见自己的行，历史未知行不可见。
+      const mine = await drepo.listAiArtifactRuns({ userId: 'u1' });
+      expect(isOk(mine)).toBe(true);
+      if (!isOk(mine)) return;
+      expect(mine.value.length).toBe(1);
+      expect(mine.value[0]!.id).not.toBe('legacy1');
+      // 跨用户不可读。
+      const other = await drepo.listAiArtifactRuns({ userId: 'u2' });
+      expect(isOk(other)).toBe(true);
+      if (!isOk(other)) return;
+      expect(other.value).toEqual([]);
+      // 空用户拒绝（fail-closed，防全表读）。
+      const empty = await drepo.listAiArtifactRuns({ userId: '' });
+      expect(isOk(empty)).toBe(false);
+    } finally {
+      drepo.getRawDb().close();
+    }
   });
 });

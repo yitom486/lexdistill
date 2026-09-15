@@ -147,10 +147,12 @@ export {
 } from './adapters/practice/practice-plan.js';
 export {
   recordAiArtifactRun,
+  listAiArtifactRuns,
   artifactInputHash,
   type AiArtifactStatus,
   type AiArtifactRun,
   type RecordAiArtifactInput,
+  type ListAiArtifactRunsInput,
 } from './adapters/practice/ai-artifact-runs.js';
 export {
   parseKanaPracticeMemory,

@@ -881,6 +881,7 @@ export const aiArtifactRuns = sqliteTable(
   'ai_artifact_runs',
   {
     id: text('id').primaryKey(),
+    userId: text('user_id').notNull().default(''),
     action: text('action').notNull(),
     inputSnapshotHash: text('input_snapshot_hash').notNull(),
     adapter: text('adapter').notNull(),
