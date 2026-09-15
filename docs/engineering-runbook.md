@@ -29,6 +29,10 @@
 
 ## 4. 基线核对流程（实现批次前后各一次）
 
+> 备份复核基线（F0-1a 实测）：隔离恢复须验证迁移 v1–v29 连续、
+> integrity ok、取消零副作用、无 tmp 残留。版本号随迁移递增，
+> 复核时以 `SCHEMA_MIGRATIONS` 末位为准重算期望值。
+
 1. `git log --oneline -1` 记 HEAD；
 2. `git status --porcelain` 与 owner 集（8M＋`domain/` 单文件＋`output/`）逐项比对，
    多一行即停；
