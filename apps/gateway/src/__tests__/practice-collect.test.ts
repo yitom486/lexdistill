@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { LearningContentTool } from '../transport/tools/learning-content-tool.js';
+import { maybeCollect } from '../transport/tools/learning-content/shared.js';
+import type { GeneratedQuestion } from '@study-studio/protocol';
 import { isOk } from '@study-studio/shared';
 import { app } from '../index.js';
 
@@ -92,6 +94,57 @@ describe('practice collections / collect', () => {
     expect(pqCards[0]!.fsrs.lapses).toBe(0);
     expect(pqCards[0]!.fsrs.state).toBe('NEW');
     expect(Number.isFinite(Date.parse(pqCards[0]!.fsrs.dueAt))).toBe(true);
+  });
+
+  it('P4-2 sourceRef 补链：模板 id 去重保序附后，缺省回退 skill 旧形', async () => {
+    const repo = new DrizzleLearnerRepository(':memory:');
+    const q: GeneratedQuestion = {
+      id: 'q1',
+      type: 'MULTIPLE_CHOICE',
+      prompt: 'p',
+      content: 'c',
+      correctAnswer: 'a',
+      explanation: 'e',
+      testedSkillId: 'jp.test',
+      difficultyTier: 2,
+    };
+    const ctx = { userId: 'u-src', sessionId: 's' };
+    const withIds = await maybeCollect(
+      repo,
+      ctx,
+      { action: 'generate_quiz', skillIds: ['jp.test'], collect: true },
+      'ja',
+      [q],
+      's',
+      undefined,
+      ['tmpl_2', 'tmpl_1', 'tmpl_2']
+    );
+    expect(isOk(withIds)).toBe(true);
+    if (!isOk(withIds)) return;
+    expect(withIds.value.collectionId).toBeTruthy();
+    const cols = await repo.listPracticeCollections('u-src');
+    expect(isOk(cols)).toBe(true);
+    if (!isOk(cols)) return;
+    // skill 保留＋模板 id 去重保序。
+    expect(cols.value[0]!.sourceRef).toBe('jp.test;template:tmpl_2,tmpl_1');
+    const items = await repo.listPracticeItems('u-src', cols.value[0]!.id);
+    expect(isOk(items)).toBe(true);
+    if (!isOk(items)) return;
+    expect(items.value[0]!.sourceRef).toBe('jp.test;template:tmpl_2,tmpl_1');
+    // 旧形：无模板 id 即纯 skill（其他动作路径不变）。
+    const legacy = await maybeCollect(
+      repo,
+      ctx,
+      { action: 'generate_quiz', skillIds: ['jp.test'], collect: true },
+      'ja',
+      [{ ...q, id: 'q2' }],
+      's'
+    );
+    expect(isOk(legacy)).toBe(true);
+    if (!isOk(legacy)) return;
+    const cols2 = await repo.listPracticeCollections('u-src');
+    if (!isOk(cols2)) return;
+    expect(cols2.value.find((c) => c.id !== cols.value[0]!.id)?.sourceRef).toBe('jp.test');
   });
 
   it('rejects empty to-cards HTTP body with validation error', async () => {

@@ -77,21 +77,25 @@ export async function handleQuizAction(
   }
 
   const picked = pickCycled(templates.value, count);
-  const questions: GeneratedQuestion[] = picked.map((row) => {
+  // P4-2 来源补链：行 id 与题目配对携带，门过滤后仍对齐（被滤掉的行 id 不进 sourceRef）。
+  const built = picked.map((row) => {
     const q = (row.payload as { question: Omit<GeneratedQuestion, 'id'> }).question;
     return {
-      ...q,
-      id: generateId('q_dyn'),
-      testedSkillId: targetSkill.includes('particle')
-        ? targetSkill
-        : q.testedSkillId || targetSkill,
-      difficultyTier: effectiveDifficulty,
+      rowId: row.id,
+      question: {
+        ...q,
+        id: generateId('q_dyn'),
+        testedSkillId: targetSkill.includes('particle')
+          ? targetSkill
+          : q.testedSkillId || targetSkill,
+        difficultyTier: effectiveDifficulty,
+      } as GeneratedQuestion,
     };
   });
   // 模板行自带 tier 可能超标、技能可能带锁：系统路径过完整门，用户点名的不动。
   const gated = !skillId
-    ? questions.filter((q) => isQuestionAllowed(q.testedSkillId, q.difficultyTier, gateLevel, gate))
-    : questions;
+    ? built.filter((b) => isQuestionAllowed(b.question.testedSkillId, b.question.difficultyTier, gateLevel, gate))
+    : built;
   if (gated.length === 0) {
     return err(
       new BusinessError('E_CONTENT_EMPTY', MSG.emptyQuiz(language, targetSkill), 'TOOL_EXECUTION')
@@ -103,8 +107,10 @@ export async function handleQuizAction(
     context,
     input,
     language,
-    gated,
-    `${MSG.quizSummary(gated.length, targetSkill)}${gateNote}`
+    gated.map((b) => b.question),
+    `${MSG.quizSummary(gated.length, targetSkill)}${gateNote}`,
+    undefined,
+    gated.map((b) => b.rowId)
   );
 }
 
@@ -129,6 +135,7 @@ export async function buildDictation(
   }
 
   const picked = pickCycled(templates.value, count);
+  const pickedRowIds = picked.map((row) => row.id);
   const dictationItems = picked.map((row) => {
     const item = (
       row.payload as {
@@ -167,6 +174,7 @@ export async function buildDictation(
     language,
     questions,
     MSG.dictationSummary(dictationItems.length),
-    { dictationItems }
+    { dictationItems },
+    pickedRowIds
   );
 }

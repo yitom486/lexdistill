@@ -121,7 +121,9 @@ export async function maybeCollect(
   language: string,
   questions: GeneratedQuestion[] | undefined,
   summary: string,
-  extras?: Partial<LearningContentOutput>
+  extras?: Partial<LearningContentOutput>,
+  /** P4-2 模板来源：picked 模板行 id（去重保序）；缺省回退 skillId 旧语义。 */
+  templateIds?: string[] | undefined
 ): Promise<Result<LearningContentOutput, BusinessError>> {
   const base: LearningContentOutput = {
     action: input.action,
@@ -134,6 +136,11 @@ export async function maybeCollect(
   if (!input.collect || !questions?.length) {
     return ok(base);
   }
+  // P4-2 题目来源补链：模板行 id 去重保序附到既有 sourceRef（旧行 skillId 语义保留）。
+  const uniqueTemplateIds = [...new Set(templateIds ?? [])];
+  const skill = input.skillIds?.[0];
+  const sourceRef =
+    uniqueTemplateIds.length > 0 ? `${skill ?? 'auto'};template:${uniqueTemplateIds.join(',')}` : skill;
 
   if (!(learnerRepo instanceof DrizzleLearnerRepository)) {
     return ok({
@@ -149,7 +156,7 @@ export async function maybeCollect(
       `${MSG.practicePrefix} ? ${input.action} ? ${nowIso().slice(0, 10)}`,
     intent: 'GENERATE_QUIZ',
     questions,
-    sourceRef: input.skillIds?.[0],
+    sourceRef,
   });
 
   if (!isOk(collected)) {
