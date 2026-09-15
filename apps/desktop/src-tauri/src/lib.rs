@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -82,6 +82,7 @@ fn gateway_db_path(app: &AppHandle) -> std::path::PathBuf {
 struct GatewaySidecar(std::sync::Mutex<Option<Child>>);
 
 impl GatewaySidecar {
+    const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_millis(1_500);
     const FORCE_REAP_TIMEOUT: Duration = Duration::from_millis(750);
     const REAP_POLL_INTERVAL: Duration = Duration::from_millis(20);
 
@@ -96,10 +97,57 @@ impl GatewaySidecar {
             return;
         };
 
-        // Gateway 当前只在进程信号上实现优雅关闭，没有桌面端可调用的 shutdown
-        // IPC；Windows 下 CREATE_NO_WINDOW 也不能安全依赖控制台 Ctrl+C。因此不
-        // 引入未经审计的 FFI 或 shell taskkill，直接使用 Child::kill 作为可移植的
-        // 强制回收兜底，并把 wait 限制在固定窗口内，避免 Tauri 关闭被卡住。
+        match child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) => {}
+            Err(error) => {
+                eprintln!("[sidecar] 检查网关退出状态失败：{error}");
+            }
+        }
+
+        if let Some(stdin) = child.stdin.as_mut() {
+            if let Err(error) = stdin.write_all(b"shutdown\n").and_then(|_| stdin.flush()) {
+                eprintln!("[sidecar] 写入网关优雅关闭命令失败：{error}");
+                Self::force_stop(&mut child);
+                return;
+            }
+        } else {
+            eprintln!("[sidecar] 网关 stdin 不可用，进入强制回收");
+            Self::force_stop(&mut child);
+            return;
+        }
+
+        if Self::wait_for_graceful_exit(&mut child) {
+            return;
+        }
+
+        eprintln!(
+            "[sidecar] 网关未在 {:?} 内优雅退出，进入强制回收",
+            Self::GRACEFUL_SHUTDOWN_TIMEOUT
+        );
+        Self::force_stop(&mut child);
+    }
+
+    fn wait_for_graceful_exit(child: &mut Child) -> bool {
+        let deadline = Instant::now() + Self::GRACEFUL_SHUTDOWN_TIMEOUT;
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => return true,
+                Ok(None) if Instant::now() < deadline => {
+                    std::thread::sleep(Self::REAP_POLL_INTERVAL);
+                }
+                Ok(None) => return false,
+                Err(error) => {
+                    eprintln!("[sidecar] 等待网关优雅退出失败：{error}");
+                    return false;
+                }
+            }
+        }
+    }
+
+    fn force_stop(child: &mut Child) {
+        // Gateway 可能在 graceful wait 返回后刚好自然退出；再次检查确保不对
+        // 已退出的子进程调用 kill。force-reap 仍限制在固定窗口内，避免关闭卡住。
         match child.try_wait() {
             Ok(Some(_)) => return,
             Ok(None) => {}
@@ -111,7 +159,7 @@ impl GatewaySidecar {
         if let Err(error) = child.kill() {
             eprintln!("[sidecar] 强制停止网关失败：{error}");
         }
-        Self::wait_for_exit(&mut child);
+        Self::wait_for_exit(child);
     }
 
     fn wait_for_exit(child: &mut Child) {
@@ -225,6 +273,7 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
     command
         .env("STUDY_STUDIO_DB", &db_path)
         .env("GATEWAY_PORT", port.to_string())
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     #[cfg(windows)]
@@ -351,6 +400,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::GatewaySidecar;
+    use std::io::Read;
     use std::process::{Child, Command};
 
     fn spawn_long_lived_child() -> Child {
@@ -368,6 +418,32 @@ mod tests {
                 .args(["-c", "sleep 5"])
                 .spawn()
                 .expect("spawn test child")
+        }
+    }
+
+    fn spawn_graceful_child() -> Child {
+        #[cfg(windows)]
+        {
+            Command::new("cmd")
+                .args(["/C", "set /p line= & echo graceful"])
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .expect("spawn graceful test child")
+        }
+
+        #[cfg(not(windows))]
+        {
+            Command::new("sh")
+                .args([
+                    "-c",
+                    "IFS= read -r line; printf graceful",
+                    "study-studio-graceful-test",
+                ])
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .expect("spawn graceful test child")
         }
     }
 
@@ -393,5 +469,26 @@ mod tests {
         sidecar.shutdown();
 
         assert!(sidecar.0.lock().expect("sidecar lock").is_none());
+    }
+
+    #[test]
+    fn shutdown_uses_graceful_stdin_before_kill_fallback() {
+        let mut child = spawn_graceful_child();
+        let mut stdout = child.stdout.take().expect("graceful child stdout");
+        let output_reader = std::thread::spawn(move || {
+            let mut output = String::new();
+            stdout
+                .read_to_string(&mut output)
+                .expect("read graceful child stdout");
+            output
+        });
+        let sidecar = GatewaySidecar(std::sync::Mutex::new(Some(child)));
+
+        sidecar.shutdown();
+
+        assert_eq!(
+            output_reader.join().expect("join stdout reader").trim(),
+            "graceful"
+        );
     }
 }
