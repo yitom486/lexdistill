@@ -5,9 +5,16 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 #[cfg(windows)]
+use std::os::windows::io::AsRawHandle;
+#[cfg(windows)]
 use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+#[cfg(windows)]
+mod windows_job;
+#[cfg(windows)]
+use windows_job::JobObject;
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
@@ -79,16 +86,38 @@ fn gateway_db_path(app: &AppHandle) -> std::path::PathBuf {
 }
 
 /// sidecar 子进程句柄：保活至应用退出（Tauri 退出时自动回收）。
-struct GatewaySidecar(std::sync::Mutex<Option<Child>>);
+/// Windows 下同时持有 Job Object，直到 Child 完成关闭流程后再释放。
+struct GatewaySidecar {
+    child: std::sync::Mutex<Option<Child>>,
+    #[cfg(windows)]
+    job: std::sync::Mutex<Option<JobObject>>,
+}
 
 impl GatewaySidecar {
     const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_millis(1_500);
     const FORCE_REAP_TIMEOUT: Duration = Duration::from_millis(750);
     const REAP_POLL_INTERVAL: Duration = Duration::from_millis(20);
 
+    #[cfg(any(not(windows), test))]
+    fn new(child: Child) -> Self {
+        Self {
+            child: std::sync::Mutex::new(Some(child)),
+            #[cfg(windows)]
+            job: std::sync::Mutex::new(None),
+        }
+    }
+
+    #[cfg(windows)]
+    fn new_with_job(child: Child, job: JobObject) -> Self {
+        Self {
+            child: std::sync::Mutex::new(Some(child)),
+            job: std::sync::Mutex::new(Some(job)),
+        }
+    }
+
     /// 停止 sidecar；重复调用安全，窗口关闭和应用析构可以同时兜底。
     fn shutdown(&self) {
-        let child = match self.0.lock() {
+        let child = match self.child.lock() {
             Ok(mut guard) => guard.take(),
             Err(_) => None,
         };
@@ -97,6 +126,13 @@ impl GatewaySidecar {
             return;
         };
 
+        Self::shutdown_child(&mut child);
+        drop(child);
+        #[cfg(windows)]
+        self.release_job();
+    }
+
+    fn shutdown_child(child: &mut Child) {
         match child.try_wait() {
             Ok(Some(_)) => return,
             Ok(None) => {}
@@ -108,16 +144,16 @@ impl GatewaySidecar {
         if let Some(stdin) = child.stdin.as_mut() {
             if let Err(error) = stdin.write_all(b"shutdown\n").and_then(|_| stdin.flush()) {
                 eprintln!("[sidecar] 写入网关优雅关闭命令失败：{error}");
-                Self::force_stop(&mut child);
+                Self::force_stop(child);
                 return;
             }
         } else {
             eprintln!("[sidecar] 网关 stdin 不可用，进入强制回收");
-            Self::force_stop(&mut child);
+            Self::force_stop(child);
             return;
         }
 
-        if Self::wait_for_graceful_exit(&mut child) {
+        if Self::wait_for_graceful_exit(child) {
             return;
         }
 
@@ -125,7 +161,14 @@ impl GatewaySidecar {
             "[sidecar] 网关未在 {:?} 内优雅退出，进入强制回收",
             Self::GRACEFUL_SHUTDOWN_TIMEOUT
         );
-        Self::force_stop(&mut child);
+        Self::force_stop(child);
+    }
+
+    #[cfg(windows)]
+    fn release_job(&self) {
+        if let Ok(mut guard) = self.job.lock() {
+            let _ = guard.take();
+        }
     }
 
     fn wait_for_graceful_exit(child: &mut Child) -> bool {
@@ -286,6 +329,17 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
                 db_path.display(),
                 sidecar_path.display()
             );
+            #[cfg(windows)]
+            let job = match JobObject::attach_to_process(child.as_raw_handle()) {
+                Ok(job) => job,
+                Err(error) => {
+                    eprintln!(
+                        "[sidecar] 网关 Job Object 绑定失败：{error}；未受进程树治理，立即终止并回收"
+                    );
+                    reap_unprotected_child(child);
+                    return;
+                }
+            };
             if let Some(stdout) = child.stdout.take() {
                 std::thread::spawn(move || {
                     for line in BufReader::new(stdout).lines().map_while(Result::ok) {
@@ -300,7 +354,10 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
                     }
                 });
             }
-            app.manage(GatewaySidecar(std::sync::Mutex::new(Some(child))));
+            #[cfg(windows)]
+            app.manage(GatewaySidecar::new_with_job(child, job));
+            #[cfg(not(windows))]
+            app.manage(GatewaySidecar::new(child));
         }
         Err(e) => {
             eprintln!(
@@ -308,6 +365,16 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
                 sidecar_path.display()
             );
         }
+    }
+}
+
+#[cfg(windows)]
+fn reap_unprotected_child(mut child: Child) {
+    if let Err(error) = child.kill() {
+        eprintln!("[sidecar] 回收未受 Job Object 保护的网关失败：{error}");
+    }
+    if let Err(error) = child.wait() {
+        eprintln!("[sidecar] 等待未受保护网关退出失败：{error}");
     }
 }
 
@@ -449,12 +516,12 @@ mod tests {
 
     #[test]
     fn shutdown_is_idempotent_and_reaps_the_owned_child() {
-        let sidecar = GatewaySidecar(std::sync::Mutex::new(Some(spawn_long_lived_child())));
+        let sidecar = GatewaySidecar::new(spawn_long_lived_child());
 
         sidecar.shutdown();
         sidecar.shutdown();
 
-        assert!(sidecar.0.lock().expect("sidecar lock").is_none());
+        assert!(sidecar.child.lock().expect("sidecar lock").is_none());
     }
 
     #[test]
@@ -465,10 +532,10 @@ mod tests {
         let mut child = child.spawn().expect("spawn exited test child");
         let _ = child.wait();
 
-        let sidecar = GatewaySidecar(std::sync::Mutex::new(Some(child)));
+        let sidecar = GatewaySidecar::new(child);
         sidecar.shutdown();
 
-        assert!(sidecar.0.lock().expect("sidecar lock").is_none());
+        assert!(sidecar.child.lock().expect("sidecar lock").is_none());
     }
 
     #[test]
@@ -482,7 +549,7 @@ mod tests {
                 .expect("read graceful child stdout");
             output
         });
-        let sidecar = GatewaySidecar(std::sync::Mutex::new(Some(child)));
+        let sidecar = GatewaySidecar::new(child);
 
         sidecar.shutdown();
 
