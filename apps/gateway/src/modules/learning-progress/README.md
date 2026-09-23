@@ -9,3 +9,4 @@
 | `application/` | learning-analysis（分析快照） |
 | `tools/` | learning-progress |
 | `http/` | 画像/任务/计划/错题/分析路由 |
+| `websocket/` | 画像读取/更新、每日进度读取/活动记录的 WS 协议适配；通过 `public.ts` 暴露给 Gateway Runtime |

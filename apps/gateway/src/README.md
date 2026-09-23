@@ -205,11 +205,10 @@ sequenceDiagram
 |---|---|
 | `runtime/gateway-runtime.ts` | Gateway Runtime 主协调器：管理 Turn、连接 Session、消费 `AgentEvent`、调用 Tool、转发客户端事件。旧的 `server.ts` 实现已迁移到这里。 |
 | `runtime/handlers/turn-handlers.ts` | 处理 Turn 相关消息，例如发送、打断、完成和失败。 |
-| `runtime/handlers/learner-handlers.ts` | 处理学习者画像、卡片、错题等实时通知或客户端消息。 |
 | `runtime/responses-lite-coach.ts` | 轻量 Coach 旁路，适合快速问答；学习闭环默认仍由 Codex 主通路处理。 |
 | `runtime/turn-summary-builder.ts` | 生成 Turn 摘要、最终结果和失败时的用户友好回退文案。 |
 
-这里应该放“Agent 如何运行”的通用逻辑，不应该放“助词题如何判定”或“FSRS 如何计算”这样的领域规则。
+这里应该放“Agent 如何运行”的通用逻辑，不应该放“助词题如何判定”或“FSRS 如何计算”这样的领域规则。学习类 WebSocket 消息由 `modules/practice/websocket/` 和 `modules/learning-progress/websocket/` 适配；`GatewayRuntime` 按事件类型分发，并只经对应模块的 `public.ts` 调用。
 
 ### `session/`：会话生命周期
 
@@ -296,6 +295,7 @@ modules/<domain>/
 - `persistence/`：练习计划、练习运行、题库、作答记录。
 - `tools/`：练习生成、练习批改、自适应出题、主观题批改等 Agent Tool。
 - `http/`：练习域 HTTP 入口。
+- `websocket/`：练习提交、自适应出题和主观题批改的 WS 协议适配；由 `public.ts` 对 Gateway Runtime 提供稳定入口。
 - `__tests__/`：装配、判题和练习闭环测试。
 
 客观题的确定性判断应优先在本地领域逻辑中完成；主观题的深度诊断可以交给 Agent，但最终结果和相关学习进度仍需写回领域层。
@@ -321,6 +321,7 @@ modules/<domain>/
 - `persistence/`：Profile、Mistakes、Activity Plan、Learning Records 等数据读写。
 - `tools/`：学习进度相关 Agent Tool。
 - `http/`：画像、任务、计划、错题和分析路由。
+- `websocket/`：画像读取/更新、每日进度读取/活动记录的 WS 协议适配；由 `public.ts` 对 Gateway Runtime 提供稳定入口。
 
 该模块是学习者事实源的主要后端落点，但不应该把练习模板或练习运行本身据为己有。
 

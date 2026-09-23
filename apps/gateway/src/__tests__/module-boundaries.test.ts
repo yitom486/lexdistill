@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'bun:test';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, relative, dirname, resolve, sep } from 'node:path';
+import * as practicePublic from '../modules/practice/public.js';
+import * as learningProgressPublic from '../modules/learning-progress/public.js';
 
 /**
  * G5：模块边界回归测试。
@@ -147,10 +149,20 @@ describe('gateway module boundaries (G5)', () => {
         ) {
           violations.push(`R1 ${rel} -> ${normTarget}（禁止引用启动装配/旧入口）`);
         }
-        // R2：模块与传输层不得（值）引用运行时协调器单例实现。
-        if (normTarget === 'runtime/gateway-runtime.js' && !ref.typeOnly) {
-          violations.push(`R2 ${rel} -> ${normTarget}（禁止值引用运行时协调器）`);
-        }
+      }
+      // R2：领域模块不得依赖 Runtime；其他层不得（值）引用运行时协调器单例实现。
+      if (!isTest && relTs.startsWith('modules/') && normTarget.startsWith('runtime/')) {
+        violations.push(`R2 ${rel} -> ${normTarget}（领域模块不得反向依赖 Runtime）`);
+      }
+      if (
+        !isTest &&
+        !ASSEMBLERS.has(rel) &&
+        !ASSEMBLERS.has(relTs) &&
+        !relTs.startsWith('modules/') &&
+        normTarget === 'runtime/gateway-runtime.js' &&
+        !ref.typeOnly
+      ) {
+        violations.push(`R2 ${rel} -> ${normTarget}（禁止值引用运行时协调器）`);
       }
 
       // R3：共享基础设施 persistence 不得反向依赖领域模块。
@@ -207,6 +219,23 @@ describe('gateway module boundaries (G5)', () => {
     expect(existsSync(join(SRC, 'modules', 'learning-content', 'public.ts'))).toBe(true);
     expect(existsSync(join(SRC, 'transport', 'tools', 'learning-content-tool.ts'))).toBe(false);
     expect(existsSync(join(SRC, 'transport', 'tools', 'learning-content'))).toBe(false);
+  });
+
+  it('keeps learning WebSocket handlers in domain modules behind public APIs', () => {
+    expect(existsSync(join(SRC, 'modules', 'practice', 'websocket', 'quiz-handlers.ts'))).toBe(true);
+    expect(existsSync(join(SRC, 'modules', 'learning-progress', 'websocket', 'learner-handlers.ts'))).toBe(true);
+    expect(existsSync(join(SRC, 'runtime', 'handlers', 'learner-handlers.ts'))).toBe(false);
+    for (const key of ['handleQuizSubmit', 'handleQuizGenerate', 'handleQuizGradeSubjective'] as const) {
+      expect(typeof practicePublic[key]).toBe('function');
+    }
+    for (const key of [
+      'handleProfileGet',
+      'handleProfileUpdate',
+      'handleTaskProgressGet',
+      'handleTaskActivityRecord',
+    ] as const) {
+      expect(typeof learningProgressPublic[key]).toBe('function');
+    }
   });
 
   it('getRawDb 原生直通仅限三处 legacy（禁新增生产调用方）', () => {

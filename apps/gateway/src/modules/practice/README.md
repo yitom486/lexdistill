@@ -12,6 +12,7 @@
 | `__tests__/` | assembly / grading / phase-d 单模块测试；`practice-collect.test.ts` 仍在根 `__tests__`（测 HTTP，需 `app`） |
 | `tools/` | learning-practice、learning-assess、grade-subjective-quiz、generate-adaptive-quiz（G3 已归组，公开 name/schema 不变） |
 | `http/` | 练习域路由（G2 已抽取） |
+| `websocket/` | quiz submit、adaptive generate、subjective grade 的 WS 协议适配；依赖经窄接口注入，并由 `public.ts` 暴露给 Gateway Runtime |
 
 依赖说明：`application/practice-assembly.ts` 经结构化 `ContentToolLike`
 消费内容生成能力，只从 `modules/learning-content/public.ts` type-only 导入契约，

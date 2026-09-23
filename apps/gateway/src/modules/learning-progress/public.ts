@@ -8,3 +8,13 @@
 export { resolveActiveLanguage } from '@study-studio/storage-sqlite';
 export { buildAnalysisSnapshot, type AnalysisSnapshot } from './application/learning-analysis.js';
 export { setTrackLevel } from './persistence/level.js';
+export {
+  handleProfileGet,
+  handleProfileUpdate,
+  handleTaskActivityRecord,
+  handleTaskProgressGet,
+} from './websocket/learner-handlers.js';
+export type {
+  LearningProgressWebSocketDependencies,
+  LearningProgressWebSocketRepository,
+} from './websocket/learner-handlers.js';

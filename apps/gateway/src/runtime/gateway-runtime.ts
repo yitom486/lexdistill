@@ -19,14 +19,19 @@ import {
 } from '@study-studio/shared';
 import { type LearnerRepository } from '@study-studio/learner-core';
 import {
+  handleQuizGenerate,
+  handleQuizGradeSubjective,
   handleQuizSubmit,
+  type PracticeQuizSubmitWebSocketDependencies,
+  type PracticeQuizToolWebSocketDependencies,
+} from '../modules/practice/public.js';
+import {
   handleProfileGet,
   handleProfileUpdate,
   handleTaskProgressGet,
   handleTaskActivityRecord,
-  handleQuizGenerate,
-  handleQuizGradeSubjective,
-} from './handlers/learner-handlers.js';
+  type LearningProgressWebSocketDependencies,
+} from '../modules/learning-progress/public.js';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { EnrichJobRegistry, buildEnrichWsEnvelope } from '../modules/library/application/pdf-import/enrich-job-runner.js';
 import { registerGatewayTools } from '../transport/tools/register-tools.js';
@@ -48,6 +53,9 @@ export class GatewayServer {
   /** 轻量旁路：快问快答；学习闭环默认走 Codex App Server */
   public readonly responsesAdapter = new ResponsesAdapter();
   public readonly learnerRepo: LearnerRepository;
+  private readonly practiceWsDependencies: PracticeQuizSubmitWebSocketDependencies &
+    PracticeQuizToolWebSocketDependencies;
+  private readonly learningProgressWsDependencies: LearningProgressWebSocketDependencies;
   /** @internal 供 runtime/handlers/turn-handlers.ts 使用 */
   public readonly activeStreamControllers = new Map<string, AbortController>();
   /** 当前 Turn 的 WS 下发器：供 Codex dynamic tool 触发 Client Tools */
@@ -67,6 +75,15 @@ export class GatewayServer {
     adapterOverride?: CodexAdapter
   ) {
     this.learnerRepo = learnerRepo ?? new DrizzleLearnerRepository(':memory:');
+    const repository = this.learnerRepo;
+    this.practiceWsDependencies = {
+      learnerRepo: repository,
+      toolRegistry: this.toolRegistry,
+      ...(repository instanceof DrizzleLearnerRepository
+        ? { saveGeneratedQuestions: (questions) => repository.saveQuestions(questions) }
+        : {}),
+    };
+    this.learningProgressWsDependencies = { learnerRepo: repository };
 
     // P6-3：先建 adapter 再注册工具，使 learning.assess 的 ai 模式可用；
     // executeTool 闭包在调用时才读 toolRegistry，提前创建无初始化顺序问题。
@@ -404,28 +421,28 @@ export class GatewayServer {
       }
 
       case WsEventTypes.CLIENT_QUIZ_SUBMIT:
-        return handleQuizSubmit(this, envelope);
+        return handleQuizSubmit(this.practiceWsDependencies, envelope);
 
       // 双传输收敛：CLIENT_CARD_REVIEW WS 处理已删除——卡片评分唯一路径为
       // HTTP POST /api/cards/:userId/:cardId/review（避免双写 FSRS 状态）。
 
       case WsEventTypes.CLIENT_PROFILE_GET:
-        return handleProfileGet(this, envelope);
+        return handleProfileGet(this.learningProgressWsDependencies, envelope);
 
       case WsEventTypes.CLIENT_PROFILE_UPDATE:
-        return handleProfileUpdate(this, envelope);
+        return handleProfileUpdate(this.learningProgressWsDependencies, envelope);
 
       case WsEventTypes.CLIENT_TASK_PROGRESS_GET:
-        return handleTaskProgressGet(this, envelope);
+        return handleTaskProgressGet(this.learningProgressWsDependencies, envelope);
 
       case WsEventTypes.CLIENT_TASK_ACTIVITY_RECORD:
-        return handleTaskActivityRecord(this, envelope);
+        return handleTaskActivityRecord(this.learningProgressWsDependencies, envelope);
 
       case WsEventTypes.CLIENT_QUIZ_GENERATE:
-        return handleQuizGenerate(this, envelope);
+        return handleQuizGenerate(this.practiceWsDependencies, envelope);
 
       case WsEventTypes.CLIENT_QUIZ_GRADE_SUBJECTIVE:
-        return handleQuizGradeSubjective(this, envelope);
+        return handleQuizGradeSubjective(this.practiceWsDependencies, envelope);
 
       case WsEventTypes.CLIENT_TURN_SEND:
         return handleTurnSend(this, envelope, emit);
