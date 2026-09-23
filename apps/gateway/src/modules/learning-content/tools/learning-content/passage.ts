@@ -1,10 +1,10 @@
 import { err, isOk, ok, type Result, BusinessError } from '@study-studio/shared';
-import type { LearningRepository } from '../../../modules/practice/ports.js';
+import type { LearningContentRepository } from '../../ports.js';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
 import { MSG, applyPlaceholders, loadTemplates } from './shared.js';
 
 export async function handlePassageAction(
-  repo: LearningRepository,
+  repo: LearningContentRepository,
   input: LearningContentInput,
   language: 'ja' | 'en' | 'ko'
 ): Promise<Result<LearningContentOutput, BusinessError>> {

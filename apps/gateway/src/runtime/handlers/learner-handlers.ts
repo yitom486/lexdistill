@@ -10,14 +10,10 @@ import {
   BusinessError,
   generateId,
   isOk,
-  nowIso,
 } from '@study-studio/shared';
-import { recordSkillAttempt } from '@study-studio/learning';
-import {
-  createMistakeEntry,
-} from '@study-studio/learner-core';
 import type { GatewayServer } from '../gateway-runtime.js';
 import { DrizzleLearnerRepository } from '../../infrastructure/drizzle-learner-repository.js';
+import { submitPracticeAttempt } from '../../modules/practice/public.js';
 import { normalizeTrackLanguage } from '../../services/learning-language-policy.js';
 
 export async function handleQuizSubmit(
@@ -37,63 +33,8 @@ export async function handleQuizSubmit(
     explanation?: string;
   };
 
-  // 1. 持久化单次做题记录
-  const attemptRes = await server.learnerRepo.recordQuizAttempt({
-    id: generateId('att'),
-    userId: payload.userId,
-    questionId: payload.questionId,
-    userAnswer: payload.userAnswer,
-    isCorrect: payload.isCorrect,
-    score: payload.score,
-    timeSpentMs: payload.timeSpentMs,
-    testedSkillId: payload.testedSkillId,
-    createdAt: nowIso(),
-  });
-  if (!isOk(attemptRes)) return err(attemptRes.error);
-
-  // 2. 将本次正误立即合并进 SQLite 学习画像，而不是仅依赖前端缓存。
-  const snapshotRes = await server.learnerRepo.getProfileSnapshot(payload.userId);
-  if (isOk(snapshotRes)) {
-    const previous = snapshotRes.value.allMetrics.find(
-      (metric) => metric.id === payload.testedSkillId
-    );
-    if (previous) {
-      const metricRes = await server.learnerRepo.saveSkillMetric(
-        payload.userId,
-        recordSkillAttempt(previous, payload.isCorrect)
-      );
-      if (!isOk(metricRes)) return err(metricRes.error);
-    }
-  }
-
-  // 3. 如果答错，自动将该题归入 SQLite 错题本
-  if (!payload.isCorrect) {
-    const mistake = createMistakeEntry(
-      payload.userId,
-      {
-        id: payload.questionId,
-        type: 'MULTIPLE_CHOICE',
-        prompt: '自适应客观题',
-        content: payload.questionContent ?? '',
-        correctAnswer: payload.correctAnswer ?? '',
-        explanation: payload.explanation ?? '',
-        testedSkillId: payload.testedSkillId,
-        difficultyTier: 3,
-      },
-      payload.userAnswer,
-      {
-        questionId: payload.questionId,
-        isCorrect: false,
-        score: 0,
-        correctAnswer: payload.correctAnswer ?? '',
-        userSubmission: payload.userAnswer,
-        explanation: payload.explanation ?? '回答有误',
-        mistakeRecorded: true,
-      }
-    );
-    const mistakeRes = await server.learnerRepo.saveMistake(mistake);
-    if (!isOk(mistakeRes)) return err(mistakeRes.error);
-  }
+  const submitRes = await submitPracticeAttempt(server.learnerRepo, payload);
+  if (!isOk(submitRes)) return err(submitRes.error);
 
   return ok({
     version: '1.0',

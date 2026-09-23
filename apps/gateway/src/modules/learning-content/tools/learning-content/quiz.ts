@@ -9,7 +9,7 @@ import {
   resolveStudyGate,
   tierCapForLevel,
 } from '@study-studio/learner-core';
-import type { LearningRepository } from '../../../modules/practice/ports.js';
+import type { LearningContentRepository } from '../../ports.js';
 import type { LearnerRepository } from '@study-studio/learner-core';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
 import {
@@ -21,7 +21,7 @@ import {
 } from './shared.js';
 
 export async function handleQuizAction(
-  repo: LearningRepository & LearnerRepository,
+  repo: LearningContentRepository & LearnerRepository,
   context: ToolExecutionContext,
   input: LearningContentInput,
   language: 'ja' | 'en' | 'ko'
@@ -115,7 +115,7 @@ export async function handleQuizAction(
 }
 
 export async function buildDictation(
-  repo: LearningRepository & LearnerRepository,
+  repo: LearningContentRepository & LearnerRepository,
   context: ToolExecutionContext,
   input: LearningContentInput,
   language: string

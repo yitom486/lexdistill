@@ -5,7 +5,7 @@ import { WsEventTypes, type WsEnvelope } from '@study-studio/protocol';
 import { isOk, ok } from '@study-studio/shared';
 import type { AgentEvent, AgentSession } from '@study-studio/agent-runtime';
 import type { CodexAdapter } from '@study-studio/agent-runtime';
-import { LearningContentTool } from '../transport/tools/learning-content-tool.js';
+import { LearningContentTool } from '../modules/learning-content/public.js';
 import { LearningAssessTool } from '../modules/practice/tools/learning-assess-tool.js';
 
 /**

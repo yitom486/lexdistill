@@ -6,7 +6,7 @@ import type { LearningRepository } from '../ports.js';
 import type { LearnerRepository } from '@study-studio/learner-core';
 import type { ContentRepository } from '../../library/ports.js';
 import type { PersistableQuestion } from '../persistence/questions.js';
-import type { LearningContentInput, LearningContentOutput } from '../../../transport/tools/learning-content-tool.js';
+import type { LearningContentInput, LearningContentOutput } from '../../learning-content/public.js';
 import {
   acceptedDbTypesForBlock,
   buildVocabQuestionsFromCards,

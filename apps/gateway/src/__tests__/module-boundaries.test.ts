@@ -7,8 +7,8 @@ import { join, relative, dirname, resolve, sep } from 'node:path';
  *
  * 允许的方向：
  * - transport/bootstrap/index 组装 runtime、modules、infrastructure（显式装配）。
- * - modules 经 `deps` 消费能力；跨模块深路径引用仅允许下表登记的过渡例外
- *  （后续以各模块 public.ts 替代，见迁移计划 §5）。
+ * - modules 经 `deps` 或 public.ts / ports.ts 消费其他模块能力；跨模块依赖必须登记，
+ *   深路径引用仅允许下表注明的过渡例外。
  * - 测试文件不受装配规则约束，但跨模块引用同样登记。
  */
 const SRC = resolve(import.meta.dir, '..');
@@ -35,8 +35,14 @@ const CROSS_MODULE_ALLOWLIST = new Set([
   'modules/practice/application/practice-proposal.ts -> modules/learning-progress/public.js',
   'modules/practice/http/practice-routes.ts -> modules/learning-progress/public.js',
   'modules/practice/__tests__/practice-phase-d.test.ts -> modules/learning-progress/public.js',
-  'modules/practice/application/practice-assembly.ts -> transport/tools/learning-content-tool.js',
-  'modules/practice/__tests__/practice-assembly.test.ts -> transport/tools/learning-content-tool.js',
+  // practice consumes content generation through the learning-content public API.
+  'modules/practice/application/practice-assembly.ts -> modules/learning-content/public.js',
+  'modules/practice/__tests__/practice-assembly.test.ts -> modules/learning-content/public.js',
+  // learning-content reuses dictionary sampling and curriculum seed reads through domain APIs.
+  'modules/learning-content/tools/learning-content/hangul-words.ts -> modules/dictionary/public.js',
+  'modules/learning-content/tools/learning-content/kana-words.ts -> modules/dictionary/public.js',
+  'modules/learning-content/tools/learning-content/hangul.ts -> modules/library/public.js',
+  'modules/learning-content/tools/learning-content/kana.ts -> modules/library/public.js',
   // E2b：yomitan 改直引 @study-studio/archive，library/public 中转边消除。
   // Anki 推送复用 tts-proxy 合成（只取音频字节；Key 随调用来、用完即弃，永不落盘）。
   'modules/flashcards/application/anki-push.ts -> modules/tts/application/tts-proxy.js',
@@ -168,13 +174,13 @@ describe('gateway module boundaries (G5)', () => {
         }
       }
 
-      // R5：跨模块深路径引用必须登记为例外。
+      // R5：所有跨模块依赖必须登记；优先引用 public.ts / ports.ts，深路径需有明确理由。
       const fromModule = relTs.startsWith('modules/') ? relTs.split('/')[1] : null;
       const toModule = normTarget.startsWith('modules/') ? normTarget.split('/')[1] : null;
       if (fromModule && toModule && fromModule !== toModule) {
         const key = `${relTs} -> ${normTarget}`;
         if (!CROSS_MODULE_ALLOWLIST.has(key)) {
-          violations.push(`R5 ${key}（新增跨模块引用需登记或走 public.ts）`);
+          violations.push(`R5 ${key}（新增跨模块依赖需登记，优先走 public.ts / ports.ts）`);
         }
       }
 
@@ -195,6 +201,12 @@ describe('gateway module boundaries (G5)', () => {
 
   it('has no boundary violations', () => {
     expect(violations).toEqual([]);
+  });
+
+  it('keeps learning.content implementation inside its domain module', () => {
+    expect(existsSync(join(SRC, 'modules', 'learning-content', 'public.ts'))).toBe(true);
+    expect(existsSync(join(SRC, 'transport', 'tools', 'learning-content-tool.ts'))).toBe(false);
+    expect(existsSync(join(SRC, 'transport', 'tools', 'learning-content'))).toBe(false);
   });
 
   it('getRawDb 原生直通仅限三处 legacy（禁新增生产调用方）', () => {

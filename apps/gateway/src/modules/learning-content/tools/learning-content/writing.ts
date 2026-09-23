@@ -1,13 +1,13 @@
 import type { ToolExecutionContext } from '@study-studio/tool-core';
 import type { GeneratedQuestion } from '@study-studio/protocol';
 import { err, generateId, isOk, type Result, BusinessError } from '@study-studio/shared';
-import type { LearningRepository } from '../../../modules/practice/ports.js';
+import type { LearningContentRepository } from '../../ports.js';
 import type { LearnerRepository } from '@study-studio/learner-core';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
 import { MSG, loadTemplates, maybeCollect, pickCycled } from './shared.js';
 
 export async function handleWritingPromptAction(
-  repo: LearningRepository & LearnerRepository,
+  repo: LearningContentRepository & LearnerRepository,
   context: ToolExecutionContext,
   input: LearningContentInput,
   language: 'ja' | 'en' | 'ko'

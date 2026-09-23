@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { LearningContentTool } from '../transport/tools/learning-content-tool.js';
+import { LearningContentTool } from '../modules/learning-content/public.js';
 
 describe('learning.content hangul_drill', () => {
   it('builds jamo-to-romanization questions from curriculum_hangul without LLM', async () => {

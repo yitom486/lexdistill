@@ -6,22 +6,9 @@ import {
   inferLanguageFromSkillId,
   normalizeTrackLanguage,
 } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import type { LearningRepository } from '../../../modules/practice/ports.js';
+import { DrizzleLearnerRepository } from '../../../../infrastructure/drizzle-learner-repository.js';
+import type { LearningContentRepository, TemplateRow } from '../../ports.js';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
-
-export type TemplateRow = {
-  id: string;
-  language: string;
-  action: string;
-  format: string | null;
-  skillId: string | null;
-  difficulty: number;
-  topic: string | null;
-  genre: string | null;
-  sortOrder: number;
-  payload: Record<string, unknown>;
-};
 
 /** Learner-facing Chinese copy kept as unicode escapes to avoid editor encoding corruption. */
 export const MSG = {
@@ -102,7 +89,7 @@ export function pickCycled<T>(items: T[], count: number): T[] {
 }
 
 export async function loadTemplates(
-  repo: LearningRepository,
+  repo: LearningContentRepository,
   options: {
     action: string;
     language: string;

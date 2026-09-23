@@ -4,7 +4,7 @@ import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repo
 import { LearningProgressTool } from '../modules/learning-progress/tools/learning-progress-tool.js';
 import { LearningCurriculumTool } from '../modules/curriculum/tools/learning-curriculum-tool.js';
 import { LearningLibraryTool } from '../modules/library/tools/learning-library-tool.js';
-import { LearningContentTool } from '../transport/tools/learning-content-tool.js';
+import { LearningContentTool } from '../modules/learning-content/public.js';
 import { LearningPlanTool } from '../transport/tools/learning-plan-tool.js';
 
 describe('learning control tools (C1–C3 / D)', () => {

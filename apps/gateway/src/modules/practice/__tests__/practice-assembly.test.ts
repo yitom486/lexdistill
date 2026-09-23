@@ -7,7 +7,7 @@ import {
   buildVocabQuestionsFromCards,
   buildTranslationQuestionsFromCards,
 } from '../application/practice-assembly.js';
-import { LearningContentTool } from '../../../transport/tools/learning-content-tool.js';
+import { LearningContentTool } from '../../learning-content/public.js';
 import type { Flashcard, PracticeBlockSpec } from '@study-studio/protocol';
 
 describe('practice assembly by block spec (P5-E4)', () => {

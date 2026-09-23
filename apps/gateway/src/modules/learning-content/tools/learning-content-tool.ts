@@ -9,7 +9,7 @@ import type { GeneratedQuestion } from '@study-studio/protocol';
 import { PracticeBlockSpecSchema } from '@study-studio/protocol';
 import { ok, err, type Result, BusinessError, isOk } from '@study-studio/shared';
 import type { LearnerRepository } from '@study-studio/learner-core';
-import { DrizzleLearnerRepository } from '../../infrastructure/drizzle-learner-repository.js';
+import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { MSG, resolveContentLanguage } from './learning-content/shared.js';
 import { handleQuizAction, buildDictation } from './learning-content/quiz.js';
 import { handleExplainAction, handleExampleSetAction } from './learning-content/explain.js';

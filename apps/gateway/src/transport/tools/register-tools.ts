@@ -8,7 +8,7 @@ import { registerCurriculumTools } from '../../modules/curriculum/tools/register
 import { registerLibraryTools } from '../../modules/library/tools/register-library-tools.js';
 import { registerDictionaryTools } from '../../modules/dictionary/tools/register-dictionary-tools.js';
 import { registerFlashcardsTools } from '../../modules/flashcards/tools/register-flashcards-tools.js';
-import { LearningContentTool } from './learning-content-tool.js';
+import { LearningContentTool } from '../../modules/learning-content/public.js';
 import { LearningPlanTool } from './learning-plan-tool.js';
 import { UiNavigateTool, UiPresentTool } from './ui-command-tools.js';
 

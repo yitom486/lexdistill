@@ -1,6 +1,6 @@
 import type { ToolExecutionContext } from '@study-studio/tool-core';
 import { err, generateId, isOk, ok, type Result, BusinessError } from '@study-studio/shared';
-import type { LexiconRepository } from '../../../modules/dictionary/ports.js';
+import type { LexiconRepository } from '../../../../modules/dictionary/public.js';
 import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
 
 export interface KanaWord {

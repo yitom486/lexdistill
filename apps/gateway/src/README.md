@@ -190,12 +190,10 @@ sequenceDiagram
 | 路径 | 作用 |
 |---|---|
 | `register-tools.ts` | 在启动装配阶段向 Tool Registry 注册 Gateway 暴露的工具。 |
-| `learning-content-tool.ts` | 内容生成/讲解/练习内容的跨域兼容入口。 |
 | `learning-plan-tool.ts` | 学习计划相关的跨域兼容入口。 |
 | `ui-command-tools.ts` | `ui.navigate`、`ui.present` 等 Client Tool，执行时通过 WS 下发到前端。 |
-| `learning-content/` | 内容 Tool 所需的输入输出、适配和辅助代码。 |
 
-具体领域 Tool 已迁移到 `modules/*/tools/`；这里保留的是跨域入口和注册装配，不是新的“大工具实现集中地”。
+具体领域 Tool 放在 `modules/*/tools/`；`learning.content` 的实现归 `modules/learning-content/`，此处只保留跨域入口和注册装配，不是新的“大工具实现集中地”。
 
 ---
 
@@ -301,6 +299,10 @@ modules/<domain>/
 - `__tests__/`：装配、判题和练习闭环测试。
 
 客观题的确定性判断应优先在本地领域逻辑中完成；主观题的深度诊断可以交给 Agent，但最终结果和相关学习进度仍需写回领域层。
+
+### `modules/learning-content/`：学习内容生成领域
+
+负责由课程内容模板生成练习内容、讲解、例句、短文和语言专项练习；`learning.content` Agent Tool 与按练习块合成输入的逻辑都归本模块。`public.ts` 是其他领域消费其输入输出契约的唯一入口；Tool 注册仍由 `transport/tools/register-tools.ts` 统一装配，并保持现有注册顺序。
 
 ### `modules/learning-progress/`：学习进度领域
 
@@ -518,7 +520,7 @@ sequenceDiagram
     participant Router as AgentRouter
     participant Adapter as AgentAdapter
     participant Tools as ToolRouter
-    participant Practice as practice module
+    participant Content as learning-content module
     participant Session as AgentSession
 
     Client->>WS: client.turn.send
@@ -531,8 +533,8 @@ sequenceDiagram
     Router->>Adapter: 启动 Turn（默认 Codex）
     Adapter-->>Runtime: Agent 原生 tool_call
     Runtime->>Tools: 执行 Tool
-    Tools->>Practice: 调用 modules/practice/tools/
-    Practice-->>Tools: 返回 Zod / 领域结果
+    Tools->>Content: 调用 learning.content
+    Content-->>Tools: 返回结构化内容结果
     Tools-->>Runtime: ToolResult
     Runtime->>Session: submitToolResult()
     Session-->>Adapter: 继续 Agent Turn
