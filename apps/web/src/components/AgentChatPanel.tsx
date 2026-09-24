@@ -397,6 +397,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
           interrupt={interrupt}
           queueMessage={queueMessage}
           coachThreadId={coachThreadId}
+          agentStatus={agentStatus}
         />
       </div>
   );

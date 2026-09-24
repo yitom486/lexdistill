@@ -11,8 +11,10 @@
  * 可在此接口新增 `tts`/`audio` 委托并在 Tauri 实现中接管。
  */
 
-export type PlatformEnvironment = 'web' | 'tauri';
+import { TauriPlatformCapabilities } from './tauri-capabilities.js';
+import { WebPlatformCapabilities } from './web-capabilities.js';
 
+export type PlatformEnvironment = 'web' | 'tauri';
 export interface DownloadPayload {
   filename: string;
   /** 文本内容；二进制下载请另设接口。 */
@@ -61,15 +63,12 @@ export function getPlatform(): PlatformCapabilities {
 
 /** 解析当前平台能力实现；导出主要供测试注入。 */
 export function resolvePlatformCapabilities(): PlatformCapabilities {
-  // 避免在测试/SSR 中把 Tauri 实现拉进 bundle：动态 require 仅在检测到 Tauri 时执行。
+  // 静态 import：tauri-capabilities 无外部静态依赖（只走 window.__TAURI__ 动态调用），
+  // Web 构建可安全打包；浏览器 ESM 下 require 根本不存在，此前复制按钮点即抛错。
   if (detectTauri()) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('./tauri-capabilities.js') as typeof import('./tauri-capabilities.js');
-    return new mod.TauriPlatformCapabilities();
+    return new TauriPlatformCapabilities();
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod = require('./web-capabilities.js') as typeof import('./web-capabilities.js');
-  return new mod.WebPlatformCapabilities();
+  return new WebPlatformCapabilities();
 }
 
 /** 仅供测试重置单例。 */

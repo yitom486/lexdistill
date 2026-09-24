@@ -12,6 +12,7 @@ import { sound } from '../../utils/audio.js';
 import type {
   AgentCollaborationModeDto,
   AgentModelDto,
+  AgentStatusDto,
 } from '../../queries/useAgentQueries.js';
 import { APPROVAL_OPTIONS, compactSelect, darkMenuItem, effortLabel } from './chat-shared.js';
 
@@ -39,6 +40,7 @@ interface ChatComposerProps {
   interrupt: () => void;
   queueMessage: { isPending: boolean };
   coachThreadId: string;
+  agentStatus?: AgentStatusDto | undefined;
 }
 
 /** P2-1 拆分：输入区 + 会话参数弹层 + 模型选择 + 发送/排队/停止（纯搬运自 AgentChatPanel）。 */
@@ -67,6 +69,7 @@ export function ChatComposer(props: ChatComposerProps) {
     interrupt,
     queueMessage,
     coachThreadId,
+    agentStatus,
   } = props;
   return (
     <footer className="shrink-0 p-3 pt-1.5">
