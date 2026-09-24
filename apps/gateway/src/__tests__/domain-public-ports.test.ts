@@ -22,7 +22,8 @@ const CONTENT_METHODS = [
   'commitTocFirstChunk', 'commitTocAppendChunk', 'recordTocChunkFailure', 'importDocumentFile',
   'saveAnnotation', 'listAnnotations', 'deleteAnnotation', 'convertAnnotationToCard',
   'saveDocumentStructure', 'getDocumentStructure', 'listDocumentLessonRefs', 'saveReadingPosition',
-  'getReadingPosition', 'shredDocument', 'materializeSeedDocument', 'getAdaptiveKanaQueue',
+  'getReadingPosition', 'shredDocument', 'materializeSeedDocument', 'saveKnowledgePoints',
+  'listKnowledgePoints', 'getAdaptiveKanaQueue',
   'getCurriculumHangul', 'getCurriculumKana', 'listReadingSets', 'saveReadingSet',
   'recordKanaPractice', 'recordHangulPractice', 'recordReadingPractice',
 ] as const;

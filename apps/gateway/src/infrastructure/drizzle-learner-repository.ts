@@ -159,6 +159,14 @@ import {
   materializeSeedIntoTransaction,
   type MaterializeSeedInput,
 } from '@study-studio/storage-sqlite';
+import {
+  saveKnowledgePoints as saveKnowledgePointsDomain,
+  listKnowledgePoints as listKnowledgePointsDomain,
+} from '../modules/library/persistence/knowledge-points.js';
+import type {
+  SaveKnowledgePointInput,
+  KnowledgePoint,
+} from '@study-studio/storage-sqlite';
 import type { StudyGateSnapshot } from '@study-studio/learner-core';
 import {
   previewCard as previewCardDomain,
@@ -342,6 +350,7 @@ export class DrizzleLearnerRepository
   //  B 卡片草稿        proposeCardDrafts…dismissCardDraft           → modules/flashcards/persistence/
   //  C 课程与课文      getLevelInfo…listWordlists                   → modules/curriculum/persistence/
   //  D 文档段/种子     saveDocumentStructure…materializeSeedDocument → modules/library/persistence/ + storage-sqlite
+  //  D2 目录挂载知识点 saveKnowledgePoints/listKnowledgePoints     → modules/library/persistence/knowledge-points.ts
   //  E 定级与阅读      getStudyGate…getReadingPosition              → modules/practice/persistence/
   //  F 卡片格式/Anki/媒体 sampleLocalDictionaryEntries止           → modules/flashcards/persistence/ + tts-proxy
   //  G 画像与每日任务  getLearnerProfile…saveSkillMetric            → modules/learning-progress/persistence/
@@ -657,6 +666,30 @@ export class DrizzleLearnerRepository
     documentId: string
   ): Promise<Result<ContentSegment[], BusinessError>> {
     return listContentSegmentsDomain(this.deps, documentId);
+  }
+
+  // ==================== D2 目录挂载知识点（→ modules/library/persistence/knowledge-points.ts） ====================
+
+  /**
+   * 蒸馏知识点幂等写入（v30；同键重存刷新释义，不增行）。
+   * AI 提取/用户追问讲解的入库口；悬空（无 source_refs）合法。
+   */
+  public async saveKnowledgePoints(input: {
+    documentId: string;
+    lessonId: string;
+    points: SaveKnowledgePointInput[];
+  }): Promise<Result<{ saved: number; updated: number }, BusinessError>> {
+    return saveKnowledgePointsDomain(this.deps, input.documentId, input.lessonId, input.points);
+  }
+
+  /**
+   * 按文档（可选按课）列知识点；未提取即空数组。
+   */
+  public async listKnowledgePoints(
+    documentId: string,
+    lessonId?: string
+  ): Promise<Result<KnowledgePoint[], BusinessError>> {
+    return listKnowledgePointsDomain(this.deps, documentId, lessonId);
   }
 
   /**

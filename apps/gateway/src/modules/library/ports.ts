@@ -29,6 +29,10 @@ import type { SavedDocumentStructure } from './persistence/document-structure.js
 import type { ShredStats } from '@study-studio/storage-sqlite';
 import type { MaterializeSeedInput } from '@study-studio/storage-sqlite';
 import type { ReadingPosition } from '@study-studio/storage-sqlite';
+import type {
+  SaveKnowledgePointInput,
+  KnowledgePoint,
+} from '@study-studio/storage-sqlite';
 
 /**
  * M1-2 内容（content）领域仓储能力契约（文档/教材/课程底座/导入任务）。
@@ -141,6 +145,15 @@ export interface ContentRepository {
     documentId: string
   ): Promise<Result<SavedDocumentStructure | null, BusinessError>>;
   listDocumentLessonRefs(documentId: string): Promise<Result<string[], BusinessError>>;
+  saveKnowledgePoints(input: {
+    documentId: string;
+    lessonId: string;
+    points: SaveKnowledgePointInput[];
+  }): Promise<Result<{ saved: number; updated: number }, BusinessError>>;
+  listKnowledgePoints(
+    documentId: string,
+    lessonId?: string
+  ): Promise<Result<KnowledgePoint[], BusinessError>>;
   saveReadingPosition(
     userId: string,
     documentId: string,

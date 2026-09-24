@@ -369,7 +369,7 @@ describe('deleteDocument 生命周期（P0.5）', () => {
     expect(isOk(del)).toBe(true);
     for (const t of [
       'textbook_lessons', 'textbook_lines', 'textbook_vocab', 'textbook_grammar',
-      'textbook_exercises', 'textbook_term_map', 'textbook_fts',
+      'textbook_exercises', 'knowledge_points', 'textbook_fts',
       'reading_positions', 'annotations', 'document_structure',
     ]) {
       expect(countFor('doc_life_01', t)).toBe(0);
