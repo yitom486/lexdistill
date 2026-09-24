@@ -342,6 +342,61 @@ describe('P5D1 importTocLesson（mock converter + :memory:）', () => {
     expect(await documentCount(repo, 'u2')).toBe(otherBefore);
   });
 
+  it('标题错位拒绝（E_TOC_TITLE_MISMATCH + details + 零写）；空白差异放行', async () => {
+    // 错位：页范围漂移到隔壁课，解析出第2課但目录位是第1課
+    {
+      const repo = new CountingRepo();
+      repos.push(repo);
+      const before = await documentCount(repo, 'u1');
+      const other = { ...oneLessonBook() };
+      other.lessons = [{ ...oneLessonBook().lessons[0]!, id: 'lesson-converted-2', title: '第2課' }];
+      const res = await importTocLesson(
+        baseDeps(repo, async () => ({ ok: true as const, value: astOutput(other) })),
+        {
+          userId: 'u1',
+          filename: 't.pdf',
+          bytes: mockBytes(),
+          entries: ENTRIES,
+          anchors: ANCHORS,
+          lessonIndex: 0,
+          fingerprint: fingerprint(),
+        }
+      );
+      expect(isOk(res)).toBe(false);
+      if (isOk(res)) return;
+      expect(res.error.code).toBe('E_TOC_TITLE_MISMATCH');
+      const details = res.error.internalDetails as {
+        lessonIndex: number;
+        expectedTitle: string;
+        actualTitle: string;
+        hint: string;
+      };
+      expect(details).toMatchObject({ lessonIndex: 0, expectedTitle: '第1課', actualTitle: '第2課' });
+      expect(typeof details.hint).toBe('string');
+      await expectNoWrite(repo, 'u1', before);
+    }
+    // 空白差异：OCR「第 1 課」/全角空格 vs 目录「第1課」归一后放行
+    for (const title of ['第 1 課', '第　1　課']) {
+      const repo = new CountingRepo();
+      repos.push(repo);
+      const spaced = { ...oneLessonBook() };
+      spaced.lessons = [{ ...oneLessonBook().lessons[0]!, title }];
+      const res = await importTocLesson(
+        baseDeps(repo, async () => ({ ok: true as const, value: astOutput(spaced) })),
+        {
+          userId: 'u1',
+          filename: 't.pdf',
+          bytes: mockBytes(),
+          entries: ENTRIES,
+          anchors: ANCHORS,
+          lessonIndex: 0,
+          fingerprint: fingerprint(),
+        }
+      );
+      expect(isOk(res)).toBe(true);
+    }
+  });
+
   it('shred 失败：错误透传，零残留', async () => {
     const repo = new ThrowingRepo();
     repos.push(repo);

@@ -142,6 +142,15 @@ function errorMessage(e: unknown): string {
   return 'PDF 解析运行时异常，请稍后重试';
 }
 
+/**
+ * 运行时加载失败的运维日志（用户面仍走 BusinessError 信封）。
+ * 只记 code + 文件名，不记用户路径与字节内容。
+ */
+function warnRuntimeLoad(scope: string, filename: string, e: unknown): void {
+  const code = e instanceof BusinessError ? e.code : 'E_RUNTIME_LOAD';
+  logger.warn(`${scope} runtime load failed`, { code, filename });
+}
+
 /** 1-based 连续页窗 [start, end]（首尾收敛，end < start 即空窗；P2 发现模块复用）。 */
 export function rangePages(start: number, end: number): number[] {
   const pages: number[] = [];
@@ -253,6 +262,7 @@ export async function mapPdfPages(
     });
     inspector = runtime.inspector;
   } catch (e) {
+    warnRuntimeLoad('[pdf-map]', input.filename, e);
     return err(
       e instanceof BusinessError
         ? e
@@ -517,6 +527,7 @@ export async function convertPdfToAst(
     });
     inspector = runtime.inspector;
   } catch (e) {
+    warnRuntimeLoad('[pdf-import]', input.filename, e);
     return err(
       e instanceof BusinessError
         ? e

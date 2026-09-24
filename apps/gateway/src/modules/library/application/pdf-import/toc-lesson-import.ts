@@ -80,6 +80,15 @@ function mapBookLanguage(language: string): string {
 }
 
 /**
+ * 标题归一（对齐比较专用）：去半角/全角空白后逐字比对。
+ * OCR 常见「第 1 課」vs 目录「第1課」只差空白，归一后视为一致；
+ * 其余差异一律不对齐（不得猜，交给调用方重试或人工确认）。
+ */
+export function normalizeTocTitle(raw: unknown): string {
+  return typeof raw === 'string' ? raw.replace(/[\s　]+/g, '') : '';
+}
+
+/**
  * 单课导入编排（写）：
  * 输入校验 → 重跑 preview → 指纹核验 → 七门 gate → convert 精确窗 →
  * 恰一课断言 → 同一事务 canonical 落库。写操作仅最后一步，且单次调用。
@@ -191,6 +200,26 @@ export async function importTocLesson(
   const only = book.lessons[0];
   if (!only) {
     return err(new BusinessError('E_TOC_LESSON_SHAPE', '该范围没有解析出可用课程，已取消导入，未写入任何数据', 'TOOL_EXECUTION'));
+  }
+
+  // 目录对齐门：解析出的课标题必须与目录条目标题归一一致。
+  // OCR 页窗漂移/跨课时会解析出隔壁课——此时落库等于张冠李戴，必须 fail-closed。
+  // 空白差异（半角/全角）归一后放行；其余差异一律拒绝，details 供调用方重试或人工确认。
+  if (normalizeTocTitle(only.title) !== normalizeTocTitle(lesson.title)) {
+    return err(
+      new BusinessError(
+        'E_TOC_TITLE_MISMATCH',
+        `解析出的课标题「${only.title}」与目录条目「${lesson.title}」对不上，已取消导入，未写入任何数据。请检查页范围或修正目录条目后重试`,
+        'VALIDATION',
+        false,
+        {
+          lessonIndex: lesson.lessonIndex,
+          expectedTitle: lesson.title,
+          actualTitle: only.title,
+          hint: '页范围可能漂移到隔壁课：核对 anchor 是否覆盖本课起始页，或让模型按目录条目逐字核对解析标题后重试',
+        }
+      )
+    );
   }
 
   // 唯一 canonical 写入口：新 id 服务端生成（杜绝覆盖他人文档），同一事务落库。
