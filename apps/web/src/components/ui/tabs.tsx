@@ -26,7 +26,7 @@ const TabsIndicator = React.forwardRef<
   <TabsPrimitive.Indicator
     ref={ref}
     className={cn(
-      'absolute rounded-xl bg-surface-espresso shadow-xs transition-all duration-200 z-0 pointer-events-none',
+      'absolute rounded-xl bg-surface-espresso shadow-xs transition-all z-0 pointer-events-none',
       className
     )}
     {...props}

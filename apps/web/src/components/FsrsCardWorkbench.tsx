@@ -255,7 +255,7 @@ export function FsrsCardWorkbench() {
               className="fsrs-card-rotor relative h-full w-full transform-style-3d"
               style={{
                 transform: `rotateY(${cardFlipped ? 180 : 0}deg)`,
-                transition: 'transform 450ms ease-out',
+                transition: 'transform var(--motion-card-flip-duration) ease-out',
                 transformOrigin: 'center center',
                 willChange: 'transform',
               }}

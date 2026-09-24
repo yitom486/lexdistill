@@ -5,18 +5,69 @@
 /*
  * Theme transitions share one token. Components that use Tailwind's
  * transition utilities without an explicit duration resolve to this value.
- * Interaction-specific animations (progress, layout, and transforms) may
- * still opt into their own duration when that timing is part of the UX.
+ * Interaction-specific animations use named --motion-* tokens. JavaScript
+ * animation APIs read those tokens through lib/css-tokens.ts.
  */
 :root {
   --theme-transition-duration: 200ms;
   --theme-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-reduced-duration: 1ms;
+  --motion-reply-hint-fade-duration: 180ms;
+  --motion-reply-hint-rotation-interval: 1800ms;
+  --motion-reply-char-bounce-duration: 900ms;
+  --motion-reply-char-stagger: 70ms;
+  --motion-chat-tool-dot-delay-first: -200ms;
+  --motion-chat-tool-dot-delay-second: -100ms;
+  --motion-wave-shadow-base-duration: 500ms;
+  --motion-wave-shadow-step-duration: 150ms;
+  --motion-wave-tts-base-duration: 450ms;
+  --motion-wave-tts-step-duration: 120ms;
+  --motion-tts-playing-dot-delay-start: 0ms;
+  --motion-tts-playing-dot-delay-middle: 150ms;
+  --motion-tts-playing-dot-delay-end: 300ms;
+  --motion-layout-enter-duration: 250ms;
+  --motion-card-hover-duration: 300ms;
+  --motion-card-flip-duration: 450ms;
+  --motion-progress-width-duration: 300ms;
+  --motion-daily-progress-duration: 500ms;
+  --motion-border-beam-default-duration: 12s;
+  --motion-border-beam-agent-tool-duration: 5s;
+  --motion-border-beam-agent-message-duration: 7s;
+  --motion-border-beam-shadowing-duration: 6s;
+  --motion-border-beam-listening-duration: 8s;
+  --motion-border-beam-delay: 0s;
+  --motion-shine-duration: 1.6s;
+  --motion-shimmer-button-duration: 1.4s;
+
+  --visual-agent-beam-from: #38bdf8;
+  --visual-agent-beam-to: #a78bfa;
+  --visual-shadowing-beam-from: #10b981;
+  --visual-shadowing-beam-to: #f59e0b;
+  --visual-listening-beam-from: #f59e0b;
+  --visual-listening-beam-to: #0ea5e9;
+  --visual-shadow-wave-active: #f59e0b;
+  --visual-shadow-wave-idle: #d6d3d1;
+  --visual-tts-wave-active: #d97706;
+  --visual-tts-wave-idle: #d6d3d1;
+  --visual-pitch-trace: #f59e0b;
+  --visual-confetti-orange: #f97316;
+  --visual-confetti-orange-light: #fb923c;
+  --visual-confetti-amber: #f59e0b;
+  --visual-confetti-orange-deep: #ea580c;
+  --visual-confetti-rose: #f43f5e;
+  --visual-confetti-emerald: #10b981;
+  --visual-confetti-yellow: #fde047;
+  --visual-confetti-peach: #fed7aa;
   view-transition-name: root;
 }
 
 @theme inline {
   --default-transition-duration: var(--theme-transition-duration);
   --default-transition-timing-function: var(--theme-transition-timing-function);
+  --color-visual-shadow-wave-active: var(--visual-shadow-wave-active);
+  --color-visual-shadow-wave-idle: var(--visual-shadow-wave-idle);
+  --color-visual-tts-wave-active: var(--visual-tts-wave-active);
+  --color-visual-tts-wave-idle: var(--visual-tts-wave-idle);
   /* P3.5 目录结果语义色板：组件只用 toc 语义工具类（bg/text/border 前缀），
      禁止色值字面量（静态门禁锁定）；亮暗两套值是同一 token 的两副面孔。 */
   --color-toc-surface: var(--toc-surface);
@@ -53,6 +104,25 @@
 }
 
 .dark {
+  --visual-agent-beam-from: #7dd3fc;
+  --visual-agent-beam-to: #c4b5fd;
+  --visual-shadowing-beam-from: #34d399;
+  --visual-shadowing-beam-to: #fbbf24;
+  --visual-listening-beam-from: #fbbf24;
+  --visual-listening-beam-to: #38bdf8;
+  --visual-shadow-wave-active: #fbbf24;
+  --visual-shadow-wave-idle: #57534e;
+  --visual-tts-wave-active: #fbbf24;
+  --visual-tts-wave-idle: #57534e;
+  --visual-pitch-trace: #fbbf24;
+  --visual-confetti-orange: #fb923c;
+  --visual-confetti-orange-light: #fdba74;
+  --visual-confetti-amber: #fbbf24;
+  --visual-confetti-orange-deep: #f97316;
+  --visual-confetti-rose: #fb7185;
+  --visual-confetti-emerald: #34d399;
+  --visual-confetti-yellow: #fef08a;
+  --visual-confetti-peach: #fed7aa;
   --toc-surface: #1c1917;
   --toc-border: #44403c;
   --toc-muted: #a8a29e;
@@ -108,9 +178,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --theme-transition-duration: var(--motion-reduced-duration);
+  }
+
   ::view-transition-old(root),
   ::view-transition-new(root) {
-    animation-duration: 1ms;
+    animation-duration: var(--motion-reduced-duration);
   }
 }
 
@@ -135,11 +209,11 @@
 }
 
 .animate-border-beam {
-  animation: border-beam calc(var(--duration) * 1s) infinite linear;
+  animation: border-beam var(--duration) infinite linear;
 }
 
 .animate-shine {
-  animation: shine 1.6s ease-in-out infinite;
+  animation: shine var(--motion-shine-duration) ease-in-out infinite;
 }
 
 @keyframes reply-char-bounce {
@@ -155,7 +229,7 @@
 
 .animate-reply-char {
   display: inline-block;
-  animation: reply-char-bounce 0.9s ease-in-out infinite;
+  animation: reply-char-bounce var(--motion-reply-char-bounce-duration) ease-in-out infinite;
 }
 
 

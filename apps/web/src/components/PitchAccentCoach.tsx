@@ -26,6 +26,8 @@ import { useDictionaryLookupQuery, usePitchLexiconQuery } from '../queries/useLe
 import type { PitchLexiconItem } from '../queries/useLearnerQueries.js';
 import type { AiTutorContext } from './AiTutorDrawer.js';
 import { buildPitchTutorContext } from '../lib/pitch-tutor.js';
+import { readCssCustomProperty } from '../lib/css-tokens.js';
+import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import {
   describePitchFeedback,
   estimatePitchContour,
@@ -61,6 +63,12 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
   const animFrameIdRef = useRef<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const theme = usePreferencesStore((state) => state.theme);
+  const pitchTraceColorRef = useRef('');
+
+  useEffect(() => {
+    pitchTraceColorRef.current = readCssCustomProperty('--visual-pitch-trace');
+  }, [theme]);
 
   const safeIndex = Math.min(selectedWordIndex, Math.max(words.length - 1, 0));
   const currentWord: PitchLexiconItem | undefined = words[safeIndex] ?? words[0];
@@ -173,7 +181,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
       const centerY = height / 2;
 
       c.lineWidth = 2.5;
-      c.strokeStyle = '#f59e0b';
+      c.strokeStyle = pitchTraceColorRef.current;
       c.beginPath();
 
       if (analyserRef.current) {
@@ -487,7 +495,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
 
                         {/* 阶梯柱状图 */}
                         <div
-                          className={`w-12 rounded-xl transition-all duration-300 flex items-center justify-center font-bold text-sm ${
+                          className={`w-12 rounded-xl transition-all flex items-center justify-center font-bold text-sm ${
                             isHigh
                               ? 'h-24 bg-gradient-to-t from-tone-amber-500 to-ink-amber-400 text-tone-stone-950 shadow-md'
                               : 'h-12 bg-tone-stone-300 dark:bg-tone-stone-800 text-ink-mute'

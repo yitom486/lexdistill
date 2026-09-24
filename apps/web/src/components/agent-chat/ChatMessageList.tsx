@@ -208,9 +208,9 @@ export function ChatMessageList(props: ChatMessageListProps) {
             {m.role !== 'user' && m.streaming && !waitingFirstToken ? (
               <BorderBeam
                 size={140}
-                duration={7}
-                colorFrom="#38bdf8"
-                colorTo="#a78bfa"
+                duration="var(--motion-border-beam-agent-message-duration)"
+                colorFrom="var(--visual-agent-beam-from)"
+                colorTo="var(--visual-agent-beam-to)"
                 borderWidth={1.25}
               />
             ) : null}

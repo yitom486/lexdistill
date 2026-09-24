@@ -44,7 +44,7 @@ export const BentoCard = ({
       )}
     >
       {background && <div className="absolute inset-0 pointer-events-none">{background}</div>}
-      <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 transition-all duration-300">
+      <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 transition-all duration-[var(--motion-card-hover-duration)]">
         {Icon && <Icon className="h-6 w-6 text-tone-amber-600 mb-1" />}
         <h3 className="text-lg font-bold font-serif text-ink">
           {name}

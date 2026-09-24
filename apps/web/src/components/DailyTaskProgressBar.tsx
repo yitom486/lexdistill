@@ -73,7 +73,7 @@ export function DailyTaskProgressBar() {
       {/* 综合打卡进度条 */}
       <div className="w-14 sm:w-16 h-1.5 bg-line-soft rounded-full overflow-hidden shrink-0">
         <div
-          className={`h-full transition-all duration-500 rounded-full ${
+          className={`h-full transition-all duration-[var(--motion-daily-progress-duration)] rounded-full ${
             isBurst
               ? 'bg-gradient-to-r from-ink-amber-400 to-line-yellow-300'
               : isCompleted

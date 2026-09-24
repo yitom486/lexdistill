@@ -224,7 +224,7 @@ function SidebarBody({
       className={cn(
         'flex flex-col min-h-0 border-r border-tone-stone-200o80-stone-800 bg-veil-whiteo90 dark:bg-surface-h1a1917o95 backdrop-blur-md h-full',
         collapsed ? 'w-[4.25rem]' : 'w-[16.5rem]',
-        'transition-[width] duration-200'
+        'transition-[width]'
       )}
     >
       <div

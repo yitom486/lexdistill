@@ -14,6 +14,7 @@ import {
   fireSuccessConfetti,
 } from './magicui/index.js';
 import { sound } from '../utils/audio.js';
+import { readCssDurationSeconds } from '../lib/css-tokens.js';
 import { UnifiedTtsPlayer } from './UnifiedTtsPlayer.js';
 import { trackToSpeechLang } from '../config/tts-voice-personas.js';
 import { SubjectiveWritingWorkbench } from './SubjectiveWritingWorkbench.js';
@@ -41,6 +42,7 @@ interface AdaptiveQuizWorkbenchProps {
 }
 
 export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProps) {
+  const panelEnterDuration = readCssDurationSeconds('--motion-layout-enter-duration');
   const shell = useLearningShell();
   const { data: questionsFromQuery = [], isLoading: questionsLoading } = useQuestionsQuery();
   const prependQuestion = usePrependQuestionMutation();
@@ -289,7 +291,7 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: AdaptiveQuizWorkbenchProp
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: panelEnterDuration }}
       className="flex flex-col gap-5 max-w-3xl"
     >
       <PlanIntentBanner />

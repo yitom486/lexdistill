@@ -4,23 +4,23 @@ import { cn } from '../../lib/utils.js';
 interface BorderBeamProps {
   className?: string;
   size?: number;
-  duration?: number;
+  duration?: string;
   borderWidth?: number;
   anchor?: number;
   colorFrom?: string;
   colorTo?: string;
-  delay?: number;
+  delay?: string;
 }
 
 export const BorderBeam: React.FC<BorderBeamProps> = ({
   className,
   size = 200,
-  duration = 12,
+  duration = 'var(--motion-border-beam-default-duration)',
   anchor = 90,
   borderWidth = 1.5,
-  colorFrom = '#f59e0b',
-  colorTo = '#10b981',
-  delay = 0,
+  colorFrom = 'var(--visual-agent-beam-from)',
+  colorTo = 'var(--visual-agent-beam-to)',
+  delay = 'var(--motion-border-beam-delay)',
 }) => {
   return (
     <div
@@ -32,7 +32,7 @@ export const BorderBeam: React.FC<BorderBeamProps> = ({
           '--border-width': borderWidth,
           '--color-from': colorFrom,
           '--color-to': colorTo,
-          '--delay': `-${delay}s`,
+          '--delay': delay,
         } as React.CSSProperties
       }
       className={cn(

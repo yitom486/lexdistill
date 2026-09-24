@@ -37,6 +37,7 @@ import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
 import { BorderBeam } from './magicui/index.js';
 import type { SupportedLanguage } from '../utils/audio.js';
+import { readCssDurationSeconds } from '../lib/css-tokens.js';
 
 interface ListeningShadowingWorkbenchProps {
   onOpenTutor?: (context: AiTutorContext) => void;
@@ -55,6 +56,9 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
   onOpenTutor,
   onAddMistake,
 }) => {
+  const waveBaseDuration = readCssDurationSeconds('--motion-wave-shadow-base-duration');
+  const waveDurationStep = readCssDurationSeconds('--motion-wave-shadow-step-duration');
+
   // 模式切换: 'SHADOWING' (对话影子跟读) | 'DICTATION' (精听挖词听写)
   const [activeSubMode, setActiveSubMode] = useState<'SHADOWING' | 'DICTATION'>('SHADOWING');
 
@@ -390,10 +394,20 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
             >
               {/* Magic UI 流光边框增强：发音与跟读反馈 */}
               {shadowStep === 'SHADOWING' && (
-                <BorderBeam size={220} duration={6} colorFrom="#10b981" colorTo="#f59e0b" />
+                <BorderBeam
+                  size={220}
+                  duration="var(--motion-border-beam-shadowing-duration)"
+                  colorFrom="var(--visual-shadowing-beam-from)"
+                  colorTo="var(--visual-shadowing-beam-to)"
+                />
               )}
               {shadowStep === 'LISTENING' && (
-                <BorderBeam size={180} duration={8} colorFrom="#f59e0b" colorTo="#0ea5e9" />
+                <BorderBeam
+                  size={180}
+                  duration="var(--motion-border-beam-listening-duration)"
+                  colorFrom="var(--visual-listening-beam-from)"
+                  colorTo="var(--visual-listening-beam-to)"
+                />
               )}
               {/* 顶部说话者与进度 */}
               <div className="flex items-center justify-between">
@@ -438,14 +452,15 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                     key={i}
                     animate={{
                       height: isSpeaking ? [baseH * 0.4, baseH * 1.2, baseH * 0.6] : 4,
-                      backgroundColor: isSpeaking ? '#f59e0b' : '#d6d3d1',
                     }}
                     transition={{
                       repeat: Infinity,
-                      duration: 0.5 + (i % 4) * 0.15,
+                      duration: waveBaseDuration + (i % 4) * waveDurationStep,
                       ease: 'easeInOut',
                     }}
-                    className="w-1.5 rounded-full dark:bg-tone-stone-700"
+                    className={`w-1.5 rounded-full transition-colors ${
+                      isSpeaking ? 'bg-visual-shadow-wave-active' : 'bg-visual-shadow-wave-idle'
+                    }`}
                   />
                 ))}
               </div>

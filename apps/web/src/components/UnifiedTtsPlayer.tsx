@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useTts } from '../hooks/useTts.js';
 import { sound, type SupportedLanguage, type TtsGender } from '../utils/audio.js';
+import { readCssDurationSeconds } from '../lib/css-tokens.js';
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
 
@@ -56,6 +57,8 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
   label,
 }) => {
   const { isSpeaking, currentText, gender, rate, speak, stop, setGender, setRate } = useTts();
+  const waveBaseDuration = readCssDurationSeconds('--motion-wave-tts-base-duration');
+  const waveDurationStep = readCssDurationSeconds('--motion-wave-tts-step-duration');
 
   // 当前实例是否正在发音
   const isCurrentPlaying = isSpeaking && currentText === text;
@@ -122,9 +125,18 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
             <VolumeX className="w-4 h-4 animate-pulse" />
             <span>{label || '暂停'}</span>
             <span className="flex items-center gap-0.5 ml-1">
-              <span className="w-1 h-3 bg-tone-stone-950 rounded-full animate-bounce [animation-delay:0ms]" />
-              <span className="w-1 h-4 bg-tone-stone-950 rounded-full animate-bounce [animation-delay:150ms]" />
-              <span className="w-1 h-2 bg-tone-stone-950 rounded-full animate-bounce [animation-delay:300ms]" />
+              <span
+                className="w-1 h-3 bg-tone-stone-950 rounded-full animate-bounce"
+                style={{ animationDelay: 'var(--motion-tts-playing-dot-delay-start)' }}
+              />
+              <span
+                className="w-1 h-4 bg-tone-stone-950 rounded-full animate-bounce"
+                style={{ animationDelay: 'var(--motion-tts-playing-dot-delay-middle)' }}
+              />
+              <span
+                className="w-1 h-2 bg-tone-stone-950 rounded-full animate-bounce"
+                style={{ animationDelay: 'var(--motion-tts-playing-dot-delay-end)' }}
+              />
             </span>
           </>
         ) : (
@@ -152,14 +164,15 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
             key={i}
             animate={{
               height: isCurrentPlaying ? [baseH * 0.35, baseH * 1.25, baseH * 0.5] : 4,
-              backgroundColor: isCurrentPlaying ? '#d97706' : '#d6d3d1',
             }}
             transition={{
               repeat: Infinity,
-              duration: 0.45 + (i % 5) * 0.12,
+              duration: waveBaseDuration + (i % 5) * waveDurationStep,
               ease: 'easeInOut',
             }}
-            className="w-1.5 rounded-full dark:bg-tone-stone-700 transition-colors"
+            className={`w-1.5 rounded-full transition-colors ${
+              isCurrentPlaying ? 'bg-visual-tts-wave-active' : 'bg-visual-tts-wave-idle'
+            }`}
           />
         ))}
       </div>

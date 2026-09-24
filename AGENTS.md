@@ -196,6 +196,13 @@
   - TTS 语音参数（男女声、语速、音色、自定义外挂端点）、主题明暗（Light/Dark）、盲听遮罩开关、假名注音开关、UI 导航状态，以及**阅读双栏宽度比（splitPaneRatio）**等布局偏好，统一使用 **Zustand 并启用 `persist` 中间件**；
   - 彻底杜绝在各个组件中到处分散编写 `localStorage.getItem/setItem` 胶水代码，保证多组件、跨标签页与未来 Tauri 桌面端的响应式自动持久化。
 
+### 6.4 颜色、主题与动效统一使用 CSS token (Theme & Motion Tokens)
+- **组件颜色只消费语义 token**：`apps/web` 的 TSX、inline style、SVG、Canvas 与第三方可视化配置中，禁止新增颜色字面量（HEX、RGB/HSL/OKLCH、CSS 命名色）或直接 Tailwind 调色板色值。颜色在 `apps/web/src/index.css` 定义为语义 CSS custom property，并在 `:root` 与 `.dark` 中分别给出亮色、暗色值；组件通过语义工具类或 `var(--...)` 使用。
+- **非 CSS 绘制通过共享 token 读取器取值**：Canvas、Confetti 等 API 若要求具体颜色字符串，必须在触发绘制时通过 `apps/web/src/lib/css-tokens.ts` 读取当前主题下计算后的 CSS token，确保主题切换后跟随亮暗值。
+- **视觉动画时间统一由 token 管理**：主题过渡使用 `--theme-transition-duration` 与 `--theme-transition-timing-function`；其他动画的时长、延迟和过渡节奏定义为 `--motion-*` token。TSX 不写数字时长；Framer Motion 等 JavaScript 动画 API 通过 `css-tokens.ts` 读取 token，CSS/Tailwind 动画直接引用 token。主题切换和 `prefers-reduced-motion` 遵循同一套全局变量。
+- **区分视觉动效与业务时间**：录音时长、请求超时、轮询间隔、toast 展示时长等业务或提示行为继续由对应业务配置管理，不塞进视觉动效 token。
+- **验收口径**：新增或修改 UI 动效时，检查 TSX 中无颜色字面量和数字动画时长；检查每个新增语义颜色在 `:root` 与 `.dark` 均有定义，并确认 Canvas/第三方绘制从当前主题读取颜色。
+
 ---
 
 ## 7. 进程生命周期与端口归属红线 (Process Lifecycle & Port Ownership)

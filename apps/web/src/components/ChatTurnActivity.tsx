@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Loader2, Sparkles, Wrench } from 'lucide-react';
 import { BorderBeam } from './magicui/index.js';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible.js';
+import { readCssDurationMilliseconds, readCssDurationSeconds } from '../lib/css-tokens.js';
 import {
   formatToolArguments,
   type ToolCallTrace,
@@ -39,7 +40,12 @@ function ToolCallCard({
       }`}
     >
       {call.status === 'running' ? (
-        <BorderBeam size={90} duration={5} colorFrom="#38bdf8" colorTo="#a78bfa" />
+        <BorderBeam
+          size={90}
+          duration="var(--motion-border-beam-agent-tool-duration)"
+          colorFrom="var(--visual-agent-beam-from)"
+          colorTo="var(--visual-agent-beam-to)"
+        />
       ) : null}
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-left">
         {call.status === 'running' ? (
@@ -101,8 +107,8 @@ export function ChatTurnActivity({
             思考 · {effortLabel}
             {streaming ? (
               <span className="ml-auto inline-flex gap-0.5">
-                <span className="size-1 animate-bounce rounded-full bg-tint-violet-300 [animation-delay:-0.2s]" />
-                <span className="size-1 animate-bounce rounded-full bg-tint-violet-300 [animation-delay:-0.1s]" />
+                <span className="size-1 animate-bounce rounded-full bg-tint-violet-300 [animation-delay:var(--motion-chat-tool-dot-delay-first)]" />
+                <span className="size-1 animate-bounce rounded-full bg-tint-violet-300 [animation-delay:var(--motion-chat-tool-dot-delay-second)]" />
                 <span className="size-1 animate-bounce rounded-full bg-tint-violet-300" />
               </span>
             ) : null}
@@ -152,11 +158,13 @@ export function StreamingReplyPlaceholder() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setHintIndex((i) => (i + 1) % STREAMING_HINTS.length);
-    }, 1800);
+    }, readCssDurationMilliseconds('--motion-reply-hint-rotation-interval'));
     return () => window.clearInterval(timer);
   }, []);
 
   const hint = STREAMING_HINTS[hintIndex] ?? STREAMING_HINTS[0];
+  const hintFadeDuration = readCssDurationSeconds('--motion-reply-hint-fade-duration');
+  const replyCharStagger = readCssDurationMilliseconds('--motion-reply-char-stagger');
 
   return (
     <p
@@ -170,14 +178,14 @@ export function StreamingReplyPlaceholder() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
+          transition={{ duration: hintFadeDuration }}
           className="inline-flex"
         >
           {Array.from(hint).map((ch, i) => (
             <span
               key={`${hint}-${i}`}
               className="animate-reply-char"
-              style={{ animationDelay: `${i * 0.07}s` }}
+              style={{ animationDelay: `${i * replyCharStagger}ms` }}
             >
               {ch}
             </span>

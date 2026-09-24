@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
 import { motion } from 'framer-motion';
+import { readCssDurationSeconds } from './lib/css-tokens.js';
 import { toast, Toaster } from 'sonner';
 import { DotPattern } from './components/magicui/index.js';
 import { CommandPalette } from './components/CommandPalette.js';
@@ -71,6 +72,7 @@ const COACH_WIDTH_MIN = 320;
 const COACH_WIDTH_MAX = 960;
 
 export function App() {
+  const panelEnterDuration = readCssDurationSeconds('--motion-layout-enter-duration');
   useEnsureGateway();
   const coachPanelWidthPx = usePreferencesStore((s) => s.coachPanelWidthPx);
   const setCoachPanelWidthPx = usePreferencesStore((s) => s.setCoachPanelWidthPx);
@@ -354,7 +356,7 @@ export function App() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: panelEnterDuration }}
               >
                 <PracticePlanPanel
                   key={shell.track}
@@ -397,7 +399,7 @@ export function App() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: panelEnterDuration }}
               >
                 <TextbookCurriculum
                   onStartLessonQuiz={startLessonQuiz}
@@ -422,7 +424,7 @@ export function App() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: panelEnterDuration }}
               >
                 <ListeningShadowingWorkbench
                   onOpenTutor={(ctx) => {
@@ -438,7 +440,7 @@ export function App() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: panelEnterDuration }}
               >
                 <PitchAccentCoach
                   onOpenTutor={(ctx) => {
@@ -453,7 +455,7 @@ export function App() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: panelEnterDuration }}
               >
                 <KanaStudioWorkbench
                   onOpenTutor={(ctx) => {
@@ -468,7 +470,7 @@ export function App() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: panelEnterDuration }}
               >
                 <HangulStudioWorkbench
                   onOpenTutor={(ctx) => {
@@ -483,7 +485,7 @@ export function App() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: panelEnterDuration }}
               >
                 <MistakeSprintWorkbench
                   onOpenTutor={(ctx) => {
