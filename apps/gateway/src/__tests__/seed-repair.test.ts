@@ -68,7 +68,7 @@ function putLegacySeedDoc(sqlite: Database, bookId: string): void {
 function countAll(sqlite: Database): string {
   const tables = [
     'documents', 'textbook_lessons', 'textbook_lines', 'textbook_vocab', 'textbook_grammar',
-    'textbook_exercises', 'textbook_term_map', 'textbook_fts',
+    'textbook_exercises', 'knowledge_points', 'textbook_fts',
   ];
   return tables
     .map((t) => `${t}:${(sqlite.query(`SELECT COUNT(*) AS n FROM "${t}"`).get() as { n: number }).n}`)

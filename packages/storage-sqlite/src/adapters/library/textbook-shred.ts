@@ -6,7 +6,6 @@ import {
   textbookGrammar,
   textbookLessons,
   textbookLines,
-  textbookTermMap,
   textbookVocab,
 } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
@@ -58,9 +57,10 @@ export function tryParseTextbookAst(raw: unknown): TextbookAST | null {
  * - 输入是已过 zod 的 TextbookAST（调用方保证），这里只做防御性收窄；
  * - 行表删插走 drizzle 构造器（列名拼错编译期炸，不再裸写 INSERT）；
  * - FTS 虚表 + 词典精确匹配走原生 sql（drizzle 无 FTS 一等支持）；
- * - textbook_term_map 只记精确匹配（词典 headword 逐字相等），对不上记 NULL 行；
- * - skill_id v1 恒为 NULL（能力映射靠分类结果，另行落盘，不在此臆造边）；
- * - 课文行（lines）只进 FTS，不进 term_map（行级映射粒度另议，不膨胀）。
+ * - v30 起 term_map 表退役：映射计数（mappedEntries/unmapped）仍在内存统计，
+ *   供覆盖率与健康检查语义延续，但不再落表（读者只剩 doctor/seed-gating，已同步移除）；
+ * - skill_id 映射靠分类结果另行落盘（knowledge_points），不在此臆造边；
+ * - 课文行（lines）只进 FTS（行级映射粒度另议，不膨胀）。
  */
 export type ShredTx = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];
 
@@ -124,7 +124,6 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
       tx.delete(textbookGrammar).where(eq(textbookGrammar.documentId, documentId)).run();
       tx.delete(textbookLines).where(eq(textbookLines.documentId, documentId)).run();
       tx.delete(textbookExercises).where(eq(textbookExercises.documentId, documentId)).run();
-      tx.delete(textbookTermMap).where(eq(textbookTermMap.documentId, documentId)).run();
       tx.run(sql`DELETE FROM textbook_fts WHERE document_id = ${documentId}`);
 
       for (const [li, lesson] of lessons.entries()) {
@@ -143,7 +142,7 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
         const title = typeof l.title === 'string' ? l.title.slice(0, 200) : '';
         // 注意：drizzle builder 是惰性的——同步事务里必须显式 .run()，
         // 光 tx.insert(...).values(...) 不执行也不报错（静默零写，已实测）。
-        tx.insert(textbookLessons).values({ documentId, lessonId, lessonNumber, title, sortOrder }).run();
+        tx.insert(textbookLessons).values({ documentId, lessonId, lessonNumber, title, sortOrder, kind: 'lesson', parentId: null }).run();
         stats.lessons++;
 
         const vocabularies = Array.isArray((lesson as { vocabularies?: unknown }).vocabularies)
@@ -179,11 +178,6 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
                 VALUES (${f.surface}, ${f.reading}, ${f.gloss}, ${null}, ${null}, ${documentId}, ${lessonId}, ${'vocab'}, ${`${lessonId}#v${f.ord}`})`
           );
           stats.ftsRows++;
-        }
-        const mapCandidates: Array<typeof textbookTermMap.$inferInsert> = [];
-        for (const f of vocabFts) {
-          const entryId = findEntry(tx, f.surface);
-          mapCandidates.push({ documentId, lessonId, kind: 'vocab', refText: f.surface, skillId: null, entryId });
         }
 
         const grammars = Array.isArray((lesson as { grammarPoints?: unknown }).grammarPoints)
@@ -221,26 +215,25 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
           gOrd++;
         }
         if (grammarRows.length > 0) tx.insert(textbookGrammar).values(grammarRows).run();
-        for (const gTitle of grammarTitles) {
-          const entryId = findEntry(tx, gTitle);
-          mapCandidates.push({ documentId, lessonId, kind: 'grammar', refText: gTitle, skillId: null, entryId });
+        // v30：映射计数只在内存统计（mappedEntries/unmapped 语义不变），不再落 term_map 表。
+        // 同课同 kind 同 ref_text 只计首条；vocab/grammar（kind 不同）与跨 lesson 永不互斥。
+        {
+          const seenTermKeys = new Set<string>();
+          for (const f of vocabFts) {
+            const key = termMapDedupKey(documentId, lessonId, 'vocab', f.surface);
+            if (seenTermKeys.has(key)) continue;
+            seenTermKeys.add(key);
+            if (findEntry(tx, f.surface)) stats.mappedEntries++;
+            else stats.unmapped++;
+          }
+          for (const gTitle of grammarTitles) {
+            const key = termMapDedupKey(documentId, lessonId, 'grammar', gTitle);
+            if (seenTermKeys.has(key)) continue;
+            seenTermKeys.add(key);
+            if (findEntry(tx, gTitle)) stats.mappedEntries++;
+            else stats.unmapped++;
+          }
         }
-        // P1-D1：按“最终写入的完整主键”确定性去重（截断/清洗之后）。
-        // term_map 是 best-effort 词典桥（非 identity）：同课同 kind 同 ref_text 只保留
-        // 首条映射；vocab/grammar（kind 不同）与跨 lesson 永不互斥。occurrence 行
-        //（vocab/grammar/lines/FTS）不受影响。无重复输入时结果与此前一字相同。
-        const seenTermKeys = new Set<string>();
-        const mapRows = mapCandidates.filter((row) => {
-          const key = termMapDedupKey(row.documentId, row.lessonId, row.kind, row.refText);
-          if (seenTermKeys.has(key)) return false;
-          seenTermKeys.add(key);
-          return true;
-        });
-        for (const row of mapRows) {
-          if (row.entryId) stats.mappedEntries++;
-          else stats.unmapped++;
-        }
-        if (mapRows.length > 0) tx.insert(textbookTermMap).values(mapRows).run();
 
         const dialogues = Array.isArray((lesson as { dialogues?: unknown }).dialogues)
           ? ((lesson as { dialogues: unknown[] }).dialogues)

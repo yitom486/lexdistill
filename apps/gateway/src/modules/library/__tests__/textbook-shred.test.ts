@@ -6,7 +6,7 @@ import { tryParseTextbookAst } from '@study-studio/storage-sqlite';
 
 /**
  * shred 写逻辑：AST 大绳拆关系行（同事务全删全插，天然幂等）。
- * - 行/词/文法/FTS 行数对齐；term_map 只记精确匹配（命中记 entry，未命中记 NULL）；
+ * - 行/词/文法/FTS 行数对齐；映射计数（命中/未命中）在内存统计，不断言落表；
  * - skill_id v1 恒 NULL；坏 AST 由 tryParseTextbookAst 挡掉，shred 不接。
  */
 const BOOK: TextbookAST = {
@@ -82,14 +82,18 @@ describe('textbook shred 写逻辑', () => {
       .query('SELECT COUNT(*) AS n FROM textbook_fts WHERE document_id = ?')
       .get('d1') as { n: number };
     expect(fts.n).toBe(4); // 2 词 + 2 行
-    const hit = db
-      .query("SELECT entry_id AS entryId FROM textbook_term_map WHERE ref_text = '食べる'")
-      .get() as { entryId: string | null };
-    expect(typeof hit.entryId).toBe('string');
-    const miss = db
-      .query("SELECT entry_id AS entryId FROM textbook_term_map WHERE ref_text = '架空語'")
-      .get() as { entryId: string | null };
-    expect(miss.entryId).toBeNull();
+    // v30：term_map 表退役（映射计数仍由内存统计）；lessons 默认 kind=lesson。
+    const tables = db
+      .query(
+        `SELECT name AS n FROM sqlite_master WHERE type = 'table' AND name IN ('textbook_term_map', 'knowledge_points')`
+      )
+      .all() as Array<{ n: string }>;
+    expect(tables.map((t) => t.n)).toContain('knowledge_points');
+    expect(tables.map((t) => t.n)).not.toContain('textbook_term_map');
+    const lessonRow = db
+      .query('SELECT kind AS kind FROM textbook_lessons WHERE document_id = ?')
+      .get('d1') as { kind: string };
+    expect(lessonRow.kind).toBe('lesson');
     expect(res.value.mappedEntries).toBe(1);
     expect(res.value.unmapped).toBe(2); // 架空語 + 〜ます
     // FTS 真能查到

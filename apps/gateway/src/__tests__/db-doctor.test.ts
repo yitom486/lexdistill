@@ -26,7 +26,7 @@ function seedClean(db: Database): void {
     CREATE TABLE textbook_vocab (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, surface TEXT NOT NULL, reading TEXT, pos TEXT, gloss_zh TEXT, pitch TEXT, example_ja TEXT, example_zh TEXT, PRIMARY KEY (document_id, lesson_id, ord));
     CREATE TABLE textbook_grammar (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, title TEXT NOT NULL, connection TEXT, explanation TEXT, examples_json TEXT NOT NULL DEFAULT '[]', PRIMARY KEY (document_id, lesson_id, ord));
     CREATE TABLE textbook_exercises (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, exercise_id TEXT, type TEXT NOT NULL, prompt TEXT NOT NULL, options_json TEXT NOT NULL DEFAULT '[]', answer TEXT NOT NULL DEFAULT '', explanation TEXT, PRIMARY KEY (document_id, lesson_id, ord));
-    CREATE TABLE textbook_term_map (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, kind TEXT NOT NULL, ref_text TEXT NOT NULL, skill_id TEXT, entry_id TEXT, PRIMARY KEY (document_id, lesson_id, kind, ref_text));
+    CREATE TABLE knowledge_points (id TEXT PRIMARY KEY, document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'concept', ord INTEGER NOT NULL DEFAULT 0, concept TEXT NOT NULL, explanation_md TEXT NOT NULL DEFAULT '', source_refs_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
     CREATE VIRTUAL TABLE textbook_fts USING fts5(surface, reading, gloss, ja, zh, document_id UNINDEXED, lesson_id UNINDEXED, kind UNINDEXED, ref UNINDEXED);
     CREATE TABLE local_dictionary_entries (id TEXT PRIMARY KEY, language TEXT NOT NULL, headword TEXT NOT NULL, meanings_json TEXT NOT NULL, source_id TEXT, source_label TEXT NOT NULL, license_note TEXT NOT NULL, created_at TEXT NOT NULL);
     CREATE TABLE dictionary_sources (id TEXT PRIMARY KEY, language TEXT NOT NULL, provider TEXT NOT NULL, version TEXT NOT NULL, source_url TEXT NOT NULL, license_name TEXT NOT NULL, license_url TEXT NOT NULL, attribution TEXT NOT NULL, entry_count INTEGER NOT NULL DEFAULT 0, imported_at TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, priority INTEGER NOT NULL DEFAULT 0);
@@ -46,7 +46,6 @@ function seedClean(db: Database): void {
     INSERT INTO textbook_fts VALUES (NULL,NULL,NULL,'おはよう',NULL,'d1','l1','line','l1#d0');
     INSERT INTO local_dictionary_entries (id, language, headword, meanings_json, source_id, source_label, license_note, created_at) VALUES ('e1','ja','食べる','[]',NULL,'t','l','t');
     INSERT INTO dictionary_sources VALUES ('s1','ja','p','1','u','l','u','a',1,'t',1,0);
-    INSERT INTO textbook_term_map VALUES ('d1','l1','vocab','食べる',NULL,'e1');
   `);
 }
 
@@ -83,13 +82,13 @@ describe('db doctor', () => {
     expect(levelOf(report, 'ord-dup:textbook_vocab')).toBe('FAIL');
   });
 
-  it('term_map 悬空 entry + FTS 缺失命中', () => {
+  it('知识点空 concept + FTS 缺失命中', () => {
     const db = mem();
     seedClean(db);
-    db.run(`UPDATE textbook_term_map SET entry_id='ghost-entry'`);
+    db.run(`INSERT INTO knowledge_points (id, document_id, lesson_id, concept, created_at, updated_at) VALUES ('kp1','d1','l1','  ','t','t')`);
     db.run(`DELETE FROM textbook_fts WHERE kind='vocab'`);
     const report = runDoctor(db);
-    expect(levelOf(report, 'term-map:entry')).toBe('FAIL');
+    expect(levelOf(report, 'knowledge:concept-empty')).toBe('FAIL');
     expect(levelOf(report, 'fts:vocab-missing')).toBe('WARN');
   });
 

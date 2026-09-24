@@ -3,7 +3,7 @@ import type { Database } from 'bun:sqlite';
 import { BusinessError, err, ok, type Result, nowIso } from '@study-studio/shared';
 import type { TextbookAST } from '@study-studio/document-model';
 import { documents, seedMaterialization } from '../../schema.js';
-import { shredIntoTransaction, termMapDedupKey, type ShredTx } from './textbook-shred.js';
+import { shredIntoTransaction, type ShredTx } from './textbook-shred.js';
 import { fingerprintCanonical } from '../../canonical-fingerprint.js';
 import { eq } from 'drizzle-orm';
 
@@ -24,19 +24,20 @@ import { eq } from 'drizzle-orm';
  *
  * 依赖 map（Task 2，实测 shredIntoTransaction）：
  * - lessons/lines/vocab/grammar/exercises ← 纯 AST；
- * - term_map.entry_id ← AST 词面/标题 × local_dictionary_entries(language, headword) 精确存在性；
+ * - 映射计数（mappedEntries/unmapped）← AST 词面/标题 × local_dictionary_entries(language, headword) 精确存在性（v30 起只在内存统计，不落表）；
  * - FTS ← projected vocab/line 行（无外部依赖）。
- * 因此 AST fp == materialization fp **不成立**（词典变化会改 term_map），必须三者组合。
+ * 因此 AST fp == materialization fp **不成立**（词典变化会改映射计数），必须三者组合。
  */
 
 /**
  * Materializer 版本：凡改以下任一必须 bump（否则 gating 认不出输出语义变化）：
- * - shredIntoTransaction 的行/列/切片/归一语义（含 P1-D1 term_map 去重语义 → v2）；
+ * - shredIntoTransaction 的行/列/切片/归一语义；
  * - findEntry 的匹配语义（language 映射、相等定义）；
  * - 本文件 mapping 切片口径。
  * 不要把 app version / package version 纳入（无依据的全局失效）。
+ * v3：term_map 表退役（v30），映射计数只在 shred 内存统计。
  */
-export const SEED_MATERIALIZER_VERSION = 2;
+export const SEED_MATERIALIZER_VERSION = 3;
 
 export interface SeedMaterializationInput {
   /** canonical seed AST 全量（含 generation-local 的位置性 ids） */
@@ -113,45 +114,13 @@ export interface ProjectionHealth {
 }
 
 /**
- * P1-D1a：期望 term_map 行数（与 shredIntoTransaction 完全同规则）。
- * 清洗/截断与 shred 一字相同（vocab kanji trim+slice(0,64) 跳空；
- * grammar title trim+slice(0,200) 跳空），键为完整持久化 PK 四元组。
- * 只计行数健康，不查 entry_id（词典正确性由 fingerprint mapping 切片 + 版本管，
- * 行数健康与 entry 正确性是两种检查，不得混淆）。
- */
-export function expectedTermMapCountForLesson(
-  documentId: string,
-  lessonId: string,
-  vocabs: unknown[],
-  grammars: unknown[]
-): number {
-  const seen = new Set<string>();
-  for (const v of vocabs) {
-    if (!v || typeof v !== 'object') continue;
-    const kanji = (v as Record<string, unknown>).kanji;
-    if (typeof kanji !== 'string' || !kanji.trim()) continue;
-    seen.add(termMapDedupKey(documentId, lessonId, 'vocab', kanji.trim().slice(0, 64)));
-  }
-  for (const g of grammars) {
-    if (!g || typeof g !== 'object') continue;
-    const title = (g as Record<string, unknown>).title;
-    if (typeof title !== 'string' || !title.trim()) continue;
-    seen.add(termMapDedupKey(documentId, lessonId, 'grammar', title.trim().slice(0, 200)));
-  }
-  return seen.size;
-}
-
-/**
  * Projection health（只读轻量，不跑全 doctor）。
  * - derived lesson 集合/数量与 AST 一致；
  * - sort_order = index+1（1-based dense 按文档）；
  * - lesson_number/title 与 AST 一致（shred 透传语义）；
  * - 非空数组有行、空数组无行（lines/vocab/grammar/exercises）；
- * - FTS：每个 vocab/line 行有对应 kind/ref 索引行；
- * - term_map：每课 map 行数 == 按最终 PK 去重后的期望桥行数（P1-D1a；
- *   不是 vocab+grammar occurrence 总数，同课重复面只计一行）。
- * term_map mapping *正确性*（entry 对不对）不在此验证——由 materializer/dependency
- * version 保证 freshness（全量比对等于重做 mapping，不廉价）。
+ * - FTS：每个 vocab/line 行有对应 kind/ref 索引行。
+ * v30 起不再校验 term_map 行数（表已退役；映射计数语义由 shred 内存统计延续）。
  */
 export function isTextbookProjectionHealthy(
   sqlite: Database,
@@ -225,11 +194,6 @@ export function isTextbookProjectionHealthy(
         break;
       }
     }
-    const mapN = (sqlite.query(
-      'SELECT COUNT(*) AS n FROM textbook_term_map WHERE document_id = ? AND lesson_id = ?'
-    ).get(documentId, l.id) as { n: number }).n;
-    const expectedMapN = expectedTermMapCountForLesson(documentId, l.id, vocabs, grammars);
-    if (mapN !== expectedMapN) reasons.push(`term_map 行数异常: ${l.id} 期望 ${expectedMapN} 实际 ${mapN}`);
   });
   return { healthy: reasons.length === 0, reasons };
 }

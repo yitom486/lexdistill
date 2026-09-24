@@ -56,7 +56,7 @@ export function runDoctor(db: Database): DoctorReport {
   const EXPECTED_TABLES = [
     'documents',
     'textbook_lessons', 'textbook_lines', 'textbook_vocab', 'textbook_grammar',
-    'textbook_exercises', 'textbook_term_map', 'textbook_fts',
+    'textbook_exercises', 'textbook_fts', 'knowledge_points',
     'local_dictionary_entries', 'dictionary_sources',
     'document_imports', 'document_structure', 'reading_positions', 'annotations',
     'flashcards', 'card_drafts', 'dictionary_search_history', 'practice_items',
@@ -76,7 +76,6 @@ export function runDoctor(db: Database): DoctorReport {
     ['textbook_vocab', 'document_id'],
     ['textbook_grammar', 'document_id'],
     ['textbook_exercises', 'document_id'],
-    ['textbook_term_map', 'document_id'],
     ['textbook_fts', 'document_id'],
     ['reading_positions', 'document_id'],
     ['annotations', 'document_id'],
@@ -106,8 +105,9 @@ export function runDoctor(db: Database): DoctorReport {
   }
 
   // ---- 2. lesson 孤儿（必须 document_id + lesson_id 双列对） ----
+  // knowledge_points 同样锚目录节点，一并检查（表缺席即跳过，见 has 守卫）。
   if (has('textbook_lessons')) {
-    for (const table of ['textbook_lines', 'textbook_vocab', 'textbook_grammar', 'textbook_exercises']) {
+    for (const table of ['textbook_lines', 'textbook_vocab', 'textbook_grammar', 'textbook_exercises', 'knowledge_points']) {
       if (!has(table)) continue;
       const n = count(
         `SELECT COUNT(*) AS n FROM "${table}" t WHERE NOT EXISTS (SELECT 1 FROM textbook_lessons l WHERE l.document_id = t.document_id AND l.lesson_id = t.lesson_id)`
@@ -150,28 +150,11 @@ export function runDoctor(db: Database): DoctorReport {
     push(`ord-affinity:${table}`, badAffinity > 0 ? 'FAIL' : 'PASS', badAffinity, badAffinity > 0 ? `${badAffinity} 行 ord 非整数亲和` : '亲和正常');
   }
 
-  // ---- 4. term_map ----
-  if (has('textbook_term_map', 'local_dictionary_entries')) {
-    const dangling = count(
-      `SELECT COUNT(*) AS n FROM textbook_term_map m LEFT JOIN local_dictionary_entries e ON e.id = m.entry_id WHERE m.entry_id IS NOT NULL AND e.id IS NULL`
-    );
-    push('term-map:entry', dangling > 0 ? 'FAIL' : 'PASS', dangling, dangling > 0 ? `${dangling} 个 entry_id 悬空（词典包卸载残留？）` : '映射有效');
-  }
-  if (has('textbook_term_map')) {
-    const badKind = count(`SELECT COUNT(*) AS n FROM textbook_term_map WHERE kind NOT IN ('vocab','grammar')`);
-    push('term-map:kind', badKind > 0 ? 'FAIL' : 'PASS', badKind, badKind > 0 ? `${badKind} 行非法 kind` : 'kind 合法');
-    if (has('textbook_vocab')) {
-      const n = count(
-        `SELECT COUNT(*) AS n FROM textbook_term_map m WHERE m.kind = 'vocab' AND NOT EXISTS (SELECT 1 FROM textbook_vocab v WHERE v.document_id = m.document_id AND v.lesson_id = m.lesson_id AND v.surface = m.ref_text)`
-      );
-      push('term-map:vocab-ref', n > 0 ? 'WARN' : 'PASS', n, n > 0 ? `${n} 条 vocab 映射找不到源词（改写/重导残留）` : '源词齐全');
-    }
-    if (has('textbook_grammar')) {
-      const n = count(
-        `SELECT COUNT(*) AS n FROM textbook_term_map m WHERE m.kind = 'grammar' AND NOT EXISTS (SELECT 1 FROM textbook_grammar g WHERE g.document_id = m.document_id AND g.lesson_id = m.lesson_id AND g.title = m.ref_text)`
-      );
-      push('term-map:grammar-ref', n > 0 ? 'WARN' : 'PASS', n, n > 0 ? `${n} 条 grammar 映射找不到源文法` : '源文法齐全');
-    }
+  // ---- 4. knowledge_points（v30 目录挂载蒸馏点） ----
+  // source_refs_json 为可空指回（悬空知识点合法），此处只查 lesson 锚（见 §2）。
+  if (has('knowledge_points')) {
+    const emptyConcept = count(`SELECT COUNT(*) AS n FROM knowledge_points WHERE concept IS NULL OR TRIM(concept) = ''`);
+    push('knowledge:concept-empty', emptyConcept > 0 ? 'FAIL' : 'PASS', emptyConcept, emptyConcept > 0 ? `${emptyConcept} 行 concept 为空` : '概念齐全');
   }
 
   // ---- 5. FTS 双向（textbook_fts 是可重建索引，FAIL=该重建了） ----

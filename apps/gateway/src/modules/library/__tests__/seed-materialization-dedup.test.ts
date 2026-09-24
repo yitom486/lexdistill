@@ -3,15 +3,16 @@ import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import {
   computeSeedMaterializationFingerprint,
-  expectedTermMapCountForLesson,
   isTextbookProjectionHealthy,
   shouldSkipSeedMaterialization,
   SEED_MATERIALIZER_VERSION,
 } from '@study-studio/storage-sqlite';
 
 /**
- * P1-D1a：term-map dedup 与 seed materialization 契约对齐（全临时 :memory: 库，真库零接触）。
- * - health 按 shred 同规则期望去重后行数，不查 entry_id；
+ * P1-D1a：映射去重与 seed materialization 契约对齐（全临时 :memory: 库，真库零接触）。
+ * - health 按 shred 同规则校验（ lessons/lines/vocab/grammar/exercises/FTS），不查 entry_id；
+ * - v30 起 term_map 表退役：去重计数语义由 shred 内存统计（mappedEntries/unmapped）延续，
+ *   本文件只锁 health 与版本门；
  * - 版本 bump 后旧 fp/version 触发一次重建，新版本稳定后 skip；
  * - 不新增 id 列，不改 occurrence 语义。
  */
@@ -58,12 +59,11 @@ async function materialize(repo: DrizzleLearnerRepository, id: string, b: Return
   return fp;
 }
 
-describe('P1-D1a seed materialization 与 term_map 去重对齐', () => {
+describe('P1-D1a seed materialization 与映射去重对齐', () => {
   it('seed AST 含同课重复 vocab：materialize 成功且 health 为 healthy（旧口径下会误报）', async () => {
     const repo = freshRepo();
     const b = book('seed-dup-v', [lesson('s-l1', 1, ['食べる', '食べる'])]);
     await materialize(repo, 'seed-dup-v', b);
-    expect(expectedTermMapCountForLesson('seed-dup-v', 's-l1', b.lessons[0]?.vocabularies as unknown[], [])).toBe(1);
     const health = isTextbookProjectionHealthy(repo.getRawDb(), 'seed-dup-v', b as never);
     expect(health).toEqual({ healthy: true, reasons: [] });
   });
@@ -72,7 +72,6 @@ describe('P1-D1a seed materialization 与 term_map 去重对齐', () => {
     const repo = freshRepo();
     const b = book('seed-dup-g', [lesson('s-l1', 1, [], ['〜ます', '〜ます'])]);
     await materialize(repo, 'seed-dup-g', b);
-    expect(expectedTermMapCountForLesson('seed-dup-g', 's-l1', [], b.lessons[0]?.grammarPoints as unknown[])).toBe(1);
     expect(isTextbookProjectionHealthy(repo.getRawDb(), 'seed-dup-g', b as never).healthy).toBe(true);
   });
 
@@ -80,22 +79,20 @@ describe('P1-D1a seed materialization 与 term_map 去重对齐', () => {
     const repo = freshRepo();
     const b = book('seed-vg', [lesson('s-l1', 1, ['食べる'], ['食べる'])]);
     await materialize(repo, 'seed-vg', b);
-    expect(expectedTermMapCountForLesson('seed-vg', 's-l1', b.lessons[0]?.vocabularies as unknown[], b.lessons[0]?.grammarPoints as unknown[])).toBe(2);
     expect(isTextbookProjectionHealthy(repo.getRawDb(), 'seed-vg', b as never).healthy).toBe(true);
   });
 
-  it('截断后冲突：两长文本 slice(0,64) 相同，仅计一行且 healthy', async () => {
+  it('截断后冲突：两长文本 slice(0,64) 相同，occurrence 两行且 healthy', async () => {
     const repo = freshRepo();
     const prefix = 'あ'.repeat(64);
     const b = book('seed-trunc', [lesson('s-l1', 1, [`${prefix}X`, `${prefix}Y`])]);
     await materialize(repo, 'seed-trunc', b);
-    expect(expectedTermMapCountForLesson('seed-trunc', 's-l1', b.lessons[0]?.vocabularies as unknown[], [])).toBe(1);
     expect(isTextbookProjectionHealthy(repo.getRawDb(), 'seed-trunc', b as never).healthy).toBe(true);
     const v = repo.getRawDb().query('SELECT COUNT(*) AS n FROM textbook_vocab WHERE document_id=?').get('seed-trunc') as { n: number };
     expect(v.n).toBe(2);
   });
 
-  it('非 term_map projection 缺失仍判 unhealthy（删词行 / 删 FTS）', async () => {
+  it('非映射 projection 缺失仍判 unhealthy（删词行 / 删 FTS）', async () => {
     const repo = freshRepo();
     const b = book('seed-unhealthy', [lesson('s-l1', 1, ['食べる'], ['〜ます'])]);
     await materialize(repo, 'seed-unhealthy', b);
@@ -128,7 +125,7 @@ describe('P1-D1a seed materialization 与 term_map 去重对齐', () => {
     expect(shouldSkipSeedMaterialization(db, 'seed-ver', b as never).skip).toBe(true);
   });
 
-  it('当前 SEED_MATERIALIZER_VERSION 已因 shred 去重语义 bump', () => {
-    expect(SEED_MATERIALIZER_VERSION).toBe(2);
+  it('当前 SEED_MATERIALIZER_VERSION 已因 v30（term_map 退役）bump', () => {
+    expect(SEED_MATERIALIZER_VERSION).toBe(3);
   });
 });

@@ -7,7 +7,6 @@ import {
   textbookGrammar,
   textbookLessons,
   textbookLines,
-  textbookTermMap,
   textbookVocab,
 } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
@@ -31,7 +30,6 @@ export interface SeedMigrationDocReport {
   vocab: number;
   grammar: number;
   exercises: number;
-  termMap: number;
   ftsRows: number;
 }
 
@@ -124,7 +122,7 @@ export function applySeedAstMigration(db: DrizzleDb): SeedMigrationReport {
     if (row.sourceKind !== 'curriculum_textbook') {
       report.docs.push({
         documentId: row.id, title: row.title, oldShape: 'unrecognized', migrated: false,
-        note: 'source_kind 非 curriculum_textbook，跳过', lessons: 0, lines: 0, vocab: 0, grammar: 0, exercises: 0, termMap: 0, ftsRows: 0,
+        note: 'source_kind 非 curriculum_textbook，跳过', lessons: 0, lines: 0, vocab: 0, grammar: 0, exercises: 0, ftsRows: 0,
       });
       continue;
     }
@@ -140,7 +138,7 @@ export function applySeedAstMigration(db: DrizzleDb): SeedMigrationReport {
     ): void => {
       report.docs.push({
         documentId: row.id, title: row.title, oldShape, migrated: false, note,
-        lessons: 0, lines: 0, vocab: 0, grammar: 0, exercises: 0, termMap: 0, ftsRows: 0,
+        lessons: 0, lines: 0, vocab: 0, grammar: 0, exercises: 0, ftsRows: 0,
       });
     };
     if (!ast || typeof ast !== 'object' || (ast as Rec).id !== row.id) {
@@ -238,7 +236,6 @@ export function applySeedAstMigration(db: DrizzleDb): SeedMigrationReport {
       vocab: counted.vocab,
       grammar: counted.grammar,
       exercises: counted.exercises,
-      termMap: counted.termMap,
       ftsRows: counted.fts,
     });
   }
@@ -248,7 +245,7 @@ export function applySeedAstMigration(db: DrizzleDb): SeedMigrationReport {
 function countDocRows(
   db: DrizzleDb,
   documentId: string
-): { lessons: number; lines: number; vocab: number; grammar: number; exercises: number; termMap: number; fts: number } {
+): { lessons: number; lines: number; vocab: number; grammar: number; exercises: number; fts: number } {
   // 只读计数走 drizzle 构造器；FTS 无表定义，走原生 sql（§1.9 豁免②）。
   const n = (row: { n: number } | undefined): number => row?.n ?? 0;
   const lessons = n(db.select({ n: count() }).from(textbookLessons).where(eq(textbookLessons.documentId, documentId)).get());
@@ -256,8 +253,7 @@ function countDocRows(
   const vocab = n(db.select({ n: count() }).from(textbookVocab).where(eq(textbookVocab.documentId, documentId)).get());
   const grammar = n(db.select({ n: count() }).from(textbookGrammar).where(eq(textbookGrammar.documentId, documentId)).get());
   const exercises = n(db.select({ n: count() }).from(textbookExercises).where(eq(textbookExercises.documentId, documentId)).get());
-  const termMap = n(db.select({ n: count() }).from(textbookTermMap).where(eq(textbookTermMap.documentId, documentId)).get());
   const ftsRows = db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM textbook_fts WHERE document_id = ${documentId}`);
   const fts = ftsRows[0]?.n ?? 0;
-  return { lessons, lines, vocab, grammar, exercises, termMap, fts };
+  return { lessons, lines, vocab, grammar, exercises, fts };
 }

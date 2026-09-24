@@ -110,7 +110,6 @@ export {
   fingerprintSeedMaterialization,
   shouldSkipSeedMaterialization,
   describeSeedStatus,
-  expectedTermMapCountForLesson,
   isTextbookProjectionHealthy,
   SEED_MATERIALIZER_VERSION,
   type SeedMaterializationInput,
@@ -259,4 +258,12 @@ export {
   type SelectionContext,
   type CaptureSelectionInput,
 } from './adapters/library/selection-contexts.js';
+export {
+  saveKnowledgePoints,
+  listKnowledgePoints,
+  KNOWLEDGE_POINT_KINDS,
+  type KnowledgePoint,
+  type KnowledgePointKind,
+  type SaveKnowledgePointInput,
+} from './adapters/library/knowledge-points.js';
 export { getVisibleDocument, type VisibleDocument } from './adapters/library/document-visibility.js';

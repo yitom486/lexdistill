@@ -4,9 +4,9 @@ import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repo
 import type { DocumentItem } from '@study-studio/protocol';
 
 /**
- * v14 教材 shred 表：只验表结构与约束（shred 写逻辑下一轮）。
- * - 四张行表 + FTS + 知识映射表存在，主键/唯一约束生效；
- * - map 表 skill_id/entry_id 可空（未映射≠脏数据，可统计覆盖率）。
+ * v14/v30 教材 shred 表：只验表结构与约束（shred 写逻辑下一轮）。
+ * - 五张行表 + FTS + 知识点表存在，主键/唯一约束生效；
+ * - v30：term_map 退役，knowledge_points 可悬空原文（source_refs_json 默认为空数组）。
  */
 describe('textbook shred schema（v14）', () => {
   let repo: DrizzleLearnerRepository;
@@ -84,17 +84,19 @@ describe('textbook shred schema（v14）', () => {
     expect(rows.map((r) => r.lessonId)).toContain('l1');
   });
 
-  it('map 表允许空映射（未映射可统计，不算脏数据）', () => {
+  it('knowledge_points 表结构（v30 目录挂载蒸馏点，默认可悬空）', () => {
     const db = repo.getRawDb();
     db.query(
-      `INSERT INTO textbook_term_map (document_id, lesson_id, kind, ref_text, skill_id, entry_id)
-       VALUES ('d1', 'l1', 'grammar', '某文法', NULL, NULL),
-              ('d1', 'l1', 'vocab', '食べる', NULL, 'n5_ja_taberu')`
+      `INSERT INTO knowledge_points (id, document_id, lesson_id, concept, created_at, updated_at)
+       VALUES ('kp1', 'd1', 'l1', 'に vs で', 't', 't')`
     ).run();
-    const unmapped = db
-      .query('SELECT COUNT(*) AS n FROM textbook_term_map WHERE skill_id IS NULL AND entry_id IS NULL')
-      .get() as { n: number };
-    expect(unmapped.n).toBe(1);
+    const row = db
+      .query('SELECT kind AS kind, ord AS ord, explanation_md AS explanationMd, source_refs_json AS sourceRefsJson FROM knowledge_points WHERE id = ?')
+      .get('kp1') as { kind: string; ord: number; explanationMd: string; sourceRefsJson: string };
+    expect(row.kind).toBe('concept');
+    expect(row.ord).toBe(0);
+    expect(row.explanationMd).toBe('');
+    expect(JSON.parse(row.sourceRefsJson)).toEqual([]);
   });
 
   it('结构分类存取往返（一文档一行，别人的文档拒绝）', async () => {

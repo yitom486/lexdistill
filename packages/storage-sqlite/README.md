@@ -43,7 +43,7 @@ createDrizzleDb(path | Database)
 
 - 学习者资产：`learner_profiles` / `learner_language_profiles`、`skill_metrics`、`flashcards`、`quiz_attempts`、`mistakes`、学习计划及其运行记录。
 - 公共课程资产：`curriculum_kana`、`curriculum_hangul`、`curriculum_lessons`、`learning_content_templates`、词典种子。
-- 文档与教材：`documents.ast_json` 是教材原稿 SSOT；`textbook_lessons`、`textbook_lines`、`textbook_vocab`、`textbook_grammar`、`textbook_exercises`、`textbook_term_map` 是由原稿拆出的查询层；相关 FTS 表用于全文检索。`seed_materialization` 只记录内置教材的派生状态（指纹与 materializer 版本），不保存用户文档。
+- 文档与教材：`documents.ast_json` 是教材原稿 SSOT；`textbook_lessons`（v30 起 kind/parent_id 支撑章层级）、`textbook_lines`、`textbook_vocab`、`textbook_grammar`、`textbook_exercises` 是由原稿拆出的查询层；`knowledge_points` 是目录挂载的蒸馏知识点（v30，可悬空原文）；相关 FTS 表用于全文检索。`seed_materialization` 只记录内置教材的派生状态（指纹与 materializer 版本），不保存用户文档。
 - 导入审计：`document_imports` 记录单文档导入；`toc_import_sessions` 与 `toc_import_chunks` 记录整书目录导入的冻结计划、分块执行状态与最终目标文档。会话拥有 `document_id`；chunk 的历史 `document_id` 列必须保持 `NULL`，不能作为所有权来源。
 - 用户学习痕迹：批注、阅读位置、导入任务、卡片、做题和错题记录都按用户与语种保存，不能用种子覆盖。
 
@@ -86,15 +86,15 @@ createDrizzleDb(path | Database)
 ```text
 canonical seed AST + 词典命中切片 + materializer version
   └─ fingerprint 与 seed_materialization 一致，且 projection 健康 → 跳过（零写）
-  └─ 否则 → documents upsert + shred + FTS/term_map + state upsert（同一事务）
+  └─ 否则 → documents upsert + shred + FTS + state upsert（同一事务）
 ```
 
-因此，修改教材 AST、影响 `term_map` 的本地词典映射，或改变 shred / 映射语义时，都会触发一次原子重建；最后一种情况还必须提升 `SEED_MATERIALIZER_VERSION`。若落库 AST 非法或与种子文档 id 不一致，启动链路只告警并交由 `doctor` / 修复流程处理，绝不猜测或覆盖。
+因此，修改教材 AST、影响本地词典映射，或改变 shred / 映射语义时，都会触发一次原子重建；最后一种情况还必须提升 `SEED_MATERIALIZER_VERSION`。若落库 AST 非法或与种子文档 id 不一致，启动链路只告警并交由 `doctor` / 修复流程处理，绝不猜测或覆盖。
 
 ## 维护约定
 
 - 新表或新列：同时修改 `ddl.ts`（最新 CREATE）、`schema.ts` 与 `migrations/vNNN-*.ts`；迁移必须登记为可重放版本，不能在导入某本教材时临时 `CREATE TABLE`。
-- 当前已发布迁移到 v22；新增迁移必须在 `migrations/index.ts` 末尾登记。已发布迁移的 version、name 与 SQL 都不可改写。
+- 当前已发布迁移到 v30；新增迁移必须在 `migrations/index.ts` 末尾登记。已发布迁移的 version、name 与 SQL 都不可改写。
 - 教材：始终先更新 `documents.ast_json`（原稿），再在同一事务重建 `textbook_*`；不要直接手改 shred 表使其与 AST 分叉。
 - 种子教材物化：通过 `materializeSeedDocument()` / 启动门控进入同一事务；不要在 `seed-bootstrap.ts` 里直接写 `textbook_*` 或伪造 `seed_materialization` 状态。
 - 整书目录导入：准备阶段只能写不可变 session / chunk 计划；首个成功 chunk 在同一事务创建并绑定 session 的目标文档。删除目标文档后，将 session 置为 `target_deleted` 并保留审计行，不恢复或复用它。

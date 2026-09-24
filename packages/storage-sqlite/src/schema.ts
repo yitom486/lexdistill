@@ -683,6 +683,9 @@ export const textbookLessons = sqliteTable(
     lessonNumber: integer('lesson_number').notNull(),
     title: text('title').notNull(),
     sortOrder: integer('sort_order'),
+    /** v30 章层级：'lesson' | 'chapter'；章经 parent_id 挂课（可空即顶层）。 */
+    kind: text('kind').notNull().default('lesson'),
+    parentId: text('parent_id'),
   },
   (table) => [primaryKey({ columns: [table.documentId, table.lessonId] })]
 );
@@ -747,18 +750,29 @@ export const textbookExercises = sqliteTable(
   (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
 );
 
-export const textbookTermMap = sqliteTable(
-  'textbook_term_map',
+/**
+ * 蒸馏知识点（v30；目录挂载，可悬空原文）。
+ * - lesson_id 锚目录节点（含章 kind）；concept 为归一概念（跨书去重键由应用层定）；
+ * - source_refs_json 指回原文行 id 数组（可空＝悬空知识点，照常可学可考）；
+ * - 与 content_segments 同性质：幂等投影、可重建，写入口收归领域命令（未接线前只建表）。
+ */
+export const knowledgePoints = sqliteTable(
+  'knowledge_points',
   {
+    id: text('id').notNull(),
     documentId: text('document_id').notNull(),
     lessonId: text('lesson_id').notNull(),
-    kind: text('kind').notNull(),
-    refText: text('ref_text').notNull(),
-    skillId: text('skill_id'),
-    entryId: text('entry_id'),
+    kind: text('kind').notNull().default('concept'),
+    ord: integer('ord').notNull().default(0),
+    concept: text('concept').notNull(),
+    explanationMd: text('explanation_md').notNull().default(''),
+    sourceRefsJson: text('source_refs_json').notNull().default('[]'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.documentId, table.lessonId, table.kind, table.refText] }),
+    primaryKey({ columns: [table.id] }),
+    index('idx_knowledge_points_lesson').on(table.documentId, table.lessonId, table.ord),
   ]
 );
 

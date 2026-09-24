@@ -46,7 +46,7 @@ export async function ensureContentSourcesAtBoot(
 /**
  * 种子教材 materialization gating（P1-D1；旧名 shred 回填，语义升级为门控）：
  * seed canonical input + mapping + materializer 版本均未变且 projection 健康
- * → 跳过 shred（零 DELETE/INSERT/UPDATE，不重建 FTS/term_map）；
+ * → 跳过 shred（零 DELETE/INSERT/UPDATE，不重建 FTS 行表）；
  * 否则经 repo.materializeSeedDocument 原子重建（documents upsert + shred + state 同事务）。
  * 单本失败只 warn，不挡网关启动（doctor 会继续报告 projection 问题）。
  * 注意：只认代码 TEXTBOOK_BOOKS 为 input 真相；落库 AST 非法/错位时跳过（等 repair）。

@@ -31,7 +31,7 @@ describe('R1-A orphan apply', () => {
   it('白名单内容与删除生命周期一致（10 表）', () => {
     expect([...REPAIR_ALLOWLIST]).toEqual([
       'textbook_lessons', 'textbook_lines', 'textbook_vocab', 'textbook_grammar',
-      'textbook_exercises', 'textbook_term_map', 'textbook_fts',
+      'textbook_exercises', 'knowledge_points', 'textbook_fts',
       'reading_positions', 'annotations', 'document_structure',
     ]);
   });

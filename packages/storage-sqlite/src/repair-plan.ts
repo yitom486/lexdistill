@@ -64,7 +64,7 @@ export function buildRepairPlan(db: Database): RepairPlan {
   // ---- 1. 可安全删除的 derived/cache 孤儿（与 deleteDocument 清单同源） ----
   const derived: string[] = [
     'textbook_lessons', 'textbook_lines', 'textbook_vocab', 'textbook_grammar',
-    'textbook_exercises', 'textbook_term_map', 'textbook_fts',
+    'textbook_exercises', 'textbook_fts',
     'reading_positions', 'annotations', 'document_structure',
   ].filter((t) => tables.has(t));
   for (const table of derived) {

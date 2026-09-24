@@ -19,7 +19,7 @@ import {
   DocumentSourceKindSchema,
   type DocumentSourceKind,
 } from '@study-studio/protocol';
-import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, textbookTermMap, documentStructures, readingPositions, captureSelectionContext } from '@study-studio/storage-sqlite';
+import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, knowledgePoints, documentStructures, readingPositions, captureSelectionContext } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { shredIntoTransaction } from '@study-studio/storage-sqlite';
 import { markSessionsTargetDeletedInTx } from '@study-studio/storage-sqlite';
@@ -278,7 +278,7 @@ export async function deleteDocument(
   userId: string
 ): Promise<Result<void, BusinessError>> {
   // 删除生命周期（见 docs/database-architecture.md §8）：
-  // - 随删（同事务）：annotations + shred 六表 + textbook_fts + document_structure + reading_positions；
+  // - 随删（同事务）：annotations + shred 五表 + knowledge_points + textbook_fts + document_structure + reading_positions；
   // - 目标为整书导入 session 的 target document 时：关联 session 同事务进 `target_deleted`
   //   终态（document_id 快照保留审计，永不再 resume；计划行不删）；
   // - 保留（审计/历史）：document_imports、作答事件、草稿（含 source_ref 出处文本）、相遇审计；
@@ -294,9 +294,9 @@ export async function deleteDocument(
       tx.delete(annotations)
         .where(and(eq(annotations.documentId, id), eq(annotations.userId, userId)))
         .run();
-      tx.delete(textbookTermMap).where(eq(textbookTermMap.documentId, id)).run();
       tx.delete(textbookVocab).where(eq(textbookVocab.documentId, id)).run();
       tx.delete(textbookGrammar).where(eq(textbookGrammar.documentId, id)).run();
+      tx.delete(knowledgePoints).where(eq(knowledgePoints.documentId, id)).run();
       tx.delete(textbookLines).where(eq(textbookLines.documentId, id)).run();
       tx.delete(textbookExercises).where(eq(textbookExercises.documentId, id)).run();
       tx.delete(textbookLessons).where(eq(textbookLessons.documentId, id)).run();

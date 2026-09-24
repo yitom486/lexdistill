@@ -35,7 +35,7 @@ export const REPAIR_ALLOWLIST = [
   'textbook_vocab',
   'textbook_grammar',
   'textbook_exercises',
-  'textbook_term_map',
+  'knowledge_points',
   'textbook_fts',
   'reading_positions',
   'annotations',

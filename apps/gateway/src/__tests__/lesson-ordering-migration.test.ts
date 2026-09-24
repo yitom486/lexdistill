@@ -20,7 +20,7 @@ describe('v17 lesson-sort-order migration', () => {
     db.run('ALTER TABLE textbook_lessons DROP COLUMN sort_order');
     db.run('DELETE FROM schema_migrations WHERE version = 17');
     expect(columnsOf(db, 'textbook_lessons')).not.toContain('sort_order');
-    db.run(`INSERT INTO textbook_lessons VALUES ('d1','l1',18,'第19課')`);
+    db.run(`INSERT INTO textbook_lessons (document_id, lesson_id, lesson_number, title) VALUES ('d1','l1',18,'第19課')`);
     const res = runMigrations(db);
     expect(res.applied).toContain(17);
     expect(columnsOf(db, 'textbook_lessons')).toContain('sort_order');

@@ -35,7 +35,7 @@ function dataVersion(repo: DrizzleLearnerRepository): number {
 function derivedChecksum(repo: DrizzleLearnerRepository): string {
   const db = repo.getRawDb();
   const parts: string[] = [];
-  for (const t of ['textbook_lessons', 'textbook_vocab', 'textbook_grammar', 'textbook_lines', 'textbook_exercises', 'textbook_term_map', 'textbook_fts', 'seed_materialization']) {
+  for (const t of ['textbook_lessons', 'textbook_vocab', 'textbook_grammar', 'textbook_lines', 'textbook_exercises', 'knowledge_points', 'textbook_fts', 'seed_materialization']) {
     try {
       const rows = db.query(`SELECT * FROM ${t} ORDER BY rowid`).all() as unknown[];
       parts.push(`${t}:${rows.length}:${JSON.stringify(rows).length}`);

@@ -46,13 +46,15 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 - 注意：vocab/grammar 的 AST `id`（zod 必填）是 generation-local 的位置性 ID（PDF 路径为 `${lessonId}-v/g${kept序号}`，种子为手写 `v1-1` 形；插入/删除/重排/enrich 都会移位，P1-D0），**不是稳定 identity**；shred 丢弃 id，只用 `ord` 做行身份（P1 事项）
 - lifecycle：随 shred 重建；rebuildable：是
 
-### textbook_term_map —— 教材词→词典标准条目的桥（Derived, best-effort）
-- PK `(document_id, lesson_id, kind, ref_text)`；`kind ∈ {vocab, grammar}`；`skill_id` v1 恒 NULL；`entry_id` 可空（空=未映射，是允许状态，可统计覆盖率）
-- 生成：shred 时 `headword` 逐字精确匹配 `local_dictionary_entries`，对不上记 NULL 行，绝不模糊
-- 它不是教材 vocab/grammar identity：AST 的 `vocab.id/grammar.id` 为位置性 ID（P1-D0），shred 根本不存 id；行身份是 `(document_id, lesson_id, ord)`，term_map 只按面字符串挂词典
-- 同课重复 mapping 按数据库关系语义去重（P1-D1）：去重键为截断/清洗后实际持久化的完整主键四元组，课内同 kind 同 `ref_text` 只保留首条确定性映射；`vocab/grammar`（kind 不同）与跨 lesson 永不互斥；occurrence 行（vocab/grammar/lines/FTS）不受影响
-- 行数口径（P1-D1a）：term_map 行数是按最终 PK 去重后的 dictionary bridge 行数，**不等于** `vocab + grammar` occurrence 总数；同课同 kind 同面越多，差值越大。health 检查与 fingerprint 均按此口径，`entry_id` NULL 仍为健康允许态
-- lifecycle：随 shred 重建；rebuildable：是。source of truth：否
+### textbook_term_map —— 已退役（v30 `knowledge-points`，表已 DROP）
+- v30 前它是教材词→词典标准条目的桥（best-effort，`entry_id` 可空）；退役原因：无用户面读者
+- 映射计数职能由 shred 内存统计（`mappedEntries/unmapped`，同课同 kind 同面只计首条）延续，去重口径不变
+- 后继：目录挂载蒸馏点见 `knowledge_points`（下）；词典精确匹配仍由 shred `findEntry` 在内存执行
+
+### knowledge_points —— 目录挂载蒸馏点（Derived，可悬空原文）
+- PK `id`；`lesson_id` 锚目录节点（含章 kind）；`kind ∈ {concept}`（预留 vocab_ref/grammar_ref/rule）；`ord` 课内序
+- `concept + explanation_md` 为蒸馏内容；`source_refs_json` 指回原文行 id 数组，**可空＝悬空知识点**（照常可学可考，复习/出题读这里不读原文）
+- lifecycle：幂等投影、可重建；写入口收归领域命令（v30 只建表，写入 Tool 未接线）
 
 ### textbook_fts —— 全文索引（Cache-Index，contentful）
 - FTS5 虚表（**contentful，自带拷贝**，手工同步）；`kind ∈ {vocab, line}`；`ref = {lesson}#v{ord} / #d{ord}`
@@ -162,7 +164,7 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 ### local_dictionary_entries —— 词典主事实（Canonical，354877 行）
 - PK `id`；`language/headword/reading/romanization/meanings_json/pronunciation_json/part_of_speech/source_id/source_label/license_note`
 - 来源：种子数百行 + 按需包（OEWN/JMdict-e/Kengdic，包本体不预装，事务替换）；只收录自有或已授权再分发
-- 被 `flashcards.source_entry_id`、`term_map.entry_id`、`search_history.top_entry_id` 引用（逻辑）
+- 被 `flashcards.source_entry_id`、`search_history.top_entry_id` 引用（逻辑）
 
 ### local_dictionary_fts —— 词典全文索引（Cache-Index，contentful）
 - FTS5（contentful，自带拷贝）；**触发器增量同步（insert/delete，无 update 触发器）** + 启动计数比对重建；生产唯一读者是释义 `MATCH+bm25`
@@ -220,9 +222,9 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 
 ## 5. 已知一致性风险（doctor 覆盖项的依据）
 
-1. **删文档留孤儿（已证实）**：`deleteDocument` 只删 annotations + documents 本行。shred 六表 + FTS + reading_positions + document_structure 全残留。线上是否有残留见 doctor 运行结果。
+1. **删文档留孤儿（已证实，已修）**：`deleteDocument` 曾只删 annotations + documents 本行。现随删集：shred 五表 + `knowledge_points` + FTS + reading_positions + document_structure + annotations（v30 起含知识点）。
 2. **lesson_number 展示错位**（见 §4，数据问题非孤儿，doctor 不查，P1 修模型）。
-3. **term_map.entry_id 悬空**：词典包可卸载（`DELETE WHERE source_id`），map 行不跟删。doctor 查。
+3. ~~**term_map.entry_id 悬空**~~（v30 删除：表已 DROP；词典卸载不再有悬空行可言）。
 4. **FTS stale**：textbook_fts 只在 shred 重建；若有人直写行表（运维脚本！）就会 stale。doctor 双向查。
 5. **practice_items.passage_document_id 恒 NULL**：预留列，勿当关系用（doctor 跳过 NULL，只查非空悬空）。
 6. **`term_occurrences.document_id` 是 docRef 字符串**：doctor 不得误报（规则写死排除）。
@@ -233,7 +235,7 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 > 首次 doctor 运行（2026-09-09，线上库）：5 errors / 1 warning，见 P1 Ready Report。
 > 新增规则先加 `db-doctor.test.ts` 用例，再进 `doctor.ts`。
 
-- 可删重建：`textbook_fts`、`local_dictionary_fts`（+影子表）、`textbook_term_map`、`textbook_lines/vocab/grammar/exercises/lessons`（由 ast_json 经 shred）、`skill_metrics`（由 attempts 重算，算法固定时）、`unit_progress`（由证据重算）、`daily_study_plans`（每日重冻）、`term_examples`（调模型重生，慢但可）、`study_activity_logs`（由各域事件重放，工程量大但可能）
+- 可删重建：`textbook_fts`、`local_dictionary_fts`（+影子表）、`textbook_lines/vocab/grammar/exercises/lessons`（由 ast_json 经 shred）、`knowledge_points`（由目录+AI 提取重投影）、`skill_metrics`（由 attempts 重算，算法固定时）、`unit_progress`（由证据重算）、`daily_study_plans`（每日重冻）、`term_examples`（调模型重生，慢但可）、`study_activity_logs`（由各域事件重放，工程量大但可能）
 - 不可删：`documents`（底稿）、`learner_language_profiles`、`flashcards`、`card_drafts`、`mistakes`（复合状态不可重放，见 §2）、`quiz_attempts`、`practice_item_attempts`、`encountered_terms`（聚合可重算但 first_seen 语义丢失，算半可）、`annotations`、`reading_positions`、`learner_profiles`（可由语种行重建镜像，displayName 除外）
 
 ## 7. 系统表
@@ -255,7 +257,8 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 
 | 表 | 删文档时 | 理由 |
 |---|---|---|
-| textbook_lessons / lines / vocab / grammar / exercises / term_map | **随删**（同事务） | doc-scoped Derived，源 AST 已删，留即孤儿 |
+| textbook_lessons / lines / vocab / grammar / exercises | **随删**（同事务） | doc-scoped Derived，源 AST 已删，留即孤儿 |
+| knowledge_points | **随删**（同事务） | 目录挂载蒸馏点，源文档已删，留即孤儿 |
 | textbook_fts | **随删**（同事务） | doc-scoped 索引 |
 | document_structure | **随删**（同事务） | 1:1 观测，源没了观测无意义 |
 | reading_positions | **随删**（同事务） | 私人游标，文档没了位置无意义 |
@@ -297,11 +300,11 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 ### Generation-local identity：vocab.id / grammar.id
 - 形如 `${lessonId}-v/g${kept序号}`，只在同一次 parse+enrich generation 内有效；
 - re-enrich / 列表顺序变化即整体重编（实测，见 `vocab-grammar-identity.test.ts`）；
-- **禁止未来 durable consumer 未经重新设计直接依赖这些 id**（它们跨代必变，
-  且 `term_map` 重建即换键）。
+- **禁止未来 durable consumer 未经重新设计直接依赖这些 id**（它们跨代必变）。
+- v30 起 term_map 表已退役，映射计数只在 shred 内存统计；目录挂载蒸馏点见 knowledge_points。
 
 ### Projection locator（同代定位，不跨代）
-- textbook vocab/grammar/term_map 当前定位方式：
+- textbook vocab/grammar 当前定位方式：
   `document + lesson + kind + ord/ref`（`ref = lesson#v{ord}/#d{ord}`），
   仅在同一 canonical generation 内有效，由 shred 同事务全量重建保证一致。
 - exercise.id 无生成器（种子手写或 null），不纳入 identity 体系。

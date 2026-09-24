@@ -11,13 +11,14 @@ import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
 
 /**
  * P1-D0 Vocab/Grammar Identity 取证（只调查不迁移）。
- * 约束：不新增 vocab_id/grammar_id/ref_id，不改 term_map/locator/lesson identity/schema，
+ * 约束：不新增 vocab_id/grammar_id/ref_id，不改 locator/lesson identity/schema，
  * 不写真实库（全 :memory:），不进 UI。
  * 结论前置（各单测分别锁定）：
  * - 唯一生成点 = enrich 接地（groundVocabularies/groundGrammarPoints），格式 `${lessonId}-v/g${kept序号}`；
  * - seed 为手写静态 `v1-1` 形，与 PDF 动态形不同源；
  * - shred 丢弃 AST id，行身份 = (document_id, lesson_id, ord)，FTS ref 亦为位置派生；
- * - term_map ref_text = 面字符串精确匹配桥，非 identity；同课同面直接整单失败；
+ * - v30 起 term_map 表退役：面字符串→词典的精确匹配计数只在 shred 内存统计
+ *  （mappedEntries/unmapped），同课同面只计首条；
  * - 下游 durable 资产零依赖 vocab/grammar id（见代码审计，测试只锁行身份与字符串键）。
  */
 
@@ -143,7 +144,7 @@ describe('P1-D0 取证：append 与 enrich 语义', () => {
   });
 });
 
-describe('P1-D0 取证：AST→shred 行身份与 term_map', () => {
+describe('P1-D0 取证：AST→shred 行身份与映射计数', () => {
   it('shred 表无 vocab_id/grammar_id 列；行身份=(document_id,lesson_id,ord)', () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
@@ -184,12 +185,14 @@ describe('P1-D0 取证：AST→shred 行身份与 term_map', () => {
     expect(rows).toEqual([{ l: 'l1', o: 0, s: '食べる' }, { l: 'l1', o: 1, s: '飲む' }]);
     const fts = repo.getRawDb().query("SELECT ref FROM textbook_fts WHERE document_id=? AND kind='vocab' ORDER BY ref").all('d1') as Array<{ ref: string }>;
     expect(fts.map((r) => r.ref).sort()).toEqual(['l1#v0', 'l1#v1']);
-    const maps = repo.getRawDb().query('SELECT kind, ref_text AS t FROM textbook_term_map WHERE document_id=? ORDER BY ref_text').all('d1') as Array<{ kind: string; t: string }>;
-    expect(maps).toContainEqual({ kind: 'vocab', t: '食べる' });
-    expect(maps).toContainEqual({ kind: 'grammar', t: '〜ます' });
+    // 映射计数（2 词 + 1 文法，去重后 3 条；命中与否看种子词典，不断言拆分）。
+    const stats = await repo.shredDocument('d1-stats', book as never);
+    expect(isOk(stats)).toBe(true);
+    if (!isOk(stats)) return;
+    expect(stats.value.mappedEntries + stats.value.unmapped).toBe(3);
   });
 
-  it('同课同面：P1-D1 去重后 shred 成功；occurrence 全保留，term_map 仅首条（best-effort 桥）', async () => {
+  it('同课同面：P1-D1 去重后 shred 成功；occurrence 全保留，映射只计首条', async () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const book = {
@@ -212,8 +215,10 @@ describe('P1-D0 取证：AST→shred 行身份与 term_map', () => {
     expect(isOk(res)).toBe(true);
     const v = repo.getRawDb().query('SELECT ord AS o, surface AS s FROM textbook_vocab WHERE document_id=? ORDER BY ord').all('d1') as Array<{ o: number; s: string }>;
     expect(v).toEqual([{ o: 0, s: '食べる' }, { o: 1, s: '食べる' }]);
-    const m = repo.getRawDb().query("SELECT COUNT(*) AS n FROM textbook_term_map WHERE document_id=? AND kind='vocab'").get('d1') as { n: number };
-    expect(m.n).toBe(1);
+    const stats = await repo.shredDocument('d1-stats', book as never);
+    expect(isOk(stats)).toBe(true);
+    if (!isOk(stats)) return;
+    expect(stats.value.mappedEntries + stats.value.unmapped).toBe(1);
   });
 
   it('跨课同面：允许落库（PK 含 lesson_id），但字符串键天然歧义', async () => {
@@ -228,8 +233,11 @@ describe('P1-D0 取证：AST→shred 行身份与 term_map', () => {
     };
     const docBase = { id: 'd1', userId: 'u1', title: 'B', sourceKind: 'user_import' as const, language: 'ja', content: 'c', createdAt: 'x', updatedAt: 'x' };
     expect(isOk(await repo.saveCanonicalAst(docBase, book as never))).toBe(true);
-    const maps = repo.getRawDb().query("SELECT lesson_id AS l, ref_text AS t FROM textbook_term_map WHERE document_id=? AND kind='vocab' ORDER BY lesson_id").all('d1') as Array<{ l: string; t: string }>;
-    expect(maps).toEqual([{ l: 'l1', t: '社員' }, { l: 'l2', t: '社員' }]);
+    const stats = await repo.shredDocument('d1-stats', book as never);
+    expect(isOk(stats)).toBe(true);
+    if (!isOk(stats)) return;
+    // 跨课同面各计一条（PK 含 lesson_id；字符串键歧义由调用方承担）。
+    expect(stats.value.mappedEntries + stats.value.unmapped).toBe(2);
   });
 });
 

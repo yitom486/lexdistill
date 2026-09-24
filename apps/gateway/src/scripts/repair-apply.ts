@@ -35,7 +35,7 @@ try {
   const migration = applySeedAstMigration(db);
   for (const d of migration.docs) {
     console.log(
-      `  ${d.documentId} oldShape=${d.oldShape} migrated=${d.migrated} L${d.lessons}/ln${d.lines}/v${d.vocab}/g${d.grammar}/e${d.exercises}/m${d.termMap}/f${d.ftsRows} ${d.note}`
+      `  ${d.documentId} oldShape=${d.oldShape} migrated=${d.migrated} L${d.lessons}/ln${d.lines}/v${d.vocab}/g${d.grammar}/e${d.exercises}/f${d.ftsRows} ${d.note}`
     );
   }
 
