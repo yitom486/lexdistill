@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { useImportPdfMutation, useMapPdfMutation, useAppendPdfMutation, useImportDocumentMutation, useClassifyStructureMutation, useSaveDocumentStructureMutation, type StructureClassItem, type StructureHeading } from '../queries/useLearnerQueries.js';
 import { useOcrStore } from '../stores/useOcrStore.js';
-import { useCodexModelsQuery } from '../queries/useCodexQueries.js';
+import { useAgentModelsQuery } from '../queries/useAgentQueries.js';
 import { pickClassifyEffort } from '../utils/classify-effort.js';
 import { nextRelayWindow, resolveOcrOverflowWindow, resolvePdfPageRange } from '../lib/pdf-page-range.js';
 import { isPdfUploadTooLarge, pdfTooLargeMessage, stripPdfPathQuotes } from '../lib/pdf-upload-guard.js';
@@ -75,10 +75,10 @@ export function TextbookImporterModal({
   const mapPdf = useMapPdfMutation();
   const classify = useClassifyStructureMutation();
   // 分类模型独立选择（与聊天模型偏好分开；默认取列表最末=最便宜可用）
-  const { data: codexModels = [] } = useCodexModelsQuery(true);
+  const { data: agentModels = [] } = useAgentModelsQuery(true);
   const [classifyModelId, setClassifyModelId] = useState<string>('');
   const effectiveClassifyModelId =
-    classifyModelId || (codexModels.length > 0 ? (codexModels[codexModels.length - 1]?.model ?? '') : '');
+    classifyModelId || (agentModels.length > 0 ? (agentModels[agentModels.length - 1]?.model ?? '') : '');
   const [classifyResult, setClassifyResult] = useState<{
     classes: StructureClassItem[];
     dropped: number;
@@ -288,7 +288,7 @@ export function TextbookImporterModal({
     }
     setParseError(null);
     sound.playClick();
-    const meta = codexModels.find((m) => m.model === effectiveClassifyModelId);
+    const meta = agentModels.find((m) => m.model === effectiveClassifyModelId);
     const effort = pickClassifyEffort(meta?.supportedReasoningEfforts, meta?.defaultReasoningEffort);
     setClassifyEffort(effort ?? '');
     setClassifyInputHeadings(headings);
@@ -885,15 +885,15 @@ export function TextbookImporterModal({
                       setClassifyModelId(v ?? '');
                       setClassifyResult(null);
                     }}
-                    disabled={codexModels.length === 0}
+                    disabled={agentModels.length === 0}
                   >
                     <SelectTrigger className="h-7 min-w-44 text-[11px]">
                       <SelectValue
-                        placeholder={codexModels.length === 0 ? '无可用模型（用网关默认）' : '选择分类模型'}
+                        placeholder={agentModels.length === 0 ? '无可用模型（用网关默认）' : '选择分类模型'}
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {codexModels.map((m) => (
+                      {agentModels.map((m) => (
                         <SelectItem key={m.id} value={m.model} className="text-[11px]">
                           {m.displayName || m.model}
                         </SelectItem>

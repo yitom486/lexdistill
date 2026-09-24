@@ -8,7 +8,7 @@ export interface ToolCallTrace {
 
 /**
  * 去掉不应出现在聊天气泡里的注入块：
- * Gateway/Adapter 学情快照、Codex trunk-context、system 标签。
+ * Gateway/Adapter 学情快照、Agent trunk-context、system 标签。
  */
 export function stripTranscriptNoise(text: string): string {
   let out = String(text ?? '');
@@ -91,7 +91,7 @@ export function mapThreadItemsToBubbles(items: ThreadItemLike[]): MappedChatBubb
   };
 
   for (const item of items) {
-    if (item.type === 'userMessage') {
+    if (item.type === 'user_message') {
       flush();
       const text = stripTranscriptNoise(item.text ?? '');
       if (text) {
@@ -110,26 +110,24 @@ export function mapThreadItemsToBubbles(items: ThreadItemLike[]): MappedChatBubb
         id: `a_${item.turnId || item.id || result.length}`,
         role: 'assistant',
         text: '',
-        source: 'codex',
+        source: 'agent',
         toolCalls: [],
       };
     }
 
-    if (item.type === 'agentMessage' && item.text) {
+    if (item.type === 'assistant_message' && item.text) {
       const cleaned = stripTranscriptNoise(item.text);
       current.text = current.text ? `${current.text}\n${cleaned}` : cleaned;
     } else if (item.type === 'reasoning' && item.text) {
       current.reasoning = item.text;
     } else if (
-      item.type === 'dynamicToolCall' ||
-      item.type === 'mcpToolCall' ||
-      item.type === 'commandExecution'
+      item.type === 'tool_call'
     ) {
       current.toolCalls = [
         ...(current.toolCalls ?? []),
         {
           id: item.id || `${item.type}_${item.turnId}_${current.toolCalls?.length ?? 0}`,
-          toolName: item.toolName || (item.type === 'commandExecution' ? 'command' : item.type),
+          toolName: item.toolName || 'tool',
           status: 'done',
           ...(item.arguments ? { arguments: item.arguments } : {}),
           ...(item.text && !item.arguments ? { arguments: { command: item.text } } : {}),

@@ -6,9 +6,9 @@ import {
 } from '../../lib/chat-transcript.js';
 import { sound } from '../../utils/audio.js';
 import { buildTutorOfflineReply } from '../../copy/tutor-track-copy.js';
-import { CODEX_QUERY_KEYS } from '../../queries/useCodexQueries.js';
+import { AGENT_QUERY_KEYS } from '../../queries/useAgentQueries.js';
 import type { useQueryClient } from '@tanstack/react-query';
-import type { ChatMessage, CodexTurnHealth } from './chat-shared.js';
+import type { ChatMessage, AgentTurnHealth } from './chat-shared.js';
 
 /** P2-1 拆分：AgentChatPanel 的轮次执行逻辑（发送/steer/队列消费/重试/审批/中断），纯搬运。 */
 
@@ -18,7 +18,7 @@ function friendlyTurnError(err: unknown, fallback: string): string {
   const raw = e?.userMessage || e?.message || '';
   if (!raw) return fallback;
   if (raw === 'Gateway is not connected' || /gateway.*not connected/i.test(raw)) {
-    return '网关未连通，消息未发出：请确认网关已启动（默认 localhost:8080），然后点右上“重试 Codex”。';
+    return '网关未连通，消息未发出：请确认网关已启动（默认 localhost:8080），然后点右上“重试”。';
   }
   return raw;
 }
@@ -31,7 +31,7 @@ export interface ChatTurnDeps {
   busy: boolean;
   setBusy: (v: boolean) => void;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
-  setCodexTurnHealth: (h: CodexTurnHealth) => void;
+  setAgentTurnHealth: (h: AgentTurnHealth) => void;
   queueDrainRef: React.MutableRefObject<boolean>;
   lastCoachPromptRef: React.MutableRefObject<string | null>;
   snapshot: () => Record<string, unknown>;
@@ -45,7 +45,7 @@ export interface ChatTurnDeps {
   coachCollaborationMode: string;
   setCoachThreadId: (v: string) => void;
   queryClient: QueryClient;
-  refetchCodexStatus: () => void;
+  refetchAgentStatus: () => void;
 }
 
 export function useChatTurn(deps: ChatTurnDeps) {
@@ -54,7 +54,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
     busy,
     setBusy,
     setMessages,
-    setCodexTurnHealth,
+    setAgentTurnHealth,
     queueDrainRef,
     lastCoachPromptRef,
     snapshot,
@@ -68,7 +68,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
     coachCollaborationMode,
     setCoachThreadId,
     queryClient,
-    refetchCodexStatus,
+    refetchAgentStatus,
   } = deps;
 
   const recordCodexTurnCompletion = useCallback(
@@ -89,7 +89,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
       fromQueue?: boolean;
     }) => {
       if (data.status === 'INTERRUPTED') {
-        setCodexTurnHealth({ state: 'idle' });
+        setAgentTurnHealth({ state: 'idle' });
         return;
       }
       // P3-C：优先读结构化 outcome / failure，旧字段作为兜底
@@ -97,26 +97,26 @@ export function useChatTurn(deps: ChatTurnDeps) {
       const failMessage =
         data.failure?.userMessage || data.codexFailureMessage;
       if (outcome === 'streamed' || data.source === 'codex') {
-        setCodexTurnHealth({ state: 'healthy' });
+        setAgentTurnHealth({ state: 'healthy' });
         return;
       }
       if (outcome === 'fallback') {
-        setCodexTurnHealth({
+        setAgentTurnHealth({
           state: 'fallback',
-          message: failMessage || 'Codex 本轮未完成，已使用本地学习提示。',
+          message: failMessage || 'Agent 本轮未完成，已使用本地学习提示。',
         });
-        void refetchCodexStatus();
+        void refetchAgentStatus();
         return;
       }
       if (data.status === 'FAILED' || data.failure) {
-        setCodexTurnHealth({
+        setAgentTurnHealth({
           state: 'failed',
           message: failMessage || '本轮请求未完成，请重试。',
         });
-        void refetchCodexStatus();
+        void refetchAgentStatus();
       }
     },
-    [setCodexTurnHealth, refetchCodexStatus]
+    [setAgentTurnHealth, refetchAgentStatus]
   );
 
   const startQueuedTurn = useCallback(
@@ -143,7 +143,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
         },
       ]);
       setBusy(true);
-      setCodexTurnHealth({ state: 'running' });
+      setAgentTurnHealth({ state: 'running' });
 
       const finish = (data: {
         finalOutput?: string;
@@ -164,9 +164,9 @@ export function useChatTurn(deps: ChatTurnDeps) {
         recordCodexTurnCompletion(data);
         if (data.threadId) {
           setCoachThreadId(data.threadId);
-          void queryClient.invalidateQueries({ queryKey: CODEX_QUERY_KEYS.THREADS });
+          void queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.SESSIONS });
           void queryClient.invalidateQueries({
-            queryKey: [...CODEX_QUERY_KEYS.QUEUE, data.threadId],
+            queryKey: [...AGENT_QUERY_KEYS.QUEUE, data.threadId],
           });
         }
         setMessages((prev) =>
@@ -257,8 +257,8 @@ export function useChatTurn(deps: ChatTurnDeps) {
         onError: (err) => {
           queueDrainRef.current = false;
           const msg = friendlyTurnError(err, '队列消费失败');
-          setCodexTurnHealth({ state: 'failed', message: msg });
-          void refetchCodexStatus();
+          setAgentTurnHealth({ state: 'failed', message: msg });
+          void refetchAgentStatus();
           setMessages((prev) =>
             prev.map((m) => (m.id === aiId ? { ...m, text: msg, streaming: false } : m))
           );
@@ -275,12 +275,12 @@ export function useChatTurn(deps: ChatTurnDeps) {
       queueDrainRef,
       setMessages,
       setBusy,
-      setCodexTurnHealth,
+      setAgentTurnHealth,
       recordCodexTurnCompletion,
       setCoachThreadId,
       queryClient,
       coachApprovalPolicy,
-      refetchCodexStatus,
+      refetchAgentStatus,
     ]
   );
 
@@ -312,12 +312,12 @@ export function useChatTurn(deps: ChatTurnDeps) {
         { id: aiId, role: 'assistant', text: '', reasoning: '', streaming: true, toolCalls: [] },
       ]);
       setBusy(true);
-      setCodexTurnHealth({ state: 'running' });
+      setAgentTurnHealth({ state: 'running' });
       lastCoachPromptRef.current = text;
 
       if (!gateway.isConnected) {
         const offline = buildTutorOfflineReply(track, text);
-        setCodexTurnHealth({ state: 'failed', message: 'Gateway 未连接，无法请求 Codex。' });
+        setAgentTurnHealth({ state: 'failed', message: 'Gateway 未连接，无法请求 Agent。' });
         setMessages((prev) =>
           prev.map((m) => (m.id === aiId ? { ...m, text: offline, streaming: false } : m))
         );
@@ -405,9 +405,9 @@ export function useChatTurn(deps: ChatTurnDeps) {
           recordCodexTurnCompletion(data);
           if (data.threadId) {
             setCoachThreadId(data.threadId);
-            void queryClient.invalidateQueries({ queryKey: CODEX_QUERY_KEYS.THREADS });
+            void queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.SESSIONS });
             void queryClient.invalidateQueries({
-              queryKey: [...CODEX_QUERY_KEYS.QUEUE, data.threadId],
+              queryKey: [...AGENT_QUERY_KEYS.QUEUE, data.threadId],
             });
           }
           setMessages((prev) =>
@@ -431,8 +431,8 @@ export function useChatTurn(deps: ChatTurnDeps) {
         },
         onError: (err) => {
           const msg = friendlyTurnError(err, '导师服务暂时不可用，请稍后重试。');
-          setCodexTurnHealth({ state: 'failed', message: msg });
-          void refetchCodexStatus();
+          setAgentTurnHealth({ state: 'failed', message: msg });
+          void refetchAgentStatus();
           setMessages((prev) =>
             prev.map((m) => (m.id === aiId ? { ...m, text: msg, streaming: false } : m))
           );
@@ -446,7 +446,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
       setInput,
       setMessages,
       setBusy,
-      setCodexTurnHealth,
+      setAgentTurnHealth,
       lastCoachPromptRef,
       track,
       snapshot,
@@ -460,11 +460,11 @@ export function useChatTurn(deps: ChatTurnDeps) {
       queryClient,
       startQueuedTurn,
       recordCodexTurnCompletion,
-      refetchCodexStatus,
+      refetchAgentStatus,
     ]
   );
 
-  const retryLastCodexTurn = useCallback(() => {
+  const retryLastAgentTurn = useCallback(() => {
     const prompt = lastCoachPromptRef.current;
     if (!prompt || busy) return;
     void send(prompt);
@@ -501,11 +501,11 @@ export function useChatTurn(deps: ChatTurnDeps) {
     queueDrainRef.current = false;
     gateway.interruptTurn('coach');
     setBusy(false);
-    setCodexTurnHealth({ state: 'idle' });
+    setAgentTurnHealth({ state: 'idle' });
     setMessages((prev) =>
       prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))
     );
-  }, [queueDrainRef, gateway, setBusy, setCodexTurnHealth, setMessages]);
+  }, [queueDrainRef, gateway, setBusy, setAgentTurnHealth, setMessages]);
 
-  return { recordCodexTurnCompletion, startQueuedTurn, send, retryLastCodexTurn, respondApproval, interrupt };
+  return { recordCodexTurnCompletion, startQueuedTurn, send, retryLastAgentTurn, respondApproval, interrupt };
 }

@@ -17,23 +17,23 @@ import {
 } from '../copy/tutor-track-copy.js';
 import { normalizeTrackLanguage } from '../learning/learning-shell.js';
 import {
-  useArchiveCodexThreadMutation,
-  useCompactCodexThreadMutation,
-  useCodexCollaborationModesQuery,
-  useCodexModelsQuery,
-  useCodexQueueQuery,
-  useCodexSkillsQuery,
-  useCodexRateLimitsQuery,
-  useCodexMcpServersQuery,
-  useCodexStatusQuery,
-  useCodexThreadItemsQuery,
-  useCodexThreadsQuery,
-  useCodexRealtimeInvalidation,
-  useDeleteCodexQueueItemMutation,
-  useForkCodexThreadMutation,
-  useQueueCodexMessageMutation,
-  CODEX_QUERY_KEYS,
-} from '../queries/useCodexQueries.js';
+  useArchiveAgentSessionMutation,
+  useCompactAgentSessionMutation,
+  useAgentCollaborationModesQuery,
+  useAgentModelsQuery,
+  useAgentQueueQuery,
+  useAgentSkillsQuery,
+  useAgentUsageQuery,
+  useMcpServersQuery,
+  useAgentStatusQuery,
+  useAgentSessionItemsQuery,
+  useAgentSessionsQuery,
+  useAgentRealtimeInvalidation,
+  useDeleteAgentQueueItemMutation,
+  useForkAgentSessionMutation,
+  useQueueAgentMessageMutation,
+  AGENT_QUERY_KEYS,
+} from '../queries/useAgentQueries.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChatPanelHeader } from './agent-chat/ChatPanelHeader.js';
 import { ChatMessageList } from './agent-chat/ChatMessageList.js';
@@ -43,7 +43,7 @@ import { useReadingFocusStore } from '../stores/useReadingFocusStore.js';
 import {
   FALLBACK_EFFORTS,
   type ChatMessage,
-  type CodexTurnHealth,
+  type AgentTurnHealth,
 } from './agent-chat/chat-shared.js';
 
 interface AgentChatPanelProps {
@@ -52,7 +52,7 @@ interface AgentChatPanelProps {
 }
 
 /**
- * 对齐 Inkdown / Codex VS Code 风格：顶栏状态 + 底栏 mode/model/thinking + 流式气泡。
+ * 对齐 Inkdown / Agent VS Code 风格：顶栏状态 + 底栏 mode/model/thinking + 流式气泡。
  * 仅经 Gateway；不引入厂商 SDK。
  */
 export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps) {
@@ -81,42 +81,42 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   const track = normalizeTrackLanguage(profile.targetLanguage);
   const queryClient = useQueryClient();
 
-  const { data: codexStatus, refetch: refetchCodexStatus } = useCodexStatusQuery();
+  const { data: agentStatus, refetch: refetchAgentStatus } = useAgentStatusQuery();
   // 次级探测门控：等 status 确认已联动再发。避免未联动/启动期 6 路打空，
   // 与后端 ensureConnection single-flight 形成双保险（启动期只 spawn 一次）。
-  const codexProbesReady =
-    Boolean(gateway.isConnected) && codexStatus?.linked === true;
-  const { data: models = [], isFetching: modelsLoading } = useCodexModelsQuery(
-    codexProbesReady
+  const agentQueriesReady =
+    Boolean(gateway.isConnected) && agentStatus?.available === true;
+  const { data: models = [], isFetching: modelsLoading } = useAgentModelsQuery(
+    agentQueriesReady
   );
-  const { data: threadsData, refetch: refetchThreads } = useCodexThreadsQuery(
-    codexProbesReady
+  const { data: sessionsData, refetch: refetchThreads } = useAgentSessionsQuery(
+    agentQueriesReady
   );
-  const threads = threadsData?.threads ?? [];
-  const { data: collabModes = [] } = useCodexCollaborationModesQuery(
-    codexProbesReady
+  const sessions = sessionsData?.sessions ?? [];
+  const { data: collabModes = [] } = useAgentCollaborationModesQuery(
+    agentQueriesReady
   );
-  const { data: threadItems = [], isFetched: threadItemsFetched } = useCodexThreadItemsQuery(
+  const { data: threadItems = [], isFetched: threadItemsFetched } = useAgentSessionItemsQuery(
     coachThreadId || null,
-    Boolean(coachThreadId) && codexProbesReady
+    Boolean(coachThreadId) && agentQueriesReady
   );
-  const archiveThread = useArchiveCodexThreadMutation();
-  const compactThread = useCompactCodexThreadMutation();
-  const forkThread = useForkCodexThreadMutation();
-  useCodexRealtimeInvalidation();
-  const queueMessage = useQueueCodexMessageMutation();
-  const deleteQueueItem = useDeleteCodexQueueItemMutation();
-  const { data: queueItems = [] } = useCodexQueueQuery(
+  const archiveThread = useArchiveAgentSessionMutation();
+  const compactThread = useCompactAgentSessionMutation();
+  const forkThread = useForkAgentSessionMutation();
+  useAgentRealtimeInvalidation();
+  const queueMessage = useQueueAgentMessageMutation();
+  const deleteQueueItem = useDeleteAgentQueueItemMutation();
+  const { data: queueItems = [] } = useAgentQueueQuery(
     coachThreadId || null,
-    Boolean(coachThreadId) && codexProbesReady
+    Boolean(coachThreadId) && agentQueriesReady
   );
-  const { data: skills = [] } = useCodexSkillsQuery(codexProbesReady);
-  const { data: rateLimits } = useCodexRateLimitsQuery(codexProbesReady);
-  const { data: mcpServers = [] } = useCodexMcpServersQuery(codexProbesReady);
+  const { data: skills = [] } = useAgentSkillsQuery(agentQueriesReady);
+  const { data: usage } = useAgentUsageQuery(agentQueriesReady);
+  const { data: mcpServers = [] } = useMcpServersQuery(agentQueriesReady);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [composerSettingsOpen, setComposerSettingsOpen] = useState(false);
-  const [codexTurnHealth, setCodexTurnHealth] = useState<CodexTurnHealth>({ state: 'idle' });
+  const [agentTurnHealth, setAgentTurnHealth] = useState<AgentTurnHealth>({ state: 'idle' });
   const lastCoachPromptRef = useRef<string | null>(null);
   const queueDrainRef = useRef(false);
 
@@ -147,7 +147,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
           {
             id: 'resume',
             role: 'system',
-            text: '正在恢复上次 Codex 会话…',
+            text: '正在恢复上次 Agent 会话…',
           },
         ]);
       } else {
@@ -253,7 +253,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
       { id: `queue_${Date.now()}`, role: 'user', text: `排队 ${text}` },
     ]);
     queueMessage.mutate(
-      { threadId: coachThreadId, message: text },
+      { sessionId: coachThreadId, message: text },
       {
         onError: () => toast.error('加入队列失败'),
         onSuccess: () => toast.success('已加入下一轮队列'),
@@ -291,7 +291,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   const {
     startQueuedTurn,
     send,
-    retryLastCodexTurn,
+    retryLastAgentTurn,
     respondApproval,
     interrupt,
   } = useChatTurn({
@@ -299,7 +299,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
     busy,
     setBusy,
     setMessages,
-    setCodexTurnHealth,
+    setAgentTurnHealth,
     queueDrainRef,
     lastCoachPromptRef,
     snapshot,
@@ -313,10 +313,10 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
     coachCollaborationMode,
     setCoachThreadId,
     queryClient,
-    refetchCodexStatus,
+    refetchAgentStatus,
   });
   const connected = gateway.isConnected;
-  const authLinked = Boolean(codexStatus?.linked);
+  const agentAvailable = Boolean(agentStatus?.available);
   const modelLabel =
     selectedModel?.displayName || coachModelId || (modelsLoading ? '加载中…' : '本机默认');
 
@@ -332,21 +332,21 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
     >
         <ChatPanelHeader
           connected={connected}
-          authLinked={authLinked}
-          codexStatus={codexStatus}
-          codexTurnHealth={codexTurnHealth}
+          agentAvailable={agentAvailable}
+          agentStatus={agentStatus}
+          agentTurnHealth={agentTurnHealth}
           lastCoachPrompt={lastCoachPromptRef.current}
           busy={busy}
-          retryLastCodexTurn={retryLastCodexTurn}
-          rateLimits={rateLimits}
+          retryLastAgentTurn={retryLastAgentTurn}
+          usage={usage}
           track={track}
           coachThreadId={coachThreadId}
           historyOpen={historyOpen}
           setHistoryOpen={setHistoryOpen}
           refetchThreads={() => void refetchThreads()}
-          threads={threads}
+          sessions={sessions}
           startNewChat={startNewChat}
-          openThread={openThread}
+          openSession={openThread}
           compactThread={compactThread}
           forkThread={forkThread}
           coachPersistThread={coachPersistThread}
@@ -397,7 +397,6 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
           interrupt={interrupt}
           queueMessage={queueMessage}
           coachThreadId={coachThreadId}
-          codexStatus={codexStatus}
         />
       </div>
   );

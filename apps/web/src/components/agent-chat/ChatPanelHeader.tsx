@@ -16,33 +16,33 @@ import { Button } from '../ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
 import { sound } from '../../utils/audio.js';
 import type {
-  CodexAccountStatusDto,
-  CodexMcpServerStatusDto,
-  CodexRateLimitsDto,
-  CodexSkillDto,
-  CodexThreadDto,
-} from '../../queries/useCodexQueries.js';
-import type { CodexTurnHealth } from './chat-shared.js';
+  AgentStatusDto,
+  McpServerStatusDto,
+  AgentUsageDto,
+  AgentSkillDto,
+  AgentSessionDto,
+} from '../../queries/useAgentQueries.js';
+import type { AgentTurnHealth } from './chat-shared.js';
 import { getTutorTrackCopy } from '../../copy/tutor-track-copy.js';
 import type { TrackLanguage } from '../../learning/learning-shell.js';
 
 interface ChatPanelHeaderProps {
   connected: boolean;
-  authLinked: boolean;
-  codexStatus?: CodexAccountStatusDto | undefined;
-  codexTurnHealth: CodexTurnHealth;
+  agentAvailable: boolean;
+  agentStatus?: AgentStatusDto | undefined;
+  agentTurnHealth: AgentTurnHealth;
   lastCoachPrompt: string | null;
   busy: boolean;
-  retryLastCodexTurn: () => void;
-  rateLimits?: CodexRateLimitsDto | null | undefined;
+  retryLastAgentTurn: () => void;
+  usage?: AgentUsageDto | null | undefined;
   track: TrackLanguage;
   coachThreadId: string;
   historyOpen: boolean;
   setHistoryOpen: (open: boolean) => void;
   refetchThreads: () => void;
-  threads: CodexThreadDto[];
+  sessions: AgentSessionDto[];
   startNewChat: () => void;
-  openThread: (threadId: string) => void;
+  openSession: (sessionId: string) => void;
   compactThread: {
     isPending: boolean;
     mutate: (
@@ -53,8 +53,8 @@ interface ChatPanelHeaderProps {
   forkThread: {
     isPending: boolean;
     mutate: (
-      vars: { threadId: string; ephemeral?: boolean },
-      opts?: { onSuccess?: (res: { threadId: string }) => void; onError?: () => void }
+      vars: { sessionId: string; ephemeral?: boolean },
+      opts?: { onSuccess?: (res: { sessionId: string }) => void; onError?: () => void }
     ) => void;
   };
   coachPersistThread: boolean;
@@ -64,8 +64,8 @@ interface ChatPanelHeaderProps {
   };
   skillsOpen: boolean;
   setSkillsOpen: (open: boolean) => void;
-  skills: CodexSkillDto[];
-  mcpServers: CodexMcpServerStatusDto[];
+  skills: AgentSkillDto[];
+  mcpServers: McpServerStatusDto[];
   clearDisplay: () => void;
   onClose?: (() => void) | undefined;
 }
@@ -74,21 +74,21 @@ interface ChatPanelHeaderProps {
 export function ChatPanelHeader(props: ChatPanelHeaderProps) {
   const {
     connected,
-    authLinked,
-    codexStatus,
-    codexTurnHealth,
+    agentAvailable,
+    agentStatus,
+    agentTurnHealth,
     lastCoachPrompt,
     busy,
-    retryLastCodexTurn,
-    rateLimits,
+    retryLastAgentTurn,
+    usage,
     track,
     coachThreadId,
     historyOpen,
     setHistoryOpen,
     refetchThreads,
-    threads,
+    sessions,
     startNewChat,
-    openThread,
+    openSession,
     compactThread,
     forkThread,
     coachPersistThread,
@@ -119,101 +119,101 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             />
             {connected ? '已连接' : '未连接'}
           </span>
-          {authLinked ? (
+          {agentAvailable ? (
             <span
               className="inline-flex items-center gap-1 text-[10px] text-ink-emerald-500o90"
-              title={codexStatus?.message}
+              title={agentStatus?.message}
             >
               <KeyRound className="size-3" />
-              Codex 已登录
+              Agent 可用
             </span>
           ) : (
-            <span className="text-[10px] text-ink-amber-500o90" title={codexStatus?.message}>
-              待 login
+            <span className="text-[10px] text-ink-amber-500o90" title={agentStatus?.message}>
+              Agent 未就绪
             </span>
           )}
-          {codexTurnHealth.state !== 'idle' ? (
+          {agentTurnHealth.state !== 'idle' ? (
             <span
               className={`inline-flex items-center gap-1 text-[10px] ${
-                codexTurnHealth.state === 'healthy'
+                agentTurnHealth.state === 'healthy'
                   ? 'text-ink-emerald-400'
-                  : codexTurnHealth.state === 'running'
+                  : agentTurnHealth.state === 'running'
                     ? 'text-tone-sky-400'
-                    : codexTurnHealth.state === 'fallback'
+                    : agentTurnHealth.state === 'fallback'
                       ? 'text-ink-amber-400'
                       : 'text-ink-rose-400'
               }`}
               title={
-                codexTurnHealth.state === 'fallback' || codexTurnHealth.state === 'failed'
-                  ? codexTurnHealth.message
+                agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed'
+                  ? agentTurnHealth.message
                   : undefined
               }
             >
               <span
                 className={`size-1.5 rounded-full ${
-                  codexTurnHealth.state === 'healthy'
+                  agentTurnHealth.state === 'healthy'
                     ? 'bg-ink-emerald-400'
-                    : codexTurnHealth.state === 'running'
+                    : agentTurnHealth.state === 'running'
                       ? 'bg-tone-sky-400 animate-pulse'
-                      : codexTurnHealth.state === 'fallback'
+                      : agentTurnHealth.state === 'fallback'
                         ? 'bg-ink-amber-400'
                         : 'bg-ink-rose-400'
                 }`}
               />
-              {codexTurnHealth.state === 'healthy'
+              {agentTurnHealth.state === 'healthy'
                 ? '本轮正常'
-                : codexTurnHealth.state === 'running'
+                : agentTurnHealth.state === 'running'
                   ? '请求中'
-                  : codexTurnHealth.state === 'fallback'
+                  : agentTurnHealth.state === 'fallback'
                     ? '本轮已回退'
                     : '本轮失败'}
             </span>
           ) : null}
-          {(codexTurnHealth.state === 'fallback' || codexTurnHealth.state === 'failed') &&
+          {(agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed') &&
           lastCoachPrompt ? (
             <button
               type="button"
               className="text-[10px] font-medium text-tone-sky-400 hover:text-ink-sky-300"
               disabled={busy}
-              onClick={retryLastCodexTurn}
+              onClick={retryLastAgentTurn}
             >
-              重试 Codex
+              重试
             </button>
           ) : null}
-          {typeof rateLimits?.primaryUsedPercent === 'number' ? (
+          {typeof usage?.usedPercent === 'number' ? (
             <span
               className="inline-flex items-center gap-1 text-[10px] text-ink-stone-500"
               title={
                 [
-                  '这是 Codex 账号额度占用，不是本轮生成进度。',
-                  rateLimits.primaryResetsAt
-                    ? `重置于 ${new Date(rateLimits.primaryResetsAt * 1000).toLocaleString()}`
-                    : rateLimits.limitName || '',
+                  '这是当前 Agent 的额度占用，不是本轮生成进度。',
+                  usage.resetsAt
+                    ? `重置于 ${new Date(usage.resetsAt * 1000).toLocaleString()}`
+                    : usage.label || '',
                 ]
                   .filter(Boolean)
                   .join(' ')
               }
             >
               <Gauge className="size-3" />
-              额度已用 {Math.round(rateLimits.primaryUsedPercent)}%
+              额度已用 {Math.round(usage.usedPercent)}%
             </span>
           ) : null}
         </div>
         <p
           className={`mt-0.5 text-[10px] truncate ${
-            codexTurnHealth.state === 'fallback' || codexTurnHealth.state === 'failed'
+            agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed'
               ? 'text-ink-amber-500o90'
               : 'text-ink-stone-500'
           }`}
           title={
-            codexTurnHealth.state === 'fallback' || codexTurnHealth.state === 'failed'
-              ? codexTurnHealth.message
+            agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed'
+              ? agentTurnHealth.message
               : undefined
           }
         >
-          {codexTurnHealth.state === 'fallback' || codexTurnHealth.state === 'failed'
-            ? codexTurnHealth.message
-            : `${copy.headerHint} · App Server 流式${coachThreadId ? ` · ${coachThreadId.slice(0, 8)}…` : ''}`}
+          {agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed'
+            ? agentTurnHealth.message
+            : `${copy.headerHint} · Agent 流式${coachThreadId ? ` · ${coachThreadId.slice(0, 8)}…` : ''}`}
         </p>
       </div>
       <div className="flex items-center gap-0.5 shrink-0">
@@ -238,7 +238,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             className="w-72 p-2 bg-panel-chat-fixed border-tone-stone-700 text-tone-stone-100"
           >
             <div className="flex items-center justify-between px-1 pb-2">
-              <p className="text-[11px] font-medium text-tone-stone-300">Codex 会话</p>
+              <p className="text-[11px] font-medium text-tone-stone-300">Agent 会话</p>
               <button
                 type="button"
                 className="text-[10px] text-tone-sky-400 hover:text-ink-sky-300"
@@ -251,10 +251,10 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
               </button>
             </div>
             <div className="max-h-64 space-y-1 overflow-y-auto">
-              {threads.length === 0 ? (
+              {sessions.length === 0 ? (
                 <p className="px-2 py-3 text-[11px] text-ink-stone-500">暂无持久化会话</p>
               ) : (
-                threads.map((t) => (
+                sessions.map((t) => (
                   <div
                     key={t.id}
                     className={`flex items-start gap-1 rounded-lg px-2 py-1.5 hover:bg-tone-stone-800o80 ${
@@ -264,7 +264,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                     <button
                       type="button"
                       className="min-w-0 flex-1 text-left"
-                      onClick={() => openThread(t.id)}
+                      onClick={() => openSession(t.id)}
                     >
                       <p className="truncate text-[11px] text-ink-stone-200">
                         {t.name || t.preview || t.id.slice(0, 12)}
@@ -303,13 +303,13 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                         sound.playClick();
                         forkThread.mutate(
                           {
-                            threadId: t.id,
+                            sessionId: t.id,
                             ephemeral: !coachPersistThread,
                           },
                           {
                             onSuccess: (res) => {
                               toast.success('已分叉新会话');
-                              openThread(res.threadId);
+                              openSession(res.sessionId);
                             },
                             onError: () => toast.error('分叉失败'),
                           }
@@ -362,7 +362,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             className="w-72 p-2 bg-panel-chat-fixed border-tone-stone-700 text-tone-stone-100"
           >
             <p className="px-1 pb-2 text-[11px] font-medium text-tone-stone-300">
-              Codex Skills（只读）
+              Agent Skills（只读）
             </p>
             <div className="max-h-40 space-y-1 overflow-y-auto">
               {skills.length === 0 ? (
@@ -407,7 +407,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                     >
                       <span className="truncate text-[10px] text-tone-stone-300">{s.name}</span>
                       <span className="shrink-0 text-[9px] text-ink-stone-500">
-                        {s.authStatus} · {s.toolCount} tools
+                        {s.status} · {s.toolCount} tools
                       </span>
                     </div>
                   ))

@@ -434,7 +434,7 @@ export async function handleTurnSend(
   const isInterrupted = abortController.signal.aborted;
   let queueRemaining = 0;
   if (codexThreadId && !isInterrupted) {
-    const queued = await server.listCodexQueue({ threadId: codexThreadId, limit: 20 });
+    const queued = await server.listAgentQueue({ sessionId: codexThreadId, limit: 20 });
     if (isOk(queued)) queueRemaining = queued.value.items.length;
   }
   // P3-C：统一执行摘要（普通回合）

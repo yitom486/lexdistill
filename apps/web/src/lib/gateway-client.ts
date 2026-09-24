@@ -9,7 +9,7 @@ import { generateId } from '@study-studio/shared';
 import { useGatewayStore } from '../stores/useGatewayStore.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
-import { emitCodexInvalidate } from '../queries/useCodexQueries.js';
+import { emitAgentInvalidate } from '../queries/useAgentQueries.js';
 
 export const DEFAULT_GATEWAY_WS_URL = 'ws://localhost:8080/ws';
 export const DEFAULT_GATEWAY_USER_ID = 'student_web_01';
@@ -62,16 +62,16 @@ export interface StreamTurnOptions {
     finalOutput: string;
     toolResults?: unknown;
     source?: string;
-    /** 本轮是否由 Codex 流式完成，或因 Codex 失败回退。 */
+    /** 本轮是否由 Agent 流式完成，或因 Agent 失败回退。 */
     codexOutcome?: 'streamed' | 'fallback' | 'not_requested';
-    /** 仅在 Codex 回退时提供的面向用户的错误说明。 */
+    /** 仅在 Agent 回退时提供的面向用户的错误说明。 */
     codexFailureMessage?: string;
     model?: string;
     threadId?: string;
     queueRemaining?: number;
     fromQueue?: boolean;
     // P3-C 结构化执行摘要字段（统一普通回合与队列回合）
-    /** Codex 通路本轮结果（与 codexOutcome 等价，统一字段名） */
+    /** Agent 通路本轮结果（与 codexOutcome 等价，统一字段名） */
     outcome?: 'streamed' | 'fallback' | 'not_requested';
     /** 结构化失败原因；仅含用户可读信息，不含底层错误栈 */
     failure?: {
@@ -593,13 +593,13 @@ export class GatewayClient {
           }
         }
       } else if (envelope.type === WsEventTypes.AGENT_QUEUE_CHANGED) {
-        const threadId = (envelope.payload as { threadId?: string } | undefined)?.threadId;
-        emitCodexInvalidate({
+        const sessionId = (envelope.payload as { sessionId?: string } | undefined)?.sessionId;
+        emitAgentInvalidate({
           kind: 'queue',
-          ...(threadId ? { threadId } : {}),
+          ...(sessionId ? { sessionId } : {}),
         });
       } else if (envelope.type === WsEventTypes.AGENT_SKILLS_CHANGED) {
-        emitCodexInvalidate({ kind: 'skills' });
+        emitAgentInvalidate({ kind: 'skills' });
       } else if (envelope.type === WsEventTypes.AGENT_APPROVAL_REQUEST) {
         const p = envelope.payload as {
           approvalId?: string;

@@ -15,16 +15,16 @@ import { trackToSpeechLang } from '../../config/tts-voice-personas.js';
 import type { TrackLanguage } from '../../learning/learning-shell.js';
 import { stripTranscriptNoise } from '../../lib/chat-transcript.js';
 import { sound } from '../../utils/audio.js';
-import type { CodexQueuedSubmissionDto } from '../../queries/useCodexQueries.js';
+import type { AgentQueuedSubmissionDto } from '../../queries/useAgentQueries.js';
 import type { ChatMessage } from './chat-shared.js';
 import { effortLabel } from './chat-shared.js';
 
 interface ChatMessageListProps {
-  queueItems: CodexQueuedSubmissionDto[];
+  queueItems: AgentQueuedSubmissionDto[];
   busy: boolean;
   startQueuedTurn: (queuedSubmissionId?: string) => void;
   coachThreadId: string;
-  deleteQueueItem: { mutate: (vars: { threadId: string; queuedId: string }) => void };
+  deleteQueueItem: { mutate: (vars: { sessionId: string; queuedId: string }) => void };
   messages: ChatMessage[];
   respondApproval: (
     approvalId: string,
@@ -87,7 +87,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
                     if (!coachThreadId) return;
                     sound.playClick();
                     deleteQueueItem.mutate({
-                      threadId: coachThreadId,
+                      sessionId: coachThreadId,
                       queuedId: q.id,
                     });
                   }}
@@ -248,7 +248,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
             )}
             {!m.streaming && m.source ? (
               <div className="mt-1.5 text-[10px] text-tone-stone-600">
-                via {m.source === 'codex' ? 'Codex App Server' : m.source}
+                via {m.source === 'codex' ? 'Agent' : m.source}
               </div>
             ) : null}
           </div>

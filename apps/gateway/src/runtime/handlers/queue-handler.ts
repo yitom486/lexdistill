@@ -172,7 +172,7 @@ export async function handleQueueStart(
   const isInterrupted = abortController.signal.aborted;
   let queueRemaining = 0;
   if (threadId && !isInterrupted) {
-    const queued = await server.listCodexQueue({ threadId, limit: 20 });
+    const queued = await server.listAgentQueue({ sessionId: threadId, limit: 20 });
     if (isOk(queued)) queueRemaining = queued.value.items.length;
   }
   // P3-C：统一执行摘要（队列回合）

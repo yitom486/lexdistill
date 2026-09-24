@@ -10,10 +10,9 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
 import { sound } from '../../utils/audio.js';
 import type {
-  CodexAccountStatusDto,
-  CodexCollaborationModeDto,
-  CodexModelDto,
-} from '../../queries/useCodexQueries.js';
+  AgentCollaborationModeDto,
+  AgentModelDto,
+} from '../../queries/useAgentQueries.js';
 import { APPROVAL_OPTIONS, compactSelect, darkMenuItem, effortLabel } from './chat-shared.js';
 
 interface ChatComposerProps {
@@ -26,7 +25,7 @@ interface ChatComposerProps {
   composerSettingsNonDefault: boolean;
   coachCollaborationMode: string;
   setCoachCollaborationMode: (v: string) => void;
-  collabModes: CodexCollaborationModeDto[];
+  collabModes: AgentCollaborationModeDto[];
   coachApprovalPolicy: string;
   setCoachApprovalPolicy: (v: string) => void;
   coachEffort: string;
@@ -35,12 +34,11 @@ interface ChatComposerProps {
   coachModelId: string;
   setCoachModelId: (v: string) => void;
   modelLabel: string;
-  models: CodexModelDto[];
+  models: AgentModelDto[];
   enqueueQueued: () => void;
   interrupt: () => void;
   queueMessage: { isPending: boolean };
   coachThreadId: string;
-  codexStatus?: CodexAccountStatusDto | undefined;
 }
 
 /** P2-1 拆分：输入区 + 会话参数弹层 + 模型选择 + 发送/排队/停止（纯搬运自 AgentChatPanel）。 */
@@ -69,7 +67,6 @@ export function ChatComposer(props: ChatComposerProps) {
     interrupt,
     queueMessage,
     coachThreadId,
-    codexStatus,
   } = props;
   return (
     <footer className="shrink-0 p-3 pt-1.5">
@@ -275,7 +272,7 @@ export function ChatComposer(props: ChatComposerProps) {
       </div>
       <p className="mt-1.5 px-1 text-[10px] text-tone-stone-600">
         ~/.codex · queue/changed · compact · rateLimits
-        {codexStatus?.message ? ` · ${codexStatus.message}` : ''}
+        {agentStatus?.message ? ` · ${agentStatus.message}` : ''}
       </p>
     </footer>
   );

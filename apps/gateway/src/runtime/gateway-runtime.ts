@@ -46,6 +46,23 @@ import {
   handleToolResult,
 } from './handlers/control-handlers.js';
 
+function normalizeAgentItemType(type: string): string {
+  switch (type) {
+    case 'userMessage':
+      return 'user_message';
+    case 'agentMessage':
+      return 'assistant_message';
+    case 'reasoning':
+      return 'reasoning';
+    case 'dynamicToolCall':
+    case 'mcpToolCall':
+    case 'commandExecution':
+      return 'tool_call';
+    default:
+      return 'other';
+  }
+}
+
 export class GatewayServer {
   public readonly sessionManager = new SessionManager();
   public readonly contextBuilder = new ContextBuilder();
@@ -136,7 +153,7 @@ export class GatewayServer {
       if (!threadId) return;
       this.emitToThreadSessions(threadId, {
         type: WsEventTypes.AGENT_QUEUE_CHANGED,
-        payload: { threadId },
+        payload: { sessionId: threadId },
       });
       return;
     }
@@ -213,83 +230,158 @@ export class GatewayServer {
     }
   }
 
-  /** 本机 Codex 登录态 / 模型清单（HTTP 探测用） */
-  public async getCodexAccountStatus() {
-    return this.agentAdapter.getAccountStatus();
+  /** Provider-neutral runtime status for the public Agent API. */
+  public async getAgentStatus() {
+    const res = await this.agentAdapter.getAccountStatus();
+    if (!isOk(res)) return res;
+    return ok({
+      available: res.value.linked,
+      message: res.value.linked
+        ? 'Agent runtime is ready.'
+        : 'The configured Agent runtime is not ready. Check its local configuration.',
+    });
   }
 
-  public async listCodexModels(includeHidden = false) {
+  public async listAgentModels(includeHidden = false) {
     return this.agentAdapter.listModels(includeHidden);
   }
 
-  public async listCodexThreads(params?: {
+  public async listAgentSessions(params?: {
     limit?: number;
     cursor?: string;
     searchTerm?: string;
   }) {
-    return this.agentAdapter.listThreads(params);
+    const res = await this.agentAdapter.listThreads(params);
+    if (!isOk(res)) return res;
+    return ok({
+      sessions: res.value.threads.map((thread) => ({
+        id: thread.id,
+        preview: thread.preview,
+        name: thread.name,
+        createdAt: thread.createdAt,
+        updatedAt: thread.updatedAt,
+        ephemeral: thread.ephemeral,
+      })),
+      nextCursor: res.value.nextCursor,
+    });
   }
 
-  public async listCodexThreadItems(params: { threadId: string; limit?: number }) {
-    return this.agentAdapter.listThreadItems(params);
+  public async listAgentSessionItems(params: { sessionId: string; limit?: number }) {
+    const res = await this.agentAdapter.listThreadItems({
+      threadId: params.sessionId,
+      ...(params.limit !== undefined ? { limit: params.limit } : {}),
+    });
+    if (!isOk(res)) return res;
+    return ok({
+      items: res.value.items.map((item) => ({
+        ...item,
+        type: normalizeAgentItemType(item.type),
+      })),
+      nextCursor: res.value.nextCursor,
+    });
   }
 
-  public async setCodexThreadName(threadId: string, name: string) {
-    return this.agentAdapter.setThreadName(threadId, name);
+  public async setAgentSessionName(sessionId: string, name: string) {
+    return this.agentAdapter.setThreadName(sessionId, name);
   }
 
-  public async archiveCodexThread(threadId: string) {
-    return this.agentAdapter.archiveThread(threadId);
+  public async archiveAgentSession(sessionId: string) {
+    return this.agentAdapter.archiveThread(sessionId);
   }
 
-  public async compactCodexThread(threadId: string) {
-    return this.agentAdapter.compactThread(threadId);
+  public async compactAgentSession(sessionId: string) {
+    return this.agentAdapter.compactThread(sessionId);
   }
 
-  public async forkCodexThread(params: {
-    threadId: string;
+  public async forkAgentSession(params: {
+    sessionId: string;
     ephemeral?: boolean;
     model?: string;
   }) {
-    return this.agentAdapter.forkThread(params);
+    const res = await this.agentAdapter.forkThread({
+      threadId: params.sessionId,
+      ...(params.ephemeral !== undefined ? { ephemeral: params.ephemeral } : {}),
+      ...(params.model ? { model: params.model } : {}),
+    });
+    if (!isOk(res)) return res;
+    return ok({ sessionId: res.value.threadId });
   }
 
-  public async queueCodexAdd(params: {
-    threadId: string;
+  public async queueAgentAdd(params: {
+    sessionId: string;
     message: string;
     clientUserMessageId?: string;
   }) {
-    return this.agentAdapter.queueAdd(params);
+    return this.agentAdapter.queueAdd({
+      threadId: params.sessionId,
+      message: params.message,
+      ...(params.clientUserMessageId
+        ? { clientUserMessageId: params.clientUserMessageId }
+        : {}),
+    });
   }
 
-  public async listCodexQueue(params: { threadId: string; limit?: number }) {
-    return this.agentAdapter.queueList(params);
+  public async listAgentQueue(params: { sessionId: string; limit?: number }) {
+    return this.agentAdapter.queueList({
+      threadId: params.sessionId,
+      ...(params.limit !== undefined ? { limit: params.limit } : {}),
+    });
   }
 
-  public async deleteCodexQueueItem(params: {
-    threadId: string;
+  public async deleteAgentQueueItem(params: {
+    sessionId: string;
     queuedSubmissionId: string;
   }) {
-    return this.agentAdapter.queueDelete(params);
+    return this.agentAdapter.queueDelete({
+      threadId: params.sessionId,
+      queuedSubmissionId: params.queuedSubmissionId,
+    });
   }
 
-  public async startCodexQueue(params: {
-    threadId: string;
+  public async startAgentQueue(params: {
+    sessionId: string;
     queuedSubmissionId?: string;
   }) {
-    return this.agentAdapter.queueStart(params);
+    return this.agentAdapter.queueStart({
+      threadId: params.sessionId,
+      ...(params.queuedSubmissionId
+        ? { queuedSubmissionId: params.queuedSubmissionId }
+        : {}),
+    });
   }
 
-  public async listCodexSkills(params?: { forceReload?: boolean }) {
-    return this.agentAdapter.listSkills(params);
+  public async listAgentSkills(params?: { forceReload?: boolean }) {
+    const res = await this.agentAdapter.listSkills(params);
+    if (!isOk(res)) return res;
+    return ok(res.value.map((skill) => ({
+      name: skill.name,
+      description: skill.description,
+      enabled: skill.enabled,
+      ...(skill.scope ? { scope: skill.scope } : {}),
+    })));
   }
 
-  public async getCodexRateLimits() {
-    return this.agentAdapter.getRateLimits();
+  public async getAgentUsage() {
+    const res = await this.agentAdapter.getRateLimits();
+    if (!isOk(res)) return res;
+    return ok({
+      usedPercent: res.value.primaryUsedPercent,
+      resetsAt: res.value.primaryResetsAt,
+      label: null,
+    });
   }
 
-  public async listCodexMcpServers(params?: { cursor?: string; limit?: number }) {
-    return this.agentAdapter.listMcpServerStatus(params);
+  public async listMcpServers(params?: { cursor?: string; limit?: number }) {
+    const res = await this.agentAdapter.listMcpServerStatus(params);
+    if (!isOk(res)) return res;
+    return ok({
+      servers: res.value.servers.map((server) => ({
+        name: server.name,
+        status: server.authStatus,
+        toolCount: server.toolCount,
+      })),
+      nextCursor: res.value.nextCursor,
+    });
   }
 
   /** EXPERIMENTAL realtime — 预留接口，产品 UI 尚未接入 */
@@ -329,7 +421,7 @@ export class GatewayServer {
     return this.agentAdapter.appendRealtimeAudio(params);
   }
 
-  public async listCodexCollaborationModes() {
+  public async listAgentCollaborationModes() {
     return this.agentAdapter.listCollaborationModes();
   }
 

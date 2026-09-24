@@ -20,7 +20,7 @@ export interface ChatMessage {
   };
 }
 
-export type CodexTurnHealth =
+export type AgentTurnHealth =
   | { state: 'idle' }
   | { state: 'running' }
   | { state: 'healthy' }
