@@ -110,7 +110,12 @@ export function OnboardingDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setDismissed(true);
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -133,7 +138,7 @@ export function OnboardingDialog() {
                     sound.playClick();
                     setTrack(t.id);
                   }}
-                  className={`rounded-xl border p-3 text-left transition-colors cursor-pointer ${
+                  className={`rounded-xl border p-3 text-left text-ink transition-colors cursor-pointer ${
                     track === t.id
                       ? 'border-tone-amber-500 bg-wash-amber-500o10'
                       : 'border-line hover:border-tone-amber-500o40'
@@ -156,7 +161,7 @@ export function OnboardingDialog() {
                     sound.playClick();
                     setLevel(l.id);
                   }}
-                  className={`w-full rounded-xl border p-3 text-left transition-colors cursor-pointer ${
+                  className={`w-full rounded-xl border p-3 text-left text-ink transition-colors cursor-pointer ${
                     level === l.id
                       ? 'border-tone-amber-500 bg-wash-amber-500o10'
                       : 'border-line hover:border-tone-amber-500o40'
