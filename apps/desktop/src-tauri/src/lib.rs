@@ -293,6 +293,39 @@ fn gateway_sidecar_path(app: &AppHandle) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("网关 sidecar 不存在：{filename}"))
 }
 
+/// Dev 网关入口解析（纯函数，可单测）：
+/// 仓库根/apps/gateway/src/sidecar.ts 存在即返回 bun 启动参数。
+/// 与生产同入口，网关改动即时生效，不再依赖预编译 sidecar 包的新鲜度
+///（曾实测跑着 9/08 老包调新路由 404）。
+fn dev_gateway_entry(repo_root: &std::path::Path) -> Option<(PathBuf, Vec<String>)> {
+    let entry = repo_root
+        .join("apps")
+        .join("gateway")
+        .join("src")
+        .join("sidecar.ts");
+    if !entry.is_file() {
+        return None;
+    }
+    Some((
+        PathBuf::from("bun"),
+        vec![entry.to_string_lossy().to_string()],
+    ))
+}
+
+/// Dev 开关：STUDY_STUDIO_GATEWAY_BUN=1 时走 bun 现场拉起；缺省走预编译包（生产路径）。
+fn dev_gateway_command() -> Option<(PathBuf, Vec<String>)> {
+    if std::env::var("STUDY_STUDIO_GATEWAY_BUN").as_deref() != Ok("1") {
+        return None;
+    }
+    // dev 下 current_exe = <root>/apps/desktop/src-tauri/target/debug/<exe>，上溯 6 级到仓库根。
+    let root = std::env::current_exe()
+        .ok()?
+        .ancestors()
+        .nth(6)?
+        .to_path_buf();
+    dev_gateway_entry(&root)
+}
+
 /// 拉起网关 sidecar；二进制缺失或启动失败只打日志，不阻塞壳启动
 ///（离线模式下前端走本地降级，见 `useGateway`）。
 fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
@@ -312,8 +345,18 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
             return;
         }
     };
-    let mut command = Command::new(&sidecar_path);
+    // Dev 覆盖：环境变量开启时用 bun 现场拉起源码入口（program= bun，args=[sidecar.ts]）；
+    // 生产与默认走预编译包（program= sidecar 二进制，无额外参数）。
+    let (program, extra_args): (PathBuf, Vec<String>) = match dev_gateway_command() {
+        Some((program, args)) => {
+            println!("[sidecar] dev 模式：经 bun 现场拉起源码 sidecar（改动即时生效）");
+            (program, args)
+        }
+        None => (sidecar_path.clone(), Vec::new()),
+    };
+    let mut command = Command::new(&program);
     command
+        .args(&extra_args)
         .env("STUDY_STUDIO_DB", &db_path)
         .env("GATEWAY_PORT", port.to_string())
         .stdin(Stdio::piped())
@@ -324,10 +367,15 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
     match command.spawn() {
         Ok(mut child) => {
             println!(
-                "[sidecar] 网关已拉起（端口={}，库路径={}，程序={}）",
+                "[sidecar] 网关已拉起（端口={}，库路径={}，程序={}{})",
                 port,
                 db_path.display(),
-                sidecar_path.display()
+                program.display(),
+                if extra_args.is_empty() {
+                    String::new()
+                } else {
+                    format!(" {}", extra_args.join(" "))
+                }
             );
             #[cfg(windows)]
             let job = match JobObject::attach_to_process(child.as_raw_handle()) {
@@ -362,7 +410,7 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
         Err(e) => {
             eprintln!(
                 "[sidecar] 网关启动失败：{e}（程序={}，前端将以降级离线模式运行）",
-                sidecar_path.display()
+                program.display()
             );
         }
     }
@@ -467,6 +515,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::GatewaySidecar;
+    use super::dev_gateway_entry;
     use std::io::Read;
     use std::process::{Child, Command};
 
@@ -536,6 +585,22 @@ mod tests {
         sidecar.shutdown();
 
         assert!(sidecar.child.lock().expect("sidecar lock").is_none());
+    }
+
+    #[test]
+    fn dev_gateway_entry_resolves_bun_sidecar_only_when_present() {
+        // 仓库根不存在 sidecar.ts → None（生产路径不受影响）。
+        assert!(dev_gateway_entry(std::path::Path::new("/nonexistent-root-xyz")).is_none());
+        // 用当前仓库真实布局断言（本文件即在 apps/desktop/src-tauri/src 下）。
+        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let repo_root = manifest
+            .ancestors()
+            .nth(3)
+            .expect("src-tauri 上溯 3 级应为仓库根");
+        let (program, args) = dev_gateway_entry(repo_root).expect("仓库应含 apps/gateway/src/sidecar.ts");
+        assert_eq!(program.to_string_lossy(), "bun");
+        assert_eq!(args.len(), 1);
+        assert!(args[0].ends_with("sidecar.ts"));
     }
 
     #[test]
