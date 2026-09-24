@@ -78,9 +78,13 @@ export {
 export {
   TOC_SEGMENT_CHUNK_PAGES,
   TOC_SEGMENT_MIN_ENTRIES,
+  TOC_LEVEL_HINT,
   fingerprintTocPlan,
   previewTocSegments,
+  validateTocEntries,
   sha256HexBytes,
+  type TocEntryField,
+  type TocEntryIssue,
   type TocLessonMappingReason,
   type TocLessonMappingStatus,
   type TocLessonSegment,

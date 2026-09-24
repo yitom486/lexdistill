@@ -17,6 +17,7 @@ const EXPECTED_RUNTIME_KEYS = new Set([
   'MIN_SEMANTIC_TITLES',
   'TOC_SEGMENT_CHUNK_PAGES',
   'TOC_SEGMENT_MIN_ENTRIES',
+  'TOC_LEVEL_HINT',
   'buildOcrOverflowError',
   'buildPdfConvertReport',
   'buildPdfMapReport',
@@ -41,10 +42,11 @@ const EXPECTED_RUNTIME_KEYS = new Set([
   'promoteLessonHeadings',
   'sha256HexBytes',
   'splitInlineChinese',
+  'validateTocEntries',
 ]);
 
 describe('content public surface', () => {
-  it('运行时导出不多不少（31 项）', () => {
+  it('运行时导出不多不少（33 项）', () => {
     const actual = new Set(Object.keys(pub));
     expect(actual.size).toBe(EXPECTED_RUNTIME_KEYS.size);
     for (const key of actual) {

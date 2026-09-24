@@ -257,7 +257,7 @@ describe('P5C POST preview-toc-segments（真运行时探针 + 自造 PDF）', (
 });
 
 describe('P3.1B 下游标题门（preview 漏斗）', () => {
-  it('无语义标题条目 → invalid，正常条目放行', () => {
+  it('无语义标题条目 → E_TOC_ENTRY_INVALID（带 issues 明细），正常条目放行', () => {
     const base = { pageCount: 100, anchors: ANCHORS };
     for (const title of ['##### ……', '···', '12', 'Page 5']) {
       const res = previewTocSegments({
@@ -266,8 +266,10 @@ describe('P3.1B 下游标题门（preview 漏斗）', () => {
       });
       expect(isOk(res)).toBe(false);
       if (isOk(res)) continue;
-      expect(res.error.code).toBe('E_INVALID_INPUT');
+      expect(res.error.code).toBe('E_TOC_ENTRY_INVALID');
       expect(res.error.userMessage).toContain('无语义');
+      const details = res.error.internalDetails as { issues: Array<{ field: string }> };
+      expect(details.issues[0]?.field).toBe('title');
     }
     const okRes = previewTocSegments({ ...base, entries: ENTRIES });
     expect(isOk(okRes)).toBe(true);
@@ -292,6 +294,6 @@ describe('P3.1B 下游标题门（preview 漏斗）', () => {
     );
     expect(isOk(res)).toBe(false);
     if (isOk(res)) return;
-    expect(res.error.code).toBe('E_INVALID_INPUT');
+    expect(res.error.code).toBe('E_TOC_ENTRY_INVALID');
   });
 });

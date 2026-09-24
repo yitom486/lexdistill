@@ -225,6 +225,135 @@ function invalid(message: string): Result<never, BusinessError> {
 }
 
 /**
+ * 目录层级约定（LLM 输出契约；preview 与增量修复共用）：
+ * level 0 = 一级（部/章），1 = 二级（课/节），2 = 三级（子节）；允许更深，但上爬每次最多 +1。
+ * section（章/復習/噪音）同样参与层级序列——层级只描述形状，不决定成课。
+ */
+export const TOC_LEVEL_HINT =
+  'level 取 0=一级（部/章）、1=二级（课/节）、2=三级（子节）；首条须为 0 或 1，上爬每次最多 +1（如 0→2 非法，中间补一级）';
+
+export type TocEntryField = 'title' | 'printedPage' | 'level' | 'kind';
+
+/** 单条目录问题（机器可读：LLM 增量修复循环直接消费本数组）。 */
+export interface TocEntryIssue {
+  /** entries 下标（0-based）；-1 表示整份不是数组 */
+  index: number;
+  title?: string | undefined;
+  field: TocEntryField;
+  reason: string;
+  /** 给大模型的修复指引（可直接拼进追问 prompt） */
+  hint: string;
+}
+
+export type ValidateTocEntriesResult =
+  | { ok: true; entries: TocSegmentTocEntry[] }
+  | { ok: false; issues: TocEntryIssue[] };
+
+/**
+ * 目录条目全量校验（纯函数，收集全部问题一次返回，不 fail-fast）。
+ * 覆盖：形状（title/printedPage/kind）+ 层级存在与连贯（首条 0/1、上爬 +1 上限）。
+ * 标题语义门（符号残留/纯数字）沿用 isSemanticOutlineTitle，与主流程同一口径。
+ */
+export function validateTocEntries(raw: unknown): ValidateTocEntriesResult {
+  if (!Array.isArray(raw)) {
+    return {
+      ok: false,
+      issues: [
+        {
+          index: -1,
+          field: 'title',
+          reason: 'entries 不是数组',
+          hint: '请输出 JSON 数组，每条含 title（目录原文）/ printedPage（原书印刷页码，正整数）/ level（0/1/2…）/ kind（lesson 成课 / section 章节噪音）',
+        },
+      ],
+    };
+  }
+  const issues: TocEntryIssue[] = [];
+  const entries: TocSegmentTocEntry[] = [];
+  let prevLevel: number | null = null;
+  raw.forEach((item, index) => {
+    if (!item || typeof item !== 'object') {
+      issues.push({ index, field: 'title', reason: '条目不是对象', hint: '该条请按 {title, printedPage, level, kind} 对象重出' });
+      return;
+    }
+    const rec = item as Record<string, unknown>;
+    const title = typeof rec.title === 'string' ? rec.title : '';
+    let bad = false;
+    if (!title) {
+      issues.push({ index, field: 'title', reason: '标题缺失或为空', hint: '请补 title（原书目录原文，不要编）' });
+      bad = true;
+    } else if (!isSemanticOutlineTitle(title)) {
+      issues.push({ index, title, field: 'title', reason: '标题无语义内容', hint: '疑似符号残留或纯数字，请用原书目录原文替换' });
+      bad = true;
+    }
+    if (typeof rec.printedPage !== 'number' || !Number.isSafeInteger(rec.printedPage) || rec.printedPage < 1) {
+      issues.push({
+        index,
+        ...(title ? { title } : {}),
+        field: 'printedPage',
+        reason: '页码缺失或非正整数',
+        hint: '请补 printedPage（原书印刷页码，正整数；没有就标未知段由人工确认，不要猜）',
+      });
+      bad = true;
+    }
+    if (rec.kind !== 'lesson' && rec.kind !== 'section') {
+      issues.push({
+        index,
+        ...(title ? { title } : {}),
+        field: 'kind',
+        reason: 'kind 非法',
+        hint: 'kind 只接受 lesson（成课）/ section（章、復習、前言等不成课条目）',
+      });
+      bad = true;
+    }
+    const level = rec.level;
+    if (typeof level !== 'number' || !Number.isSafeInteger(level) || level < 0) {
+      issues.push({
+        index,
+        ...(title ? { title } : {}),
+        field: 'level',
+        reason: '层级缺失或非法',
+        hint: `请为「${title || `第${index + 1}条`}」补 level。${TOC_LEVEL_HINT}`,
+      });
+      bad = true;
+    } else {
+      if (prevLevel === null) {
+        if (level !== 0 && level !== 1) {
+          issues.push({
+            index,
+            ...(title ? { title } : {}),
+            field: 'level',
+            reason: `首条层级为 ${level}`,
+            hint: '目录首条须为 0（一级）或 1（二级）；若原书目录从章开始，给章标 0',
+          });
+          bad = true;
+        }
+      } else if (level > prevLevel + 1) {
+        issues.push({
+          index,
+          ...(title ? { title } : {}),
+          field: 'level',
+          reason: `层级从 ${prevLevel} 跳到 ${level}`,
+          hint: '上爬每次最多 +1（如 0→2 非法：中间一定漏了一级，请把漏掉的那级补回来）',
+        });
+        bad = true;
+      }
+      prevLevel = level;
+    }
+    if (!bad) {
+      entries.push({
+        title,
+        printedPage: rec.printedPage as number,
+        level: rec.level as number,
+        kind: rec.kind as 'lesson' | 'section',
+      });
+    }
+  });
+  if (issues.length > 0) return { ok: false, issues };
+  return { ok: true, entries };
+}
+
+/**
  * 印刷页 → 物理页映射与分段预览（纯函数）：
  * 输入校验（fail-closed）→ 已验证区间装配 → 逐课映射 → 相邻 end → chunk 拆分。
  * 不读运行时、不碰 IO；输入对象一律只读（排序用拷贝）。
@@ -274,24 +403,30 @@ export function previewTocSegments(
     title: string;
     printed: number;
   }
+  // 条目形状 + 层级连贯：收集全部问题一次返回（issues 进 details 供 LLM 增量修复）。
+  const checked = validateTocEntries(entries);
+  if (!checked.ok) {
+    const first = checked.issues[0]!;
+    const where = first.index >= 0 ? `第${first.index + 1}条${first.field}` : '整份目录';
+    return err(
+      new BusinessError(
+        'E_TOC_ENTRY_INVALID',
+        `目录草稿 ${checked.issues.length} 处层级/页码问题（第1处：${where}：${first.reason}。${first.hint}），请按 details.issues 逐条补齐后重试`,
+        'VALIDATION',
+        false,
+        { issues: checked.issues }
+      )
+    );
+  }
   const lessons: LessonRow[] = [];
   let sections = 0;
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
-    if (!entry || typeof entry !== 'object') return invalid('目录条目须为对象');
-    const { title, printedPage, kind } = entry as { title?: unknown; printedPage?: unknown; kind?: unknown };
-    if (kind !== 'lesson' && kind !== 'section') return invalid('目录条目 kind 只接受 lesson / section');
-    if (typeof title !== 'string' || !title) return invalid('目录条目标题不能为空');
-    // P3.1B 标题内容门（与 P3 基线同一语义规则，不复制第二套）：
-    // 符号-only/Markdown 残留/纯数字形一律拒绝，垃圾基线到不了导入。
-    if (!isSemanticOutlineTitle(title)) return invalid('目录条目标题无语义内容（疑似符号残留或纯数字），请修正后重试');
-    if (!isPositiveInt(printedPage)) return invalid('目录条目 printedPage 须为正整数');
-    if (kind === 'section') {
+  checked.entries.forEach((entry, i) => {
+    if (entry.kind === 'section') {
       sections++;
-      continue;
+      return;
     }
-    lessons.push({ entryIndex: i, title, printed: printedPage });
-  }
+    lessons.push({ entryIndex: i, title: entry.title, printed: entry.printedPage });
+  });
   for (let i = 1; i < lessons.length; i++) {
     const prev = lessons[i - 1];
     const curr = lessons[i];
