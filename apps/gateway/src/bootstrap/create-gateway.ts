@@ -1,5 +1,6 @@
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../runtime/gateway-runtime.js';
+import { createDefaultAgentAdapterFactory } from '../composition/agent-deps.js';
 import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
 import { tryParseTextbookAst } from '@study-studio/storage-sqlite';
 import {
@@ -18,7 +19,8 @@ import { dbPath } from './config.js';
  */
 export async function createGateway(db: string = dbPath) {
   const repo = new DrizzleLearnerRepository(db);
-  const server = new GatewayServer(repo);
+  // DI 装配：Agent 创建权收归装配根，Server 只收工厂；各领域模块经 ToolRegistry 按名订阅。
+  const server = new GatewayServer(repo, undefined, createDefaultAgentAdapterFactory());
   await shredSeedTextbooks(repo);
   await ensureContentSourcesAtBoot(repo);
   return { repo, server };

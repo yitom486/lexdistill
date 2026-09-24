@@ -1,8 +1,10 @@
 import { SessionManager, type AgentLane } from '../session/session-manager.js';
 import { ContextBuilder } from '../context/context-builder.js';
 import { ToolRouter } from '../router/tool-router.js';
-import { ToolRegistry, ToolLocations } from '@study-studio/tool-core';
+import { ToolRegistry } from '@study-studio/tool-core';
 import { CodexAdapter } from '@study-studio/agent-runtime';
+import type { AgentAdapterFactory } from '../composition/agent-deps.js';
+import { createDefaultAgentAdapterFactory } from '../composition/agent-deps.js';
 import { ResponsesAdapter } from '@study-studio/agent-runtime';
 import {
   type WsEnvelope,
@@ -71,8 +73,10 @@ export class GatewayServer {
 
   constructor(
     learnerRepo?: LearnerRepository,
-    /** @internal 测试注入 mock adapter；产品调用走默认 CodexAdapter */
-    adapterOverride?: CodexAdapter
+    /** @internal 测试注入 mock adapter；产品调用走装配根注入的工厂 */
+    adapterOverride?: CodexAdapter,
+    /** DI 工厂：缺席时用 composition 默认工厂；测试传 adapterOverride 可完全绕过 */
+    adapterFactory?: AgentAdapterFactory
   ) {
     this.learnerRepo = learnerRepo ?? new DrizzleLearnerRepository(':memory:');
     const repository = this.learnerRepo;
@@ -85,44 +89,13 @@ export class GatewayServer {
     };
     this.learningProgressWsDependencies = { learnerRepo: repository };
 
-    // P6-3：先建 adapter 再注册工具，使 learning.assess 的 ai 模式可用；
-    // executeTool 闭包在调用时才读 toolRegistry，提前创建无初始化顺序问题。
+    // Agent 创建权在装配根（composition/agent-deps.ts + bootstrap/create-gateway.ts）：
+    // executeTool 闭包在调用时才读 toolRegistry，构造期创建无初始化顺序问题（原 P6-3 语义）。
     this.agentAdapter =
       adapterOverride ??
-      new CodexAdapter({
-        executeTool: async (toolName, input, ctx) => {
-          const tool = this.toolRegistry.get(toolName);
-          if (!tool) {
-            throw new BusinessError(
-              'E_TOOL_NOT_FOUND',
-              `未注册工具：${toolName}`,
-              'TOOL_EXECUTION'
-            );
-          }
-          const res = await tool.execute(input as never, {
-            userId: ctx.userId,
-            sessionId: ctx.sessionId,
-          });
-          if (!isOk(res)) {
-            throw res.error;
-          }
-          // Client Tools：进程内校验参数后，经 WS 下发前端执行
-          if (tool.location === ToolLocations.CLIENT && this.activeTurnEmit) {
-            this.activeTurnEmit({
-              version: '1.0',
-              id: generateId('tool'),
-              sessionId: ctx.sessionId,
-              type: WsEventTypes.AGENT_TOOL_CALL,
-              payload: {
-                callId: generateId('call'),
-                toolName: tool.name,
-                args: res.value,
-              },
-              timestamp: Date.now(),
-            });
-          }
-          return res.value;
-        },
+      (adapterFactory ?? createDefaultAgentAdapterFactory())({
+        toolRegistry: this.toolRegistry,
+        getActiveTurnEmit: () => this.activeTurnEmit,
         onNotification: (method, params) => {
           this.handleCodexNotification(method, params);
         },

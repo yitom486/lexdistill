@@ -66,7 +66,6 @@ import {
 } from '@study-studio/storage-sqlite';
 import type { AgentAdapter } from '@study-studio/agent-runtime';
 import type { FsrsState, SchedulerOutput } from '@study-studio/learning-algorithms';
-import { reviewScheduleEvents } from '@study-studio/storage-sqlite';
 import type { ContentRepository } from '../modules/library/ports.js';
 import type { LexiconRepository } from '../modules/dictionary/ports.js';
 import type { LearningRepository } from '../modules/practice/ports.js';
@@ -215,6 +214,11 @@ import {
   saveCard as saveCardDomain,
   markCardStudied as markCardStudiedDomain,
 } from '../modules/review/persistence/cards.js';
+import { commitReviewOutcome as commitReviewOutcomeDomain } from '../modules/review/persistence/review-outcome.js';
+import {
+  runWithTransaction,
+  runWithSavepointSandbox,
+} from './persistence/savepoints.js';
 import {
   getQuestions as getQuestionsDomain,
   saveQuestion as saveQuestionDomain,
@@ -332,6 +336,20 @@ export {
 export class DrizzleLearnerRepository
   implements LearnerRepository, ContentRepository, LexiconRepository, LearningRepository, FlashcardsRepository
 {
+  // 本类是纯委托门面：每个方法一行，转调各域 persistence 实现；读法是“查目录→跳域文件”。
+  // 分节速览（节内方法均以 `XXXDomain(this.deps, …)` 委托，冒号后为实现落点）：
+  //  A 词典读/写      searchLocalDictionary…getTermExamples        → modules/dictionary/persistence/
+  //  B 卡片草稿        proposeCardDrafts…dismissCardDraft           → modules/flashcards/persistence/
+  //  C 课程与课文      getLevelInfo…listWordlists                   → modules/curriculum/persistence/
+  //  D 文档段/种子     saveDocumentStructure…materializeSeedDocument → modules/library/persistence/ + storage-sqlite
+  //  E 定级与阅读      getStudyGate…getReadingPosition              → modules/practice/persistence/
+  //  F 卡片格式/Anki/媒体 sampleLocalDictionaryEntries止           → modules/flashcards/persistence/ + tts-proxy
+  //  G 画像与每日任务  getLearnerProfile…saveSkillMetric            → modules/learning-progress/persistence/
+  //  H 卡片/题库/错题  getDueCards…commitReviewOutcome              → modules/review/persistence/ + practice + learning-progress
+  //  I 文档与批注      saveDocument…（Documents/Annotations 节）    → modules/library/persistence/
+  //  J 假名/谚文/阅读  getCurriculumKana…（Curriculum 节）          → modules/curriculum/persistence/
+  //  K 练习集与计划    collectPracticeQuestions…末尾                → modules/practice/persistence/
+  //  通用：withTransaction/withSavepointSandbox → infrastructure/persistence/savepoints.ts
   private readonly db: DrizzleDb;
   private readonly sqlite: Database;
   /** 建库路径（':memory:' 或外部传入 Database 时为标记值；备份导出需真实文件路径）。 */
@@ -347,6 +365,8 @@ export class DrizzleLearnerRepository
   public getRawDb(): Database {
     return this.sqlite;
   }
+
+  // ==================== A 词典读/写（→ modules/dictionary/persistence/） ====================
 
   /**
    * 查询本地、可再分发的词典资产。第三方词典只可作为外链兜底，绝不在此抓取。
@@ -448,6 +468,8 @@ export class DrizzleLearnerRepository
     });
   }
 
+  // ==================== B 卡片草稿（→ modules/flashcards/persistence/） ====================
+
   /** 批量提议生词草稿（幂等去重）。实现已下沉 flashcards 域，此处仅委托。 */
   public async proposeCardDrafts(
     inputs: ProposeCardDraftInput[]
@@ -489,6 +511,8 @@ export class DrizzleLearnerRepository
   ): Promise<Result<CardDraft, BusinessError>> {
     return dismissCardDraftDomain(this.deps, userId, draftId);
   }
+
+  // ==================== C 课程与课文（→ modules/curriculum/persistence/ + learning-progress） ====================
 
   /** 档位信息（当前档 + 升级提示语）。实现已下沉 learning-progress 域，此处仅委托。 */
   public async getLevelInfo(
@@ -543,6 +567,8 @@ export class DrizzleLearnerRepository
   ): Promise<Result<WordlistGroup[], BusinessError>> {
     return listWordlistsDomain(this.deps, userId, language);
   }
+
+  // ==================== D 文档段/种子物化（→ modules/library/persistence/ + storage-sqlite） ====================
 
   /** 保存文档结构分类。实现已下沉 library 域，此处仅委托。 */
   public async saveDocumentStructure(
@@ -696,6 +722,8 @@ export class DrizzleLearnerRepository
     }
   }
 
+  // ==================== E 定级与阅读位置（→ modules/practice/persistence/） ====================
+
   /**
    * 出题门快照（档位 + 已学完技能 + 本轨道有讲义技能；一次取齐，四个出题口复用）。
    * 档位读不到整体 err（调用方 fail-open，不过门）。
@@ -784,7 +812,11 @@ export class DrizzleLearnerRepository
    */
   public async listDocumentLessonRefs(documentId: string): Promise<Result<string[], BusinessError>> {
     return listDocumentLessonRefsDomain(this.deps, documentId);
-  }  /**
+  }
+
+  // ==================== F 卡片格式/Anki/媒体（→ modules/flashcards/persistence/） ====================
+
+  /**
    * 词典包配置更新（开关 / 排序权重）。
    * 实现已下沉 dictionary 域，此处仅委托。
    */
@@ -951,6 +983,8 @@ export class DrizzleLearnerRepository
     return mirrorLanguageProfileToMainDomain(this.deps, userId, language, langRow, displayName);
   }
 
+  // ==================== G 画像与每日任务（→ modules/learning-progress/persistence/） ====================
+
   /**
    * 实现已下沉 domains/profile.ts，此处仅委托。
    */
@@ -991,49 +1025,22 @@ export class DrizzleLearnerRepository
 
   /**
    * 在独立事务中执行操作（回调 resolve 即提交，throw 即整体回滚）。
-   * 实现用显式 SAVEPOINT 包裹 await 链：bun:sqlite 的 transaction() 回调
-   * 不支持跨 await 持有事务（M4-2 回滚测试实证部分提交），SAVEPOINT 才对
-   * 异步委托链生效；与 withSavepointSandbox 同口径但成功时提交。
-   * 调用方（finalizePracticePlanRun 等）签名与语义不变。
+   * 实现已下沉 infrastructure/persistence/savepoints.ts，此处仅委托。
    */
   public async withTransaction<T>(
     fn: (repo: DrizzleLearnerRepository) => Promise<T>
   ): Promise<T> {
-    const savepoint = `tx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    this.sqlite.run(`SAVEPOINT ${savepoint};`);
-    try {
-      const value = await fn(this);
-      this.sqlite.run(`RELEASE ${savepoint};`);
-      return value;
-    } catch (e) {
-      try {
-        this.sqlite.run(`ROLLBACK TO ${savepoint};`);
-      } catch {
-        // 回滚语句自身失败已无可为，下面的 RELEASE 尽力清理
-      }
-      try {
-        this.sqlite.run(`RELEASE ${savepoint};`);
-      } catch {
-        // 清理失败可忽略：调用方收到的仍是原始错误
-      }
-      throw e;
-    }
+    return runWithTransaction(this.sqlite, () => fn(this));
   }
 
   /**
-   * 使用 SAVEPOINT 进行沙盒测试执行，并在执行完毕后无条件回滚，确保测试数据绝不污染真实数据库
+   * 使用 SAVEPOINT 进行沙盒测试执行，并在执行完毕后无条件回滚，确保测试数据绝不污染真实数据库。
+   * 实现已下沉 infrastructure/persistence/savepoints.ts，此处仅委托。
    */
   public async withSavepointSandbox<T>(
     fn: (repo: DrizzleLearnerRepository) => Promise<T>
   ): Promise<T> {
-    const savepointName = `sp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    this.sqlite.run(`SAVEPOINT ${savepointName};`);
-    try {
-      return await fn(this);
-    } finally {
-      this.sqlite.run(`ROLLBACK TO ${savepointName};`);
-      this.sqlite.run(`RELEASE ${savepointName};`);
-    }
+    return runWithSavepointSandbox(this.sqlite, () => fn(this));
   }
 
   /**
@@ -1096,6 +1103,8 @@ export class DrizzleLearnerRepository
   ): Promise<Result<void, BusinessError>> {
     return saveSkillMetricDomain(this.deps, userId, metric);
   }
+
+  // ==================== H 卡片/题库/错题/复习提交（→ modules/review + practice + learning-progress） ====================
 
   /**
    * 实现已下沉 domains/cards-questions.ts，此处仅委托。
@@ -1205,13 +1214,8 @@ export class DrizzleLearnerRepository
   }
 
   /**
-   * M4-2 复习提交原子命令（review 域）：存卡片 FSRS state + 追加排程事件 +
-   * 每日 cards 计数，同一事务；任一步失败整体回滚。
-   * 原子实现用显式 SAVEPOINT 包裹 await 链（与 withSavepointSandbox 同口径）：
-   * bun:sqlite 的 transaction() 回调不支持跨 await 持有事务，
-   * SAVEPOINT/RELEASE/ROLLBACK TO 才对异步委托链生效。
-   * 事件 id 由 (cardId, evaluatedAt) 确定性派生：同一瞬间的重复提交以后到者
-   * 主键冲突拒绝，不静默双记。调用方传入已计算的版本化排程结果，本命令不重算。
+   * M4-2 复习提交原子命令（review 域）。
+   * 实现已下沉 modules/review/persistence/review-outcome.ts，此处仅委托。
    */
   public async commitReviewOutcome(input: {
     userId: string;
@@ -1219,70 +1223,7 @@ export class DrizzleLearnerRepository
     rating: CardReviewRating;
     scheduled: SchedulerOutput<FsrsState>;
   }): Promise<Result<{ cardId: string; eventId: string }, BusinessError>> {
-    const eventId = `rse_${input.card.id}_${input.scheduled.trace.evaluatedAt}`;
-    const savepoint = `sp_rco_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    try {
-      this.sqlite.run(`SAVEPOINT ${savepoint};`);
-    } catch (e) {
-      return err(translateToBusinessError(e, 'REVIEW_COMMIT'));
-    }
-    try {
-      const saved = await saveCardDomain(this.deps, input.card);
-      if (!isOk(saved)) throw saved.error;
-      // 协议 Flashcard 无 language 字段，运行时行可能自带；缺席回退画像语种。
-      const runtimeLanguage = (input.card as { language?: unknown }).language;
-      const profileRes = await getLearnerProfileDomain(this.deps, input.userId);
-      if (!isOk(profileRes)) throw profileRes.error;
-      const language =
-        typeof runtimeLanguage === 'string' && runtimeLanguage
-          ? runtimeLanguage
-          : profileRes.value.targetLanguage;
-        await this.db
-          .insert(reviewScheduleEvents)
-          .values({
-            id: eventId,
-            userId: input.userId,
-            cardId: input.card.id,
-            language,
-            algorithmId: input.scheduled.algorithmId,
-            algorithmVersion: input.scheduled.algorithmVersion,
-            rating: input.rating,
-            inputStateJson: JSON.stringify(input.scheduled.trace.inputState),
-            outputStateJson: JSON.stringify(input.scheduled.trace.outputState),
-            evaluatedAt: input.scheduled.trace.evaluatedAt,
-            createdAt: new Date().toISOString(),
-          })
-          .run();
-        // 写断言（AGENTS.md §1.9：同步事务内显式执行 + 行数断言）：同事务回读确认落库。
-        const check = await this.db
-          .select({ id: reviewScheduleEvents.id })
-          .from(reviewScheduleEvents)
-          .where(eq(reviewScheduleEvents.id, eventId))
-          .limit(1);
-        if (check.length !== 1) {
-          throw new BusinessError('E_REVIEW_COMMIT', '排程事件追加未生效', 'DATABASE', false);
-        }
-      const activity = await recordDailyActivityDomain(this.deps, input.userId, { cards: 1 });
-      if (!isOk(activity)) throw activity.error;
-      try {
-        this.sqlite.run(`RELEASE ${savepoint};`);
-      } catch (e) {
-        return err(translateToBusinessError(e, 'REVIEW_COMMIT'));
-      }
-      return ok({ cardId: input.card.id, eventId });
-    } catch (e) {
-      try {
-        this.sqlite.run(`ROLLBACK TO ${savepoint};`);
-      } catch {
-        // 回滚语句自身失败已无可为，下面的 RELEASE 尽力清理
-      }
-      try {
-        this.sqlite.run(`RELEASE ${savepoint};`);
-      } catch {
-        // 清理失败可忽略：连接级错误会经外层 BusinessError 上报
-      }
-      return err(e instanceof BusinessError ? e : translateToBusinessError(e, 'REVIEW_COMMIT'));
-    }
+    return commitReviewOutcomeDomain(this.deps, input);
   }
 
   // ==================== 文档与教材资产 (Documents) ====================

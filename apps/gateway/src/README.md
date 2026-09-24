@@ -125,7 +125,7 @@ infrastructure/drizzle-learner-repository.ts
 | `index.ts` | 生产入口和兼容导出；创建应用依赖并暴露 `startGatewayServer` 等入口。 |
 | `sidecar.ts` | 桌面端 sidecar 场景使用的启动入口。 |
 | `bootstrap/config.ts` | 读取 Gateway 配置，例如 `GATEWAY_PORT` 和 `STUDY_STUDIO_DB`；测试可以使用 `:memory:`。 |
-| `bootstrap/create-gateway.ts` | `createGateway()` 装配根：创建数据库、Repository、Agent Adapter、Tool Registry 和 Gateway Runtime。测试可以在这里注入替身依赖。 |
+| `bootstrap/create-gateway.ts` | `createGateway()` 创建 Repository 和 GatewayServer，并执行启动期内容初始化；Agent Adapter 由装配根经 `composition/agent-deps.ts` 工厂显式注入，Tool Registry 由 GatewayServer 构造时装配。 |
 | `bootstrap/start-gateway.ts` | 启动监听生命周期。通过 `Bun.serve` 承载 HTTP，并处理 `/ws` 升级；不放领域逻辑。 |
 
 `bootstrap/` 的依赖方向是单向的：它可以装配其他层，但领域代码和传输代码不应该反向依赖启动装配目录。
@@ -142,6 +142,7 @@ infrastructure/drizzle-learner-repository.ts
 |---|---|
 | `create-app.ts` | 创建 Hono 应用，配置 CORS、404、统一错误兜底，并挂载各域路由。导入它本身不会打开真实数据库。 |
 | `../composition/gateway-deps.ts` | 定义 HTTP 路由可使用的 `GatewayDeps`，是 repo、runtime/server 等依赖的统一来源（E4a 起家于此）。 |
+| `../composition/agent-deps.ts` | 定义 Agent 装配契约 `AgentAdapterFactory` 与生产默认工厂；Adapter 创建权收归装配根，各领域模块经 ToolRegistry 按工具名订阅，不持有 Adapter 实例。 |
 | `health-routes.ts` | 健康检查和运行状态接口。 |
 | `agent-routes.ts` | Agent Session/Turn 等 Agent 管理接口。 |
 | `learning-routes.ts` | 历史兼容入口；将跨域的 `learning.content`、`learning.assess` 请求委托给 Tool/领域能力。 |
