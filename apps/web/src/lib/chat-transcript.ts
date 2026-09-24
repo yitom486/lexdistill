@@ -75,6 +75,21 @@ export interface MappedChatBubble {
   toolCalls?: ToolCallTrace[];
 }
 
+function normalizeThreadItemType(type: string): string {
+  switch (type) {
+    case 'userMessage':
+      return 'user_message';
+    case 'agentMessage':
+      return 'assistant_message';
+    case 'dynamicToolCall':
+    case 'mcpToolCall':
+    case 'commandExecution':
+      return 'tool_call';
+    default:
+      return type;
+  }
+}
+
 /** 按 turn 折叠历史 items：user 单独成泡，思考/工具/回复合成一条 assistant */
 export function mapThreadItemsToBubbles(items: ThreadItemLike[]): MappedChatBubble[] {
   const result: MappedChatBubble[] = [];
@@ -91,7 +106,9 @@ export function mapThreadItemsToBubbles(items: ThreadItemLike[]): MappedChatBubb
   };
 
   for (const item of items) {
-    if (item.type === 'user_message') {
+    const itemType = normalizeThreadItemType(item.type);
+
+    if (itemType === 'user_message') {
       flush();
       const text = stripTranscriptNoise(item.text ?? '');
       if (text) {
@@ -115,13 +132,13 @@ export function mapThreadItemsToBubbles(items: ThreadItemLike[]): MappedChatBubb
       };
     }
 
-    if (item.type === 'assistant_message' && item.text) {
+    if (itemType === 'assistant_message' && item.text) {
       const cleaned = stripTranscriptNoise(item.text);
       current.text = current.text ? `${current.text}\n${cleaned}` : cleaned;
     } else if (item.type === 'reasoning' && item.text) {
       current.reasoning = item.text;
     } else if (
-      item.type === 'tool_call'
+      itemType === 'tool_call'
     ) {
       current.toolCalls = [
         ...(current.toolCalls ?? []),
