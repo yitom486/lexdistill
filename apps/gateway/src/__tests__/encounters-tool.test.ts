@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { LearningEncountersTool } from '../modules/dictionary/tools/learning-encounters-tool.js';
-import { selectTurnTools } from '../router/turn-tools.js';
+import { selectTurnTools } from '../runtime/router/turn-tools.js';
 
 const CTX = { userId: 'u1', sessionId: 's1' };
 

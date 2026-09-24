@@ -1,9 +1,7 @@
-import type { ToolExecutionContext } from '@study-studio/tool-core';
 import type { GeneratedQuestion, HangulType } from '@study-studio/protocol';
 import { err, generateId, isOk, type Result, BusinessError } from '@study-studio/shared';
-import type { ContentRepository } from '../../../../modules/library/public.js';
-import type { LearnerRepository } from '@study-studio/learner-core';
-import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
+import type { LearningContentCurriculumRepository } from '../../ports.js';
+import type { LearningContentInput, LearningContentOutput, LearningContentContext } from '../../contracts.js';
 import { MSG, maybeCollect } from './shared.js';
 
 const HANGUL_SKILL_BY_TYPE: Record<HangulType, string> = {
@@ -19,8 +17,8 @@ const HANGUL_SKILL_BY_TYPE: Record<HangulType, string> = {
  * 题干约束全部来自课程表种子，模型不得自造字母。
  */
 export async function handleHangulDrillAction(
-  repo: ContentRepository & LearnerRepository,
-  context: ToolExecutionContext,
+  repo: LearningContentCurriculumRepository,
+  context: LearningContentContext,
   input: LearningContentInput
 ): Promise<Result<LearningContentOutput, BusinessError>> {
   const count = input.count ?? 1;

@@ -1,20 +1,8 @@
-import type { ToolExecutionContext } from '@study-studio/tool-core';
 import { err, generateId, isOk, ok, type Result, BusinessError } from '@study-studio/shared';
-import type { LexiconRepository } from '../../../../modules/dictionary/public.js';
-import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
+import type { LearningContentLexiconRepository } from '../../ports.js';
+import type { LearningContentContext, LearningContentInput, LearningContentOutput, KanaWord } from '../../contracts.js';
 
-export interface KanaWord {
-  id: string;
-  /** 词典条目 id（可直接调收集接口转 FSRS 生词卡）。 */
-  entryId: string;
-  headword: string;
-  /** 假名读音（听写播报与作答比对用）。 */
-  kana: string;
-  meanings: string[];
-  /** TTS 朗读文本（即 kana）。 */
-  audioText: string;
-  sourceLabel: string;
-}
+
 
 /** 假名读音（含 ー・长音与中点；汉字/拉丁混入一律排除）。 */
 const KANA_READING_RE = /^[\u3040-\u30FFー・\s]+$/;
@@ -26,8 +14,8 @@ const HIRAGANA_RE = /[\u3040-\u309F]/;
  * 系统随机出题（零成本即时）；主观写作批改仍走 learning.assess。
  */
 export async function handleKanaWordsAction(
-  repo: LexiconRepository,
-  context: ToolExecutionContext,
+  repo: LearningContentLexiconRepository,
+  context: LearningContentContext,
   input: LearningContentInput
 ): Promise<Result<LearningContentOutput, BusinessError>> {
   void context;

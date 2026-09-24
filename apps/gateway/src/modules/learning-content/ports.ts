@@ -1,4 +1,8 @@
 import type { BusinessError, Result } from '@study-studio/shared';
+import type { StudyGateSource } from '@study-studio/learner-core';
+import type { ContentRepository } from '../library/ports.js';
+import type { LexiconRepository } from '../dictionary/ports.js';
+import type { LearningRepository } from '../practice/ports.js';
 
 /** Content-template row consumed by learning.content. */
 export type TemplateRow = {
@@ -25,3 +29,25 @@ export interface LearningContentRepository {
     limit?: number | undefined;
   }): Promise<Result<TemplateRow[], BusinessError>>;
 }
+
+/** Optional write capability: content generation can run without collection persistence. */
+export type LearningContentCollectionRepository = Partial<
+  Pick<LearningRepository, 'collectPracticeQuestions'>
+>;
+
+export type LearningContentTemplateRepository = LearningContentRepository &
+  LearningContentCollectionRepository &
+  StudyGateSource;
+
+export type LearningContentCurriculumRepository =
+  Pick<ContentRepository, 'getCurriculumKana' | 'getCurriculumHangul'> &
+  LearningContentCollectionRepository;
+
+export type LearningContentLexiconRepository =
+  Pick<LexiconRepository, 'sampleLocalDictionaryEntries'>;
+
+/** Complete content command port, independent of the database implementation. */
+export type LearningContentCommandRepository =
+  LearningContentTemplateRepository &
+  LearningContentCurriculumRepository &
+  LearningContentLexiconRepository;

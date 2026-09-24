@@ -1,6 +1,6 @@
 # Lingua Studio - 系统架构设计规格说明书 (System Architecture Specification)
 
-> **文档版本**：v1.0  
+> **文档版本**：v1.1（2026-09-23：明确桌面优先与 Android 伴随端运行边界）
 > **维护责任人**：首席系统架构师  
 > **核心架构原则**：单体模块化 (Modular Monolith)、强隔离适配层、学习者资产中心化、统一网关屏障
 >
@@ -79,16 +79,16 @@ C4Container
 
 针对用户的核心疑问：**“客户端采用 Tauri，数据库是放在 Tauri Rust 层管理更好，还是用 Next.js 这类框架直接对接更好？”**
 
-经过深度架构权衡，我们确立了**“Vite Web 前端 + 模块化单体 Gateway 统一管库 + Tauri 零侵入外壳”**的最佳架构：
+针对当前桌面主产品，我们采用**“Vite/React 共享界面 + 模块化单体 Gateway 统一管库 + Tauri 桌面外壳”**。浏览器运行态服务于开发、预览与调试，不构成必须单独发行的产品：
 
 ### 3.1 方案优缺点深度对比
 
 | 评估维度 | 方案 A：Tauri Rust 直接管库 | 方案 B：Next.js 全栈直连 | 方案 C (采纳方案)：Gateway 统一管库 + Vite 前端 + Tauri 壳 |
 | :--- | :--- | :--- | :--- |
-| **多端同构性** | 差。浏览器 Web 端无法调用 Tauri Rust IPC，导致 Web 端必须重写一套网络层。 | 差。Next.js 的 SSR、Server Actions 与打包 Tauri 存在天然兼容冲突，且无法轻量打包进桌面壳。 | **极佳**。同一套 Web 前端在浏览器、Tauri 桌面端与未来移动端 100% 行为一致。 |
-| **安装包与资源开销** | 极低 (~15MB)。 | 极大。若要兼顾本地无服务运行，桌面端需内置 Node.js 运行时，包体积超 150MB+。 | **极低**。Vite 构建产出纯静态 HTML/CSS/JS，桌面端包体积仅 15MB 左右。 |
+| **多端同构性** | Web 客户端不能直接调用 Tauri Rust IPC，需另设浏览器接口。 | SSR、Server Actions 与桌面本地封装需额外设计。 | Web 与 Tauri 桌面复用 React 界面和 Gateway 协议；Android 需适配移动 UI，并另行决定 Gateway 运行与数据同步方式。 |
+| **安装包与资源开销** | Tauri 壳轻，但业务若迁入 Rust 有迁移成本。 | SSR 与桌面本地运行时需额外设计。 | Windows 当前实测：NSIS 安装包约 31.9 MB、MSI 约 45.7 MB；Gateway Sidecar 解包后约 111 MB。 |
 | **数据库一致性** | 业务逻辑下沉到 Rust，需要维护复杂的 Rust SQL 与前端 TypeScript 序列化。 | 严重受限于 Vercel / Node 部署范式，不利于轻量离线运行。 | **极高**。在 Gateway 内通过 TypeScript ORM/Repository 统一管理，与领域模型零距离。 |
-| **单机离线运行能力** | 纯本地单机原生支持。 | 强依赖外部服务或重型打包。 | **完全支持**。桌面端可直接以本地 Sidecar 方式拉起轻量 Gateway 进程（基于单一二进制），对外暴露相同端口。 |
+| **单机离线运行能力** | 可在 Tauri 本地实现。 | 通常依赖外部服务或额外本地运行时。 | 桌面端通过本机 Sidecar + SQLite 支持；Android 离线能力尚未定案，不能从桌面实现直接推导。 |
 
 ### 3.2 架构实施原则
 1. **统一由 Gateway 提供数据抽象**：
@@ -97,7 +97,14 @@ C4Container
 2. **Web 客户端轻量化 (`apps/web`)**：
    - 采用 **Vite + React 19**，开发体验极速，构建出标准的静态产物目录 `dist/`。
 3. **Tauri 桌面端无缝接入 (`apps/desktop`)**：
-   - Tauri 的 `tauri.conf.json` 中 `frontendDist` 直接指向 `../web/dist`，零适配成本打包成各平台桌面应用。
+   - Tauri 的 `tauri.conf.json` 中 `frontendDist` 直接指向 `../web/dist`，复用 React 界面构建 Windows / macOS / Linux 桌面应用。
+
+### 3.3 Android 伴随端策略
+
+- Android 是桌面端之后的轻量伴随端目标，首期聚焦卡片复习、练习与学习记录，不要求手机本地运行 Agent / ACP。
+- React 界面与 `packages/protocol` 契约可以复用；手机布局、触控与系统权限需要适配。
+- 当前 Gateway Sidecar 构建脚本只生成桌面目标。Android 开工前必须先决定 Gateway 由远程服务提供，还是建设移动端本地实现；同时明确离线与跨设备数据策略。
+- 若未来需要 Android AI 辅导，优先由可访问的远程 Gateway 执行 Agent，手机只提交请求并展示流式结果。手机本地 Agent 不属于当前目标。
 
 ---
 

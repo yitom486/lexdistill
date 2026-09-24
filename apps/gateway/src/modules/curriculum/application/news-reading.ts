@@ -3,7 +3,7 @@ import { pickLeadSentence, sanitizeRssText } from '../infrastructure/news-rss.js
 import {
   type StudyContentLanguage,
   ENGLISH_NEWS_QUIZ_GUIDANCE,
-} from '../../../services/learning-language-policy.js';
+} from './content-language-policy.js';
 
 /** 英文新闻配题共用尾注：对齐 CET/考研向约束（接 LLM 时可整段注入） */
 const EN_QUIZ_TAIL = ENGLISH_NEWS_QUIZ_GUIDANCE.split('\n')[1] ?? ENGLISH_NEWS_QUIZ_GUIDANCE;

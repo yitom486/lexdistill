@@ -1,21 +1,18 @@
-import type { ToolExecutionContext } from '@study-studio/tool-core';
 import type { GeneratedQuestion } from '@study-studio/protocol';
 import { ok, isOk, nowIso, type Result, type BusinessError } from '@study-studio/shared';
-import type { LearnerRepository } from '@study-studio/learner-core';
+import type { LearningContentCollectionRepository, LearningContentRepository, TemplateRow } from '../../ports.js';
 import {
   inferLanguageFromSkillId,
   normalizeTrackLanguage,
 } from '@study-studio/shared';
-import { DrizzleLearnerRepository } from '../../../../infrastructure/drizzle-learner-repository.js';
-import type { LearningContentRepository, TemplateRow } from '../../ports.js';
-import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
+import type { LearningContentInput, LearningContentOutput, LearningContentContext } from '../../contracts.js';
 
 /** Learner-facing Chinese copy kept as unicode escapes to avoid editor encoding corruption. */
 export const MSG = {
   description:
     '\u4e07\u80fd\u5916\u8bed\u5b66\u4e60\u5185\u5bb9\u5f15\u64ce\uff1a\u6309\u6559\u5b66\u610f\u56fe\u4ece SQLite \u5185\u5bb9\u6a21\u677f\u5e93\u7ec4\u9898\u3001\u8bb2\u89e3\u3001\u4f8b\u53e5\u3001\u5047\u540d/\u8c1a\u6587\u5c0f\u6d4b\u6216\u9605\u8bfb\u5199\u4f5c\u6750\u6599\u3002',
   repoUnsupported:
-    '\u5f53\u524d\u4ed3\u50a8\u4e0d\u652f\u6301\u5185\u5bb9\u6a21\u677f\u5e93\uff0c\u8bf7\u4f7f\u7528 DrizzleLearnerRepository',
+    '\u5f53\u524d\u4ed3\u50a8\u4e0d\u652f\u6301\u5185\u5bb9\u6a21\u677f\u5e93\uff0c\u8bf7\u68c0\u67e5\u5185\u5bb9\u751f\u6210\u4ed3\u50a8\u914d\u7f6e',
   collectSkip:
     '\uff08\u5f53\u524d\u4ed3\u50a8\u4e0d\u652f\u6301\u7ec3\u4e60\u961f\u5217 collect\uff0c\u5df2\u8df3\u8fc7\u5165\u5e93\uff09',
   practicePrefix: '\u7ec3\u4e60',
@@ -52,7 +49,6 @@ export const MSG = {
   emptyDictation: (lang: string) => `\u5185\u5bb9\u6a21\u677f\u5e93\u4e2d\u6682\u65e0 ${lang} \u542c\u5199\u9898`,
   dictationSummary: (n: number) =>
     `\u5df2\u4ece\u5185\u5bb9\u5e93\u7ec4\u51fa ${n} \u9053\u6316\u8bcd\u542c\u5199\u9898\u3002`,
-  execFailed: (m: string) => `\u5b66\u4e60\u5185\u5bb9\u5f15\u64ce\u6267\u884c\u5931\u8d25: ${m}`,
   coreTopic: '\u6838\u5fc3\u8003\u70b9',
   dailyJa: '\u65e5\u5e38\u751f\u6d3b',
   dailyEn: 'daily life',
@@ -102,8 +98,8 @@ export async function loadTemplates(
 }
 
 export async function maybeCollect(
-  learnerRepo: LearnerRepository,
-  context: ToolExecutionContext,
+  learnerRepo: LearningContentCollectionRepository,
+  context: LearningContentContext,
   input: LearningContentInput,
   language: string,
   questions: GeneratedQuestion[] | undefined,
@@ -129,7 +125,7 @@ export async function maybeCollect(
   const sourceRef =
     uniqueTemplateIds.length > 0 ? `${skill ?? 'auto'};template:${uniqueTemplateIds.join(',')}` : skill;
 
-  if (!(learnerRepo instanceof DrizzleLearnerRepository)) {
+  if (typeof learnerRepo.collectPracticeQuestions !== 'function') {
     return ok({
       ...base,
       summary: `${summary}${MSG.collectSkip}`,

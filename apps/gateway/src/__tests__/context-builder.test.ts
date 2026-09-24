@@ -3,7 +3,7 @@ import {
   ContextBuilder,
   deriveRecentErrorTags,
   sanitizeSnapshotReading,
-} from '../context/context-builder.js';
+} from '../runtime/context/context-builder.js';
 import type { ContextSnapshot } from '@study-studio/agent-runtime';
 import type { LearnerRepository, LearnerProfile, LearnerProfileSnapshot } from '@study-studio/learner-core';
 import type { Flashcard } from '@study-studio/protocol';

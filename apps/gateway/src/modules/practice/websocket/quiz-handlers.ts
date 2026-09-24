@@ -9,11 +9,11 @@ import {
   generateId,
   isOk,
   ok,
+  normalizeTrackLanguage,
 } from '@study-studio/shared';
 import type { PracticeSubmissionRepository } from '../application/submit-practice-attempt.js';
 import { submitPracticeAttempt } from '../application/submit-practice-attempt.js';
 import type { PersistableQuestion } from '../persistence/questions.js';
-import { normalizeTrackLanguage } from '../../../services/learning-language-policy.js';
 
 interface PracticeToolLike {
   execute(

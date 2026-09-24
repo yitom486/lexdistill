@@ -1,4 +1,3 @@
-import type { ToolExecutionContext } from '@study-studio/tool-core';
 import type { GeneratedQuestion } from '@study-studio/protocol';
 import { err, generateId, isOk, ok, type Result, BusinessError } from '@study-studio/shared';
 import {
@@ -9,9 +8,8 @@ import {
   resolveStudyGate,
   tierCapForLevel,
 } from '@study-studio/learner-core';
-import type { LearningContentRepository } from '../../ports.js';
-import type { LearnerRepository } from '@study-studio/learner-core';
-import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
+import type { LearningContentTemplateRepository } from '../../ports.js';
+import type { LearningContentInput, LearningContentOutput, LearningContentContext } from '../../contracts.js';
 import {
   MSG,
   defaultQuizSkill,
@@ -21,8 +19,8 @@ import {
 } from './shared.js';
 
 export async function handleQuizAction(
-  repo: LearningContentRepository & LearnerRepository,
-  context: ToolExecutionContext,
+  repo: LearningContentTemplateRepository,
+  context: LearningContentContext,
   input: LearningContentInput,
   language: 'ja' | 'en' | 'ko'
 ): Promise<Result<LearningContentOutput, BusinessError>> {
@@ -115,8 +113,8 @@ export async function handleQuizAction(
 }
 
 export async function buildDictation(
-  repo: LearningContentRepository & LearnerRepository,
-  context: ToolExecutionContext,
+  repo: LearningContentTemplateRepository,
+  context: LearningContentContext,
   input: LearningContentInput,
   language: string
 ): Promise<Result<LearningContentOutput, BusinessError>> {

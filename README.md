@@ -6,13 +6,15 @@ Lingua Studio 是一个面向多语种学习的自适应学习工作室：提供
 错题本攻克流转、学情画像雷达。客户端只连接自研 Agent Gateway（HTTP + WebSocket），
 学习资产以 SQLite（`learner-core` Repository）为唯一事实源，可整体换模型而不丢失。
 
+**产品策略：桌面端是完整产品形态，提供本地学习数据与 Agent 辅导。**浏览器运行态用于共享界面的开发、预览和调试，不是必须独立发行的产品。Android 是后续轻量伴随端方向，首期不要求手机本地运行 Agent / ACP；远程 AI、离线与跨设备同步方案留待 Android 排期前决策。
+
 顶层协作宪章见 [`AGENTS.md`](./AGENTS.md），所有参与者（人类与 AI Agent）必须遵守。
 
 ## 仓库结构
 
 ```text
 apps/
-  web/        React 19 + Vite + Tailwind 学习客户端（dev 端口 3000）
+  web/        React 19 + Vite + Tailwind 共享学习界面（浏览器开发/预览端口 3000，供桌面端复用）
   gateway/    Agent Gateway：唯一后端屏障 + 领域调度中枢（默认端口 8080）
   desktop/    Tauri v2 桌面壳（frontendDist 复用 web/dist，Gateway 以 sidecar 拉起）
 packages/
@@ -69,7 +71,7 @@ bun run release -- 0.1.0               # 校验、提交、打 tag 并推送，�
 
 | 脚本 | 位置 | 用途 |
 | --- | --- | --- |
-| `sidecar:build` | `apps/gateway/scripts/build-sidecar.ts` | `Bun.build compile` 产出桌面端 sidecar 二进制到 `apps/desktop/src-tauri/binaries/`（gitignored，约 94MB，含 `bun:sqlite`） |
+| `sidecar:build` | `apps/gateway/scripts/build-sidecar.ts` | `Bun.build compile` 产出桌面端 Sidecar 到 `apps/desktop/src-tauri/binaries/`（gitignored；当前 Windows x64 文件约 111 MB，含 `bun:sqlite`；Android 不在现有构建目标内） |
 | `dictionary:import:oewn` | `apps/gateway/src/scripts/import-oewn.ts` | Open English WordNet 离线导入（默认 dry-run，`--apply` 才写库） |
 | live 私人教材验收 | `apps/gateway/src/scripts/live-corpus-map.ts` + `docs/pdf-live-corpus-playbook.md` | 本机 PDF 只读结构预览（需 `STUDY_STUDIO_LIVE_PDF`，不写库；未设变量只打印用法） |
 
@@ -92,7 +94,7 @@ Lingua Studio 将学习者模型、课程资产和 Agent 能力组合成一个�
 - **AI tutoring**：通过 Agent Gateway 提供流式讲解、批改、诊断和练习生成；
 - **Learner-first**：学习记录、错题、卡片和学情指标以 SQLite 为唯一事实源；
 - **Provider-agnostic**：Codex、Responses 或未来的其他 Agent 都通过统一 Adapter 接入；
-- **Web + Desktop**：同一套 Web 客户端可运行在浏览器和 Tauri 桌面端。
+- **桌面优先**：Tauri 桌面端是完整产品，复用 React 界面；Android 作为后续轻量伴随端评估，不要求本地 Agent。
 
 GitHub 项目简介：
 

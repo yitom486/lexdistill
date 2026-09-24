@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { selectTurnTools } from '../router/turn-tools.js';
+import { selectTurnTools } from '../runtime/router/turn-tools.js';
 
 describe('selectTurnTools', () => {
   it('默认意图：基线 9 个 + 只读三件套，不开写', () => {

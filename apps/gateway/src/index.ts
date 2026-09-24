@@ -8,10 +8,10 @@ import {
 } from './bootstrap/shutdown-control.js';
 
 export * from './runtime/gateway-runtime.js';
-export * from './session/session-manager.js';
-export * from './context/context-builder.js';
-export * from './router/tool-router.js';
-export * from './router/agent-router.js';
+export * from './runtime/session/session-manager.js';
+export * from './runtime/context/context-builder.js';
+export * from './runtime/router/tool-router.js';
+export * from './runtime/router/agent-router.js';
 export * from '@study-studio/storage-sqlite';
 export * from './infrastructure/drizzle-learner-repository.js';
 export * from './errors/http-error-handler.js';

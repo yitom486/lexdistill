@@ -1,7 +1,6 @@
-import type { ToolExecutionContext } from '@study-studio/tool-core';
 import type { PracticeBlockSpec } from '@study-studio/protocol';
 import { err, isOk, ok, type Result, BusinessError } from '@study-studio/shared';
-import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
+import type { LearningContentInput, LearningContentOutput, LearningContentContext } from '../../contracts.js';
 
 /**
  * P5-E7：练习计划块规格 → 既有生成路径的合成输入（模板驱动，不调 LLM）。
@@ -49,7 +48,7 @@ export function synthesizeContentInputForBlock(
 
 type ExecuteFn = (
   input: LearningContentInput,
-  context: ToolExecutionContext
+  context: LearningContentContext
 ) => Promise<Result<LearningContentOutput, BusinessError>>;
 
 /**
@@ -58,7 +57,7 @@ type ExecuteFn = (
  */
 export async function generateForBlock(
   input: LearningContentInput,
-  context: ToolExecutionContext,
+  context: LearningContentContext,
   language: 'ja' | 'en' | 'ko',
   execute: ExecuteFn
 ): Promise<Result<LearningContentOutput, BusinessError>> {

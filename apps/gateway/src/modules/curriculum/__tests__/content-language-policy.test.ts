@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   buildEnglishAiReadingPrompt,
   buildKoreanAiReadingPrompt,
-} from '../services/learning-language-policy.js';
+} from '../application/content-language-policy.js';
 
 const HANGUL = /[\uAC00-\uD7A3]/;
 

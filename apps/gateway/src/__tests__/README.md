@@ -8,4 +8,4 @@
 | `gateway-websocket.test.ts` | WS 连接、事件收发 |
 | `turn-summary.test.ts` | Turn 汇总与复盘 |
 
-运行：`bun test`（全仓）或 `bun test apps/gateway/src/__tests__/xxx.test.ts`（单文件）。
+正式门禁：bun run test:all 与 bun run typecheck（仓库根执行）。定位失败时可单独运行 bun test apps/gateway/src/__tests__/xxx.test.ts。

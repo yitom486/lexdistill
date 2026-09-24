@@ -1,20 +1,8 @@
-import type { ToolExecutionContext } from '@study-studio/tool-core';
 import { err, generateId, isOk, ok, type Result, BusinessError } from '@study-studio/shared';
-import type { LexiconRepository } from '../../../../modules/dictionary/public.js';
-import type { LearningContentInput, LearningContentOutput } from '../learning-content-tool.js';
+import type { LearningContentLexiconRepository } from '../../ports.js';
+import type { LearningContentContext, LearningContentInput, LearningContentOutput, HangulWord } from '../../contracts.js';
 
-export interface HangulWord {
-  id: string;
-  /** 词典条目 id（可直接调收集接口转 FSRS 生词卡）。 */
-  entryId: string;
-  /** 韩语表层形（听写播报与选项用；Kengdic 条目即 headword）。 */
-  korean: string;
-  /** 英文释义（词义回想选项用，取前 3）。 */
-  meanings: string[];
-  /** TTS 朗读文本（即 korean）。 */
-  audioText: string;
-  sourceLabel: string;
-}
+
 
 /** 韩语表层形（音节块 + 字母 + 空格/中点；拉丁/汉字混入一律排除）。 */
 const KOREAN_SURFACE_RE = /^[\uAC00-\uD7A3\u3130-\u318F\s·・]+$/;
@@ -24,8 +12,8 @@ const KOREAN_SURFACE_RE = /^[\uAC00-\uD7A3\u3130-\u318F\s·・]+$/;
  * 系统随机出题（零成本即时）；词池唯一来源为已安装的韩语词典包，未安装报 E_CONTENT_EMPTY。
  */
 export async function handleHangulWordsAction(
-  repo: LexiconRepository,
-  context: ToolExecutionContext,
+  repo: LearningContentLexiconRepository,
+  context: LearningContentContext,
   input: LearningContentInput
 ): Promise<Result<LearningContentOutput, BusinessError>> {
   void context;

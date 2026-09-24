@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { LearningContentTool } from '../modules/learning-content/public.js';
-import { maybeCollect } from '../modules/learning-content/tools/learning-content/shared.js';
+import { maybeCollect } from '../modules/learning-content/application/actions/shared.js';
 import type { GeneratedQuestion } from '@study-studio/protocol';
 import { isOk } from '@study-studio/shared';
 import { app } from '../index.js';

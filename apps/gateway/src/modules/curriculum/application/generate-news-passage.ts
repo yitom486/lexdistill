@@ -9,7 +9,7 @@ import { buildReadingQuestionsFromNews, formatNewsBody } from './news-reading.js
 import {
   type StudyContentLanguage,
   normalizeContentLanguage,
-} from '../../../services/learning-language-policy.js';
+} from './content-language-policy.js';
 
 export interface GeneratedNewsPassage {
   title: string;

@@ -38,10 +38,10 @@
 | `src/index.ts` | 同时创建 Repository/Gateway 实例、注册 Hono 路由、导出 `GatewayAppType`、实现 `Bun.serve` 与 `/ws`；约 1,700 行 | 应拆启动、依赖装配和 HTTP 应用，不只是改文件名 |
 | `src/server.ts` | 定义 `GatewayServer`；注册 Tools、构造 Adapter、管理会话/流式事件并编排业务 | 实际是运行时协调器，不是独立监听端口入口 |
 | `src/repository/domains/*` | 已按 profile、practice、dictionary 等拆分 SQL 实现；由 `DrizzleLearnerRepository` 门面委托 | 复用既有拆分；SQL 文件不等于纯领域模型 |
-| `src/services/practice-assembly.ts` | 依赖具体 Drizzle Repository 和 `learning-content-tool` 输入输出类型 | 移动后仍需将应用能力与 Tool 适配契约解耦 |
-| `src/tools/learning-plan-tool.ts` | 同时处理今日计划、练习模板/运行查询和计划建议 | 是跨模块入口，不能简单归入其中一域并形成反向依赖 |
-| `src/tools/learning-content-tool.ts` | 覆盖出题、讲解、例句、假名、阅读、写作等 action | 保留外部 Tool 契约，内部逐步委托应用能力 |
-| `src/services/learning-language-policy.ts` | 混合语种规范化、阅读 prompt 和教练文案 | 不能未经拆分就作为万能 shared 模块 |
+| `src/modules/practice/application/practice-assembly.ts` | 已迁入练习领域 application；仍需关注 Repository 与 `learning-content-tool` DTO 的耦合 | 后续提取应用能力与 Tool 适配契约，不再回到通用 `services/` |
+| `src/transport/tools/learning-plan-tool.ts` | 跨模块计划 Tool 门面，保留注册给 Agent 的统一契约 | 由 transport 负责组合；计划与练习能力继续由领域模块提供 |
+| `src/modules/learning-content/tools/learning-content-tool.ts` | learning-content 领域 Tool 入口，具体内容动作已拆入子模块 | 保留外部 Tool 契约，内部按领域调用课程与练习能力 |
+| `src/modules/curriculum/application/content-language-policy.ts` + `src/runtime/coach-language-policy.ts` | 阅读语言策略归 curriculum，教练提示与上下文 metadata 归 runtime；轨道语种复用 shared | 已拆除混合职责，静态策略已登记 |
 
 现有 `src/README.md` 把 `server.ts` 描述为监听入口并注明 8999，与当前代码不符：启动在 `index.ts`，默认端口为 8080，受 `GATEWAY_PORT` 覆盖。实施时同步纠正文档，不以 README 的旧描述安排迁移。
 
@@ -136,7 +136,7 @@ apps/gateway/src/
 | `services/news-reading.ts` | `modules/curriculum/application/news-reading.ts` | M |
 | `services/news-rss.ts`、`services/news-article-fetch.ts` | `modules/curriculum/infrastructure/` 下同名文件 | M；外部采集是模块专属 IO |
 | `services/responses-lite-coach.ts`、`services/turn-summary-builder.ts` | `runtime/` 下同名文件 | M；保留 seed 引用，后续单独评估动态化 |
-| `services/learning-language-policy.ts` | 过渡保留；最终拆为 `shared/language.ts`、`modules/curriculum/application/reading-language-policy.ts`、`runtime/coach-language-policy.ts` | E；语种规范化与仓储 `language.ts` 对照测试后再去重，不盲目合并 |
+| `services/learning-language-policy.ts` | 已完成：`modules/curriculum/application/content-language-policy.ts` + `runtime/coach-language-policy.ts`；轨道语种归一复用 `@study-studio/shared` | E；课程模板与教练 fallback 分属各自边界，静态策略已更新登记 |
 
 ### 4.2 Tools
 

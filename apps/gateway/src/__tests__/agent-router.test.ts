@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { selectAgentRoute } from '../router/agent-router.js';
+import { selectAgentRoute } from '../runtime/router/agent-router.js';
 
 describe('selectAgentRoute', () => {
   it('routes quiz / example intents to learning-loop', () => {

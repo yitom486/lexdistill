@@ -1,6 +1,6 @@
-import { SessionManager, type AgentLane } from '../session/session-manager.js';
-import { ContextBuilder } from '../context/context-builder.js';
-import { ToolRouter } from '../router/tool-router.js';
+import { SessionManager, type AgentLane } from './session/session-manager.js';
+import { ContextBuilder } from './context/context-builder.js';
+import { ToolRouter } from './router/tool-router.js';
 import { ToolRegistry } from '@study-studio/tool-core';
 import { CodexAdapter } from '@study-studio/agent-runtime';
 import type { AgentAdapterFactory } from '../composition/agent-deps.js';
@@ -37,14 +37,14 @@ import {
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { EnrichJobRegistry, buildEnrichWsEnvelope } from '../modules/library/application/pdf-import/enrich-job-runner.js';
 import { registerGatewayTools } from '../transport/tools/register-tools.js';
+import { handleTurnSend } from './handlers/turn-handlers.js';
+import { handleQueueStart } from './handlers/queue-handler.js';
 import {
-  handleTurnSend,
-  handleQueueStart,
   handleApprovalRespond,
   handleTurnInterrupt,
   handleTurnSteer,
   handleToolResult,
-} from './handlers/turn-handlers.js';
+} from './handlers/control-handlers.js';
 
 export class GatewayServer {
   public readonly sessionManager = new SessionManager();

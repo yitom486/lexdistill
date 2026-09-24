@@ -41,11 +41,11 @@ const CROSS_MODULE_ALLOWLIST = new Set([
   // practice consumes content generation through the learning-content public API.
   'modules/practice/application/practice-assembly.ts -> modules/learning-content/public.js',
   'modules/practice/__tests__/practice-assembly.test.ts -> modules/learning-content/public.js',
+  // learning-content declares borrowed domain capabilities through public ports.
+  'modules/learning-content/ports.ts -> modules/dictionary/ports.js',
+  'modules/learning-content/ports.ts -> modules/library/ports.js',
+  'modules/learning-content/ports.ts -> modules/practice/ports.js',
   // learning-content reuses dictionary sampling and curriculum seed reads through domain APIs.
-  'modules/learning-content/tools/learning-content/hangul-words.ts -> modules/dictionary/public.js',
-  'modules/learning-content/tools/learning-content/kana-words.ts -> modules/dictionary/public.js',
-  'modules/learning-content/tools/learning-content/hangul.ts -> modules/library/public.js',
-  'modules/learning-content/tools/learning-content/kana.ts -> modules/library/public.js',
   // E2b：yomitan 改直引 @study-studio/archive，library/public 中转边消除。
   // Anki 推送复用 tts-proxy 合成（只取音频字节；Key 随调用来、用完即弃，永不落盘）。
   'modules/flashcards/application/anki-push.ts -> modules/tts/application/tts-proxy.js',
@@ -80,7 +80,7 @@ function collectTs(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === 'dist' || entry.name === 'node_modules') continue;
+      if (entry.name === 'dist' || entry.name === 'node_modules' || entry.name === '.test-runtime') continue;
       collectTs(full, out);
     } else if (
       (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) ||
@@ -237,6 +237,27 @@ describe('gateway module boundaries (G5)', () => {
     ] as const) {
       expect(typeof learningProgressPublic[key]).toBe('function');
     }
+  });
+
+  it('keeps cross-cutting agent runtime capabilities under runtime/', () => {
+    const movedFiles = [
+      'runtime/context/context-builder.ts',
+      'runtime/session/session-manager.ts',
+      'runtime/router/agent-router.ts',
+      'runtime/router/tool-router.ts',
+      'runtime/router/turn-tools.ts',
+      'runtime/router/README.md',
+    ];
+    const oldFiles = [
+      'context/context-builder.ts',
+      'session/session-manager.ts',
+      'router/agent-router.ts',
+      'router/tool-router.ts',
+      'router/turn-tools.ts',
+      'router/README.md',
+    ];
+    for (const file of movedFiles) expect(existsSync(join(SRC, ...file.split('/')))).toBe(true);
+    for (const file of oldFiles) expect(existsSync(join(SRC, ...file.split('/')))).toBe(false);
   });
 
   it('getRawDb 原生直通仅限三处 legacy（禁新增生产调用方）', () => {

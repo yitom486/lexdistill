@@ -15,7 +15,7 @@ import {
   buildKoreanAiReadingPrompt,
   normalizeContentLanguage,
   DEFAULT_CONTENT_LANGUAGE,
-} from '../../../services/learning-language-policy.js';
+} from '../application/content-language-policy.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import type { KanaPracticeScriptType } from '@study-studio/learner-core';
 

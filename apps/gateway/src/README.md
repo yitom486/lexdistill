@@ -2,7 +2,7 @@
 
 > 这里是 Lingua Studio 的后端中枢：客户端唯一连接的 HTTP + WebSocket Gateway。
 >
-> Web 客户端（`apps/web`）和桌面端（`apps/desktop`）只应该认识 Gateway 的协议与领域命令；数据库、学习者领域规则、Agent 适配器以及外部模型都隐藏在本目录之后。
+> Web 客户端（`apps/web`）和桌面端（`apps/desktop`）只通过 Gateway 使用服务端能力。Gateway 的文件负责串接请求与领域用例；通用学习算法、协议契约、存储适配和 Agent 适配器由 `packages/*` 提供。梳理业务流程时先读本目录，遇到具体能力实现再追到对应 package。
 
 ---
 
@@ -53,7 +53,7 @@ Gateway 的四个核心职责是：
 - `modules/*/application/` 负责领域用例和业务编排。
 - `modules/*/persistence/` 负责具体领域的数据库读写。
 - `infrastructure/` 负责数据库、Repository 门面和跨域基础设施。
-- `runtime/`、`router/`、`session/` 负责 Agent 运行时，不属于某个具体学习领域。
+- `runtime/` 负责通用 Agent 运行时（会话、上下文、路由与流式协调），不属于某个具体学习领域。
 - 具体模型厂商代码只能存在于 `packages/agent-runtime/adapters/*`，Gateway 只依赖 `agent-runtime` 抽象。
 
 ---
@@ -87,10 +87,10 @@ transport/websocket/websocket-handler.ts
 
 ```text
 runtime/gateway-runtime.ts
-session/session-manager.ts
-context/context-builder.ts
-router/agent-router.ts
-router/tool-router.ts
+runtime/session/session-manager.ts
+runtime/context/context-builder.ts
+runtime/router/agent-router.ts
+runtime/router/tool-router.ts
 ```
 
 这里可以回答“一次 Agent Turn 如何创建、运行、流式返回、调用工具和结束”。
@@ -198,24 +198,26 @@ sequenceDiagram
 
 ---
 
-## 5. Agent 运行时三件套：`runtime/`、`session/`、`router/`
+## 5. Agent 运行时：`runtime/`
 
 ### `runtime/`：跨领域的 Agent 运行协调
 
 | 文件/目录 | 作用 |
 |---|---|
 | `runtime/gateway-runtime.ts` | Gateway Runtime 主协调器：管理 Turn、连接 Session、消费 `AgentEvent`、调用 Tool、转发客户端事件。旧的 `server.ts` 实现已迁移到这里。 |
-| `runtime/handlers/turn-handlers.ts` | 处理 Turn 相关消息，例如发送、打断、完成和失败。 |
+| runtime/handlers/turn-handlers.ts | 处理 Turn 发送与流式输出。 |
+| runtime/handlers/queue-handler.ts | 消费 Agent 队列并汇总队列 Turn。 |
+| runtime/handlers/control-handlers.ts | 处理审批、打断、引导与客户端工具回执。 |
 | `runtime/responses-lite-coach.ts` | 轻量 Coach 旁路，适合快速问答；学习闭环默认仍由 Codex 主通路处理。 |
 | `runtime/turn-summary-builder.ts` | 生成 Turn 摘要、最终结果和失败时的用户友好回退文案。 |
 
 这里应该放“Agent 如何运行”的通用逻辑，不应该放“助词题如何判定”或“FSRS 如何计算”这样的领域规则。学习类 WebSocket 消息由 `modules/practice/websocket/` 和 `modules/learning-progress/websocket/` 适配；`GatewayRuntime` 按事件类型分发，并只经对应模块的 `public.ts` 调用。
 
-### `session/`：会话生命周期
+### `runtime/session/`：会话生命周期
 
 | 文件 | 作用 |
 |---|---|
-| `session/session-manager.ts` | 管理客户端会话和 Agent Session 的创建、恢复、查找、关闭；协调流式事件和 Tool Result 回填。 |
+| `runtime/session/session-manager.ts` | 管理客户端会话和 Agent Session 的创建、恢复、查找、关闭；协调流式事件和 Tool Result 回填。 |
 
 要区分两个概念：
 
@@ -224,11 +226,11 @@ sequenceDiagram
 
 客户端不应该直接管理 Codex Thread；客户端只持有系统协议中的 session/turn 标识。
 
-### `context/`：构建不可变 `ContextSnapshot`
+### `runtime/context/`：构建不可变 `ContextSnapshot`
 
 | 文件 | 作用 |
 |---|---|
-| `context/context-builder.ts` | 合并客户端传来的当前 UI/题目/作答事实，并从 Repository 补充用户弱项、复习数据等学习摘要，形成发送给 Agent 的上下文快照。 |
+| `runtime/context/context-builder.ts` | 合并客户端传来的当前 UI/题目/作答事实，并从 Repository 补充用户弱项、复习数据等学习摘要，形成发送给 Agent 的上下文快照。 |
 
 上下文快照适合放：
 
@@ -250,12 +252,13 @@ getActiveTab()
 
 如果客户端或 Gateway 已知这些信息，应随 Turn 放入 Snapshot。Tool 只用于查询外部未知数据，或触发持久化写入。
 
-### `router/`：选择 Agent 和执行 Tool
+### `runtime/router/`：选择 Agent 和执行 Tool
 
 | 文件 | 作用 |
 |---|---|
-| `router/agent-router.ts` | 根据路由策略选择 `codex`、Responses 或未来的其他 `AgentAdapter`。业务模块不直接选择厂商 SDK。 |
-| `router/tool-router.ts` | 根据 Tool Registry 的定义执行 Server/Client/External Tool，检查权限，并把结果回传给 Agent。 |
+| `runtime/router/agent-router.ts` | 根据路由策略选择 `codex`、Responses 或未来的其他 `AgentAdapter`。业务模块不直接选择厂商 SDK。 |
+| `runtime/router/turn-tools.ts` | 按意图与本轮信息收窄 Agent 可用工具集，并执行会话级 allowlist 约束。 |
+| `runtime/router/tool-router.ts` | 根据 Tool Registry 的定义执行 Server/Client/External Tool，检查权限，并把结果回传给 Agent。 |
 
 推荐的数据流是：
 
@@ -303,7 +306,13 @@ modules/<domain>/
 
 ### `modules/learning-content/`：学习内容生成领域
 
-负责由课程内容模板生成练习内容、讲解、例句、短文和语言专项练习；`learning.content` Agent Tool 与按练习块合成输入的逻辑都归本模块。`public.ts` 是其他领域消费其输入输出契约的唯一入口；Tool 注册仍由 `transport/tools/register-tools.ts` 统一装配，并保持现有注册顺序。
+负责由课程内容模板生成练习内容、讲解、例句、短文和语言专项练习。模块内部分工如下：
+
+- contracts.ts：内容命令的参数 Schema、输入输出和调用上下文契约。
+- ports.ts：模板查询、课程读取、词典抽样和可选练习收集能力的接口。
+- application/execute-learning-content.ts 与 application/actions/：领域命令分发及各内容动作实现。
+- tools/learning-content-tool.ts：Agent Tool 适配器，校验仓储能力后调用领域命令。
+- public.ts：对其他领域公开命令、Tool 与类型；Tool 注册由 transport/tools/register-tools.ts 统一装配。
 
 ### `modules/learning-progress/`：学习进度领域
 
@@ -474,37 +483,32 @@ Unexpected token < in JSON
 
 ---
 
-## 9. 旧目录和迁移状态
+## 9. 目录职责和迁移状态
 
-### `repository/`
+### 持久化实现
 
-该目录已清空，仅保留说明文件。持久层已经迁移到：
+旧的顶层 repository/ 目录已移除。持久层位于：
 
 ```text
 infrastructure/                         # Repository 门面、DB、共享持久化基础
 modules/*/persistence/                  # 各领域 SQL 和数据访问
 ```
 
-### `tools/`
+### `transport/`
 
-该目录已清空，仅保留说明文件。Tool 实现已经迁移到各领域模块：
+HTTP / WebSocket 协议适配、应用路由组合，以及跨领域 Tool 的注册装配。领域 Tool 适配器放在 `modules/*/tools/`，可复用的领域命令放在 `modules/*/application/`；跨域 Tool 和注册装配入口保留在 `transport/tools/`。
 
-```text
-modules/practice/tools/
-modules/learning-progress/tools/
-modules/library/tools/
-modules/curriculum/tools/
-modules/dictionary/tools/
-transport/tools/                        # 跨域 Tool 和注册装配
-```
+### `errors/`
 
-### `services/`
+统一把底层异常翻译并格式化为客户端可读的 `BusinessError` HTTP 响应。领域 HTTP 路由复用 `errors/http-error-handler.ts`。
 
-当前主要保留 `learning-language-policy.ts`。它属于跨领域策略，但仍存在职责混合，后续可能继续拆分。新增业务代码不要因为“方便”全部堆入 `services/`；先判断它属于哪个领域或基础设施层。
+### 顶层 `services/` 与 `tools/`
 
-### `runtime/` 中的待收拢项
+这两个通用目录已移除。课程阅读策略归 `modules/curriculum/application/`，Agent 教练策略归 `runtime/`；Tool 实现按领域放入 `modules/*/tools/`，跨域 Tool 和注册装配归 `transport/tools/`。
 
-`session/`、`context/`、`router/` 当前仍是独立目录，分别承载会话、上下文和路由职责。它们与 `runtime/` 配合工作，未来可以继续收拢，但目前应以现有文件位置为准，不要自行制造第二套运行时。
+### `runtime/` 的职责边界
+
+`runtime/context/`、`runtime/session/` 和 `runtime/router/` 分别承载上下文、会话与路由能力，均属于通用 Agent 运行时。领域业务继续放在 `modules/*`，不要在领域模块中复制一套 Agent 运行时。
 
 ---
 
@@ -589,7 +593,7 @@ Agent 负责解释和诊断；`learner-core` 与数据库负责长期事实记�
 | 是给 Agent 原生调用的能力吗？ | 对应模块的 `tools/`，跨域才考虑 `transport/tools/` |
 | 是某个领域的数据库读写吗？ | 对应模块的 `persistence/` |
 | 是表结构、连接、路径、事务上下文吗？ | `infrastructure/` |
-| 是 Agent Session、Turn、流式事件或模型路由吗？ | `runtime/`、`session/`、`router/` |
+| 是 Agent Session、Turn、流式事件或模型路由吗？ | `runtime/` |
 | 是所有模块都可能使用的错误、日志、ID、时间能力吗？ | `packages/shared` |
 | 是具体模型厂商 SDK 或协议转换吗？ | `packages/agent-runtime/adapters/*` 等适配器 |
 
@@ -620,7 +624,7 @@ flowchart TD
 7. **错误先翻译再出网**：不要把底层异常、调用栈或厂商错误原文返回客户端。
 8. **类型安全**：不要新增 `any`；跨信任边界的数据必须解析和收窄。
 9. **静态数据要登记**：新增 seed、演示题库、Mock 状态或硬编码规则时，登记到 `.studio-internal/STATIC-DATA-INVENTORY.md`。
-10. **按真实代码位置阅读**：`repository/` 和 `tools/` 是迁移后的兼容说明目录，不是新实现的落点。
+10. **按真实代码位置阅读**：持久化实现位于 infrastructure/ 与 modules/*/persistence/；领域 Tool 位于 modules/*/tools/。
 
 ---
 

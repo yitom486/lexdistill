@@ -6,7 +6,7 @@ import {
   pickLeadSentence,
 } from '../modules/curriculum/infrastructure/news-rss.js';
 import { generateNewsPassage } from '../modules/curriculum/application/generate-news-passage.js';
-import { DEFAULT_CONTENT_LANGUAGE } from '../services/learning-language-policy.js';
+import { DEFAULT_CONTENT_LANGUAGE } from '../modules/curriculum/application/content-language-policy.js';
 
 describe('news RSS integration', () => {
   // 真网 live 用例：默认隔离，CI/常规 bun test 不跑；
@@ -56,7 +56,7 @@ describe('news RSS integration', () => {
 
   it('builds Korean TOPIK AI passage (no longer an English scaffold)', async () => {
     const { buildKoreanAiReadingPrompt } = await import(
-      '../services/learning-language-policy.js'
+      '../modules/curriculum/application/content-language-policy.js'
     );
     const p = buildKoreanAiReadingPrompt({ topic: '시사', difficulty: 2 });
     expect(p.sourceLabel).toContain('TOPIK');

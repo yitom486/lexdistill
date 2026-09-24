@@ -427,11 +427,11 @@ describe('M1-1 package 依赖方向', () => {
     }
   });
 
-  it('gateway 学习进度 API：三纯函数走 learning 统一入口', async () => {
+  it('gateway 学习能力：纯领域函数走 learning 统一入口', async () => {
     const cases: Array<[string, string[]]> = [
-      ['context/context-builder.ts', ['summarizeLearningEvidence']],
+      ['runtime/context/context-builder.ts', ['summarizeLearningEvidence']],
       ['modules/learning-progress/application/learning-analysis.ts', ['summarizeLearningEvidence']],
-      ['runtime/handlers/learner-handlers.ts', ['recordSkillAttempt']],
+      ['modules/practice/application/submit-practice-attempt.ts', ['recordSkillAttempt']],
     ];
     for (const [file, symbols] of cases) {
       const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');

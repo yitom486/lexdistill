@@ -2,13 +2,14 @@ import type { ContextSnapshot, ContextFocusItem } from '@study-studio/agent-runt
 import { summarizeLearningEvidence } from '@study-studio/learning';
 import { COURSE_STAGES, type LearnerProfileSnapshot, type LearnerRepository } from '@study-studio/learner-core';
 import type { GeneratedQuestion, Flashcard } from '@study-studio/protocol';
-import { isOk, type Result, type BusinessError } from '@study-studio/shared';
 import {
-  buildTrackCoachMetadata,
+  isOk,
+  type Result,
+  type BusinessError,
   normalizeTrackLanguage,
-  skillMatchesTrack,
   type TrackLanguage,
-} from '../services/learning-language-policy.js';
+} from '@study-studio/shared';
+import { buildTrackCoachMetadata, skillMatchesTrack } from '../coach-language-policy.js';
 
 export interface BuildTurnContextParams {
   profile: LearnerProfileSnapshot;
