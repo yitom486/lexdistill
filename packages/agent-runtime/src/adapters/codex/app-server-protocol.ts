@@ -2,8 +2,8 @@
  * Codex App Server 最小协议类型（对照官方 generate-ts）。
  * 注意：sandbox / approval 必须用 kebab-case（协议真实枚举）。
  */
-import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { resolveNewestInstalledCodexBinary } from './codex-binary.js';
 
 export interface DynamicToolFunctionSpec {
   type: 'function';
@@ -324,13 +324,7 @@ export function resolveCodexBinary(explicit?: string): string {
   if (process.env.CODEX_BIN?.trim()) return process.env.CODEX_BIN.trim();
   if (process.env.CODEX_PATH?.trim()) return process.env.CODEX_PATH.trim();
 
-  const localAppData = process.env.LOCALAPPDATA;
-  if (localAppData) {
-    const winCodex = path.join(localAppData, 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe');
-    if (existsSync(winCodex)) return winCodex;
-  }
-
-  return 'codex';
+  return resolveNewestInstalledCodexBinary(resolveUserHome(), process.env.LOCALAPPDATA) ?? 'codex';
 }
 
 export function buildCodexProcessEnv(
