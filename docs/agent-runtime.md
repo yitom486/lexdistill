@@ -147,3 +147,11 @@ export type AgentEvent =
 ### 工具通道优先级 (与 AGENTS.md 1.6 对齐)
 1. **最高优先**：引擎原生 dynamic tool / function call → Gateway `ToolRouter` → `tool-core` 注册工具。
 2. **最低优先 / 可选**：MCP，仅用于 Anki、Notion 等外部异构系统，不得成为学习域默认总线。
+
+### 新工具上线门禁（强制）
+任何新 Tool 在 `registerGatewayTools`（或各域 `registerXTools`）注册上线前，必须配齐以下测试，缺一不可：
+1. **schema 拒绝测试**：`safeParse` 非法输入（空必填、越界枚举、超长/超量）必须失败；
+2. **真仓储 round-trip**：`new XxxTool(new DrizzleLearnerRepository(':memory:')).execute()` 落库可回读；
+3. **元数据锁定**：`name/location/permission` 断言（CLIENT 工具还要断言网关侧无副作用、只回显）；
+4. **降级语义**（如有）：缺 adapter / 缺登录时必须显式报错（`E_*_NO_ADAPTER`），禁止静默编造。
+参考样例：`apps/gateway/src/__tests__/ui-command-tools.test.ts`（Client Tool）、`apps/gateway/src/modules/library/__tests__/knowledge-points.test.ts`（Server Tool + 真仓储）。
