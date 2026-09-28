@@ -4,6 +4,7 @@ import {
   anchorFlowReducer,
   buildPreviewEntries,
   decideAnchorConfirm,
+  decideManualAnchorConfirm,
   decideLessonImport,
   findCorroboratedFolios,
   fingerprintAnchors,
@@ -69,6 +70,22 @@ describe('decideAnchorConfirm（唯一 anchor 判定点）', () => {
     // 守门通过 ≠ 自动确认：调用方只有点击 handler 一处，没有数据驱动的自动路径。
     const res = decideAnchorConfirm(arabic('18', 18, 'ocr'), 26, []);
     expect(res.ok).toBe(true);
+  });
+});
+
+describe('手填 anchor 必须显式确认', () => {
+  it('合法的印刷页与 PDF 物理页组成 human-confirmed anchor', () => {
+    expect(decideManualAnchorConfirm('18', '26', [])).toEqual({
+      ok: true,
+      anchor: { printedPage: 18, physicalPage: 26, evidence: 'human-confirmed', label: '印18 ↔ 物26' },
+    });
+  });
+
+  it('拒绝非法与重复页码', () => {
+    const existing: LocalAnchor[] = [{ printedPage: 18, physicalPage: 26, evidence: 'human-confirmed', label: '印18 ↔ 物26' }];
+    expect(decideManualAnchorConfirm('0', '27', []).ok).toBe(false);
+    expect(decideManualAnchorConfirm('18', '27', existing).ok).toBe(false);
+    expect(decideManualAnchorConfirm('19', '26', existing).ok).toBe(false);
   });
 });
 

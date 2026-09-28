@@ -107,7 +107,7 @@ export function parseAnchorCheckPages(text: string): AnchorPagesValidation {
 export type AnchorDecision = { ok: true; anchor: LocalAnchor } | { ok: false; message: string };
 
 /**
- * anchor 确认守门（纯函数）：唯一能产出 anchor 的判定点。
+ * folio 候选确认守门（纯函数）：只有用户点击候选才产出 anchor。
  * - Roman 一律拒绝（仅前言证据，不能映射数字印刷页）；
  * - 重复印刷页拒绝（P5-A fail-closed，提前拦下给友好文案）；
  * - 通过仍只返回 anchor 对象，是否进入 state 由调用方显式 dispatch 决定
@@ -132,6 +132,34 @@ export function decideAnchorConfirm(
       physicalPage,
       evidence: 'human-confirmed',
       label: `印${printed} ↔ 物${physicalPage}`,
+    },
+  };
+}
+
+/** Explicitly entered folio pair. The user must inspect the PDF before confirming it. */
+export function decideManualAnchorConfirm(
+  printedText: string,
+  physicalText: string,
+  existing: LocalAnchor[],
+): AnchorDecision {
+  if (!/^\d+$/.test(printedText.trim()) || !/^\d+$/.test(physicalText.trim())) {
+    return { ok: false, message: '印刷页和 PDF 物理页都必须是正整数' };
+  }
+  const printedPage = Number(printedText.trim());
+  const physicalPage = Number(physicalText.trim());
+  if (!Number.isSafeInteger(printedPage) || !Number.isSafeInteger(physicalPage) || printedPage < 1 || physicalPage < 1) {
+    return { ok: false, message: '印刷页和 PDF 物理页都必须是正整数' };
+  }
+  if (existing.some((anchor) => anchor.printedPage === printedPage || anchor.physicalPage === physicalPage)) {
+    return { ok: false, message: '该印刷页或 PDF 物理页已有 anchor，请先移除再确认' };
+  }
+  return {
+    ok: true,
+    anchor: {
+      printedPage,
+      physicalPage,
+      evidence: 'human-confirmed',
+      label: `印${printedPage} ↔ 物${physicalPage}`,
     },
   };
 }

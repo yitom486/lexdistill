@@ -17,6 +17,7 @@ import {
   anchorFlowReducer,
   buildPreviewEntries,
   decideAnchorConfirm,
+  decideManualAnchorConfirm,
   decideLessonImport,
   findCorroboratedFolios,
   fingerprintAnchors,
@@ -162,7 +163,7 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
         页码 anchor 与分段预览（只读）
       </p>
       <p className="text-[11px] text-ink-ghost">
-        候选只是弱证据；只有你点击确认后才成为本次会话 anchor；anchor 与预览只保存在当前页面，刷新即丢失。
+        候选只是弱证据；请核对 PDF 后点击确认候选，或手填印刷页与物理页并确认。anchor 与预览只保存在当前页面，刷新即丢失。
       </p>
       <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-ghost">
         <span className="font-bold text-ink-mute-deep">检查 folio 页：</span>
@@ -268,7 +269,7 @@ export function TocAnchorPanelView(props: TocAnchorPanelViewProps): React.ReactE
           本地 anchors（{anchors.length} 个，初始为零，只增于你的确认点击）：
         </p>
         {anchors.length === 0 && (
-          <p className="text-ink-stone-400">暂无 anchor。请先检查 folio，再逐条确认。</p>
+          <p className="text-ink-stone-400">暂无 anchor。请检查页码候选或手动填写并确认。</p>
         )}
         <div className="flex flex-wrap gap-1.5">
           {anchors.map((anchor) => (
@@ -471,6 +472,9 @@ export function LessonImportDialogContent(props: {
 export function TocAnchorPanel({ file, filePath, entries }: TocAnchorPanelProps): React.ReactElement {
   const [flow, dispatch] = useReducer(anchorFlowReducer, initialAnchorFlowState);
   const [importTarget, setImportTarget] = useState<{ lessonIndex: number; docTitle: string } | null>(null);
+  const [manualPrinted, setManualPrinted] = useState('');
+  const [manualPhysical, setManualPhysical] = useState('');
+  const [manualError, setManualError] = useState<string | null>(null);
   const folio = useFolioCandidatesMutation();
   const preview = usePreviewTocSegmentsMutation();
   const lessonImport = useImportTocLessonMutation();
@@ -513,6 +517,19 @@ export function TocAnchorPanel({ file, filePath, entries }: TocAnchorPanelProps)
     const decision = decideAnchorConfirm(candidate, physicalPage, flow.anchors);
     if (!decision.ok) return;
     dispatch({ type: 'confirm-anchor', anchor: decision.anchor });
+  };
+
+  const handleConfirmManualAnchor = (): void => {
+    const decision = decideManualAnchorConfirm(manualPrinted, manualPhysical, flow.anchors);
+    if (!decision.ok) {
+      setManualError(decision.message);
+      return;
+    }
+    dispatch({ type: 'confirm-anchor', anchor: decision.anchor });
+    preview.reset();
+    setManualPrinted('');
+    setManualPhysical('');
+    setManualError(null);
   };
 
   const handleRemoveAnchor = (printedPage: number): void => {
@@ -589,6 +606,14 @@ export function TocAnchorPanel({ file, filePath, entries }: TocAnchorPanelProps)
 
   return (
     <>
+      <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 text-[11px] text-ink-mute-deep">
+        <span className="font-semibold">手动确认页码锚点：</span>
+        <input aria-label="锚点印刷页" inputMode="numeric" placeholder="书上印刷页" value={manualPrinted} onChange={(event) => { setManualPrinted(event.target.value); setManualError(null); }} className="h-8 w-24 rounded-lg border border-line bg-surface px-2 text-ink" />
+        <span>↔</span>
+        <input aria-label="锚点 PDF 物理页" inputMode="numeric" placeholder="PDF 物理页" value={manualPhysical} onChange={(event) => { setManualPhysical(event.target.value); setManualError(null); }} className="h-8 w-24 rounded-lg border border-line bg-surface px-2 text-ink" />
+        <Button type="button" size="sm" variant="outline" onClick={handleConfirmManualAnchor}>核对后确认</Button>
+        {manualError && <span role="status" className="text-ink-amber-800-amber-400">{manualError}</span>}
+      </div>
       <TocAnchorPanelView
       hasSource={source !== null}
       checkText={flow.checkText}

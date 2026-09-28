@@ -33,6 +33,7 @@ import {
 } from './ui/dialog.js';
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
+import { TocRecognitionPanel } from './toc/TocRecognitionPanel.js';
 import {
   Select,
   SelectContent,
@@ -596,7 +597,7 @@ export function TextbookImporterModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
+        className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
         showCloseButton
       >
         <DialogHeader className="px-6 py-4 border-b border-line-accent bg-wash-amber-500o5 text-left">
@@ -952,11 +953,13 @@ export function TextbookImporterModal({
                 )}
               </div>
             )}
-            <div className="pt-1 mt-1 border-t border-tone-amber-500o20 space-y-1.5">
-              <p className="text-[11px] font-bold text-ink-mute-deep">
-                目录识别与人工确认（只读，不入库；用上方已选 PDF / 路径）
-              </p>
-              <p className="text-[11px] text-ink-ghost">目录识别流程已下线重构，本区域暂不可用。</p>
+            <div className="pt-1 mt-1 border-t border-tone-amber-500o20">
+              <TocRecognitionPanel
+                key={pdfFile ? `${pdfFile.name}:${pdfFile.size}:${pdfFile.lastModified}` : stripPdfPathQuotes(pdfPath)}
+                file={pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null}
+                filePath={stripPdfPathQuotes(pdfPath)}
+                {...(azureCreds ? { azure: azureCreds } : {})}
+              />
             </div>
           </div>
 

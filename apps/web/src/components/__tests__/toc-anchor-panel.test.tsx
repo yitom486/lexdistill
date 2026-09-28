@@ -93,7 +93,7 @@ describe('P5C TocAnchorPanelView（SSR）', () => {
   it('初始零 anchor，不声称已保存', () => {
     const html = render();
     expect(html).toContain('暂无 anchor');
-    expect(html).toContain('检查 folio');
+    expect(html).toContain('手动填写并确认');
     expect(html).not.toContain('已保存');
     expect(html).not.toContain('已入库');
   });
