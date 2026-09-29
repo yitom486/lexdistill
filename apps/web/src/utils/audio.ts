@@ -9,12 +9,10 @@ import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 export interface SpeechStudioConfig {
   gender: TtsGender;
   rate: number;
-  preferredService: 'gemini' | 'azure' | 'local';
-  geminiApiKey: string;
-  azureKey: string;
+  preferredService: string;
+  providerApiKeys: Record<string, string>;
   azureRegion: string;
   localBaseUrl: string;
-  localApiKey: string;
   voiceId: string;
 }
 
@@ -174,9 +172,8 @@ export const sound = new SoundEngine();
 class SpeechStudioEngine {
   private listeners = new Set<() => void>();
   private config: SpeechStudioConfig = {
-    gender: 'FEMALE', rate: 0.9, preferredService: 'gemini',
-    geminiApiKey: '', azureKey: '', azureRegion: '',
-    localBaseUrl: '', localApiKey: '', voiceId: '',
+    gender: 'FEMALE', rate: 0.9, preferredService: '',
+    providerApiKeys: {}, azureRegion: '', localBaseUrl: '', voiceId: '',
   };
   private isSpeaking = false;
   private currentText = '';
@@ -225,22 +222,30 @@ class SpeechStudioEngine {
       const config = this.config;
       const language = options?.lang === 'JA' ? 'ja-JP' : options?.lang === 'KO' ? 'ko-KR' : 'en-US';
       // Gateway 地址可能在 Tauri 启动后变更，因此每次调用读取 live binding。
-      const client = createTTSClient({ baseUrl: GATEWAY_BASE_URL, prefix: '/api/tts-studio' });
+      const credentialHeaders = Object.fromEntries(
+        Object.entries(config.providerApiKeys)
+          .filter(([provider, key]) => /^[a-z0-9-]+$/.test(provider) && Boolean(key))
+          .map(([provider, key]) => [`x-${provider}-api-key`, key]),
+      );
+      const client = createTTSClient({
+        baseUrl: GATEWAY_BASE_URL,
+        prefix: '/api/tts-studio',
+        headers: credentialHeaders,
+      });
+      const voiceId = options?.neural?.voiceId || config.voiceId;
+      const voicePreference = {
+        ...(options?.gender ? { gender: options.gender === 'MALE' ? 'male' as const : 'female' as const } : {}),
+        ...(voiceId ? { voiceId } : {}),
+      };
       const result = await client.synthesizeUnified({
         text,
         language,
         ...(options?.purpose ? { purpose: options.purpose } : {}),
-        preferredService: config.preferredService,
-        voicePreference: {
-          gender: (options?.gender ?? config.gender) === 'MALE' ? 'male' : 'female',
-          ...(options?.neural?.voiceId || config.voiceId ? { voiceId: options?.neural?.voiceId || config.voiceId } : {}),
-        },
+        ...(config.preferredService ? { preferredService: config.preferredService } : {}),
+        ...(Object.keys(voicePreference).length > 0 ? { voicePreference } : {}),
         credentials: {
-          ...(config.geminiApiKey ? { geminiApiKey: config.geminiApiKey } : {}),
-          ...(config.azureKey ? { azureKey: config.azureKey } : {}),
           ...(config.azureRegion ? { azureRegion: config.azureRegion } : {}),
           ...(config.localBaseUrl ? { localBaseUrl: config.localBaseUrl } : {}),
-          ...(config.localApiKey ? { localApiKey: config.localApiKey } : {}),
         },
       }, controller.signal);
       if (sequence !== this.sequence) return;

@@ -18,7 +18,7 @@ import { MarkdownText } from './common/MarkdownText.js';
 import { UnifiedTtsPlayer } from './UnifiedTtsPlayer.js';
 import { toSpeakableText } from '../lib/speakable.js';
 import { extractFollowUps, extractPredictedFollowUps } from '../lib/followups.js';
-import { trackToSpeechLang } from '../config/tts-voice-personas.js';
+import { trackToSpeechLang } from '../config/speech-language.js';
 import {
   buildTutorBootstrapPrompt,
   buildTutorOfflineReply,

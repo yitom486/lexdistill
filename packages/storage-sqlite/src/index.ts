@@ -246,8 +246,10 @@ export {
 } from './adapters/library/knowledge-points.js';
 export {
   seedTextbookTocSkeleton,
+  listTextbookLessonSlots,
   type SeedTocSkeletonInput,
   type SavedTocSkeleton,
+  type TextbookLessonSlotItem,
 } from './adapters/library/toc-skeleton.js';
 export {
   commitLessonKnowledge,

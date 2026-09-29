@@ -17,6 +17,7 @@ export interface LessonContentSlice {
   title: string;
   startPage: number;
   endPage: number;
+  subSections?: string[];
   ocrText: string;
 }
 
@@ -102,11 +103,21 @@ export async function slicePdfLessonsWithOcr(
         });
       }
 
+      // 提取本课辖下的子条目（微观目录白名单，如文型 1~4、会话标题）
+      const subSections = canonical
+        .filter(
+          (e) =>
+            e.level === 'section' &&
+            (e.parentId === lesson.id || (!e.parentId && e.startPage >= start && e.startPage <= end))
+        )
+        .map((e) => e.title);
+
       results[index] = {
         lessonId: lesson.id,
         title: lesson.title,
         startPage: start,
         endPage: end,
+        subSections,
         ocrText: extractedText.trim(),
       };
     }

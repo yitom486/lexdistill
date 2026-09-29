@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  SlidersHorizontal,
   Wifi,
   WifiOff,
   User,
@@ -18,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
+import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from './ui/tabs.js';
 import {
   Select,
   SelectTrigger,
@@ -28,7 +28,7 @@ import {
 import { sound } from '../utils/audio.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { useLearningShell } from '../hooks/useLearningShell.js';
-import { trackToSpeechLang } from '../config/tts-voice-personas.js';
+import { trackToSpeechLang } from '../config/speech-language.js';
 import { TtsStudioSettings } from './TtsStudioSettings.js';
 import {
   useDictionaryPackagesQuery,
@@ -55,11 +55,12 @@ export function SystemSettingsPage() {
   const setProfileModalOpen = useUserProfileStore((s) => s.setProfileModalOpen);
   const shell = useLearningShell();
   const speechLang = trackToSpeechLang(shell.track);
-  const dictionaryPackages = useDictionaryPackagesQuery(true);
+  const [section, setSection] = useState<'speech' | 'more'>('speech');
+  const dictionaryPackages = useDictionaryPackagesQuery(section === 'more');
   const installDictionaryPackage = useInstallDictionaryPackageMutation();
   const updateDictionaryPackage = useUpdateDictionaryPackageMutation();
   const installCustomDictionary = useInstallCustomDictionaryMutation();
-  const ankiStatus = useAnkiStatusQuery(true);
+  const ankiStatus = useAnkiStatusQuery(section === 'more');
   const saveAnkiSettings = useSaveAnkiSettingsMutation();
   const [customDictLicenseOk, setCustomDictLicenseOk] = useState(false);
   const [cardWorkbenchOpen, setCardWorkbenchOpen] = useState(false);
@@ -169,21 +170,14 @@ export function SystemSettingsPage() {
   };
 
   return (
-    <div className="space-y-8 pb-10">
-      <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl border border-line bg-surface p-6 shadow-sm sm:p-8">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-accent-ink">
-            <SlidersHorizontal className="h-4 w-4" />
-            LINGUA STUDIO
-          </div>
-          <h1 className="mt-2 text-3xl font-semibold text-ink">设置</h1>
-          <p className="mt-2 text-sm text-ink-mute">管理语音朗读、离线资源、外部连接与学习数据。</p>
-        </div>
-        <div className="flex items-center gap-1.5 text-sm font-medium">
+    <div className="space-y-6 pb-10">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-3xl font-semibold text-ink">设置</h1>
+        <div className="flex items-center gap-1.5 text-base font-medium">
             {isConnected ? (
               <span className="inline-flex items-center gap-1 text-ink-emerald-600-emerald-400">
                 <Wifi className="h-4 w-4" />
-                <span>已联通{latencyMs ? ` (${latencyMs}ms)` : ''}</span>
+                <span>已连接{latencyMs ? ` (${latencyMs}ms)` : ''}</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 text-accent-ink">
@@ -194,8 +188,16 @@ export function SystemSettingsPage() {
         </div>
       </header>
 
-      <TtsStudioSettings lang={speechLang} />
-
+      <Tabs value={section} onValueChange={(value) => setSection(value === 'more' ? 'more' : 'speech')}>
+        <TabsList className="w-full justify-start sm:w-auto">
+          <TabsIndicator />
+          <TabsTrigger value="speech" className="px-6 py-3 text-base">语音朗读</TabsTrigger>
+          <TabsTrigger value="more" className="px-6 py-3 text-base">其他设置</TabsTrigger>
+        </TabsList>
+        <TabsContent value="speech" className="mt-6">
+          <TtsStudioSettings lang={speechLang} />
+        </TabsContent>
+        <TabsContent value="more" className="mt-6">
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <div className="space-y-6">
           {isDesktop && (
@@ -207,19 +209,19 @@ export function SystemSettingsPage() {
                 </div>
                 <Badge
                   variant="outline"
-                  className="border-line-amber-500o30 px-1.5 py-0 text-[10px] text-accent-ink"
+                  className="border-line-amber-500o30 px-1.5 py-0 text-sm text-accent-ink"
                 >
                   桌面端
                 </Badge>
               </div>
-              <p className="text-[10px] leading-relaxed text-ink-ghost">
+              <p className="text-sm leading-relaxed text-ink-ghost">
                 启动时会自动检查更新；你也可以随时手动检查。更新应用不会覆盖学习数据和本地配置。
               </p>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 w-full gap-1.5 border-line-amber-500o30 text-[11px] text-tone-amber-700 hover:bg-wash-amber-100o70 dark:text-ink-amber-300 dark:hover:bg-grad-amber-950o40 transition-colors"
+                className="h-8 w-full gap-1.5 border-line-amber-500o30 text-sm text-tone-amber-700 hover:bg-wash-amber-100o70 dark:text-ink-amber-300 dark:hover:bg-grad-amber-950o40 transition-colors"
                 disabled={updateChecking}
                 onClick={() => void handleCheckForUpdate()}
               >
@@ -240,7 +242,7 @@ export function SystemSettingsPage() {
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-7 gap-1 px-2 text-[11px]"
+                className="h-7 gap-1 px-2 text-sm"
                 onClick={() => {
                   sound.playClick();
                   setCardWorkbenchOpen(true);
@@ -262,7 +264,7 @@ export function SystemSettingsPage() {
                         <p className="font-medium text-ink-soft">
                           {dictionaryLangLabel(dictionary.language)}释义 · {dictionary.provider}
                         </p>
-                        <p className="mt-0.5 text-[10px] leading-relaxed text-ink-ghost">
+                        <p className="mt-0.5 text-sm leading-relaxed text-ink-ghost">
                           {dictionary.installed
                             ? `已写入本机 SQLite${dictionary.entryCount ? ` · ${dictionary.entryCount.toLocaleString()} 条` : ''}`
                             : dictionary.installerReady === false
@@ -276,7 +278,7 @@ export function SystemSettingsPage() {
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className="h-7 w-7 p-0 text-[11px]"
+                            className="h-7 w-7 p-0 text-sm"
                             disabled={!isConnected || updateDictionaryPackage.isPending}
                             title="优先（查词排序提前）"
                             onClick={() => {
@@ -293,7 +295,7 @@ export function SystemSettingsPage() {
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className="h-7 gap-1 px-2 text-[11px]"
+                            className="h-7 gap-1 px-2 text-sm"
                             disabled={!isConnected || updateDictionaryPackage.isPending}
                             title={dictionary.enabled === false ? '已禁用，点击启用' : '已启用，点击禁用'}
                             onClick={() => {
@@ -311,7 +313,7 @@ export function SystemSettingsPage() {
                         <Button
                           type="button"
                           size="sm"
-                          className="h-7 shrink-0 gap-1 px-2 text-[11px]"
+                          className="h-7 shrink-0 gap-1 px-2 text-sm"
                           disabled={!isConnected || installDictionaryPackage.isPending || dictionary.installerReady === false}
                           onClick={() => handleInstallDictionary(dictionary.id)}
                         >
@@ -324,21 +326,21 @@ export function SystemSettingsPage() {
                         </Button>
                       )}
                     </div>
-                    <p className="mt-2 text-[10px] text-ink-stone-400">
+                    <p className="mt-2 text-sm text-ink-stone-400">
                       {dictionary.licenseName} · 已保留来源与署名
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-ink-stone-500">正在读取词典包状态…</p>
+              <p className="text-sm text-ink-stone-500">正在读取词典包状态…</p>
             )}
             <div className="rounded-xl border border-dashed border-line-stone-300o80 p-2.5 dark:border-tone-stone-700 transition-colors">
-              <p className="text-[11px] font-medium text-ink-mute">
+              <p className="text-sm font-medium text-ink-mute">
                 自备 Yomitan 词典包（bank v3 .zip）
               </p>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-tone-amber-600 px-2 py-1 text-[11px] font-semibold text-tone-white hover:bg-tone-amber-700">
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-tone-amber-600 px-2 py-1 text-sm font-semibold text-tone-white hover:bg-tone-amber-700">
                   <Download className="h-3 w-3" />
                   {installCustomDictionary.isPending ? '安装中…' : '选择 zip 安装'}
                   <input
@@ -355,7 +357,7 @@ export function SystemSettingsPage() {
                     if (v === 'ja' || v === 'en' || v === 'ko') setCustomDictLang(v);
                   }}
                 >
-                  <SelectTrigger className="h-7 w-20 text-[11px]">
+                  <SelectTrigger className="h-7 w-20 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -365,7 +367,7 @@ export function SystemSettingsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <label className="mt-1.5 flex cursor-pointer items-start gap-1.5 text-[10px] leading-relaxed text-ink-stone-500">
+              <label className="mt-1.5 flex cursor-pointer items-start gap-1.5 text-sm leading-relaxed text-ink-stone-500">
                 <input
                   type="checkbox"
                   checked={customDictLicenseOk}
@@ -389,7 +391,7 @@ export function SystemSettingsPage() {
               {ankiStatus.data && (
                 <Badge
                   variant="outline"
-                  className="border-line-amber-500o30 px-1.5 py-0 text-[10px] text-accent-ink"
+                  className="border-line-amber-500o30 px-1.5 py-0 text-sm text-accent-ink"
                 >
                   {ankiStatus.data.connected
                     ? `已连接 v${ankiStatus.data.ankiVersion ?? '?'}`
@@ -398,7 +400,7 @@ export function SystemSettingsPage() {
               )}
             </div>
             <div className="flex items-center justify-between gap-2 rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50 transition-colors">
-              <p className="text-[10px] leading-relaxed text-ink-ghost">
+              <p className="text-sm leading-relaxed text-ink-ghost">
                 把生词本卡片推送到本机 Anki（需打开 Anki + 安装 AnkiConnect 插件）。关闭时查词面板不显示推送入口。
               </p>
               <Switch
@@ -425,7 +427,7 @@ export function SystemSettingsPage() {
                 <User className="w-3.5 h-3.5 text-tone-amber-500" />
                 <span>学习者画像与打卡</span>
               </div>
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-line-amber-500o30 text-accent-ink">
+              <Badge variant="outline" className="text-sm px-1.5 py-0 border-line-amber-500o30 text-accent-ink">
                 {profile.studyGoal.replace('JLPT_', '')}
               </Badge>
             </div>
@@ -439,14 +441,14 @@ export function SystemSettingsPage() {
               className="group flex w-full cursor-pointer items-center justify-between rounded-xl border border-line bg-surface-dim p-2.5 text-left transition-colors hover:border-line-amber-500o30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-tone-amber-500 to-tone-amber-600 text-tone-stone-950 font-bold flex items-center justify-center text-xs shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-tone-amber-500 to-tone-amber-600 text-tone-stone-950 font-bold flex items-center justify-center text-sm shrink-0">
                   {profile.displayName.slice(0, 1) || '学'}
                 </div>
                 <div className="min-w-0">
                   <div className="font-medium text-ink-soft truncate">
                     {profile.displayName || '学员'}
                   </div>
-                  <div className="text-[10px] text-ink-ghost flex items-center gap-1.5">
+                  <div className="text-sm text-ink-ghost flex items-center gap-1.5">
                     <span className="flex items-center gap-0.5 text-accent-ink font-medium">
                       <Flame className="w-2.5 h-2.5 fill-current" />
                       {profile.streakDays} 天连续
@@ -460,7 +462,7 @@ export function SystemSettingsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 text-[11px] text-ink-stone-400 group-hover:text-tone-amber-500 transition-colors shrink-0">
+              <div className="flex items-center gap-1 text-sm text-ink-stone-400 group-hover:text-tone-amber-500 transition-colors shrink-0">
                 <span>管理</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </div>
@@ -474,19 +476,19 @@ export function SystemSettingsPage() {
                 <div className="flex items-center gap-1.5 font-medium text-ink-mute">
                   <DatabaseBackup className="w-3.5 h-3.5 text-tone-amber-500" />
                   <span>学习数据管理</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-line-amber-500o30 text-accent-ink">
+                  <Badge variant="outline" className="text-sm px-1.5 py-0 border-line-amber-500o30 text-accent-ink">
                     桌面端
                   </Badge>
                 </div>
                 <div className="rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50 transition-colors">
-                  <p className="text-[10px] leading-relaxed text-ink-ghost">
+                  <p className="text-sm leading-relaxed text-ink-ghost">
                     学习库保存在本机应用数据目录，随应用重启保留。建议定期备份；恢复时把备份文件放回原目录并重启应用即可。
                   </p>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="mt-2 h-7 gap-1 px-2 text-[11px]"
+                    className="mt-2 h-7 gap-1 px-2 text-sm"
                     disabled={backupPending}
                     onClick={() => void handleBackupDatabase()}
                   >
@@ -504,6 +506,8 @@ export function SystemSettingsPage() {
         </div>
       </div>
       <AnkiTemplateWorkbench open={cardWorkbenchOpen} onOpenChange={setCardWorkbenchOpen} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

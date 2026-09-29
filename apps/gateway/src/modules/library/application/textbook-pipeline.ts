@@ -18,6 +18,8 @@ import {
   type BatchExtractionProgress,
   type LessonExtractionJob,
 } from './lesson-batch-extractor.js';
+import { slicePdfLessonsWithOcr } from './pdf-import/lesson-content-slicer.js';
+import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 
 export interface TextbookPipelineInput {
   userId: string;
@@ -27,12 +29,23 @@ export interface TextbookPipelineInput {
   filename?: string | undefined;
   /** Phase 0: 目录识别结构（4 级枚举与起止页码） */
   tocEntries: readonly TocEntry[];
-  /** Phase 1: 各章节待提炼的 OCR 文本切片 */
-  lessonJobs: Array<{
+  /** Phase 1: 各章节待提炼的 OCR 文本切片（可选：若未提供，将通过 pdf/inspector 自动并发切片） */
+  lessonJobs?: Array<{
     lessonId: string;
     ocrText: string;
     title?: string | undefined;
-  }>;
+    startPage?: number | undefined;
+    endPage?: number | undefined;
+    subSections?: string[] | undefined;
+  }> | undefined;
+  /** PDF 原始字节（用于自动切片抽取） */
+  pdf?: Uint8Array | undefined;
+  /** PDF 运行时 Inspector */
+  inspector?: PdfInspectorLike | undefined;
+  /** OCR 并发度（默认 3） */
+  ocrConcurrency?: number | undefined;
+  /** 是否强制重新提炼全书（默认 false：若已为 ready 则直接跳过以保全复习记录并节约算力） */
+  forceOverwrite?: boolean | undefined;
   /** 可选注入的 Worker 池（支持 AgentPool 或测试 Mock） */
   pool?: AgentPoolLike | undefined;
   /** 实时进度通知回调 */
@@ -94,17 +107,62 @@ export async function executeTextbookPipeline(
     return tocResult;
   }
 
-  // 3. Phase 1 & 2: 依托 AgentPool 执行各章节并发提炼与白名单回填
-  const extractor = new LessonBatchExtractor(repo);
-  const jobs: LessonExtractionJob[] = input.lessonJobs.map((j) => ({
-    documentId,
-    lessonId: j.lessonId,
-    ocrText: j.ocrText,
-    ...(j.title ? { title: j.title } : {}),
-  }));
+  // 3. 准备章节待提炼任务：若已提供切片则直接使用，否则通过 PDF 与检测器自动并发切片
+  let jobs: LessonExtractionJob[] = [];
+  if (Array.isArray(input.lessonJobs) && input.lessonJobs.length > 0) {
+    jobs = input.lessonJobs.map((j) => ({
+      documentId,
+      lessonId: j.lessonId,
+      ocrText: j.ocrText,
+      ...(j.title ? { title: j.title } : {}),
+      ...(j.startPage !== undefined ? { startPage: j.startPage } : {}),
+      ...(j.endPage !== undefined ? { endPage: j.endPage } : {}),
+      ...(j.subSections ? { subSections: j.subSections } : {}),
+    }));
+  } else if (input.pdf && input.inspector) {
+    const sliceRes = await slicePdfLessonsWithOcr({
+      pdf: input.pdf,
+      tocEntries: input.tocEntries,
+      inspector: input.inspector,
+      concurrency: input.ocrConcurrency ?? 3,
+    });
+    if (!isOk(sliceRes)) {
+      await repo.updateImportTask(task.id, {
+        status: 'failed',
+        documentId,
+        error: sliceRes.error.userMessage,
+      });
+      return sliceRes;
+    }
+    jobs = sliceRes.value.map((s) => ({
+      documentId,
+      lessonId: s.lessonId,
+      ocrText: s.ocrText,
+      title: s.title,
+      startPage: s.startPage,
+      endPage: s.endPage,
+      ...(s.subSections ? { subSections: s.subSections } : {}),
+    }));
+  } else {
+    const noJobErr = new BusinessError(
+      'E_INVALID_INPUT',
+      '未提供章节文本切片 (lessonJobs)，也未提供 PDF 字节或检测器供自动切片',
+      'VALIDATION',
+      false
+    );
+    await repo.updateImportTask(task.id, {
+      status: 'failed',
+      documentId,
+      error: noJobErr.userMessage,
+    });
+    return err(noJobErr);
+  }
 
+  // 4. Phase 1 & 2: 依托 AgentPool 执行各章节并发提炼与白名单回填
+  const extractor = new LessonBatchExtractor(repo);
   const batchSummary = await extractor.extractBatch(jobs, {
     pool: input.pool,
+    forceOverwrite: input.forceOverwrite,
     onProgress: input.onProgress,
   });
 

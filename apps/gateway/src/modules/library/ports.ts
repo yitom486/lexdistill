@@ -28,6 +28,7 @@ import type {
   SavedTocSkeleton,
   CommitLessonKnowledgeInput,
   CommitLessonKnowledgeOutput,
+  TextbookLessonSlotItem,
 } from '@study-studio/storage-sqlite';
 import type {
   TextbookPipelineInput,
@@ -52,6 +53,9 @@ export interface ContentRepository {
   commitLessonKnowledge(
     input: CommitLessonKnowledgeInput
   ): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>>;
+  listTextbookLessonSlots(
+    documentId: string
+  ): Promise<Result<TextbookLessonSlotItem[], BusinessError>>;
   getDocumentById(id: string): Promise<Result<DocumentItem | null, BusinessError>>;
   saveDocument(doc: DocumentItem): Promise<Result<DocumentItem, BusinessError>>;
   listDocuments(

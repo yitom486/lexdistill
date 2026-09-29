@@ -212,8 +212,10 @@ export function createPdfImportRoutes(
           title?: string;
           language?: string;
           filename?: string;
+          filePath?: string;
           model?: string;
           poolSize?: number;
+          forceOverwrite?: boolean;
           tocEntries?: TocEntry[];
           lessonJobs?: Array<{
             lessonId: string;
@@ -222,10 +224,28 @@ export function createPdfImportRoutes(
           }>;
         } | null;
 
-        if (!body || !body.title?.trim() || !Array.isArray(body.tocEntries) || !Array.isArray(body.lessonJobs)) {
+        if (!body || !body.title?.trim() || !Array.isArray(body.tocEntries)) {
           return formatBusinessErrorResponse(
             c,
-            new BusinessError('E_INVALID_INPUT', '请求体格式不正确，缺少 title、tocEntries 或 lessonJobs', 'VALIDATION')
+            new BusinessError('E_INVALID_INPUT', '请求体格式不正确，缺少 title 或 tocEntries', 'VALIDATION')
+          );
+        }
+
+        let pdfBytes: Uint8Array | undefined = undefined;
+        let inspector: PdfInspectorLike | undefined = undefined;
+        if (body.filePath) {
+          const fileRes = await readLocalPdfFile(body.filePath);
+          if (fileRes.ok) {
+            pdfBytes = fileRes.value.bytes;
+            const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
+            inspector = runtime.inspector;
+          }
+        }
+
+        if ((!Array.isArray(body.lessonJobs) || body.lessonJobs.length === 0) && !pdfBytes) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '请提供章节文本切片 (lessonJobs) 或有效的教材本地路径 (filePath)', 'VALIDATION')
           );
         }
 
@@ -243,7 +263,10 @@ export function createPdfImportRoutes(
           ...(body.language ? { language: body.language } : {}),
           ...(body.filename ? { filename: body.filename } : {}),
           tocEntries: body.tocEntries,
-          lessonJobs: body.lessonJobs,
+          ...(body.lessonJobs ? { lessonJobs: body.lessonJobs } : {}),
+          ...(pdfBytes ? { pdf: pdfBytes } : {}),
+          ...(inspector ? { inspector } : {}),
+          ...(body.forceOverwrite !== undefined ? { forceOverwrite: Boolean(body.forceOverwrite) } : {}),
           ...(pool ? { pool } : {}),
         };
 
@@ -252,6 +275,22 @@ export function createPdfImportRoutes(
         return c.json(res.value);
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'executeTextbookPipeline');
+      }
+    })
+    .get('/api/documents/:userId/textbook-lessons/:documentId', async (c) => {
+      try {
+        const documentId = c.req.param('documentId');
+        if (!documentId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少文档标识 documentId', 'VALIDATION')
+          );
+        }
+        const res = await deps.repo.listTextbookLessonSlots(documentId);
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'listTextbookLessonSlots');
+        return c.json({ slots: res.value });
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'listTextbookLessonSlots');
       }
     })
     .post('/api/documents/:userId/:documentId/append-pdf', async (c) => {      // 接力追加：新页段的课接在已有教材后面（大书分段导入）。

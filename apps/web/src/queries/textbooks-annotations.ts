@@ -921,8 +921,12 @@ export interface ExecuteTextbookPipelineVars {
   title: string;
   language?: string;
   filename?: string;
+  filePath?: string;
+  model?: string;
+  poolSize?: number;
+  forceOverwrite?: boolean;
   tocEntries: unknown[];
-  lessonJobs: Array<{
+  lessonJobs?: Array<{
     lessonId: string;
     ocrText: string;
     title?: string;

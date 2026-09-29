@@ -134,13 +134,10 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
   const wordlists = useWordlistsQuery(undefined, language);
   // TTS 凭证只存浏览器本地：推送时随请求携带、网关不落盘；未配置则音频留空。
   const preferredService = useTtsStore((s) => s.preferredService);
-  const geminiApiKey = useTtsStore((s) => s.geminiApiKey);
-  const azureKey = useTtsStore((s) => s.azureKey);
+  const providerApiKeys = useTtsStore((s) => s.providerApiKeys);
   const azureRegion = useTtsStore((s) => s.azureRegion);
   const localBaseUrl = useTtsStore((s) => s.localBaseUrl);
-  const localApiKey = useTtsStore((s) => s.localApiKey);
   const voiceId = useTtsStore((s) => s.voiceId);
-  const gender = useTtsStore((s) => s.gender);
   const ankiPushable = (ankiStatus.data?.enabled && ankiStatus.data.connected) === true;
   // 查到结果后刷新最近查词与相遇词热力（画像信号已由网关记录）
   useEffect(() => {
@@ -196,13 +193,11 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
   const pushEntryToAnki = (entryId: string) => {
     const tts: AnkiPushTts = {
       provider: preferredService,
-      ...(preferredService === 'gemini' && geminiApiKey ? { apiKey: geminiApiKey } : {}),
-      ...(preferredService === 'azure' && azureKey ? { apiKey: azureKey } : {}),
+      ...(providerApiKeys[preferredService] ? { apiKey: providerApiKeys[preferredService] } : {}),
       ...(azureRegion ? { region: azureRegion } : {}),
       ...(localBaseUrl ? { localBaseUrl } : {}),
-      ...(localApiKey ? { localApiKey } : {}),
+      ...(providerApiKeys.local ? { localApiKey: providerApiKeys.local } : {}),
       ...(voiceId ? { voice: voiceId } : {}),
-      gender,
     };
     collect.mutate(entryId, {
       onSuccess: (result) => {

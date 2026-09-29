@@ -261,10 +261,12 @@ import {
 import {
   seedTextbookTocSkeleton as seedTextbookTocSkeletonDomain,
   commitLessonKnowledge as commitLessonKnowledgeDomain,
+  listTextbookLessonSlots as listTextbookLessonSlotsDomain,
   type SeedTocSkeletonInput,
   type SavedTocSkeleton,
   type CommitLessonKnowledgeInput,
   type CommitLessonKnowledgeOutput,
+  type TextbookLessonSlotItem,
 } from '@study-studio/storage-sqlite';
 import {
   executeTextbookPipeline as executeTextbookPipelineDomain,
@@ -632,6 +634,15 @@ export class DrizzleLearnerRepository
     input: CommitLessonKnowledgeInput
   ): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
     return commitLessonKnowledgeDomain(this.deps, input);
+  }
+
+  /**
+   * 查询指定教材文档已建立的章节槽位状态列表。
+   */
+  public async listTextbookLessonSlots(
+    documentId: string
+  ): Promise<Result<TextbookLessonSlotItem[], BusinessError>> {
+    return listTextbookLessonSlotsDomain(this.deps, documentId);
   }
 
   /**

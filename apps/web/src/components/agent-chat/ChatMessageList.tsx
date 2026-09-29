@@ -11,7 +11,7 @@ import { ChatTurnActivity, StreamingReplyPlaceholder } from '../ChatTurnActivity
 import { MarkdownText } from '../common/MarkdownText.js';
 import { UnifiedTtsPlayer } from '../UnifiedTtsPlayer.js';
 import { toSpeakableText } from '../../lib/speakable.js';
-import { trackToSpeechLang } from '../../config/tts-voice-personas.js';
+import { trackToSpeechLang } from '../../config/speech-language.js';
 import type { TrackLanguage } from '../../learning/learning-shell.js';
 import { stripTranscriptNoise } from '../../lib/chat-transcript.js';
 import { sound } from '../../utils/audio.js';

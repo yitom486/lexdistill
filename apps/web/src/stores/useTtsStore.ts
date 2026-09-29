@@ -24,14 +24,34 @@ export interface TtsStoreState extends SpeechStudioConfig {
   setGender: (gender: TtsGender) => void;
   setRate: (rate: number) => void;
   setPreferredService: (service: SpeechStudioConfig['preferredService']) => void;
-  setGeminiApiKey: (key: string) => void;
-  setAzureKey: (key: string) => void;
+  setProviderApiKey: (provider: string, key: string) => void;
   setAzureRegion: (region: string) => void;
   setLocalBaseUrl: (url: string) => void;
-  setLocalApiKey: (key: string) => void;
   setVoiceId: (id: string) => void;
   speak: (text: string, options?: SpeakOptions) => Promise<void>;
   stop: () => void;
+}
+
+/** 旧版单独存储厂商 Key；升级时只在本机迁入按服务 ID 索引的偏好。 */
+export function migrateTtsPreferences(persisted: unknown): Record<string, unknown> {
+  if (!persisted || typeof persisted !== 'object') return { providerApiKeys: {} };
+  const saved = persisted as Record<string, unknown>;
+  const providerApiKeys: Record<string, string> = {};
+  if (saved.providerApiKeys && typeof saved.providerApiKeys === 'object') {
+    for (const [provider, key] of Object.entries(saved.providerApiKeys)) {
+      if (typeof key === 'string') providerApiKeys[provider] = key;
+    }
+  }
+  const migrations: Array<[string, string]> = [
+    ['geminiApiKey', 'gemini'],
+    ['azureKey', 'azure'],
+    ['localApiKey', 'local'],
+  ];
+  for (const [field, provider] of migrations) {
+    const key = saved[field];
+    if (typeof key === 'string' && key && !providerApiKeys[provider]) providerApiKeys[provider] = key;
+  }
+  return { ...saved, providerApiKeys };
 }
 
 export const useTtsStore = create<TtsStoreState>()(
@@ -54,16 +74,15 @@ export const useTtsStore = create<TtsStoreState>()(
         setGender: (gender) => update({ gender }),
         setRate: (rate) => update({ rate: Math.max(0.5, Math.min(1.5, rate)) }),
         setPreferredService: (preferredService) => update({ preferredService }),
-        setGeminiApiKey: (geminiApiKey) => update({ geminiApiKey: geminiApiKey.trim() }),
-        setAzureKey: (azureKey) => update({ azureKey: azureKey.trim() }),
+        setProviderApiKey: (provider, key) => update({
+          providerApiKeys: { ...get().providerApiKeys, [provider]: key.trim() },
+        }),
         setAzureRegion: (azureRegion) => update({ azureRegion: azureRegion.trim() }),
         setLocalBaseUrl: (localBaseUrl) => update({ localBaseUrl: localBaseUrl.trim() }),
-        setLocalApiKey: (localApiKey) => update({ localApiKey: localApiKey.trim() }),
         setVoiceId: (voiceId) => update({ voiceId: voiceId.trim() }),
         speak: (text, options) => speechStudio.speak(text, {
           ...options,
           lang: options?.lang ?? 'EN',
-          gender: options?.gender ?? get().gender,
           rate: options?.rate ?? get().rate,
         }),
         stop: () => speechStudio.stop(),
@@ -71,15 +90,15 @@ export const useTtsStore = create<TtsStoreState>()(
     },
     {
       name: 'study_studio_tts_config',
+      version: 1,
+      migrate: migrateTtsPreferences,
       partialize: (state) => ({
         gender: state.gender,
         rate: state.rate,
         preferredService: state.preferredService,
-        geminiApiKey: state.geminiApiKey,
-        azureKey: state.azureKey,
+        providerApiKeys: state.providerApiKeys,
         azureRegion: state.azureRegion,
         localBaseUrl: state.localBaseUrl,
-        localApiKey: state.localApiKey,
         voiceId: state.voiceId,
       }),
       onRehydrateStorage: () => (state) => {
@@ -87,11 +106,9 @@ export const useTtsStore = create<TtsStoreState>()(
           gender: state.gender,
           rate: state.rate,
           preferredService: state.preferredService,
-          geminiApiKey: state.geminiApiKey,
-          azureKey: state.azureKey,
+          providerApiKeys: state.providerApiKeys,
           azureRegion: state.azureRegion,
           localBaseUrl: state.localBaseUrl,
-          localApiKey: state.localApiKey,
           voiceId: state.voiceId,
         });
       },

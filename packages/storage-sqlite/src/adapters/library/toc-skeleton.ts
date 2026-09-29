@@ -135,3 +135,60 @@ export async function seedTextbookTocSkeleton(
     return err(translateToBusinessError(e, 'seedTextbookTocSkeleton'));
   }
 }
+
+export interface TextbookLessonSlotItem {
+  documentId: string;
+  lessonId: string;
+  lessonNumber: number;
+  title: string;
+  sortOrder: number;
+  kind: string;
+  parentId: string | null;
+  startPage: number | null;
+  endPage: number | null;
+  status: string;
+  hasPassage: boolean;
+  hasPreview: boolean;
+  hasSummary: boolean;
+}
+
+/**
+ * 查询指定文档已创建的教材章节槽位列表（按 sortOrder 升序排列）
+ */
+export async function listTextbookLessonSlots(
+  deps: { db: DrizzleDb },
+  documentId: string
+): Promise<Result<TextbookLessonSlotItem[], BusinessError>> {
+  if (!documentId?.trim()) {
+    return err(new BusinessError('E_INVALID_INPUT', '缺少文档标识 documentId', 'VALIDATION', false));
+  }
+  try {
+    const rows = deps.db
+      .select()
+      .from(textbookLessons)
+      .where(eq(textbookLessons.documentId, documentId.trim()))
+      .orderBy(textbookLessons.sortOrder)
+      .all();
+
+    const items: TextbookLessonSlotItem[] = rows.map((r) => ({
+      documentId: r.documentId,
+      lessonId: r.lessonId,
+      lessonNumber: r.lessonNumber,
+      title: r.title,
+      sortOrder: r.sortOrder ?? 0,
+      kind: r.kind,
+      parentId: r.parentId,
+      startPage: r.startPage,
+      endPage: r.endPage,
+      status: r.status,
+      hasPassage: Boolean(r.passageMd?.trim()),
+      hasPreview: Boolean(r.previewJson?.trim()),
+      hasSummary: Boolean(r.summaryJson?.trim()),
+    }));
+
+    return ok(items);
+  } catch (e) {
+    return err(translateToBusinessError(e, 'listTextbookLessonSlots'));
+  }
+}
+

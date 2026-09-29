@@ -37,6 +37,8 @@ import { createCurriculumRoutes } from '../../modules/curriculum/http/public.js'
  */
 export function createApp(deps: GatewayDeps) {
   return new Hono()
+    // TTS Studio 使用由服务决定的凭证头，预检只在本路由反映请求头。
+    .use('/api/tts-studio/*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'] }))
     .use(
       '*',
       cors({

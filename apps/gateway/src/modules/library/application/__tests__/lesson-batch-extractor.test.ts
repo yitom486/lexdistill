@@ -225,5 +225,101 @@ describe('LessonBatchExtractor', () => {
       expect(summary.errors.length).toBe(1);
       expect(summary.errors[0]?.lessonId).toBe('l1');
     });
+
+    it('教学增强字段 (preview/summary) 成功解析并以 JSON 字符串回填', async () => {
+      const captured: { input?: import('@study-studio/storage-sqlite').CommitLessonKnowledgeInput } = {};
+      const mockPool: AgentPoolLike = {
+        acquire: async () => ({
+          ask: async () => ({
+            text: JSON.stringify({
+              title: '第1课',
+              preview: {
+                keyPoints: ['敬体与简体'],
+                pitfalls: ['は与が'],
+                canDoGoal: '打招呼',
+              },
+              summary: {
+                goldenSentences: ['はじめまして。'],
+                selfCheckQuestions: ['能分清动词分类吗？'],
+              },
+            }),
+          }),
+          finish: async () => {},
+        }),
+        close: async () => {},
+      };
+
+      const mockRepo: Partial<ContentRepository> = {
+        commitLessonKnowledge: async (input) => {
+          captured.input = input;
+          return ok({
+            documentId: input.documentId,
+            lessonId: input.lessonId,
+            stats: { vocabCount: 0, grammarCount: 0, exerciseCount: 0, hasPassage: false },
+            allLessonsReady: true,
+          });
+        },
+      };
+
+      const extractor = new LessonBatchExtractor(mockRepo as ContentRepository);
+      const res = await extractor.extractAndCommitSingleLesson(
+        { documentId: 'doc_1', lessonId: 'l1', ocrText: '文本' },
+        mockPool
+      );
+
+      expect(isOk(res)).toBe(true);
+      expect(captured.input).toBeDefined();
+      expect(captured.input?.previewJson).toContain('敬体与简体');
+      expect(captured.input?.summaryJson).toContain('はじめまして。');
+    });
+
+    it('幂等性跳过：若课次已处于 ready 状态且未开启 forceOverwrite，默认跳过提炼以省算力防覆盖', async () => {
+      let llmCalled = false;
+      const mockPool: AgentPoolLike = {
+        acquire: async () => ({
+          ask: async () => {
+            llmCalled = true;
+            return { text: '{}' };
+          },
+          finish: async () => {},
+        }),
+        close: async () => {},
+      };
+
+      const mockRepo: Partial<ContentRepository> = {
+        listTextbookLessonSlots: async () =>
+          ok([
+            {
+              documentId: 'doc_ready_01',
+              lessonId: 'l1',
+              lessonNumber: 1,
+              title: '第1课',
+              sortOrder: 1,
+              kind: 'lesson',
+              parentId: null,
+              startPage: 1,
+              endPage: 5,
+              status: 'ready',
+              hasPassage: true,
+              hasPreview: true,
+              hasSummary: true,
+            },
+          ]),
+        commitLessonKnowledge: async () => {
+          throw new Error('should not be called');
+        },
+      };
+
+      const extractor = new LessonBatchExtractor(mockRepo as ContentRepository);
+      const summary = await extractor.extractBatch(
+        [{ documentId: 'doc_ready_01', lessonId: 'l1', ocrText: '文本' }],
+        { pool: mockPool, forceOverwrite: false }
+      );
+
+      expect(summary.totalJobs).toBe(1);
+      expect(summary.successfulJobs).toBe(1);
+      expect(summary.failedJobs).toBe(0);
+      expect(llmCalled).toBe(false); // 成功拦截，未消耗大模型算力
+    });
   });
 });

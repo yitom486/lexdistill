@@ -16,7 +16,7 @@ import {
 import { sound } from '../utils/audio.js';
 import { readCssDurationSeconds } from '../lib/css-tokens.js';
 import { UnifiedTtsPlayer } from './UnifiedTtsPlayer.js';
-import { trackToSpeechLang } from '../config/tts-voice-personas.js';
+import { trackToSpeechLang } from '../config/speech-language.js';
 import { SubjectiveWritingWorkbench } from './SubjectiveWritingWorkbench.js';
 import { Tabs, TabsList, TabsTrigger, TabsIndicator } from './ui/tabs.js';
 import { Badge } from './ui/badge.js';

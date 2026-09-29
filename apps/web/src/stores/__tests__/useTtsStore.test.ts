@@ -1,0 +1,29 @@
+import { describe, expect, it } from 'bun:test';
+import { migrateTtsPreferences } from '../useTtsStore.js';
+
+describe('TTS local preference migration', () => {
+  it('keeps saved keys when moving to provider-indexed storage', () => {
+    const migrated = migrateTtsPreferences({
+      preferredService: 'gemini',
+      geminiApiKey: 'saved-gemini-key',
+      azureKey: 'saved-azure-key',
+      localApiKey: 'saved-local-key',
+      voiceId: 'saved-voice',
+    });
+    expect(migrated.providerApiKeys).toEqual({
+      gemini: 'saved-gemini-key',
+      azure: 'saved-azure-key',
+      local: 'saved-local-key',
+    });
+    expect(migrated.voiceId).toBe('saved-voice');
+  });
+
+  it('preserves newer provider keys and ignores invalid values', () => {
+    const migrated = migrateTtsPreferences({
+      providerApiKeys: { gemini: 'new-key', azure: 123 },
+      geminiApiKey: 'old-key',
+      azureKey: 'old-azure-key',
+    });
+    expect(migrated.providerApiKeys).toEqual({ gemini: 'new-key', azure: 'old-azure-key' });
+  });
+});

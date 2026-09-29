@@ -13,7 +13,7 @@ import { studyCardToSourceEntry, buildReviewCardDoc } from '../lib/review-card.j
 import { useExportApkgMutation } from '../queries/useLearnerQueries.js';
 import { cn } from '../lib/utils.js';
 import { useLearningShell } from '../hooks/useLearningShell.js';
-import { trackToSpeechLang } from '../config/tts-voice-personas.js';
+import { trackToSpeechLang } from '../config/speech-language.js';
 import { Tabs, TabsList, TabsTrigger, TabsIndicator } from './ui/tabs.js';
 import {
   Select,

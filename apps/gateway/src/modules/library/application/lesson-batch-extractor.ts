@@ -29,6 +29,8 @@ export interface LessonExtractionJob {
   title?: string | undefined;
   startPage?: number | undefined;
   endPage?: number | undefined;
+  /** 本课在目录中已知的子条目（微观白名单） */
+  subSections?: string[] | undefined;
   ocrText: string;
 }
 
@@ -50,6 +52,8 @@ export interface BatchExtractionOptions {
   poolSize?: number | undefined;
   codexProgram?: string | undefined;
   model?: string | undefined;
+  /** 是否强制重新提炼全书（默认 false：若已为 ready 则直接跳过以保全复习记录并节约算力） */
+  forceOverwrite?: boolean | undefined;
   onProgress?: ((progress: BatchExtractionProgress) => void) | undefined;
   pool?: AgentPoolLike | undefined;
 }
@@ -66,6 +70,13 @@ export interface BatchExtractionSummary {
 export const ExtractedLessonSchema = z.object({
   title: z.string().optional(),
   passageMd: z.string().optional(),
+  preview: z
+    .object({
+      keyPoints: z.array(z.string()).optional(),
+      pitfalls: z.array(z.string()).optional(),
+      canDoGoal: z.string().optional(),
+    })
+    .optional(),
   vocabularies: z
     .array(
       z.object({
@@ -106,6 +117,12 @@ export const ExtractedLessonSchema = z.object({
         explanation: z.string().optional(),
       })
     )
+    .optional(),
+  summary: z
+    .object({
+      goldenSentences: z.array(z.string()).optional(),
+      selfCheckQuestions: z.array(z.string()).optional(),
+    })
     .optional(),
 });
 
@@ -238,6 +255,8 @@ export class LessonBatchExtractor {
       lessonId: job.lessonId,
       ...(extracted.title ? { title: extracted.title } : {}),
       ...(extracted.passageMd ? { passageMd: extracted.passageMd } : {}),
+      ...(extracted.preview ? { previewJson: JSON.stringify(extracted.preview) } : {}),
+      ...(extracted.summary ? { summaryJson: JSON.stringify(extracted.summary) } : {}),
       ...(extracted.vocabularies ? { vocabularies: extracted.vocabularies } : {}),
       ...(extracted.knowledgePoints ? { knowledgePoints: extracted.knowledgePoints } : {}),
       ...(extracted.exercises ? { exercises: extracted.exercises } : {}),
@@ -270,6 +289,65 @@ export class LessonBatchExtractor {
     }
 
     const documentId = jobs[0]!.documentId;
+
+    let completedCount = 0;
+    let successfulJobs = 0;
+    let failedJobs = 0;
+    let finalAllLessonsReady = false;
+    const errors: Array<{ lessonId: string; error: string }> = [];
+
+    // 0. 幂等性检查：若非强制覆盖，查询已入库就绪槽位，跳过无谓的 LLM 调用（省算力防覆盖）
+    const readyLessonIds = new Set<string>();
+    if (!options.forceOverwrite && typeof this.repo.listTextbookLessonSlots === 'function') {
+      try {
+        const slotsRes = await this.repo.listTextbookLessonSlots(documentId);
+        if (slotsRes.ok) {
+          for (const s of slotsRes.value) {
+            if (s.status === 'ready') {
+              readyLessonIds.add(s.lessonId);
+            }
+          }
+        }
+      } catch (err) {
+        logger.warn('[LessonBatchExtractor] listTextbookLessonSlots 检查失败，降级为常规提炼:', { error: String(err) });
+      }
+    }
+
+    const pendingJobs: LessonExtractionJob[] = [];
+    for (const job of jobs) {
+      if (readyLessonIds.has(job.lessonId)) {
+        completedCount += 1;
+        successfulJobs += 1;
+        logger.info(`[LessonBatchExtractor] 课次 "${job.lessonId}" 已就绪，默认跳过提炼 (idempotent skip)`);
+        options.onProgress?.({
+          documentId: job.documentId,
+          lessonId: job.lessonId,
+          completedCount,
+          totalCount: jobs.length,
+          allLessonsReady: false,
+          stats: {
+            vocabCount: 0,
+            grammarCount: 0,
+            exerciseCount: 0,
+            hasPassage: true,
+          },
+        });
+      } else {
+        pendingJobs.push(job);
+      }
+    }
+
+    if (pendingJobs.length === 0) {
+      return {
+        documentId,
+        totalJobs: jobs.length,
+        successfulJobs,
+        failedJobs: 0,
+        allLessonsReady: true,
+        errors: [],
+      };
+    }
+
     const shouldClosePool = !options.pool;
     const pool =
       options.pool ??
@@ -279,15 +357,9 @@ export class LessonBatchExtractor {
         model: options.model,
       });
 
-    let completedCount = 0;
-    let successfulJobs = 0;
-    let failedJobs = 0;
-    let finalAllLessonsReady = false;
-    const errors: Array<{ lessonId: string; error: string }> = [];
-
     try {
       await Promise.all(
-        jobs.map(async (job) => {
+        pendingJobs.map(async (job) => {
           const result = await this.extractAndCommitSingleLesson(job, pool);
           completedCount += 1;
 

@@ -12,15 +12,20 @@ import {
   CheckCircle2,
   ListTree,
   FileCheck2,
+  Cpu,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import type { TextbookAST } from '@study-studio/document-model';
 import {
   useImportPdfMutation,
   useMapPdfMutation,
   useAppendPdfMutation,
   useImportDocumentMutation,
+  useExecuteTextbookPipelineMutation,
+  type ExecuteTextbookPipelineResult,
 } from '../../queries/useLearnerQueries.js';
+import { Switch } from '../ui/switch.js';
 import { useOcrStore } from '../../stores/useOcrStore.js';
 import { nextRelayWindow, resolveOcrOverflowWindow, resolvePdfPageRange } from '../../lib/pdf-page-range.js';
 import { isPdfUploadTooLarge, pdfTooLargeMessage, stripPdfPathQuotes } from '../../lib/pdf-upload-guard.js';
@@ -104,6 +109,13 @@ export function TextbookPipelineImporterTab({
   const mapPdf = useMapPdfMutation();
   const appendPdf = useAppendPdfMutation();
   const importDoc = useImportDocumentMutation();
+  const executePipeline = useExecuteTextbookPipelineMutation();
+  const queryClient = useQueryClient();
+
+  const [pipelineModel, setPipelineModel] = useState<string>('default');
+  const [pipelinePoolSize, setPipelinePoolSize] = useState<string>('3');
+  const [forceOverwrite, setForceOverwrite] = useState<boolean>(false);
+  const [pipelineResult, setPipelineResult] = useState<ExecuteTextbookPipelineResult | null>(null);
 
   // Azure 云 OCR（备用回填）
   const azureDiEndpoint = useOcrStore((s) => s.azureDiEndpoint);
@@ -425,6 +437,58 @@ export function TextbookPipelineImporterTab({
     setConfirmedToc(entries);
     sound.playCorrect();
     toast.success(`已核对 ${entries.length} 条目录草稿，请推进至全文解析`);
+  };
+
+  const handleExecutePipeline = () => {
+    if (executePipeline.isPending) return;
+    if (!confirmedToc || confirmedToc.length === 0) {
+      toast.error('请先在第 2 步核对并确认教材目录大纲');
+      return;
+    }
+    const path = stripPdfPathQuotes(pdfPath);
+    if (!path && !pdfFile) {
+      toast.error('未找到有效的教材文件，请返回第 1 步重新选取');
+      return;
+    }
+
+    sound.playClick();
+    setParseError(null);
+    setPipelineResult(null);
+
+    const docTitle = selectedFileName.replace(/\.[^/.]+$/, '').trim() || '未命名教材';
+    const tocEntries = confirmedToc.map((c, idx) => ({
+      id: `l${idx + 1}`,
+      title: c.title.trim(),
+      level: c.kind === 'section' ? 'section' : 'lesson',
+      startPage: Number(c.printedPage) || c.physicalPage || (idx + 1),
+      sortOrder: idx + 1,
+    }));
+
+    executePipeline.mutate(
+      {
+        title: docTitle,
+        language: 'ja',
+        ...(path ? { filePath: path } : {}),
+        ...(pipelineModel !== 'default' ? { model: pipelineModel } : {}),
+        poolSize: Number(pipelinePoolSize) || 3,
+        forceOverwrite,
+        tocEntries,
+      },
+      {
+        onSuccess: (res) => {
+          sound.playCorrect();
+          setPipelineResult(res);
+          queryClient.invalidateQueries({ queryKey: ['textbooks'] });
+          toast.success(`教材《${res.title}》全书提炼完成！共 ${res.successfulLessons} 课就绪`);
+        },
+        onError: (err) => {
+          sound.playMistake();
+          const msg = err instanceof Error ? err.message : '教材提炼流水线执行异常';
+          setParseError(msg);
+          toast.error(msg);
+        },
+      }
+    );
   };
 
   return (
@@ -819,122 +883,109 @@ export function TextbookPipelineImporterTab({
             </div>
           </div>
 
-          {/* 解析与接力配置 */}
-          <div className="p-4 rounded-2xl border border-line bg-surface space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-3 text-xs text-ink-ghost">
-                <span className="font-semibold text-ink">接力模式：</span>
-                <Select
-                  value={appendTarget || '__new'}
-                  onValueChange={(v) => setAppendTarget(!v || v === '__new' ? '' : v)}
-                >
-                  <SelectTrigger className="w-52 h-8 text-xs">
-                    <SelectValue placeholder="作为新书导入" />
+          {/* Agent 池与专精大模型分级配置（AGENTS.md §1.6b 用户配置权） */}
+          <div className="p-4 rounded-2xl border border-line bg-surface space-y-4">
+            <div className="flex items-center justify-between border-b border-line-soft pb-2.5">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-accent" />
+                <span className="text-xs font-bold text-ink">AI Agent 池与模型算力配置</span>
+              </div>
+              <Badge variant="outline" className="text-[10px] text-ink-ghost">
+                AGENTS.md §1.6b 规范
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="block font-medium text-ink mb-1.5">
+                  专职提炼大模型（Model Tiering）：
+                </label>
+                <Select value={pipelineModel} onValueChange={(v) => v && setPipelineModel(v)} disabled={executePipeline.isPending}>
+                  <SelectTrigger className="w-full h-8 text-xs">
+                    <SelectValue placeholder="选择大模型" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__new">作为新书导入</SelectItem>
-                    {existingBooks.map((b) => (
-                      <SelectItem key={b.documentId} value={b.documentId}>
-                        {b.title}（{b.lessons} 课）
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="default">系统默认托管模型（自动平衡）</SelectItem>
+                    <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash（超轻量·高性价比·推荐）</SelectItem>
+                    <SelectItem value="gpt-4o-mini">GPT-4o-mini（极速轻量）</SelectItem>
+                    <SelectItem value="claude-3-5-haiku">Claude 3.5 Haiku（高效结构化）</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="mt-1 text-[11px] text-ink-ghost">
+                  教学提炼为中轻度格式化与知识点归纳任务，推荐使用高性价比轻量模型。
+                </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 text-xs text-ink-ghost">
-                <span className="font-semibold text-ink">解析范围：</span>
-                <button
-                  type="button"
-                  className={`h-8 px-3 rounded-xl border text-xs font-semibold transition-colors ${
-                    pdfScope === 'all'
-                      ? 'border-line-accent bg-wash-amber-500o15 text-accent-ink font-bold'
-                      : 'border-line hover:bg-wash-amber-500o5'
-                  }`}
-                  disabled={importPdf.isPending}
-                  onClick={() => {
-                    setPdfScope('all');
-                    setPdfStartPage('');
-                    setPdfEndPage('');
-                  }}
-                >
-                  整书全部页
-                </button>
-                <button
-                  type="button"
-                  className={`h-8 px-3 rounded-xl border text-xs font-semibold transition-colors ${
-                    pdfScope === 'range'
-                      ? 'border-line-accent bg-wash-amber-500o15 text-accent-ink font-bold'
-                      : 'border-line hover:bg-wash-amber-500o5'
-                  }`}
-                  disabled={importPdf.isPending}
-                  onClick={() => setPdfScope('range')}
-                >
-                  指定页码
-                </button>
-                {pdfScope === 'range' && (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min={1}
-                      placeholder="起始"
-                      value={pdfStartPage}
-                      onChange={(e) => setPdfStartPage(e.target.value)}
-                      disabled={importPdf.isPending}
-                      className="w-16 h-8 px-2 rounded-xl border border-line bg-surface text-ink text-xs outline-none focus:border-tone-amber-500"
-                    />
-                    <span>–</span>
-                    <input
-                      type="number"
-                      min={1}
-                      placeholder="结束"
-                      value={pdfEndPage}
-                      onChange={(e) => setPdfEndPage(e.target.value)}
-                      disabled={importPdf.isPending}
-                      className="w-16 h-8 px-2 rounded-xl border border-line bg-surface text-ink text-xs outline-none focus:border-tone-amber-500"
-                    />
-                  </div>
-                )}
+              <div>
+                <label className="block font-medium text-ink mb-1.5">
+                  Agent 池并发 Worker 数量（Concurrency）：
+                </label>
+                <Select value={pipelinePoolSize} onValueChange={(v) => v && setPipelinePoolSize(v)} disabled={executePipeline.isPending}>
+                  <SelectTrigger className="w-full h-8 text-xs">
+                    <SelectValue placeholder="选择并发 Worker 数量" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 个 Worker（温和·适合较低 API 限额）</SelectItem>
+                    <SelectItem value="3">3 个 Worker（默认推荐·平衡吞吐）</SelectItem>
+                    <SelectItem value="4">4 个 Worker（高效提炼）</SelectItem>
+                    <SelectItem value="6">6 个 Worker（高速吞吐·需足够限额）</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-[11px] text-ink-ghost">
+                  在单进程内开启指定数量的长连接 Session 并发，互不抢占。
+                </p>
               </div>
             </div>
 
+            {/* 幂等性保护开关 */}
+            <div className="pt-2 border-t border-line-soft flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-ink">强制重新提炼全书（覆盖已就绪课次）</span>
+                <p className="text-[11px] text-ink-ghost">
+                  默认关闭：自动跳过数据库中状态已为 ready 的课次，保护已有学习与复习记录，省算力防覆盖。
+                </p>
+              </div>
+              <Switch
+                checked={forceOverwrite}
+                onCheckedChange={setForceOverwrite}
+                disabled={executePipeline.isPending}
+              />
+            </div>
+
             {/* 提炼行动按钮 */}
-            <div className="pt-2 border-t border-line-soft flex flex-wrap items-center justify-between gap-3">
+            <div className="pt-3 border-t border-line-soft flex flex-wrap items-center justify-between gap-3">
               <Button
                 size="sm"
-                disabled={importPdf.isPending || appendPdf.isPending}
-                onClick={handlePdfImport}
+                disabled={executePipeline.isPending}
+                onClick={handleExecutePipeline}
                 className="gap-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                {importPdf.isPending || appendPdf.isPending
-                  ? '课文全文智能提炼中…'
-                  : appendTarget
-                    ? '开始接力追加到已有书'
-                    : '开始全书课文智能提炼与落库'}
+                {executePipeline.isPending ? 'AI Agent 池并发提炼与落库中…' : '启动 AI Agent 池并发提炼与落库'}
               </Button>
               <span className="text-[11px] text-ink-ghost">
-                解析 PDF 正文，提取课文 Markdown、生词、语法例句与习题
+                一课一个 Worker 任务，原子提炼预习导学、课文 Markdown、生词语法与习题
               </span>
             </div>
           </div>
 
           {/* 解析完成结果卡片 */}
-          {importPdf.isSuccess && (
+          {pipelineResult && (
             <div className="p-4 rounded-2xl bg-wash-emerald-500o10 border border-tone-emerald-600o30 flex items-center justify-between shadow-xs">
               <div className="flex items-center gap-2.5">
                 <FileCheck2 className="w-5 h-5 text-ink-emerald-700-emerald-400" />
                 <div>
                   <h4 className="text-xs font-bold text-ink">
-                    课文结构与知识点已成功提炼完成！
+                    教材《{pipelineResult.title}》全书提炼已落库！
                   </h4>
                   <p className="text-[11px] text-ink-ghost mt-0.5">
-                    {pdfNote || '已生成严格类型安全的课文知识树，请点击弹窗右下角「确认导入并激活」'}
+                    全书共 {pipelineResult.lessonCount} 课，成功就绪 {pipelineResult.successfulLessons} 课
+                    {pipelineResult.failedLessons > 0 && `（${pipelineResult.failedLessons} 课失败）`}，可在教材列表立即开始学习！
                   </p>
                 </div>
               </div>
               <Badge variant="emerald" className="text-xs">
-                准备就绪
+                {pipelineResult.allLessonsReady ? '全书就绪' : '部分就绪'}
               </Badge>
             </div>
           )}
@@ -946,7 +997,7 @@ export function TextbookPipelineImporterTab({
               返回核对目录
             </Button>
             <span className="text-[11px] text-ink-ghost">
-              提炼完成后，点击弹窗底部的「确认导入并激活」入库
+              提炼已直接原子落库，可随时关闭弹窗或在课程列表查看
             </span>
           </div>
         </div>

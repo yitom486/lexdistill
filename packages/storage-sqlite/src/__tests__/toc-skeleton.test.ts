@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { isOk } from '@study-studio/shared';
 import { initSchema } from '../ddl.js';
 import * as schema from '../schema.js';
-import { seedTextbookTocSkeleton } from '../adapters/library/toc-skeleton.js';
+import { seedTextbookTocSkeleton, listTextbookLessonSlots } from '../adapters/library/toc-skeleton.js';
 import type { TocEntry } from '@study-studio/document-model';
 
 function freshDb() {
@@ -163,5 +163,33 @@ describe('seedTextbookTocSkeleton', () => {
     expect(lessons[0]!.startPage).toBe(2);
     expect(lessons[1]!.title).toBe('第2课（精校标题）');
     expect(lessons[1]!.startPage).toBe(15);
+  });
+
+  it('listTextbookLessonSlots: 能够按 sortOrder 准确返回已入库课次槽位及就绪状态', async () => {
+    const { db } = freshDb();
+    const entries: TocEntry[] = [
+      { id: 'l1', level: 'lesson', title: '第1课', startPage: 1, endPage: 5 },
+      { id: 'l2', level: 'lesson', title: '第2课', startPage: 6, endPage: 10 },
+    ];
+
+    await seedTextbookTocSkeleton(
+      { db },
+      {
+        documentId: 'doc_slots_01',
+        userId: 'user_01',
+        title: '测试槽位查询',
+        entries,
+      }
+    );
+
+    const slotsRes = await listTextbookLessonSlots({ db }, 'doc_slots_01');
+    expect(isOk(slotsRes)).toBe(true);
+    if (isOk(slotsRes)) {
+      expect(slotsRes.value).toHaveLength(2);
+      expect(slotsRes.value[0]!.lessonId).toBe('l1');
+      expect(slotsRes.value[0]!.status).toBe('pending');
+      expect(slotsRes.value[1]!.lessonId).toBe('l2');
+      expect(slotsRes.value[1]!.status).toBe('pending');
+    }
   });
 });
