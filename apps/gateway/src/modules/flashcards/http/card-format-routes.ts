@@ -250,6 +250,8 @@ function narrowAnkiPushTts(input: unknown):
   | {
       provider: string;
       baseUrl?: string;
+      localBaseUrl?: string;
+      localApiKey?: string;
       region?: string;
       apiKey?: string;
       voice?: string;
@@ -264,6 +266,8 @@ function narrowAnkiPushTts(input: unknown):
   const out: {
     provider: string;
     baseUrl?: string;
+    localBaseUrl?: string;
+    localApiKey?: string;
     region?: string;
     apiKey?: string;
     voice?: string;
@@ -271,7 +275,7 @@ function narrowAnkiPushTts(input: unknown):
     rate?: number;
     gender?: 'FEMALE' | 'MALE';
   } = { provider: v['provider'] };
-  for (const key of ['baseUrl', 'region', 'apiKey', 'voice', 'model'] as const) {
+  for (const key of ['baseUrl', 'localBaseUrl', 'localApiKey', 'region', 'apiKey', 'voice', 'model'] as const) {
     if (typeof v[key] === 'string' && v[key]) out[key] = v[key] as string;
   }
   if (typeof v['rate'] === 'number') out.rate = v['rate'];

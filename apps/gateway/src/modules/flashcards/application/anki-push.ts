@@ -1,5 +1,6 @@
 import { eq, and } from 'drizzle-orm';
-import { type Result, type BusinessError } from '@study-studio/shared';
+import { ok, err, BusinessError, translateToBusinessError, type Result } from '@study-studio/shared';
+import { synthesizeUnified, UnifiedSynthesisError } from 'gemini-tts-studio/server';
 import {
   pushCardToAnki as pushCardToAnkiUseCase,
   type AnkiPushRequest as AnkiPushRequestIn,
@@ -7,10 +8,6 @@ import {
   type AnkiPushPorts,
   type FetchImpl,
 } from '@study-studio/flashcards';
-// 跨模块复用（G5 已登记）：TTS 合成只取音频字节，Key 仅本次调用内存，永不落盘。
-import {
-  synthesizeViaProxy,
-} from '../../tts/application/tts-proxy.js';
 import {
   flashcards,
 } from '@study-studio/storage-sqlite';
@@ -57,22 +54,43 @@ export async function pushCardToAnki(
     },
     loadFormat: (formatId) => getCardFormat(deps, formatId),
     resolveSource: (card) => resolveCardSourceEntry(deps, card),
-    synthesizeTts: (input) =>
-      synthesizeViaProxy(
-        {
-          provider: input.provider,
+    synthesizeTts: async (input) => {
+      try {
+        const result = await synthesizeUnified({
           text: input.text,
-          trackLanguage: input.trackLanguage,
-          ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
-          ...(input.region ? { region: input.region } : {}),
-          ...(input.apiKey ? { apiKey: input.apiKey } : {}),
-          ...(input.voice ? { voice: input.voice } : {}),
+          language: input.trackLanguage,
+          purpose: 'flashcard',
+          preferredService: input.provider,
           ...(input.model ? { model: input.model } : {}),
-          ...(input.rate !== undefined ? { rate: input.rate } : {}),
-          ...(input.gender ? { gender: input.gender } : {}),
-        },
-        fetchImpl
-      ),
+          voicePreference: {
+            ...(input.voice ? { voiceId: input.voice } : {}),
+            ...(input.gender ? { gender: input.gender === 'MALE' ? 'male' : 'female' } : {}),
+          },
+          credentials: {
+            ...(input.provider === 'gemini' && input.apiKey ? { geminiApiKey: input.apiKey } : {}),
+            ...(input.provider === 'azure' && input.apiKey ? { azureKey: input.apiKey } : {}),
+            ...(input.region ? { azureRegion: input.region } : {}),
+            ...(input.localBaseUrl ? { localBaseUrl: input.localBaseUrl } : {}),
+            ...(input.localApiKey ? { localApiKey: input.localApiKey } : {}),
+          },
+        });
+        const audio = Buffer.from(result.audioBase64, 'base64');
+        return ok({
+          audio,
+          bytes: audio.length,
+          contentType: result.mimeType,
+          ...(result.usedFallback ? { ttsWarning: `首选 ${result.preferredError?.provider ?? input.provider} 失败，已使用本地 TTS：${result.preferredError?.message ?? '原因未提供'}` } : {}),
+        });
+      } catch (error) {
+        if (error instanceof UnifiedSynthesisError) {
+          const failure = error.failure;
+          return err(new BusinessError('E_TTS_SYNTHESIS',
+            `首选 ${failure.preferredError.provider} 失败：${failure.preferredError.message}${failure.fallbackError ? `；本地 TTS 失败：${failure.fallbackError.message}` : ''}`,
+            'TOOL_EXECUTION', false));
+        }
+        return err(translateToBusinessError(error, 'ANKI_TTS_SYNTHESIS'));
+      }
+    },
   };
   return pushCardToAnkiUseCase(ports, fetchImpl, request);
 }

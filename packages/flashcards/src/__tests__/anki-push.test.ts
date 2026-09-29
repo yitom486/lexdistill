@@ -114,18 +114,16 @@ describe('pushCardToAnki', () => {
     expect(log).toContain('anki:addNote');
   });
 
-  it('TTS 失败降级：跳过音频但推送成功', async () => {
+  it('请求了 TTS 且合成失败时，明确报错并停止推送', async () => {
     const log: string[] = [];
     const res = await pushCardToAnki(
       stubPorts(log, { tts: 'fail' }),
       ankiStub(log),
       { ...REQ, tts: { provider: 'x' } }
     );
-    expect(isOk(res)).toBe(true);
-    if (!isOk(res)) return;
-    expect(res.value.noteId).toBe(42);
-    expect(res.value.audioStored).toBe(false);
-    expect(res.value.audioSkippedReason).toContain('TTS 合成失败');
+    expect(isErr(res)).toBe(true);
+    if (isErr(res)) expect(res.error.userMessage).toContain('合成失败');
+    expect(log).not.toContain('anki:addNote');
   });
 
   it('Anki 不可达 → E_ANKI_UNREACHABLE（可重试）', async () => {

@@ -91,7 +91,7 @@ export function mapThreadItemsToBubbles(items: ThreadItemLike[]): MappedChatBubb
   };
 
   for (const item of items) {
-    if (item.type === 'user_message') {
+    if (item.type === 'user_message' || item.type === 'userMessage') {
       flush();
       const text = stripTranscriptNoise(item.text ?? '');
       if (text) {
@@ -115,13 +115,13 @@ export function mapThreadItemsToBubbles(items: ThreadItemLike[]): MappedChatBubb
       };
     }
 
-    if (item.type === 'assistant_message' && item.text) {
+    if ((item.type === 'assistant_message' || item.type === 'agentMessage') && item.text) {
       const cleaned = stripTranscriptNoise(item.text);
       current.text = current.text ? `${current.text}\n${cleaned}` : cleaned;
     } else if (item.type === 'reasoning' && item.text) {
       current.reasoning = item.text;
     } else if (
-      item.type === 'tool_call'
+      item.type === 'tool_call' || item.type === 'dynamicToolCall'
     ) {
       current.toolCalls = [
         ...(current.toolCalls ?? []),

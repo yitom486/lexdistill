@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SlidersHorizontal,
   Volume2,
@@ -18,7 +18,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover.js';
 import { Button, buttonVariants } from './ui/button.js';
 import { Badge } from './ui/badge.js';
@@ -30,25 +29,18 @@ import {
   SelectContent,
   SelectItem,
 } from './ui/select.js';
-import { sound, speechStudio, type TtsGender } from '../utils/audio.js';
-import { useTtsStore, voicePrefKey } from '../stores/useTtsStore.js';
+import { sound } from '../utils/audio.js';
+import { useTtsStore } from '../stores/useTtsStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { useLearningShell } from '../hooks/useLearningShell.js';
-import {
-  getPersonaLabel,
-  getPreviewText,
-  getTtsVoicePack,
-  trackToSpeechLang,
-} from '../config/tts-voice-personas.js';
+import { getPreviewText, trackToSpeechLang } from '../config/tts-voice-personas.js';
 import {
   useDictionaryPackagesQuery,
   useInstallDictionaryPackageMutation,
   useInstallCustomDictionaryMutation,
-  useUpdateDictionaryPackageMutation,  useAzureVoicesQuery,
-  useInvalidateTtsVoices,
+  useUpdateDictionaryPackageMutation,
   useAnkiStatusQuery,
   useSaveAnkiSettingsMutation,
-  type AzureVoiceOption,
 } from '../queries/useLearnerQueries.js';
 import { Switch } from './ui/switch.js';
 import { useGatewayStore } from '../stores/useGatewayStore.js';
@@ -59,49 +51,29 @@ import { checkForAppUpdate } from '../platform/app-updater.js';
 
 export function SystemSettingsPopover() {
   const [open, setOpen] = useState(false);
-  const [voiceTick, setVoiceTick] = useState(0);
   const isConnected = useGatewayStore((s) => s.isConnected);
   const latencyMs = useGatewayStore((s) => s.latencyMs);
 
-  // TTS 状态
-  const gender = useTtsStore((s) => s.gender);
-  const rate = useTtsStore((s) => s.rate);
-  const preferredVoices = useTtsStore((s) => s.preferredVoices);
-  const setGender = useTtsStore((s) => s.setGender);
-  const setRate = useTtsStore((s) => s.setRate);
-  const setPreferredVoice = useTtsStore((s) => s.setPreferredVoice);
-  const speak = useTtsStore((s) => s.speak);
-
-  // 神经语音（经网关代理）：三选项 + 分服务商字段 + 有效性验证
-  type EngineChoice = 'system' | 'openai-compatible' | 'azure-speech';
-  const customPluginUrl = useTtsStore((s) => s.customPluginUrl);
-  const isCustomPluginEnabled = useTtsStore((s) => s.isCustomPluginEnabled);
-  const customPluginApiKey = useTtsStore((s) => s.customPluginApiKey);
-  const customPluginVoiceId = useTtsStore((s) => s.customPluginVoiceId);
-  const proxyProvider = useTtsStore((s) => s.proxyProvider);
-  const proxyRegion = useTtsStore((s) => s.proxyRegion);
-  const azureStyle = useTtsStore((s) => s.azureStyle);
-  const azureFemaleVoiceId = useTtsStore((s) => s.azureFemaleVoiceId);
-  const azureMaleVoiceId = useTtsStore((s) => s.azureMaleVoiceId);
-  const setCustomPluginConfig = useTtsStore((s) => s.setCustomPluginConfig);
-  const setCustomPluginAuth = useTtsStore((s) => s.setCustomPluginAuth);
-  const setProxyProvider = useTtsStore((s) => s.setProxyProvider);
-  const setProxyRegion = useTtsStore((s) => s.setProxyRegion);
-  const setAzureStyle = useTtsStore((s) => s.setAzureStyle);
-  const setAzureGenderVoice = useTtsStore((s) => s.setAzureGenderVoice);
-  const [editEngine, setEditEngine] = useState<EngineChoice>(
-    isCustomPluginEnabled ? proxyProvider : 'system'
-  );
-  const [editUrl, setEditUrl] = useState(customPluginUrl);
-  const [editRegion, setEditRegion] = useState(proxyRegion);
-  const [editApiKey, setEditApiKey] = useState(customPluginApiKey);
-  const [editVoiceId, setEditVoiceId] = useState(customPluginVoiceId);
-  const [editFemaleVoiceId, setEditFemaleVoiceId] = useState(azureFemaleVoiceId);
-  const [editMaleVoiceId, setEditMaleVoiceId] = useState(azureMaleVoiceId);
-  const [editStyle, setEditStyle] = useState(azureStyle);
-  const [validating, setValidating] = useState(false);
-  const [testingNeural, setTestingNeural] = useState(false);
-  const invalidateTtsVoices = useInvalidateTtsVoices();
+  // 用户偏好由 Zustand 持久化；模型、音色选择与兜底均交给 gemini-tts-studio。
+  const gender = useTtsStore((state) => state.gender);
+  const rate = useTtsStore((state) => state.rate);
+  const preferredService = useTtsStore((state) => state.preferredService);
+  const geminiApiKey = useTtsStore((state) => state.geminiApiKey);
+  const azureKey = useTtsStore((state) => state.azureKey);
+  const azureRegion = useTtsStore((state) => state.azureRegion);
+  const localBaseUrl = useTtsStore((state) => state.localBaseUrl);
+  const localApiKey = useTtsStore((state) => state.localApiKey);
+  const voiceId = useTtsStore((state) => state.voiceId);
+  const setGender = useTtsStore((state) => state.setGender);
+  const setRate = useTtsStore((state) => state.setRate);
+  const setPreferredService = useTtsStore((state) => state.setPreferredService);
+  const setGeminiApiKey = useTtsStore((state) => state.setGeminiApiKey);
+  const setAzureKey = useTtsStore((state) => state.setAzureKey);
+  const setAzureRegion = useTtsStore((state) => state.setAzureRegion);
+  const setLocalBaseUrl = useTtsStore((state) => state.setLocalBaseUrl);
+  const setLocalApiKey = useTtsStore((state) => state.setLocalApiKey);
+  const setVoiceId = useTtsStore((state) => state.setVoiceId);
+  const speak = useTtsStore((state) => state.speak);
 
   // 学情与画像
   const profile = useUserProfileStore((s) => s.profile);
@@ -109,9 +81,6 @@ export function SystemSettingsPopover() {
   const setProfileModalOpen = useUserProfileStore((s) => s.setProfileModalOpen);
   const shell = useLearningShell();
   const speechLang = trackToSpeechLang(shell.track);
-  const voicePack = getTtsVoicePack(speechLang);
-  const prefKey = voicePrefKey(speechLang, gender);
-  const preferredURI = preferredVoices[prefKey] ?? null;
   const dictionaryPackages = useDictionaryPackagesQuery(open);
   const installDictionaryPackage = useInstallDictionaryPackageMutation();
   const updateDictionaryPackage = useUpdateDictionaryPackageMutation();
@@ -137,261 +106,6 @@ export function SystemSettingsPopover() {
       setIsDesktop(false);
     }
   }, []);
-
-  // 系统音色异步加载（Chrome onvoiceschanged）
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    const bump = () => setVoiceTick((n) => n + 1);
-    bump();
-    window.speechSynthesis.addEventListener('voiceschanged', bump);
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', bump);
-  }, []);
-
-  const langVoices = useMemo(() => {
-    void voiceTick;
-    return speechStudio.listVoicesForLang(speechLang);
-  }, [speechLang, voiceTick]);
-
-  const activeSystemVoice = speechStudio.getBestVoice(speechLang, gender, preferredURI);
-  const hasNamed = speechStudio.hasNamedGenderVoice(speechLang, gender);
-
-  // 切到男声且尚无偏好时，自动锁定评分最高的男声音色
-  useEffect(() => {
-    if (gender !== 'MALE' || preferredURI || langVoices.length === 0) return;
-    const best = speechStudio.getBestVoice(speechLang, 'MALE');
-    if (best && speechStudio.hasNamedGenderVoice(speechLang, 'MALE')) {
-      setPreferredVoice(speechLang, 'MALE', best.voiceURI);
-    }
-  }, [gender, speechLang, preferredURI, langVoices.length, setPreferredVoice]);
-
-  /** 音色 id 取短名（ja-JP-DaichiNeural → Daichi），顶栏按钮跟着桶走，不写死 */
-  const shortVoiceNameOf = (voiceId: string): string => {
-    const m = voiceId.match(/-([A-Za-z]+)Neural$/);
-    return m?.[1] ?? (voiceId || '');
-  };
-  const femaleBucketVoiceId = editEngine === 'azure-speech' ? editFemaleVoiceId : '';
-  const maleBucketVoiceId = editEngine === 'azure-speech' ? editMaleVoiceId : '';
-  const femaleChipLabel = `女声${femaleBucketVoiceId ? `（${shortVoiceNameOf(femaleBucketVoiceId)}）` : ''}`;
-  const maleChipLabel = `男声${maleBucketVoiceId ? `（${shortVoiceNameOf(maleBucketVoiceId)}）` : ''}`;
-
-  const handleGenderChange = (newGender: TtsGender) => {
-    sound.playClick();
-    setGender(newGender);
-    // 风格归属当前性别桶的音色，切性别即重置；两桶各自保留互不干扰
-    setEditStyle('');
-    toast.success(
-      newGender === 'MALE' ? `已切换至：${maleChipLabel}` : `已切换至：${femaleChipLabel}`
-    );
-  };
-
-  // 切语种时清空跨语种残留的显式音色/风格（两桶 + OpenAI 单值；挂载时不动）
-  const prevLangRef = useRef(speechLang);
-  useEffect(() => {
-    if (prevLangRef.current !== speechLang) {
-      prevLangRef.current = speechLang;
-      setEditVoiceId('');
-      setEditFemaleVoiceId('');
-      setEditMaleVoiceId('');
-      setEditStyle('');
-    }
-  }, [speechLang]);
-
-  const handleVoicePick = (voiceURI: string | null) => {
-    sound.playClick();
-    setPreferredVoice(speechLang, gender, voiceURI);
-    if (voiceURI) {
-      const v = speechStudio.getVoiceByURI(voiceURI);
-      toast.success(`已指定引擎音色：${v?.name ?? voiceURI}`);
-    }
-  };
-
-  /** 三处同源的实际生效描述：引擎行、试听、试播验证 */
-  const describeEffectiveVoice = (): string => {
-    if (!editEngine || editEngine === 'system') {
-      return activeSystemVoice?.name || '系统默认';
-    }
-    if (editEngine === 'azure-speech') {
-      return effectiveAzureVoice
-        ? `${effectiveAzureVoice.label} · ${effectiveAzureVoice.id}`
-        : '按语种自动';
-    }
-    return editVoiceId || (gender === 'MALE' ? 'echo（男）' : 'alloy（女）');
-  };
-
-  const handlePreview = () => {
-    sound.playClick();
-    // 先落盘再播：否则下拉改了没点保存，试听用的还是旧桶，可复现“换哪个都一个声”
-    persistNeuralForm();
-    toast.message(`试听：${describeEffectiveVoice()}`);
-    speak(getPreviewText(speechLang, gender), { lang: speechLang, gender, rate });
-  };
-
-  const persistNeuralForm = () => {
-    if (editEngine === 'system') {
-      setCustomPluginConfig(editUrl, false);
-    } else {
-      setCustomPluginConfig(editUrl, true);
-      setProxyProvider(editEngine);
-    }
-    setProxyRegion(editRegion);
-    setCustomPluginAuth(editApiKey, editVoiceId);
-    setAzureGenderVoice('FEMALE', editFemaleVoiceId);
-    setAzureGenderVoice('MALE', editMaleVoiceId);
-    setAzureStyle(editEngine === 'azure-speech' ? editStyle : '');
-  };
-
-  const handleSaveNeural = () => {
-    sound.playCorrect();
-    persistNeuralForm();
-    const summary =
-      editEngine === 'system'
-        ? '已切回系统语音'
-        : editEngine === 'azure-speech'
-          ? `已保存 Azure（女 ${editFemaleVoiceId || '默认'} / 男 ${editMaleVoiceId || '默认'}）`
-          : `已保存兼容端点（音色 ${editVoiceId || '默认'}）`;
-    toast.success(summary);
-  };
-
-  const handleValidateNeural = async () => {
-    if (editEngine === 'system') return;
-    if (editEngine === 'azure-speech' && !editRegion.trim()) {
-      toast.error('请先填写 Azure 区域（如 japaneast）。');
-      return;
-    }
-    if (editEngine === 'openai-compatible' && !editUrl.trim()) {
-      toast.error('请先填写外挂端点 URL。');
-      return;
-    }
-    sound.playClick();
-    setValidating(true);
-    try {
-      const res = await fetch(`${GATEWAY_BASE_URL}/api/tts/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: editEngine,
-          trackLanguage: speechLang.toLowerCase(),
-          ...(editEngine === 'openai-compatible' ? { baseUrl: editUrl } : { region: editRegion }),
-          ...(editApiKey ? { apiKey: editApiKey } : {}),
-          // 验证用当前性别桶的音色（与实际生效一致）
-          ...((() => {
-            const bucketId = gender === 'MALE' ? editMaleVoiceId : editFemaleVoiceId;
-            return editEngine === 'azure-speech' && bucketId ? { voice: bucketId } : {};
-          })()),
-          ...(editEngine === 'azure-speech' && editStyle ? { style: editStyle } : {}),
-        }),
-      });
-      const data = (await res.json().catch(() => null)) as {
-        ok?: unknown;
-        voice?: unknown;
-        bytes?: unknown;
-        error?: { userMessage?: string };
-      } | null;
-      if (res.ok && data?.ok) {
-        persistNeuralForm();
-        void invalidateTtsVoices();
-        toast.success(`Key 有效：${String(data.voice ?? '')}（探针 ${String(data.bytes ?? 0)} 字节）。`);
-      } else {
-        toast.error(data?.error?.userMessage ?? '验证失败，请检查配置。');
-      }
-    } catch {
-      toast.error('网关未响应：请确认网关已启动（localhost:8080）。');
-    } finally {
-      setValidating(false);
-    }
-  };
-
-  const handleTestNeural = () => {
-    if (editEngine === 'system') return;
-    sound.playClick();
-    setTestingNeural(true);
-    persistNeuralForm();
-    // 报出实际试播的音色：所见即所听，对不上立刻能发现
-    const testDesc = describeEffectiveVoice();
-    toast.message(`正在试播：${testDesc}`);
-    void speak(getPreviewText(speechLang, gender), {
-      lang: speechLang,
-      gender,
-      onEnd: () => setTestingNeural(false),
-      onError: (e) => {
-        setTestingNeural(false);
-        toast.error(e instanceof Error ? e.message : '神经语音试播失败，请检查配置。');
-      },
-    });
-  };
-
-  // Azure 区域做成选择题；音色优先用网关拉取的全量表（含各音色可用风格），
-  // 未加载时回退内置短表。音色与顶部男女声是同一状态：选具体音色会同步男女声，
-  // 切男女声/语种则回到自动跟随，永不矛盾
-  const AZURE_REGIONS = [
-    'japaneast',
-    'koreacentral',
-    'southeastasia',
-    'eastasia',
-    'eastus',
-    'westus2',
-    'westeurope',
-    'australiaeast',
-  ];
-  const AZURE_VOICE_FALLBACK: AzureVoiceOption[] = [
-    { id: 'ja-JP-NanamiNeural', label: '七海（女）', gender: 'FEMALE', locale: 'ja-JP', styles: [] },
-    { id: 'ja-JP-KeitaNeural', label: '圭太（男）', gender: 'MALE', locale: 'ja-JP', styles: [] },
-    { id: 'ja-JP-AoiNeural', label: '葵（女）', gender: 'FEMALE', locale: 'ja-JP', styles: [] },
-    { id: 'ja-JP-DaichiNeural', label: '大地（男）', gender: 'MALE', locale: 'ja-JP', styles: [] },
-    { id: 'ko-KR-SunHiNeural', label: 'SunHi（女）', gender: 'FEMALE', locale: 'ko-KR', styles: [] },
-    { id: 'ko-KR-InJoonNeural', label: 'InJoon（男）', gender: 'MALE', locale: 'ko-KR', styles: [] },
-    { id: 'en-US-JennyNeural', label: 'Jenny（女）', gender: 'FEMALE', locale: 'en-US', styles: [] },
-    { id: 'en-US-GuyNeural', label: 'Guy（男）', gender: 'MALE', locale: 'en-US', styles: [] },
-    { id: 'en-US-AriaNeural', label: 'Aria（女）', gender: 'FEMALE', locale: 'en-US', styles: [] },
-    { id: 'en-US-DavisNeural', label: 'Davis（男）', gender: 'MALE', locale: 'en-US', styles: [] },
-  ];
-  const { data: remoteVoices = [], isFetching: isVoicesFetching } = useAzureVoicesQuery({
-    region: editRegion,
-    apiKey: editApiKey,
-    track: speechLang,
-    // 面板打开且选了 Azure 才拉全量表（Key 不进缓存键，换 Key 后靠验证成功刷新）
-    enabled: editEngine === 'azure-speech' && open,
-  });
-  // Key 从空到有（用户后填的常见顺序）自动刷一次音色表，否则永远停在内置短表
-  const hadKeyRef = useRef(editApiKey.trim().length > 0);
-  useEffect(() => {
-    const hasKey = editApiKey.trim().length > 0;
-    if (
-      hasKey &&
-      !hadKeyRef.current &&
-      editEngine === 'azure-speech' &&
-      editRegion.trim().length > 0
-    ) {
-      void invalidateTtsVoices();
-    }
-    hadKeyRef.current = hasKey;
-  }, [editApiKey, editEngine, editRegion, invalidateTtsVoices]);
-  const azureVoiceOptions: AzureVoiceOption[] = (
-    remoteVoices.length > 0 ? remoteVoices : AZURE_VOICE_FALLBACK
-  ).filter((v) => v.id.toLowerCase().startsWith(speechLang.toLowerCase()));
-  /** 两桶各管各：女声下拉只列女声，男声下拉只列男声，互不串味 */
-  const femaleOptions = azureVoiceOptions.filter((v) => v.gender === 'FEMALE');
-  const maleOptions = azureVoiceOptions.filter((v) => v.gender === 'MALE');
-  /** 当前性别桶选中的音色（风格取自它）；顶部男女声开关决定用哪一桶 */
-  const activeBucketId = gender === 'MALE' ? editMaleVoiceId : editFemaleVoiceId;
-  const activeVoice =
-    azureVoiceOptions.find((v) => v.id === activeBucketId) ??
-    azureVoiceOptions.find((v) => v.gender === gender) ??
-    azureVoiceOptions[0];
-  const voiceStyles = activeVoice?.styles ?? [];
-  /** 当前实际生效的 Azure 音色 */
-  const effectiveAzureVoice = activeVoice;
-  /** 下拉框显示文本（SelectValue 无 children 时会裸显 value，不可传哨兵） */
-  const azureVoiceTriggerLabel = (bucketId: string) =>
-    bucketId
-      ? (azureVoiceOptions.find((v) => v.id === bucketId)?.label ?? bucketId)
-      : '默认';
-  const azureRegionTriggerLabel = editRegion || '选择区域，如 japaneast';
-  const OPENAI_ENDPOINT_PRESETS = [
-    { label: 'OpenAI 官方', value: 'https://api.openai.com/v1/audio/speech' },
-    { label: '本地默认', value: 'http://127.0.0.1:8880/v1/audio/speech' },
-  ];
-  const OPENAI_VOICE_PRESETS = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
   const handleInstallDictionary = (packageId: string) => {
     const target = installableDictionaries.find((item) => item.id === packageId);
@@ -560,368 +274,59 @@ export function SystemSettingsPopover() {
             </div>
           )}
 
-          {/* 1. TTS 语音设置 */}
+          {/* 1. TTS 设置：宿主仅保存偏好并调用包，不在本地选择模型或音色。 */}
           <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 font-medium text-ink-mute">
-                <Volume2 className="w-3.5 h-3.5 text-tone-amber-500" />
-                <span>发音音色与语速</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className="text-[10px] px-1.5 py-0 border-line-amber-500o30 text-accent-ink font-mono"
-                >
-                  {voicePack.trackLabel} · {speechLang}
-                </Badge>
-                <button
-                  type="button"
-                  onClick={handlePreview}
-                  className="text-[11px] text-accent-ink hover:underline flex items-center gap-1 cursor-pointer font-medium"
-                >
-                  <Play className="w-2.5 h-2.5 fill-current" />
-                  试听
-                </button>
-              </div>
+            <div className="flex items-center gap-1.5 font-medium text-ink-mute">
+              <Volume2 className="w-3.5 h-3.5 text-tone-amber-500" />
+              <span>语音朗读</span>
+              <Badge variant="outline" className="text-[10px]">{speechLang}</Badge>
             </div>
-
-            {/* 引擎三选一：选择即在此，音色一并在此定 */}
             <div className="grid grid-cols-3 gap-1">
-              {(
-                [
-                  { value: 'system', label: '系统语音' },
-                  { value: 'openai-compatible', label: 'OpenAI兼容' },
-                  { value: 'azure-speech', label: 'Azure' },
-                ] as const
-              ).map((o) => (
+              {([
+                { value: 'gemini', label: 'Gemini' },
+                { value: 'azure', label: 'Azure' },
+                { value: 'local', label: '本地 TTS' },
+              ] as const).map((item) => (
                 <Button
-                  key={o.value}
+                  key={item.value}
                   type="button"
                   size="sm"
-                  variant={editEngine === o.value ? 'default' : 'outline'}
-                  className="h-7 text-[11px] px-1"
-                  onClick={() => {
-                    sound.playClick();
-                    setEditEngine(o.value);
-                  }}
+                  variant={preferredService === item.value ? 'default' : 'outline'}
+                  className="h-7 text-[11px]"
+                  onClick={() => setPreferredService(item.value)}
                 >
-                  {o.label}
+                  {item.label}
                 </Button>
               ))}
             </div>
-
-            {/* 男女声：不写死具体人名，只定性别方向，具体音色由下方下拉定 */}
             <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleGenderChange('FEMALE')}
-                className={`py-1.5 px-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                  gender === 'FEMALE'
-                    ? 'border-halo-amber-500o60 bg-wash-amber-500o10 text-ink-amber-900-amber-200 font-semibold'
-                    : 'border-line-soft hover:bg-tone-stone-100 dark:hover:bg-veil-stone-800o60 text-ink-faint-soft'
-                }`}
-              >
-                <span className="truncate">{femaleChipLabel}</span>
-                {gender === 'FEMALE' && <Check className="w-3 h-3 text-tone-amber-500" />}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleGenderChange('MALE')}
-                className={`py-1.5 px-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                  gender === 'MALE'
-                    ? 'border-halo-amber-500o60 bg-wash-amber-500o10 text-ink-amber-900-amber-200 font-semibold'
-                    : 'border-line-soft hover:bg-tone-stone-100 dark:hover:bg-veil-stone-800o60 text-ink-faint-soft'
-                }`}
-              >
-                <span className="truncate">{maleChipLabel}</span>
-                {gender === 'MALE' && <Check className="w-3 h-3 text-tone-amber-500" />}
-              </button>
+              <Button size="sm" variant={gender === 'FEMALE' ? 'default' : 'outline'} onClick={() => setGender('FEMALE')}>女声</Button>
+              <Button size="sm" variant={gender === 'MALE' ? 'default' : 'outline'} onClick={() => setGender('MALE')}>男声</Button>
             </div>
-
-            <div className="flex items-center gap-1 text-[10px] text-ink-ghost truncate">
-              <span className="w-1.5 h-1.5 rounded-full bg-tone-emerald-500 shrink-0" />
-              <span className="truncate">
-                当前引擎: {editEngine && editEngine !== 'system' ? `${editEngine === 'azure-speech' ? 'Azure' : '兼容端点'} · ` : ''}{describeEffectiveVoice()}
-              </span>
+            {preferredService === 'gemini' && (
+              <input type="password" autoComplete="off" value={geminiApiKey} onChange={(event) => setGeminiApiKey(event.target.value)} placeholder="Gemini API Key（可留空，使用网关环境变量）" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
+            )}
+            {preferredService === 'azure' && (
+              <>
+                <input type="password" autoComplete="off" value={azureKey} onChange={(event) => setAzureKey(event.target.value)} placeholder="Azure API Key" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
+                <input type="text" value={azureRegion} onChange={(event) => setAzureRegion(event.target.value)} placeholder="Azure 区域，如 japaneast" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
+              </>
+            )}
+            <input type="text" value={localBaseUrl} onChange={(event) => setLocalBaseUrl(event.target.value)} placeholder="本地 TTS 地址（可留空，使用网关 LOCAL_TTS_ENDPOINT）" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
+            <input type="password" autoComplete="off" value={localApiKey} onChange={(event) => setLocalApiKey(event.target.value)} placeholder="本地 TTS API Key（可选）" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
+            <input type="text" value={voiceId} onChange={(event) => setVoiceId(event.target.value)} placeholder="音色 ID（可留空，由 TTS 包选择）" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-ink-ghost">播放速度 {rate.toFixed(1)}x</span>
+              <Slider value={rate} min={0.5} max={1.5} step={0.1} onValueChange={(value) => {
+                const next = Array.isArray(value) ? value[0] : value;
+                if (typeof next === 'number') setRate(next);
+              }} />
             </div>
-
-            {/* 具体音色选择：随引擎切换，选中即生效（保存后持久） */}
-            {editEngine === 'system' && langVoices.length > 0 && (
-              <div className="space-y-1">
-                <label className="text-[10px] font-medium text-ink-ghost">
-                  系统音色（英语请优先选 David / Mark / Guy）
-                </label>
-                <Select
-                  value={preferredURI || activeSystemVoice?.voiceURI || ''}
-                  onValueChange={(val) => handleVoicePick(val || null)}
-                >
-                  <SelectTrigger className="h-8 text-[11px]">
-                    <SelectValue placeholder="选择系统音色..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-56">
-                    {langVoices.map((v) => (
-                      <SelectItem key={v.voiceURI} value={v.voiceURI}>
-                        <span className="truncate">
-                          {v.name}
-                          {v.localService ? ' · 本地' : ' · 云端'}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {editEngine === 'azure-speech' && (
-              <div className="space-y-2">
-                {(
-                  [
-                    { gender: 'FEMALE' as const, label: '女声', bucketId: editFemaleVoiceId, options: femaleOptions },
-                    { gender: 'MALE' as const, label: '男声', bucketId: editMaleVoiceId, options: maleOptions },
-                  ]
-                ).map((group) => (
-                  <div key={group.gender} className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-ink-ghost w-8 shrink-0">
-                      {group.label}
-                    </span>
-                    <Select
-                      value={group.bucketId || `__auto_${group.gender}`}
-                      onValueChange={(v) => {
-                        if (!v) return;
-                        sound.playClick();
-                        const next = v === `__auto_${group.gender}` ? '' : v;
-                        if (group.gender === 'MALE') {
-                          setEditMaleVoiceId(next);
-                        } else {
-                          setEditFemaleVoiceId(next);
-                        }
-                        // 风格归属当前性别桶的音色，换桶内音色即重置
-                        if (
-                          (group.gender === gender && next !== activeBucketId) ||
-                          next === ''
-                        ) {
-                          setEditStyle('');
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-[11px] flex-1">
-                        <SelectValue placeholder={`${group.label}音色（默认）`}>
-                          {azureVoiceTriggerLabel(group.bucketId)}
-                          {isVoicesFetching ? ' · 读取中…' : ''}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={`__auto_${group.gender}`}>默认{group.label}音色</SelectItem>
-                        {group.options.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.label} · {v.id}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-                {voiceStyles.length > 0 && (
-                  <Select
-                    value={editStyle || '__none'}
-                    onValueChange={(v) => {
-                      if (!v) return;
-                      sound.playClick();
-                      setEditStyle(v === '__none' ? '' : v);
-                    }}
-                  >
-                    <SelectTrigger className="h-8 text-[11px]">
-                      <SelectValue placeholder="说话风格（默认自然）">
-                        {editStyle ? `风格：${editStyle}` : '说话风格（默认自然）'}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none">自然（无风格）</SelectItem>
-                      {voiceStyles.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {remoteVoices.length > 0 ? (
-                  <p className="text-[10px] text-ink-emerald-600-emerald-400 leading-relaxed">
-                    已加载 {remoteVoices.length} 个{speechLang === 'JA' ? '日语' : speechLang === 'KO' ? '韩语' : '英语'}云端音色（含各音色可用风格）。
-                  </p>
-                ) : (
-                  <p className="text-[10px] text-ink-stone-400 leading-relaxed">
-                    到下方填好区域与 Key 后自动拉取该区全量音色与说话风格。
-                  </p>
-                )}
-              </div>
-            )}
-
-            {editEngine === 'openai-compatible' && (
-              <div className="space-y-2">
-                <div className="flex gap-1">
-                  {OPENAI_VOICE_PRESETS.map((p) => (
-                    <Button
-                      key={p}
-                      type="button"
-                      size="sm"
-                      variant={editVoiceId === p ? 'default' : 'outline'}
-                      className="flex-1 h-7 text-[11px] px-1"
-                      onClick={() => {
-                        sound.playClick();
-                        setEditVoiceId(p);
-                      }}
-                    >
-                      {p}
-                    </Button>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  value={editVoiceId}
-                  onChange={(e) => setEditVoiceId(e.target.value)}
-                  placeholder="音色 id（可空，如 alloy）"
-                  className="w-full p-2 text-[11px] font-mono rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft"
-                />
-              </div>
-            )}
-
-            {editEngine === 'system' && !hasNamed && (
-              <p className="text-[10px] text-ink-amber-700o90-amber-300o90 leading-relaxed">
-                {gender === 'MALE'
-                  ? '未检测到具名男声（如 Microsoft David/Mark）。若列表里只有 Google US English，听感会偏女声；请在上方手动选男声，或到系统设置安装英文男声 / 启用 TTS 外挂。'
-                  : '未检测到具名女声引擎；已使用该语种默认音色。'}
-              </p>
-            )}
-
-            {/* 语速滑动条 */}
-            <div className="pt-1">
-              <div className="flex justify-between text-[11px] text-ink-ghost mb-1.5">
-                <span>朗读语速</span>
-                <span className="font-mono font-semibold text-ink-mute">
-                  {rate.toFixed(1)}x
-                </span>
-              </div>
-              <Slider
-                value={rate}
-                min={0.5}
-                max={1.5}
-                step={0.1}
-                onValueChange={(val) => {
-                  const numVal = Array.isArray(val) ? val[0] : val;
-                  if (typeof numVal === 'number') {
-                    setRate(Math.round(numVal * 100) / 100);
-                  }
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="h-px bg-tone-stone-100-stone-800o80" />
-
-          {/* 2. 连接配置：引擎与音色到上方选择区定，这里只填连通三件套 */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5 font-medium text-ink-mute">
-              <Plug className="w-3.5 h-3.5 text-tone-amber-500" />
-              <span>神经语音连接</span>
-              <span className="text-[10px] font-mono text-ink-stone-400">
-                {editEngine === 'system'
-                  ? '未启用'
-                  : editEngine === 'azure-speech'
-                    ? 'Azure·已选'
-                    : '兼容端点·已选'}
-              </span>
-            </div>
-              {editEngine === 'openai-compatible' && (
-                <>
-                  <div className="flex gap-1">
-                    {OPENAI_ENDPOINT_PRESETS.map((p) => (
-                      <Button
-                        key={p.value}
-                        type="button"
-                        size="sm"
-                        variant={editUrl === p.value ? 'default' : 'outline'}
-                        className="flex-1 h-7 text-[11px]"
-                        onClick={() => {
-                          sound.playClick();
-                          setEditUrl(p.value);
-                        }}
-                      >
-                        {p.label}
-                      </Button>
-                    ))}
-                  </div>
-                  <input
-                    type="text"
-                    value={editUrl}
-                    onChange={(e) => setEditUrl(e.target.value)}
-                    placeholder="端点 URL，如 https://api.openai.com/v1/audio/speech"
-                    className="w-full p-2 text-[11px] font-mono rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft"
-                  />
-                  <p className="text-[10px] text-ink-stone-400 leading-relaxed">
-                    任何 OpenAI /v1/audio/speech 兼容端点：公有云、自建网关或本地兼容服务均可直填。
-                  </p>
-                </>
-              )}
-              {editEngine === 'azure-speech' && (
-                <>
-                    <Select value={editRegion} onValueChange={(v) => v && setEditRegion(v)}>
-                      <SelectTrigger className="h-8 text-[11px]">
-                        <SelectValue placeholder="选择区域，如 japaneast">
-                          {azureRegionTriggerLabel}
-                        </SelectValue>
-                      </SelectTrigger>
-                    <SelectContent>
-                      {AZURE_REGIONS.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-ink-stone-400 leading-relaxed">
-                    Azure Speech 原生 REST：选区域 + 填 Key 即可，音色不选按语种用默认神经音色。
-                  </p>
-                </>
-              )}
-            {editEngine !== 'system' && (
-              <input
-                type="password"
-                value={editApiKey}
-                onChange={(e) => setEditApiKey(e.target.value)}
-                placeholder="API Key（可空传本地服务；仅存本机）"
-                autoComplete="off"
-                className="w-full p-2 text-[11px] font-mono rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft"
-              />
-            )}
-                <p className="text-[10px] text-ink-stone-400 leading-relaxed">
-                  Key 随本次请求发往本机网关代调第三方，网关不落盘。先验证再保存。
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 h-7 text-[11px]"
-                    disabled={validating}
-                    onClick={() => void handleValidateNeural()}
-                  >
-                    {validating ? '验证中…' : '验证有效性'}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 h-7 text-[11px]"
-                    disabled={testingNeural}
-                    onClick={handleTestNeural}
-                  >
-                    {testingNeural ? '试播中…' : '试播验证'}
-                  </Button>
-                </div>
-            <Button type="button" size="sm" className="w-full h-7 text-[11px]" onClick={handleSaveNeural}>
-              保存语音配置
-            </Button>
+            <p className="text-[10px] text-ink-ghost">首选服务失败时，包只尝试本地 TTS；失败原因会显示。播放速度在客户端调整，0.3.0 尚不支持合成语速。</p>
+            <Button type="button" size="sm" variant="outline" className="w-full h-7 text-[11px]" onClick={() => {
+              sound.playClick();
+              void speak(getPreviewText(speechLang, gender), { lang: speechLang, gender, purpose: 'preview' });
+            }}>试听当前配置</Button>
           </div>
 
           <div className="h-px bg-tone-stone-100-stone-800o80" />

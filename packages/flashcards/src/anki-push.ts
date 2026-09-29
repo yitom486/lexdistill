@@ -40,6 +40,8 @@ const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 export interface AnkiPushTts {
   provider: string;
   baseUrl?: string | undefined;
+  localBaseUrl?: string | undefined;
+  localApiKey?: string | undefined;
   region?: string | undefined;
   apiKey?: string | undefined;
   voice?: string | undefined;
@@ -64,6 +66,7 @@ export interface AnkiPushResult {
   formatId: string;
   audioStored: boolean;
   audioSkippedReason?: string | undefined;
+  ttsWarning?: string | undefined;
 }
 
 /** port 视角的设置（Gateway 用 Anki 开关持久化实现）。 */
@@ -82,12 +85,14 @@ export interface AnkiPushCard {
   sourceEntryId: string | null;
 }
 
-/** port 视角的 TTS 合成请求（Gateway 用 tts-proxy 实现；Key 随调用来、用完即弃）。 */
+/** port 视角的 TTS 合成请求（Gateway 调用 npm 包；Key 随调用来、用完即弃）。 */
 export interface AnkiPushTtsRequest {
   provider: string;
   text: string;
   trackLanguage: string;
   baseUrl?: string | undefined;
+  localBaseUrl?: string | undefined;
+  localApiKey?: string | undefined;
   region?: string | undefined;
   apiKey?: string | undefined;
   voice?: string | undefined;
@@ -101,6 +106,7 @@ export interface AnkiPushAudio {
   bytes: number;
   contentType: string;
   audio: Uint8Array;
+  ttsWarning?: string | undefined;
 }
 
 /** 推送用例所需的最小读取/合成能力（Gateway 实现，见薄组合层）。 */
@@ -118,7 +124,7 @@ export interface AnkiPushPorts {
     phonetic: string | null;
     sourceEntryId: string | null;
   }): Promise<{ source: CardSourceEntry; sourceLabel?: string | undefined }>;
-  /** TTS 合成（失败由用例降级为跳过音频，不阻断推送）。 */
+  /** TTS 合成；显式请求后失败必须向用户报错。 */
   synthesizeTts(input: AnkiPushTtsRequest): Promise<Result<AnkiPushAudio, BusinessError>>;
 }
 
@@ -194,12 +200,15 @@ export async function pushCardToAnki(
     // 音频：有凭证才合成 → 存媒体 → [sound:]；否则留空（{{#Audio}} 自动隐藏）。
     let audioStored = false;
     let audioSkippedReason: string | undefined = '未提供 TTS 凭证，音频字段留空（模板条件块自动隐藏）';
+    let ttsWarning: string | undefined;
     if (request.tts) {
       const synth = await ports.synthesizeTts({
         provider: request.tts.provider,
         text: source.reading ?? source.headword,
         trackLanguage: card.language ?? 'ja',
         ...(request.tts.baseUrl ? { baseUrl: request.tts.baseUrl } : {}),
+        ...(request.tts.localBaseUrl ? { localBaseUrl: request.tts.localBaseUrl } : {}),
+        ...(request.tts.localApiKey ? { localApiKey: request.tts.localApiKey } : {}),
         ...(request.tts.region ? { region: request.tts.region } : {}),
         ...(request.tts.apiKey ? { apiKey: request.tts.apiKey } : {}),
         ...(request.tts.voice ? { voice: request.tts.voice } : {}),
@@ -207,9 +216,9 @@ export async function pushCardToAnki(
         ...(request.tts.rate !== undefined ? { rate: request.tts.rate } : {}),
         ...(request.tts.gender ? { gender: request.tts.gender } : {}),
       });
-      if (!isOk(synth)) {
-        audioSkippedReason = `TTS 合成失败（${synth.error.userMessage}），已跳过音频推送`;
-      } else if (synth.value.bytes > MAX_AUDIO_BYTES) {
+      if (!isOk(synth)) return synth;
+      ttsWarning = synth.value.ttsWarning;
+      if (synth.value.bytes > MAX_AUDIO_BYTES) {
         audioSkippedReason = '合成音频过大（>8MB），已跳过音频推送';
       } else {
         const ext = audioExtension(synth.value.contentType);
@@ -236,6 +245,7 @@ export async function pushCardToAnki(
       formatId: format.id,
       audioStored,
       ...(audioSkippedReason ? { audioSkippedReason } : {}),
+      ...(ttsWarning ? { ttsWarning } : {}),
     };
     return ok(result);
   } catch (e) {
