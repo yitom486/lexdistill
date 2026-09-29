@@ -546,11 +546,6 @@ export function initSchema(sqlite: Database): void {
     'ALTER TABLE dictionary_sources ADD COLUMN priority INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE dictionary_term_meta ADD COLUMN freq_json TEXT',
     'ALTER TABLE dictionary_term_meta ADD COLUMN freq_value INTEGER',
-    // v31：教材目录槽位与精读课文支持
-    'ALTER TABLE textbook_lessons ADD COLUMN start_page INTEGER',
-    'ALTER TABLE textbook_lessons ADD COLUMN end_page INTEGER',
-    "ALTER TABLE textbook_lessons ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'",
-    'ALTER TABLE textbook_lessons ADD COLUMN passage_md TEXT',
   ];
   for (const sql of alterStatements) {
     try {
@@ -667,6 +662,43 @@ export function runMigrations(sqlite: Database): { applied: number[] } {
         sqlite.run('ROLLBACK');
       } catch {
         /* ignore */
+      }
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('duplicate column name') || msg.includes('already exists')) {
+        sqlite.run('BEGIN');
+        try {
+          const stmts = m.sql
+            .split(';')
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+          for (const stmt of stmts) {
+            try {
+              sqlite.run(stmt);
+            } catch (stmtErr) {
+              const stmtMsg = stmtErr instanceof Error ? stmtErr.message : String(stmtErr);
+              if (
+                stmtMsg.includes('duplicate column name') ||
+                stmtMsg.includes('already exists')
+              ) {
+                continue;
+              }
+              throw stmtErr;
+            }
+          }
+          sqlite
+            .query('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
+            .run(m.version, m.name, new Date().toISOString());
+          sqlite.run('COMMIT');
+          done.push(m.version);
+          continue;
+        } catch (innerErr) {
+          try {
+            sqlite.run('ROLLBACK');
+          } catch {
+            /* ignore */
+          }
+          throw innerErr;
+        }
       }
       throw e;
     }

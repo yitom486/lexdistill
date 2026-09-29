@@ -27,17 +27,15 @@ import {
 import type { ToolExecutionContext } from '@study-studio/tool-core';
 
 async function rmRetry(dir: string): Promise<void> {
-  let last: unknown = null;
   for (let i = 0; i < 30; i++) {
     try {
+      if (!existsSync(dir)) return;
       await rm(dir, { recursive: true, force: true });
       return;
-    } catch (e) {
-      last = e;
+    } catch {
       await new Promise((r) => setTimeout(r, 100));
     }
   }
-  throw last;
 }
 
 function freshTestEnvironment() {
