@@ -158,10 +158,14 @@ export function parseLessonExtractionJson(text: string): Result<ExtractedLessonD
   try {
     rawJson = JSON.parse(cleaned);
   } catch (cause) {
+    logger.warn('[LessonBatchExtractor] 大模型返回文本 JSON 解析失败', {
+      error: String(cause),
+      snippet: cleaned.slice(0, 150),
+    });
     return err(
       new BusinessError(
         'E_LLM_JSON_PARSE_FAILED',
-        `大模型返回的内容无法解析为 JSON: ${String(cause)}`,
+        '大模型返回的内容无法解析为 JSON，建议重试本课',
         'VALIDATION',
         true
       )
@@ -170,10 +174,13 @@ export function parseLessonExtractionJson(text: string): Result<ExtractedLessonD
 
   const parsed = ExtractedLessonSchema.safeParse(rawJson);
   if (!parsed.success) {
+    logger.warn('[LessonBatchExtractor] 大模型返回 JSON Schema 校验失败', {
+      issues: parsed.error.issues,
+    });
     return err(
       new BusinessError(
         'E_LLM_SCHEMA_INVALID',
-        `大模型提炼的结构不符合规范: ${parsed.error.message}`,
+        '大模型提炼的结构不符合规范，建议重试本课',
         'VALIDATION',
         true
       )
@@ -260,19 +267,26 @@ export class LessonBatchExtractor {
     );
 
     if (toolCall) {
+      logger.info(`[LessonBatchExtractor] 课次 "${job.lessonId}" 命中原生工具调用回填 (${toolCall.name})`);
       const parsedToolInput = ExtractedLessonSchema.safeParse(toolCall.input);
       if (!parsedToolInput.success) {
+        logger.warn('[LessonBatchExtractor] 工具调用参数 Schema 校验失败', {
+          lessonId: job.lessonId,
+          issues: parsedToolInput.error.issues,
+        });
         return err(
           new BusinessError(
             'E_LLM_SCHEMA_INVALID',
-            `工具调用参数不合法: ${parsedToolInput.error.message}`,
-            'VALIDATION'
+            '大模型提炼的结构不符合规范（工具调用参数非法），建议重试本课',
+            'VALIDATION',
+            true
           )
         );
       }
       extracted = parsedToolInput.data;
     } else {
       // 2. 文本解析兜底：处理标准或代码块包裹的 JSON 字符串
+      logger.info(`[LessonBatchExtractor] 课次 "${job.lessonId}" 未检测到工具调用，采用文本 JSON 解析兜底`);
       const parsedResult = parseLessonExtractionJson(responseText);
       if (!parsedResult.ok) {
         return parsedResult;
@@ -366,6 +380,13 @@ export class LessonBatchExtractor {
       }
     }
 
+    logger.info('[LessonBatchExtractor] 开始执行章节批处理提取', {
+      documentId,
+      totalJobs: jobs.length,
+      pendingJobs: pendingJobs.length,
+      skippedReady: readyLessonIds.size,
+    });
+
     if (pendingJobs.length === 0) {
       return {
         documentId,
@@ -395,6 +416,11 @@ export class LessonBatchExtractor {
           if (result.ok) {
             successfulJobs += 1;
             finalAllLessonsReady = result.value.allLessonsReady;
+            logger.info(`[LessonBatchExtractor] 课次 "${job.lessonId}" 提炼并原子落库成功`, {
+              documentId: job.documentId,
+              allLessonsReady: result.value.allLessonsReady,
+              stats: result.value.stats,
+            });
             options.onProgress?.({
               documentId: job.documentId,
               lessonId: job.lessonId,
@@ -409,7 +435,9 @@ export class LessonBatchExtractor {
               lessonId: job.lessonId,
               error: result.error.userMessage,
             });
-            logger.warn(`[LessonBatchExtractor] 课次 "${job.lessonId}" 提炼失败:`, {
+            logger.warn(`[LessonBatchExtractor] 课次 "${job.lessonId}" 提炼失败`, {
+              documentId: job.documentId,
+              code: result.error.code,
               error: result.error.userMessage,
             });
           }
@@ -424,6 +452,14 @@ export class LessonBatchExtractor {
         }
       }
     }
+
+    logger.info('[LessonBatchExtractor] 批处理提炼结束', {
+      documentId,
+      totalJobs: jobs.length,
+      successfulJobs,
+      failedJobs,
+      allLessonsReady: finalAllLessonsReady,
+    });
 
     return {
       documentId,

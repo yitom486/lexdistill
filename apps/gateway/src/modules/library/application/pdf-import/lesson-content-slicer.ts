@@ -5,6 +5,7 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
+  logger,
 } from '@study-studio/shared';
 import {
   canonicalizeTocEntries,
@@ -66,6 +67,12 @@ export async function slicePdfLessonsWithOcr(
   const queue = lessons.map((lesson, index) => ({ lesson, index }));
   const workerCount = Math.max(1, Math.min(concurrency, queue.length));
 
+  logger.info('[slicePdfLessonsWithOcr] 开始教材切片', {
+    lessonCount: lessons.length,
+    workerCount,
+    totalPdfPages,
+  });
+
   async function runWorker(): Promise<void> {
     while (queue.length > 0) {
       const item = queue.shift();
@@ -103,6 +110,16 @@ export async function slicePdfLessonsWithOcr(
         });
       }
 
+      const trimmedText = extractedText.trim();
+      if (!trimmedText) {
+        logger.warn('[slicePdfLessonsWithOcr] 提取到的课文切片内容为空', {
+          lessonId: lesson.id,
+          title: lesson.title,
+          startPage: start,
+          endPage: end,
+        });
+      }
+
       // 提取本课辖下的子条目（微观目录白名单，如文型 1~4、会话标题）
       const subSections = canonical
         .filter(
@@ -118,7 +135,7 @@ export async function slicePdfLessonsWithOcr(
         startPage: start,
         endPage: end,
         subSections,
-        ocrText: extractedText.trim(),
+        ocrText: trimmedText,
       };
     }
   }
@@ -126,6 +143,10 @@ export async function slicePdfLessonsWithOcr(
   try {
     const workers = Array.from({ length: workerCount }, () => runWorker());
     await Promise.all(workers);
+    logger.info('[slicePdfLessonsWithOcr] 教材切片完成', {
+      totalLessons: lessons.length,
+      extractedCount: results.length,
+    });
     return ok(results);
   } catch (e) {
     if (e instanceof BusinessError) return err(e);

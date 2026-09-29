@@ -213,6 +213,7 @@ export function createPdfImportRoutes(
           language?: string;
           filename?: string;
           filePath?: string;
+          pdfBase64?: string;
           model?: string;
           poolSize?: number;
           forceOverwrite?: boolean;
@@ -235,17 +236,33 @@ export function createPdfImportRoutes(
         let inspector: PdfInspectorLike | undefined = undefined;
         if (body.filePath) {
           const fileRes = await readLocalPdfFile(body.filePath);
-          if (fileRes.ok) {
-            pdfBytes = fileRes.value.bytes;
+          if (!fileRes.ok) {
+            return formatBusinessErrorResponse(c, fileRes.error, 'readLocalPdfFile');
+          }
+          pdfBytes = fileRes.value.bytes;
+          const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
+          inspector = runtime.inspector;
+        } else if (body.pdfBase64) {
+          try {
+            pdfBytes = new Uint8Array(Buffer.from(body.pdfBase64, 'base64'));
             const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
             inspector = runtime.inspector;
+          } catch (e) {
+            return formatBusinessErrorResponse(
+              c,
+              new BusinessError('E_INVALID_INPUT', '提供的 pdfBase64 无法正常解码为二进制数据', 'VALIDATION')
+            );
           }
         }
 
         if ((!Array.isArray(body.lessonJobs) || body.lessonJobs.length === 0) && !pdfBytes) {
           return formatBusinessErrorResponse(
             c,
-            new BusinessError('E_INVALID_INPUT', '请提供章节文本切片 (lessonJobs) 或有效的教材本地路径 (filePath)', 'VALIDATION')
+            new BusinessError(
+              'E_INVALID_INPUT',
+              '请提供章节文本切片 (lessonJobs) 或教材文件 (filePath / pdfBase64)',
+              'VALIDATION'
+            )
           );
         }
 

@@ -759,5 +759,100 @@ describe('教材导入 AI-Native 管道端到端集成测试 (E2E Pipeline)', ()
       await rmRetry(tempDir);
     }
   });
+
+  it('【流水线任务台账异常翻转】Phase 0 目录校验失败时，导入任务自动翻转为 failed 并记录友好错误信息', async () => {
+    const { db, repo } = freshTestEnvironment();
+
+    const result = await repo.executeTextbookPipeline({
+      userId: 'user_err_01',
+      title: '页码倒退教材',
+      tocEntries: [
+        { id: 'l1', level: 'lesson', title: '第1课', startPage: 20 },
+        { id: 'l2', level: 'lesson', title: '第2课', startPage: 10 },
+      ],
+      lessonJobs: [{ lessonId: 'l1', ocrText: '文本' }],
+    });
+
+    expect(isOk(result)).toBe(false);
+    if (!isOk(result)) {
+      expect(result.error.code).toBe('E_TOC_PAGE_ORDER_INVALID');
+    }
+
+    const tasks = db.select().from(schema.documentImports).where(eq(schema.documentImports.userId, 'user_err_01')).all();
+    expect(tasks.length).toBe(1);
+    expect(tasks[0]?.status).toBe('failed');
+    expect(tasks[0]?.error).toContain('单调递增');
+  });
+
+  it('【流水线任务台账异常翻转】缺少正文切片与 PDF 运行时时，导入任务翻转为 failed 并返回 E_INVALID_INPUT', async () => {
+    const { db, repo } = freshTestEnvironment();
+
+    const result = await repo.executeTextbookPipeline({
+      userId: 'user_err_02',
+      title: '无切片教材',
+      tocEntries: [{ id: 'l1', level: 'lesson', title: '第1课', startPage: 1 }],
+      lessonJobs: [], // 空切片且无 pdf / inspector
+    });
+
+    expect(isOk(result)).toBe(false);
+    if (!isOk(result)) {
+      expect(result.error.code).toBe('E_INVALID_INPUT');
+      expect(result.error.userMessage).toContain('未提供章节文本切片');
+    }
+
+    const tasks = db.select().from(schema.documentImports).where(eq(schema.documentImports.userId, 'user_err_02')).all();
+    expect(tasks.length).toBe(1);
+    expect(tasks[0]?.status).toBe('failed');
+    expect(tasks[0]?.error).toContain('未提供章节文本切片');
+  });
+
+  it('【流水线部分失败容错】部分课次大模型失败时，流水线输出 failedLessons 并将任务标记为 failed 附带重试建议', async () => {
+    const { db, repo } = freshTestEnvironment();
+
+    const mockPool: AgentPoolLike = {
+      acquire: async () => ({
+        ask: async (prompt) => {
+          const str = typeof prompt === 'string' ? prompt : JSON.stringify(prompt);
+          if (str.includes('课次: l1')) {
+            return { text: JSON.stringify({ passageMd: '第一课正文' }) };
+          }
+          return { text: 'invalid json for l2' };
+        },
+        finish: async () => {},
+      }),
+      close: async () => {},
+    };
+
+    const result = await repo.executeTextbookPipeline({
+      userId: 'user_err_03',
+      title: '部分失败流水线教材',
+      tocEntries: [
+        { id: 'l1', level: 'lesson', title: '第1课', startPage: 1 },
+        { id: 'l2', level: 'lesson', title: '第2课', startPage: 10 },
+      ],
+      lessonJobs: [
+        { lessonId: 'l1', ocrText: '课文1' },
+        { lessonId: 'l2', ocrText: '课文2' },
+      ],
+      pool: mockPool,
+    });
+
+    expect(isOk(result)).toBe(true);
+    if (!isOk(result)) return;
+
+    const output = result.value;
+    expect(output.allLessonsReady).toBe(false);
+    expect(output.successfulLessons).toBe(1);
+    expect(output.failedLessons).toBe(1);
+    expect(output.errors.length).toBe(1);
+    expect(output.errors[0]?.lessonId).toBe('l2');
+    expect(output.task.status).toBe('failed');
+    expect(output.task.error).toContain('建议重试失败课次: l2');
+
+    // 数据库中 l1 仍正常落库为 ready
+    const lessons = db.select().from(schema.textbookLessons).where(eq(schema.textbookLessons.documentId, output.documentId)).all();
+    expect(lessons.find((l) => l.lessonId === 'l1')?.status).toBe('ready');
+    expect(lessons.find((l) => l.lessonId === 'l2')?.status).toBe('pending');
+  });
 });
 
