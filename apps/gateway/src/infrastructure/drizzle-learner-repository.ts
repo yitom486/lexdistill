@@ -266,12 +266,18 @@ import {
   commitTocFirstChunk as commitTocFirstChunkDomain,
   commitTocAppendChunk as commitTocAppendChunkDomain,
   recordTocChunkFailure as recordTocChunkFailureDomain,
+  seedTextbookTocSkeleton as seedTextbookTocSkeletonDomain,
+  commitLessonKnowledge as commitLessonKnowledgeDomain,
   type PrepareTocImportSessionInput,
   type PreparedTocImportSession,
   type TocAppendChunkResult,
   type TocFirstChunkResult,
   type TocImportSession,
   type TocImportChunk,
+  type SeedTocSkeletonInput,
+  type SavedTocSkeleton,
+  type CommitLessonKnowledgeInput,
+  type CommitLessonKnowledgeOutput,
 } from '@study-studio/storage-sqlite';
 import {
   importDocument as importDocumentDomain,
@@ -606,6 +612,24 @@ export class DrizzleLearnerRepository
     documentId: string
   ): Promise<Result<SavedDocumentStructure | null, BusinessError>> {
     return getDocumentStructureDomain(this.deps, userId, documentId);
+  }
+
+  /**
+   * 目录优先骨架落库（单调递增强校验 + 槽位批量初始化）。
+   */
+  public async seedTextbookTocSkeleton(
+    input: SeedTocSkeletonInput
+  ): Promise<Result<SavedTocSkeleton, BusinessError>> {
+    return seedTextbookTocSkeletonDomain(this.deps, input);
+  }
+
+  /**
+   * 章节内容提炼原子回填（TOC 白名单对齐核验 + 槽位状态翻转为 ready）。
+   */
+  public async commitLessonKnowledge(
+    input: CommitLessonKnowledgeInput
+  ): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
+    return commitLessonKnowledgeDomain(this.deps, input);
   }
 
   /**

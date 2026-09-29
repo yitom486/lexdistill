@@ -32,6 +32,10 @@ import type { ReadingPosition } from '@study-studio/storage-sqlite';
 import type {
   SaveKnowledgePointInput,
   KnowledgePoint,
+  SeedTocSkeletonInput,
+  SavedTocSkeleton,
+  CommitLessonKnowledgeInput,
+  CommitLessonKnowledgeOutput,
 } from '@study-studio/storage-sqlite';
 
 /**
@@ -43,6 +47,12 @@ import type {
  *   所有权归属 M5 再定，本契约暂不收录。
  */
 export interface ContentRepository {
+  seedTextbookTocSkeleton(
+    input: SeedTocSkeletonInput
+  ): Promise<Result<SavedTocSkeleton, BusinessError>>;
+  commitLessonKnowledge(
+    input: CommitLessonKnowledgeInput
+  ): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>>;
   getDocumentById(id: string): Promise<Result<DocumentItem | null, BusinessError>>;
   saveDocument(doc: DocumentItem): Promise<Result<DocumentItem, BusinessError>>;
   listDocuments(
@@ -205,3 +215,11 @@ export interface ContentRepository {
     input: SubmitReadingPractice
   ): Promise<Result<{ proficiency: number }, BusinessError>>;
 }
+
+export type {
+  SeedTocSkeletonInput,
+  SavedTocSkeleton,
+  CommitLessonKnowledgeInput,
+  CommitLessonKnowledgeOutput,
+};
+

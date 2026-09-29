@@ -3,6 +3,8 @@ import type { ContentRepository } from '../ports.js';
 import { LearningLibraryTool } from './learning-library-tool.js';
 import { LibraryImportTool } from './library-import-tool.js';
 import { LibraryKnowledgeSaveTool } from './library-knowledge-tool.js';
+import { LibrarySubmitTocTool } from './library-toc-tool.js';
+import { LibraryLessonCommitTool } from './library-lesson-commit-tool.js';
 
 /**
  * E4b 文库域工具注册（纯组装）。
@@ -16,4 +18,6 @@ export function registerLibraryTools(
   registry.register(new LearningLibraryTool(drizzle));
   registry.register(new LibraryImportTool(drizzle));
   registry.register(new LibraryKnowledgeSaveTool(drizzle));
+  registry.register(new LibrarySubmitTocTool(drizzle));
+  registry.register(new LibraryLessonCommitTool(drizzle));
 }
