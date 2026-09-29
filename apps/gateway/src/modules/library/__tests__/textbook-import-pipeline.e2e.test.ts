@@ -2,6 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { eq } from 'drizzle-orm';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { existsSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { isOk } from '@study-studio/shared';
 import {
   initSchema,
@@ -21,6 +25,20 @@ import {
   type AgentPoolLease,
 } from '../application/lesson-batch-extractor.js';
 import type { ToolExecutionContext } from '@study-studio/tool-core';
+
+async function rmRetry(dir: string): Promise<void> {
+  let last: unknown = null;
+  for (let i = 0; i < 10; i++) {
+    try {
+      await rm(dir, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      last = e;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+  throw last;
+}
 
 function freshTestEnvironment() {
   const repo = new DrizzleLearnerRepository(':memory:');
@@ -433,4 +451,147 @@ describe('教材导入 AI-Native 管道端到端集成测试 (E2E Pipeline)', ()
     const lessonsFinal = db.select().from(textbookLessons).where(eq(textbookLessons.documentId, 'doc_partial_retry')).all();
     expect(lessonsFinal.every((l) => l.status === 'ready')).toBe(true);
   });
+
+  it('【真实物理磁盘数据库持久化与冷启动复验】实际落入真实 SQLite 磁盘文件，冷启动重新连接读取验证持久化完整性', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'ss-realdb-e2e-'));
+    const realDbPath = join(tempDir, 'actual-textbook-test.db');
+
+    try {
+      // 1. 使用真实磁盘文件路径创建仓储与底层 SQLite 实例（非内存库，走真实文件 I/O 与 WAL 日志）
+      const repo = new DrizzleLearnerRepository(realDbPath);
+      const tocTool = new LibrarySubmitTocTool(repo);
+
+      // Phase 0: 目录识别并优先落盘建立骨架
+      const tocResult = await tocTool.execute(
+        {
+          documentId: 'doc_tb_real_disk_01',
+          userId: 'user_real_disk',
+          title: '真实落盘教材',
+          language: 'ja',
+          entries: [
+            { id: 'u1', level: 'unit', title: '第1单元', startPage: 1 },
+            { id: 'l1', level: 'lesson', title: '第1课 真实持久化', startPage: 5, endPage: 12, parentId: 'u1' },
+            { id: 'l2', level: 'lesson', title: '第2课 真实事务回填', startPage: 13, endPage: 20, parentId: 'u1' },
+          ],
+        },
+        dummyContext
+      );
+      expect(isOk(tocResult)).toBe(true);
+
+      // Phase 1&2: 模拟 AgentPool 并发提炼并原子写入物理磁盘
+      const mockPool: AgentPoolLike = {
+        acquire: async () => ({
+          ask: async (prompt) => {
+            const promptStr = typeof prompt === 'string' ? prompt : JSON.stringify(prompt);
+            const isLesson1 = promptStr.includes('课次: l1');
+            return {
+              text: JSON.stringify({
+                title: isLesson1 ? '第1课 真实持久化' : '第2课 真实事务回填',
+                passageMd: isLesson1
+                  ? '# 第1课 真实持久化\n\n数据已成功写入物理磁盘文件。'
+                  : '# 第2课 真实事务回填\n\n事务落盘测试完成。',
+                vocabularies: [
+                  {
+                    surface: isLesson1 ? '永続化' : '排他制御',
+                    reading: isLesson1 ? 'えいぞくか' : 'はいたいせいぎょ',
+                    glossZh: isLesson1 ? '持久化' : '互斥控制',
+                  },
+                ],
+                knowledgePoints: [
+                  {
+                    title: isLesson1 ? '～てある（存续态）' : '～ておく（预先准备）',
+                    explanation: '知识点说明',
+                    examples: [{ japanese: '本が置いてあります。', chinese: '放着书。' }],
+                  },
+                ],
+                exercises: [
+                  {
+                    type: 'CHOICE',
+                    prompt: '数据写入了哪里？',
+                    options: ['内存', '真实磁盘数据库', '云端'],
+                    answer: '真实磁盘数据库',
+                    explanation: '本测试针对真实磁盘 SQLite 库',
+                  },
+                ],
+              }),
+            };
+          },
+          finish: async () => {},
+        }),
+        close: async () => {},
+      };
+
+      const extractor = new LessonBatchExtractor(repo);
+      const batchResult = await extractor.extractBatch(
+        [
+          { documentId: 'doc_tb_real_disk_01', lessonId: 'l1', ocrText: '文本1' },
+          { documentId: 'doc_tb_real_disk_01', lessonId: 'l2', ocrText: '文本2' },
+        ],
+        { pool: mockPool }
+      );
+
+      expect(batchResult.successfulJobs).toBe(2);
+      expect(batchResult.allLessonsReady).toBe(true);
+
+      // 验证物理磁盘文件确实在文件系统上存在且具有非零体积
+      expect(existsSync(realDbPath)).toBe(true);
+      const stat = statSync(realDbPath);
+      expect(stat.size).toBeGreaterThan(0);
+
+      // 2. 模拟应用完全退出：彻底关闭现有仓储连接句柄
+      repo.getRawDb().close();
+
+      // 3. 模拟冷启动：完全新建一个独立的只读 SQLite 连接从磁盘重新读取（脱离原连接上下文）
+      const coldSqlite = new Database(realDbPath, { readonly: true });
+      try {
+        // 验证数据库物理完整性（无损坏、无裂缝）
+        const integrity = coldSqlite.query('PRAGMA integrity_check;').all() as Array<{ integrity_check: string }>;
+        expect(integrity[0]?.integrity_check).toBe('ok');
+
+        // 验证冷启动读取教材元数据
+        const coldDoc = coldSqlite
+          .query('SELECT id, title, source_kind FROM documents WHERE id = ?')
+          .get('doc_tb_real_disk_01') as { id: string; title: string; source_kind: string } | null;
+        expect(coldDoc).not.toBeNull();
+        expect(coldDoc?.title).toBe('真实落盘教材');
+
+        // 验证冷启动读取课文槽位与 Markdown
+        const coldLessons = coldSqlite
+          .query('SELECT lesson_id, kind, status, passage_md FROM textbook_lessons WHERE document_id = ? ORDER BY sort_order ASC')
+          .all('doc_tb_real_disk_01') as Array<{ lesson_id: string; kind: string; status: string; passage_md: string | null }>;
+        expect(coldLessons.length).toBe(3);
+        const actualLessons = coldLessons.filter((l) => l.kind === 'lesson');
+        expect(actualLessons.length).toBe(2);
+        expect(actualLessons.every((l) => l.status === 'ready')).toBe(true);
+        expect(actualLessons.find((l) => l.lesson_id === 'l1')?.passage_md).toContain('数据已成功写入物理磁盘文件');
+        expect(actualLessons.find((l) => l.lesson_id === 'l2')?.passage_md).toContain('事务落盘测试完成');
+
+        // 验证冷启动读取生词表
+        const coldVocab = coldSqlite
+          .query('SELECT surface, reading, gloss_zh FROM textbook_vocab WHERE document_id = ?')
+          .all('doc_tb_real_disk_01') as Array<{ surface: string; reading: string; gloss_zh: string }>;
+        expect(coldVocab.length).toBe(2);
+        expect(coldVocab.map((v) => v.surface)).toContain('永続化');
+        expect(coldVocab.map((v) => v.surface)).toContain('排他制御');
+
+        // 验证冷启动读取语法与习题
+        const coldGrammar = coldSqlite
+          .query('SELECT title, examples_json FROM textbook_grammar WHERE document_id = ?')
+          .all('doc_tb_real_disk_01') as Array<{ title: string; examples_json: string }>;
+        expect(coldGrammar.length).toBe(2);
+        expect(coldGrammar.map((g) => g.title)).toContain('～てある（存续态）');
+
+        const coldExercises = coldSqlite
+          .query('SELECT prompt, answer FROM textbook_exercises WHERE document_id = ?')
+          .all('doc_tb_real_disk_01') as Array<{ prompt: string; answer: string }>;
+        expect(coldExercises.length).toBe(2);
+        expect(coldExercises.every((e) => e.answer === '真实磁盘数据库')).toBe(true);
+      } finally {
+        coldSqlite.close();
+      }
+    } finally {
+      await rmRetry(tempDir);
+    }
+  });
 });
+
