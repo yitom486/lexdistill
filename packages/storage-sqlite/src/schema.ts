@@ -686,6 +686,12 @@ export const textbookLessons = sqliteTable(
     /** v30 章层级：'lesson' | 'chapter'；章经 parent_id 挂课（可空即顶层）。 */
     kind: text('kind').notNull().default('lesson'),
     parentId: text('parent_id'),
+    /** v31 目录识别页码与槽位生命周期支持 */
+    startPage: integer('start_page'),
+    endPage: integer('end_page'),
+    status: text('status').notNull().default('pending'),
+    /** v31 整篇精读课文/对话 Markdown（取代旧行级碎片表 textbook_lines） */
+    passageMd: text('passage_md'),
   },
   (table) => [primaryKey({ columns: [table.documentId, table.lessonId] })]
 );

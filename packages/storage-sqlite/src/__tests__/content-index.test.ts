@@ -260,6 +260,10 @@ describe('P1-3 v22 旧库升级 v23–v30', () => {
     db.run('DROP TABLE knowledge_points');
     db.run('ALTER TABLE textbook_lessons DROP COLUMN kind');
     db.run('ALTER TABLE textbook_lessons DROP COLUMN parent_id');
+    db.run('ALTER TABLE textbook_lessons DROP COLUMN start_page');
+    db.run('ALTER TABLE textbook_lessons DROP COLUMN end_page');
+    db.run('ALTER TABLE textbook_lessons DROP COLUMN status');
+    db.run('ALTER TABLE textbook_lessons DROP COLUMN passage_md');
     db.run('ALTER TABLE card_drafts DROP COLUMN selection_context_id');
     db.run('ALTER TABLE term_occurrences DROP COLUMN segment_id');
     db.run('ALTER TABLE term_occurrences DROP COLUMN lesson_id');
@@ -280,7 +284,7 @@ describe('P1-3 v22 旧库升级 v23–v30', () => {
               ('o2', 'u9', 'ja', 'k', 'reading', 'd1', NULL, 't2')`
     );
     const res = runMigrations(db);
-    expect(res.applied).toEqual([23, 24, 25, 26, 27, 28, 29, 30]);
+    expect(res.applied).toEqual([23, 24, 25, 26, 27, 28, 29, 30, 31]);
     const tables = db
       .query(`SELECT name AS n FROM sqlite_master WHERE type = 'table' AND name IN ('textbook_term_map', 'knowledge_points')`)
       .all() as Array<{ n: string }>;

@@ -578,6 +578,11 @@ export function initSchema(sqlite: Database): void {
     'ALTER TABLE dictionary_sources ADD COLUMN priority INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE dictionary_term_meta ADD COLUMN freq_json TEXT',
     'ALTER TABLE dictionary_term_meta ADD COLUMN freq_value INTEGER',
+    // v31：教材目录槽位与精读课文支持
+    'ALTER TABLE textbook_lessons ADD COLUMN start_page INTEGER',
+    'ALTER TABLE textbook_lessons ADD COLUMN end_page INTEGER',
+    "ALTER TABLE textbook_lessons ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'",
+    'ALTER TABLE textbook_lessons ADD COLUMN passage_md TEXT',
   ];
   for (const sql of alterStatements) {
     try {

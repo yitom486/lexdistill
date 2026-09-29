@@ -4,6 +4,7 @@
 > `packages/storage-sqlite/src/schema.ts`（drizzle 类型）、`modules/*/persistence/*.ts`（writer/reader），
 > 行数为例行线上库（`study-studio.db`）快照。
 > 原则：**无 FOREIGN KEY**（全库 0 条约束），关系靠列名约定 + 应用层保证。
+> 详见专题规范：[教材导入架构与数据表设计说明](./textbook-import-architecture.md)。
 > 本轮 P0 只记录事实，不做 schema 重构。
 
 ## 0. 分类定义
