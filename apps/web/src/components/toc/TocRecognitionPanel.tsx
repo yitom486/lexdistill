@@ -50,6 +50,17 @@ export function TocRecognitionPanel({
   const tocReviewModel = usePreferencesStore((s) => s.tocReviewModel);
   const setTocReviewModel = usePreferencesStore((s) => s.setTocReviewModel);
 
+  const isKnownModel = models.some(
+    (m) => (m.id && m.id === tocReviewModel) || (m.model && m.model === tocReviewModel)
+  );
+  const effectiveTocReviewModel = isKnownModel ? tocReviewModel : '__default__';
+
+  useEffect(() => {
+    if (tocReviewModel && models.length > 0 && !isKnownModel) {
+      setTocReviewModel('');
+    }
+  }, [tocReviewModel, models.length, isKnownModel, setTocReviewModel]);
+
   const hasInitial = Boolean(initialEntries && initialEntries.length > 0);
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -184,7 +195,7 @@ export function TocRecognitionPanel({
       ...(file ? { file } : { filePath: filePath.trim() }),
       startPage,
       endPage,
-      ...(tocReviewModel ? { model: tocReviewModel } : {}),
+      ...(effectiveTocReviewModel !== '__default__' ? { model: effectiveTocReviewModel } : {}),
     };
 
     extractLlm.mutate(vars, {
@@ -306,7 +317,7 @@ export function TocRecognitionPanel({
               <Zap className="w-3.5 h-3.5 text-ink-amber-500" />
               <span className="text-[11px] text-ink-ghost">提炼模型:</span>
               <Select
-                value={tocReviewModel || '__default__'}
+                value={effectiveTocReviewModel}
                 onValueChange={(val: string | null) => setTocReviewModel(!val || val === '__default__' ? '' : val)}
               >
                 <SelectTrigger className="h-7 w-44 border-0 bg-transparent px-1 text-xs focus:ring-0">

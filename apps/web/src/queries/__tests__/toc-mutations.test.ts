@@ -209,7 +209,16 @@ describe('教材匹配与槽位复用纯函数测试', () => {
     const match3 = findMatchingDocument('大家的日语', docs);
     expect(match3?.id).toBe('minna-nihongo-1');
 
-    // 4. 无匹配
+    // 4. 常见教材多语言别名与分册匹配（长文件名 大家的日语（初级 1）系列 成功匹配 minna1）
+    const matchAlias = findMatchingDocument(
+      '大家的日语（初级 1）大家的日语系列 第二版（日本 3A 出版社）(z-library)',
+      docs
+    );
+    expect(matchAlias).not.toBeNull();
+    // 优先匹配用户的 user_import 本地骨架
+    expect(matchAlias?.id).toBe('doc_mtt3n2rp0v4d5u');
+
+    // 5. 无匹配
     const matchNone = findMatchingDocument('完全不相干的英语教材', docs);
     expect(matchNone).toBeNull();
   });

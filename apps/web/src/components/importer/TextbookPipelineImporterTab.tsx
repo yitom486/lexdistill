@@ -27,6 +27,7 @@ import {
   useTextbookLessonSlotsQuery,
   lessonSlotsToTocCandidates,
   findMatchingDocument,
+  findMatchingDocuments,
   type ExecuteTextbookPipelineResult,
 } from '../../queries/useLearnerQueries.js';
 import { QUERY_KEYS } from '../../queries/query-keys.js';
@@ -311,11 +312,15 @@ export function TextbookPipelineImporterTab({
   const [matchedDocIdOverride, setMatchedDocIdOverride] = useState<string | null>(null);
   const [ignoreExistingDoc, setIgnoreExistingDoc] = useState<boolean>(false);
 
+  const candidateDocs = React.useMemo(() => {
+    return findMatchingDocuments(docTitle, allDocuments);
+  }, [docTitle, allDocuments]);
+
   const matchedDoc = ignoreExistingDoc
     ? null
     : matchedDocIdOverride
       ? allDocuments.find((d) => d.id === matchedDocIdOverride) ?? null
-      : findMatchingDocument(docTitle, allDocuments);
+      : candidateDocs[0] ?? null;
 
   const lessonSlotsQuery = useTextbookLessonSlotsQuery(matchedDoc?.id);
   const existingSlots = lessonSlotsQuery.data ?? [];
@@ -824,6 +829,52 @@ export function TextbookPipelineImporterTab({
             </div>
           )}
 
+          {/* 手动关联本地已有教材大纲选择器 */}
+          {selectedFileName && allDocuments.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-surface border border-line flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <ListTree className="w-4 h-4 text-accent-ink shrink-0" />
+                <div>
+                  <span className="font-semibold text-ink">关联本地已有教材大纲：</span>
+                  <span className="text-[11px] text-ink-ghost ml-1">
+                    {matchedDoc ? `当前关联《${matchedDoc.title}》` : '未关联（按全新独立教材识别）'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={matchedDoc?.id || '__none__'}
+                  onValueChange={(val: string | null) => {
+                    if (!val || val === '__none__') {
+                      setIgnoreExistingDoc(true);
+                      setMatchedDocIdOverride(null);
+                      setConfirmedToc(null);
+                      toast.info('已取消关联已有教材，将作为全新独立教材识别');
+                    } else {
+                      setIgnoreExistingDoc(false);
+                      setMatchedDocIdOverride(val);
+                      setConfirmedToc(null);
+                      const targetDoc = allDocuments.find((d) => d.id === val);
+                      toast.success(`已切换关联本地教材：《${targetDoc?.title}》`);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-8 min-w-56 text-xs bg-surface border-line">
+                    <SelectValue placeholder="手动选择本地已有教材..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">不关联已有教材（新建全新教材）</SelectItem>
+                    {allDocuments.map((doc) => (
+                      <SelectItem key={doc.id} value={doc.id}>
+                        《{doc.title}》（{doc.sourceKind === 'curriculum_textbook' ? '官方课程' : '本地导入'} · {doc.id}）
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
           {pdfFileError && (
             <p role="alert" className="text-xs font-semibold text-ink-red-600-red-400">
               {pdfFileError}
@@ -955,6 +1006,60 @@ export function TextbookPipelineImporterTab({
             </Button>
           </div>
 
+          {/* 若在 Step 2 发现本地有大纲槽位且尚未确认，提供一键载入快捷横幅 */}
+          {hasExistingOutline && matchedDoc && (!confirmedToc || confirmedToc.length === 0) && (
+            <div className="p-3.5 rounded-2xl bg-wash-emerald-500o10 border border-tone-emerald-600o30 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-ink-emerald-700-emerald-400 shrink-0" />
+                <div>
+                  <span className="font-bold text-ink">
+                    本地数据库已存《{matchedDoc.title}》大纲（共 {existingLessonCount} 课）
+                  </span>
+                  <p className="text-[11px] text-ink-ghost mt-0.5">
+                    槽位已在数据库中就绪，点击可直接载入该大纲，无需重新扫描与大模型提炼！
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => handleUseExistingToc(2)}
+                className="gap-1.5 text-xs h-8"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                一键载入已存大纲
+              </Button>
+            </div>
+          )}
+
+          {/* 若未关联但在本地找到候选匹配教材，提示一键关联 */}
+          {!hasExistingOutline && candidateDocs.length > 0 && candidateDocs[0] && (
+            <div className="p-3.5 rounded-2xl bg-wash-amber-500o10 border border-tone-amber-500o30 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="w-5 h-5 text-accent-ink shrink-0" />
+                <div>
+                  <span className="font-bold text-ink">
+                    发现本地数据库可能匹配的教材：《{candidateDocs[0].title}》
+                  </span>
+                  <p className="text-[11px] text-ink-ghost mt-0.5">
+                    检测到本地可能已存该教材大纲，是否直接复用此已有大纲？
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setIgnoreExistingDoc(false);
+                  setMatchedDocIdOverride(candidateDocs[0]?.id ?? null);
+                  handleUseExistingToc(2);
+                }}
+                className="gap-1.5 text-xs h-8"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                一键载入《{candidateDocs[0].title}》大纲
+              </Button>
+            </div>
+          )}
+
           {/* 目录识别面板 */}
           <div className="p-4 rounded-2xl bg-surface border border-line space-y-3">
             <div className="flex items-center gap-2">
@@ -966,7 +1071,7 @@ export function TextbookPipelineImporterTab({
             </p>
 
             <TocRecognitionPanel
-              key={pdfFile ? `${pdfFile.name}:${pdfFile.size}:${pdfFile.lastModified}` : stripPdfPathQuotes(pdfPath)}
+              key={`${pdfFile ? `${pdfFile.name}:${pdfFile.size}:${pdfFile.lastModified}` : stripPdfPathQuotes(pdfPath)}:${matchedDoc?.id || 'none'}:${existingLessonCount}`}
               file={pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null}
               filePath={stripPdfPathQuotes(pdfPath)}
               {...(azureCreds ? { azure: azureCreds } : {})}

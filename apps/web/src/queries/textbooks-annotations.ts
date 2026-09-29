@@ -1142,40 +1142,126 @@ export function lessonSlotsToTocCandidates(slots: TextbookLessonSlotItem[]): Toc
   }));
 }
 
-/** 从文档标题或文件名中模糊查找本地已存在的匹配教材 */
+const TEXTBOOK_SERIES_ALIASES: ReadonlyArray<{
+  series: string;
+  patterns: readonly RegExp[];
+}> = [
+  {
+    series: 'minna',
+    patterns: [
+      /大家的日[语語]/i,
+      /大家的日本[语語]/i,
+      /みんなの日本[語语]/i,
+      /みんな/i,
+      /minna(?:\s*no\s*nihongo)?/i,
+    ],
+  },
+  {
+    series: 'biaori',
+    patterns: [
+      /(?:新版)?\s*(?:中日交流)?\s*标准日[语語]/i,
+      /标日/i,
+      /biaori/i,
+      /standard\s*japanese/i,
+    ],
+  },
+  {
+    series: 'nce',
+    patterns: [
+      /新概念英[语語]/i,
+      /新概念/i,
+      /new\s*concept\s*english/i,
+      /\bnce\b/i,
+    ],
+  },
+];
+
+function detectSeries(str: string): string | null {
+  for (const item of TEXTBOOK_SERIES_ALIASES) {
+    if (item.patterns.some((p) => p.test(str))) return item.series;
+  }
+  return null;
+}
+
+function detectVolume(str: string): string | null {
+  const volMatch = str.match(/(?:初级|中级|高级|第)?\s*([0-9一二三四1-4上册下册上下]+)\s*(?:册|本|卷)/i);
+  if (volMatch && volMatch[1]) {
+    return volMatch[1]
+      .replace('一', '1')
+      .replace('二', '2')
+      .replace('三', '3')
+      .replace('四', '4')
+      .replace('上册', '上')
+      .replace('下册', '下');
+  }
+  const chujiNum = str.match(/初级\s*([1-4一二三四])/);
+  if (chujiNum && chujiNum[1]) {
+    return chujiNum[1].replace('一', '1').replace('二', '2').replace('三', '3').replace('四', '4');
+  }
+  const tailNum = str.match(/[a-z_-]+([1-4])/i);
+  if (tailNum && tailNum[1]) return tailNum[1];
+  return null;
+}
+
+/** 从文档标题或文件名中模糊查找本地已存在的匹配教材列表（按匹配度从高到低排序） */
+export function findMatchingDocuments(
+  docTitle: string,
+  documents: RawDocumentSummary[]
+): RawDocumentSummary[] {
+  if (!docTitle.trim() || documents.length === 0) return [];
+  const clean = docTitle.trim().toLowerCase();
+  const normalize = (s: string) => s.replace(/[\s\-_（）()【】\[\]第册卷·]/g, '').toLowerCase();
+  const cleanNorm = normalize(docTitle);
+
+  const scored: Array<{ doc: RawDocumentSummary; score: number }> = [];
+
+  const inputSeries = detectSeries(docTitle);
+  const inputVolume = detectVolume(docTitle);
+
+  for (const d of documents) {
+    const dTitle = d.title.trim().toLowerCase();
+    const dNorm = normalize(d.title);
+    let score = 0;
+
+    if (dTitle === clean || d.id.toLowerCase() === clean) {
+      score = 100;
+    } else if (cleanNorm.length >= 2 && dNorm === cleanNorm) {
+      score = 80;
+    } else if (cleanNorm.length >= 2 && (dNorm.includes(cleanNorm) || cleanNorm.includes(dNorm))) {
+      score = 65;
+    } else if (clean.length >= 3 && (dTitle.includes(clean) || clean.includes(dTitle))) {
+      score = 60;
+    } else if (inputSeries) {
+      const dSeries = detectSeries(d.title) || detectSeries(d.id);
+      if (dSeries === inputSeries) {
+        const dVol = detectVolume(d.title) || detectVolume(d.id);
+        if (!inputVolume || !dVol || inputVolume === dVol || inputVolume.includes(dVol) || dVol.includes(inputVolume)) {
+          score = 50;
+        } else {
+          score = 30;
+        }
+      }
+    }
+
+    if (score > 0) {
+      // 优先用户自主导入的真实骨架 (user_import)
+      if (d.sourceKind === 'user_import') score += 10;
+      scored.push({ doc: d, score });
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((s) => s.doc);
+}
+
+/** 从文档标题或文件名中查找最匹配的本地教材 */
 export function findMatchingDocument(
   docTitle: string,
   documents: RawDocumentSummary[]
 ): RawDocumentSummary | null {
-  if (!docTitle.trim() || documents.length === 0) return null;
-  const clean = docTitle.trim().toLowerCase();
-
-  // 1. 完全匹配标题或 ID
-  const exact = documents.find(
-    (d) => d.title.trim().toLowerCase() === clean || d.id.toLowerCase() === clean
-  );
-  if (exact) return exact;
-
-  // 2. 标点与修饰符归一化匹配（消除空格、括号、第X册等差异）
-  const normalize = (s: string) => s.replace(/[\s\-_（）()【】\[\]第册卷·]/g, '').toLowerCase();
-  const cleanNorm = normalize(docTitle);
-  if (cleanNorm.length >= 2) {
-    const normMatch = documents.find((d) => {
-      const dNorm = normalize(d.title);
-      return dNorm === cleanNorm || (dNorm.length >= 2 && (dNorm.includes(cleanNorm) || cleanNorm.includes(dNorm)));
-    });
-    if (normMatch) return normMatch;
-  }
-
-  // 3. 子串包含匹配（前缀或包含）
-  if (clean.length >= 3) {
-    const subMatch = documents.find(
-      (d) => d.title.toLowerCase().includes(clean) || clean.includes(d.title.toLowerCase())
-    );
-    if (subMatch) return subMatch;
-  }
-
-  return null;
+  const matches = findMatchingDocuments(docTitle, documents);
+  return matches[0] ?? null;
 }
+
 
 
