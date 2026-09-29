@@ -43,7 +43,7 @@ describe('card formats persistence', () => {
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     const builtin = res.value.find((f) => f.id === 'study-basic');
-    expect(builtin?.templateVersion).toBe(3);
+    expect(builtin?.templateVersion).toBe(4);
     expect(builtin?.name).toBe('Lingua Studio 基础');
     expect(builtin?.fields['Pitch']).toContain('{pitch-graph}');
     const mine = res.value.find((f) => f.id === 'my-own');

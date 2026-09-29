@@ -2,6 +2,11 @@ import { describe, expect, it } from 'bun:test';
 import { LEARNING_SHELL_CONFIGS, resolveGuardTab } from '../learning-shell.js';
 
 describe('resolveGuardTab (P5-E6)', () => {
+  it('设置页面在所有学习轨道均可访问', () => {
+    for (const track of ['ja', 'en', 'ko'] as const) {
+      expect(resolveGuardTab(track, 'SETTINGS')).toBe('SETTINGS');
+    }
+  });
   it('keeps legal tabs unchanged for all tracks', () => {
     for (const track of ['en', 'ja', 'ko'] as const) {
       for (const tab of LEARNING_SHELL_CONFIGS[track].allowedTabs) {

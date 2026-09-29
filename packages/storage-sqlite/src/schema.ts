@@ -635,6 +635,9 @@ export const textbookLessons = sqliteTable(
     status: text('status').notNull().default('pending'),
     /** v31 整篇精读课文/对话 Markdown（取代旧行级碎片表 textbook_lines） */
     passageMd: text('passage_md'),
+    /** v33 AI 教学增强字段：预习导学与课后总结 */
+    previewJson: text('preview_json'),
+    summaryJson: text('summary_json'),
   },
   (table) => [primaryKey({ columns: [table.documentId, table.lessonId] })]
 );

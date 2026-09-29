@@ -37,15 +37,16 @@ describe('schema migrations catalog (ddl.ts ↔ migrations/)', () => {
     initSchema(sqlite);
     // 验证当前已经迁移到最新
     const maxVer = (sqlite.query('SELECT MAX(version) as max_v FROM schema_migrations').get() as { max_v: number }).max_v;
-    expect(maxVer).toBe(32);
+    expect(maxVer).toBe(33);
 
-    // 模拟场景：删掉 v31 和 v32 迁移记录，模拟由于某种原因表已有 start_page，但 migration 尚未记录
+    // 模拟场景：删掉 v31、v32、v33 迁移记录，模拟由于某种原因表已有 start_page，但 migration 尚未记录
     sqlite.run('DELETE FROM schema_migrations WHERE version >= 31');
     
     // 重新跑 runMigrations，验证不会抛 duplicate column name 异常，且自愈后版本补齐
     const res = runMigrations(sqlite);
     expect(res.applied).toContain(31);
     expect(res.applied).toContain(32);
+    expect(res.applied).toContain(33);
 
     // 验证 textbook_lessons 的字段依然完好
     const columns = sqlite.query<{ name: string }, []>('PRAGMA table_info(textbook_lessons)').all();
@@ -54,6 +55,8 @@ describe('schema migrations catalog (ddl.ts ↔ migrations/)', () => {
     expect(colNames.has('end_page')).toBe(true);
     expect(colNames.has('status')).toBe(true);
     expect(colNames.has('passage_md')).toBe(true);
+    expect(colNames.has('preview_json')).toBe(true);
+    expect(colNames.has('summary_json')).toBe(true);
     sqlite.close();
   });
 });

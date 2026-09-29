@@ -8,13 +8,13 @@ import {
   Sun,
   PanelLeft,
   RefreshCw,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button.js';
 import { sound } from '../utils/audio.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
-import { SystemSettingsPopover } from './SystemSettingsPopover.js';
 import { UserProfileModal } from './UserProfileModal.js';
 import { useGatewayStore } from '../stores/useGatewayStore.js';
 import { getPlatform } from '../platform/capabilities.js';
@@ -30,6 +30,7 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
   const setIsCommandOpen = useStudySessionStore((s) => s.setIsCommandOpen);
   const openTutor = useStudySessionStore((s) => s.openTutor);
   const activeTab = useStudySessionStore((s) => s.activeTab);
+  const setActiveTab = useStudySessionStore((s) => s.setActiveTab);
   const isConnected = useGatewayStore((s) => s.isConnected);
   const latencyMs = useGatewayStore((s) => s.latencyMs);
   const isDesktop = React.useMemo(() => {
@@ -171,8 +172,19 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
             <span className="hidden sm:inline">AI 助教</span>
           </Button>
 
-          {/* 偏好与系统控制中心收纳面板 (集成 Edge-TTS 音色、网关状态、画像入口) */}
-          <SystemSettingsPopover />
+          <Button
+            variant={activeTab === 'SETTINGS' ? 'default' : 'outline'}
+            size="sm"
+            className="h-8 gap-1.5 px-2.5 text-xs sm:h-9 sm:px-3"
+            onClick={() => {
+              sound.playClick();
+              setActiveTab('SETTINGS');
+            }}
+            aria-label="打开设置页面"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">设置</span>
+          </Button>
 
           {/* 桌面端更新入口：放在顶栏，避免用户需要滚动设置面板查找 */}
           {isDesktop && (

@@ -167,6 +167,7 @@ export function getLearningShellConfig(track: string | undefined | null): Learni
  * - 其余非法 Tab → 轨道 fallbackTab。
  */
 export function resolveGuardTab(track: TrackLanguage, activeTab: NavigationTab): NavigationTab {
+  if (activeTab === 'SETTINGS') return activeTab;
   const config = LEARNING_SHELL_CONFIGS[track];
   if (config.allowedTabs.includes(activeTab)) return activeTab;
   if (activeTab === 'KANA' || activeTab === 'HANGUL' || activeTab === 'PITCH' || activeTab === 'TEXTBOOK' || activeTab === 'SHADOWING') {

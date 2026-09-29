@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   SlidersHorizontal,
-  Volume2,
   Wifi,
   WifiOff,
   User,
-  Play,
   Check,
   ChevronRight,
   Flame,
@@ -18,10 +16,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover.js';
-import { Button, buttonVariants } from './ui/button.js';
+import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
-import { Slider } from './ui/slider.js';
 import {
   Select,
   SelectTrigger,
@@ -30,10 +26,10 @@ import {
   SelectItem,
 } from './ui/select.js';
 import { sound } from '../utils/audio.js';
-import { useTtsStore } from '../stores/useTtsStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { useLearningShell } from '../hooks/useLearningShell.js';
-import { getPreviewText, trackToSpeechLang } from '../config/tts-voice-personas.js';
+import { trackToSpeechLang } from '../config/tts-voice-personas.js';
+import { TtsStudioSettings } from './TtsStudioSettings.js';
 import {
   useDictionaryPackagesQuery,
   useInstallDictionaryPackageMutation,
@@ -49,31 +45,9 @@ import { getPlatform } from '../platform/capabilities.js';
 import { backupDesktopDatabase } from '../platform/tauri-capabilities.js';
 import { checkForAppUpdate } from '../platform/app-updater.js';
 
-export function SystemSettingsPopover() {
-  const [open, setOpen] = useState(false);
+export function SystemSettingsPage() {
   const isConnected = useGatewayStore((s) => s.isConnected);
   const latencyMs = useGatewayStore((s) => s.latencyMs);
-
-  // 用户偏好由 Zustand 持久化；模型、音色选择与兜底均交给 gemini-tts-studio。
-  const gender = useTtsStore((state) => state.gender);
-  const rate = useTtsStore((state) => state.rate);
-  const preferredService = useTtsStore((state) => state.preferredService);
-  const geminiApiKey = useTtsStore((state) => state.geminiApiKey);
-  const azureKey = useTtsStore((state) => state.azureKey);
-  const azureRegion = useTtsStore((state) => state.azureRegion);
-  const localBaseUrl = useTtsStore((state) => state.localBaseUrl);
-  const localApiKey = useTtsStore((state) => state.localApiKey);
-  const voiceId = useTtsStore((state) => state.voiceId);
-  const setGender = useTtsStore((state) => state.setGender);
-  const setRate = useTtsStore((state) => state.setRate);
-  const setPreferredService = useTtsStore((state) => state.setPreferredService);
-  const setGeminiApiKey = useTtsStore((state) => state.setGeminiApiKey);
-  const setAzureKey = useTtsStore((state) => state.setAzureKey);
-  const setAzureRegion = useTtsStore((state) => state.setAzureRegion);
-  const setLocalBaseUrl = useTtsStore((state) => state.setLocalBaseUrl);
-  const setLocalApiKey = useTtsStore((state) => state.setLocalApiKey);
-  const setVoiceId = useTtsStore((state) => state.setVoiceId);
-  const speak = useTtsStore((state) => state.speak);
 
   // 学情与画像
   const profile = useUserProfileStore((s) => s.profile);
@@ -81,11 +55,11 @@ export function SystemSettingsPopover() {
   const setProfileModalOpen = useUserProfileStore((s) => s.setProfileModalOpen);
   const shell = useLearningShell();
   const speechLang = trackToSpeechLang(shell.track);
-  const dictionaryPackages = useDictionaryPackagesQuery(open);
+  const dictionaryPackages = useDictionaryPackagesQuery(true);
   const installDictionaryPackage = useInstallDictionaryPackageMutation();
   const updateDictionaryPackage = useUpdateDictionaryPackageMutation();
   const installCustomDictionary = useInstallCustomDictionaryMutation();
-  const ankiStatus = useAnkiStatusQuery(open);
+  const ankiStatus = useAnkiStatusQuery(true);
   const saveAnkiSettings = useSaveAnkiSettingsMutation();
   const [customDictLicenseOk, setCustomDictLicenseOk] = useState(false);
   const [cardWorkbenchOpen, setCardWorkbenchOpen] = useState(false);
@@ -195,54 +169,35 @@ export function SystemSettingsPopover() {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        onClick={() => sound.playClick()}
-        className={buttonVariants({
-          variant: 'outline',
-          size: 'sm',
-          className: 'gap-1.5 text-ink-mute border-line-soft hover:border-tone-amber-500o40 cursor-pointer h-8 sm:h-9 px-2.5 sm:px-3 text-xs',
-        })}
-        title="系统与语音设置"
-      >
-        <SlidersHorizontal className="w-3.5 h-3.5 text-ink-ghost" />
-        <span className="hidden md:inline font-medium">设置</span>
-        <span
-          className={`w-1.5 h-1.5 rounded-full ${
-            isConnected ? 'bg-tone-emerald-500' : 'bg-ink-amber-400'
-          }`}
-        />
-      </PopoverTrigger>
-
-      <PopoverContent
-        align="end"
-        className="w-80 max-h-[calc(100dvh-2rem)] p-0 flex flex-col border border-line-stone-200o90-stone-800o90 shadow-xl rounded-2xl bg-veil-whiteo95 dark:bg-surface-h1a1917o95 backdrop-blur-md overflow-hidden z-50 transition-colors"
-      >
-        {/* Header */}
-        <div className="shrink-0 px-4 py-3 border-b border-tone-stone-100-stone-800o80 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-tone-amber-500" />
-            <h4 className="font-semibold text-xs text-ink-soft">
-              系统控制中心
-            </h4>
+    <div className="space-y-8 pb-10">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl border border-line bg-surface p-6 shadow-sm sm:p-8">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-accent-ink">
+            <SlidersHorizontal className="h-4 w-4" />
+            LINGUA STUDIO
           </div>
-          {/* 网关轻量状态指示 */}
-          <div className="flex items-center gap-1.5 text-[11px] font-medium">
+          <h1 className="mt-2 text-3xl font-semibold text-ink">设置</h1>
+          <p className="mt-2 text-sm text-ink-mute">管理语音朗读、离线资源、外部连接与学习数据。</p>
+        </div>
+        <div className="flex items-center gap-1.5 text-sm font-medium">
             {isConnected ? (
               <span className="inline-flex items-center gap-1 text-ink-emerald-600-emerald-400">
-                <Wifi className="w-3 h-3" />
+                <Wifi className="h-4 w-4" />
                 <span>已联通{latencyMs ? ` (${latencyMs}ms)` : ''}</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 text-accent-ink">
-                <WifiOff className="w-3 h-3" />
+                <WifiOff className="h-4 w-4" />
                 <span>离线模式</span>
               </span>
             )}
-          </div>
         </div>
+      </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 text-xs">
+      <TtsStudioSettings lang={speechLang} />
+
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-6">
           {isDesktop && (
             <div className="space-y-2 rounded-xl border border-tone-amber-500o25 bg-wash-amber-50o60-amber-950o20 p-2.5 dark:border-line-amber-400o20 transition-colors">
               <div className="flex items-center justify-between font-medium text-ink-mute">
@@ -274,65 +229,8 @@ export function SystemSettingsPopover() {
             </div>
           )}
 
-          {/* 1. TTS 设置：宿主仅保存偏好并调用包，不在本地选择模型或音色。 */}
-          <div className="space-y-2.5">
-            <div className="flex items-center gap-1.5 font-medium text-ink-mute">
-              <Volume2 className="w-3.5 h-3.5 text-tone-amber-500" />
-              <span>语音朗读</span>
-              <Badge variant="outline" className="text-[10px]">{speechLang}</Badge>
-            </div>
-            <div className="grid grid-cols-3 gap-1">
-              {([
-                { value: 'gemini', label: 'Gemini' },
-                { value: 'azure', label: 'Azure' },
-                { value: 'local', label: '本地 TTS' },
-              ] as const).map((item) => (
-                <Button
-                  key={item.value}
-                  type="button"
-                  size="sm"
-                  variant={preferredService === item.value ? 'default' : 'outline'}
-                  className="h-7 text-[11px]"
-                  onClick={() => setPreferredService(item.value)}
-                >
-                  {item.label}
-                </Button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button size="sm" variant={gender === 'FEMALE' ? 'default' : 'outline'} onClick={() => setGender('FEMALE')}>女声</Button>
-              <Button size="sm" variant={gender === 'MALE' ? 'default' : 'outline'} onClick={() => setGender('MALE')}>男声</Button>
-            </div>
-            {preferredService === 'gemini' && (
-              <input type="password" autoComplete="off" value={geminiApiKey} onChange={(event) => setGeminiApiKey(event.target.value)} placeholder="Gemini API Key（可留空，使用网关环境变量）" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
-            )}
-            {preferredService === 'azure' && (
-              <>
-                <input type="password" autoComplete="off" value={azureKey} onChange={(event) => setAzureKey(event.target.value)} placeholder="Azure API Key" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
-                <input type="text" value={azureRegion} onChange={(event) => setAzureRegion(event.target.value)} placeholder="Azure 区域，如 japaneast" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
-              </>
-            )}
-            <input type="text" value={localBaseUrl} onChange={(event) => setLocalBaseUrl(event.target.value)} placeholder="本地 TTS 地址（可留空，使用网关 LOCAL_TTS_ENDPOINT）" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
-            <input type="password" autoComplete="off" value={localApiKey} onChange={(event) => setLocalApiKey(event.target.value)} placeholder="本地 TTS API Key（可选）" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
-            <input type="text" value={voiceId} onChange={(event) => setVoiceId(event.target.value)} placeholder="音色 ID（可留空，由 TTS 包选择）" className="w-full p-2 text-[11px] rounded-lg bg-surface-coal border border-line-stone-300-stone-700 text-ink-soft" />
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-ink-ghost">播放速度 {rate.toFixed(1)}x</span>
-              <Slider value={rate} min={0.5} max={1.5} step={0.1} onValueChange={(value) => {
-                const next = Array.isArray(value) ? value[0] : value;
-                if (typeof next === 'number') setRate(next);
-              }} />
-            </div>
-            <p className="text-[10px] text-ink-ghost">首选服务失败时，包只尝试本地 TTS；失败原因会显示。播放速度在客户端调整，0.3.0 尚不支持合成语速。</p>
-            <Button type="button" size="sm" variant="outline" className="w-full h-7 text-[11px]" onClick={() => {
-              sound.playClick();
-              void speak(getPreviewText(speechLang, gender), { lang: speechLang, gender, purpose: 'preview' });
-            }}>试听当前配置</Button>
-          </div>
-
-          <div className="h-px bg-tone-stone-100-stone-800o80" />
-
           {/* 3. 词典包：内容按需进入 SQLite，避免初装体积与无授权数据混入。 */}
-          <div className="space-y-2">
+          <div id="settings-dictionaries" className="space-y-4 rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6">
             <div className="flex items-center justify-between font-medium text-ink-mute">
               <div className="flex items-center gap-1.5">
                 <BookOpen className="w-3.5 h-3.5 text-tone-amber-500" />
@@ -479,10 +377,10 @@ export function SystemSettingsPopover() {
             </div>
           </div>
 
-          <div className="h-px bg-tone-stone-100-stone-800o80" />
-
+        </div>
+        <div className="space-y-6">
           {/* 3b. Anki 推送（EXTERNAL 桥接，默认关闭；只连本机 AnkiConnect）。 */}
-          <div className="space-y-2">
+          <div className="space-y-4 rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6">
             <div className="flex items-center justify-between font-medium text-ink-mute">
               <div className="flex items-center gap-1.5">
                 <Plug className="w-3.5 h-3.5 text-tone-amber-500" />
@@ -520,10 +418,8 @@ export function SystemSettingsPopover() {
             </div>
           </div>
 
-          <div className="h-px bg-tone-stone-100-stone-800o80" />
-
           {/* 4. 学情画像与打卡目标入口 */}
-          <div className="space-y-2">
+          <div className="space-y-4 rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6">
             <div className="flex items-center justify-between font-medium text-ink-mute">
               <div className="flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-tone-amber-500" />
@@ -534,13 +430,13 @@ export function SystemSettingsPopover() {
               </Badge>
             </div>
 
-            <div
+            <button
+              type="button"
               onClick={() => {
                 sound.playClick();
-                setOpen(false);
                 setProfileModalOpen(true);
               }}
-              className="p-2.5 rounded-xl border border-tone-stone-200o80-stone-800 hover:border-tone-amber-500o40 bg-veil-stone-50o70-stone-900o50 flex items-center justify-between cursor-pointer group transition-all"
+              className="group flex w-full cursor-pointer items-center justify-between rounded-xl border border-line bg-surface-dim p-2.5 text-left transition-colors hover:border-line-amber-500o30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-tone-amber-500 to-tone-amber-600 text-tone-stone-950 font-bold flex items-center justify-center text-xs shrink-0">
@@ -568,14 +464,13 @@ export function SystemSettingsPopover() {
                 <span>管理</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </div>
-            </div>
+            </button>
           </div>
 
           {/* 5. 桌面端数据管理（仅 Tauri 壳内可见） */}
           {isDesktop && (
             <>
-              <div className="h-px bg-tone-stone-100-stone-800o80" />
-              <div className="space-y-2">
+              <div className="space-y-4 rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6">
                 <div className="flex items-center gap-1.5 font-medium text-ink-mute">
                   <DatabaseBackup className="w-3.5 h-3.5 text-tone-amber-500" />
                   <span>学习数据管理</span>
@@ -607,8 +502,8 @@ export function SystemSettingsPopover() {
             </>
           )}
         </div>
-        <AnkiTemplateWorkbench open={cardWorkbenchOpen} onOpenChange={setCardWorkbenchOpen} />
-      </PopoverContent>
-    </Popover>
+      </div>
+      <AnkiTemplateWorkbench open={cardWorkbenchOpen} onOpenChange={setCardWorkbenchOpen} />
+    </div>
   );
 }

@@ -10,6 +10,7 @@ import { LessonDialog } from './components/LessonDialog.js';
 import { SelectionLookupPopup } from './components/SelectionLookupPopup.js';
 import { AgentChatPanel } from './components/AgentChatPanel.js';
 import { AppHeader } from './components/AppHeader.js';
+import { SystemSettingsPage } from './components/SystemSettingsPage.js';
 import { AppSidebar } from './components/AppSidebar.js';
 import { TodayPlanWorkbench } from './components/TodayPlanWorkbench.js';
 import { AdaptiveQuizWorkbench } from './components/AdaptiveQuizWorkbench.js';
@@ -329,7 +330,7 @@ export function App() {
 
         <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
           <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-6">
-          {shell.copy.interimBanner && (
+          {activeTab !== 'SETTINGS' && shell.copy.interimBanner && (
             <div
               role="status"
               className="rounded-xl border border-tone-amber-500o25 bg-wash-amber-500o10 px-3.5 py-2.5 text-xs text-ink-amber-950o90-amber-100o90"
@@ -351,6 +352,7 @@ export function App() {
               }
             >
             {activeTab === 'TODAY' && <TodayPlanWorkbench key={shell.track} />}
+            {activeTab === 'SETTINGS' && <SystemSettingsPage />}
 
             {activeTab === 'PRACTICE_PLAN' && (
               <motion.div

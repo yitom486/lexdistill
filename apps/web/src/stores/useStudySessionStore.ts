@@ -19,7 +19,8 @@ export type NavigationTab =
   | 'PITCH'
   | 'MISTAKES'
   | 'RADAR'
-  | 'STATS';
+  | 'STATS'
+  | 'SETTINGS';
 
 export interface PlanIntent {
   stepId: string;
@@ -88,6 +89,7 @@ const TAB_SET = new Set<string>([
   'MISTAKES',
   'RADAR',
   'STATS',
+  'SETTINGS',
 ]);
 
 function snapshotTutorContext(ctx: AiTutorContext) {

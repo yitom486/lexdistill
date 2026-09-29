@@ -105,12 +105,12 @@ export function buildPitchGraphSvg(
   const dots = units
     .map((_, i) => {
       const high = pattern[i] === 'H';
-      return `<circle cx="${cx(i)}" cy="${cy(i)}" r="4.5" fill="${high ? '#d97706' : '#ffffff'}" stroke="#d97706" stroke-width="2"/>`;
+      return `<circle cx="${cx(i)}" cy="${cy(i)}" r="4.5" fill="${high ? 'var(--card-pitch-accent, currentColor)' : 'var(--card-surface, Canvas)'}" stroke="var(--card-pitch-accent, currentColor)" stroke-width="2"/>`;
     })
     .join('');
   const labels = units
     .map((unit, i) => `<text x="${cx(i)}" y="${textY}" text-anchor="middle" font-size="13">${escapeXml(unit)}</text>`)
     .join('');
   const titleText = options.label ? `${reading} ${options.label}` : reading;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"><title>${escapeXml(titleText)}</title><path d="${path}" fill="none" stroke="#d97706" stroke-width="2"/>${dots}${labels}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"><title>${escapeXml(titleText)}</title><path d="${path}" fill="none" stroke="var(--card-pitch-accent, currentColor)" stroke-width="2"/>${dots}${labels}</svg>`;
 }
