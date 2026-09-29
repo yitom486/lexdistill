@@ -111,6 +111,7 @@ export async function executeTextbookPipeline(
       title: input.title,
       language: input.language ?? 'ja',
       entries: input.tocEntries,
+      forceOverwrite: input.forceOverwrite,
     });
 
     if (!isOk(tocResult)) {

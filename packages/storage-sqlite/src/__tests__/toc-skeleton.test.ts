@@ -192,4 +192,53 @@ describe('seedTextbookTocSkeleton', () => {
       expect(slotsRes.value[1]!.status).toBe('pending');
     }
   });
+
+  it('幂等落库：若课次已处于 ready 状态且 forceOverwrite=false，保留 ready 状态及正文等内容', async () => {
+    const { db } = freshDb();
+    const entries: TocEntry[] = [
+      { id: 'l1', level: 'lesson', title: '第1课', startPage: 1, endPage: 5 },
+      { id: 'l2', level: 'lesson', title: '第2课', startPage: 6, endPage: 10 },
+    ];
+
+    await seedTextbookTocSkeleton(
+      { db },
+      {
+        documentId: 'doc_ready_preserve',
+        userId: 'user_01',
+        title: '已完成测试',
+        entries,
+      }
+    );
+
+    // 模拟 l1 已提炼完成
+    db.update(schema.textbookLessons)
+      .set({
+        status: 'ready',
+        passageMd: '# 第1课正文',
+        previewJson: JSON.stringify({ goal: '问候' }),
+      })
+      .where(eq(schema.textbookLessons.lessonId, 'l1'))
+      .run();
+
+    // 再次 seed（forceOverwrite: false）
+    await seedTextbookTocSkeleton(
+      { db },
+      {
+        documentId: 'doc_ready_preserve',
+        userId: 'user_01',
+        title: '已完成测试',
+        entries,
+        forceOverwrite: false,
+      }
+    );
+
+    const slots = await listTextbookLessonSlots({ db }, 'doc_ready_preserve');
+    expect(isOk(slots)).toBe(true);
+    if (isOk(slots)) {
+      expect(slots.value[0]!.status).toBe('ready');
+      expect(slots.value[0]!.hasPassage).toBe(true);
+      expect(slots.value[0]!.hasPreview).toBe(true);
+      expect(slots.value[1]!.status).toBe('pending');
+    }
+  });
 });

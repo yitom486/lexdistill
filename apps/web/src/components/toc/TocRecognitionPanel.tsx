@@ -25,11 +25,24 @@ export interface TocDetectedCandidate {
 interface TocRecognitionPanelProps {
   file: File | null;
   filePath: string;
-  azure?: PdfAzureCredential;
-  onTocConfirmed?: (entries: TocRecognitionCandidate[]) => void;
+  azure?: PdfAzureCredential | undefined;
+  initialEntries?: TocRecognitionCandidate[] | undefined;
+  existingDocInfo?: {
+    documentId: string;
+    title: string;
+    lessonCount: number;
+  } | undefined;
+  onTocConfirmed?: ((entries: TocRecognitionCandidate[]) => void) | undefined;
 }
 
-export function TocRecognitionPanel({ file, filePath, azure, onTocConfirmed }: TocRecognitionPanelProps) {
+export function TocRecognitionPanel({
+  file,
+  filePath,
+  azure,
+  initialEntries,
+  existingDocInfo,
+  onTocConfirmed,
+}: TocRecognitionPanelProps) {
   const map = useMapPdfMutation();
   const extractLlm = useExtractTocWithLlmMutation();
   const modelsQuery = useAgentModelsQuery();
@@ -37,15 +50,26 @@ export function TocRecognitionPanel({ file, filePath, azure, onTocConfirmed }: T
   const tocReviewModel = usePreferencesStore((s) => s.tocReviewModel);
   const setTocReviewModel = usePreferencesStore((s) => s.setTocReviewModel);
 
+  const hasInitial = Boolean(initialEntries && initialEntries.length > 0);
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
-  const [entries, setEntries] = useState<TocRecognitionCandidate[]>([]);
-  const [scanned, setScanned] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
+  const [entries, setEntries] = useState<TocRecognitionCandidate[]>(() => initialEntries ?? []);
+  const [scanned, setScanned] = useState(hasInitial);
+  const [confirmed, setConfirmed] = useState(hasInitial);
   const [message, setMessage] = useState<string | null>(null);
   const [detectedHint, setDetectedHint] = useState<string | null>(null);
   const [discoveredCandidates, setDiscoveredCandidates] = useState<TocDetectedCandidate[]>([]);
-  const autoProbedRef = useRef(false);
+  const autoProbedRef = useRef(hasInitial);
+
+  // 当外部 initialEntries 传入或发生变动时同步（如一键载入已存大纲）
+  useEffect(() => {
+    if (initialEntries && initialEntries.length > 0) {
+      setEntries(initialEntries);
+      setScanned(true);
+      setConfirmed(true);
+      autoProbedRef.current = true;
+    }
+  }, [initialEntries]);
 
   const hasSource = Boolean(file || filePath.trim());
 
@@ -113,13 +137,19 @@ export function TocRecognitionPanel({ file, filePath, azure, onTocConfirmed }: T
     });
   };
 
-  // 用户进入 Step 2 面板时自动触发后端探测，无需强制手动点击
+  // 仅在无已有大纲且未曾探测过时才自动触发后端探测，绝不强刷已有大纲
   useEffect(() => {
-    if (hasSource && !start && !map.isPending && !autoProbedRef.current) {
+    if (
+      hasSource &&
+      !start &&
+      !map.isPending &&
+      !autoProbedRef.current &&
+      (!initialEntries || initialEntries.length === 0)
+    ) {
       autoProbedRef.current = true;
       handleProbeTocLocation();
     }
-  }, [hasSource]);
+  }, [hasSource, initialEntries]);
 
   /**
    * 阶段二：由大模型对确定的目次页进行深度语义解析与结构化提取
@@ -201,6 +231,42 @@ export function TocRecognitionPanel({ file, filePath, azure, onTocConfirmed }: T
 
   return (
     <div className="space-y-3 text-xs text-ink">
+      {/* 若检测到已有教材大纲，展示复用提示条 */}
+      {existingDocInfo && (
+        <div className="p-3.5 rounded-2xl bg-wash-emerald-500o10 border border-tone-emerald-600o30 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-ink-emerald-700-emerald-400 shrink-0" />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-ink">
+                  已自动载入本地数据库大纲（《{existingDocInfo.title}》）
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface border border-line font-medium text-ink">
+                  共 {existingDocInfo.lessonCount} 课
+                </span>
+              </div>
+              <p className="text-[11px] text-ink-ghost mt-0.5">
+                该教材的大纲与课次结构已在数据库中就绪，可直接核对下方草稿推进至下一步；若确需重扫，可点击右侧按钮重新提取。
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs h-7 gap-1"
+            onClick={() => {
+              sound.playClick();
+              clearScan();
+              handleProbeTocLocation();
+            }}
+            disabled={map.isPending || extractLlm.isPending}
+          >
+            <ScanText className="w-3.5 h-3.5" />
+            重新扫描大纲
+          </Button>
+        </div>
+      )}
+
       {/* 目录页码定位与提取 */}
       <div className="p-3.5 rounded-2xl border border-line bg-surface space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">

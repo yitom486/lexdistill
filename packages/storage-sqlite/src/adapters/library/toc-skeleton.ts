@@ -22,6 +22,7 @@ export interface SeedTocSkeletonInput {
   title: string;
   language?: string | undefined;
   entries: readonly TocEntry[];
+  forceOverwrite?: boolean | undefined;
 }
 
 export interface SavedTocSkeleton {
@@ -39,7 +40,8 @@ export interface SavedTocSkeleton {
  * 2. 规范化补齐每课 endPage 并赋予从 1 开始严格单调连续的 sortOrder；
  * 3. 在同一 SQLite 事务中：
  *    - 插入或更新 documents 主表元数据；
- *    - 清空旧槽位，批量插入初始化的 textbook_lessons 槽位（status='pending'）；
+ *    - 若 forceOverwrite=false，检查并保留现有槽位已就绪状态及生成内容；
+ *    - 清空旧槽位，批量插入初始化的 textbook_lessons 槽位；
  * 4. 返回落库成功摘要。
  */
 export async function seedTextbookTocSkeleton(
@@ -100,23 +102,37 @@ export async function seedTextbookTocSkeleton(
           .run();
       }
 
+      // 检查现有课次槽位（若存在且未强制覆盖，保留已 ready 状态与内容）
+      const existingLessons = tx
+        .select()
+        .from(textbookLessons)
+        .where(eq(textbookLessons.documentId, input.documentId))
+        .all();
+      const existingLessonMap = new Map(existingLessons.map((l) => [l.lessonId, l]));
+
       // 幂等清理该文档现有章节槽位
       tx.delete(textbookLessons).where(eq(textbookLessons.documentId, input.documentId)).run();
 
-      // 批量插入章节槽位（status='pending'）
-      const lessonRows: Array<typeof textbookLessons.$inferInsert> = canonicalEntries.map((entry) => ({
-        documentId: input.documentId,
-        lessonId: entry.id,
-        lessonNumber: entry.sortOrder,
-        title: entry.title,
-        sortOrder: entry.sortOrder,
-        kind: entry.level === 'unit' || entry.level === 'chapter' ? 'chapter' : 'lesson',
-        parentId: entry.parentId ?? null,
-        startPage: entry.startPage,
-        endPage: entry.endPage ?? null,
-        status: 'pending',
-        passageMd: null,
-      }));
+      // 批量插入章节槽位（若旧槽位存在且已 ready 且未强制覆盖，保留状态与生成内容）
+      const lessonRows: Array<typeof textbookLessons.$inferInsert> = canonicalEntries.map((entry) => {
+        const prev = existingLessonMap.get(entry.id);
+        const shouldPreserve = Boolean(!input.forceOverwrite && prev && prev.status === 'ready');
+        return {
+          documentId: input.documentId,
+          lessonId: entry.id,
+          lessonNumber: entry.sortOrder,
+          title: entry.title,
+          sortOrder: entry.sortOrder,
+          kind: entry.level === 'unit' || entry.level === 'chapter' ? 'chapter' : 'lesson',
+          parentId: entry.parentId ?? null,
+          startPage: entry.startPage,
+          endPage: entry.endPage ?? null,
+          status: shouldPreserve && prev ? prev.status : 'pending',
+          passageMd: shouldPreserve && prev ? prev.passageMd : null,
+          previewJson: shouldPreserve && prev ? prev.previewJson : null,
+          summaryJson: shouldPreserve && prev ? prev.summaryJson : null,
+        };
+      });
 
       if (lessonRows.length > 0) {
         tx.insert(textbookLessons).values(lessonRows).run();

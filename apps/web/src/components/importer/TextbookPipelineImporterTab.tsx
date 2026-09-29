@@ -23,8 +23,13 @@ import {
   useAppendPdfMutation,
   useImportDocumentMutation,
   useExecuteTextbookPipelineMutation,
+  useAllDocumentsQuery,
+  useTextbookLessonSlotsQuery,
+  lessonSlotsToTocCandidates,
+  findMatchingDocument,
   type ExecuteTextbookPipelineResult,
 } from '../../queries/useLearnerQueries.js';
+import { QUERY_KEYS } from '../../queries/query-keys.js';
 import { Switch } from '../ui/switch.js';
 import { useOcrStore } from '../../stores/useOcrStore.js';
 import { nextRelayWindow, resolveOcrOverflowWindow, resolvePdfPageRange } from '../../lib/pdf-page-range.js';
@@ -188,6 +193,8 @@ export function TextbookPipelineImporterTab({
     setPdfNote(null);
     setParseError(null);
     setConfirmedToc(null);
+    setMatchedDocIdOverride(null);
+    setIgnoreExistingDoc(false);
     setCurrentStep(1);
   };
 
@@ -294,6 +301,84 @@ export function TextbookPipelineImporterTab({
       : docPath
         ? '电子书文档'
         : '';
+
+  const docTitle = selectedFileName.replace(/\.[^/.]+$/, '').trim();
+
+  // 查询本地 SQLite 数据库中全部已有文档（包含仅建大纲/槽位的教材）
+  const allDocsQuery = useAllDocumentsQuery();
+  const allDocuments = allDocsQuery.data ?? [];
+
+  const [matchedDocIdOverride, setMatchedDocIdOverride] = useState<string | null>(null);
+  const [ignoreExistingDoc, setIgnoreExistingDoc] = useState<boolean>(false);
+
+  const matchedDoc = ignoreExistingDoc
+    ? null
+    : matchedDocIdOverride
+      ? allDocuments.find((d) => d.id === matchedDocIdOverride) ?? null
+      : findMatchingDocument(docTitle, allDocuments);
+
+  const lessonSlotsQuery = useTextbookLessonSlotsQuery(matchedDoc?.id);
+  const existingSlots = lessonSlotsQuery.data ?? [];
+
+  const existingAstLessons = React.useMemo<Array<{ id?: string; title?: string }>>(() => {
+    if (!matchedDoc?.astJson) return [];
+    try {
+      const parsed: unknown = JSON.parse(matchedDoc.astJson);
+      if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { lessons?: unknown }).lessons)) {
+        const rawLessons = (parsed as { lessons: unknown[] }).lessons;
+        return rawLessons
+          .filter((l): l is Record<string, unknown> => typeof l === 'object' && l !== null)
+          .map((l) => ({
+            ...(typeof l.id === 'string' ? { id: l.id } : {}),
+            ...(typeof l.title === 'string' ? { title: l.title } : {}),
+          }));
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  }, [matchedDoc?.astJson]);
+
+  const hasExistingOutline = Boolean(
+    !ignoreExistingDoc && matchedDoc && (existingSlots.length > 0 || existingAstLessons.length > 0)
+  );
+
+  const existingLessonCount = existingSlots.length > 0 ? existingSlots.length : existingAstLessons.length;
+
+  const handleUseExistingToc = (targetStep: 2 | 3 = 3) => {
+    sound.playClick();
+    let candidates: TocRecognitionCandidate[] = [];
+    if (existingSlots.length > 0) {
+      candidates = lessonSlotsToTocCandidates(existingSlots);
+    } else if (existingAstLessons.length > 0) {
+      candidates = existingAstLessons.map((l: { id?: string; title?: string }, idx: number) => ({
+        key: l.id || `ast-${idx + 1}`,
+        title: typeof l.title === 'string' ? l.title : `第${idx + 1}课`,
+        printedPage: String(idx + 1),
+        level: 1,
+        kind: 'lesson' as const,
+        confidence: 'high' as const,
+      }));
+    }
+
+    if (candidates.length > 0) {
+      setConfirmedToc(candidates);
+      setCurrentStep(targetStep);
+      sound.playCorrect();
+      toast.success(
+        targetStep === 3
+          ? `已成功载入《${matchedDoc?.title}》已存大纲（共 ${candidates.length} 课），可直接开始提炼！`
+          : `已载入《${matchedDoc?.title}》已存大纲（共 ${candidates.length} 课）待核对`
+      );
+    }
+  };
+
+  // 自动从已匹配大纲中初始化 confirmedToc（若尚未手动确认过）
+  React.useEffect(() => {
+    if (hasExistingOutline && !confirmedToc && existingSlots.length > 0) {
+      setConfirmedToc(lessonSlotsToTocCandidates(existingSlots));
+    }
+  }, [hasExistingOutline, existingSlots]);
 
   const readPageRange = () => resolvePdfPageRange(pdfScope, pdfStartPage, pdfEndPage);
 
@@ -483,7 +568,8 @@ export function TextbookPipelineImporterTab({
 
     executePipeline.mutate(
       {
-        title: docTitle,
+        ...(matchedDoc?.id ? { documentId: matchedDoc.id } : {}),
+        title: docTitle || '未命名教材',
         language: 'ja',
         ...(path ? { filePath: path } : {}),
         ...(pipelineModel && pipelineModel !== '__default__' && pipelineModel !== 'default'
@@ -497,7 +583,8 @@ export function TextbookPipelineImporterTab({
         onSuccess: (res) => {
           sound.playCorrect();
           setPipelineResult(res);
-          queryClient.invalidateQueries({ queryKey: ['textbooks'] });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TEXTBOOKS });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCUMENTS });
           toast.success(`教材《${res.title}》全书提炼完成！共 ${res.successfulLessons} 课就绪`);
         },
         onError: (err) => {
@@ -679,6 +766,64 @@ export function TextbookPipelineImporterTab({
             </div>
           )}
 
+          {/* 检测到本地数据库已有大纲/槽位数据提示 */}
+          {hasExistingOutline && matchedDoc && (
+            <div className="p-4 rounded-3xl border border-tone-emerald-600o30 bg-wash-emerald-500o10 space-y-3 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-surface border border-line text-ink-emerald-700-emerald-400">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-ink">
+                        检测到本地已存该教材大纲：《{matchedDoc.title}》
+                      </span>
+                      <Badge variant="emerald" className="text-[10px]">
+                        已收录 {existingLessonCount} 课
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-ink-ghost mt-0.5">
+                      该教材此前已在本地 SQLite 数据库中完成大纲建槽，无需调用大模型重复抽取目录！
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-[11px] text-ink-ghost hover:text-ink h-7"
+                  onClick={() => {
+                    setIgnoreExistingDoc(true);
+                    toast.info('已忽略本地已有大纲，将作为全新教材重新识别');
+                  }}
+                >
+                  忽略已有，按全新文件识别
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-tone-emerald-600o20">
+                <Button
+                  size="sm"
+                  onClick={() => handleUseExistingToc(3)}
+                  className="gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  直接复用已有大纲，进入全文提炼 (Step 3)
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUseExistingToc(2)}
+                  className="gap-1.5 text-xs"
+                >
+                  <ListTree className="w-3.5 h-3.5" />
+                  查看并微调已有大纲 (Step 2)
+                </Button>
+              </div>
+            </div>
+          )}
+
           {pdfFileError && (
             <p role="alert" className="text-xs font-semibold text-ink-red-600-red-400">
               {pdfFileError}
@@ -779,6 +924,10 @@ export function TextbookPipelineImporterTab({
               disabled={!hasSourceFile}
               onClick={() => {
                 sound.playClick();
+                if (hasExistingOutline && (!confirmedToc || confirmedToc.length === 0)) {
+                  handleUseExistingToc(2);
+                  return;
+                }
                 setCurrentStep(2);
               }}
               className="gap-2"
@@ -821,6 +970,20 @@ export function TextbookPipelineImporterTab({
               file={pdfFile && !isPdfUploadTooLarge(pdfFile.size) ? pdfFile : null}
               filePath={stripPdfPathQuotes(pdfPath)}
               {...(azureCreds ? { azure: azureCreds } : {})}
+              {...(confirmedToc
+                ? { initialEntries: confirmedToc }
+                : hasExistingOutline && existingSlots.length > 0
+                  ? { initialEntries: lessonSlotsToTocCandidates(existingSlots) }
+                  : {})}
+              {...(matchedDoc
+                ? {
+                    existingDocInfo: {
+                      documentId: matchedDoc.id,
+                      title: matchedDoc.title,
+                      lessonCount: Number(existingLessonCount) || 0,
+                    },
+                  }
+                : {})}
               onTocConfirmed={handleTocConfirmed}
             />
           </div>
@@ -901,6 +1064,23 @@ export function TextbookPipelineImporterTab({
               )}
             </div>
           </div>
+
+          {/* 关联已有教材状态提示 */}
+          {matchedDoc && (
+            <div className="p-3.5 rounded-2xl bg-surface border border-line flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-accent shrink-0" />
+                <span className="font-semibold text-ink">提炼目标教材：</span>
+                <span className="font-mono text-ink">《{matchedDoc.title}》（ID: {matchedDoc.id}）</span>
+                <Badge variant="emerald" className="text-[10px]">
+                  {existingSlots.filter((s) => s.status === 'ready').length}/{existingLessonCount} 课已就绪
+                </Badge>
+              </div>
+              <span className="text-[11px] text-ink-ghost">
+                已就绪课次将自动跳过，保障已有学习与复习记录
+              </span>
+            </div>
+          )}
 
           {/* Agent 池与专精大模型分级配置（AGENTS.md §1.6b 用户配置权） */}
           <div className="p-4 rounded-2xl border border-line bg-surface space-y-4">

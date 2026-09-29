@@ -28,6 +28,7 @@ async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Respo
   }
 }
 import type { TextbookBook } from '../models/textbook.js';
+import type { TocRecognitionCandidate } from '../lib/toc-recognition.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 
 
@@ -1050,4 +1051,131 @@ export function useExtractTocWithLlmMutation(userId = DEFAULT_USER_ID) {
     },
   });
 }
+
+export interface RawDocumentSummary {
+  id: string;
+  userId: string;
+  title: string;
+  sourceKind: string;
+  language: string;
+  content: string;
+  astJson?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TextbookLessonSlotItem {
+  documentId: string;
+  lessonId: string;
+  lessonNumber: number;
+  title: string;
+  sortOrder: number;
+  kind: string;
+  parentId: string | null;
+  startPage: number | null;
+  endPage: number | null;
+  status: string;
+  hasPassage: boolean;
+  hasPreview: boolean;
+  hasSummary: boolean;
+}
+
+/** 查询全部原始文档（包含未完成 AST 结构化仅有骨架大纲的文档） */
+export function useAllDocumentsQuery(userId = DEFAULT_USER_ID) {
+  return useQuery<RawDocumentSummary[]>({
+    queryKey: [...QUERY_KEYS.DOCUMENTS, userId],
+    queryFn: async () => {
+      try {
+        const res = await apiClient.api.documents[':userId'].$get({ param: { userId } });
+        if (res.ok) {
+          const docs = await res.json();
+          if (Array.isArray(docs)) {
+            return docs as RawDocumentSummary[];
+          }
+        }
+      } catch (e) {
+        logger.debug('[useAllDocumentsQuery] failed to load documents from gateway', e);
+      }
+      return [];
+    },
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+/** 查询指定文档已建立的教材章节槽位列表（textbook_lessons） */
+export function useTextbookLessonSlotsQuery(documentId: string | undefined, userId = DEFAULT_USER_ID) {
+  return useQuery<TextbookLessonSlotItem[]>({
+    queryKey: [...QUERY_KEYS.TEXTBOOKS, userId, documentId ?? '', 'slots'],
+    enabled: Boolean(documentId),
+    queryFn: async () => {
+      if (!documentId) return [];
+      try {
+        const res = await fetch(
+          `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/textbook-lessons/${encodeURIComponent(documentId)}`
+        );
+        if (!res.ok) return [];
+        const payload: unknown = await res.json().catch(() => null);
+        if (payload && typeof payload === 'object' && Array.isArray((payload as { slots?: unknown }).slots)) {
+          return (payload as { slots: TextbookLessonSlotItem[] }).slots;
+        }
+      } catch (e) {
+        logger.debug('[useTextbookLessonSlotsQuery] failed to load lesson slots', e);
+      }
+      return [];
+    },
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+/** 将已入库教材槽位转换为目录候选（可直接复用，免去大模型重复抽取） */
+export function lessonSlotsToTocCandidates(slots: TextbookLessonSlotItem[]): TocRecognitionCandidate[] {
+  return slots.map((s, idx) => ({
+    key: s.lessonId || `slot-${idx + 1}`,
+    title: s.title,
+    printedPage: s.startPage ? String(s.startPage) : String(idx + 1),
+    level: (s.kind === 'chapter' || s.kind === 'section' ? 2 : 1) as 1 | 2,
+    kind: (s.kind === 'chapter' || s.kind === 'section' ? 'section' : 'lesson') as 'section' | 'lesson',
+    confidence: 'high' as const,
+    ...(typeof s.startPage === 'number' && Number.isFinite(s.startPage)
+      ? { physicalPage: s.startPage }
+      : {}),
+  }));
+}
+
+/** 从文档标题或文件名中模糊查找本地已存在的匹配教材 */
+export function findMatchingDocument(
+  docTitle: string,
+  documents: RawDocumentSummary[]
+): RawDocumentSummary | null {
+  if (!docTitle.trim() || documents.length === 0) return null;
+  const clean = docTitle.trim().toLowerCase();
+
+  // 1. 完全匹配标题或 ID
+  const exact = documents.find(
+    (d) => d.title.trim().toLowerCase() === clean || d.id.toLowerCase() === clean
+  );
+  if (exact) return exact;
+
+  // 2. 标点与修饰符归一化匹配（消除空格、括号、第X册等差异）
+  const normalize = (s: string) => s.replace(/[\s\-_（）()【】\[\]第册卷·]/g, '').toLowerCase();
+  const cleanNorm = normalize(docTitle);
+  if (cleanNorm.length >= 2) {
+    const normMatch = documents.find((d) => {
+      const dNorm = normalize(d.title);
+      return dNorm === cleanNorm || (dNorm.length >= 2 && (dNorm.includes(cleanNorm) || cleanNorm.includes(dNorm)));
+    });
+    if (normMatch) return normMatch;
+  }
+
+  // 3. 子串包含匹配（前缀或包含）
+  if (clean.length >= 3) {
+    const subMatch = documents.find(
+      (d) => d.title.toLowerCase().includes(clean) || clean.includes(d.title.toLowerCase())
+    );
+    if (subMatch) return subMatch;
+  }
+
+  return null;
+}
+
 

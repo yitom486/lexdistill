@@ -1,8 +1,12 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import {
   requestExecuteTextbookPipeline,
+  findMatchingDocument,
+  lessonSlotsToTocCandidates,
   type ExecuteTextbookPipelineVars,
   type ExecuteTextbookPipelineResult,
+  type RawDocumentSummary,
+  type TextbookLessonSlotItem,
 } from '../textbooks-annotations.js';
 
 /**
@@ -144,5 +148,117 @@ describe('requestExecuteTextbookPipeline 请求层', () => {
 
     expect(err).toBeInstanceOf(Error);
     expect((err as Error).message).toContain('教材导入流水线执行失败（HTTP 500）');
+  });
+
+  it('更新已有教材时正确透传 documentId 与 forceOverwrite 参数', async () => {
+    installFetchStub();
+    nextResponse = { status: 200, payload: PIPELINE_SUCCESS_PAYLOAD };
+
+    const vars: ExecuteTextbookPipelineVars = {
+      documentId: 'doc_existing_123',
+      title: '更新现有书',
+      forceOverwrite: false,
+      tocEntries: [{ title: '第1课', printedPage: 1 }],
+    };
+
+    await requestExecuteTextbookPipeline('user_123', vars);
+
+    expect(calls.length).toBe(1);
+    expect(calls[0]?.jsonBody).toMatchObject({
+      documentId: 'doc_existing_123',
+      title: '更新现有书',
+      forceOverwrite: false,
+    });
+  });
+});
+
+describe('教材匹配与槽位复用纯函数测试', () => {
+  it('findMatchingDocument: 支持完全匹配、规范化去标点匹配与子串匹配', () => {
+    const docs: RawDocumentSummary[] = [
+      {
+        id: 'doc_mtt3n2rp0v4d5u',
+        userId: 'user_1',
+        title: 'minna1',
+        sourceKind: 'user_import',
+        language: 'ja',
+        content: '',
+        createdAt: '2026-09-29T10:00:00Z',
+        updatedAt: '2026-09-29T10:00:00Z',
+      },
+      {
+        id: 'minna-nihongo-1',
+        userId: 'system',
+        title: '大家的日语 第1册 (Minna no Nihongo I)',
+        sourceKind: 'curriculum_textbook',
+        language: 'ja',
+        content: '',
+        createdAt: '2026-09-29T10:00:00Z',
+        updatedAt: '2026-09-29T10:00:00Z',
+      },
+    ];
+
+    // 1. 完全一致
+    const match1 = findMatchingDocument('minna1', docs);
+    expect(match1?.id).toBe('doc_mtt3n2rp0v4d5u');
+
+    // 2. 规范化匹配（不同括号与标点）
+    const match2 = findMatchingDocument('大家的日语（第 1 册）', docs);
+    expect(match2?.id).toBe('minna-nihongo-1');
+
+    // 3. 子串匹配
+    const match3 = findMatchingDocument('大家的日语', docs);
+    expect(match3?.id).toBe('minna-nihongo-1');
+
+    // 4. 无匹配
+    const matchNone = findMatchingDocument('完全不相干的英语教材', docs);
+    expect(matchNone).toBeNull();
+  });
+
+  it('lessonSlotsToTocCandidates: 准确将持久化槽位映射为可编辑目录候选', () => {
+    const slots: TextbookLessonSlotItem[] = [
+      {
+        documentId: 'doc_01',
+        lessonId: 'l1',
+        lessonNumber: 1,
+        title: '第 1 课 初次见面',
+        sortOrder: 1,
+        kind: 'lesson',
+        parentId: null,
+        startPage: 14,
+        endPage: 22,
+        status: 'ready',
+        hasPassage: true,
+        hasPreview: true,
+        hasSummary: true,
+      },
+      {
+        documentId: 'doc_01',
+        lessonId: 'u1',
+        lessonNumber: 2,
+        title: '第 1 单元 总结',
+        sortOrder: 2,
+        kind: 'chapter',
+        parentId: null,
+        startPage: 23,
+        endPage: 25,
+        status: 'pending',
+        hasPassage: false,
+        hasPreview: false,
+        hasSummary: false,
+      },
+    ];
+
+    const candidates = lessonSlotsToTocCandidates(slots);
+    expect(candidates).toHaveLength(2);
+    expect(candidates[0]!.key).toBe('l1');
+    expect(candidates[0]!.title).toBe('第 1 课 初次见面');
+    expect(candidates[0]!.printedPage).toBe('14');
+    expect(candidates[0]!.level).toBe(1);
+    expect(candidates[0]!.kind).toBe('lesson');
+    expect(candidates[0]!.physicalPage).toBe(14);
+
+    expect(candidates[1]!.key).toBe('u1');
+    expect(candidates[1]!.kind).toBe('section');
+    expect(candidates[1]!.level).toBe(2);
   });
 });
