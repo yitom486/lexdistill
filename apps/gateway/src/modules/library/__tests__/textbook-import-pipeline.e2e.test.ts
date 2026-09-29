@@ -28,13 +28,13 @@ import type { ToolExecutionContext } from '@study-studio/tool-core';
 
 async function rmRetry(dir: string): Promise<void> {
   let last: unknown = null;
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 30; i++) {
     try {
       await rm(dir, { recursive: true, force: true });
       return;
     } catch (e) {
       last = e;
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 100));
     }
   }
   throw last;
@@ -456,9 +456,12 @@ describe('教材导入 AI-Native 管道端到端集成测试 (E2E Pipeline)', ()
     const tempDir = await mkdtemp(join(tmpdir(), 'ss-realdb-e2e-'));
     const realDbPath = join(tempDir, 'actual-textbook-test.db');
 
+    let repo: DrizzleLearnerRepository | null = null;
+    let coldSqlite: Database | null = null;
+
     try {
       // 1. 使用真实磁盘文件路径创建仓储与底层 SQLite 实例（非内存库，走真实文件 I/O 与 WAL 日志）
-      const repo = new DrizzleLearnerRepository(realDbPath);
+      repo = new DrizzleLearnerRepository(realDbPath);
       const tocTool = new LibrarySubmitTocTool(repo);
 
       // Phase 0: 目录识别并优先落盘建立骨架
@@ -540,56 +543,206 @@ describe('教材导入 AI-Native 管道端到端集成测试 (E2E Pipeline)', ()
 
       // 2. 模拟应用完全退出：彻底关闭现有仓储连接句柄
       repo.getRawDb().close();
+      repo = null;
 
       // 3. 模拟冷启动：完全新建一个独立的只读 SQLite 连接从磁盘重新读取（脱离原连接上下文）
-      const coldSqlite = new Database(realDbPath, { readonly: true });
-      try {
-        // 验证数据库物理完整性（无损坏、无裂缝）
-        const integrity = coldSqlite.query('PRAGMA integrity_check;').all() as Array<{ integrity_check: string }>;
-        expect(integrity[0]?.integrity_check).toBe('ok');
+      coldSqlite = new Database(realDbPath, { readonly: true });
 
-        // 验证冷启动读取教材元数据
-        const coldDoc = coldSqlite
-          .query('SELECT id, title, source_kind FROM documents WHERE id = ?')
-          .get('doc_tb_real_disk_01') as { id: string; title: string; source_kind: string } | null;
-        expect(coldDoc).not.toBeNull();
-        expect(coldDoc?.title).toBe('真实落盘教材');
+      // 验证数据库物理完整性（无损坏、无裂缝）
+      const integrity = coldSqlite.query('PRAGMA integrity_check;').all() as Array<{ integrity_check: string }>;
+      expect(integrity[0]?.integrity_check).toBe('ok');
 
-        // 验证冷启动读取课文槽位与 Markdown
-        const coldLessons = coldSqlite
-          .query('SELECT lesson_id, kind, status, passage_md FROM textbook_lessons WHERE document_id = ? ORDER BY sort_order ASC')
-          .all('doc_tb_real_disk_01') as Array<{ lesson_id: string; kind: string; status: string; passage_md: string | null }>;
-        expect(coldLessons.length).toBe(3);
-        const actualLessons = coldLessons.filter((l) => l.kind === 'lesson');
-        expect(actualLessons.length).toBe(2);
-        expect(actualLessons.every((l) => l.status === 'ready')).toBe(true);
-        expect(actualLessons.find((l) => l.lesson_id === 'l1')?.passage_md).toContain('数据已成功写入物理磁盘文件');
-        expect(actualLessons.find((l) => l.lesson_id === 'l2')?.passage_md).toContain('事务落盘测试完成');
+      // 验证冷启动读取教材元数据
+      const coldDoc = coldSqlite
+        .query('SELECT id, title, source_kind FROM documents WHERE id = ?')
+        .get('doc_tb_real_disk_01') as { id: string; title: string; source_kind: string } | null;
+      expect(coldDoc).not.toBeNull();
+      expect(coldDoc?.title).toBe('真实落盘教材');
 
-        // 验证冷启动读取生词表
-        const coldVocab = coldSqlite
-          .query('SELECT surface, reading, gloss_zh FROM textbook_vocab WHERE document_id = ?')
-          .all('doc_tb_real_disk_01') as Array<{ surface: string; reading: string; gloss_zh: string }>;
-        expect(coldVocab.length).toBe(2);
-        expect(coldVocab.map((v) => v.surface)).toContain('永続化');
-        expect(coldVocab.map((v) => v.surface)).toContain('排他制御');
+      // 验证冷启动读取课文槽位与 Markdown
+      const coldLessons = coldSqlite
+        .query('SELECT lesson_id, kind, status, passage_md FROM textbook_lessons WHERE document_id = ? ORDER BY sort_order ASC')
+        .all('doc_tb_real_disk_01') as Array<{ lesson_id: string; kind: string; status: string; passage_md: string | null }>;
+      expect(coldLessons.length).toBe(3);
+      const actualLessons = coldLessons.filter((l) => l.kind === 'lesson');
+      expect(actualLessons.length).toBe(2);
+      expect(actualLessons.every((l) => l.status === 'ready')).toBe(true);
+      expect(actualLessons.find((l) => l.lesson_id === 'l1')?.passage_md).toContain('数据已成功写入物理磁盘文件');
+      expect(actualLessons.find((l) => l.lesson_id === 'l2')?.passage_md).toContain('事务落盘测试完成');
 
-        // 验证冷启动读取语法与习题
-        const coldGrammar = coldSqlite
-          .query('SELECT title, examples_json FROM textbook_grammar WHERE document_id = ?')
-          .all('doc_tb_real_disk_01') as Array<{ title: string; examples_json: string }>;
-        expect(coldGrammar.length).toBe(2);
-        expect(coldGrammar.map((g) => g.title)).toContain('～てある（存续态）');
+      // 验证冷启动读取生词表
+      const coldVocab = coldSqlite
+        .query('SELECT surface, reading, gloss_zh FROM textbook_vocab WHERE document_id = ?')
+        .all('doc_tb_real_disk_01') as Array<{ surface: string; reading: string; gloss_zh: string }>;
+      expect(coldVocab.length).toBe(2);
+      expect(coldVocab.map((v) => v.surface)).toContain('永続化');
+      expect(coldVocab.map((v) => v.surface)).toContain('排他制御');
 
-        const coldExercises = coldSqlite
-          .query('SELECT prompt, answer FROM textbook_exercises WHERE document_id = ?')
-          .all('doc_tb_real_disk_01') as Array<{ prompt: string; answer: string }>;
-        expect(coldExercises.length).toBe(2);
-        expect(coldExercises.every((e) => e.answer === '真实磁盘数据库')).toBe(true);
-      } finally {
-        coldSqlite.close();
-      }
+      // 验证冷启动读取语法与习题
+      const coldGrammar = coldSqlite
+        .query('SELECT title, examples_json FROM textbook_grammar WHERE document_id = ?')
+        .all('doc_tb_real_disk_01') as Array<{ title: string; examples_json: string }>;
+      expect(coldGrammar.length).toBe(2);
+      expect(coldGrammar.map((g) => g.title)).toContain('～てある（存续态）');
+
+      const coldExercises = coldSqlite
+        .query('SELECT prompt, answer FROM textbook_exercises WHERE document_id = ?')
+        .all('doc_tb_real_disk_01') as Array<{ prompt: string; answer: string }>;
+      expect(coldExercises.length).toBe(2);
+      expect(coldExercises.every((e) => e.answer === '真实磁盘数据库')).toBe(true);
     } finally {
+      if (repo) {
+        try {
+          (repo as DrizzleLearnerRepository).getRawDb().close();
+        } catch {}
+      }
+      if (coldSqlite) {
+        try {
+          (coldSqlite as Database).close();
+        } catch {}
+      }
+      await rmRetry(tempDir);
+    }
+  });
+
+  it('【一条龙全贯通流水线】executeTextbookPipeline：任务台账 → Phase 0 骨架建槽 → Phase 1&2 并发提炼 → 任务终结全闭环（真实物理磁盘验证）', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'study-studio-pipeline-dragon-'));
+    const realDbPath = join(tempDir, 'dragon-pipeline.db');
+
+    let repo: DrizzleLearnerRepository | null = null;
+    let coldSqlite: Database | null = null;
+
+    try {
+      // 1. 初始化真实磁盘仓储
+      repo = new DrizzleLearnerRepository(realDbPath);
+      const documentId = 'doc_dragon_001';
+
+      // 模拟符合 AgentPoolLike 契约且返回标准提炼结构的大模型 Worker 池
+      const mockPool: AgentPoolLike = {
+        acquire: async () => ({
+          ask: async () => ({
+            text: JSON.stringify({
+              passageMd: '# 第 1 课 一条龙精读课文\n\n一条龙流水线贯通测试，无补丁整洁架构。',
+              vocabularies: [
+                { surface: '一本化', reading: 'いっぽんか', glossZh: '一体化，统一' },
+              ],
+              knowledgePoints: [
+                {
+                  title: '～を通じて',
+                  explanation: '通过……整个过程',
+                  examples: [{ japanese: '一連のパイプラインを通じて処理する。', chinese: '通过一整套流水线进行处理。' }],
+                },
+              ],
+              exercises: [
+                {
+                  type: 'CHOICE',
+                  prompt: '一条龙流水线的作用是什么？',
+                  options: ['修补漏洞', '端到端整洁打通', '增加中间层'],
+                  answer: '端到端整洁打通',
+                  explanation: '杜绝打补丁，从建档到提炼全链路自洽。',
+                },
+              ],
+            }),
+          }),
+          finish: async () => {},
+        }),
+        close: async () => {},
+      };
+
+      const progressEvents: number[] = [];
+
+      // 2. 直接驱动一条龙高层服务
+      const result = await repo.executeTextbookPipeline({
+        userId: 'user_dragon_01',
+        documentId,
+        title: '新编日语一条龙导入教材',
+        language: 'ja',
+        filename: 'shinpen_nihongo_01.pdf',
+        tocEntries: [
+          { id: 'u1', level: 'unit', title: '第一单元', startPage: 1, endPage: 20 },
+          { id: 'lesson_d1', level: 'lesson', title: '第1课 一体化概念', startPage: 1, endPage: 10, parentId: 'u1' },
+          { id: 'lesson_d2', level: 'lesson', title: '第2课 整洁架构实践', startPage: 11, endPage: 20, parentId: 'u1' },
+        ],
+        lessonJobs: [
+          { lessonId: 'lesson_d1', ocrText: '第1课 扫描文本内容...' },
+          { lessonId: 'lesson_d2', ocrText: '第2课 扫描文本内容...' },
+        ],
+        pool: mockPool,
+        onProgress: (p) => {
+          progressEvents.push(p.completedCount);
+        },
+      });
+
+      // 3. 校验一条龙管道输出
+      expect(isOk(result)).toBe(true);
+      if (!isOk(result)) return;
+
+      const output = result.value;
+      expect(output.documentId).toBe(documentId);
+      expect(output.title).toBe('新编日语一条龙导入教材');
+      expect(output.lessonCount).toBe(2); // 2 core lessons
+      expect(output.allLessonsReady).toBe(true);
+      expect(output.successfulLessons).toBe(2);
+      expect(output.failedLessons).toBe(0);
+      expect(output.task.status).toBe('done');
+      expect(output.task.lessons).toBe(2);
+      expect(progressEvents.length).toBeGreaterThanOrEqual(2);
+
+      // 4. 关闭现有仓储连接，模拟应用完全退出
+      repo.getRawDb().close();
+      repo = null;
+
+      // 5. 冷启动验证真实磁盘持久化
+      coldSqlite = new Database(realDbPath, { readonly: true });
+
+      // PRAGMA 完整性检查
+      const integrity = coldSqlite.query('PRAGMA integrity_check;').all() as Array<{ integrity_check: string }>;
+      expect(integrity[0]?.integrity_check).toBe('ok');
+
+      // 验证任务台账落盘
+      const coldTask = coldSqlite
+        .query('SELECT status, lessons, document_id FROM document_imports WHERE id = ?')
+        .get(output.task.id) as { status: string; lessons: number; document_id: string } | null;
+      expect(coldTask).not.toBeNull();
+      expect(coldTask?.status).toBe('done');
+      expect(coldTask?.lessons).toBe(2);
+      expect(coldTask?.document_id).toBe(documentId);
+
+      // 验证课文槽位状态全部翻转为 ready
+      const coldLessons = coldSqlite
+        .query('SELECT lesson_id, status, passage_md FROM textbook_lessons WHERE document_id = ? AND kind = ?')
+        .all(documentId, 'lesson') as Array<{ lesson_id: string; status: string; passage_md: string }>;
+      expect(coldLessons.length).toBe(2);
+      expect(coldLessons.every((l) => l.status === 'ready')).toBe(true);
+      expect(coldLessons.find((l) => l.lesson_id === 'lesson_d1')?.passage_md).toContain('一条龙精读课文');
+
+      // 验证生词、语法、习题均成功落盘
+      const vocabRows = coldSqlite
+        .query('SELECT surface, reading, gloss_zh FROM textbook_vocab WHERE document_id = ?')
+        .all(documentId) as Array<{ surface: string; reading: string; gloss_zh: string }>;
+      expect(vocabRows.length).toBe(2);
+      expect(vocabRows.map((v) => v.surface)).toContain('一本化');
+
+      const grammarCount = coldSqlite
+        .query('SELECT COUNT(*) as count FROM textbook_grammar WHERE document_id = ?')
+        .get(documentId) as { count: number };
+      expect(grammarCount.count).toBe(2);
+
+      const exerciseCount = coldSqlite
+        .query('SELECT COUNT(*) as count FROM textbook_exercises WHERE document_id = ?')
+        .get(documentId) as { count: number };
+      expect(exerciseCount.count).toBe(2);
+    } finally {
+      if (repo) {
+        try {
+          (repo as DrizzleLearnerRepository).getRawDb().close();
+        } catch {}
+      }
+      if (coldSqlite) {
+        try {
+          (coldSqlite as Database).close();
+        } catch {}
+      }
       await rmRetry(tempDir);
     }
   });

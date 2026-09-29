@@ -280,6 +280,11 @@ import {
   type CommitLessonKnowledgeOutput,
 } from '@study-studio/storage-sqlite';
 import {
+  executeTextbookPipeline as executeTextbookPipelineDomain,
+  type TextbookPipelineInput,
+  type TextbookPipelineOutput,
+} from '../modules/library/application/textbook-pipeline.js';
+import {
   importDocument as importDocumentDomain,
   type DocumentImportInput,
   type DocumentImportOutput,
@@ -612,6 +617,16 @@ export class DrizzleLearnerRepository
     documentId: string
   ): Promise<Result<SavedDocumentStructure | null, BusinessError>> {
     return getDocumentStructureDomain(this.deps, userId, documentId);
+  }
+
+  /**
+   * AI-Native 教材端到端导入一条龙流水线。
+   * 包含：任务台账 -> Phase 0 骨架优先校验建槽 -> Phase 1&2 Worker并发提炼与白名单回填 -> 任务终结。
+   */
+  public async executeTextbookPipeline(
+    input: TextbookPipelineInput
+  ): Promise<Result<TextbookPipelineOutput, BusinessError>> {
+    return executeTextbookPipelineDomain(this, input);
   }
 
   /**

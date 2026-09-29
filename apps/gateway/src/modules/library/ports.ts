@@ -37,6 +37,10 @@ import type {
   CommitLessonKnowledgeInput,
   CommitLessonKnowledgeOutput,
 } from '@study-studio/storage-sqlite';
+import type {
+  TextbookPipelineInput,
+  TextbookPipelineOutput,
+} from './application/textbook-pipeline.js';
 
 /**
  * M1-2 内容（content）领域仓储能力契约（文档/教材/课程底座/导入任务）。
@@ -47,6 +51,9 @@ import type {
  *   所有权归属 M5 再定，本契约暂不收录。
  */
 export interface ContentRepository {
+  executeTextbookPipeline(
+    input: TextbookPipelineInput
+  ): Promise<Result<TextbookPipelineOutput, BusinessError>>;
   seedTextbookTocSkeleton(
     input: SeedTocSkeletonInput
   ): Promise<Result<SavedTocSkeleton, BusinessError>>;
@@ -221,5 +228,7 @@ export type {
   SavedTocSkeleton,
   CommitLessonKnowledgeInput,
   CommitLessonKnowledgeOutput,
+  TextbookPipelineInput,
+  TextbookPipelineOutput,
 };
 
