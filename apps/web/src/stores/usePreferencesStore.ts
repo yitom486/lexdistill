@@ -201,6 +201,19 @@ export const usePreferencesStore = create<PreferencesState>()(
         if (state?.theme) {
           applyThemeToDom(state.theme);
         }
+        // 清洗历史版本可能存留的虚构/硬编码模型名（例如 gpt-6-luna / gpt-5 等），回退为空（跟随本机 Codex 默认）
+        if (
+          state?.pipelineModel &&
+          (state.pipelineModel.includes('gpt-6') || state.pipelineModel.includes('gpt-5'))
+        ) {
+          state.pipelineModel = '';
+        }
+        if (
+          state?.tocReviewModel &&
+          (state.tocReviewModel.includes('gpt-6') || state.tocReviewModel.includes('gpt-5'))
+        ) {
+          state.tocReviewModel = '';
+        }
       },
     }
   )

@@ -60,6 +60,7 @@ export interface BatchExtractionOptions {
   forceOverwrite?: boolean | undefined;
   onProgress?: ((progress: BatchExtractionProgress) => void) | undefined;
   pool?: AgentPoolLike | undefined;
+  signal?: AbortSignal | undefined;
 }
 
 export interface BatchExtractionSummary {
@@ -415,7 +416,9 @@ export class LessonBatchExtractor {
     try {
       await Promise.all(
         pendingJobs.map(async (job) => {
+          if (options.signal?.aborted) return;
           const result = await this.extractAndCommitSingleLesson(job, pool);
+          if (options.signal?.aborted) return;
           completedCount += 1;
 
           if (result.ok) {

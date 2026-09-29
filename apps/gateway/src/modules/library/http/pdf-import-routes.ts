@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import { BusinessError, isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
@@ -293,6 +294,177 @@ export function createPdfImportRoutes(
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'executeTextbookPipeline');
       }
+    })
+    .post('/api/documents/:userId/textbook-pipeline-jobs', async (c) => {
+      // 启动 AI-Native 教材一条龙提炼后台任务（非阻塞，支持 SSE 流式推模式与全局进度监控）
+      try {
+        const userId = c.req.param('userId');
+        if (!userId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
+          );
+        }
+        const body = (await c.req.json().catch(() => null)) as {
+          documentId?: string;
+          title?: string;
+          language?: string;
+          filename?: string;
+          filePath?: string;
+          pdfBase64?: string;
+          model?: string;
+          poolSize?: number;
+          forceOverwrite?: boolean;
+          tocEntries?: TocEntry[];
+          lessonJobs?: Array<{
+            lessonId: string;
+            ocrText: string;
+            title?: string;
+          }>;
+        } | null;
+
+        if (!body || !body.title?.trim() || !Array.isArray(body.tocEntries)) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '请求体格式不正确，缺少 title 或 tocEntries', 'VALIDATION')
+          );
+        }
+
+        let pdfBytes: Uint8Array | undefined = undefined;
+        let inspector: PdfInspectorLike | undefined = undefined;
+        if (body.filePath) {
+          const fileRes = await readLocalPdfFile(body.filePath);
+          if (!fileRes.ok) {
+            return formatBusinessErrorResponse(c, fileRes.error, 'readLocalPdfFile');
+          }
+          pdfBytes = fileRes.value.bytes;
+          const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
+          inspector = runtime.inspector;
+        } else if (body.pdfBase64) {
+          try {
+            pdfBytes = new Uint8Array(Buffer.from(body.pdfBase64, 'base64'));
+            const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
+            inspector = runtime.inspector;
+          } catch (e) {
+            return formatBusinessErrorResponse(
+              c,
+              new BusinessError('E_INVALID_INPUT', '提供的 pdfBase64 无法正常解码为二进制数据', 'VALIDATION')
+            );
+          }
+        }
+
+        if ((!Array.isArray(body.lessonJobs) || body.lessonJobs.length === 0) && !pdfBytes) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError(
+              'E_INVALID_INPUT',
+              '请提供章节文本切片 (lessonJobs) 或教材文件 (filePath / pdfBase64)',
+              'VALIDATION'
+            )
+          );
+        }
+
+        const pool = body.model || body.poolSize
+          ? createDefaultAgentPool({
+              ...(body.model ? { model: body.model } : {}),
+              ...(body.poolSize ? { poolSize: body.poolSize } : {}),
+            })
+          : undefined;
+
+        const pipelineInput: TextbookPipelineInput = {
+          userId,
+          ...(body.documentId ? { documentId: body.documentId } : {}),
+          title: body.title.trim(),
+          ...(body.language ? { language: body.language } : {}),
+          ...(body.filename ? { filename: body.filename } : {}),
+          tocEntries: body.tocEntries,
+          ...(body.lessonJobs ? { lessonJobs: body.lessonJobs } : {}),
+          ...(pdfBytes ? { pdf: pdfBytes } : {}),
+          ...(inspector ? { inspector } : {}),
+          ...(body.forceOverwrite !== undefined ? { forceOverwrite: Boolean(body.forceOverwrite) } : {}),
+          ...(pool ? { pool } : {}),
+        };
+
+        const res = deps.server.pipelineJobs.start(deps.repo, {
+          ...pipelineInput,
+          ...(body.model ? { model: body.model } : {}),
+          ...(body.poolSize ? { poolSize: body.poolSize } : {}),
+        });
+
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'startTextbookPipelineJob');
+        return c.json(res.value, 202);
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'startTextbookPipelineJob');
+      }
+    })
+    .get('/api/documents/:userId/textbook-pipeline-jobs/active', (c) => {
+      const userId = c.req.param('userId');
+      const activeJob = deps.server.pipelineJobs.getActive(userId);
+      return c.json({ activeJob });
+    })
+    .get('/api/documents/:userId/textbook-pipeline-jobs/:jobId', (c) => {
+      const jobId = c.req.param('jobId');
+      const job = deps.server.pipelineJobs.get(jobId);
+      if (!job) {
+        return formatBusinessErrorResponse(
+          c,
+          new BusinessError('E_NOT_FOUND', '未找到指定的提炼任务', 'LEARNER_STATE')
+        );
+      }
+      return c.json(job);
+    })
+    .get('/api/documents/:userId/textbook-pipeline-jobs/:jobId/events', (c) => {
+      const jobId = c.req.param('jobId');
+      const job = deps.server.pipelineJobs.get(jobId);
+      if (!job) {
+        return formatBusinessErrorResponse(
+          c,
+          new BusinessError('E_NOT_FOUND', '未找到指定的提炼任务', 'LEARNER_STATE')
+        );
+      }
+
+      return streamSSE(c, async (stream) => {
+        // 挂载时立即推送当前内存快照
+        await stream.writeSSE({
+          event: 'pipeline.snapshot',
+          data: JSON.stringify(job),
+        });
+
+        if (job.status === 'done' || job.status === 'failed' || job.status === 'cancelled') {
+          return;
+        }
+
+        const unsubscribe = deps.server.pipelineJobs.subscribe(jobId, async (snapshot) => {
+          try {
+            await stream.writeSSE({
+              event: snapshot.status === 'running' ? 'pipeline.progress' : 'pipeline.snapshot',
+              data: JSON.stringify(snapshot),
+            });
+            if (snapshot.status !== 'running') {
+              unsubscribe();
+            }
+          } catch {
+            unsubscribe();
+          }
+        });
+
+        stream.onAbort(() => {
+          unsubscribe();
+        });
+
+        // 维持连接直至任务结束或客户端断开
+        while (true) {
+          const current = deps.server.pipelineJobs.get(jobId);
+          if (!current || current.status !== 'running') break;
+          await stream.sleep(2000);
+        }
+      });
+    })
+    .post('/api/documents/:userId/textbook-pipeline-jobs/:jobId/cancel', (c) => {
+      const jobId = c.req.param('jobId');
+      const res = deps.server.pipelineJobs.cancel(jobId);
+      if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'cancelPipelineJob');
+      return c.json(res.value);
     })
     .get('/api/documents/:userId/textbook-lessons/:documentId', async (c) => {
       try {

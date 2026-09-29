@@ -36,6 +36,7 @@ import {
 } from '../modules/learning-progress/public.js';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { EnrichJobRegistry, buildEnrichWsEnvelope } from '../modules/library/application/pdf-import/enrich-job-runner.js';
+import { TextbookPipelineJobRegistry } from '../modules/library/application/pipeline-job-runner.js';
 import { registerGatewayTools } from '../transport/tools/register-tools.js';
 import { handleTurnSend } from './handlers/turn-handlers.js';
 import { handleQueueStart } from './handlers/queue-handler.js';
@@ -87,6 +88,7 @@ export class GatewayServer {
   private readonly sessionEmitters = new Map<string, (env: WsEnvelope) => void>();
   /** 整本 enrich 后台任务注册表（进程内；已落库课天然续跑，重启不丢数据） */
   public readonly enrichJobs = new EnrichJobRegistry();
+  public readonly pipelineJobs = new TextbookPipelineJobRegistry();
 
   constructor(
     learnerRepo?: LearnerRepository,

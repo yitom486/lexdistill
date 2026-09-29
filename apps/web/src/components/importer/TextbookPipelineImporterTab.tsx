@@ -13,6 +13,10 @@ import {
   ListTree,
   FileCheck2,
   Cpu,
+  Loader2,
+  StopCircle,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -52,6 +56,11 @@ import {
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui/collapsible.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { useAgentModelsQuery } from '../../queries/useAgentQueries.js';
+import {
+  useStartPipelineJobMutation,
+  useCancelPipelineJobMutation,
+} from '../../queries/pipeline-jobs.js';
+import { usePipelineJobStore } from '../../stores/usePipelineJobStore.js';
 
 interface TextbookPipelineImporterTabProps {
   pdfFile: File | null;
@@ -100,7 +109,14 @@ export function TextbookPipelineImporterTab({
   onSelectJsonFile,
 }: TextbookPipelineImporterTabProps) {
   // 严格时序状态机：1. 选取文件 -> 2. 目录识别与核对 -> 3. 全文解析与提炼入库
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const activeJob = usePipelineJobStore((s) => s.activeJob);
+  const startPipelineJob = useStartPipelineJobMutation();
+  const cancelPipelineJob = useCancelPipelineJobMutation();
+
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(() => {
+    const job = usePipelineJobStore.getState().activeJob;
+    return job && (job.status === 'running' || job.status === 'done') ? 3 : 1;
+  });
   const [confirmedToc, setConfirmedToc] = useState<TocRecognitionCandidate[] | null>(null);
 
   const [pdfStartPage, setPdfStartPage] = useState<string>('');
@@ -123,7 +139,12 @@ export function TextbookPipelineImporterTab({
   const modelsQuery = useAgentModelsQuery();
   const codexModels = modelsQuery.data ?? [];
 
-  const pipelineModel = usePreferencesStore((s) => s.pipelineModel);
+  const rawPipelineModel = usePreferencesStore((s) => s.pipelineModel);
+  // 清洗历史残留的虚构/硬编码模型名（例如 gpt-6-luna / gpt-5 等），回退为空（跟随本机 Codex 默认）
+  const pipelineModel =
+    rawPipelineModel.includes('gpt-6') || rawPipelineModel.includes('gpt-5')
+      ? ''
+      : rawPipelineModel;
   const setPipelineModel = usePreferencesStore((s) => s.setPipelineModel);
   const pipelinePoolSize = usePreferencesStore((s) => s.pipelinePoolSize);
   const setPipelinePoolSize = usePreferencesStore((s) => s.setPipelinePoolSize);
@@ -547,7 +568,7 @@ export function TextbookPipelineImporterTab({
   };
 
   const handleExecutePipeline = () => {
-    if (executePipeline.isPending) return;
+    if (startPipelineJob.isPending) return;
     if (!confirmedToc || confirmedToc.length === 0) {
       toast.error('请先在第 2 步核对并确认教材目录大纲');
       return;
@@ -571,7 +592,7 @@ export function TextbookPipelineImporterTab({
       sortOrder: idx + 1,
     }));
 
-    executePipeline.mutate(
+    startPipelineJob.mutate(
       {
         ...(matchedDoc?.id ? { documentId: matchedDoc.id } : {}),
         title: docTitle || '未命名教材',
@@ -585,12 +606,9 @@ export function TextbookPipelineImporterTab({
         tocEntries,
       },
       {
-        onSuccess: (res) => {
+        onSuccess: (snapshot) => {
           sound.playCorrect();
-          setPipelineResult(res);
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TEXTBOOKS });
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCUMENTS });
-          toast.success(`教材《${res.title}》全书提炼完成！共 ${res.successfulLessons} 课就绪`);
+          toast.success(`已启动整书 AI 并发提炼！共 ${snapshot.totalLessons} 课进入并发执行队列`);
         },
         onError: (err) => {
           sound.playMistake();
@@ -1140,234 +1158,463 @@ export function TextbookPipelineImporterTab({
       {/* ======================= Step 3: 全文解析与提炼入库 ======================= */}
       {currentStep === 3 && (
         <div className="space-y-4">
-          {/* 已核对的目录草稿预览；此时尚未写入课次槽位。 */}
-          <div className="p-4 rounded-2xl bg-wash-amber-500o10 border border-tone-amber-500o30 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-ink-emerald-700-emerald-400" />
-                <span className="text-xs font-bold text-ink">
-                  目录草稿已核对（共 {confirmedToc?.length ?? 0} 条）
-                </span>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setCurrentStep(2)} className="text-xs h-7">
-                返回修改目录
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
-              {confirmedToc?.slice(0, 30).map((t, idx) => (
-                <span
-                  key={t.key || idx}
-                  className="px-2 py-0.5 rounded-lg border border-line bg-surface text-[11px] font-medium text-ink"
-                >
-                  {t.title || `第${idx + 1}课`} (p{t.printedPage})
-                </span>
-              ))}
-              {(confirmedToc?.length ?? 0) > 30 && (
-                <span className="text-[11px] text-ink-ghost self-center">
-                  …等共 {confirmedToc?.length} 课
-                </span>
-              )}
-            </div>
-          </div>
+          {activeJob && (activeJob.status === 'running' || activeJob.status === 'done' || activeJob.status === 'failed') ? (
+            /* 实时流水线监控大屏（受 SSE 流式持续驱动） */
+            <div className="space-y-4">
+              {/* 任务状态总览头卡 */}
+              <div className="p-5 rounded-2xl bg-surface border border-line shadow-xs space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl border ${
+                      activeJob.status === 'running'
+                        ? 'bg-tone-amber-500/10 border-tone-amber-500/30 text-tone-amber-500'
+                        : activeJob.status === 'done'
+                          ? 'bg-tone-emerald-500/10 border-tone-emerald-500/30 text-tone-emerald-500'
+                          : 'bg-tone-rose-500/10 border-tone-rose-500/30 text-tone-rose-500'
+                    }`}>
+                      {activeJob.status === 'running' ? (
+                        <Sparkles className="w-5 h-5 animate-pulse" />
+                      ) : activeJob.status === 'done' ? (
+                        <CheckCircle2 className="w-5 h-5" />
+                      ) : (
+                        <AlertTriangle className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-ink">
+                          《{activeJob.title}》整书 AI 并发提炼
+                        </h3>
+                        <Badge
+                          variant={activeJob.status === 'running' ? 'secondary' : activeJob.status === 'done' ? 'emerald' : 'outline'}
+                          className="text-xs"
+                        >
+                          {activeJob.status === 'running' ? 'AI 并发执行中' : activeJob.status === 'done' ? '全书提炼已完成' : '提炼中断/异常'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-ink-muted mt-1">
+                        并发算力：{activeJob.concurrency ?? 3} 个 AI Worker 并行
+                        {activeJob.model ? ` · 专职模型: ${activeJob.model}` : ' · 跟随本机 Codex 默认'}
+                      </p>
+                    </div>
+                  </div>
 
-          {/* 关联已有教材状态提示 */}
-          {matchedDoc && (
-            <div className="p-3.5 rounded-2xl bg-surface border border-line flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-accent shrink-0" />
-                <span className="font-semibold text-ink">提炼目标教材：</span>
-                <span className="font-mono text-ink">《{matchedDoc.title}》（ID: {matchedDoc.id}）</span>
-                <Badge variant="emerald" className="text-[10px]">
-                  {existingSlots.filter((s) => s.status === 'ready').length}/{existingLessonCount} 课已就绪
-                </Badge>
-              </div>
-              <span className="text-[11px] text-ink-ghost">
-                已就绪课次将自动跳过，保障已有学习与复习记录
-              </span>
-            </div>
-          )}
-
-          {/* Agent 池与专精大模型分级配置（AGENTS.md §1.6b 用户配置权） */}
-          <div className="p-4 rounded-2xl border border-line bg-surface space-y-4">
-            <div className="flex items-center justify-between border-b border-line-soft pb-2.5">
-              <div className="flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-accent" />
-                <span className="text-xs font-bold text-ink">AI Agent 池与模型算力配置</span>
-              </div>
-              <Badge variant="outline" className="text-[10px] text-ink-ghost">
-                AGENTS.md §1.6b 规范
-              </Badge>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="font-medium text-ink">
-                    专职提炼大模型（Model Tiering）：
-                  </label>
-                  {modelsQuery.isFetching ? (
-                    <span className="text-[10px] text-ink-ghost">拉取本地 Codex 模型中…</span>
-                  ) : codexModels.length > 0 ? (
-                    <span className="text-[10px] text-tone-amber-600 dark:text-tone-amber-400">
-                      已识别 {codexModels.length} 个本机模型
-                    </span>
-                  ) : null}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      sound.playClick();
+                      onClose();
+                      toast.info('流水线已转入后台静默运行，随时可在右下角悬浮球查看进度');
+                    }}
+                    className="text-xs h-8 gap-1.5"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" />
+                    后台静默执行
+                  </Button>
                 </div>
-                <Select
-                  value={isCustomMode ? '__custom__' : (pipelineModel || '__default__')}
-                  onValueChange={(v) => {
-                    if (v === '__custom__') {
-                      setIsCustomMode(true);
-                      if (customModelInput.trim()) {
-                        setPipelineModel(customModelInput.trim());
-                      }
-                    } else if (v === '__default__') {
-                      setIsCustomMode(false);
-                      setPipelineModel('');
-                    } else if (v) {
-                      setIsCustomMode(false);
-                      setPipelineModel(v);
-                    }
-                  }}
-                  disabled={executePipeline.isPending}
-                >
-                  <SelectTrigger className="w-full h-8 text-xs">
-                    <SelectValue placeholder="选择本地 Codex 模型" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__default__">
-                      ⚡ 本地 Codex 默认模型（跟随本机全局配置）
-                    </SelectItem>
-                    {codexModels.map((m) => (
-                      <SelectItem key={m.id || m.model} value={m.id || m.model}>
-                        {m.displayName || m.model}
-                        {m.isDefault ? '（本机推荐/默认）' : ''}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="__custom__">
-                      ✏️ 手动输入模型标识 (Custom Model)...
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
 
-                {isCustomMode && (
-                  <div className="mt-2 space-y-1">
-                    <input
-                      type="text"
-                      placeholder="输入本地可用模型标识（留空则跟随默认）"
-                      value={customModelInput}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCustomModelInput(val);
-                        setPipelineModel(val.trim());
+                {/* 进度条与实时指标 */}
+                <div className="space-y-2 pt-2 border-t border-line-soft">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-ink">
+                      总体提炼进度：{Math.min(100, Math.round((activeJob.doneLessons / (activeJob.totalLessons || 1)) * 100))}%
+                    </span>
+                    <span className="font-mono text-ink-muted">
+                      {activeJob.doneLessons} / {activeJob.totalLessons} 课
+                    </span>
+                  </div>
+                  <div className="w-full h-3 rounded-full bg-surface-elevated border border-line overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 rounded-full ${
+                        activeJob.status === 'running'
+                          ? 'bg-tone-amber-500'
+                          : activeJob.status === 'done'
+                            ? 'bg-tone-emerald-500'
+                            : 'bg-tone-rose-500'
+                      }`}
+                      style={{
+                        width: `${Math.min(100, Math.round((activeJob.doneLessons / (activeJob.totalLessons || 1)) * 100))}%`,
                       }}
-                      className="w-full h-8 px-2.5 rounded-xl border border-line bg-surface text-ink text-xs outline-none focus:border-tone-amber-500 font-mono"
                     />
-                    <p className="text-[10px] text-ink-ghost">
-                      请输入本地 Codex App Server 已接入或支持的模型标识
+                  </div>
+                </div>
+
+                {/* 实时指标三格 */}
+                <div className="grid grid-cols-3 gap-3 pt-1">
+                  <div className="p-3 rounded-xl bg-surface-elevated border border-line-soft text-left">
+                    <span className="text-[10px] text-ink-ghost block">已就绪课次</span>
+                    <span className="text-sm font-bold text-ink-emerald-700-emerald-400 font-mono">
+                      {activeJob.successfulLessons} 课
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-surface-elevated border border-line-soft text-left">
+                    <span className="text-[10px] text-ink-ghost block">失败/异常课次</span>
+                    <span className="text-sm font-bold text-tone-rose-500 font-mono">
+                      {activeJob.failedLessons.length} 课
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-surface-elevated border border-line-soft text-left overflow-hidden">
+                    <span className="text-[10px] text-ink-ghost block">当前活跃任务</span>
+                    <span className="text-xs font-medium text-ink truncate block" title={activeJob.currentLessonTitle}>
+                      {activeJob.status === 'running'
+                        ? (activeJob.currentLessonTitle || '课次切片中...')
+                        : '全部课次已结算'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 课次执行队列卡片列表 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs text-ink font-semibold px-1">
+                  <span>全书课次提炼队列（共 {activeJob.totalLessons} 课）</span>
+                  <span className="text-[11px] text-ink-ghost font-normal">
+                    包含预习导学、课文 Markdown、生词语法与习题保姆级解析
+                  </span>
+                </div>
+
+                <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+                  {(confirmedToc && confirmedToc.length > 0
+                    ? confirmedToc
+                    : Array.from({ length: activeJob.totalLessons }).map((_, i) => ({
+                        key: `l${i + 1}`,
+                        title: `第 ${i + 1} 课`,
+                        printedPage: i + 1,
+                      }))
+                  ).map((item, idx) => {
+                    const lessonId = `l${idx + 1}`;
+                    const isCurrent =
+                      activeJob.status === 'running' &&
+                      (activeJob.currentLessonId === lessonId || activeJob.currentLessonTitle === item.title);
+                    const isDoneLesson = idx < activeJob.successfulLessons;
+                    const failedInfo = activeJob.failedLessons.find((f) => f.lessonId === lessonId);
+
+                    return (
+                      <div
+                        key={lessonId}
+                        className={`p-2.5 rounded-xl border text-xs flex items-center justify-between transition-all ${
+                          isCurrent
+                            ? 'border-tone-amber-500 bg-tone-amber-500/10 shadow-xs'
+                            : isDoneLesson
+                              ? 'border-tone-emerald-600o30 bg-surface'
+                              : failedInfo
+                                ? 'border-tone-rose-500/40 bg-tone-rose-500/5'
+                                : 'border-line-soft bg-surface opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {isCurrent ? (
+                            <Loader2 className="w-4 h-4 text-tone-amber-500 animate-spin shrink-0" />
+                          ) : isDoneLesson ? (
+                            <CheckCircle2 className="w-4 h-4 text-tone-emerald-500 shrink-0" />
+                          ) : failedInfo ? (
+                            <AlertTriangle className="w-4 h-4 text-tone-rose-500 shrink-0" />
+                          ) : (
+                            <Clock className="w-4 h-4 text-ink-ghost shrink-0" />
+                          )}
+                          <span className="font-medium text-ink truncate">
+                            {item.title}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isCurrent && (
+                            <Badge variant="secondary" className="text-[10px] text-tone-amber-600 dark:text-tone-amber-400">
+                              AI Worker 正在提炼
+                            </Badge>
+                          )}
+                          {isDoneLesson && !isCurrent && (
+                            <Badge variant="emerald" className="text-[10px]">
+                              已原子入库
+                            </Badge>
+                          )}
+                          {failedInfo && (
+                            <span className="text-[10px] text-tone-rose-500 truncate max-w-[140px]" title={failedInfo.error}>
+                              {failedInfo.error}
+                            </span>
+                          )}
+                          {!isCurrent && !isDoneLesson && !failedInfo && (
+                            <span className="text-[10px] text-ink-ghost">
+                              排队中
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 底部行动条 */}
+              <div className="flex items-center justify-between pt-3 border-t border-line-soft">
+                {activeJob.status === 'running' ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (window.confirm(`确定要中止教材《${activeJob.title}》的提炼吗？已完成的课次将得以保留。`)) {
+                          cancelPipelineJob.mutate(activeJob.jobId);
+                        }
+                      }}
+                      disabled={cancelPipelineJob.isPending}
+                      className="text-xs text-tone-rose-500 hover:text-tone-rose-600 gap-1.5"
+                    >
+                      <StopCircle className="w-3.5 h-3.5" />
+                      中止当前任务
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        sound.playClick();
+                        onClose();
+                        toast.info('任务正在后台执行，随时可通过右下角悬浮球查看进度');
+                      }}
+                      className="gap-1.5 text-xs"
+                    >
+                      后台运行并关闭弹窗
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        sound.playClick();
+                        usePipelineJobStore.getState().clearActiveJob();
+                      }}
+                      className="text-xs"
+                    >
+                      重新配置新教材
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        sound.playCorrect();
+                        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TEXTBOOKS });
+                        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCUMENTS });
+                        onClose();
+                      }}
+                      className="gap-1.5 text-xs bg-tone-emerald-600 hover:bg-tone-emerald-700 text-tone-white"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      完成提炼并前往学习
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* 现有 Step 3 提炼配置表单 */
+            <div className="space-y-4">
+              {/* 已核对的目录草稿预览；此时尚未写入课次槽位。 */}
+              <div className="p-4 rounded-2xl bg-wash-amber-500o10 border border-tone-amber-500o30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-ink-emerald-700-emerald-400" />
+                    <span className="text-xs font-bold text-ink">
+                      目录草稿已核对（共 {confirmedToc?.length ?? 0} 条）
+                    </span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentStep(2)} className="text-xs h-7">
+                    返回修改目录
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                  {confirmedToc?.slice(0, 30).map((t, idx) => (
+                    <span
+                      key={t.key || idx}
+                      className="px-2 py-0.5 rounded-lg border border-line bg-surface text-[11px] font-medium text-ink"
+                    >
+                      {t.title || `第${idx + 1}课`} (p{t.printedPage})
+                    </span>
+                  ))}
+                  {(confirmedToc?.length ?? 0) > 30 && (
+                    <span className="text-[11px] text-ink-ghost self-center">
+                      …等共 {confirmedToc?.length} 课
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* 关联已有教材状态提示 */}
+              {matchedDoc && (
+                <div className="p-3.5 rounded-2xl bg-surface border border-line flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-accent shrink-0" />
+                    <span className="font-semibold text-ink">提炼目标教材：</span>
+                    <span className="font-mono text-ink">《{matchedDoc.title}》（ID: {matchedDoc.id}）</span>
+                    <Badge variant="emerald" className="text-[10px]">
+                      {existingSlots.filter((s) => s.status === 'ready').length}/{existingLessonCount} 课已就绪
+                    </Badge>
+                  </div>
+                  <span className="text-[11px] text-ink-ghost">
+                    已就绪课次将自动跳过，保障已有学习与复习记录
+                  </span>
+                </div>
+              )}
+
+              {/* Agent 池与专精大模型分级配置（AGENTS.md §1.6b 用户配置权） */}
+              <div className="p-4 rounded-2xl border border-line bg-surface space-y-4">
+                <div className="flex items-center justify-between border-b border-line-soft pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="w-4 h-4 text-accent" />
+                    <span className="text-xs font-bold text-ink">AI Agent 池与模型算力配置</span>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] text-ink-ghost">
+                    AGENTS.md §1.6b 规范
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="font-medium text-ink">
+                        专职提炼大模型（Model Tiering）：
+                      </label>
+                      {modelsQuery.isFetching ? (
+                        <span className="text-[10px] text-ink-ghost">拉取本地 Codex 模型中…</span>
+                      ) : codexModels.length > 0 ? (
+                        <span className="text-[10px] text-tone-amber-600 dark:text-tone-amber-400">
+                          已识别 {codexModels.length} 个本机模型
+                        </span>
+                      ) : null}
+                    </div>
+                    <Select
+                      value={isCustomMode ? '__custom__' : (pipelineModel || '__default__')}
+                      onValueChange={(v) => {
+                        if (v === '__custom__') {
+                          setIsCustomMode(true);
+                          if (customModelInput.trim()) {
+                            setPipelineModel(customModelInput.trim());
+                          }
+                        } else if (v === '__default__') {
+                          setIsCustomMode(false);
+                          setPipelineModel('');
+                        } else if (v) {
+                          setIsCustomMode(false);
+                          setPipelineModel(v);
+                        }
+                      }}
+                      disabled={startPipelineJob.isPending || activeJob?.status === 'running'}
+                    >
+                      <SelectTrigger className="w-full h-8 text-xs">
+                        <SelectValue placeholder="选择本地 Codex 模型" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">
+                          ⚡ 本地 Codex 默认模型（跟随本机全局配置）
+                        </SelectItem>
+                        {codexModels.map((m) => (
+                          <SelectItem key={m.id || m.model} value={m.id || m.model}>
+                            {m.displayName || m.model}
+                            {m.isDefault ? '（本机推荐/默认）' : ''}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__custom__">
+                          ✏️ 手动输入模型标识 (Custom Model)...
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {isCustomMode && (
+                      <div className="mt-2 space-y-1">
+                        <input
+                          type="text"
+                          placeholder="输入本地可用模型标识（留空则跟随默认）"
+                          value={customModelInput}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomModelInput(val);
+                            setPipelineModel(val.trim());
+                          }}
+                          className="w-full h-8 px-2.5 rounded-xl border border-line bg-surface text-ink text-xs outline-none focus:border-tone-amber-500 font-mono"
+                        />
+                        <p className="text-[10px] text-ink-ghost">
+                          请输入本地 Codex App Server 已接入或支持的模型标识
+                        </p>
+                      </div>
+                    )}
+
+                    <p className="mt-1 text-[11px] text-ink-ghost">
+                      依托本机 Codex App Server 实时提供可用模型；选默认则自动采用本地环境配置。
                     </p>
                   </div>
-                )}
 
-                <p className="mt-1 text-[11px] text-ink-ghost">
-                  依托本机 Codex App Server 实时提供可用模型；选默认则自动采用本地环境配置。
-                </p>
-              </div>
+                  <div>
+                    <label className="block font-medium text-ink mb-1.5">
+                      Agent 池并发 Worker 数量（Concurrency）：
+                    </label>
+                    <Select
+                      value={pipelinePoolSize || '3'}
+                      onValueChange={(v) => v && setPipelinePoolSize(v)}
+                      disabled={startPipelineJob.isPending || activeJob?.status === 'running'}
+                    >
+                      <SelectTrigger className="w-full h-8 text-xs">
+                        <SelectValue placeholder="选择并发 Worker 数量" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 个 Worker（单任务串行·最低资源占用）</SelectItem>
+                        <SelectItem value="2">2 个 Worker（温和·适合较低 API 限额）</SelectItem>
+                        <SelectItem value="3">3 个 Worker（默认推荐·平衡吞吐）</SelectItem>
+                        <SelectItem value="4">4 个 Worker（高效提炼）</SelectItem>
+                        <SelectItem value="6">6 个 Worker（高速吞吐·需足够限额）</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1 text-[11px] text-ink-ghost">
+                      在单进程内开启指定数量的长连接 Session 并发，互不抢占。
+                    </p>
+                  </div>
+                </div>
 
-              <div>
-                <label className="block font-medium text-ink mb-1.5">
-                  Agent 池并发 Worker 数量（Concurrency）：
-                </label>
-                <Select
-                  value={pipelinePoolSize || '3'}
-                  onValueChange={(v) => v && setPipelinePoolSize(v)}
-                  disabled={executePipeline.isPending}
-                >
-                  <SelectTrigger className="w-full h-8 text-xs">
-                    <SelectValue placeholder="选择并发 Worker 数量" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 个 Worker（单任务串行·最低资源占用）</SelectItem>
-                    <SelectItem value="2">2 个 Worker（温和·适合较低 API 限额）</SelectItem>
-                    <SelectItem value="3">3 个 Worker（默认推荐·平衡吞吐）</SelectItem>
-                    <SelectItem value="4">4 个 Worker（高效提炼）</SelectItem>
-                    <SelectItem value="6">6 个 Worker（高速吞吐·需足够限额）</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="mt-1 text-[11px] text-ink-ghost">
-                  在单进程内开启指定数量的长连接 Session 并发，互不抢占。
-                </p>
-              </div>
-            </div>
+                {/* 幂等性保护开关 */}
+                <div className="pt-2 border-t border-line-soft flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-ink">强制重新提炼全书（覆盖已就绪课次）</span>
+                    <p className="text-[11px] text-ink-ghost">
+                      默认关闭：自动跳过数据库中状态已为 ready 的课次，保护已有学习与复习记录，省算力防覆盖。
+                    </p>
+                  </div>
+                  <Switch
+                    checked={forceOverwrite}
+                    onCheckedChange={setForceOverwrite}
+                    disabled={startPipelineJob.isPending || activeJob?.status === 'running'}
+                  />
+                </div>
 
-            {/* 幂等性保护开关 */}
-            <div className="pt-2 border-t border-line-soft flex items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold text-ink">强制重新提炼全书（覆盖已就绪课次）</span>
-                <p className="text-[11px] text-ink-ghost">
-                  默认关闭：自动跳过数据库中状态已为 ready 的课次，保护已有学习与复习记录，省算力防覆盖。
-                </p>
-              </div>
-              <Switch
-                checked={forceOverwrite}
-                onCheckedChange={setForceOverwrite}
-                disabled={executePipeline.isPending}
-              />
-            </div>
-
-            {/* 提炼行动按钮 */}
-            <div className="pt-3 border-t border-line-soft flex flex-wrap items-center justify-between gap-3">
-              <Button
-                size="sm"
-                disabled={executePipeline.isPending}
-                onClick={handleExecutePipeline}
-                className="gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                {executePipeline.isPending ? 'AI Agent 池并发提炼与落库中…' : '启动 AI Agent 池并发提炼与落库'}
-              </Button>
-              <span className="text-[11px] text-ink-ghost">
-                一课一个 Worker 任务，原子提炼预习导学、课文 Markdown、生词语法与习题
-              </span>
-            </div>
-          </div>
-
-          {/* 解析完成结果卡片 */}
-          {pipelineResult && (
-            <div className="p-4 rounded-2xl bg-wash-emerald-500o10 border border-tone-emerald-600o30 flex items-center justify-between shadow-xs">
-              <div className="flex items-center gap-2.5">
-                <FileCheck2 className="w-5 h-5 text-ink-emerald-700-emerald-400" />
-                <div>
-                  <h4 className="text-xs font-bold text-ink">
-                    教材《{pipelineResult.title}》全书提炼已落库！
-                  </h4>
-                  <p className="text-[11px] text-ink-ghost mt-0.5">
-                    全书共 {pipelineResult.lessonCount} 课，成功就绪 {pipelineResult.successfulLessons} 课
-                    {pipelineResult.failedLessons > 0 && `（${pipelineResult.failedLessons} 课失败）`}，可在教材列表立即开始学习！
-                  </p>
+                {/* 提炼行动按钮 */}
+                <div className="pt-3 border-t border-line-soft flex flex-wrap items-center justify-between gap-3">
+                  <Button
+                    size="sm"
+                    disabled={startPipelineJob.isPending || activeJob?.status === 'running'}
+                    onClick={handleExecutePipeline}
+                    className="gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {startPipelineJob.isPending ? 'AI Agent 池并发提炼与落库中…' : '启动 AI Agent 池并发提炼与落库'}
+                  </Button>
+                  <span className="text-[11px] text-ink-ghost">
+                    一课一个 Worker 任务，原子提炼预习导学、课文 Markdown、生词语法与习题
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="emerald" className="text-xs">
-                  {pipelineResult.allLessonsReady ? '全书就绪' : '部分就绪'}
-                </Badge>
-                <Button size="sm" onClick={onClose} className="h-7 text-xs gap-1">
-                  进入学习
+
+              {/* Step 3 底部导航 */}
+              <div className="flex items-center justify-between pt-2">
+                <Button variant="outline" size="sm" onClick={() => setCurrentStep(2)} className="gap-1.5">
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  返回核对目录
                 </Button>
+                <span className="text-[11px] text-ink-ghost">
+                  提炼已直接原子落库，可随时关闭弹窗或在课程列表查看
+                </span>
               </div>
             </div>
           )}
-
-          {/* Step 3 底部导航 */}
-          <div className="flex items-center justify-between pt-2">
-            <Button variant="outline" size="sm" onClick={() => setCurrentStep(2)} className="gap-1.5">
-              <ArrowLeft className="w-3.5 h-3.5" />
-              返回核对目录
-            </Button>
-            <span className="text-[11px] text-ink-ghost">
-              提炼已直接原子落库，可随时关闭弹窗或在课程列表查看
-            </span>
-          </div>
         </div>
       )}
     </div>

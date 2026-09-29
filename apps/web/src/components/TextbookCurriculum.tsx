@@ -23,6 +23,7 @@ import {
 } from '../models/textbook.js';
 import { sound } from '../utils/audio.js';
 import { useReadingFocusStore } from '../stores/useReadingFocusStore.js';
+import { usePipelineJobStore } from '../stores/usePipelineJobStore.js';
 import { ShimmerButton } from './magicui/index.js';
 import { InteractivePdfReader } from './InteractivePdfReader.js';
 import { TextbookImporterModal } from './TextbookImporterModal.js';
@@ -76,7 +77,8 @@ export function TextbookCurriculum({
   const [lessonSubTab, setLessonSubTab] = useState<'READER' | 'VOCAB' | 'GRAMMAR'>('READER');
   const [activeWordCard, setActiveWordCard] = useState<FuriganaWord | null>(null);
   const [addedCardsMap, setAddedCardsMap] = useState<Record<string, boolean>>({});
-  const [isImporterOpen, setIsImporterOpen] = useState(false);
+  const isImporterOpen = usePipelineJobStore((s) => s.isImporterModalOpen);
+  const setIsImporterOpen = usePipelineJobStore((s) => s.setIsImporterModalOpen);
   // B：默认跟轨道（ja→JA/en→EN/ko→KO，不要 ALL），ALL 仍在下拉里可手选。
   const [languageFilter, setLanguageFilter] = useState<'ALL' | 'JA' | 'EN' | 'KO'>(
     () => targetLanguageToFilter(targetLanguage)

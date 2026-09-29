@@ -51,6 +51,8 @@ export interface TextbookPipelineInput {
   pool?: AgentPoolLike | undefined;
   /** 实时进度通知回调 */
   onProgress?: ((progress: BatchExtractionProgress) => void) | undefined;
+  /** 任务终止信号 */
+  signal?: AbortSignal | undefined;
 }
 
 export interface TextbookPipelineOutput {
@@ -218,6 +220,7 @@ export async function executeTextbookPipeline(
       pool: input.pool,
       forceOverwrite: input.forceOverwrite,
       onProgress: input.onProgress,
+      ...(input.signal ? { signal: input.signal } : {}),
     });
 
     // 5. 更新导入任务最终状态

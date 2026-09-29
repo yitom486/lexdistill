@@ -68,6 +68,8 @@ import {
 import { sound } from './utils/audio.js';
 import { cn } from './lib/utils.js';
 import { checkForAppUpdate, logUpdaterFailure } from './platform/app-updater.js';
+import { usePipelineJobSubscription } from './queries/pipeline-jobs.js';
+import { GlobalPipelineTaskWidget } from './components/pipeline/GlobalPipelineTaskWidget.js';
 
 const COACH_WIDTH_MIN = 320;
 const COACH_WIDTH_MAX = 960;
@@ -75,6 +77,7 @@ const COACH_WIDTH_MAX = 960;
 export function App() {
   const panelEnterDuration = readCssDurationSeconds('--motion-layout-enter-duration');
   useEnsureGateway();
+  usePipelineJobSubscription();
   const coachPanelWidthPx = usePreferencesStore((s) => s.coachPanelWidthPx);
   const setCoachPanelWidthPx = usePreferencesStore((s) => s.setCoachPanelWidthPx);
   const coachPanelOpen = usePreferencesStore((s) => s.coachPanelOpen);
@@ -511,6 +514,7 @@ export function App() {
         </main>
         <OnboardingDialog />
         <LessonDialog />
+        <GlobalPipelineTaskWidget />
       </div>
     </div>
   );
