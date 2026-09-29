@@ -84,7 +84,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
   const [sentenceIndex, setSentenceIndex] = useState<number>(0);
 
   // 统一的 TTS 调度与状态 (Zustand)
-  const { isSpeaking, gender, rate, speak, stop, setGender, setRate } = useTts();
+  const { isSpeaking, rate, speak, stop, setRate } = useTts();
   const [isLooping, setIsLooping] = useState<boolean>(false);
   const isLoopingRef = useRef<boolean>(isLooping);
   useEffect(() => {
@@ -116,7 +116,6 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
     setShadowStep('LISTENING');
     speak(activeSentence.japanese, {
       lang: currentLanguage,
-      gender,
       rate,
       onStart: () => setShadowStep('LISTENING'),
       onEnd: () => {
@@ -321,22 +320,8 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
               </Select>
             </div>
 
-            {/* 辅助工具栏：音色性别 + 语速 + 假名显示 + 纯盲听遮罩 */}
+            {/* 辅助工具栏：语速、假名显示与纯盲听遮罩 */}
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  sound.playClick();
-                  setGender(gender === 'FEMALE' ? 'MALE' : 'FEMALE');
-                }}
-                className="h-7 gap-1 px-2.5 text-[11px]"
-                title="一键切换自然男女声音色"
-              >
-                <span>{gender === 'FEMALE' ? '👩 女声' : '👨 男声'}</span>
-              </Button>
-
               <div className="flex items-center gap-1 bg-veil-stone-200o60-stone-800 p-1 rounded-lg">
                 {[0.75, 1.0, 1.25].map((spd) => (
                   <Button

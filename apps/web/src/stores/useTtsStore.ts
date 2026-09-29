@@ -4,13 +4,11 @@ import type { TtsPurpose } from '@study-studio/speech';
 import {
   speechStudio,
   type SpeechStudioConfig,
-  type TtsGender,
   type SupportedLanguage,
 } from '../utils/audio.js';
 
 export interface SpeakOptions {
   lang?: SupportedLanguage;
-  gender?: TtsGender;
   rate?: number;
   purpose?: TtsPurpose;
   onStart?: () => void;
@@ -21,7 +19,6 @@ export interface SpeakOptions {
 export interface TtsStoreState extends SpeechStudioConfig {
   isSpeaking: boolean;
   currentText: string;
-  setGender: (gender: TtsGender) => void;
   setRate: (rate: number) => void;
   setPreferredService: (service: SpeechStudioConfig['preferredService']) => void;
   setProviderApiKey: (provider: string, key: string) => void;
@@ -71,7 +68,6 @@ export const useTtsStore = create<TtsStoreState>()(
         ...speechStudio.getConfig(),
         isSpeaking: speechStudio.getIsSpeaking(),
         currentText: speechStudio.getCurrentText(),
-        setGender: (gender) => update({ gender }),
         setRate: (rate) => update({ rate: Math.max(0.5, Math.min(1.5, rate)) }),
         setPreferredService: (preferredService) => update({ preferredService }),
         setProviderApiKey: (provider, key) => update({
@@ -93,7 +89,6 @@ export const useTtsStore = create<TtsStoreState>()(
       version: 1,
       migrate: migrateTtsPreferences,
       partialize: (state) => ({
-        gender: state.gender,
         rate: state.rate,
         preferredService: state.preferredService,
         providerApiKeys: state.providerApiKeys,
@@ -103,7 +98,6 @@ export const useTtsStore = create<TtsStoreState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) speechStudio.configure({
-          gender: state.gender,
           rate: state.rate,
           preferredService: state.preferredService,
           providerApiKeys: state.providerApiKeys,

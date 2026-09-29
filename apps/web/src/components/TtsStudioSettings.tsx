@@ -40,10 +40,13 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
     queryKey: ['tts-studio', 'voices', preferredService, azureRegion],
     queryFn: () => {
       const key = providerApiKeys[preferredService];
+      const credentialHeaders = key && /^[a-z0-9-]+$/.test(preferredService)
+        ? { [`x-${preferredService}-api-key`]: key }
+        : {};
       return createTTSClient({
         baseUrl: GATEWAY_BASE_URL,
         prefix: '/api/tts-studio',
-        headers: key ? { [`x-${preferredService}-api-key`]: key } : {},
+        headers: credentialHeaders,
       }).getVoices(preferredService, preferredService === 'azure' ? azureRegion : undefined);
     },
     enabled: false,
@@ -87,6 +90,9 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
               <SelectTrigger className="min-h-11 min-w-0 flex-1 text-base"><SelectValue placeholder="自动选择" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__automatic">自动选择</SelectItem>
+                {voiceId && !voices.data?.some((voice) => voice.id === voiceId) && (
+                  <SelectItem value={voiceId}>{voiceId}</SelectItem>
+                )}
                 {voices.data?.map((voice) => <SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>)}
               </SelectContent>
             </Select>

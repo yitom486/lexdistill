@@ -10,7 +10,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useTts } from '../hooks/useTts.js';
-import { sound, type SupportedLanguage, type TtsGender } from '../utils/audio.js';
+import { sound, type SupportedLanguage } from '../utils/audio.js';
 import { readCssDurationSeconds } from '../lib/css-tokens.js';
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
@@ -56,7 +56,7 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
   className = '',
   label,
 }) => {
-  const { isSpeaking, currentText, gender, rate, speak, stop, setGender, setRate } = useTts();
+  const { isSpeaking, currentText, rate, speak, stop, setRate } = useTts();
   const waveBaseDuration = readCssDurationSeconds('--motion-wave-tts-base-duration');
   const waveDurationStep = readCssDurationSeconds('--motion-wave-tts-step-duration');
 
@@ -73,7 +73,6 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
       onPlayStart?.();
       await speak(text, {
         lang,
-        gender,
         rate,
         onStart: () => onPlayStart?.(),
         onEnd: () => onPlayEnd?.(),
@@ -92,7 +91,7 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
         size="icon"
         onClick={handleTogglePlay}
         className={`h-7 w-7 p-1 text-accent-ink-warm hover:bg-wash-amber-500o15 ${className}`}
-        title={isCurrentPlaying ? '停止发音' : `标准发音 (${lang} · ${gender === 'FEMALE' ? '女声' : '男声'})`}
+        title={isCurrentPlaying ? '停止发音' : `标准发音 (${lang})`}
       >
         {isCurrentPlaying ? (
           <VolumeX className="w-3.5 h-3.5 animate-pulse text-tone-amber-600" />
@@ -118,7 +117,7 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
             ? 'bg-tone-amber-500 text-tone-stone-950 border-tone-amber-600 shadow-tone-amber-500o20 shadow-md hover:bg-tone-amber-500'
             : 'border border-line hover:border-tone-amber-500o50 hover:bg-wash-amber-500o10'
         } ${className}`}
-        title={`朗读 (${lang} · ${gender === 'FEMALE' ? '自然女声' : '自然男声'} · ${rate}x)`}
+        title={`朗读 (${lang} · ${rate}x)`}
       >
         {isCurrentPlaying ? (
           <>
@@ -143,9 +142,6 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
           <>
             <Volume2 className="w-4 h-4 text-accent-ink" />
             <span>{label || '标准发音'}</span>
-            <span className="text-[10px] opacity-60 font-mono">
-              {gender === 'FEMALE' ? '女' : '男'}
-            </span>
           </>
         )}
       </Button>
@@ -270,23 +266,8 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
           )}
         </div>
 
-        {/* 右侧：性别快速切换与语种指示 */}
+        {/* 右侧：语种指示 */}
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              sound.playClick();
-              const nextGender: TtsGender = gender === 'FEMALE' ? 'MALE' : 'FEMALE';
-              setGender(nextGender);
-            }}
-            className="gap-1 border border-line-stone-300o40-stone-800"
-            title="点击切换男女声"
-          >
-            <span>{gender === 'FEMALE' ? '👩 女声' : '👨 男声'}</span>
-          </Button>
-
           <Badge variant="secondary" className="rounded-lg font-mono text-[11px]">
             {lang === 'EN' ? '🇬🇧 英语' : lang === 'KO' ? '🇰🇷 韩语' : '🇯🇵 日语'}
           </Badge>

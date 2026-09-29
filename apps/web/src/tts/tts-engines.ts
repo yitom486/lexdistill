@@ -27,7 +27,6 @@ export const studioTtsEngine: TtsEngine = {
     const finished = new Promise<void>((resolve) => { notifyEnd = resolve; });
     await speechStudio.speak(request.utteranceText, {
       lang: supportedFromBcp47(request.bcp47),
-      gender: request.context.gender,
       rate: request.rate,
       ...(request.personaName ? { personaName: request.personaName } : {}),
       onEnd: notifyEnd,
