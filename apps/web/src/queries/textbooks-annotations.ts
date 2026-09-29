@@ -1059,6 +1059,8 @@ export interface RawDocumentSummary {
   sourceKind: string;
   language: string;
   content: string;
+  sourcePublisher?: string | null;
+  sourceUrl?: string | null;
   astJson?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -1142,68 +1144,47 @@ export function lessonSlotsToTocCandidates(slots: TextbookLessonSlotItem[]): Toc
   }));
 }
 
-const TEXTBOOK_SERIES_ALIASES: ReadonlyArray<{
-  series: string;
-  patterns: readonly RegExp[];
-}> = [
-  {
-    series: 'minna',
-    patterns: [
-      /大家的日[语語]/i,
-      /大家的日本[语語]/i,
-      /みんなの日本[語语]/i,
-      /みんな/i,
-      /minna(?:\s*no\s*nihongo)?/i,
-    ],
-  },
-  {
-    series: 'biaori',
-    patterns: [
-      /(?:新版)?\s*(?:中日交流)?\s*标准日[语語]/i,
-      /标日/i,
-      /biaori/i,
-      /standard\s*japanese/i,
-    ],
-  },
-  {
-    series: 'nce',
-    patterns: [
-      /新概念英[语語]/i,
-      /新概念/i,
-      /new\s*concept\s*english/i,
-      /\bnce\b/i,
-    ],
-  },
-];
+/**
+ * 通用文本特征词元提取（纯无状态函数，零业务/领域硬编码）
+ * 1. 过滤常见文件包装杂质（如扩展名、下载站标记等）；
+ * 2. 提取字母数字词元（>=2 字符）；
+ * 3. 提取 CJK 连续语素及 2-gram 切片；
+ */
+export function extractGenericSearchTokens(text: string): string[] {
+  if (!text) return [];
+  const clean = text
+    .replace(/\.[^/.]+$/, '')
+    .replace(/\b(?:z-library|zlib|libgen|download|scan|ocr|v\d+|p\d+)\b/gi, '')
+    .replace(/[\s\-_（）()【】\[\]第册卷·.,:;!?，。、！？/\\~`@#$%^&*+=|<>]/g, ' ')
+    .trim();
 
-function detectSeries(str: string): string | null {
-  for (const item of TEXTBOOK_SERIES_ALIASES) {
-    if (item.patterns.some((p) => p.test(str))) return item.series;
+  const tokens: string[] = [];
+  const alphaNums = clean.match(/[a-zA-Z0-9]{2,}/g);
+  if (alphaNums) {
+    tokens.push(...alphaNums.map((t) => t.toLowerCase()));
   }
-  return null;
+  const cjkMatches = clean.match(/[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]{2,}/g);
+  if (cjkMatches) {
+    for (const segment of cjkMatches) {
+      tokens.push(segment.toLowerCase());
+      if (segment.length > 2) {
+        for (let i = 0; i <= segment.length - 2; i++) {
+          tokens.push(segment.substring(i, i + 2).toLowerCase());
+        }
+      }
+    }
+  }
+  return Array.from(new Set(tokens));
 }
 
-function detectVolume(str: string): string | null {
-  const volMatch = str.match(/(?:初级|中级|高级|第)?\s*([0-9一二三四1-4上册下册上下]+)\s*(?:册|本|卷)/i);
-  if (volMatch && volMatch[1]) {
-    return volMatch[1]
-      .replace('一', '1')
-      .replace('二', '2')
-      .replace('三', '3')
-      .replace('四', '4')
-      .replace('上册', '上')
-      .replace('下册', '下');
-  }
-  const chujiNum = str.match(/初级\s*([1-4一二三四])/);
-  if (chujiNum && chujiNum[1]) {
-    return chujiNum[1].replace('一', '1').replace('二', '2').replace('三', '3').replace('四', '4');
-  }
-  const tailNum = str.match(/[a-z_-]+([1-4])/i);
-  if (tailNum && tailNum[1]) return tailNum[1];
-  return null;
-}
-
-/** 从文档标题或文件名中模糊查找本地已存在的匹配教材列表（按匹配度从高到低排序） */
+/**
+ * 通用动态教材与大纲匹配（纯信息检索算法，无任何特定书名硬编码）
+ * 匹配优先级：
+ * 1. 标题或 ID 严格一致 (100)
+ * 2. 规范化去标点后标题完全一致 (80)
+ * 3. 标题子串互为前缀/包含 (65)
+ * 4. 标题与文档正文底稿通用 Token 交集加权匹配 (基于词元重合度，动态打分)
+ */
 export function findMatchingDocuments(
   docTitle: string,
   documents: RawDocumentSummary[]
@@ -1213,10 +1194,8 @@ export function findMatchingDocuments(
   const normalize = (s: string) => s.replace(/[\s\-_（）()【】\[\]第册卷·]/g, '').toLowerCase();
   const cleanNorm = normalize(docTitle);
 
+  const queryTokens = extractGenericSearchTokens(docTitle);
   const scored: Array<{ doc: RawDocumentSummary; score: number }> = [];
-
-  const inputSeries = detectSeries(docTitle);
-  const inputVolume = detectVolume(docTitle);
 
   for (const d of documents) {
     const dTitle = d.title.trim().toLowerCase();
@@ -1231,21 +1210,26 @@ export function findMatchingDocuments(
       score = 65;
     } else if (clean.length >= 3 && (dTitle.includes(clean) || clean.includes(dTitle))) {
       score = 60;
-    } else if (inputSeries) {
-      const dSeries = detectSeries(d.title) || detectSeries(d.id);
-      if (dSeries === inputSeries) {
-        const dVol = detectVolume(d.title) || detectVolume(d.id);
-        if (!inputVolume || !dVol || inputVolume === dVol || inputVolume.includes(dVol) || dVol.includes(inputVolume)) {
-          score = 50;
-        } else {
-          score = 30;
+    } else if (queryTokens.length > 0) {
+      // 动态比对该文档已存的内容底稿、标题、以及元数据
+      const targetCorpus = `${d.title} ${d.content ?? ''} ${d.sourcePublisher ?? ''}`.toLowerCase();
+      let matchCount = 0;
+      for (const token of queryTokens) {
+        if (targetCorpus.includes(token)) {
+          matchCount++;
         }
+      }
+      // 阈值保护：至少命中 2 个特征 token 且重合率 >= 20%，防止因单个通用词（如“教材/书”）发生误判
+      const minRequired = queryTokens.length >= 3 ? 2 : 1;
+      const ratio = matchCount / queryTokens.length;
+      if (matchCount >= minRequired && ratio >= 0.2) {
+        score = Math.round(ratio * 55);
       }
     }
 
     if (score > 0) {
-      // 优先用户自主导入的真实骨架 (user_import)
-      if (d.sourceKind === 'user_import') score += 10;
+      // 用户本地导入的自备资料优先于通用系统内置样例
+      if (d.sourceKind === 'user_import') score += 5;
       scored.push({ doc: d, score });
     }
   }

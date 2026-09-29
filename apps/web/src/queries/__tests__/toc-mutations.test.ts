@@ -181,7 +181,7 @@ describe('教材匹配与槽位复用纯函数测试', () => {
         title: 'minna1',
         sourceKind: 'user_import',
         language: 'ja',
-        content: '',
+        content: '日本3A出版社 编写 第二版 みんなの日本語 大家的日本語 教材',
         createdAt: '2026-09-29T10:00:00Z',
         updatedAt: '2026-09-29T10:00:00Z',
       },
@@ -209,17 +209,17 @@ describe('教材匹配与槽位复用纯函数测试', () => {
     const match3 = findMatchingDocument('大家的日语', docs);
     expect(match3?.id).toBe('minna-nihongo-1');
 
-    // 4. 常见教材多语言别名与分册匹配（长文件名 大家的日语（初级 1）系列 成功匹配 minna1）
+    // 4. 通用文本特征与底稿内容匹配（长文件名 大家的日语（初级 1）系列 第二版（日本 3A 出版社）动态命中包含该底稿内容的 minna1）
     const matchAlias = findMatchingDocument(
       '大家的日语（初级 1）大家的日语系列 第二版（日本 3A 出版社）(z-library)',
       docs
     );
     expect(matchAlias).not.toBeNull();
-    // 优先匹配用户的 user_import 本地骨架
+    // 命中包含 3A出版社/第二版/大家的日语 的 doc_mtt3n2rp0v4d5u
     expect(matchAlias?.id).toBe('doc_mtt3n2rp0v4d5u');
 
     // 5. 无匹配
-    const matchNone = findMatchingDocument('完全不相干的英语教材', docs);
+    const matchNone = findMatchingDocument('完全不相干的未知法语教材', docs);
     expect(matchNone).toBeNull();
   });
 
