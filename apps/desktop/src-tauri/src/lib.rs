@@ -312,9 +312,15 @@ fn dev_gateway_entry(repo_root: &std::path::Path) -> Option<(PathBuf, Vec<String
     ))
 }
 
-/// Dev 开关：STUDY_STUDIO_GATEWAY_BUN=1 时走 bun 现场拉起；缺省走预编译包（生产路径）。
+/// Debug 桌面构建默认从仓库源码启动 Gateway；Release 默认走预编译 sidecar。
+/// STUDY_STUDIO_GATEWAY_BUN=0 可在 Debug 下强制测试 sidecar；=1 可显式强制源码模式。
 fn dev_gateway_command() -> Option<(PathBuf, Vec<String>)> {
-    if std::env::var("STUDY_STUDIO_GATEWAY_BUN").as_deref() != Ok("1") {
+    let use_source = match std::env::var("STUDY_STUDIO_GATEWAY_BUN").as_deref() {
+        Ok("1") => true,
+        Ok("0") => false,
+        _ => cfg!(debug_assertions),
+    };
+    if !use_source {
         return None;
     }
     // dev 下 current_exe = <root>/apps/desktop/src-tauri/target/debug/<exe>，上溯 6 级到仓库根。
