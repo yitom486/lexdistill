@@ -141,6 +141,22 @@
 - 不得把裸 `bun test` 宣称为全量门禁：`bun test <filter>` 会绕过 bunfig 的 pathIgnorePatterns
   把 `tsc -b` 的 stale dist 编译副本也跑一遍；`test:all` 显式排除 dist（`--path-ignore-patterns`）。
 
+### 4.1 应用工具与 AI 交互全量集成测试铁律 (Tool & AI Integration Test Rule)
+- **零盲区原则 (Full Coverage for Tools)**：
+  - 凡编写、新增或重构的应用工具（包括 Gateway Native Tools、`agentpools` 批处理执行器、解析/回填管线等），必须具备完整的**端到端集成测试**，不仅要测单元方法，还要走通从任务触发、数据库状态变更到回执反馈的完整闭环；
+- **大模型 Mock 输出与端到端闭环 (Mock LLM Pipeline)**：
+  - 涉及大模型交互（LLM / Vision / Codex / AgentPool）的链路，绝不允许因外部 API 依赖跳过测试。必须设计清晰的 Mock 输出机制（通过注入 `AgentPoolLike` 或自定义 Response 生成器），模拟大模型在各种端到端业务场景下的实际表现；
+- **正负案例严格对齐 (Positive & Negative Test Symmetry)**：
+  - **正向案例（Positive Cases）**：
+    - 标准合法 JSON 输出、Markdown 课文全文、多题型习题（选择/填空/翻译）、生词/语法例句；
+    - Markdown 代码块包裹容错（```json ... ```）；
+    - 多课并发正常消费、排队与全书最终 `ready` 状态翻转；
+  - **负向与容错案例（Negative & Fault Cases）**：
+    - **大模型输出破损**：非合法 JSON、截断语法、空返回，必须由友好业务错误收敛；
+    - **大模型 Schema 违背**：缺少必填字段、非法题型枚举等，必须触发 `E_LLM_SCHEMA_INVALID` 拦截；
+    - **目录白名单违背（防幻觉造课）**：大模型返回未在已落库目录中登记的课次槽位 ID 时，必须触发 `E_TOC_SLOT_NOT_FOUND` 拦截并不污染数据库；
+    - **单调递增页码违背**：目录大模型识别出倒退页码时，必须触发 `E_TOC_PAGE_ORDER_INVALID` 拦截；
+    - **Worker 异常与错误隔离**：Lease 租借失败、底层 Worker 进程抛错时，单课失败必须被安全捕获并记录，不得打崩批处理整体执行。
 ---
 
 ## 5. 硬编码与静态数据登记铁律 (Static Data & Hardcode Tracking Rule)
