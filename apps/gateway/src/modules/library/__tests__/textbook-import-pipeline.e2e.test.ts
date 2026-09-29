@@ -199,6 +199,21 @@ describe('教材导入 AI-Native 管道端到端集成测试 (E2E Pipeline)', ()
 
     const exercises = db.select().from(textbookExercises).where(eq(textbookExercises.documentId, 'doc_tb_minna_01')).all();
     expect(exercises.length).toBe(2); // l1(1) + l2(1)
+
+    // 4. 验证底稿 documents.ast_json 与派生表同事务同步回填（SSOT 不分叉，满足 AGENTS.md §1.8）
+    const docRow = db.select().from(documents).where(eq(documents.id, 'doc_tb_minna_01')).all()[0]!;
+    expect(docRow.astJson).not.toBeNull();
+    const parsedAst = JSON.parse(docRow.astJson!);
+    expect(parsedAst.id).toBe('doc_tb_minna_01');
+    expect(parsedAst.lessons.length).toBe(3); // 1 unit + 2 lessons
+    const l1Ast = parsedAst.lessons.find((l: { id: string }) => l.id === 'l1');
+    const l2Ast = parsedAst.lessons.find((l: { id: string }) => l.id === 'l2');
+    expect(l1Ast).toBeDefined();
+    expect(l1Ast?.vocabularies.length).toBe(2);
+    expect(l1Ast?.grammarPoints.length).toBe(1);
+    expect(l1Ast?.exercises.length).toBe(1);
+    expect(l2Ast).toBeDefined();
+    expect(l2Ast?.vocabularies.length).toBe(1);
   });
 
   it('【负向防御 Case 1】目录识别页码倒退时拦截，数据库零写入', async () => {

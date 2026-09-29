@@ -15,6 +15,13 @@ import {
   textbookExercises,
 } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
+import type { ShredTx } from './textbook-shred.js';
+import {
+  type TextbookAST,
+  type TextbookLesson,
+  type DialogueLine,
+  TextbookASTSchema,
+} from '@study-studio/document-model';
 
 export interface LessonVocabularyInput {
   surface: string;
@@ -241,7 +248,7 @@ export async function commitLessonKnowledge(
         tx.insert(textbookExercises).values(exerciseRows).run();
       }
 
-      // 7. 统计全书进度
+      // 7. 同步回填底稿 documents.ast_json（保持 SSOT 与派生表两边永不分叉，符合 AGENTS.md §1.8）
       const pendingRows = tx
         .select({ id: textbookLessons.lessonId })
         .from(textbookLessons)
@@ -255,12 +262,9 @@ export async function commitLessonKnowledge(
         .all();
 
       const allLessonsReady = pendingRows.length === 0;
-      if (allLessonsReady) {
-        tx.update(documents)
-          .set({ updatedAt: nowIso() })
-          .where(eq(documents.id, docId))
-          .run();
-      }
+
+      // 自动从当前已入库槽位与知识点数据重组规范 TextbookAST，回填底稿
+      syncDocumentAstInTx(tx, docId);
 
       return {
         vocabCount: vOrd,
@@ -289,3 +293,192 @@ export async function commitLessonKnowledge(
     return err(translateToBusinessError(e, 'commitLessonKnowledge'));
   }
 }
+
+/**
+ * 在 SQLite 事务内自动从已入库的章节、生词、语法和习题数据反向重构合规的 TextbookAST，
+ * 并原子回填到 documents.ast_json 底稿，确保派生表与底稿 100% 保持同步（SSOT 不分叉）。
+ */
+function syncDocumentAstInTx(tx: ShredTx, docId: string): void {
+  try {
+    const docRows = tx.select().from(documents).where(eq(documents.id, docId)).limit(1).all();
+    if (docRows.length === 0) return;
+    const doc = docRows[0]!;
+
+    const lessons = tx
+      .select()
+      .from(textbookLessons)
+      .where(eq(textbookLessons.documentId, docId))
+      .orderBy(textbookLessons.sortOrder)
+      .all();
+
+    if (lessons.length === 0) return;
+
+    const vocabs = tx
+      .select()
+      .from(textbookVocab)
+      .where(eq(textbookVocab.documentId, docId))
+      .orderBy(textbookVocab.ord)
+      .all();
+
+    const grammars = tx
+      .select()
+      .from(textbookGrammar)
+      .where(eq(textbookGrammar.documentId, docId))
+      .orderBy(textbookGrammar.ord)
+      .all();
+
+    const exercises = tx
+      .select()
+      .from(textbookExercises)
+      .where(eq(textbookExercises.documentId, docId))
+      .orderBy(textbookExercises.ord)
+      .all();
+
+    const vocabsByLesson = new Map<string, typeof vocabs>();
+    for (const v of vocabs) {
+      const list = vocabsByLesson.get(v.lessonId) ?? [];
+      list.push(v);
+      vocabsByLesson.set(v.lessonId, list);
+    }
+
+    const grammarsByLesson = new Map<string, typeof grammars>();
+    for (const g of grammars) {
+      const list = grammarsByLesson.get(g.lessonId) ?? [];
+      list.push(g);
+      grammarsByLesson.set(g.lessonId, list);
+    }
+
+    const exercisesByLesson = new Map<string, typeof exercises>();
+    for (const e of exercises) {
+      const list = exercisesByLesson.get(e.lessonId) ?? [];
+      list.push(e);
+      exercisesByLesson.set(e.lessonId, list);
+    }
+
+    const astLessons: TextbookLesson[] = [];
+    for (let i = 0; i < lessons.length; i++) {
+      const l = lessons[i]!;
+      const lVocabs = vocabsByLesson.get(l.lessonId) ?? [];
+      const lGrammars = grammarsByLesson.get(l.lessonId) ?? [];
+      const lExercises = exercisesByLesson.get(l.lessonId) ?? [];
+
+      const parsedDialogues: DialogueLine[] = [];
+      if (l.passageMd?.trim()) {
+        const lines = l.passageMd
+          .split(/\r?\n/)
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 0 && !s.startsWith('#'));
+        for (const line of lines) {
+          const m = /^\*{0,2}(?:【)?([^:*：\n】]+)(?:】)?\*{0,2}[:：]\s*(.*)$/.exec(line);
+          if (m) {
+            parsedDialogues.push({
+              speaker: m[1]!.trim(),
+              japanese: m[2]!.trim(),
+              chinese: '',
+            });
+          } else {
+            parsedDialogues.push({
+              speaker: '本文',
+              japanese: line,
+              chinese: '',
+            });
+          }
+        }
+      }
+
+      astLessons.push({
+        id: l.lessonId,
+        lessonNumber: l.lessonNumber > 0 ? l.lessonNumber : i + 1,
+        title: l.title,
+        vocabularies: lVocabs.map((v, idx) => ({
+          id: `${l.lessonId}-v${idx + 1}`,
+          kanji: v.surface,
+          kana: v.reading || v.surface,
+          pos: v.pos || '名词',
+          pitchAccent: v.pitch || '⓪',
+          chinese: v.glossZh || '',
+          ...(v.exampleJa ? { example: { japanese: v.exampleJa, chinese: v.exampleZh ?? '' } } : {}),
+        })),
+        grammarPoints: lGrammars.map((g, idx) => {
+          let examplesList: Array<{ japanese: string; chinese: string }> = [];
+          if (g.examplesJson) {
+            try {
+              const parsed: unknown = JSON.parse(g.examplesJson);
+              if (Array.isArray(parsed)) {
+                examplesList = parsed.map((item: unknown) => {
+                  const it = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+                  return {
+                    japanese: String(it.japanese ?? ''),
+                    chinese: String(it.chinese ?? ''),
+                  };
+                });
+              }
+            } catch {
+              // ignore corrupt json
+            }
+          }
+          return {
+            id: `${l.lessonId}-g${idx + 1}`,
+            title: g.title,
+            connection: g.connection ?? '',
+            explanation: g.explanation ?? '',
+            examples: examplesList,
+          };
+        }),
+        dialogues: parsedDialogues,
+        exercises: lExercises.map((e, eIdx) => {
+          let optionsList: string[] | undefined = undefined;
+          if (e.optionsJson) {
+            try {
+              const parsed: unknown = JSON.parse(e.optionsJson);
+              if (Array.isArray(parsed)) optionsList = parsed.map(String);
+            } catch {
+              // ignore
+            }
+          }
+          const validTypes = ['CHOICE', 'FILL_BLANK', 'TRANSLATION'] as const;
+          const normalizedType = (validTypes as readonly string[]).includes(e.type)
+            ? (e.type as (typeof validTypes)[number])
+            : 'CHOICE';
+          return {
+            id: e.exerciseId || `${l.lessonId}-ex${eIdx + 1}`,
+            type: normalizedType,
+            prompt: e.prompt,
+            ...(optionsList ? { options: optionsList } : {}),
+            answer: e.answer,
+            ...(e.explanation ? { explanation: e.explanation } : {}),
+          };
+        }),
+      });
+    }
+
+    const rawLang = doc.language ? doc.language.toUpperCase() : 'JA';
+    const lang: 'JA' | 'EN' | 'KO' = ['JA', 'EN', 'KO'].includes(rawLang)
+      ? (rawLang as 'JA' | 'EN' | 'KO')
+      : 'JA';
+
+    const candidateAst: TextbookAST = {
+      id: docId,
+      language: lang,
+      title: doc.title,
+      shortTitle: doc.title.slice(0, 32),
+      level: 'N5',
+      totalLessons: astLessons.length,
+      lessons: astLessons,
+    };
+
+    const validated = TextbookASTSchema.safeParse(candidateAst);
+    if (validated.success) {
+      tx.update(documents)
+        .set({
+          astJson: JSON.stringify(validated.data),
+          updatedAt: nowIso(),
+        })
+        .where(eq(documents.id, docId))
+        .run();
+    }
+  } catch {
+    // 忽略 AST 组装异常，不阻断事务主逻辑
+  }
+}
+

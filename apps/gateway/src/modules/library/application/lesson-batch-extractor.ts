@@ -111,58 +111,8 @@ export const ExtractedLessonSchema = z.object({
 
 export type ExtractedLessonData = z.infer<typeof ExtractedLessonSchema>;
 
-/**
- * 构造面向大模型的章节提炼标准提示词。
- */
-export function buildLessonExtractionPrompt(job: LessonExtractionJob): string {
-  return [
-    '你是一个专业的语言教材数字化与知识提取专家。',
-    `请深入分析以下提供的教材章节 OCR 扫描文本（教材ID: ${job.documentId}，课次: ${job.lessonId}${job.title ? `，标题: ${job.title}` : ''}）：`,
-    '',
-    '【待提炼课文 OCR 文本】：',
-    job.ocrText,
-    '',
-    '请提炼本课核心内容，并严格以合法 JSON 输出，不要输出任何多余的前言、结语或解释。',
-    'JSON 结构定义如下：',
-    '{',
-    '  "title": "精校后的课文标题（可选）",',
-    '  "passageMd": "完整排版的精读课文/对话全文 Markdown（带清晰段落结构与注音/排版）",',
-    '  "vocabularies": [',
-    '    {',
-    '      "surface": "生词原形/汉字",',
-    '      "reading": "假名/注音/音标",',
-    '      "pos": "词性",',
-    '      "glossZh": "中文释义",',
-    '      "pitch": "声调标注（如 ⓪）",',
-    '      "exampleJa": "课文例句",',
-    '      "exampleZh": "例句中文翻译"',
-    '    }',
-    '  ],',
-    '  "knowledgePoints": [',
-    '    {',
-    '      "title": "语法/知识点条目名称",',
-    '      "connection": "接续规则说明",',
-    '      "explanation": "语法详细讲解与用法注意",',
-    '      "examples": [',
-    '        {',
-    '          "japanese": "例句原句",',
-    '          "chinese": "例句中文翻译"',
-    '        }',
-    '      ]',
-    '    }',
-    '  ],',
-    '  "exercises": [',
-    '    {',
-    '      "type": "CHOICE",',
-    '      "prompt": "题目内容",',
-    '      "options": ["选项A", "选项B", "选项C"],',
-    '      "answer": "正确答案",',
-    '      "explanation": "解析"',
-    '    }',
-    '  ]',
-    '}',
-  ].join('\n');
-}
+import { buildLessonExtractionPrompt } from './prompts/index.js';
+export { buildLessonExtractionPrompt };
 
 /**
  * 从大模型返回文本中安全提取并解析 JSON。
