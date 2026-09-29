@@ -632,6 +632,14 @@ export interface MapPdfResult {
   outlineSource?: 'embedded' | 'none';
   /** 校验后的原生目录条目（physicalPage 必合法；none 时缺席或空）。 */
   embeddedOutline?: Array<{ title: string; level: number; physicalPage: number }>;
+  /** 阶段一 OCR 探测出的目次区间候选（未检测到时为 null 或缺席） */
+  detectedTocRange?: {
+    startPage: number;
+    endPage: number;
+    confidence: number;
+    reason: string;
+    candidates?: Array<{ fromPage: number; toPage: number; score: number; reasons?: string[] }>;
+  } | null;
 }
 
 /** 云 OCR 凭据（随请求发网关，内存态用完即弃；不填走纯本地链路）。 */
@@ -721,6 +729,7 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
               ),
             }
           : {}),
+        ...(p.detectedTocRange ? { detectedTocRange: p.detectedTocRange } : {}),
       };
     },
     onError: (e) => {
@@ -965,3 +974,76 @@ export function useExecuteTextbookPipelineMutation(userId = DEFAULT_USER_ID) {
     },
   });
 }
+
+export interface ExtractTocWithLlmVars {
+  filePath?: string;
+  file?: File;
+  startPage: number;
+  endPage: number;
+  title?: string;
+  language?: string;
+  model?: string;
+}
+
+export interface ExtractTocWithLlmResult {
+  title?: string;
+  entries: Array<{
+    title: string;
+    level: string;
+    startPage: number;
+    endPage?: number;
+  }>;
+}
+
+export async function requestExtractTocWithLlm(
+  userId: string,
+  vars: ExtractTocWithLlmVars
+): Promise<ExtractTocWithLlmResult> {
+  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/extract-toc-llm`;
+  let res: Response;
+  if (vars.file) {
+    const fd = new FormData();
+    fd.append('file', vars.file);
+    fd.append('startPage', String(vars.startPage));
+    fd.append('endPage', String(vars.endPage));
+    if (vars.title) fd.append('title', vars.title);
+    if (vars.language) fd.append('language', vars.language);
+    if (vars.model) fd.append('model', vars.model);
+    res = await fetchPdfGateway(url, { method: 'POST', body: fd });
+  } else {
+    res = await fetchPdfGateway(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: vars.filePath,
+        startPage: vars.startPage,
+        endPage: vars.endPage,
+        ...(vars.title ? { title: vars.title } : {}),
+        ...(vars.language ? { language: vars.language } : {}),
+        ...(vars.model ? { model: vars.model } : {}),
+      }),
+    });
+  }
+
+  const payload = (await res.json().catch(() => null)) as ExtractTocWithLlmResult | null;
+  if (!res.ok || !payload) {
+    throw new GatewayRequestError(
+      readGatewayUserMessage(payload, `大模型提取目录失败（HTTP ${res.status}）`),
+      {
+        code: readGatewayErrorCode(payload),
+        details: readGatewayErrorDetails(payload),
+      }
+    );
+  }
+  return payload;
+}
+
+export function useExtractTocWithLlmMutation(userId = DEFAULT_USER_ID) {
+  return useMutation({
+    mutationFn: (vars: ExtractTocWithLlmVars) => requestExtractTocWithLlm(userId, vars),
+    onError: (e) => {
+      logger.debug('[useExtractTocWithLlmMutation] failed', e);
+    },
+  });
+}
+

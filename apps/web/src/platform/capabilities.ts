@@ -22,6 +22,11 @@ export interface DownloadPayload {
   mimeType?: string;
 }
 
+export interface PickFileOptions {
+  filterName?: string;
+  extensions?: string[];
+}
+
 export interface PlatformCapabilities {
   readonly environment: PlatformEnvironment;
   isDesktop(): boolean;
@@ -32,6 +37,8 @@ export interface PlatformCapabilities {
   openExternalUrl(url: string): Promise<void>;
   /** 写入系统剪贴板。 */
   clipboardWriteText(text: string): Promise<void>;
+  /** 弹出系统原生文件选择对话框（桌面端返回绝对物理路径；Web 端无法访问绝对路径则返回 null）。 */
+  pickFile(options?: PickFileOptions): Promise<string | null>;
 }
 
 /** Tauri v2 注入的全局对象最小形态（`withGlobalTauri` 启用时存在）。 */

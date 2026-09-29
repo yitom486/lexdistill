@@ -52,10 +52,13 @@
   - 引入任何 MCP 依赖时，必须证明「目标系统无等价原生 API / 无本仓库内工具可覆盖」，并保持与 `agent-runtime` 契约隔离。
 - **违反判定**：凡学习域工具仅因“图省事”改走 MCP、导致额外进程/协议往返的，一律视为架构违规。
 
-### 1.6b 专精会话的工具隔离 (Per-Agent Tool Isolation)
+### 1.6b 专精会话与 Agent 池的模型分级与用户配置权 (Model Tiering & Configurable Agent Pools)
 - **工具按会话 allowlist 声明**：专精 agent（如目录审核）只声明自有工具，不声明其他任何工具；主 lane 按意图点名，永不顺带声明专精工具。
 - **执行侧对会话设防**：会话级工具有第二道门——未登记会话的调用直接拒绝（预算不扣，错误码为安全码），宣言之外的调用在执行侧也发不出来。
-- **专精模型可配**：专精会话的模型与思考等级（effort）走显式配置 > 环境变量 > 缺席三级，透传引擎原生字段，不在业务包绑定厂商枚举。
+- **轻量任务杜绝大材小用（Task-Model Tiering）**：目次结构提炼、JSON Schema 格式校验等简单结构化任务，属于低难度 NLP 格式化，必须支持并优先推荐轻量高性价比模型（Flash / Mini 等），严禁在后台静默绑定最昂贵的旗舰慢思考模型做廉价任务。
+- **Agent 池与批处理执行器显式可控**：无论是目次单次提炼，还是 Agent 池并发批量提取（全书课文、语法、习题），**用户必须拥有完全知情权与选择权**：
+  1. 前端界面必须提供显式的模型选择与思考等级配置入口，并支持记住用户偏好；
+  2. Agent 池必须开放并发度 (`poolSize` / Worker 数量) 与专职 Worker 模型的配置参数，避免并发过高击穿 API 速率限制 (Rate Limit) 或造成无意义的算力浪费。
 
 ### 1.7 领域能力与 UI 组合解耦 (Composable Domain Capabilities)
 - **领域命令先于界面**：学习域能力（查词、收藏生词、建卡、复习、学习记录、AI 分析）必须先定义为 Gateway / Repository / `learner-core` 可调用的命令与数据契约；不得把核心流程藏在某个 React 组件、按钮回调或页面状态中。
@@ -83,6 +86,21 @@
 - **原生 sql 查询只用 `db.all(...)[0]`**：`db.get(sql`…`)` 在 bun-sqlite 会话上返回形状不对（实测回 `[0]`），COUNT 查出来是 0——静默误报，同样要单测锁。
 - **禁止新的双源漂移**：新增表必须同时落 `ddl.ts`（最新建表）、`schema.ts`（类型）和 `migrations/vNNN-*.ts`（旧库升级），缺一边即视为未完成。
 - **`sqliteTable` 第三参数只许返回数组**（Drizzle 0.45）：`(table) => ({ pk: primaryKey(...) })` 命中已废弃的 `SQLiteTableExtraConfig` 对象签名，IDE 会报 deprecated。正确写法是 `(table) => [primaryKey({ columns: [...] }), index('idx_...').on(...)]`。对象键名没有运行时意义；约束/索引名写在 `primaryKey` / `index()` / `uniqueIndex()` 里。全仓库表定义只许在 `packages/storage-sqlite/src/schema.ts`；无复合主键/索引的表不要硬加第三参数。本条只约束 TypeScript schema，不改 `ddl.ts`。
+
+---
+
+### 1.10 教材解析与目录提取的两阶段流水线铁律 (Standard Two-Stage PDF/TOC Pipeline)
+- **扫描版与文字版严格区分，扫描版必须接入 OCR**：
+  - 数字原生 PDF（含文本层）：通过底层运行时直接提取原生文本，无需跑图像 OCR；
+  - 扫描版 PDF（纯图片扫描件）：底层必须自动判断并调用真实 OCR 引擎（PaddleOCR / Tesseract / Azure），扫描件绝不允许绕过 OCR 空跑。
+- **工业级目录提取必须遵循两阶段管道，严禁全书无脑发大模型**：
+  - **阶段一：快速范围探测（Range Probing）**：
+    - 在扫描前 30 页窗口内，利用原生 PDF 书签大纲与 OCR/直提文本的高密度特征（课次模式、引导点线、页码密度），在几秒内计算出目录所在物理页区间（如 16–21 页），并输出候选列表；
+    - 绝不允许对 300~500 页全书每一页无差别调用大模型视觉进行地毯式扫描（成本高昂、延迟极高且极易超时）。
+  - **阶段二：大模型精准语义结构化提炼（LLM TOC Structuring）**：
+    - 一旦确定目次区间（如 16–21 页），**必须将该区间的文本交给大模型进行深度语义提炼**（调用网关 `/extract-toc-llm`）；
+    - 大模型专门负责：容错与纠正 OCR 错别字、消除粘连数字、补全印刷页码映射、识别单元/成课层级，并输出强类型的单调递增结构化目录；
+    - **严禁使用简陋正则硬写全套目次解析**，正则仅用于轻量打分定位，语义解析必须由大模型完成。
 
 ---
 
@@ -218,6 +236,19 @@
 - **视觉动画时间统一由 token 管理**：主题过渡使用 `--theme-transition-duration` 与 `--theme-transition-timing-function`；其他动画的时长、延迟和过渡节奏定义为 `--motion-*` token。TSX 不写数字时长；Framer Motion 等 JavaScript 动画 API 通过 `css-tokens.ts` 读取 token，CSS/Tailwind 动画直接引用 token。主题切换和 `prefers-reduced-motion` 遵循同一套全局变量。
 - **区分视觉动效与业务时间**：录音时长、请求超时、轮询间隔、toast 展示时长等业务或提示行为继续由对应业务配置管理，不塞进视觉动效 token。
 - **验收口径**：新增或修改 UI 动效时，检查 TSX 中无颜色字面量和数字动画时长；检查每个新增语义颜色在 `:root` 与 `.dark` 均有定义，并确认 Canvas/第三方绘制从当前主题读取颜色。
+
+---
+
+### 6.5 严禁在屎山代码上雕花与反上帝组件铁律 (Zero Polishing on Shit & Anti-God-Components)
+- **单文件规模与单一职责硬指标**：
+  - 单个 UI 组件文件（`.tsx`）代码规模原则上控制在 **300 行以内**，绝对禁止编写 500+ 行的“巨无霸/上帝组件”（God Component）；
+  - 复杂交互流程（如教材导入、多步向导、题目批改等）必须严格遵循**分治架构**：
+    1. 步进拆分：每个 Step 单独拆成独立子组件（如 `StepFileSelect`、`StepTocProbe`、`StepTocConfirm`、`StepPipelineProgress`）；
+    2. 逻辑外置：多状态联动、API 调用与突变统一抽离到自定义 Hook（如 `useTextbookImportFlow`），UI 组件内只保留纯 JSX 视图与事件分发；
+    3. 纯展示组件（Presentational）与容器组件（Container）解耦，禁止在展示层混入任何复杂的数据解析或猜测算法。
+- **杜绝“屎上雕花”（No Patching on Broken Foundations）**：
+  - 发现已有组件架构失范、逻辑冗余、状态混乱时，**坚决禁止通过新增一堆临时 `useState`、补丁式 `useEffect` 或局部正则去“雕花修补”**；
+  - 必须对混乱代码大刀阔斧重构解耦，将其拆解为结构清晰的原子模块；凡是因“图省事”在巨型组件上继续堆砌面条代码的，一律视为严重架构违规。
 
 ---
 

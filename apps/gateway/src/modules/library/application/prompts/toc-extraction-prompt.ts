@@ -1,43 +1,30 @@
-/**
- * 教材目录提取与校验智能体（TOC Extraction Agent）专用提示词。
- * 遵循严格单调递增页码不变量与标准层级规范。
- */
-
+/** 目录视觉审核给任务、原则和模型可见工具名；字段由工具声明。 */
 export interface TocExtractionPromptInput {
   title?: string | undefined;
   language?: string | undefined;
-  ocrText: string;
+  pageNumbers: number[];
 }
 
 export function buildTocExtractionPrompt(input: TocExtractionPromptInput): string {
-  const lang = input.language ?? 'ja';
+  const langDesc = input.language ? `目标语种：${input.language}` : '';
   return [
-    '你是一个专业的语言教材数字化排版与目录结构提取专家。',
-    '请仔细分析以下教材的目录页（TOC）OCR 扫描文本，识别并提取完整的课程与章节目录大纲。',
-    ...(input.title ? [`【教材参考名称】：${input.title}`] : []),
-    `【目标语种】：${lang}`,
+    '请阅读随消息附上的教材目录页高清图片，按阅读顺序完整提取全书的树状目录草稿。',
+    `图片依次对应 PDF 物理页：${input.pageNumbers.join('、')}。`,
+    ...(input.title ? [`教材参考名称：${input.title}`] : []),
+    ...(langDesc ? [langDesc] : []),
     '',
-    '【目录页 OCR 扫描内容】：',
-    input.ocrText,
-    '',
-    '【提取规则与质量不变量】：',
-    '1. 必须准确提取课次序号（如第1課、Lesson 1）、课文主标题（去除点号、虚线、装饰符号）、印刷起始页码。',
-    '2. 严禁倒退页码：提取出的条目必须满足单调递增页码顺序。如果识别出倒退，请仔细核对是否为前言、附录或 OCR 误识别数字。',
-    '3. 层级规范（level）：单元/篇章（unit/chapter）标记为 unit 或 chapter，具体成课课次标记为 lesson。',
-    '4. 过滤无关内容：版权信息、编者序言、出版说明等非教学课次条目请勿作为 lesson 提取。',
-    '',
-    '【输出格式】：必须且仅输出合法 JSON 格式，严禁包含任何前言、结语、代码块外文字。',
-    'JSON 结构定义：',
-    '{',
-    '  "title": "教材标准规范标题",',
-    '  "entries": [',
-    '    {',
-    '      "title": "课次标题（如：第1課 初対面）",',
-    '      "level": "lesson",',
-    '      "startPage": 14,',
-    '      "endPage": 25',
-    '    }',
-    '  ]',
-    '}',
+    '【语言教材通用目次提取准则】：',
+    '1. 必须提取前置教学准备单元（Lesson 0 / Introductory）：',
+    '   - 严禁将开篇带有实质教学内容的入门准备部分（如字母/发音/音标、课堂用语、日常问候、数词等）误当成版权页或无用序言过滤；',
+    '   - 只要开篇部分印刷了具体教学条目并配有印刷页码，必须作为 section 提取并记录印刷起始页。',
+    '2. 必须提取深度多级子目（还原真实树状大纲，严禁偷懒只提取平铺课名）：',
+    '   - 核心教学实体（如课次、Lesson、Chapter、第X课/章）标记为 level: "lesson"；',
+    '   - 凡是在成课下方通过缩进、编号（如 1. 2. 3.）、小标题、点线对齐排版的具体次级条目（如核心句型/语法点、情景会话、课文主题、单元复习/Test 等），均为目录有效条目，必须全部作为 level: "section" 提取！',
+    '3. 印刷页码规则：',
+    '   - 只读取图片中通过虚线点线或对齐指向的教材印刷页码，不要填入 PDF 的物理页码；',
+    '   - 同一课内的次级条目若在同一起始页，页码相同即可，后续条目的页码不能倒退。',
+    '4. 工具调用约束：',
+    '   - 本会话提供 library_propose_toc 目录草稿工具。请直接调用它提交完整条目草稿；具体字段以工具说明为准。严禁以普通聊天文本回复。',
   ].join('\n');
 }
+

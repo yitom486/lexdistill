@@ -2,10 +2,14 @@ import { Hono } from 'hono';
 import { BusinessError, isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
-import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
+import { extractTocWithLlm } from '../application/toc-extractor.js';
+import { beginTocVisionTrace, listTocVisionTraces } from '../application/toc-vision-diagnostics.js';
+import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
+import { ensurePdfRuntime, type PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import type { TocEntry } from '@study-studio/document-model';
-import type { TextbookPipelineInput } from '../application/textbook-pipeline.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
+import type { TextbookPipelineInput } from '../application/textbook-pipeline.js';
+import { createDefaultAgentPool } from '../application/lesson-batch-extractor.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
 /**
@@ -89,9 +93,108 @@ export function createPdfImportRoutes(
           tocEntries: res.value.tocEntries,
           outlineSource: res.value.outlineSource,
           embeddedOutline: res.value.embeddedOutline,
+          detectedTocRange: res.value.detectedTocRange,
         });
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'mapPdfDocument');
+      }
+    })
+    .get('/api/toc-vision/:userId/traces', (c) =>
+      c.json({ traces: listTocVisionTraces(c.req.param('userId')) })
+    )
+    .post('/api/documents/:userId/extract-toc-llm', async (c) => {
+      // 目录定位完成后，只将选中 PDF 页渲染为图片交给视觉会话；不生成或传入 OCR 文本。
+      const userId = c.req.param('userId');
+      const trace = beginTocVisionTrace(userId);
+      c.header('X-Toc-Trace-Id', trace.id);
+      const input = await readPdfInput(c);
+      if (!input.ok) {
+        trace.finish('failed', { code: input.error.code });
+        return formatBusinessErrorResponse(c, input.error);
+      }
+      try {
+        if (!userId) {
+          trace.finish('failed', { code: 'E_INVALID_INPUT' });
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
+          );
+        }
+        if (!input.value.pages || input.value.pages.length === 0) {
+          trace.finish('failed', { code: 'E_INVALID_INPUT' });
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '请指定教材目次所在的起始与结束页码', 'VALIDATION')
+          );
+        }
+        if (input.value.pages.length > 8) {
+          trace.finish('failed', { code: 'E_INVALID_INPUT' });
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '一次最多识别 8 张目录页图片，请缩小范围', 'VALIDATION')
+          );
+        }
+        trace.record('request_accepted', {
+          pdfPages: input.value.pages,
+          model: input.value.model ?? 'default',
+          source: 'pdf-page-images',
+        });
+        const proposalTool = deps.server.toolRegistry.get('library.propose_toc');
+        if (!(proposalTool instanceof LibraryProposeTocTool)) {
+          trace.finish('failed', { code: 'E_TOOL_NOT_FOUND' });
+          return formatBusinessErrorResponse(c, new BusinessError(
+            'E_TOOL_NOT_FOUND', '目录草稿工具尚未就绪，请重启网关后重试', 'TOOL_EXECUTION'
+          ));
+        }
+        trace.record('runtime_starting');
+        const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
+        trace.record('runtime_ready');
+        if (!runtime.inspector.renderPdfPages) {
+          trace.finish('failed', { code: 'E_PDF_RENDER_UNAVAILABLE' });
+          return formatBusinessErrorResponse(c, new BusinessError(
+            'E_PDF_RENDER_UNAVAILABLE', 'PDF 页面渲染功能尚未就绪，请重启网关后重试', 'TOOL_EXECUTION'
+          ));
+        }
+        trace.record('render_starting');
+        const rendered = await runtime.inspector.renderPdfPages(input.value.bytes, input.value.pages);
+        if (rendered.length !== input.value.pages.length || rendered.some((page, index) =>
+          page.pageNumber !== input.value.pages![index] || page.png.length === 0
+        )) {
+          trace.finish('failed', { code: 'E_PDF_RENDER_INVALID' });
+          return formatBusinessErrorResponse(c, new BusinessError(
+            'E_PDF_RENDER_INVALID', '目录页图片生成不完整，请核对页码并重试', 'TOOL_EXECUTION'
+          ));
+        }
+        trace.record('render_completed', {
+          imageCount: rendered.length,
+          imageBytes: rendered.reduce((total, page) => total + page.png.length, 0),
+          imageWidths: rendered.map((page) => page.width),
+        });
+        const res = await extractTocWithLlm({
+          userId,
+          title: input.value.filename.replace(/\.[^/.]+$/, ''),
+          language: input.value.language || 'ja',
+          pageNumbers: input.value.pages,
+          pageImages: rendered.map((page) => ({ png: page.png, label: `PDF 第 ${page.pageNumber} 页` })),
+          adapter: deps.server.agentAdapter,
+          proposalTool,
+          traceId: trace.id,
+          onDiagnostic: trace.record,
+          ...(input.value.model ? { model: input.value.model } : {}),
+        });
+
+        if (!isOk(res)) {
+          trace.finish('failed', { code: res.error.code });
+          return formatBusinessErrorResponse(c, res.error, 'extractTocWithLlm');
+        }
+        trace.finish('completed', {
+          entryCount: res.value.entries.length,
+          firstPrintedPage: res.value.entries[0]?.startPage ?? 0,
+        });
+        return c.json(res.value);
+      } catch (e) {
+        trace.finish('failed', { code: e instanceof BusinessError ? e.code : 'E_UNEXPECTED' });
+        return formatBusinessErrorResponse(c, e, 'extractTocWithLlm');
       }
     })
     .post('/api/documents/:userId/execute-textbook-pipeline', async (c) => {
@@ -109,6 +212,8 @@ export function createPdfImportRoutes(
           title?: string;
           language?: string;
           filename?: string;
+          model?: string;
+          poolSize?: number;
           tocEntries?: TocEntry[];
           lessonJobs?: Array<{
             lessonId: string;
@@ -124,6 +229,13 @@ export function createPdfImportRoutes(
           );
         }
 
+        const pool = body.model || body.poolSize
+          ? createDefaultAgentPool({
+              ...(body.model ? { model: body.model } : {}),
+              ...(body.poolSize ? { poolSize: body.poolSize } : {}),
+            })
+          : undefined;
+
         const pipelineInput: TextbookPipelineInput = {
           userId,
           ...(body.documentId ? { documentId: body.documentId } : {}),
@@ -132,6 +244,7 @@ export function createPdfImportRoutes(
           ...(body.filename ? { filename: body.filename } : {}),
           tocEntries: body.tocEntries,
           lessonJobs: body.lessonJobs,
+          ...(pool ? { pool } : {}),
         };
 
         const res = await deps.repo.executeTextbookPipeline(pipelineInput);
@@ -202,6 +315,10 @@ interface PdfRouteInput {
   classes?: unknown;
   /** Azure 云 OCR 凭据（内存态透传，网关不落盘） */
   azure?: { endpoint: string; apiKey: string };
+  /** 专精大模型标识（空=服务端默认/轻量推荐） */
+  model?: string;
+  /** 目标语种（空=服务端默认） */
+  language?: string;
 }
 
 /**
@@ -364,6 +481,8 @@ async function readPdfInput(
     }
     const fingerprint = strField((body as Record<string, unknown>)['fingerprint']);
     const docTitle = strField((body as Record<string, unknown>)['docTitle']);
+    const model = strField((body as Record<string, unknown>)['model']);
+    const language = strField((body as Record<string, unknown>)['language']);
     return {
       ok: true,
       value: {
@@ -378,6 +497,8 @@ async function readPdfInput(
         ...(docTitle ? { docTitle } : {}),
         ...(azure ? { azure } : {}),
         ...(classes !== undefined ? { classes } : {}),
+        ...(model ? { model } : {}),
+        ...(language ? { language } : {}),
       },
     };
   }
@@ -392,6 +513,8 @@ async function readPdfInput(
   let lessonIndexRaw: unknown;
   let fingerprintRaw: unknown;
   let docTitleRaw: unknown;
+  let modelRaw: unknown;
+  let languageRaw: unknown;
   try {
     const body = await c.req.parseBody();
     const candidate = body['file'];
@@ -406,6 +529,8 @@ async function readPdfInput(
     lessonIndexRaw = body['lessonIndex'];
     fingerprintRaw = body['fingerprint'];
     docTitleRaw = body['docTitle'];
+    modelRaw = body['model'];
+    languageRaw = body['language'];
   } catch {
     return fail('上传体不是合法 multipart，请用 file 字段上传 PDF');
   }
@@ -428,6 +553,8 @@ async function readPdfInput(
   }
   const fingerprint = fingerprintRaw === undefined ? undefined : strField(fingerprintRaw);
   const docTitle = docTitleRaw === undefined ? undefined : strField(docTitleRaw);
+  const model = strField(modelRaw);
+  const language = strField(languageRaw);
   return {
     ok: true,
     value: {
@@ -438,10 +565,12 @@ async function readPdfInput(
       ...(entries !== undefined ? { entries } : {}),
       ...(anchors !== undefined ? { anchors } : {}),
       ...(lessonIndex !== undefined ? { lessonIndex } : {}),
-        ...(fingerprint ? { fingerprint } : {}),
-        ...(docTitle ? { docTitle } : {}),
-        ...(azure ? { azure } : {}),
+      ...(fingerprint ? { fingerprint } : {}),
+      ...(docTitle ? { docTitle } : {}),
+      ...(azure ? { azure } : {}),
       ...(classes !== undefined ? { classes } : {}),
+      ...(model ? { model } : {}),
+      ...(language ? { language } : {}),
     },
   };
 }

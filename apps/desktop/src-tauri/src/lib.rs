@@ -70,6 +70,26 @@ fn get_extension(filename: &str) -> &str {
         .unwrap_or("txt")
 }
 
+/// 弹出原生文件选择对话框，选择一个本地文件并返回其绝对物理路径。
+#[tauri::command]
+async fn platform_pick_file(
+    app: tauri::AppHandle,
+    filter_name: String,
+    extensions: Vec<String>,
+) -> Result<Option<String>, String> {
+    let mut builder = app.dialog().file();
+    let exts: Vec<&str> = extensions.iter().map(|s| s.as_str()).collect();
+    if !extensions.is_empty() {
+        builder = builder.add_filter(&filter_name, &exts);
+    }
+    let res = builder.blocking_pick_file();
+    match res {
+        Some(tauri_plugin_dialog::FilePath::Path(p)) => Ok(Some(p.to_string_lossy().to_string())),
+        Some(tauri_plugin_dialog::FilePath::Url(u)) => Ok(Some(u.to_string())),
+        None => Ok(None),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // P4-B：Agent Gateway sidecar 生命周期与数据库备份
 // 网关以编译产物 sidecar 随壳启动（`bun scripts/build-sidecar.ts` 产出
@@ -294,27 +314,27 @@ fn gateway_sidecar_path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 /// Dev 网关入口解析（纯函数，可单测）：
-/// 仓库根/apps/gateway/src/sidecar.ts 存在即返回 bun 启动参数。
+/// 仓库根/apps/gateway/src/sidecar.ts 存在即返回 bun 启动参数和工作目录。
 /// 与生产同入口，网关改动即时生效，不再依赖预编译 sidecar 包的新鲜度
 ///（曾实测跑着 9/08 老包调新路由 404）。
-fn dev_gateway_entry(repo_root: &std::path::Path) -> Option<(PathBuf, Vec<String>)> {
-    let entry = repo_root
-        .join("apps")
+fn dev_gateway_entry(repo_root: &std::path::Path) -> Option<(PathBuf, Vec<String>, PathBuf)> {
+    let entry = PathBuf::from("apps")
         .join("gateway")
         .join("src")
         .join("sidecar.ts");
-    if !entry.is_file() {
+    if !repo_root.join(&entry).is_file() {
         return None;
     }
     Some((
         PathBuf::from("bun"),
-        vec![entry.to_string_lossy().to_string()],
+        vec!["--watch".to_string(), entry.to_string_lossy().to_string()],
+        repo_root.to_path_buf(),
     ))
 }
 
 /// Debug 桌面构建默认从仓库源码启动 Gateway；Release 默认走预编译 sidecar。
 /// STUDY_STUDIO_GATEWAY_BUN=0 可在 Debug 下强制测试 sidecar；=1 可显式强制源码模式。
-fn dev_gateway_command() -> Option<(PathBuf, Vec<String>)> {
+fn dev_gateway_command() -> Option<(PathBuf, Vec<String>, PathBuf)> {
     let use_source = match std::env::var("STUDY_STUDIO_GATEWAY_BUN").as_deref() {
         Ok("1") => true,
         Ok("0") => false,
@@ -351,16 +371,19 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
             return;
         }
     };
-    // Dev 覆盖：环境变量开启时用 bun 现场拉起源码入口（program= bun，args=[sidecar.ts]）；
+    // Dev 覆盖：从仓库根运行 bun --watch，确保源码位于 Bun 的项目目录内。
     // 生产与默认走预编译包（program= sidecar 二进制，无额外参数）。
-    let (program, extra_args): (PathBuf, Vec<String>) = match dev_gateway_command() {
-        Some((program, args)) => {
+    let (program, extra_args, working_dir) = match dev_gateway_command() {
+        Some((program, args, working_dir)) => {
             println!("[sidecar] dev 模式：经 bun 现场拉起源码 sidecar（改动即时生效）");
-            (program, args)
+            (program, args, Some(working_dir))
         }
-        None => (sidecar_path.clone(), Vec::new()),
+        None => (sidecar_path.clone(), Vec::new(), None),
     };
     let mut command = Command::new(&program);
+    if let Some(dir) = working_dir {
+        command.current_dir(dir);
+    }
     command
         .args(&extra_args)
         .env("STUDY_STUDIO_DB", &db_path)
@@ -501,6 +524,7 @@ pub fn run() {
             platform_save_text_file,
             platform_backup_database,
             gateway_connection,
+            platform_pick_file,
         ])
         .setup(|app| {
             let port = match pick_gateway_port() {
@@ -520,8 +544,8 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::GatewaySidecar;
     use super::dev_gateway_entry;
+    use super::GatewaySidecar;
     use std::io::Read;
     use std::process::{Child, Command};
 
@@ -603,10 +627,17 @@ mod tests {
             .ancestors()
             .nth(3)
             .expect("src-tauri 上溯 3 级应为仓库根");
-        let (program, args) = dev_gateway_entry(repo_root).expect("仓库应含 apps/gateway/src/sidecar.ts");
+        let (program, args, working_dir) =
+            dev_gateway_entry(repo_root).expect("仓库应含 apps/gateway/src/sidecar.ts");
         assert_eq!(program.to_string_lossy(), "bun");
-        assert_eq!(args.len(), 1);
-        assert!(args[0].ends_with("sidecar.ts"));
+        assert_eq!(args.len(), 2);
+        assert_eq!(args[0], "--watch");
+        let expected_entry = std::path::Path::new("apps")
+            .join("gateway")
+            .join("src")
+            .join("sidecar.ts");
+        assert_eq!(std::path::Path::new(&args[1]), expected_entry);
+        assert_eq!(working_dir, repo_root);
     }
 
     #[test]

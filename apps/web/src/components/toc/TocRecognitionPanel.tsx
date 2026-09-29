@@ -1,31 +1,52 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Sparkles, ScanText, CheckCircle2, AlertCircle, Zap } from 'lucide-react';
+import { toast } from 'sonner';
+import { logger } from '@study-studio/shared';
 import { Button } from '../ui/button.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
-import { useMapPdfMutation } from '../../queries/useLearnerQueries.js';
+import { useMapPdfMutation, useExtractTocWithLlmMutation } from '../../queries/useLearnerQueries.js';
+import { useAgentModelsQuery } from '../../queries/useAgentQueries.js';
+import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import type { PdfAzureCredential } from '../../queries/textbooks-annotations.js';
 import { nextManualKey } from '../../lib/toc-confirm-flow.js';
 import {
-  parseTocScanRange,
-  tocCandidatesFromMap,
   validateTocCandidates,
   type TocRecognitionCandidate,
 } from '../../lib/toc-recognition.js';
+import { sound } from '../../utils/audio.js';
+
+export interface TocDetectedCandidate {
+  fromPage: number;
+  toPage: number;
+  score: number;
+  reasons?: string[];
+}
 
 interface TocRecognitionPanelProps {
   file: File | null;
   filePath: string;
   azure?: PdfAzureCredential;
+  onTocConfirmed?: (entries: TocRecognitionCandidate[]) => void;
 }
 
-export function TocRecognitionPanel({ file, filePath, azure }: TocRecognitionPanelProps) {
+export function TocRecognitionPanel({ file, filePath, azure, onTocConfirmed }: TocRecognitionPanelProps) {
   const map = useMapPdfMutation();
+  const extractLlm = useExtractTocWithLlmMutation();
+  const modelsQuery = useAgentModelsQuery();
+  const models = modelsQuery.data ?? [];
+  const tocReviewModel = usePreferencesStore((s) => s.tocReviewModel);
+  const setTocReviewModel = usePreferencesStore((s) => s.setTocReviewModel);
+
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [entries, setEntries] = useState<TocRecognitionCandidate[]>([]);
   const [scanned, setScanned] = useState(false);
-  const [outlineSource, setOutlineSource] = useState<'embedded' | 'none'>('none');
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [detectedHint, setDetectedHint] = useState<string | null>(null);
+  const [discoveredCandidates, setDiscoveredCandidates] = useState<TocDetectedCandidate[]>([]);
+  const autoProbedRef = useRef(false);
+
   const hasSource = Boolean(file || filePath.trim());
 
   const clearScan = () => {
@@ -34,95 +55,403 @@ export function TocRecognitionPanel({ file, filePath, azure }: TocRecognitionPan
     setConfirmed(false);
     setMessage(null);
   };
+
   const invalidate = () => {
     setConfirmed(false);
     setMessage(null);
   };
+
   const updateEntry = (key: string, patch: Partial<TocRecognitionCandidate>) => {
-    setEntries((previous) => previous.map((entry) => entry.key === key ? { ...entry, ...patch } : entry));
+    setEntries((previous) => previous.map((entry) => (entry.key === key ? { ...entry, ...patch } : entry)));
     invalidate();
   };
-  const scan = () => {
+
+  /**
+   * 阶段一：向后端 Gateway 发起结构探测
+   * 领域分析（书签提取、OCR 特征加权、跨页聚合）100% 由后端闭环完成，前端仅接收标准契约并组合呈现。
+   */
+  const handleProbeTocLocation = () => {
     if (!hasSource || map.isPending) return;
-    const range = parseTocScanRange(start, end);
-    if (!range.ok) {
-      setMessage(range.message);
+    sound.playClick();
+    setMessage(null);
+    setDetectedHint(null);
+
+    const vars = file
+      ? {
+          file,
+          ...(azure ? { azure } : {}),
+        }
+      : {
+          filePath: filePath.trim(),
+          ...(azure ? { azure } : {}),
+        };
+
+    map.mutate(vars, {
+      onSuccess: (result) => {
+        sound.playCorrect();
+        if (result.detectedTocRange) {
+          const { startPage, endPage, reason, candidates = [] } = result.detectedTocRange;
+          setStart(String(startPage));
+          setEnd(String(endPage));
+          const list = candidates.length > 0 ? candidates : [{ fromPage: startPage, toPage: endPage, score: 10, reasons: [reason] }];
+          setDiscoveredCandidates(list);
+          const hint = `💡 推荐第 ${startPage}–${endPage} 页（${reason}）`;
+          setDetectedHint(hint);
+          toast.success(hint);
+          return;
+        }
+
+        setDiscoveredCandidates([]);
+        const hint = '前 30 页未自动识别出明确目次区间，请翻看教材后手动输入目录所在页码';
+        setDetectedHint(hint);
+        toast.info(hint);
+      },
+      onError: (err) => {
+        setMessage(err instanceof Error ? err.message : 'OCR 探测失败，请直接手动填写目录所在页码');
+        sound.playMistake();
+      },
+    });
+  };
+
+  // 用户进入 Step 2 面板时自动触发后端探测，无需强制手动点击
+  useEffect(() => {
+    if (hasSource && !start && !map.isPending && !autoProbedRef.current) {
+      autoProbedRef.current = true;
+      handleProbeTocLocation();
+    }
+  }, [hasSource]);
+
+  /**
+   * 阶段二：由大模型对确定的目次页进行深度语义解析与结构化提取
+   */
+  const handleLlmExtractToc = () => {
+    if (!hasSource || extractLlm.isPending) return;
+    const startPage = Number(start.trim());
+    const endPage = Number(end.trim());
+
+    if (!start.trim() || !end.trim() || !Number.isSafeInteger(startPage) || !Number.isSafeInteger(endPage)) {
+      setMessage('请先填写目录（目次）所在的起始页与结束页（如第 6 至 8 页）');
+      sound.playMistake();
       return;
     }
+
+    if (startPage < 1 || endPage < startPage) {
+      setMessage('目录起始页与结束页必须为递增的正整数');
+      sound.playMistake();
+      return;
+    }
+
+    if (endPage - startPage + 1 > 8) {
+      setMessage('一次最多识别 8 张目录页图片，请缩小范围');
+      sound.playMistake();
+      return;
+    }
+
+    sound.playClick();
     clearScan();
-    const source = file ? { file } : { filePath: filePath.trim() };
-    map.mutate(
-      { ...source, ...(range.startPage !== undefined ? { startPage: range.startPage, endPage: range.endPage } : {}), ...(azure ? { azure } : {}) },
-      {
-        onSuccess: (result) => {
-          const candidates = tocCandidatesFromMap(result);
-          setEntries(candidates);
-          setOutlineSource(result.outlineSource === 'embedded' ? 'embedded' : 'none');
-          setScanned(true);
-          if (candidates.length === 0) setMessage('未找到可确认的目录条目。请指定实际目录页，或手动添加条目。');
-        },
-        onError: (error) => setMessage(error instanceof Error ? error.message : '目录识别失败，请重试'),
+
+    const vars = {
+      ...(file ? { file } : { filePath: filePath.trim() }),
+      startPage,
+      endPage,
+      ...(tocReviewModel ? { model: tocReviewModel } : {}),
+    };
+
+    extractLlm.mutate(vars, {
+      onSuccess: (data) => {
+        sound.playCorrect();
+        if (!data.entries || data.entries.length === 0) {
+          setMessage('大模型在该页码范围内未识别出有效课次条目，请核实页码是否准确');
+          sound.playMistake();
+          return;
+        }
+
+        const candidates: TocRecognitionCandidate[] = data.entries.map((item, index) => ({
+          key: `llm-${index}`,
+          title: item.title,
+          printedPage: String(item.startPage),
+          level: item.level === 'section' ? 2 : 1,
+          kind: item.level === 'lesson' ? 'lesson' : 'section',
+          confidence: null,
+        }));
+
+        setEntries(candidates);
+        setScanned(true);
+        toast.success(`大模型成功识别出 ${candidates.length} 条规范课次大纲！`);
       },
-    );
+      onError: (err) => {
+        setMessage(err instanceof Error ? err.message : '大模型提炼目录失败，请检查页码范围后重试');
+        sound.playMistake();
+      },
+    });
   };
+
   const confirm = () => {
     const error = validateTocCandidates(entries);
     if (error) {
       setMessage(error);
+      sound.playMistake();
       return;
     }
     setMessage(null);
     setConfirmed(true);
+    sound.playCorrect();
+    onTocConfirmed?.(entries);
   };
 
   return (
-    <div className="space-y-3 text-[11px] text-ink-mute-deep">
-      <div>
-        <p className="font-bold">目录识别与人工确认</p>
-        <p className="text-ink-ghost">先读取 PDF 内嵌目录；没有可用内嵌目录时，提取所选页面的文字或 OCR 目录。确认前不写入教材。</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1">
-          PDF 目录页
-          <input aria-label="目录起始 PDF 页" inputMode="numeric" value={start} disabled={map.isPending} onChange={(event) => { setStart(event.target.value); clearScan(); }} placeholder="起始" className="h-8 w-16 rounded-lg border border-line bg-surface px-2 text-ink" />
-          –
-          <input aria-label="目录结束 PDF 页" inputMode="numeric" value={end} disabled={map.isPending} onChange={(event) => { setEnd(event.target.value); clearScan(); }} placeholder="结束" className="h-8 w-16 rounded-lg border border-line bg-surface px-2 text-ink" />
-        </label>
-        <Button type="button" size="sm" variant="outline" disabled={!hasSource || map.isPending} onClick={scan}>
-          {map.isPending ? '识别中…' : '识别目录'}
-        </Button>
-        <span className="text-ink-ghost">留空则预览前 30 页；扫描书请填目录所在页。</span>
-      </div>
-      {message && <p role="status" className="text-ink-amber-800-amber-400">{message}</p>}
-      {scanned && (
-        <>
-          <p className="text-ink-ghost">
-            {outlineSource === 'embedded' ? '来源：PDF 内嵌目录。这里只知道 PDF 物理页；请按书上页码填写印刷页。' : '来源：页面文字 / OCR 规则候选。请核对标题、印刷页码和成课类型。'}
-          </p>
-          <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-            {entries.map((entry, index) => (
-              <div key={entry.key} className="grid grid-cols-1 gap-1 rounded-xl border border-line bg-surface p-2 sm:grid-cols-[minmax(0,1fr)_5rem_5rem_5rem_auto] sm:items-center">
-                <input aria-label={`目录标题 ${index + 1}`} value={entry.title} onChange={(event) => updateEntry(entry.key, { title: event.target.value })} className="h-8 min-w-0 rounded-lg border border-line bg-surface px-2 text-ink" />
-                <input aria-label={`印刷页码 ${index + 1}`} inputMode="numeric" value={entry.printedPage} onChange={(event) => updateEntry(entry.key, { printedPage: event.target.value })} placeholder="印刷页" className="h-8 w-full rounded-lg border border-line bg-surface px-2 text-ink" />
-                <Select value={entry.kind} onValueChange={(value) => { if (value === 'lesson' || value === 'section') updateEntry(entry.key, { kind: value }); }}>
-                  <SelectTrigger aria-label={`目录类型 ${index + 1}`} className="h-8"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="lesson">成课</SelectItem><SelectItem value="section">章节</SelectItem></SelectContent>
-                </Select>
-                <Select value={String(entry.level)} onValueChange={(value) => { if (value === '1' || value === '2') updateEntry(entry.key, { level: value === '1' ? 1 : 2 }); }}>
-                  <SelectTrigger aria-label={`目录层级 ${index + 1}`} className="h-8"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="1">一级</SelectItem><SelectItem value="2">二级</SelectItem></SelectContent>
-                </Select>
-                <Button type="button" size="sm" variant="ghost" onClick={() => { setEntries((previous) => previous.filter((item) => item.key !== entry.key)); invalidate(); }}>移除</Button>
-                {entry.physicalPage !== undefined && <span className="text-ink-ghost sm:col-span-5">PDF 物理页 {entry.physicalPage}</span>}
-              </div>
-            ))}
+    <div className="space-y-3 text-xs text-ink">
+      {/* 目录页码定位与提取 */}
+      <div className="p-3.5 rounded-2xl border border-line bg-surface space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-ink">目次所在页码：</span>
+            <div className="flex items-center gap-1.5">
+              <input
+                aria-label="目录起始页"
+                inputMode="numeric"
+                value={start}
+                disabled={extractLlm.isPending || map.isPending}
+                onChange={(e) => {
+                  setStart(e.target.value);
+                  clearScan();
+                }}
+                placeholder="起始页"
+                className="h-8 w-16 rounded-xl border border-line bg-surface px-2 text-ink text-center font-mono outline-none focus:border-line-accent"
+              />
+              <span className="text-ink-ghost">–</span>
+              <input
+                aria-label="目录结束页"
+                inputMode="numeric"
+                value={end}
+                disabled={extractLlm.isPending || map.isPending}
+                onChange={(e) => {
+                  setEnd(e.target.value);
+                  clearScan();
+                }}
+                placeholder="结束页"
+                className="h-8 w-16 rounded-xl border border-line bg-surface px-2 text-ink text-center font-mono outline-none focus:border-line-accent"
+              />
+            </div>
           </div>
+
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => { setEntries((previous) => [...previous, { key: nextManualKey(previous), title: '', printedPage: '', level: 1, kind: 'lesson', confidence: null }]); invalidate(); }}>添加条目</Button>
-            <Button type="button" size="sm" disabled={entries.length === 0 || confirmed} onClick={confirm}>确认目录</Button>
-            {confirmed && <span className="text-ink-emerald-700-emerald-400">已确认 {entries.length} 条目录。</span>}
+            <div className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2 py-0.5 text-xs text-ink-muted">
+              <Zap className="w-3.5 h-3.5 text-ink-amber-500" />
+              <span className="text-[11px] text-ink-ghost">提炼模型:</span>
+              <Select
+                value={tocReviewModel || '__default__'}
+                onValueChange={(val: string | null) => setTocReviewModel(!val || val === '__default__' ? '' : val)}
+              >
+                <SelectTrigger className="h-7 w-44 border-0 bg-transparent px-1 text-xs focus:ring-0">
+                  <SelectValue placeholder="默认轻量模型" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__default__">⚡ 推荐轻量模型 (Flash / 快速)</SelectItem>
+                  {models.map((m) => (
+                    <SelectItem key={m.id || m.model} value={m.id || m.model}>
+                      {m.displayName || m.model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!hasSource || map.isPending || extractLlm.isPending}
+              onClick={handleProbeTocLocation}
+              className="gap-1.5 text-xs"
+            >
+              <ScanText className="w-3.5 h-3.5" />
+              {map.isPending ? '后端分析中…' : '重新探测目录'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!hasSource || !start.trim() || !end.trim() || extractLlm.isPending}
+              onClick={handleLlmExtractToc}
+              className="gap-1.5 text-xs shadow-xs"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {extractLlm.isPending ? '大模型提炼目录中…' : '大模型智能提炼目录'}
+            </Button>
           </div>
-        </>
+        </div>
+
+        {discoveredCandidates.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="text-[11px] text-ink-ghost">候选项：</span>
+            {discoveredCandidates.map((c, idx) => {
+              const isSelected = start === String(c.fromPage) && end === String(c.toPage);
+              return (
+                <button
+                  key={`${c.fromPage}-${c.toPage}`}
+                  type="button"
+                  onClick={() => {
+                    setStart(String(c.fromPage));
+                    setEnd(String(c.toPage));
+                    clearScan();
+                  }}
+                  className={`px-2 py-0.5 rounded-lg text-xs font-mono transition-colors border ${
+                    isSelected
+                      ? 'border-line-accent bg-wash-amber-500o10 text-ink font-semibold'
+                      : 'border-line bg-surface text-ink-muted hover:text-ink hover:bg-surface-ash'
+                  }`}
+                >
+                  第 {c.fromPage}–{c.toPage} 页{idx === 0 ? ' (推荐)' : ''}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {detectedHint && (
+          <p className="text-[11px] text-ink-muted font-medium">
+            {detectedHint}
+          </p>
+        )}
+      </div>
+
+      {message && (
+        <div className="p-3 rounded-xl bg-wash-amber-500o10 border border-line-accent flex items-center gap-2 text-ink-amber-800-amber-400 text-xs">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{message}</span>
+        </div>
+      )}
+
+      {/* 第二阶段：展示大模型识别出的结构化条目与人工核对 */}
+      {scanned && (
+        <div className="space-y-2.5 pt-1">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-ink flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-ink-emerald-700-emerald-400" />
+              2. 核对大模型提取的课次大纲（共 {entries.length} 条）：
+            </p>
+            <span className="text-[11px] text-ink-ghost">
+              支持人工微调课名、印刷页码或调整类型
+            </span>
+          </div>
+
+          <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+            {entries.map((entry, index) => {
+              const isSubItem = entry.level === 2;
+              return (
+                <div
+                  key={entry.key}
+                  className={`grid grid-cols-1 gap-1.5 rounded-xl border p-2 sm:grid-cols-[minmax(0,1fr)_5rem_5rem_5rem_auto] sm:items-center shadow-2xs transition-colors ${
+                    isSubItem
+                      ? 'ml-3 sm:ml-6 border-line-soft bg-surface-ash border-l-2 border-l-line-accent'
+                      : 'border-line bg-surface'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {isSubItem ? (
+                      <span className="text-ink-ghost text-xs shrink-0 select-none pl-0.5">↳</span>
+                    ) : (
+                      <span className="w-1.5 h-1.5 rounded-full bg-tone-amber-500 shrink-0 ml-1 select-none" />
+                    )}
+                    <input
+                      aria-label={`目录标题 ${index + 1}`}
+                      value={entry.title}
+                      onChange={(e) => updateEntry(entry.key, { title: e.target.value })}
+                      className={`h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 text-ink text-xs outline-none focus:border-line-accent ${
+                        isSubItem ? 'font-normal text-ink-soft' : 'font-semibold'
+                      }`}
+                    />
+                  </div>
+                  <input
+                    aria-label={`印刷页码 ${index + 1}`}
+                    inputMode="numeric"
+                    value={entry.printedPage}
+                    onChange={(e) => updateEntry(entry.key, { printedPage: e.target.value })}
+                    placeholder="印刷页"
+                    className="h-8 w-full rounded-lg border border-line bg-surface px-2 text-ink text-xs font-mono text-center outline-none focus:border-line-accent"
+                  />
+                  <Select
+                    value={entry.kind}
+                    onValueChange={(val) => {
+                      if (val === 'lesson' || val === 'section') updateEntry(entry.key, { kind: val });
+                    }}
+                  >
+                    <SelectTrigger aria-label={`目录类型 ${index + 1}`} className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lesson">成课</SelectItem>
+                      <SelectItem value="section">章节/复习</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={String(entry.level)}
+                    onValueChange={(val) => {
+                      if (val === '1' || val === '2') updateEntry(entry.key, { level: val === '1' ? 1 : 2 });
+                    }}
+                  >
+                    <SelectTrigger aria-label={`目录层级 ${index + 1}`} className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">一级</SelectItem>
+                      <SelectItem value="2">二级 (子目)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setEntries((previous) => previous.filter((item) => item.key !== entry.key));
+                      invalidate();
+                    }}
+                    className="text-xs text-ink-rose-700-rose-400"
+                  >
+                    移除
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-line-soft">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEntries((prev) => [
+                  ...prev,
+                  {
+                    key: nextManualKey(prev),
+                    title: '',
+                    printedPage: '',
+                    level: 1,
+                    kind: 'lesson',
+                    confidence: null,
+                  },
+                ]);
+                invalidate();
+              }}
+              className="text-xs"
+            >
+              + 手动添加课次条目
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={entries.length === 0 || confirmed}
+                onClick={confirm}
+                className="gap-1.5"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {confirmed ? `已核对 ${entries.length} 条目录` : '确认目录草稿'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

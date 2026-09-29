@@ -1,4 +1,4 @@
-import type { DownloadPayload, PlatformCapabilities } from './capabilities.js';
+import type { DownloadPayload, PlatformCapabilities, PickFileOptions } from './capabilities.js';
 import { WebPlatformCapabilities } from './web-capabilities.js';
 
 /**
@@ -50,6 +50,18 @@ export class TauriPlatformCapabilities implements PlatformCapabilities {
       await tauriInvoke('platform_clipboard_write_text', { text });
     } catch {
       await this.fallback.clipboardWriteText(text);
+    }
+  }
+
+  async pickFile(options?: PickFileOptions): Promise<string | null> {
+    try {
+      const res = await tauriInvoke('platform_pick_file', {
+        filterName: options?.filterName ?? '所有支持的文件',
+        extensions: options?.extensions ?? [],
+      });
+      return typeof res === 'string' && res.trim() ? res.trim() : null;
+    } catch {
+      return null;
     }
   }
 }

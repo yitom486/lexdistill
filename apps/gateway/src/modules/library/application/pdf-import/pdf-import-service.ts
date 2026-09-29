@@ -14,6 +14,7 @@ import {
   AZURE_FALLBACK_MIN_CHARS,
   type AzureOcrPage,
 } from '../ocr/azure-document.js';
+import { detectTocPageRange, type DetectedTocRangeResult } from './toc-range-detector.js';
 
 /**
  * PDF 导入编排：校验 → 按需运行时 → 分类（文字直提 / 扫描 OCR）→ AST → 入库。
@@ -230,6 +231,7 @@ export interface PdfMapOutput {
    * none 时为空数组；绝不混入 TocEntry.printedPage 语义。
    */
   embeddedOutline: EmbeddedOutlineEntry[];
+  detectedTocRange?: DetectedTocRangeResult | null;
 }
 
 /** 校验后的单条原生目录（M8-5 起由 canonical 出口定义，此处仅兼容重导出）。 */
@@ -360,6 +362,7 @@ export async function mapPdfPages(
       tocEntries: [],
       outlineSource: 'embedded',
       embeddedOutline: embedded,
+      detectedTocRange: detectTocPageRange([], embedded),
     });
   }
   try {
@@ -459,6 +462,15 @@ export async function mapPdfPages(
       tocEntries,
       outlineSource: 'none',
       embeddedOutline: [],
+      detectedTocRange: detectTocPageRange(
+        perPage.length > 0
+          ? perPage.map((pg) => ({
+              page: pg.pageNumber,
+              text: typeof pg.markdown === 'string' ? pg.markdown : '',
+            }))
+          : [{ page: window[0] ?? 1, text: combined }],
+        outlineQuality.entries
+      ),
     });
   } catch (e) {
     logger.warn('[pdf-map] map window failed', { message: errorMessage(e) });

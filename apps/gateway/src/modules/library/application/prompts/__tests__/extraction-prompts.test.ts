@@ -5,18 +5,21 @@ import {
 } from '../index.js';
 
 describe('教材专精提取提示词模板（Extraction Prompts）', () => {
-  it('buildTocExtractionPrompt: 包含严格单调递增页码不变量与规范 JSON 约束', () => {
+  it('buildTocExtractionPrompt: 点名模型可见工具，保留视觉任务与页码原则，不塞 OCR 或字段清单', () => {
     const prompt = buildTocExtractionPrompt({
       title: '大家的日本语初级1',
       language: 'ja',
-      ocrText: '第1課 はじめまして 12\n第2課 これは本です 24',
+      pageNumbers: [16, 17],
     });
 
     expect(prompt).toContain('大家的日本语初级1');
-    expect(prompt).toContain('单调递增页码顺序');
-    expect(prompt).toContain('"level": "lesson"');
-    expect(prompt).toContain('"startPage": 14');
-    expect(prompt).toContain('第1課 はじめまして 12');
+    expect(prompt).toContain('PDF 物理页：16、17');
+    expect(prompt).toContain('印刷页码');
+    expect(prompt).toContain('页码不能倒退');
+    expect(prompt).toContain('library_propose_toc');
+    expect(prompt).toContain('具体字段以工具说明为准');
+    expect(prompt).not.toContain('OCR');
+    expect(prompt).not.toContain('"level"');
   });
 
   it('buildLessonExtractionPrompt: 包含四大核心要素（课文Markdown/生词/语法例句/习题）', () => {

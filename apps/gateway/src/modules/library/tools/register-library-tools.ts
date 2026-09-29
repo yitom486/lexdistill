@@ -4,6 +4,7 @@ import { LearningLibraryTool } from './learning-library-tool.js';
 import { LibraryImportTool } from './library-import-tool.js';
 import { LibraryKnowledgeSaveTool } from './library-knowledge-tool.js';
 import { LibrarySubmitTocTool } from './library-toc-tool.js';
+import { LibraryProposeTocTool } from './library-propose-toc-tool.js';
 import { LibraryLessonCommitTool } from './library-lesson-commit-tool.js';
 
 /**
@@ -19,5 +20,6 @@ export function registerLibraryTools(
   registry.register(new LibraryImportTool(drizzle));
   registry.register(new LibraryKnowledgeSaveTool(drizzle));
   registry.register(new LibrarySubmitTocTool(drizzle));
+  registry.register(new LibraryProposeTocTool());
   registry.register(new LibraryLessonCommitTool(drizzle));
 }

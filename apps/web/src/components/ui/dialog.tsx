@@ -35,7 +35,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       <BaseDialog.Popup
         ref={ref}
         className={cn(
-          'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-line-amber-900o15-amber-500o20 bg-paper-soft p-6 shadow-2xl rounded-3xl outline-none',
+          'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-line-amber-900o15-amber-500o20 bg-paper-soft text-ink p-6 shadow-2xl rounded-3xl outline-none',
           className
         )}
         {...props}

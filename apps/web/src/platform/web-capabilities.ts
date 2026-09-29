@@ -78,4 +78,9 @@ export class WebPlatformCapabilities implements PlatformCapabilities {
       body.removeChild(area);
     }
   }
+
+  async pickFile(): Promise<string | null> {
+    // 浏览器沙箱安全限制：纯 Web 环境无法直接获取文件在用户操作系统的物理绝对路径
+    return null;
+  }
 }
