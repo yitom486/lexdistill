@@ -11,7 +11,7 @@
     "dev:web:parallel": "bun --parallel --filter @study-studio/web --filter @study-studio/gateway dev",
     "dev:clean": "bun scripts/dev-clean.ts",
     "dev:gateway": "bun --filter @study-studio/gateway dev",
-    "dev:desktop": "bun --filter @study-studio/desktop dev",
+    "dev:desktop": "bun scripts/dev-desktop.ts",
     "build": "bun --filter \"*\" build",
     "build:sidecar": "bun run --filter @study-studio/gateway sidecar:build",
     "typecheck": "tsc -b --force",
