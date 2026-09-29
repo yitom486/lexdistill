@@ -47,8 +47,6 @@ const CROSS_MODULE_ALLOWLIST = new Set([
   'modules/learning-content/ports.ts -> modules/practice/ports.js',
   // learning-content reuses dictionary sampling and curriculum seed reads through domain APIs.
   // E2b：yomitan 改直引 @study-studio/archive，library/public 中转边消除。
-  // Anki 推送复用 tts-proxy 合成（只取音频字节；Key 随调用来、用完即弃，永不落盘）。
-  'modules/flashcards/application/anki-push.ts -> modules/tts/application/tts-proxy.js',
   // E2b：apkg-import 改直引 @study-studio/archive，library/public 中转边消除。
   // flashcards.collect 复用词典 collect 的输出类型（type-only；与查词面板同一命令）。
   'modules/flashcards/tools/flashcards-collect-tool.ts -> modules/dictionary/public.js',

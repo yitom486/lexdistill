@@ -133,11 +133,14 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
     !levelInfo || levelInfo.level === 'NOVICE' || levelInfo.level === 'BEGINNER';
   const wordlists = useWordlistsQuery(undefined, language);
   // TTS 凭证只存浏览器本地：推送时随请求携带、网关不落盘；未配置则音频留空。
-  const customPluginUrl = useTtsStore((s) => s.customPluginUrl);
-  const isCustomPluginEnabled = useTtsStore((s) => s.isCustomPluginEnabled);
-  const customPluginApiKey = useTtsStore((s) => s.customPluginApiKey);
-  const customPluginVoiceId = useTtsStore((s) => s.customPluginVoiceId);
-  const ttsRate = useTtsStore((s) => s.rate);
+  const preferredService = useTtsStore((s) => s.preferredService);
+  const geminiApiKey = useTtsStore((s) => s.geminiApiKey);
+  const azureKey = useTtsStore((s) => s.azureKey);
+  const azureRegion = useTtsStore((s) => s.azureRegion);
+  const localBaseUrl = useTtsStore((s) => s.localBaseUrl);
+  const localApiKey = useTtsStore((s) => s.localApiKey);
+  const voiceId = useTtsStore((s) => s.voiceId);
+  const gender = useTtsStore((s) => s.gender);
   const ankiPushable = (ankiStatus.data?.enabled && ankiStatus.data.connected) === true;
   // 查到结果后刷新最近查词与相遇词热力（画像信号已由网关记录）
   useEffect(() => {
@@ -191,25 +194,27 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
 
   /** 推送到本机 Anki：先入库生词本（去重），再按卡片模板渲染推送。 */
   const pushEntryToAnki = (entryId: string) => {
-    let tts: AnkiPushTts | undefined;
-    if (isCustomPluginEnabled && customPluginUrl) {
-      tts = {
-        provider: 'openai-compatible',
-        baseUrl: customPluginUrl,
-        ...(customPluginApiKey ? { apiKey: customPluginApiKey } : {}),
-        ...(customPluginVoiceId ? { voice: customPluginVoiceId } : {}),
-        rate: ttsRate,
-      };
-    }
+    const tts: AnkiPushTts = {
+      provider: preferredService,
+      ...(preferredService === 'gemini' && geminiApiKey ? { apiKey: geminiApiKey } : {}),
+      ...(preferredService === 'azure' && azureKey ? { apiKey: azureKey } : {}),
+      ...(azureRegion ? { region: azureRegion } : {}),
+      ...(localBaseUrl ? { localBaseUrl } : {}),
+      ...(localApiKey ? { localApiKey } : {}),
+      ...(voiceId ? { voice: voiceId } : {}),
+      gender,
+    };
     collect.mutate(entryId, {
       onSuccess: (result) => {
         pushToAnki.mutate(
-          { cardId: result.card.id, ...(tts ? { tts } : {}) },
+          { cardId: result.card.id, tts },
           {
             onSuccess: (r) => {
               toast.success(
                 `已推送到 Anki「${r.deckName}」${r.audioStored ? '（含发音）' : '（无音频）'}`
               );
+              if (r.ttsWarning) toast.warning(r.ttsWarning);
+              if (r.audioSkippedReason) toast.warning(r.audioSkippedReason);
             },
             onError: (error) => {
               toast.error(error instanceof Error ? error.message : '推送到 Anki 失败。');

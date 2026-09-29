@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { createTTSApp } from 'gemini-tts-studio/server';
 import { cors } from 'hono/cors';
 import { BusinessError } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../errors/http-error-handler.js';
@@ -28,7 +29,6 @@ import {
   createPdfImportRoutes,
 } from '../../modules/library/http/public.js';
 import { createCurriculumRoutes } from '../../modules/curriculum/http/public.js';
-import { createTtsRoutes } from '../../modules/tts/http/tts-routes.js';
 
 /**
  * 应用构建工厂（G2）：只组装路由，不创建 DB/Adapter/监听。
@@ -74,7 +74,7 @@ export function createApp(deps: GatewayDeps) {
     .route('/', createTextbookQuizRoutes(deps))
     .route('/', createPdfImportRoutes(deps))
     .route('/', createCurriculumRoutes(deps))
-    .route('/', createTtsRoutes())
+    .route('/', createTTSApp({ prefix: '/api/tts-studio', corsOrigins: false, enableLogger: false }))
     .route('/', createLearningCompatRoutes(deps));
 }
 

@@ -1006,6 +1006,7 @@ export interface AnkiPushResult {
   formatId: string;
   audioStored: boolean;
   audioSkippedReason?: string;
+  ttsWarning?: string;
 }
 
 export function useAnkiStatusQuery(enabled = true) {
@@ -1048,6 +1049,8 @@ export function useSaveAnkiSettingsMutation() {
 export interface AnkiPushTts {
   provider: string;
   baseUrl?: string;
+  localBaseUrl?: string;
+  localApiKey?: string;
   region?: string;
   apiKey?: string;
   voice?: string;

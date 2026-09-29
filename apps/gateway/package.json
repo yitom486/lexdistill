@@ -23,6 +23,7 @@
     "agentpools": "^0.1.0",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5",
+    "gemini-tts-studio": "0.3.0",
     "jsdom": "^30.0.1"
   },
   "scripts": {

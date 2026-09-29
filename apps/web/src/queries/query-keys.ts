@@ -12,7 +12,6 @@ export const QUERY_KEYS = {
   KANA_ADAPTIVE: ['curriculum', 'kana', 'adaptive'] as const,
   HANGUL: ['curriculum', 'hangul'] as const,
   TRAIL: ['learner', 'trail'] as const,
-  TTS_VOICES: ['tts', 'voices'] as const,
   READING: ['learner', 'reading'] as const,
   NEWS_TOPICS: ['learner', 'newsTopics'] as const,
   PITCH: ['curriculum', 'pitch'] as const,

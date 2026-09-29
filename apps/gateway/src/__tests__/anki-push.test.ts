@@ -84,7 +84,13 @@ describe('pushCardToAnki end-to-end (stub AnkiConnect over loopback HTTP)', () =
       port: 0,
       fetch: async (req) => {
         const url = new URL(req.url);
-        if (url.pathname === '/tts') {
+        if (url.pathname === '/v1/models') {
+          return Response.json({ data: [{ id: 'stub-model' }] });
+        }
+        if (url.pathname === '/v1/audio/voices') {
+          return Response.json({ data: [{ id: 'stub-voice' }] });
+        }
+        if (url.pathname === '/v1/audio/speech') {
           calls.push('TTS:synthesize');
           return new Response(new Uint8Array([1, 2, 3, 4]), {
             headers: { 'Content-Type': 'audio/mpeg' },
@@ -158,7 +164,7 @@ describe('pushCardToAnki end-to-end (stub AnkiConnect over loopback HTTP)', () =
     const res = await repo.pushCardToAnki({
       userId: 'default_user',
       cardId: 'card-2',
-      tts: { provider: 'openai-compatible', baseUrl: `${endpoint}/tts` },
+      tts: { provider: 'local', localBaseUrl: `${endpoint}/v1` },
     });
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
