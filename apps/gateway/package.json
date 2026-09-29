@@ -6,10 +6,10 @@
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@study-studio/agent-runtime": "workspace:*",
+    "@study-studio/ai-content": "workspace:*",
     "@study-studio/archive": "workspace:*",
     "@study-studio/content": "workspace:*",
     "@study-studio/document-model": "workspace:*",
-    "@study-studio/ai-content": "workspace:*",
     "@study-studio/flashcards": "workspace:*",
     "@study-studio/learner-core": "workspace:*",
     "@study-studio/learning": "workspace:*",
@@ -20,6 +20,7 @@
     "@study-studio/speech": "workspace:*",
     "@study-studio/storage-sqlite": "workspace:*",
     "@study-studio/tool-core": "workspace:*",
+    "agentpools": "^0.1.0",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5",
     "jsdom": "^30.0.1"

@@ -38,6 +38,7 @@
         "@study-studio/speech": "workspace:*",
         "@study-studio/storage-sqlite": "workspace:*",
         "@study-studio/tool-core": "workspace:*",
+        "agentpools": "^0.1.0",
         "drizzle-orm": "^0.45.2",
         "hono": "^4.13.5",
         "jsdom": "^30.0.1",
@@ -556,6 +557,18 @@
     "@ungap/structured-clone": ["@ungap/structured-clone@1.4.0", "", {}, "sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ=="],
 
     "@vitejs/plugin-react": ["@vitejs/plugin-react@4.7.0", "", { "dependencies": { "@babel/core": "^7.28.0", "@babel/plugin-transform-react-jsx-self": "^7.27.1", "@babel/plugin-transform-react-jsx-source": "^7.27.1", "@rolldown/pluginutils": "1.0.0-beta.27", "@types/babel__core": "^7.20.5", "react-refresh": "^0.17.0" }, "peerDependencies": { "vite": "^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0" } }, "sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA=="],
+
+    "agentpools": ["agentpools@0.1.0", "", { "optionalDependencies": { "agentpools-darwin-arm64": "0.1.0", "agentpools-darwin-x64": "0.1.0", "agentpools-linux-arm64-gnu": "0.1.0", "agentpools-linux-x64-gnu": "0.1.0", "agentpools-win32-x64-msvc": "0.1.0" } }, "sha512-Gxbf/koOo6ZLwaE3fLzJlCm2gRsyeTkJ312NC4+MUoTqvbAt7ZdGu8LaCRmQeyLvpeo3c8+Td7m07D2GO9Kfmg=="],
+
+    "agentpools-darwin-arm64": ["agentpools-darwin-arm64@0.1.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-sCjz+htqDZ9ueYLUwg2om+6j70nJu1MNDh8bgbwuB5iJp2q71A3qhLChFfAg5Nm4B4HunIuAVy8ieZFst6rY9Q=="],
+
+    "agentpools-darwin-x64": ["agentpools-darwin-x64@0.1.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-XCKl9jhUvPaCkCtkc/dpPrOF+pPrn47OZ1xPmf5zBLlB8KS3+l+QWJAk9F4+sonQ6rzMqiRfkyCTKKACHVcobA=="],
+
+    "agentpools-linux-arm64-gnu": ["agentpools-linux-arm64-gnu@0.1.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-lh61feIQVqwhUDEyM9hoaWfDAWRuknsJlsUsE46YQk7XD0h1KcNnTGMZ3aSN7Dqfm4Mt+AejVP47r9ocjsU45Q=="],
+
+    "agentpools-linux-x64-gnu": ["agentpools-linux-x64-gnu@0.1.0", "", { "os": "linux", "cpu": "x64" }, "sha512-uwhv0zQlc9CrAMSWvi8N5l/2wD6sSVK89ILSPr6jh4m3+n3gkuHYWJav5hSxQfiUyuIARwc9TSGgTl4b7pJqhw=="],
+
+    "agentpools-win32-x64-msvc": ["agentpools-win32-x64-msvc@0.1.0", "", { "os": "win32", "cpu": "x64" }, "sha512-AtJDOFwYY6ZO05awhfaYavrbtFNadGZzCtBHBsJUVmjE7m5oDFJtWSJlk7LIKPnqyEZihdpoRk1P7GpSLtzSEg=="],
 
     "array-buffer-byte-length": ["array-buffer-byte-length@1.0.2", "", { "dependencies": { "call-bound": "^1.0.3", "is-array-buffer": "^3.0.5" } }, "sha512-LHE+8BuR7RYGDKvnrmcuSq3tDcKv9OFEXQt/HpbZhY7V6h0zlUXutnAD82GiFx9rdieCMjkvtcsPqBwgUl1Iiw=="],
 
