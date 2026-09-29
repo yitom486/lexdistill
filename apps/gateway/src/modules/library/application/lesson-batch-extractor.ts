@@ -199,7 +199,12 @@ export function createDefaultAgentPool(options: {
   model?: string | undefined;
 }): AgentPoolLike {
   const poolSize = options.poolSize ?? 3;
-  const program = options.program ?? process.env.STUDY_STUDIO_CODEX_PATH ?? 'codex';
+  const program =
+    options.program ??
+    process.env.STUDY_STUDIO_CODEX_PATH ??
+    process.env.CODEX_BIN ??
+    process.env.CODEX_PATH ??
+    'codex';
   const agents = Array.from({ length: poolSize }, () => ({
     runtime: 'codexAppServer' as const,
     program,

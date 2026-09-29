@@ -44,6 +44,8 @@ import {
   SelectValue,
 } from '../ui/select.js';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui/collapsible.js';
+import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
+import { useAgentModelsQuery } from '../../queries/useAgentQueries.js';
 
 interface TextbookPipelineImporterTabProps {
   pdfFile: File | null;
@@ -112,8 +114,23 @@ export function TextbookPipelineImporterTab({
   const executePipeline = useExecuteTextbookPipelineMutation();
   const queryClient = useQueryClient();
 
-  const [pipelineModel, setPipelineModel] = useState<string>('default');
-  const [pipelinePoolSize, setPipelinePoolSize] = useState<string>('3');
+  const modelsQuery = useAgentModelsQuery();
+  const codexModels = modelsQuery.data ?? [];
+
+  const pipelineModel = usePreferencesStore((s) => s.pipelineModel);
+  const setPipelineModel = usePreferencesStore((s) => s.setPipelineModel);
+  const pipelinePoolSize = usePreferencesStore((s) => s.pipelinePoolSize);
+  const setPipelinePoolSize = usePreferencesStore((s) => s.setPipelinePoolSize);
+
+  const isKnownCodexModel = codexModels.some(
+    (m) => (m.id && m.id === pipelineModel) || (m.model && m.model === pipelineModel)
+  );
+  const isCustomModel = Boolean(pipelineModel) && !isKnownCodexModel;
+  const [isCustomMode, setIsCustomMode] = useState<boolean>(() => isCustomModel);
+  const [customModelInput, setCustomModelInput] = useState<string>(
+    () => (isCustomModel ? pipelineModel : '')
+  );
+
   const [forceOverwrite, setForceOverwrite] = useState<boolean>(false);
   const [pipelineResult, setPipelineResult] = useState<ExecuteTextbookPipelineResult | null>(null);
 
@@ -469,7 +486,9 @@ export function TextbookPipelineImporterTab({
         title: docTitle,
         language: 'ja',
         ...(path ? { filePath: path } : {}),
-        ...(pipelineModel !== 'default' ? { model: pipelineModel } : {}),
+        ...(pipelineModel && pipelineModel !== '__default__' && pipelineModel !== 'default'
+          ? { model: pipelineModel.trim() }
+          : {}),
         poolSize: Number(pipelinePoolSize) || 3,
         forceOverwrite,
         tocEntries,
@@ -897,22 +916,76 @@ export function TextbookPipelineImporterTab({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div>
-                <label className="block font-medium text-ink mb-1.5">
-                  专职提炼大模型（Model Tiering）：
-                </label>
-                <Select value={pipelineModel} onValueChange={(v) => v && setPipelineModel(v)} disabled={executePipeline.isPending}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-medium text-ink">
+                    专职提炼大模型（Model Tiering）：
+                  </label>
+                  {modelsQuery.isFetching ? (
+                    <span className="text-[10px] text-ink-ghost">拉取本地 Codex 模型中…</span>
+                  ) : codexModels.length > 0 ? (
+                    <span className="text-[10px] text-tone-amber-600 dark:text-tone-amber-400">
+                      已识别 {codexModels.length} 个本机模型
+                    </span>
+                  ) : null}
+                </div>
+                <Select
+                  value={isCustomMode ? '__custom__' : (pipelineModel || '__default__')}
+                  onValueChange={(v) => {
+                    if (v === '__custom__') {
+                      setIsCustomMode(true);
+                      if (customModelInput.trim()) {
+                        setPipelineModel(customModelInput.trim());
+                      }
+                    } else if (v === '__default__') {
+                      setIsCustomMode(false);
+                      setPipelineModel('');
+                    } else if (v) {
+                      setIsCustomMode(false);
+                      setPipelineModel(v);
+                    }
+                  }}
+                  disabled={executePipeline.isPending}
+                >
                   <SelectTrigger className="w-full h-8 text-xs">
-                    <SelectValue placeholder="选择大模型" />
+                    <SelectValue placeholder="选择本地 Codex 模型" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="default">系统默认托管模型（自动平衡）</SelectItem>
-                    <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash（超轻量·高性价比·推荐）</SelectItem>
-                    <SelectItem value="gpt-4o-mini">GPT-4o-mini（极速轻量）</SelectItem>
-                    <SelectItem value="claude-3-5-haiku">Claude 3.5 Haiku（高效结构化）</SelectItem>
+                    <SelectItem value="__default__">
+                      ⚡ 本地 Codex 默认模型（跟随本机全局配置）
+                    </SelectItem>
+                    {codexModels.map((m) => (
+                      <SelectItem key={m.id || m.model} value={m.id || m.model}>
+                        {m.displayName || m.model}
+                        {m.isDefault ? '（本机推荐/默认）' : ''}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="__custom__">
+                      ✏️ 手动输入模型标识 (Custom Model)...
+                    </SelectItem>
                   </SelectContent>
                 </Select>
+
+                {isCustomMode && (
+                  <div className="mt-2 space-y-1">
+                    <input
+                      type="text"
+                      placeholder="输入本地可用模型名（如 gpt-4o, o3-mini, deepseek-chat 等）"
+                      value={customModelInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomModelInput(val);
+                        setPipelineModel(val.trim());
+                      }}
+                      className="w-full h-8 px-2.5 rounded-xl border border-line bg-surface text-ink text-xs outline-none focus:border-tone-amber-500 font-mono"
+                    />
+                    <p className="text-[10px] text-ink-ghost">
+                      请输入本地 Codex App Server 已接入或支持的模型标识
+                    </p>
+                  </div>
+                )}
+
                 <p className="mt-1 text-[11px] text-ink-ghost">
-                  教学提炼为中轻度格式化与知识点归纳任务，推荐使用高性价比轻量模型。
+                  依托本机 Codex App Server 实时提供可用模型；选默认则自动采用本地环境配置。
                 </p>
               </div>
 
@@ -920,11 +993,16 @@ export function TextbookPipelineImporterTab({
                 <label className="block font-medium text-ink mb-1.5">
                   Agent 池并发 Worker 数量（Concurrency）：
                 </label>
-                <Select value={pipelinePoolSize} onValueChange={(v) => v && setPipelinePoolSize(v)} disabled={executePipeline.isPending}>
+                <Select
+                  value={pipelinePoolSize || '3'}
+                  onValueChange={(v) => v && setPipelinePoolSize(v)}
+                  disabled={executePipeline.isPending}
+                >
                   <SelectTrigger className="w-full h-8 text-xs">
                     <SelectValue placeholder="选择并发 Worker 数量" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="1">1 个 Worker（单任务串行·最低资源占用）</SelectItem>
                     <SelectItem value="2">2 个 Worker（温和·适合较低 API 限额）</SelectItem>
                     <SelectItem value="3">3 个 Worker（默认推荐·平衡吞吐）</SelectItem>
                     <SelectItem value="4">4 个 Worker（高效提炼）</SelectItem>

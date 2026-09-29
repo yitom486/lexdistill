@@ -44,6 +44,10 @@ export interface PreferencesState {
   tocReviewModel: string;
   /** 目录 AI 审核思考等级；空=使用默认 */
   tocReviewEffort: string;
+  /** 教材正文提炼专职模型 id；空=使用本机 Codex 默认配置 */
+  pipelineModel: string;
+  /** 教材提炼 Worker 并发度；默认 '3' */
+  pipelinePoolSize: string;
 
   setTheme: (theme: 'light' | 'dark') => void;
   toggleTheme: () => void;
@@ -60,6 +64,7 @@ export interface PreferencesState {
     ctx: PreferencesState['tutorContextSnapshot']
   ) => void;
   setTutorPanelWidthPx: (widthPx: number) => void;
+
   setCoachModelId: (modelId: string) => void;
   setCoachEffort: (effort: string) => void;
   setCoachApprovalPolicy: (policy: string) => void;
@@ -70,6 +75,8 @@ export interface PreferencesState {
   setReviewCardFormatId: (formatId: string) => void;
   setTocReviewModel: (model: string) => void;
   setTocReviewEffort: (effort: string) => void;
+  setPipelineModel: (model: string) => void;
+  setPipelinePoolSize: (poolSize: string) => void;
 }
 
 const applyThemeToDom = (theme: 'light' | 'dark') => {
@@ -133,6 +140,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       reviewCardFormatId: 'study-basic',
       tocReviewModel: '',
       tocReviewEffort: '',
+      pipelineModel: '',
+      pipelinePoolSize: '3',
 
       setTheme: (theme: 'light' | 'dark') => {
         runThemeTransition(() => {
@@ -183,6 +192,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       setReviewCardFormatId: (reviewCardFormatId: string) => set({ reviewCardFormatId }),
       setTocReviewModel: (tocReviewModel: string) => set({ tocReviewModel }),
       setTocReviewEffort: (tocReviewEffort: string) => set({ tocReviewEffort }),
+      setPipelineModel: (pipelineModel: string) => set({ pipelineModel }),
+      setPipelinePoolSize: (pipelinePoolSize: string) => set({ pipelinePoolSize }),
     }),
     {
       name: 'study_studio_user_preferences',
