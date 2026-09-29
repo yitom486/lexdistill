@@ -5,6 +5,7 @@ import { BusinessError } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../composition/gateway-deps.js';
 import { createHealthRoutes } from './health-routes.js';
+import { createTtsDefaultsRoutes } from './tts-defaults-routes.js';
 import { createAgentRoutes } from './agent-routes.js';
 import { createLearningCompatRoutes } from './learning-routes.js';
 import { createDictionaryRoutes } from '../../modules/dictionary/http/public.js';
@@ -59,6 +60,7 @@ export function createApp(deps: GatewayDeps) {
       );
     })
     .route('/', createHealthRoutes(deps))
+    .route('/', createTtsDefaultsRoutes())
     .route('/', createAgentRoutes(deps))
     .route('/', createDictionaryRoutes(deps))
     .route('/', createCardFormatRoutes(deps))

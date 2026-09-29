@@ -28,4 +28,15 @@ describe('TTS local preference migration', () => {
     });
     expect(migrated.providerApiKeys).toEqual({ gemini: 'new-key', azure: 'old-azure-key' });
   });
+
+  it('preserves the selected model id across migration', () => {
+    const migrated = migrateTtsPreferences({ preferredService: 'gemini', modelId: 'gemini-3.8-flash-tts', voiceId: 'Achernar' });
+    expect(migrated.modelId).toBe('gemini-3.8-flash-tts');
+    expect(migrated.voiceId).toBe('Achernar');
+  });
+
+  it('defaults invalid model id to empty string', () => {
+    const migrated = migrateTtsPreferences({ modelId: 123 });
+    expect(migrated.modelId).toBe('');
+  });
 });

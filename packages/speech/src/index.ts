@@ -35,6 +35,7 @@ export {
   setActiveTtsEngine,
 } from './engine.js';
 export type { TtsEngine } from './engine.js';
+export { TTS_PREVIEW_TEXTS, previewTextForTrack } from './preview-texts.js';
 export {
   buildOpenAiSpeechPayload,
   isHttpEndpoint,
