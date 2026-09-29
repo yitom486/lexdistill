@@ -9,6 +9,7 @@ describe('TTS local preference migration', () => {
       azureKey: 'saved-azure-key',
       localApiKey: 'saved-local-key',
       voiceId: 'saved-voice',
+      gender: 'FEMALE',
     });
     expect(migrated.providerApiKeys).toEqual({
       gemini: 'saved-gemini-key',
@@ -16,6 +17,7 @@ describe('TTS local preference migration', () => {
       local: 'saved-local-key',
     });
     expect(migrated.voiceId).toBe('saved-voice');
+    expect(migrated).not.toHaveProperty('gender');
   });
 
   it('preserves newer provider keys and ignores invalid values', () => {

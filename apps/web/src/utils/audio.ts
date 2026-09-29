@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 
 export interface SpeechStudioConfig {
-  gender: TtsGender;
   rate: number;
   preferredService: string;
   providerApiKeys: Record<string, string>;
@@ -35,7 +34,6 @@ function readTtsFailure(error: unknown): UnifiedSynthesizeFailure | null {
   return failure as UnifiedSynthesizeFailure;
 }
 
-export type TtsGender = 'FEMALE' | 'MALE';
 export type SupportedLanguage = 'JA' | 'EN' | 'KO';
 
 class SoundEngine {
@@ -172,7 +170,7 @@ export const sound = new SoundEngine();
 class SpeechStudioEngine {
   private listeners = new Set<() => void>();
   private config: SpeechStudioConfig = {
-    gender: 'FEMALE', rate: 0.9, preferredService: '',
+    rate: 0.9, preferredService: '',
     providerApiKeys: {}, azureRegion: '', localBaseUrl: '', voiceId: '',
   };
   private isSpeaking = false;
@@ -199,7 +197,6 @@ class SpeechStudioEngine {
     text: string,
     options?: {
       lang?: SupportedLanguage;
-      gender?: TtsGender;
       rate?: number;
       purpose?: TtsPurpose;
       personaName?: string;
@@ -234,7 +231,6 @@ class SpeechStudioEngine {
       });
       const voiceId = options?.neural?.voiceId || config.voiceId;
       const voicePreference = {
-        ...(options?.gender ? { gender: options.gender === 'MALE' ? 'male' as const : 'female' as const } : {}),
         ...(voiceId ? { voiceId } : {}),
       };
       const result = await client.synthesizeUnified({

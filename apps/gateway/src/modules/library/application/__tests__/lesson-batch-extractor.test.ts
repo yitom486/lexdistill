@@ -321,5 +321,62 @@ describe('LessonBatchExtractor', () => {
       expect(summary.failedJobs).toBe(0);
       expect(llmCalled).toBe(false); // 成功拦截，未消耗大模型算力
     });
+
+    it('原生工具调用优先：当模型通过 tool_call 回填结构化参数时直接入库', async () => {
+      const captured: { input?: import('@study-studio/storage-sqlite').CommitLessonKnowledgeInput } = {};
+      const mockPool: AgentPoolLike = {
+        acquire: async () => ({
+          ask: async () => ({
+            text: '我已调用工具提交了本课内容。',
+            toolCalls: [
+              {
+                name: 'library.commit_lesson_knowledge',
+                input: {
+                  title: '第1课 原生工具调用',
+                  passageMd: '# 第1课\n这是工具调用回填的课文。',
+                  vocabularies: [
+                    { surface: '文脈', reading: 'ぶんみゃく', glossZh: '上下文' },
+                  ],
+                  preview: {
+                    keyPoints: ['工具调用强类型约束'],
+                  },
+                },
+              },
+            ],
+          }),
+          finish: async () => {},
+        }),
+        close: async () => {},
+      };
+
+      const mockRepo: Partial<ContentRepository> = {
+        commitLessonKnowledge: async (input) => {
+          captured.input = input;
+          return ok({
+            documentId: input.documentId,
+            lessonId: input.lessonId,
+            stats: {
+              vocabCount: 1,
+              grammarCount: 0,
+              exerciseCount: 0,
+              hasPassage: true,
+            },
+            allLessonsReady: true,
+          });
+        },
+      };
+
+      const extractor = new LessonBatchExtractor(mockRepo as ContentRepository);
+      const res = await extractor.extractAndCommitSingleLesson(
+        { documentId: 'doc_tool_1', lessonId: 'l1', ocrText: '课文' },
+        mockPool
+      );
+
+      expect(res.ok).toBe(true);
+      expect(captured.input?.title).toBe('第1课 原生工具调用');
+      expect(captured.input?.passageMd).toContain('工具调用回填');
+      expect(captured.input?.vocabularies?.length).toBe(1);
+      expect(captured.input?.previewJson).toContain('工具调用强类型约束');
+    });
   });
 });

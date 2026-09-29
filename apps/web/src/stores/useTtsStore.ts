@@ -48,7 +48,8 @@ export function migrateTtsPreferences(persisted: unknown): Record<string, unknow
     const key = saved[field];
     if (typeof key === 'string' && key && !providerApiKeys[provider]) providerApiKeys[provider] = key;
   }
-  return { ...saved, providerApiKeys };
+  const { gender: _legacyGender, ...preferences } = saved;
+  return { ...preferences, providerApiKeys };
 }
 
 export const useTtsStore = create<TtsStoreState>()(
@@ -86,7 +87,7 @@ export const useTtsStore = create<TtsStoreState>()(
     },
     {
       name: 'study_studio_tts_config',
-      version: 1,
+      version: 2,
       migrate: migrateTtsPreferences,
       partialize: (state) => ({
         rate: state.rate,

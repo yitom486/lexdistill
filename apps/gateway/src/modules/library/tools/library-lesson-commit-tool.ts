@@ -58,6 +58,21 @@ export const LibraryLessonCommitInputSchema = z.object({
     )
     .optional()
     .describe('课后习题列表'),
+  preview: z
+    .object({
+      keyPoints: z.array(z.string()).optional().describe('本课核心掌握要点清单'),
+      pitfalls: z.array(z.string()).optional().describe('易错与难点预警'),
+      canDoGoal: z.string().optional().describe('学完本课后的实际语言应用目标（Can-do）'),
+    })
+    .optional()
+    .describe('课前预习导学卡片'),
+  summary: z
+    .object({
+      goldenSentences: z.array(z.string()).optional().describe('本课必须掌握的黄金核心句'),
+      selfCheckQuestions: z.array(z.string()).optional().describe('课后自测检验问题清单'),
+    })
+    .optional()
+    .describe('课后总结自测卡片'),
 });
 
 export type LibraryLessonCommitInput = z.infer<typeof LibraryLessonCommitInputSchema>;
@@ -102,11 +117,13 @@ export class LibraryLessonCommitTool implements ToolDefinition<LibraryLessonComm
     const result = await this.repo.commitLessonKnowledge({
       documentId: input.documentId,
       lessonId: input.lessonId,
-      title: input.title,
-      passageMd: input.passageMd,
-      vocabularies: input.vocabularies,
-      knowledgePoints: input.knowledgePoints,
-      exercises: input.exercises,
+      ...(input.title ? { title: input.title } : {}),
+      ...(input.passageMd ? { passageMd: input.passageMd } : {}),
+      ...(input.preview ? { previewJson: JSON.stringify(input.preview) } : {}),
+      ...(input.summary ? { summaryJson: JSON.stringify(input.summary) } : {}),
+      ...(input.vocabularies ? { vocabularies: input.vocabularies } : {}),
+      ...(input.knowledgePoints ? { knowledgePoints: input.knowledgePoints } : {}),
+      ...(input.exercises ? { exercises: input.exercises } : {}),
     });
 
     if (!result.ok) {

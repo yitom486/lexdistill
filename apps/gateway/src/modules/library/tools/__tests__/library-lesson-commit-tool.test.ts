@@ -56,6 +56,15 @@ describe('LibraryLessonCommitTool', () => {
             explanation: '肯定判断句用です',
           },
         ],
+        preview: {
+          keyPoints: ['掌握敬体与简体'],
+          pitfalls: ['助词错位'],
+          canDoGoal: '自我介绍',
+        },
+        summary: {
+          goldenSentences: ['手を洗ってから、ご飯を食べます。'],
+          selfCheckQuestions: ['能分清动词变形吗？'],
+        },
       },
       dummyContext
     );
@@ -73,6 +82,9 @@ describe('LibraryLessonCommitTool', () => {
       expect(result.value.message).toContain('全书所有章节已全部提炼完成');
     }
     expect(capturedInput).not.toBeNull();
+    const captured = capturedInput as { previewJson?: string; summaryJson?: string };
+    expect(captured.previewJson).toContain('掌握敬体与简体');
+    expect(captured.summaryJson).toContain('手を洗ってから');
   });
 
   it('白名单拦截：脱离预置目录造课（E_TOC_SLOT_NOT_FOUND）时正确拦截并透传业务错误', async () => {

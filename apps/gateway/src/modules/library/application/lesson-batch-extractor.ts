@@ -14,7 +14,11 @@ import type {
 } from '../ports.js';
 
 export interface AgentPoolLease {
-  ask(prompt: string | { content: unknown[] }): Promise<{ text: string; stopReason?: string }>;
+  ask(prompt: string | { content: unknown[] }): Promise<{
+    text: string;
+    stopReason?: string;
+    toolCalls?: Array<{ name: string; input: Record<string, unknown> }>;
+  }>;
   finish(): Promise<void>;
 }
 
@@ -222,11 +226,13 @@ export class LessonBatchExtractor {
 
     let lease: AgentPoolLease | null = null;
     let responseText = '';
+    let responseToolCalls: Array<{ name: string; input: Record<string, unknown> }> | undefined;
 
     try {
       lease = await pool.acquire();
       const response = await lease.ask(prompt);
       responseText = response.text;
+      responseToolCalls = response.toolCalls;
     } catch (cause) {
       return err(
         translateToBusinessError(cause, {
@@ -244,12 +250,35 @@ export class LessonBatchExtractor {
       }
     }
 
-    const parsedResult = parseLessonExtractionJson(responseText);
-    if (!parsedResult.ok) {
-      return parsedResult;
-    }
+    let extracted: ExtractedLessonData;
 
-    const extracted = parsedResult.value;
+    // 1. 原生工具调用优先：若底层 Agent/Worker 通过 tool_call 回填了结构化参数
+    const toolCall = responseToolCalls?.find(
+      (tc) =>
+        tc.name === 'library.commit_lesson_knowledge' ||
+        tc.name === 'library_commit_lesson_knowledge'
+    );
+
+    if (toolCall) {
+      const parsedToolInput = ExtractedLessonSchema.safeParse(toolCall.input);
+      if (!parsedToolInput.success) {
+        return err(
+          new BusinessError(
+            'E_LLM_SCHEMA_INVALID',
+            `工具调用参数不合法: ${parsedToolInput.error.message}`,
+            'VALIDATION'
+          )
+        );
+      }
+      extracted = parsedToolInput.data;
+    } else {
+      // 2. 文本解析兜底：处理标准或代码块包裹的 JSON 字符串
+      const parsedResult = parseLessonExtractionJson(responseText);
+      if (!parsedResult.ok) {
+        return parsedResult;
+      }
+      extracted = parsedResult.value;
+    }
     const commitInput: CommitLessonKnowledgeInput = {
       documentId: job.documentId,
       lessonId: job.lessonId,
