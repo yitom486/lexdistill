@@ -6,16 +6,40 @@ import {
   killPid,
   listWatchedListeners,
   procInfos,
+  sh,
   shortCmd,
 } from './dev-ports.js';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const WEB_PORT = 3000;
 
+function cleanupStaleDesktopProcesses(): void {
+  try {
+    if (process.platform === 'win32') {
+      const r = sh('powershell.exe', [
+        '-NoProfile',
+        '-Command',
+        'Get-Process -Name "study-studio-desktop" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id',
+      ]);
+      if (r.ok && r.out.trim()) {
+        const pids = r.out.trim().split(/\s+/).map(Number).filter((n) => Number.isSafeInteger(n) && n > 0);
+        for (const pid of pids) {
+          console.log(`[dev-desktop] 发现历史残留桌面进程 (PID ${pid})，自动清理以避免 WebView2 单实例冲突...`);
+          killPid(pid);
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * 桌面端开发环境启动器（自动完成端口 3000 预检与孤儿清理，防端口占用报错）。
  */
 async function main(): Promise<number> {
+  cleanupStaleDesktopProcesses();
+
   const holders = listWatchedListeners().filter((l) => l.port === WEB_PORT);
   if (holders.length > 0) {
     const infos = procInfos(holders.map((h) => h.pid));
