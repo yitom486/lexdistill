@@ -984,9 +984,14 @@ export function TextbookPipelineImporterTab({
                   </p>
                 </div>
               </div>
-              <Badge variant="emerald" className="text-xs">
-                {pipelineResult.allLessonsReady ? '全书就绪' : '部分就绪'}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="emerald" className="text-xs">
+                  {pipelineResult.allLessonsReady ? '全书就绪' : '部分就绪'}
+                </Badge>
+                <Button size="sm" onClick={onClose} className="h-7 text-xs gap-1">
+                  进入学习
+                </Button>
+              </div>
             </div>
           )}
 
