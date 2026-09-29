@@ -244,13 +244,14 @@ export function TocRecognitionPanel({ file, filePath, azure, onTocConfirmed }: T
                 onValueChange={(val: string | null) => setTocReviewModel(!val || val === '__default__' ? '' : val)}
               >
                 <SelectTrigger className="h-7 w-44 border-0 bg-transparent px-1 text-xs focus:ring-0">
-                  <SelectValue placeholder="默认轻量模型" />
+                  <SelectValue placeholder="本机 Codex 默认模型" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__default__">⚡ 推荐轻量模型 (Flash / 快速)</SelectItem>
+                  <SelectItem value="__default__">⚡ 本机 Codex 默认模型</SelectItem>
                   {models.map((m) => (
                     <SelectItem key={m.id || m.model} value={m.id || m.model}>
                       {m.displayName || m.model}
+                      {m.isDefault ? '（本机默认）' : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

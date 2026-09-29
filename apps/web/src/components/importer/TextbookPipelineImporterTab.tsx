@@ -969,7 +969,7 @@ export function TextbookPipelineImporterTab({
                   <div className="mt-2 space-y-1">
                     <input
                       type="text"
-                      placeholder="输入本地可用模型名（如 gpt-4o, o3-mini, deepseek-chat 等）"
+                      placeholder="输入本地可用模型标识（留空则跟随默认）"
                       value={customModelInput}
                       onChange={(e) => {
                         const val = e.target.value;
