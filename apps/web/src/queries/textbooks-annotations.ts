@@ -29,22 +29,8 @@ async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Respo
 }
 import type { TextbookBook } from '../models/textbook.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
-import {
-  narrowFolioResponse,
-  narrowPreviewResponse,
-  narrowTocLessonImport,
-  type FolioResponseData,
-  type PreviewResponseData,
-  type TocLessonImportResult,
-} from '../lib/toc-anchor-flow.js';
-import {
-  narrowExecuteResult,
-  narrowPrepareResult,
-  narrowSessionView,
-  type SessionExecuteResult,
-  type SessionPrepareResult,
-  type SessionView,
-} from '../lib/toc-import-session-flow.js';
+
+
 
 /** P1-2 拆分：教材 / 批注组（自 useLearnerQueries.ts 逐行平移，仅改 import）。 */
 
@@ -919,326 +905,63 @@ export function useDocumentStructureQuery(documentId: string | undefined, userId
   });
 }
 
-/** P4C 目录确认三专线入参（File 小文件上传 / filePath 本机直读二选一）。 */
-export type TocPdfSource = { file: File } | { filePath: string };
 
-/**
- * P5-C-1：folio 候选（folio-candidates，只读弱证据）。
- * 调用方必须先经 parseAnchorCheckPages（超 8 页到不了这里；后端仍是最终事实源）。
- */
-export async function requestFolioCandidates(
-  userId: string,
-  source: TocPdfSource,
-  pageNumbers: number[]
-): Promise<FolioResponseData> {
-  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/folio-candidates`;
-  const src: TocPdfSource = source;
-  const hasPath = 'filePath' in src;
-  const res = hasPath
-    ? await fetchPdfGateway(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: src.filePath, pages: pageNumbers }),
-      })
-    : await (async () => {
-        const form = new FormData();
-        form.append('file', src.file, src.file.name);
-        form.append('pages', JSON.stringify(pageNumbers));
-        return fetchPdfGateway(url, { method: 'POST', body: form });
-      })();
-  const payload: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new GatewayRequestError(readGatewayUserMessage(payload, `folio 候选失败（HTTP ${res.status}）`), {
-      code: readGatewayErrorCode(payload),
-      details: readGatewayErrorDetails(payload),
-    });
-  }
-  const narrowed = narrowFolioResponse(payload);
-  if (!narrowed) throw new Error('folio 候选返回异常，请稍后重试');
-  return narrowed;
+
+export interface ExecuteTextbookPipelineVars {
+  documentId?: string;
+  title: string;
+  language?: string;
+  filename?: string;
+  tocEntries: unknown[];
+  lessonJobs: Array<{
+    lessonId: string;
+    ocrText: string;
+    title?: string;
+  }>;
 }
 
-export function useFolioCandidatesMutation(userId = DEFAULT_USER_ID) {
-  return useMutation({
-    mutationFn: (vars: { source: TocPdfSource; pageNumbers: number[] }) =>
-      requestFolioCandidates(userId, vars.source, vars.pageNumbers),
-    onError: (e) => {
-      logger.debug('[useFolioCandidatesMutation] folio failed', e);
-    },
-  });
-}
-
-export interface PreviewTocSegmentsVars {
-  source: TocPdfSource;
-  entries: Array<{ title: string; printedPage: number; level: number; kind: 'lesson' | 'section' }>;
-  anchors: Array<{ printedPage: number; physicalPage: number; evidence: 'human-confirmed' }>;
+export interface ExecuteTextbookPipelineResult {
+  task: { id: string; status: string; lessons?: number };
+  documentId: string;
+  title: string;
+  lessonCount: number;
+  allLessonsReady: boolean;
+  successfulLessons: number;
+  failedLessons: number;
+  errors: Array<{ lessonId: string; error: string }>;
 }
 
 /**
- * P5-C-2：分段预览（preview-toc-segments，只读计划）。
- * entries 须是 P4C 已确认条目，anchors 须是用户显式确认（human-confirmed）；
- * 服务侧 P5-A 严格校验，非法即 userMessage。
+ * AI-Native 教材一条龙导入流水线（Phase 0 骨架建槽 + Phase 1&2 Worker并发提炼与白名单回填）。
  */
-export async function requestPreviewTocSegments(
+export async function requestExecuteTextbookPipeline(
   userId: string,
-  vars: PreviewTocSegmentsVars
-): Promise<PreviewResponseData> {
-  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/preview-toc-segments`;
-  const body = { entries: vars.entries, anchors: vars.anchors };
-  const src: TocPdfSource = vars.source;
-  const hasPath = 'filePath' in src;
-  const res = hasPath
-    ? await fetchPdfGateway(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: src.filePath, ...body }),
-      })
-    : await (async () => {
-        const form = new FormData();
-        form.append('file', src.file, src.file.name);
-        form.append('entries', JSON.stringify(body.entries));
-        form.append('anchors', JSON.stringify(body.anchors));
-        return fetchPdfGateway(url, { method: 'POST', body: form });
-      })();
-  const payload: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new GatewayRequestError(readGatewayUserMessage(payload, `分段预览失败（HTTP ${res.status}）`), {
-      code: readGatewayErrorCode(payload),
-      details: readGatewayErrorDetails(payload),
-    });
-  }
-  const narrowed = narrowPreviewResponse(payload);
-  if (!narrowed) throw new Error('分段预览返回异常，请稍后重试');
-  return narrowed;
-}
-
-export function usePreviewTocSegmentsMutation(userId = DEFAULT_USER_ID) {
-  return useMutation({
-    mutationFn: (vars: PreviewTocSegmentsVars) => requestPreviewTocSegments(userId, vars),
-    onError: (e) => {
-      logger.debug('[usePreviewTocSegmentsMutation] preview failed', e);
-    },
+  vars: ExecuteTextbookPipelineVars
+): Promise<ExecuteTextbookPipelineResult> {
+  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/execute-textbook-pipeline`;
+  const res = await fetchPdfGateway(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(vars),
   });
-}
-
-export interface ImportTocLessonVars {
-  source: TocPdfSource;
-  entries: Array<{ title: string; printedPage: number; level: number; kind: 'lesson' | 'section' }>;
-  anchors: Array<{ printedPage: number; physicalPage: number; evidence: 'human-confirmed' }>;
-  lessonIndex: number;
-  fingerprint: string;
-  docTitle?: string;
-}
-
-/**
- * P5-D1：单课试导入（import-toc-lesson，本轮唯一写请求）。
- * 只发 entries/anchors/lessonIndex/fingerprint/docTitle，绝不发任意页范围；
- * 页范围由服务端按指纹核验后的 preview 确定。失败只透传 userMessage。
- */
-export async function requestImportTocLesson(
-  userId: string,
-  vars: ImportTocLessonVars
-): Promise<TocLessonImportResult> {
-  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/import-toc-lesson`;
-  const body = {
-    entries: vars.entries,
-    anchors: vars.anchors,
-    lessonIndex: vars.lessonIndex,
-    fingerprint: vars.fingerprint,
-    ...(vars.docTitle ? { docTitle: vars.docTitle } : {}),
-  };
-  const src: TocPdfSource = vars.source;
-  const hasPath = 'filePath' in src;
-  const res = hasPath
-    ? await fetchPdfGateway(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: src.filePath, ...body }),
-      })
-    : await (async () => {
-        const form = new FormData();
-        form.append('file', src.file, src.file.name);
-        form.append('entries', JSON.stringify(body.entries));
-        form.append('anchors', JSON.stringify(body.anchors));
-        form.append('lessonIndex', String(body.lessonIndex));
-        form.append('fingerprint', body.fingerprint);
-        if (body.docTitle) form.append('docTitle', body.docTitle);
-        return fetchPdfGateway(url, { method: 'POST', body: form });
-      })();
-  const payload: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new GatewayRequestError(readGatewayUserMessage(payload, `单课导入失败（HTTP ${res.status}）`), {
-      code: readGatewayErrorCode(payload),
-      details: readGatewayErrorDetails(payload),
-    });
+  const payload = (await res.json().catch(() => null)) as ExecuteTextbookPipelineResult | null;
+  if (!res.ok || !payload) {
+    throw new GatewayRequestError(
+      readGatewayUserMessage(payload, `教材导入流水线执行失败（HTTP ${res.status}）`),
+      {
+        code: readGatewayErrorCode(payload),
+        details: readGatewayErrorDetails(payload),
+      }
+    );
   }
-  const narrowed = narrowTocLessonImport(payload);
-  if (!narrowed) throw new Error('单课导入返回异常，请稍后重试');
-  return narrowed;
+  return payload;
 }
 
-export function useImportTocLessonMutation(userId = DEFAULT_USER_ID) {
+export function useExecuteTextbookPipelineMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
-    mutationFn: (vars: ImportTocLessonVars) => requestImportTocLesson(userId, vars),
+    mutationFn: (vars: ExecuteTextbookPipelineVars) => requestExecuteTextbookPipeline(userId, vars),
     onError: (e) => {
-      logger.debug('[useImportTocLessonMutation] import failed', e);
-    },
-  });
-}
-
-export interface PrepareSessionVars {
-  source: TocPdfSource;
-  entries: Array<{ title: string; printedPage: number; level: number; kind: 'lesson' | 'section' }>;
-  anchors: Array<{ printedPage: number; physicalPage: number; evidence: 'human-confirmed' }>;
-  fingerprint: string;
-  docTitle?: string;
-}
-
-/**
- * P5-D2D：准备导入会话（prepare-toc-import，只建计划行）。
- * 同 request key 重试返回同一 session（reused），由调用方展示复用文案。
- */
-export async function requestPrepareSession(
-  userId: string,
-  vars: PrepareSessionVars
-): Promise<SessionPrepareResult> {
-  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/prepare-toc-import`;
-  const body = {
-    entries: vars.entries,
-    anchors: vars.anchors,
-    fingerprint: vars.fingerprint,
-    ...(vars.docTitle ? { docTitle: vars.docTitle } : {}),
-  };
-  const src: TocPdfSource = vars.source;
-  const hasPath = 'filePath' in src;
-  const res = hasPath
-    ? await fetchPdfGateway(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: src.filePath, ...body }),
-      })
-    : await (async () => {
-        const form = new FormData();
-        form.append('file', src.file, src.file.name);
-        form.append('entries', JSON.stringify(body.entries));
-        form.append('anchors', JSON.stringify(body.anchors));
-        form.append('fingerprint', body.fingerprint);
-        if (body.docTitle) form.append('docTitle', body.docTitle);
-        return fetchPdfGateway(url, { method: 'POST', body: form });
-      })();
-  const payload: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new GatewayRequestError(readGatewayUserMessage(payload, `准备导入会话失败（HTTP ${res.status}）`), {
-      code: readGatewayErrorCode(payload),
-      details: readGatewayErrorDetails(payload),
-    });
-  }
-  const narrowed = narrowPrepareResult(payload);
-  if (!narrowed) throw new Error('准备导入会话返回异常，请稍后重试');
-  return narrowed;
-}
-
-export function usePrepareSessionMutation(userId = DEFAULT_USER_ID) {
-  return useMutation({
-    mutationFn: (vars: PrepareSessionVars) => requestPrepareSession(userId, vars),
-    onError: (e) => {
-      logger.debug('[usePrepareSessionMutation] prepare failed', e);
-    },
-  });
-}
-
-/**
- * P5-D2D：会话只读摘要（GET，无请求体，纯 DB 读）。
- * 白名单字段外一律丢弃（narrowSessionView）。
- */
-export async function requestSessionStatus(userId: string, sessionId: string): Promise<SessionView> {
-  const res = await fetchPdfGateway(
-    `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/toc-import-sessions/${encodeURIComponent(sessionId)}`,
-    { method: 'GET' }
-  );
-  const payload: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new GatewayRequestError(readGatewayUserMessage(payload, `读取会话状态失败（HTTP ${res.status}）`), {
-      code: readGatewayErrorCode(payload),
-      details: readGatewayErrorDetails(payload),
-    });
-  }
-  const narrowed = narrowSessionView(payload);
-  if (!narrowed) throw new Error('会话状态返回异常，请稍后重试');
-  return narrowed;
-}
-
-export function useSessionStatusQuery(sessionId: string | null, userId = DEFAULT_USER_ID) {
-  return useQuery<SessionView>({
-    queryKey: [...QUERY_KEYS.DOCUMENTS, userId, 'toc-import-session', sessionId ?? ''],
-    queryFn: () => {
-      if (!sessionId) throw new Error('缺少会话标识');
-      return requestSessionStatus(userId, sessionId);
-    },
-    enabled: sessionId !== null,
-    staleTime: 1000 * 15,
-    retry: false,
-  });
-}
-
-export interface ExecuteSessionChunkVars {
-  sessionId: string;
-  source: TocPdfSource;
-  entries: Array<{ title: string; printedPage: number; level: number; kind: 'lesson' | 'section' }>;
-  anchors: Array<{ printedPage: number; physicalPage: number; evidence: 'human-confirmed' }>;
-  fingerprint: string;
-  docTitle?: string;
-}
-
-export async function requestExecuteSessionChunk(
-  userId: string,
-  vars: ExecuteSessionChunkVars,
-  first: boolean
-): Promise<SessionExecuteResult> {
-  const endpoint = first ? 'execute-first' : 'execute-next';
-  const url = `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/toc-import-sessions/${encodeURIComponent(vars.sessionId)}/${endpoint}`;
-  const body = {
-    entries: vars.entries,
-    anchors: vars.anchors,
-    fingerprint: vars.fingerprint,
-    ...(vars.docTitle ? { docTitle: vars.docTitle } : {}),
-  };
-  const src: TocPdfSource = vars.source;
-  const hasPath = 'filePath' in src;
-  const res = hasPath
-    ? await fetchPdfGateway(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: src.filePath, ...body }),
-      })
-    : await (async () => {
-        const form = new FormData();
-        form.append('file', src.file, src.file.name);
-        form.append('entries', JSON.stringify(body.entries));
-        form.append('anchors', JSON.stringify(body.anchors));
-        form.append('fingerprint', body.fingerprint);
-        if (body.docTitle) form.append('docTitle', body.docTitle);
-        return fetchPdfGateway(url, { method: 'POST', body: form });
-      })();
-  const payload: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new GatewayRequestError(readGatewayUserMessage(payload, `导入下一课失败（HTTP ${res.status}）`), {
-      code: readGatewayErrorCode(payload),
-      details: readGatewayErrorDetails(payload),
-    });
-  }
-  const narrowed = narrowExecuteResult(payload);
-  if (!narrowed) throw new Error('导入结果返回异常，请稍后重试');
-  return narrowed;
-}
-
-/** P5-D2D：手动执行下一课（调用方按 documentId 有无选 first/next，单次一课）。 */
-export function useExecuteSessionChunkMutation(userId = DEFAULT_USER_ID) {
-  return useMutation({
-    mutationFn: (vars: ExecuteSessionChunkVars & { first: boolean }) =>
-      requestExecuteSessionChunk(userId, vars, vars.first),
-    onError: (e) => {
-      logger.debug('[useExecuteSessionChunkMutation] execute failed', e);
+      logger.debug('[useExecuteTextbookPipelineMutation] failed', e);
     },
   });
 }

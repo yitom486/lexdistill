@@ -13,14 +13,6 @@ import type {
 import type { TextbookAST } from '@study-studio/document-model';
 import type { ImportTask, ImportTaskStatus } from '@study-studio/storage-sqlite';
 import type {
-  PrepareTocImportSessionInput,
-  PreparedTocImportSession,
-  TocImportSession,
-  TocImportChunk,
-  TocAppendChunkResult,
-  TocFirstChunkResult,
-} from '@study-studio/storage-sqlite';
-import type {
   DocumentImportInput,
   DocumentImportOutput,
   DocumentImportDeps,
@@ -81,41 +73,6 @@ export interface ContentRepository {
     patch: { status: ImportTaskStatus; documentId?: string; lessons?: number; error?: string }
   ): Promise<Result<ImportTask, BusinessError>>;
   getImportTask(id: string): Promise<ImportTask | undefined>;
-  prepareTocImportSession(
-    input: PrepareTocImportSessionInput
-  ): Promise<Result<PreparedTocImportSession, BusinessError>>;
-  getTocImportSession(
-    userId: string,
-    requestKey: string
-  ): Promise<{ session: TocImportSession; chunks: TocImportChunk[] } | undefined>;
-  getTocImportSessionById(
-    sessionId: string
-  ): Promise<{ session: TocImportSession; chunks: TocImportChunk[] } | undefined>;
-  bindTocImportSessionDocument(input: {
-    sessionId: string;
-    userId: string;
-    documentId: string;
-  }): Promise<Result<TocImportSession, BusinessError>>;
-  commitTocFirstChunk(input: {
-    sessionId: string;
-    userId: string;
-    docTitle: string;
-    book: TextbookAST;
-    range: { fromPage: number; toPage: number };
-  }): Promise<Result<TocFirstChunkResult, BusinessError>>;
-  commitTocAppendChunk(input: {
-    sessionId: string;
-    userId: string;
-    ordinal: number;
-    book: TextbookAST;
-    range: { fromPage: number; toPage: number };
-  }): Promise<Result<TocAppendChunkResult, BusinessError>>;
-  recordTocChunkFailure(input: {
-    sessionId: string;
-    userId: string;
-    ordinal: number;
-    errorCode: string;
-  }): Promise<Result<void, BusinessError>>;
   importDocumentFile(
     input: DocumentImportInput,
     readers?: DocumentImportDeps

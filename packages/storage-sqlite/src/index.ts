@@ -183,28 +183,6 @@ export {
   mirrorLanguageProfileToMain,
 } from './adapters/learning-progress/profile-internals.js';
 export {
-  prepareTocImportSession,
-  getTocImportSession,
-  getTocImportSessionById,
-  bindTocImportSessionDocument,
-  commitTocFirstChunk,
-  commitTocAppendChunk,
-  recordTocChunkFailure,
-  markSessionsTargetDeletedInTx,
-  computeTocRequestKey,
-  fingerprintTocChunk,
-  sha256HexText,
-  toTocImportSessionView,
-  type TocImportSessionStatus,
-  type TocImportChunkStatus,
-  type TocImportSession,
-  type TocImportChunk,
-  type PrepareTocImportSessionInput,
-  type PreparedTocImportSession,
-  type TocFirstChunkResult,
-  type TocAppendChunkResult,
-} from './adapters/library/toc-import-sessions.js';
-export {
   KANA_SEEDS,
   HANGUL_SEEDS,
   INITIAL_READING_SEEDS,

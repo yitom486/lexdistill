@@ -3,13 +3,8 @@ import { BusinessError, isOk } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
 import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
-import { extractFolioCandidates } from '../application/pdf-import/toc-folio-candidates.js';
-import { planTocSegments } from '../application/pdf-import/toc-segment-plan.js';
-import { importTocLesson } from '../application/pdf-import/toc-lesson-import.js';
-import { prepareTocImport } from '../application/pdf-import/toc-import-prepare.js';
-import { executeTocImportFirst } from '../application/pdf-import/toc-import-execute.js';
-import { executeTocImportNext } from '../application/pdf-import/toc-import-execute-next.js';
-import { toTocImportSessionView } from '@study-studio/storage-sqlite';
+import type { TocEntry } from '@study-studio/document-model';
+import type { TextbookPipelineInput } from '../application/textbook-pipeline.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 
@@ -99,11 +94,8 @@ export function createPdfImportRoutes(
         return formatBusinessErrorResponse(c, e, 'mapPdfDocument');
       }
     })
-    .post('/api/documents/:userId/folio-candidates', async (c) => {
-      // P5-B folio 候选（只读弱证据）：调用方给出显式物理页号（pages 数组），
-      // 返回每页页眉/页脚的孤立页码候选。绝不产出 anchor，不触发导入。
-      const input = await readPdfInput(c);
-      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
+    .post('/api/documents/:userId/execute-textbook-pipeline', async (c) => {
+      // AI-Native 教材一条龙导入流水线：Phase 0 骨架建槽 + Phase 1&2 Worker并发提炼与白名单回填
       try {
         const userId = c.req.param('userId');
         if (!userId) {
@@ -112,280 +104,41 @@ export function createPdfImportRoutes(
             new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
           );
         }
-        const pageNumbers = input.value.pageNumbers;
-        if (!pageNumbers) {
+        const body = (await c.req.json().catch(() => null)) as {
+          documentId?: string;
+          title?: string;
+          language?: string;
+          filename?: string;
+          tocEntries?: TocEntry[];
+          lessonJobs?: Array<{
+            lessonId: string;
+            ocrText: string;
+            title?: string;
+          }>;
+        } | null;
+
+        if (!body || !body.title?.trim() || !Array.isArray(body.tocEntries) || !Array.isArray(body.lessonJobs)) {
           return formatBusinessErrorResponse(
             c,
-            new BusinessError('E_INVALID_INPUT', '请提供要查看的 PDF 物理页号（pages 非空数组）', 'VALIDATION')
+            new BusinessError('E_INVALID_INPUT', '请求体格式不正确，缺少 title、tocEntries 或 lessonJobs', 'VALIDATION')
           );
         }
-        const res = await extractFolioCandidates(
-          {},
-          { userId, filename: input.value.filename, bytes: input.value.bytes, pageNumbers }
-        );
-        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
+
+        const pipelineInput: TextbookPipelineInput = {
+          userId,
+          ...(body.documentId ? { documentId: body.documentId } : {}),
+          title: body.title.trim(),
+          ...(body.language ? { language: body.language } : {}),
+          ...(body.filename ? { filename: body.filename } : {}),
+          tocEntries: body.tocEntries,
+          lessonJobs: body.lessonJobs,
+        };
+
+        const res = await deps.repo.executeTextbookPipeline(pipelineInput);
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'executeTextbookPipeline');
         return c.json(res.value);
       } catch (e) {
-        return formatBusinessErrorResponse(c, e, 'extractFolioCandidates');
-      }
-    })
-    .post('/api/documents/:userId/preview-toc-segments', async (c) => {
-      // P5-C 分段预览（只读）：P4C 已确认条目 + 用户显式确认 anchors，
-      // 仅以 [1] 探 pageCount 后调 P5-A 纯函数。不调 OCR/Agent/render，
-      // 不写 DB/AST/cache；无效输入走 BusinessError.userMessage。
-      const input = await readPdfInput(c);
-      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
-      try {
-        const userId = c.req.param('userId');
-        if (!userId) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
-          );
-        }
-        if (input.value.entries === undefined || input.value.anchors === undefined) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '请提供已确认目录条目（entries）与用户确认 anchors（anchors）', 'VALIDATION')
-          );
-        }
-        const res = await planTocSegments(
-          {},
-          {
-            userId,
-            filename: input.value.filename,
-            bytes: input.value.bytes,
-            entries: input.value.entries,
-            anchors: input.value.anchors,
-          }
-        );
-        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
-        return c.json(res.value);
-      } catch (e) {
-        return formatBusinessErrorResponse(c, e, 'planTocSegments');
-      }
-    })
-    .post('/api/documents/:userId/prepare-toc-import', async (c) => {
-      // P5-D2A 整书导入准备（只建 session，不执行导入）：
-      // 探页数 → 重跑 preview → 指纹核验 → 全绿 gate → 幂等持久化 prepared chunks。
-      // 不调 OCR/Agent/render/convert，不建 document；重复同请求复用同一 session。
-      const input = await readPdfInput(c);
-      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
-      try {
-        const userId = c.req.param('userId');
-        if (!userId) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
-          );
-        }
-        if (
-          input.value.entries === undefined ||
-          input.value.anchors === undefined ||
-          input.value.fingerprint === undefined
-        ) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '请提供已确认条目、anchors 与预览指纹', 'VALIDATION')
-          );
-        }
-        const res = await prepareTocImport(
-          {
-            prepareSession: (prepared) => deps.repo.prepareTocImportSession(prepared),
-          },
-          {
-            userId,
-            filename: input.value.filename,
-            bytes: input.value.bytes,
-            entries: input.value.entries,
-            anchors: input.value.anchors,
-            fingerprint: input.value.fingerprint,
-            ...(input.value.docTitle !== undefined ? { docTitle: input.value.docTitle } : {}),
-          }
-        );
-        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'prepareTocImport');
-        return c.json(res.value);
-      } catch (e) {
-        return formatBusinessErrorResponse(c, e, 'prepareTocImport');
-      }
-    })
-    .get('/api/documents/:userId/toc-import-sessions/:sessionId', async (c) => {
-      // P5-D2D 会话只读摘要：纯 DB 读，不碰 PDF/运行时/Agent/写路径。
-      // 白名单字段（无 PDF/AST/folio/anchor/指纹原文）；owner 不符即 E_NOT_FOUND。
-      try {
-        const userId = c.req.param('userId');
-        const sessionId = c.req.param('sessionId');
-        if (!userId || !sessionId) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '缺少用户或会话标识', 'VALIDATION')
-          );
-        }
-        const found = await deps.repo.getTocImportSessionById(sessionId);
-        if (!found || found.session.userId !== userId) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_NOT_FOUND', '未找到指定的导入会话', 'LEARNER_STATE')
-          );
-        }
-        return c.json(toTocImportSessionView(found.session, found.chunks));
-      } catch (e) {
-        return formatBusinessErrorResponse(c, e, 'getTocImportSession');
-      }
-    })
-    .post('/api/documents/:userId/toc-import-sessions/:sessionId/execute-first', async (c) => {
-      // P5-D2B 首 chunk 执行（只许 ordinal=0）：重验 gate → 精确窗 convert →
-      // 单事务提交（建文档 + shred + 绑定 + 状态流转，含 completed 幂等读档）。
-      // 禁止第二个 chunk、禁止 append；失败零残留（converter 失败只记 chunk 计数）。
-      const input = await readPdfInput(c);
-      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
-      try {
-        const userId = c.req.param('userId');
-        const sessionId = c.req.param('sessionId');
-        if (!userId || !sessionId) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '缺少用户或会话标识', 'VALIDATION')
-          );
-        }
-        if (
-          input.value.entries === undefined ||
-          input.value.anchors === undefined ||
-          input.value.fingerprint === undefined
-        ) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '请提供已确认条目、anchors 与预览指纹', 'VALIDATION')
-          );
-        }
-        const res = await executeTocImportFirst(
-          {
-            getSession: async (uid, sid) => {
-              const found = await deps.repo.getTocImportSessionById(sid);
-              if (!found || found.session.userId !== uid) return undefined;
-              return found;
-            },
-            getDocument: (id) => deps.repo.getDocumentById(id),
-            commitFirstChunk: (committed) => deps.repo.commitTocFirstChunk(committed),
-            recordChunkFailure: (failure) => deps.repo.recordTocChunkFailure(failure),
-          },
-          {
-            userId,
-            sessionId,
-            filename: input.value.filename,
-            bytes: input.value.bytes,
-            entries: input.value.entries,
-            anchors: input.value.anchors,
-            fingerprint: input.value.fingerprint,
-            ...(input.value.docTitle !== undefined ? { docTitle: input.value.docTitle } : {}),
-          }
-        );
-        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'executeTocImportFirst');
-        return c.json(res.value);
-      } catch (e) {
-        return formatBusinessErrorResponse(c, e, 'executeTocImportFirst');
-      }
-    })
-    .post('/api/documents/:userId/toc-import-sessions/:sessionId/execute-next', async (c) => {
-      // P5-D2C 下一个 chunk 追加（只许最小 prepared 即上一个 completed 的直接后继）：
-      // 重验 gate → 精确窗 convert → 单事务提交（合并 AST + shred + 指纹 + 状态）。
-      // 禁止整书循环、禁止跳过、禁止长课跨 chunk；失败零残留（converter 失败只记计数）。
-      const input = await readPdfInput(c);
-      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
-      try {
-        const userId = c.req.param('userId');
-        const sessionId = c.req.param('sessionId');
-        if (!userId || !sessionId) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '缺少用户或会话标识', 'VALIDATION')
-          );
-        }
-        if (
-          input.value.entries === undefined ||
-          input.value.anchors === undefined ||
-          input.value.fingerprint === undefined
-        ) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '请提供已确认条目、anchors 与预览指纹', 'VALIDATION')
-          );
-        }
-        const res = await executeTocImportNext(
-          {
-            getSession: async (uid, sid) => {
-              const found = await deps.repo.getTocImportSessionById(sid);
-              if (!found || found.session.userId !== uid) return undefined;
-              return found;
-            },
-            getDocument: (id) => deps.repo.getDocumentById(id),
-            commitAppendChunk: (committed) => deps.repo.commitTocAppendChunk(committed),
-            recordChunkFailure: (failure) => deps.repo.recordTocChunkFailure(failure),
-          },
-          {
-            userId,
-            sessionId,
-            filename: input.value.filename,
-            bytes: input.value.bytes,
-            entries: input.value.entries,
-            anchors: input.value.anchors,
-            fingerprint: input.value.fingerprint,
-          }
-        );
-        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'executeTocImportNext');
-        return c.json(res.value);
-      } catch (e) {
-        return formatBusinessErrorResponse(c, e, 'executeTocImportNext');
-      }
-    })
-    .post('/api/documents/:userId/import-toc-lesson', async (c) => {
-      // P5-D1 单课导入（本轮唯一写入口）：用户选定一课 + 指纹一致 + 最终确认后，
-      // 把该课完整 verified range 交给既有 convert 路径，恰一课才 canonical 落库。
-      // 禁止整书/多课/append/任意页范围；失败零残留。
-      const input = await readPdfInput(c);
-      if (!input.ok) return formatBusinessErrorResponse(c, input.error);
-      try {
-        const userId = c.req.param('userId');
-        if (!userId) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
-          );
-        }
-        if (
-          input.value.entries === undefined ||
-          input.value.anchors === undefined ||
-          input.value.lessonIndex === undefined ||
-          input.value.fingerprint === undefined
-        ) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '请提供已确认条目、anchors、所选课与预览指纹', 'VALIDATION')
-          );
-        }
-        const res = await importTocLesson(
-          {
-            // 唯一写能力：canonical 入口（id 服务端生成，不读他人文档，不调普通保存）。
-            saveCanonicalAst: (docBase, book) => deps.repo.saveCanonicalAst(docBase, book),
-            // P2-2a：提交后显式 lines 投影。
-            projectLinesSegments: (userId, documentId) =>
-              deps.repo.projectLinesSegments(userId, documentId),
-          },
-          {
-            userId,
-            filename: input.value.filename,
-            bytes: input.value.bytes,
-            entries: input.value.entries,
-            anchors: input.value.anchors,
-            lessonIndex: input.value.lessonIndex,
-            fingerprint: input.value.fingerprint,
-            ...(input.value.docTitle !== undefined ? { docTitle: input.value.docTitle } : {}),
-          }
-        );
-        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'importTocLesson');
-        return c.json(res.value);
-      } catch (e) {
-        return formatBusinessErrorResponse(c, e, 'importTocLesson');
+        return formatBusinessErrorResponse(c, e, 'executeTextbookPipeline');
       }
     })
     .post('/api/documents/:userId/:documentId/append-pdf', async (c) => {      // 接力追加：新页段的课接在已有教材后面（大书分段导入）。

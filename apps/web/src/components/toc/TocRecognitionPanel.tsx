@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../ui/button.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
-import { TocAnchorPanel } from '../TocAnchorPanel.js';
 import { useMapPdfMutation } from '../../queries/useLearnerQueries.js';
 import type { PdfAzureCredential } from '../../queries/textbooks-annotations.js';
 import { nextManualKey } from '../../lib/toc-confirm-flow.js';
@@ -120,12 +119,11 @@ export function TocRecognitionPanel({ file, filePath, azure }: TocRecognitionPan
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" size="sm" variant="outline" onClick={() => { setEntries((previous) => [...previous, { key: nextManualKey(previous), title: '', printedPage: '', level: 1, kind: 'lesson', confidence: null }]); invalidate(); }}>添加条目</Button>
-            <Button type="button" size="sm" disabled={entries.length === 0 || confirmed} onClick={confirm}>确认目录并设置页码锚点</Button>
-            {confirmed && <span className="text-ink-emerald-700-emerald-400">已确认 {entries.length} 条；请继续核对 PDF 页码映射。</span>}
+            <Button type="button" size="sm" disabled={entries.length === 0 || confirmed} onClick={confirm}>确认目录</Button>
+            {confirmed && <span className="text-ink-emerald-700-emerald-400">已确认 {entries.length} 条目录。</span>}
           </div>
         </>
       )}
-      {confirmed && <TocAnchorPanel file={file} filePath={filePath} entries={entries} />}
     </div>
   );
 }

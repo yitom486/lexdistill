@@ -17,9 +17,8 @@ import * as flashcardsPublic from '../modules/flashcards/public.js';
 
 const CONTENT_METHODS = [
   'getDocumentById', 'saveDocument', 'listDocuments', 'deleteDocument', 'saveCanonicalAst',
-  'createImportTask', 'updateImportTask', 'getImportTask', 'prepareTocImportSession',
-  'getTocImportSession', 'getTocImportSessionById', 'bindTocImportSessionDocument',
-  'commitTocFirstChunk', 'commitTocAppendChunk', 'recordTocChunkFailure', 'importDocumentFile',
+  'createImportTask', 'updateImportTask', 'getImportTask', 'executeTextbookPipeline',
+  'seedTextbookTocSkeleton', 'commitLessonKnowledge', 'importDocumentFile',
   'saveAnnotation', 'listAnnotations', 'deleteAnnotation', 'convertAnnotationToCard',
   'saveDocumentStructure', 'getDocumentStructure', 'listDocumentLessonRefs', 'saveReadingPosition',
   'getReadingPosition', 'shredDocument', 'materializeSeedDocument', 'saveKnowledgePoints',

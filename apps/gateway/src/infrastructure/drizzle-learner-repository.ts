@@ -259,21 +259,8 @@ import {
   type ImportTaskStatus,
 } from '@study-studio/storage-sqlite';
 import {
-  prepareTocImportSession as prepareTocImportSessionDomain,
-  getTocImportSession as getTocImportSessionDomain,
-  getTocImportSessionById as getTocImportSessionByIdDomain,
-  bindTocImportSessionDocument as bindTocImportSessionDocumentDomain,
-  commitTocFirstChunk as commitTocFirstChunkDomain,
-  commitTocAppendChunk as commitTocAppendChunkDomain,
-  recordTocChunkFailure as recordTocChunkFailureDomain,
   seedTextbookTocSkeleton as seedTextbookTocSkeletonDomain,
   commitLessonKnowledge as commitLessonKnowledgeDomain,
-  type PrepareTocImportSessionInput,
-  type PreparedTocImportSession,
-  type TocAppendChunkResult,
-  type TocFirstChunkResult,
-  type TocImportSession,
-  type TocImportChunk,
   type SeedTocSkeletonInput,
   type SavedTocSkeleton,
   type CommitLessonKnowledgeInput,
@@ -1362,83 +1349,6 @@ export class DrizzleLearnerRepository
 
   public async getImportTask(id: string): Promise<ImportTask | undefined> {
     return getImportTaskDomain(this.deps, id);
-  }
-
-  /**
-   * 整书目录导入 session：幂等创建或复用 + 按 key 读取。
-   * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
-   */
-  public async prepareTocImportSession(
-    input: PrepareTocImportSessionInput
-  ): Promise<Result<PreparedTocImportSession, BusinessError>> {
-    return prepareTocImportSessionDomain(this.deps, input);
-  }
-
-  public async getTocImportSession(
-    userId: string,
-    requestKey: string
-  ): Promise<{ session: TocImportSession; chunks: TocImportChunk[] } | undefined> {
-    return getTocImportSessionDomain(this.deps, userId, requestKey);
-  }
-
-  /** 按 id 取导入 session + chunks（读侧永不抛；归属由调用方校验）。 */
-  public async getTocImportSessionById(
-    sessionId: string
-  ): Promise<{ session: TocImportSession; chunks: TocImportChunk[] } | undefined> {
-    return getTocImportSessionByIdDomain(this.deps, sessionId);
-  }
-
-  /**
-   * 绑定 session → target document（D2B 首 chunk 成功后调用，唯一绑定入口）。
-   * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
-   */
-  public async bindTocImportSessionDocument(input: {
-    sessionId: string;
-    userId: string;
-    documentId: string;
-  }): Promise<Result<TocImportSession, BusinessError>> {
-    return bindTocImportSessionDocumentDomain(this.deps, input);
-  }
-
-  /**
-   * 首 chunk 成功提交（单事务：建文档 + shred + 绑定 + 状态流转；已完成即幂等返回）。
-   * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
-   */
-  public async commitTocFirstChunk(input: {
-    sessionId: string;
-    userId: string;
-    docTitle: string;
-    book: TextbookAST;
-    range: { fromPage: number; toPage: number };
-  }): Promise<Result<TocFirstChunkResult, BusinessError>> {
-    return commitTocFirstChunkDomain(this.deps, input, shredIntoTransactionDomain);
-  }
-
-  /**
-   * 后续 chunk 追加提交（单事务：合并 AST + shred + 指纹 + 状态；已完成即幂等返回）。
-   * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
-   */
-  public async commitTocAppendChunk(input: {
-    sessionId: string;
-    userId: string;
-    ordinal: number;
-    book: TextbookAST;
-    range: { fromPage: number; toPage: number };
-  }): Promise<Result<TocAppendChunkResult, BusinessError>> {
-    return commitTocAppendChunkDomain(this.deps, input, shredIntoTransactionDomain);
-  }
-
-  /**
-   * 记录 chunk 执行失败（仅 attempts + 中性错误码；session 不动）。
-   * 实现已下沉 library/persistence/toc-import-sessions.ts，此处仅委托。
-   */
-  public async recordTocChunkFailure(input: {
-    sessionId: string;
-    userId: string;
-    ordinal: number;
-    errorCode: string;
-  }): Promise<Result<void, BusinessError>> {
-    return recordTocChunkFailureDomain(this.deps, input);
   }
 
   /**

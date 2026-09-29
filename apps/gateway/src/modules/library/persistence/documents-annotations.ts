@@ -22,7 +22,6 @@ import {
 import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, knowledgePoints, documentStructures, readingPositions, captureSelectionContext } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { shredIntoTransaction } from '@study-studio/storage-sqlite';
-import { markSessionsTargetDeletedInTx } from '@study-studio/storage-sqlite';
 import { recordTermExposure } from '../../dictionary/public.js';
 
 /**
@@ -303,8 +302,7 @@ export async function deleteDocument(
       tx.run(sql`DELETE FROM textbook_fts WHERE document_id = ${id}`);
       tx.delete(documentStructures).where(eq(documentStructures.documentId, id)).run();
       tx.delete(readingPositions).where(eq(readingPositions.documentId, id)).run();
-      // 整书导入 session 终态（同事务；双条件已验归属；无关联即 0，不影响其它 session）。
-      markSessionsTargetDeletedInTx(tx, { documentId: id, userId });
+
       tx.delete(documents)
         .where(and(eq(documents.id, id), eq(documents.userId, userId)))
         .run();
