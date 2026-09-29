@@ -53,6 +53,8 @@ export interface CommitLessonKnowledgeInput {
   lessonId: string;
   title?: string | undefined;
   passageMd?: string | undefined;
+  previewJson?: string | undefined;
+  summaryJson?: string | undefined;
   vocabularies?: LessonVocabularyInput[] | undefined;
   knowledgePoints?: LessonKnowledgePointInput[] | undefined;
   exercises?: LessonExerciseInput[] | undefined;
@@ -116,6 +118,8 @@ export async function commitLessonKnowledge(
           status: 'ready',
           ...(input.title?.trim() ? { title: input.title.trim().slice(0, 200) } : {}),
           ...(input.passageMd !== undefined ? { passageMd: input.passageMd } : {}),
+          ...(input.previewJson !== undefined ? { previewJson: input.previewJson } : {}),
+          ...(input.summaryJson !== undefined ? { summaryJson: input.summaryJson } : {}),
         })
         .where(and(eq(textbookLessons.documentId, docId), eq(textbookLessons.lessonId, lId)))
         .run();

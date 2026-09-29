@@ -82,6 +82,11 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
     setVoiceId('');
     setPreferredService(provider);
   };
+  const chooseGender = (next: 'FEMALE' | 'MALE') => {
+    if (next === gender) return;
+    setVoiceId('');
+    setGender(next);
+  };
 
   return (
     <section id="settings-speech" className="space-y-5">
@@ -135,9 +140,10 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
               <div>
                 <p className="mb-2 text-sm font-medium text-ink">声音</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button type="button" variant={gender === 'FEMALE' ? 'default' : 'outline'} onClick={() => setGender('FEMALE')}>女声</Button>
-                  <Button type="button" variant={gender === 'MALE' ? 'default' : 'outline'} onClick={() => setGender('MALE')}>男声</Button>
+                    <Button type="button" variant={gender === 'FEMALE' ? 'default' : 'outline'} onClick={() => chooseGender('FEMALE')}>女声</Button>
+                    <Button type="button" variant={gender === 'MALE' ? 'default' : 'outline'} onClick={() => chooseGender('MALE')}>男声</Button>
                 </div>
+                {voiceId && <p className="mt-2 text-xs text-ink-mute">切换男女声会恢复自动选择音色。</p>}
               </div>
               <div>
                 <div className="mb-3 flex items-center justify-between text-sm font-medium text-ink">
