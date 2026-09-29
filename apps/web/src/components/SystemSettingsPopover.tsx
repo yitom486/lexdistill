@@ -502,7 +502,7 @@ export function SystemSettingsPopover() {
 
       <PopoverContent
         align="end"
-        className="w-80 max-h-[calc(100dvh-2rem)] p-0 flex flex-col border border-line-stone-200o90-stone-800o90 shadow-xl rounded-2xl bg-veil-whiteo95 dark:bg-surface-h1a1917o95 backdrop-blur-md overflow-hidden z-50"
+        className="w-80 max-h-[calc(100dvh-2rem)] p-0 flex flex-col border border-line-stone-200o90-stone-800o90 shadow-xl rounded-2xl bg-veil-whiteo95 dark:bg-surface-h1a1917o95 backdrop-blur-md overflow-hidden z-50 transition-colors"
       >
         {/* Header */}
         <div className="shrink-0 px-4 py-3 border-b border-tone-stone-100-stone-800o80 flex items-center justify-between">
@@ -530,7 +530,7 @@ export function SystemSettingsPopover() {
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 text-xs">
           {isDesktop && (
-            <div className="space-y-2 rounded-xl border border-tone-amber-500o25 bg-wash-amber-50o60-amber-950o20 p-2.5 dark:border-line-amber-400o20">
+            <div className="space-y-2 rounded-xl border border-tone-amber-500o25 bg-wash-amber-50o60-amber-950o20 p-2.5 dark:border-line-amber-400o20 transition-colors">
               <div className="flex items-center justify-between font-medium text-ink-mute">
                 <div className="flex items-center gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5 text-tone-amber-500" />
@@ -550,7 +550,7 @@ export function SystemSettingsPopover() {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 w-full gap-1.5 border-line-amber-500o30 text-[11px] text-tone-amber-700 hover:bg-wash-amber-100o70 dark:text-ink-amber-300 dark:hover:bg-grad-amber-950o40"
+                className="h-8 w-full gap-1.5 border-line-amber-500o30 text-[11px] text-tone-amber-700 hover:bg-wash-amber-100o70 dark:text-ink-amber-300 dark:hover:bg-grad-amber-950o40 transition-colors"
                 disabled={updateChecking}
                 onClick={() => void handleCheckForUpdate()}
               >
@@ -952,7 +952,7 @@ export function SystemSettingsPopover() {
                 {installableDictionaries.map((dictionary) => (
                   <div
                     key={dictionary.id}
-                    className="rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50"
+                    className="rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -1030,7 +1030,7 @@ export function SystemSettingsPopover() {
             ) : (
               <p className="text-[11px] text-ink-stone-500">正在读取词典包状态…</p>
             )}
-            <div className="rounded-xl border border-dashed border-line-stone-300o80 p-2.5 dark:border-tone-stone-700">
+            <div className="rounded-xl border border-dashed border-line-stone-300o80 p-2.5 dark:border-tone-stone-700 transition-colors">
               <p className="text-[11px] font-medium text-ink-mute">
                 自备 Yomitan 词典包（bank v3 .zip）
               </p>
@@ -1094,7 +1094,7 @@ export function SystemSettingsPopover() {
                 </Badge>
               )}
             </div>
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50">
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50 transition-colors">
               <p className="text-[10px] leading-relaxed text-ink-ghost">
                 把生词本卡片推送到本机 Anki（需打开 Anki + 安装 AnkiConnect 插件）。关闭时查词面板不显示推送入口。
               </p>
@@ -1178,7 +1178,7 @@ export function SystemSettingsPopover() {
                     桌面端
                   </Badge>
                 </div>
-                <div className="rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50">
+                <div className="rounded-xl border border-line-stone-200o80 bg-veil-stone-50o70 p-2.5 dark:border-tone-stone-800 dark:bg-veil-stone-900o50 transition-colors">
                   <p className="text-[10px] leading-relaxed text-ink-ghost">
                     学习库保存在本机应用数据目录，随应用重启保留。建议定期备份；恢复时把备份文件放回原目录并重启应用即可。
                   </p>

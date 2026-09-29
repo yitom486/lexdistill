@@ -596,7 +596,7 @@ export function AiTutorDrawer({
                       {isAi ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
                     </div>
                     <div
-                      className={`max-w-[85%] p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${ isAi ? 'bg-tone-white dark:bg-veil-stone-900o90 text-ink-soft border border-line-accent shadow-sm rounded-tl-none font-serif' : 'bg-tone-amber-500 text-tone-stone-950 font-medium rounded-tr-none shadow-sm' }`}
+                      className={`transition-colors max-w-[85%] p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${ isAi ? 'bg-tone-white dark:bg-veil-stone-900o90 text-ink-soft border border-line-accent shadow-sm rounded-tl-none font-serif' : 'bg-tone-amber-500 text-tone-stone-950 font-medium rounded-tr-none shadow-sm' }`}
                     >
                       {isAi && msg.reasoning ? (
                         <div className="mb-2 text-[11px] text-ink-ghost border-l-2 border-tone-amber-500o40 pl-2 font-sans">

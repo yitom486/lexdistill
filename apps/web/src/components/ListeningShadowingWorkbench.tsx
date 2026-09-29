@@ -377,7 +377,7 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                   sound.playClick();
                   setMaskText(!maskText);
                 }}
-                className={`h-7 gap-1 px-2.5 ${ maskText ? 'border-line-purple-500o30 bg-wash-purple-500o10 text-ink-purple-900 dark:text-ink-purple-300' : '' }`}
+                className={`h-7 gap-1 px-2.5 transition-colors ${ maskText ? 'border-line-purple-500o30 bg-wash-purple-500o10 text-ink-purple-900 dark:text-ink-purple-300' : '' }`}
               >
                 <span>{maskText ? '🙈 盲听中' : '👀 看原文'}</span>
               </Button>

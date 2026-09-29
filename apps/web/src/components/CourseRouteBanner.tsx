@@ -70,7 +70,7 @@ export function CourseRouteBanner() {
               key={u.unit.id}
               type="button"
               onClick={() => goUnit(u)}
-              className="rounded-full border border-tone-amber-500o40 px-2 py-0.5 text-[11px] text-ink-amber-800 hover:bg-wash-amber-500o15 dark:text-ink-amber-200"
+              className="rounded-full border border-tone-amber-500o40 px-2 py-0.5 text-[11px] text-ink-amber-800 hover:bg-wash-amber-500o15 dark:text-ink-amber-200 transition-colors"
               title="近期有错误，回去练两道"
             >
               {u.unit.title}
@@ -84,7 +84,7 @@ export function CourseRouteBanner() {
           sound.playClick();
           setExpanded((v) => !v);
         }}
-        className="inline-flex items-center gap-1 text-[11px] text-ink-stone-500 hover:text-tone-stone-700 dark:text-ink-stone-400"
+        className="inline-flex items-center gap-1 text-[11px] text-ink-stone-500 hover:text-tone-stone-700 dark:text-ink-stone-400 transition-colors"
       >
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         {expanded ? '收起完整路线' : '展开完整路线'}
@@ -120,7 +120,7 @@ export function CourseRouteBanner() {
                         <button
                           type="button"
                           onClick={() => goUnit(u)}
-                          className="truncate text-xs font-semibold text-tone-stone-800 hover:underline dark:text-tone-stone-100"
+                          className="truncate text-xs font-semibold text-tone-stone-800 hover:underline dark:text-tone-stone-100 transition-colors"
                           title={u.unit.summary}
                         >
                           {u.unit.title}

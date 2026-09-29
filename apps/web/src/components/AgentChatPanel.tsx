@@ -328,7 +328,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
 
   return (
     <div
-      className={`flex flex-col h-full min-h-[420px] rounded-xl border border-tone-stone-800o80 bg-surface-midnight-fixed text-tone-stone-100 overflow-hidden shadow-xl ${className}`}
+      className={`flex flex-col h-full min-h-[420px] rounded-xl border border-line bg-paper-soft text-ink overflow-hidden shadow-xl ${className}`}
     >
         <ChatPanelHeader
           connected={connected}

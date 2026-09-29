@@ -205,7 +205,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-5xl overflow-hidden p-0">
         <div className="flex max-h-[92vh] flex-col">
-          <DialogHeader className="shrink-0 border-b border-line-amber-900o10 bg-linear-to-br from-grad-amber-50-amber-950o40 via-paper-soft to-grad-orange-50-orange-950o30 p-5 pr-12 dark:border-wash-amber-500o15 sm:p-7 sm:pr-14">
+          <DialogHeader className="shrink-0 border-b border-line-amber-900o10 bg-linear-to-br from-grad-amber-50-amber-950o40 via-paper-soft to-grad-orange-50-orange-950o30 p-5 pr-12 dark:border-wash-amber-500o15 sm:p-7 sm:pr-14 transition-colors">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="amber" className="gap-1">
                 <BookOpen className="h-3 w-3" />
@@ -226,7 +226,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
 
           <nav
             aria-label="五十音记忆法大纲"
-            className="flex shrink-0 gap-2 overflow-x-auto border-b border-line-stone-200o80 bg-veil-whiteo70-stone-950o30 px-5 py-3 dark:border-tone-stone-800 sm:px-7"
+            className="flex shrink-0 gap-2 overflow-x-auto border-b border-line-stone-200o80 bg-veil-whiteo70-stone-950o30 px-5 py-3 dark:border-tone-stone-800 sm:px-7 transition-colors"
           >
             {[
               ['kana-guide-vowels', '五个元音'],
@@ -250,7 +250,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
             <div className="mx-auto flex max-w-4xl flex-col gap-5">
               <section
                 id="kana-guide-vowels"
-                className="scroll-mt-4 rounded-3xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o10 sm:p-5"
+                className="scroll-mt-4 rounded-3xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o10 sm:p-5 transition-colors"
               >
                 <GuideSectionTitle
                   eyebrow="地基"
@@ -283,7 +283,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 flex items-start gap-2 rounded-2xl border border-tone-amber-500o20 bg-veil-whiteo55-stone-900o35 p-3 text-xs leading-relaxed text-tone-stone-700 dark:text-ink-stone-200">
+                <div className="mt-4 flex items-start gap-2 rounded-2xl border border-tone-amber-500o20 bg-veil-whiteo55-stone-900o35 p-3 text-xs leading-relaxed text-tone-stone-700 dark:text-ink-stone-200 transition-colors">
                   <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent-ink" />
                   <p>
                     把它们当成五个固定插座：`か (ka)` 是 `k + a`，`き (ki)` 是 `k + i`。所以先把
@@ -294,7 +294,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
 
               <section
                 id="kana-guide-families"
-                className="scroll-mt-4 rounded-3xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o35 p-4 dark:border-tone-stone-800 sm:p-5"
+                className="scroll-mt-4 rounded-3xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o35 p-4 dark:border-tone-stone-800 sm:p-5 transition-colors"
               >
                 <GuideSectionTitle
                   eyebrow="组队"
@@ -339,7 +339,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                   description="不同教材可能横着排或竖着排，不必纠结方向。看懂“谁是一家人”和“最后落在哪个元音”就够了。"
                 />
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-3xl border border-line-sky-500o20 bg-wash-sky-500o10 p-4 dark:bg-wash-sky-500o10">
+                  <div className="rounded-3xl border border-line-sky-500o20 bg-wash-sky-500o10 p-4 dark:bg-wash-sky-500o10 transition-colors">
                     <div className="flex items-center gap-2 text-sm font-bold text-ink-sky-900-sky-200">
                       <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-wash-sky-500o15">行</span>
                       行 = 辅音家族
@@ -353,7 +353,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                       <span>か (ka)</span>
                     </div>
                   </div>
-                  <div className="rounded-3xl border border-line-violet-500o20 bg-wash-violet-500o10 p-4 dark:bg-wash-violet-500o10">
+                  <div className="rounded-3xl border border-line-violet-500o20 bg-wash-violet-500o10 p-4 dark:bg-wash-violet-500o10 transition-colors">
                     <div className="flex items-center gap-2 text-sm font-bold text-ink-violet-900-violet-200">
                       <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-wash-violet-500o15">段</span>
                       段 = 元音位置
@@ -372,7 +372,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
 
               <section
                 id="kana-guide-origin"
-                className="scroll-mt-4 rounded-3xl border border-line-orange-500o20 bg-wash-orange-500o10 p-4 dark:bg-wash-orange-500o10 sm:p-5"
+                className="scroll-mt-4 rounded-3xl border border-line-orange-500o20 bg-wash-orange-500o10 p-4 dark:bg-wash-orange-500o10 sm:p-5 transition-colors"
               >
                 <GuideSectionTitle
                   eyebrow="假名家谱"
@@ -399,14 +399,14 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                     </p>
                   </div>
                 </div>
-                <p className="mt-4 rounded-2xl border border-line-orange-500o15 bg-veil-whiteo55-stone-900o35 p-3 text-xs leading-relaxed text-tone-stone-700 dark:text-ink-stone-200">
+                <p className="mt-4 rounded-2xl border border-line-orange-500o15 bg-veil-whiteo55-stone-900o35 p-3 text-xs leading-relaxed text-tone-stone-700 dark:text-ink-stone-200 transition-colors">
                   所以平假名和片假名是同一套声音的两套衣服，不是 46 + 46 个新声音。五十音表后来又受汉字音韵学和梵文/悉昙排列影响，才整理成今天这张声音地图。
                 </p>
               </section>
 
               <section
                 id="kana-guide-rules"
-                className="scroll-mt-4 rounded-3xl border border-line-emerald-500o20 bg-wash-emerald-500o10 p-4 dark:bg-wash-emerald-500o10 sm:p-5"
+                className="scroll-mt-4 rounded-3xl border border-line-emerald-500o20 bg-wash-emerald-500o10 p-4 dark:bg-wash-emerald-500o10 sm:p-5 transition-colors"
               >
                 <GuideSectionTitle
                   eyebrow="真正的诀窍"
@@ -438,7 +438,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                   description="浊音、半浊音、拗音、促音和长音都建立在基础假名上。先认识本体，再解锁变形，不用第一天全套带走。"
                 />
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-3xl border border-line-rose-500o20 bg-wash-rose-500o10 p-4 dark:bg-wash-rose-500o10">
+                  <div className="rounded-3xl border border-line-rose-500o20 bg-wash-rose-500o10 p-4 dark:bg-wash-rose-500o10 transition-colors">
                     <div className="flex items-center gap-2 text-sm font-bold text-ink-rose-900-rose-200">
                       <span className="rounded-xl bg-wash-rose-500o15 px-2 py-1">゛ ゜</span>
                       加点之后会变声
@@ -447,7 +447,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                       `か (ka) → が (ga)`，`は (ha) → ば (ba) / ぱ (pa)`。两点是浊音，小圆圈是半浊音 p。
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-line-indigo-500o20 bg-wash-indigo-500o10 p-4 dark:bg-wash-indigo-500o10">
+                  <div className="rounded-3xl border border-line-indigo-500o20 bg-wash-indigo-500o10 p-4 dark:bg-wash-indigo-500o10 transition-colors">
                     <div className="flex items-center gap-2 text-sm font-bold text-ink-indigo-900-indigo-200">
                       <span className="rounded-xl bg-wash-indigo-500o15 px-2 py-1">ゃ ゅ ょ</span>
                       小字挤在一起读
@@ -458,7 +458,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                   </div>
                 </div>
 
-                <div className="mt-3 rounded-3xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o10">
+                <div className="mt-3 rounded-3xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o10 transition-colors">
                   <div className="flex items-center gap-2 text-sm font-bold text-ink-amber-900-amber-200">
                     <GitCompareArrows className="h-4 w-4" />
                     这些音，建议直接点一下听
@@ -491,7 +491,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                 </div>
               </section>
 
-              <div className="flex items-start gap-2 rounded-2xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o30 p-3 text-[11px] leading-relaxed text-ink-stone-500 dark:border-tone-stone-800 dark:text-ink-stone-400">
+              <div className="flex items-start gap-2 rounded-2xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o30 p-3 text-[11px] leading-relaxed text-ink-stone-500 dark:border-tone-stone-800 dark:text-ink-stone-400 transition-colors">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <p>
                   看完这张地图，就可以回到矩阵做一轮短练习。错了不用气馁：错误会告诉系统下一次该把哪个假名请回来复习。

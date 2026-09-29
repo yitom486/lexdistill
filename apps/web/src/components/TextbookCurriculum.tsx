@@ -424,7 +424,7 @@ export function TextbookCurriculum({
                     setSelectedLessonId(lesson.id);
                     setActiveWordCard(null);
                   }}
-                  className={`w-full h-auto text-left p-3.5 rounded-xl border justify-start ${
+                  className={`w-full h-auto text-left p-3.5 rounded-xl border justify-start transition-colors ${
                     isSelected
                       ? 'bg-wash-amber-500o10 dark:bg-tone-amber-500o20 border-tone-amber-500o40 shadow-sm hover:bg-wash-amber-500o15'
                       : 'bg-paper-soft border-line-amber-900o10-amber-500o10 hover:border-line-amber-500o30'

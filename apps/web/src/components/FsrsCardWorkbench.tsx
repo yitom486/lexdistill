@@ -250,7 +250,7 @@ export function FsrsCardWorkbench() {
           }}
           className="fsrs-card-stage h-115 cursor-pointer"
         >
-          <div className="fsrs-card-viewport relative h-full w-full overflow-hidden rounded-3xl border border-line-amber-900o10 bg-paper-soft shadow-sm dark:border-wash-amber-500o15">
+          <div className="fsrs-card-viewport relative h-full w-full overflow-hidden rounded-3xl border border-line-amber-900o10 bg-paper-soft shadow-sm dark:border-wash-amber-500o15 transition-colors">
             <div
               className="fsrs-card-rotor relative h-full w-full transform-style-3d"
               style={{

@@ -262,7 +262,7 @@ export function SubjectiveWritingWorkbench({
             className="space-y-3"
           >
             <div
-              className={`p-4 rounded-2xl border ${ gradingResult.isCorrect ? 'bg-wash-emerald-50o80 border-line-emerald-500o30 dark:bg-wash-emerald-950o20' : 'bg-wash-rose-50o80 border-line-rose-500o30 dark:bg-wash-rose-950o20' }`}
+              className={`p-4 rounded-2xl border transition-colors ${ gradingResult.isCorrect ? 'bg-wash-emerald-50o80 border-line-emerald-500o30 dark:bg-wash-emerald-950o20' : 'bg-wash-rose-50o80 border-line-rose-500o30 dark:bg-wash-rose-950o20' }`}
             >
               <div className="flex items-center gap-2 mb-2">
                 {gradingResult.isCorrect ? (

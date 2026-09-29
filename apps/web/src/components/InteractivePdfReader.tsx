@@ -402,7 +402,7 @@ export function InteractivePdfReader({
                               );
                               toast.info('已将整句提交给 AI 导师讲透');
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-tone-amber-700 hover:bg-wash-amber-500o10 dark:text-ink-amber-300 cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-tone-amber-700 hover:bg-wash-amber-500o10 dark:text-ink-amber-300 cursor-pointer transition-colors"
                             title="整句讲透：语法成分 + 助词接续 + 语感（不用先划选）"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
@@ -412,7 +412,7 @@ export function InteractivePdfReader({
                             type="button"
                             onClick={() => handleCollectSentence(dlg.japanese, dlg.chinese)}
                             disabled={proposeDraft.isPending}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-ink-stone-500 hover:bg-wash-amber-500o10 hover:text-tone-amber-700 dark:text-ink-stone-400 dark:hover:text-ink-amber-300 cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-ink-stone-500 hover:bg-wash-amber-500o10 hover:text-tone-amber-700 dark:text-ink-stone-400 dark:hover:text-ink-amber-300 cursor-pointer transition-colors"
                             title="收进生词草稿箱，确认后建成句子卡"
                           >
                             <BookmarkPlus className="w-3.5 h-3.5" />

@@ -131,7 +131,7 @@ export function CommandPalette({ isOpen, onClose, actions }: CommandPaletteProps
                     }}
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={cn(
-                      'h-auto w-full justify-between px-3 py-2.5 rounded-xl text-left font-normal',
+                      'h-auto w-full justify-between px-3 py-2.5 rounded-xl text-left font-normal transition-colors',
                       isSelected
                         ? 'bg-wash-amber-500o15-amber-500o25 text-ink-amber-950-amber-100 border border-line-amber-500o30'
                         : 'border border-transparent hover:bg-veil-stone-200o40 dark:hover:bg-veil-stone-800o40'

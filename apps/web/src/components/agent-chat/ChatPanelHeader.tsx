@@ -103,32 +103,32 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
   } = props;
   const copy = getTutorTrackCopy(track);
   return (
-    <header className="flex items-start justify-between gap-2 px-3 py-2.5 border-b border-line-stone-800o90">
+    <header className="flex items-start justify-between gap-2 px-3 py-2.5 border-b border-line">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold tracking-tight">Agent</span>
           <span
             className={`inline-flex items-center gap-1 text-[10px] ${
-              connected ? 'text-ink-emerald-400' : 'text-ink-stone-500'
+              connected ? 'text-ink-emerald-700-emerald-400' : 'text-ink-ghost'
             }`}
           >
             <span
               className={`size-1.5 rounded-full ${
-                connected ? 'bg-ink-emerald-400' : 'bg-tone-stone-600'
+                connected ? 'bg-ink-emerald-700-emerald-400' : 'bg-ink-ghost'
               }`}
             />
             {connected ? '已连接' : '未连接'}
           </span>
           {agentAvailable ? (
             <span
-              className="inline-flex items-center gap-1 text-[10px] text-ink-emerald-500o90"
+              className="inline-flex items-center gap-1 text-[10px] text-ink-emerald-700-emerald-400"
               title={agentStatus?.message}
             >
               <KeyRound className="size-3" />
               Agent 可用
             </span>
           ) : (
-            <span className="text-[10px] text-ink-amber-500o90" title={agentStatus?.message}>
+            <span className="text-[10px] text-ink-amber-900-amber-300" title={agentStatus?.message}>
               Agent 未就绪
             </span>
           )}
@@ -136,12 +136,12 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             <span
               className={`inline-flex items-center gap-1 text-[10px] ${
                 agentTurnHealth.state === 'healthy'
-                  ? 'text-ink-emerald-400'
+                  ? 'text-ink-emerald-700-emerald-400'
                   : agentTurnHealth.state === 'running'
-                    ? 'text-tone-sky-400'
+                    ? 'text-ink-sky-700-sky-300'
                     : agentTurnHealth.state === 'fallback'
-                      ? 'text-ink-amber-400'
-                      : 'text-ink-rose-400'
+                      ? 'text-ink-amber-900-amber-300'
+                      : 'text-ink-rose-600-rose-400'
               }`}
               title={
                 agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed'
@@ -152,12 +152,12 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
               <span
                 className={`size-1.5 rounded-full ${
                   agentTurnHealth.state === 'healthy'
-                    ? 'bg-ink-emerald-400'
+                    ? 'bg-ink-emerald-700-emerald-400'
                     : agentTurnHealth.state === 'running'
-                      ? 'bg-tone-sky-400 animate-pulse'
+                      ? 'bg-ink-sky-700-sky-300 animate-pulse'
                       : agentTurnHealth.state === 'fallback'
-                        ? 'bg-ink-amber-400'
-                        : 'bg-ink-rose-400'
+                        ? 'bg-ink-amber-900-amber-300'
+                        : 'bg-ink-rose-600-rose-400'
                 }`}
               />
               {agentTurnHealth.state === 'healthy'
@@ -173,7 +173,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           lastCoachPrompt ? (
             <button
               type="button"
-              className="text-[10px] font-medium text-tone-sky-400 hover:text-ink-sky-300"
+              className="text-[10px] font-medium text-ink-sky-700-sky-300 hover:text-ink-sky-900-sky-200"
               disabled={busy}
               onClick={retryLastAgentTurn}
             >
@@ -182,7 +182,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           ) : null}
           {typeof usage?.usedPercent === 'number' ? (
             <span
-              className="inline-flex items-center gap-1 text-[10px] text-ink-stone-500"
+              className="inline-flex items-center gap-1 text-[10px] text-ink-ghost"
               title={
                 [
                   '这是当前 Agent 的额度占用，不是本轮生成进度。',
@@ -202,8 +202,8 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
         <p
           className={`mt-0.5 text-[10px] truncate ${
             agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed'
-              ? 'text-ink-amber-500o90'
-              : 'text-ink-stone-500'
+              ? 'text-ink-amber-900-amber-300'
+              : 'text-ink-ghost'
           }`}
           title={
             agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed'
@@ -218,13 +218,13 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
       </div>
       <div className="flex items-center gap-0.5 shrink-0">
         {connected ? (
-          <Wifi className="size-3.5 text-ink-emerald-500o70 mr-1" />
+          <Wifi className="size-3.5 text-ink-emerald-700-emerald-400 mr-1" />
         ) : (
-          <WifiOff className="size-3.5 text-tone-stone-600 mr-1" />
+          <WifiOff className="size-3.5 text-ink-ghost mr-1" />
         )}
         <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
           <PopoverTrigger
-            className="inline-flex size-7 items-center justify-center rounded-md text-ink-stone-400 hover:bg-tone-stone-800 hover:text-tone-stone-100"
+            className="inline-flex size-7 items-center justify-center rounded-md text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
             title="会话历史"
             onClick={() => {
               sound.playClick();
@@ -235,13 +235,13 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           </PopoverTrigger>
           <PopoverContent
             align="end"
-            className="w-72 p-2 bg-panel-chat-fixed border-tone-stone-700 text-tone-stone-100"
+            className="w-72 p-2 border-line bg-paper-soft text-ink"
           >
             <div className="flex items-center justify-between px-1 pb-2">
-              <p className="text-[11px] font-medium text-tone-stone-300">Agent 会话</p>
+              <p className="text-[11px] font-medium text-ink-soft">Agent 会话</p>
               <button
                 type="button"
-                className="text-[10px] text-tone-sky-400 hover:text-ink-sky-300"
+                className="text-[10px] text-ink-sky-700-sky-300 hover:text-ink-sky-900-sky-200"
                 onClick={() => {
                   startNewChat();
                   setHistoryOpen(false);
@@ -252,13 +252,13 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             </div>
             <div className="max-h-64 space-y-1 overflow-y-auto">
               {sessions.length === 0 ? (
-                <p className="px-2 py-3 text-[11px] text-ink-stone-500">暂无持久化会话</p>
+                <p className="px-2 py-3 text-[11px] text-ink-ghost">暂无持久化会话</p>
               ) : (
                 sessions.map((t) => (
                   <div
                     key={t.id}
-                    className={`flex items-start gap-1 rounded-lg px-2 py-1.5 hover:bg-tone-stone-800o80 ${
-                      t.id === coachThreadId ? 'bg-tone-stone-800' : ''
+                    className={`flex items-start gap-1 rounded-lg px-2 py-1.5 hover:bg-surface-stone-100-stone-900 ${
+                      t.id === coachThreadId ? 'bg-surface-slate-50-slate-800' : ''
                     }`}
                   >
                     <button
@@ -266,10 +266,10 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                       className="min-w-0 flex-1 text-left"
                       onClick={() => openSession(t.id)}
                     >
-                      <p className="truncate text-[11px] text-ink-stone-200">
+                      <p className="truncate text-[11px] text-ink">
                         {t.name || t.preview || t.id.slice(0, 12)}
                       </p>
-                      <p className="text-[10px] text-ink-stone-500">
+                      <p className="text-[10px] text-ink-ghost">
                         {t.updatedAt
                           ? new Date(t.updatedAt * 1000).toLocaleString()
                           : t.id.slice(0, 8)}
@@ -279,7 +279,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-6 shrink-0 text-ink-stone-500 hover:text-ink-amber-300"
+                      className="size-6 shrink-0 text-ink-ghost hover:text-ink-amber-900-amber-200"
                       title="压缩上下文"
                       disabled={compactThread.isPending}
                       onClick={() => {
@@ -296,7 +296,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-6 shrink-0 text-ink-stone-500 hover:text-ink-sky-300"
+                      className="size-6 shrink-0 text-ink-ghost hover:text-ink-sky-900-sky-200"
                       title="分叉会话"
                       disabled={forkThread.isPending}
                       onClick={() => {
@@ -322,7 +322,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-6 shrink-0 text-ink-stone-500 hover:text-ink-rose-400"
+                      className="size-6 shrink-0 text-ink-ghost hover:text-ink-rose-600-rose-400"
                       title="归档"
                       onClick={() => {
                         sound.playClick();
@@ -339,7 +339,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                 ))
               )}
             </div>
-            <label className="mt-2 flex items-center gap-2 border-t border-tone-stone-800 px-1 pt-2 text-[10px] text-ink-stone-400">
+            <label className="mt-2 flex items-center gap-2 border-t border-line px-1 pt-2 text-[10px] text-ink-ghost">
               <input
                 type="checkbox"
                 checked={coachPersistThread}
@@ -351,7 +351,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
         </Popover>
         <Popover open={skillsOpen} onOpenChange={setSkillsOpen}>
           <PopoverTrigger
-            className="inline-flex size-7 items-center justify-center rounded-md text-ink-stone-400 hover:bg-tone-stone-800 hover:text-tone-stone-100"
+            className="inline-flex size-7 items-center justify-center rounded-md text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
             title="Skills"
             onClick={() => sound.playClick()}
           >
@@ -359,32 +359,32 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           </PopoverTrigger>
           <PopoverContent
             align="end"
-            className="w-72 p-2 bg-panel-chat-fixed border-tone-stone-700 text-tone-stone-100"
+            className="w-72 p-2 border-line bg-paper-soft text-ink"
           >
-            <p className="px-1 pb-2 text-[11px] font-medium text-tone-stone-300">
+            <p className="px-1 pb-2 text-[11px] font-medium text-ink-soft">
               Agent Skills（只读）
             </p>
             <div className="max-h-40 space-y-1 overflow-y-auto">
               {skills.length === 0 ? (
-                <p className="px-2 py-3 text-[11px] text-ink-stone-500">暂无 skill</p>
+                <p className="px-2 py-3 text-[11px] text-ink-ghost">暂无 skill</p>
               ) : (
                 skills.map((s) => (
                   <div
                     key={`${s.scope ?? 'x'}:${s.name}`}
-                    className="rounded-lg px-2 py-1.5 hover:bg-tone-stone-800o80"
+                    className="rounded-lg px-2 py-1.5 hover:bg-surface-stone-100-stone-900"
                   >
                     <div className="flex items-center gap-1.5">
-                      <p className="min-w-0 truncate text-[11px] text-ink-stone-200">{s.name}</p>
+                      <p className="min-w-0 truncate text-[11px] text-ink">{s.name}</p>
                       <span
                         className={`shrink-0 text-[9px] ${
-                          s.enabled ? 'text-tone-emerald-500' : 'text-tone-stone-600'
+                          s.enabled ? 'text-ink-emerald-700-emerald-400' : 'text-ink-ghost'
                         }`}
                       >
                         {s.enabled ? 'on' : 'off'}
                       </span>
                     </div>
                     {s.description ? (
-                      <p className="mt-0.5 line-clamp-2 text-[10px] text-ink-stone-500">
+                      <p className="mt-0.5 line-clamp-2 text-[10px] text-ink-ghost">
                         {s.description}
                       </p>
                     ) : null}
@@ -392,21 +392,21 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
                 ))
               )}
             </div>
-            <div className="mt-2 border-t border-tone-stone-800 px-1 pt-2">
-              <p className="pb-1 text-[10px] font-medium text-ink-stone-400">
+            <div className="mt-2 border-t border-line px-1 pt-2">
+              <p className="pb-1 text-[10px] font-medium text-ink-ghost">
                 MCP 状态（观测，非学习工具总线）
               </p>
               <div className="max-h-28 space-y-1 overflow-y-auto">
                 {mcpServers.length === 0 ? (
-                  <p className="px-1 py-2 text-[10px] text-tone-stone-600">未配置 MCP</p>
+                  <p className="px-1 py-2 text-[10px] text-ink-ghost">未配置 MCP</p>
                 ) : (
                   mcpServers.map((s) => (
                     <div
                       key={s.name}
                       className="flex items-center justify-between gap-2 rounded px-1 py-0.5"
                     >
-                      <span className="truncate text-[10px] text-tone-stone-300">{s.name}</span>
-                      <span className="shrink-0 text-[9px] text-ink-stone-500">
+                      <span className="truncate text-[10px] text-ink-soft">{s.name}</span>
+                      <span className="shrink-0 text-[9px] text-ink-ghost">
                         {s.status} · {s.toolCount} tools
                       </span>
                     </div>
@@ -420,7 +420,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-ink-stone-400 hover:text-tone-stone-100"
+          className="size-7 text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
           title="新对话（新开 thread）"
           onClick={startNewChat}
         >
@@ -430,7 +430,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-ink-stone-400 hover:text-tone-stone-100"
+          className="size-7 text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
           title="清屏（保留当前会话）"
           onClick={clearDisplay}
         >
@@ -441,7 +441,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             type="button"
             variant="ghost"
             size="icon"
-            className="size-7 text-ink-stone-400 hover:text-tone-stone-100"
+            className="size-7 text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
             title="关闭面板（会话不断开）"
             onClick={onClose}
           >

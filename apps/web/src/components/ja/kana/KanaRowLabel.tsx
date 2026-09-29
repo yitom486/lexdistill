@@ -114,7 +114,7 @@ export function KanaRowLabel({
       type="button"
       variant="ghost"
       onClick={onOpen}
-      className="group h-full min-h-20 w-full min-w-0 flex-col items-start justify-center gap-1 rounded-xl border-b border-ink-stone-200 px-2.5 py-3 text-left hover:bg-wash-amber-500o10 hover:text-tone-amber-700 dark:border-tone-stone-800 dark:hover:text-ink-amber-300 sm:rounded-none sm:border-b-0 sm:border-r sm:px-3 sm:py-2"
+      className="group h-full min-h-20 w-full min-w-0 flex-col items-start justify-center gap-1 rounded-xl border-b border-ink-stone-200 px-2.5 py-3 text-left hover:bg-wash-amber-500o10 hover:text-tone-amber-700 dark:border-tone-stone-800 dark:hover:text-ink-amber-300 sm:rounded-none sm:border-b-0 sm:border-r sm:px-3 sm:py-2 transition-colors"
       aria-label={`打开 ${rowName} 的行记忆讲义`}
     >
       <span className="font-serif text-xs font-bold text-ink-faint sm:text-sm">

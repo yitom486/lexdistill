@@ -97,7 +97,7 @@ export function SelectionLookupPopup() {
   return (
     <div
       {...{ [LOOKUP_POPUP_ATTR]: 'true' }}
-      className="fixed z-[70] w-64 rounded-xl border border-line-amber-900o15 bg-tone-white p-3 shadow-2xl dark:border-tone-amber-500o25 dark:bg-surface-h211e1b"
+      className="fixed z-[70] w-64 rounded-xl border border-line-amber-900o15 bg-tone-white p-3 shadow-2xl dark:border-tone-amber-500o25 dark:bg-surface-h211e1b transition-colors"
       style={{ left: popup.x, top: popup.y }}
       role="dialog"
       aria-label={`查词：${popup.text}`}
@@ -109,7 +109,7 @@ export function SelectionLookupPopup() {
         <button
           type="button"
           onClick={() => setPopup(null)}
-          className="shrink-0 rounded-md p-1 text-ink-stone-400 hover:bg-tone-stone-100 hover:text-tone-stone-600 dark:hover:bg-tone-stone-800"
+          className="shrink-0 rounded-md p-1 text-ink-stone-400 hover:bg-tone-stone-100 hover:text-tone-stone-600 dark:hover:bg-tone-stone-800 transition-colors"
           aria-label="关闭查词浮层"
         >
           <X className="h-3.5 w-3.5" />
@@ -124,7 +124,7 @@ export function SelectionLookupPopup() {
       ) : entries.length > 0 ? (
         <div className="mt-1.5 space-y-2">
           {entries.map((entry) => (
-            <div key={entry.id} className="border-t border-tone-stone-100 pt-1.5 first:border-0 first:pt-0 dark:border-tone-stone-800">
+            <div key={entry.id} className="border-t border-tone-stone-100 pt-1.5 first:border-0 first:pt-0 dark:border-tone-stone-800 transition-colors">
               <p className="text-xs font-semibold text-ink-soft">
                 {entry.headword}
                 {entry.reading && (
@@ -148,7 +148,7 @@ export function SelectionLookupPopup() {
                       toast.error(e instanceof Error ? e.message : '加入生词本失败。'),
                   });
                 }}
-                className="mt-1 inline-flex items-center gap-1 rounded-lg border border-tone-amber-500o40 px-2 py-0.5 text-[11px] font-medium text-tone-amber-700 hover:bg-wash-amber-500o10 dark:text-ink-amber-300"
+                className="mt-1 inline-flex items-center gap-1 rounded-lg border border-tone-amber-500o40 px-2 py-0.5 text-[11px] font-medium text-tone-amber-700 hover:bg-wash-amber-500o10 dark:text-ink-amber-300 transition-colors"
               >
                 <BookPlus className="h-3 w-3" />
                 加入生词本

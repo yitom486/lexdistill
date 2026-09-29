@@ -302,7 +302,6 @@
   --surface-paper-abyss: #faf9f6;
   --surface-stone-100-stone-950: oklch(97% 0.001 106.424);
   --surface-abyss-fixed: #0e0f11;
-  --surface-midnight-fixed: #141518;
   --surface-h1a1917o85: color-mix(in oklab, #1a1917 85%, transparent);
   --surface-hfaf9f6: #faf9f6;
   --surface-h1a1816: #1a1816;
@@ -673,9 +672,6 @@
   /* mark（2 token，hits 2） */
   --mark-stone-900o10: color-mix(in oklab, oklch(21.6% 0.006 56.043) 10%, transparent);
   --mark-stone-100o10: color-mix(in oklab, oklch(97% 0.001 106.424) 10%, transparent);
-
-  /* panel（1 token，hits 7） */
-  --panel-chat-fixed: #12141a;
 }
 .dark {
   /* paper */
@@ -707,7 +703,6 @@
   --surface-paper-abyss: color-mix(in oklab, oklch(14.7% 0.004 49.25) 30%, transparent);
   --surface-stone-100-stone-950: oklch(14.7% 0.004 49.25);
   --surface-abyss-fixed: #0e0f11;
-  --surface-midnight-fixed: #141518;
   --surface-h1a1917o85: color-mix(in oklab, #1a1917 85%, transparent);
   --surface-hfaf9f6: #faf9f6;
   --surface-h1a1816: #1a1816;
@@ -1078,9 +1073,6 @@
   /* mark */
   --mark-stone-900o10: color-mix(in oklab, oklch(21.6% 0.006 56.043) 10%, transparent);
   --mark-stone-100o10: color-mix(in oklab, oklch(97% 0.001 106.424) 10%, transparent);
-
-  /* panel */
-  --panel-chat-fixed: #12141a;
 }
 @theme inline {
   /* 全应用语义 token 导出 */
@@ -1110,7 +1102,6 @@
   --color-surface-paper-abyss: var(--surface-paper-abyss);
   --color-surface-stone-100-stone-950: var(--surface-stone-100-stone-950);
   --color-surface-abyss-fixed: var(--surface-abyss-fixed);
-  --color-surface-midnight-fixed: var(--surface-midnight-fixed);
   --color-surface-h1a1917o85: var(--surface-h1a1917o85);
   --color-surface-hfaf9f6: var(--surface-hfaf9f6);
   --color-surface-h1a1816: var(--surface-h1a1816);
@@ -1461,5 +1452,4 @@
   --color-halo-sky-400o40: var(--halo-sky-400o40);
   --color-mark-stone-900o10: var(--mark-stone-900o10);
   --color-mark-stone-100o10: var(--mark-stone-100o10);
-  --color-panel-chat-fixed: var(--panel-chat-fixed);
 }

@@ -199,7 +199,7 @@ export function PracticePlanEditor({ isOpen, onClose, userId, language, template
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：考研英语晚间 35 分钟"
-              className="flex-1 rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600"
+              className="flex-1 rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600 transition-colors"
             />
             <label className="flex items-center gap-2 text-xs">
               <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />

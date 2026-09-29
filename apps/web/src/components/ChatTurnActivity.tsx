@@ -36,7 +36,7 @@ function ToolCallCard({
       className={`relative overflow-hidden rounded-xl border px-2.5 py-1.5 ${
         call.status === 'running'
           ? 'border-tone-sky-500o40 bg-wash-sky-500o10'
-          : 'border-line-stone-700o80 bg-veil-stone-900o70'
+          : 'border-line bg-surface-stone-100-stone-900'
       }`}
     >
       {call.status === 'running' ? (
@@ -49,24 +49,24 @@ function ToolCallCard({
       ) : null}
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-left">
         {call.status === 'running' ? (
-          <Loader2 className="size-3 shrink-0 animate-spin text-ink-sky-300" />
+          <Loader2 className="size-3 shrink-0 animate-spin text-ink-sky-900-sky-200" />
         ) : (
-          <Wrench className="size-3 shrink-0 text-ink-stone-400" />
+          <Wrench className="size-3 shrink-0 text-ink-ghost" />
         )}
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-ink-stone-200">
+        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-ink">
           {call.toolName}
         </span>
-        <span className="shrink-0 text-[10px] text-ink-stone-500">
+        <span className="shrink-0 text-[10px] text-ink-ghost">
           {call.status === 'running' ? '调用中' : '已完成'}
         </span>
         <ChevronDown
-          className={`size-3 shrink-0 text-ink-stone-500 transition-transform ${
+          className={`size-3 shrink-0 text-ink-ghost transition-transform ${
             open ? 'rotate-180' : ''
           }`}
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-1.5">
-        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-veil-blacko30 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-ink-stone-400">
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-surface-stone-100-stone-900 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-ink-soft">
           {formatToolArguments(call.arguments)}
         </pre>
       </CollapsibleContent>
@@ -102,7 +102,7 @@ export function ChatTurnActivity({
     <div className="space-y-1.5">
       {hasReasoning ? (
         <div className="rounded-xl border border-line-violet-500o25 bg-wash-violet-500o8 px-2.5 py-2">
-          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-ink-violet-300o90">
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-ink-violet-900-violet-200">
             <Sparkles className="size-3" />
             思考 · {effortLabel}
             {streaming ? (
@@ -113,7 +113,7 @@ export function ChatTurnActivity({
               </span>
             ) : null}
           </div>
-          <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-ink-stone-400">
+          <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-ink-soft">
             {reasoning}
           </p>
         </div>
@@ -130,13 +130,13 @@ export function ChatTurnActivity({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="mb-2">
-      <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-lg px-1 py-0.5 text-left text-[11px] text-ink-stone-500 hover:bg-veil-stone-800o70 hover:text-tone-stone-300">
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-lg px-1 py-0.5 text-left text-[11px] text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink">
         <ChevronDown
           className={`size-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
         />
-        <Sparkles className="size-3 text-ink-violet-400o80" />
+        <Sparkles className="size-3 text-ink-violet-900-violet-200" />
         <span className="min-w-0 truncate">{summary || '思考与工具'}</span>
-        <span className="ml-auto shrink-0 text-[10px] text-tone-stone-600">
+        <span className="ml-auto shrink-0 text-[10px] text-ink-ghost">
           {open ? '收起' : '查看过程'}
         </span>
       </CollapsibleTrigger>
@@ -168,7 +168,7 @@ export function StreamingReplyPlaceholder() {
 
   return (
     <p
-      className="flex items-center overflow-visible py-0.5 text-[12px] leading-6 text-ink-stone-400"
+      className="flex items-center overflow-visible py-0.5 text-[12px] leading-6 text-ink-ghost"
       aria-live="polite"
       aria-busy="true"
     >

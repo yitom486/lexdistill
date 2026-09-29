@@ -9,8 +9,8 @@ import type {
 import { sound } from '../utils/audio.js';
 import { logger } from '@study-studio/shared';
 import { fireTaskCompletedConfetti, fireGoldenBurstConfetti } from '../utils/confetti.js';
+import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 
-const GATEWAY_HTTP_URL = 'http://localhost:8080';
 const DEFAULT_USER_ID = 'student_web_01';
 
 const getTodayDateString = () => new Date().toISOString().slice(0, 10);
@@ -88,7 +88,7 @@ export const useUserProfileStore = create<UserProfileState>()(
         try {
           const lang = get().profile.targetLanguage || 'en';
           const res = await fetch(
-            `${GATEWAY_HTTP_URL}/api/profile/${userId}?lang=${encodeURIComponent(lang)}`
+            `${GATEWAY_BASE_URL}/api/profile/${userId}?lang=${encodeURIComponent(lang)}`
           );
           if (res.ok) {
             const data = await res.json();
@@ -135,7 +135,7 @@ export const useUserProfileStore = create<UserProfileState>()(
         });
 
         try {
-          const res = await fetch(`${GATEWAY_HTTP_URL}/api/profile/${currentProfile.userId}`, {
+          const res = await fetch(`${GATEWAY_BASE_URL}/api/profile/${currentProfile.userId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates),
@@ -226,7 +226,7 @@ export const useUserProfileStore = create<UserProfileState>()(
 
         // 异步同步至 Gateway 后端
         try {
-          await fetch(`${GATEWAY_HTTP_URL}/api/task/activity/${currentProfile.userId}`, {
+          await fetch(`${GATEWAY_BASE_URL}/api/task/activity/${currentProfile.userId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...delta, date: today }),

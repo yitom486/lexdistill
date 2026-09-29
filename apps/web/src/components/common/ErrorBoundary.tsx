@@ -105,7 +105,7 @@ UserAgent: ${getPlatform().getUserAgent()}
       <div
         role="alert"
         aria-live="assertive"
-        className={`flex items-center justify-center p-6 ${ isFullscreen ? 'min-h-screen w-full bg-surface-paper-fixed dark:bg-ink-h141312 text-ink-soft' : 'min-h-[22rem] w-full rounded-2xl border border-line-rose-200o80 dark:border-line-rose-900o40 bg-veil-whiteo80 dark:bg-veil-stone-900o60 backdrop-blur-md shadow-sm' }`}
+        className={`flex items-center justify-center p-6 transition-colors ${ isFullscreen ? 'min-h-screen w-full bg-surface-paper-fixed dark:bg-ink-h141312 text-ink-soft' : 'min-h-[22rem] w-full rounded-2xl border border-line-rose-200o80 dark:border-line-rose-900o40 bg-veil-whiteo80 dark:bg-veil-stone-900o60 backdrop-blur-md shadow-sm' }`}
       >
         <div className="max-w-lg w-full text-center space-y-4">
           {/* 异常警示徽章图标 */}
@@ -133,7 +133,7 @@ UserAgent: ${getPlatform().getUserAgent()}
               variant="default"
               size="sm"
               onClick={this.handleReset}
-              className="gap-1.5 bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white dark:bg-tone-amber-500 dark:hover:bg-tone-amber-600 cursor-pointer"
+              className="gap-1.5 bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white dark:bg-tone-amber-500 dark:hover:bg-tone-amber-600 cursor-pointer transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>重新加载此区域</span>

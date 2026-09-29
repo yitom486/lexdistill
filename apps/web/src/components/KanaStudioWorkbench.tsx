@@ -1062,7 +1062,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                 {groupedByRow.map(({ rowName, items }) => (
                 <div
                   key={rowName}
-                  className="grid grid-cols-1 gap-3 rounded-2xl border border-line-amber-900o10 bg-paper-soft p-3.5 dark:border-wash-amber-500o10 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:items-stretch sm:p-4"
+                  className="grid grid-cols-1 gap-3 rounded-2xl border border-line-amber-900o10 bg-paper-soft p-3.5 dark:border-wash-amber-500o10 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:items-stretch sm:p-4 transition-colors"
                 >
                   <KanaRowLabel
                     rowName={rowName}
@@ -1123,7 +1123,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                               event.stopPropagation();
                               handleOpenKanaGuide(kana);
                             }}
-                            className="mt-1 h-6 rounded-lg px-2 text-[10px] text-tone-amber-700 hover:bg-wash-amber-500o15 dark:text-ink-amber-300"
+                            className="mt-1 h-6 rounded-lg px-2 text-[10px] text-tone-amber-700 hover:bg-wash-amber-500o15 dark:text-ink-amber-300 transition-colors"
                             aria-label={`查看 ${kana.hiragana} 的发音与记忆详情`}
                           >
                             <Lightbulb className="h-3 w-3" />
@@ -1150,7 +1150,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                 ))}
               </div>
             ) : (
-              <div className="rounded-2xl border border-line-amber-900o10 bg-paper-soft p-6 text-center dark:border-wash-amber-500o10">
+              <div className="rounded-2xl border border-line-amber-900o10 bg-paper-soft p-6 text-center dark:border-wash-amber-500o10 transition-colors">
                 <p className="text-xs leading-relaxed text-ink-ghost">
                   {isKanaLoading
                     ? '正在加载假名表…'
@@ -1218,7 +1218,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
             </DialogHeader>
 
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 rounded-2xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o15 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 rounded-2xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o15 sm:flex-row sm:items-center sm:justify-between transition-colors">
                 <div className="flex min-w-0 items-center gap-4">
                   <div className="flex h-20 min-w-20 shrink-0 flex-col items-center justify-center rounded-2xl border border-line-amber-500o30 bg-tone-amber-500o20 text-ink">
                     <div className="flex items-baseline gap-1 text-3xl font-serif font-bold">
@@ -1274,7 +1274,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
               </div>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10">
+                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10 transition-colors">
                   <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
                     <Info className="h-3.5 w-3.5 text-accent-ink" />
                     发音抓手
@@ -1285,7 +1285,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10">
+                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10 transition-colors">
                   <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
                     <Lightbulb className="h-3.5 w-3.5 text-accent-ink" />
                     记忆窍门
@@ -1296,7 +1296,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10">
+                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10 transition-colors">
                   <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
                     <Mic2 className="h-3.5 w-3.5 text-accent-ink" />
                     发音动作
@@ -1307,7 +1307,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10">
+                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10 transition-colors">
                   <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
                     <GitCompareArrows className="h-3.5 w-3.5 text-accent-ink" />
                     易混淆对照
@@ -1331,7 +1331,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
               )}
 
               {(activeKana.learningGuide?.exampleWords ?? []).length > 0 && (
-                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo55-stone-900o25 p-3 dark:border-wash-amber-500o10">
+                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo55-stone-900o25 p-3 dark:border-wash-amber-500o10 transition-colors">
                   <div className="mb-2 text-xs font-bold text-ink-deep">
                     放进词里记
                   </div>
@@ -1349,7 +1349,7 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
                             purpose: 'preview',
                           });
                         }}
-                        className="h-auto min-h-8 justify-start rounded-lg bg-veil-whiteo80 px-2.5 py-1.5 text-left whitespace-normal dark:bg-veil-stone-800o70"
+                        className="h-auto min-h-8 justify-start rounded-lg bg-veil-whiteo80 px-2.5 py-1.5 text-left whitespace-normal dark:bg-veil-stone-800o70 transition-colors"
                         title="播放例词发音"
                         aria-label={`播放例词 ${exampleWord.word} 的发音`}
                       >

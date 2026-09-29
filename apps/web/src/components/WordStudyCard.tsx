@@ -73,7 +73,7 @@ export function WordStudyCard({
   };
 
   return (
-    <div className="mt-2 rounded-xl border border-tone-amber-500o25 bg-tone-white p-4 shadow-sm dark:bg-tone-stone-900 space-y-3">
+    <div className="mt-2 rounded-xl border border-tone-amber-500o25 bg-tone-white p-4 shadow-sm dark:bg-tone-stone-900 space-y-3 transition-colors">
       <div className="flex flex-wrap items-center gap-3">
         <span className="font-serif text-3xl font-bold text-ink">
           {entry.headword}

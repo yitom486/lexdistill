@@ -85,7 +85,7 @@ export function QuestionRenderer({
           onChange={(e) => update(e.target.value)}
           disabled={disabled}
           placeholder="填入答案"
-          className="rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600"
+          className="rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600 transition-colors"
         />
         <Button size="sm" className="w-fit" disabled={!answer.trim() || disabled || busy} onClick={() => onSubmitObjective(answer)}>
           提交
@@ -111,7 +111,7 @@ export function QuestionRenderer({
               type="button"
               onClick={() => toggle(c)}
               disabled={disabled}
-              className={`rounded-md border px-2 py-1 text-sm ${ picked.includes(c) ? 'border-ink-indigo-500 bg-tint-indigo-50 dark:bg-tint-indigo-950' : 'border-line-slate-200-slate-700' }`}
+              className={`rounded-md border px-2 py-1 text-sm transition-colors ${ picked.includes(c) ? 'border-ink-indigo-500 bg-tint-indigo-50 dark:bg-tint-indigo-950' : 'border-line-slate-200-slate-700' }`}
             >
               {c}
             </button>
@@ -179,7 +179,7 @@ export function QuestionRenderer({
         onBlur={() => answer.trim() && onSaveDraft(answer)}
         placeholder={q.type === 'TRANSLATION' ? '输入译文' : '输入写作内容'}
         rows={4}
-        className="rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600"
+        className="rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600 transition-colors"
       />
       {immediate ? (
         <>
@@ -281,7 +281,7 @@ function DictationSubjective({
         onBlur={() => answer.trim() && onSaveDraft(answer)}
         placeholder="输入你听到的句子或空缺词"
         rows={3}
-        className="rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600"
+        className="rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600 transition-colors"
       />
       {immediate ? (
         <Button

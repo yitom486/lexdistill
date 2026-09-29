@@ -179,7 +179,7 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
             <Button
               variant="outline"
               size="sm"
-              className="h-8 gap-1.5 border-line-amber-500o30 px-2.5 text-tone-amber-700 hover:bg-wash-amber-100o70 dark:text-ink-amber-300 dark:hover:bg-grad-amber-950o40 sm:h-9 sm:px-3"
+              className="h-8 gap-1.5 border-line-amber-500o30 px-2.5 text-tone-amber-700 hover:bg-wash-amber-100o70 dark:text-ink-amber-300 dark:hover:bg-grad-amber-950o40 sm:h-9 sm:px-3 transition-colors"
               disabled={updateChecking}
               onClick={() => void handleCheckForUpdate()}
               title="检查应用更新"

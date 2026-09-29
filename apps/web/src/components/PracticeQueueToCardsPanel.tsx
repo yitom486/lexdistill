@@ -142,7 +142,7 @@ export function PracticeQueueToCardsPanel() {
                     item.id;
                   return (
                     <li key={item.id}>
-                      <label className="flex items-start gap-2 rounded-lg border border-line-stone-200o80-stone-700o80 px-2.5 py-2 cursor-pointer hover:bg-veil-stone-50o80 dark:hover:bg-veil-stone-900o40">
+                      <label className="flex items-start gap-2 rounded-lg border border-line-stone-200o80-stone-700o80 px-2.5 py-2 cursor-pointer hover:bg-veil-stone-50o80 dark:hover:bg-veil-stone-900o40 transition-colors">
                         <input
                           type="checkbox"
                           className="mt-0.5 accent-tone-amber-700"

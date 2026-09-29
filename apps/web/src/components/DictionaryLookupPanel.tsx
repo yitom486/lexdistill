@@ -56,7 +56,7 @@ function PitchBadge({ pronunciation, reading }: { pronunciation: unknown; readin
       </Badge>
       {graph && (
         <span
-          className="inline-flex items-center rounded-md border border-tone-amber-500o25 bg-tone-white px-1 dark:bg-tone-stone-900 [&_svg]:h-7 [&_svg]:w-auto"
+          className="inline-flex items-center rounded-md border border-tone-amber-500o25 bg-tone-white px-1 dark:bg-tone-stone-900 [&_svg]:h-7 [&_svg]:w-auto transition-colors"
           title={`声调阶梯（${reading} ${info.label}）`}
           dangerouslySetInnerHTML={{ __html: graph }}
         />
@@ -224,7 +224,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
   };
 
   return (
-    <section className="rounded-2xl border border-line-amber-900o10 bg-veil-paper-70 p-4 shadow-sm dark:border-wash-amber-500o15">
+    <section className="rounded-2xl border border-line-amber-900o10 bg-veil-paper-70 p-4 shadow-sm dark:border-wash-amber-500o15 transition-colors">
       <form
         className="flex flex-col gap-3 sm:flex-row sm:items-end"
         onSubmit={(event) => {
@@ -263,7 +263,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
                 setInput(h.query);
                 setQuery(h.query);
               }}
-              className="rounded-full border border-ink-stone-200 px-2.5 py-1 text-[11px] text-ink-stone-500 hover:border-tone-amber-500o50 hover:text-tone-amber-700 dark:border-tone-stone-700 dark:text-ink-stone-400 dark:hover:text-ink-amber-300"
+              className="rounded-full border border-ink-stone-200 px-2.5 py-1 text-[11px] text-ink-stone-500 hover:border-tone-amber-500o50 hover:text-tone-amber-700 dark:border-tone-stone-700 dark:text-ink-stone-400 dark:hover:text-ink-amber-300 transition-colors"
               title={`最近查过（${h.hitCount} 条结果）`}
             >
               {h.query}
@@ -272,7 +272,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
         </div>
       )}
       {!query && showWordlist && (
-        <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800 space-y-3">
+        <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800 space-y-3 transition-colors">
           <p className="text-[11px] font-bold text-ink-ghost">
             零基础单词表 · 按顺序点词展开学透（收进生词本即计入带路第 3 天）
           </p>
@@ -366,7 +366,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
       )}
 
       {query && (
-        <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800">
+        <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800 transition-colors">
           {lookup.isFetching ? (
             <p className="text-xs text-ink-stone-500">正在查询本地词典…</p>
           ) : lookup.isError ? (
@@ -383,7 +383,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
                   {group.entries.map((entry) => (
                 <div key={entry.id}>
                 <div
-                  className="flex flex-col gap-2 rounded-xl bg-wash-amber-50o70 p-3 dark:bg-wash-amber-500o10 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-2 rounded-xl bg-wash-amber-50o70 p-3 dark:bg-wash-amber-500o10 sm:flex-row sm:items-center sm:justify-between transition-colors"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-baseline gap-2">
@@ -493,7 +493,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
                 href={lookup.data.externalLookup.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 font-semibold text-tone-amber-700 hover:underline dark:text-ink-amber-300"
+                className="inline-flex items-center gap-1 font-semibold text-tone-amber-700 hover:underline dark:text-ink-amber-300 transition-colors"
               >
                 前往 OJAD 查询 <ExternalLink className="h-3.5 w-3.5" />
               </a>

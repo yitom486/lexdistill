@@ -610,7 +610,7 @@ export function ReadingComprehensionWorkbench({
                       sound.playClick();
                       setSelected(opt.key);
                     }}
-                    className={`h-auto w-full justify-start px-3 py-3 text-left font-normal ${ showOk ? 'border-tone-emerald-500 bg-wash-emerald-500o10 text-ink-emerald-950 dark:text-tint-emerald-100' : showBad ? 'border-tone-rose-500 bg-wash-rose-500o10 text-ink-rose-950 dark:text-tint-rose-100' : isSel ? 'border-tone-amber-500 bg-wash-amber-500o10 font-medium' : '' }`}
+                    className={`h-auto w-full justify-start px-3 py-3 text-left font-normal transition-colors ${ showOk ? 'border-tone-emerald-500 bg-wash-emerald-500o10 text-ink-emerald-950 dark:text-tint-emerald-100' : showBad ? 'border-tone-rose-500 bg-wash-rose-500o10 text-ink-rose-950 dark:text-tint-rose-100' : isSel ? 'border-tone-amber-500 bg-wash-amber-500o10 font-medium' : '' }`}
                   >
                     <Badge variant="secondary" className="mr-2 font-mono shrink-0">
                       {opt.key}

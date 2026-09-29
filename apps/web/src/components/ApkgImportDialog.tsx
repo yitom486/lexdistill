@@ -144,7 +144,7 @@ export function ApkgImportDialog({ open, onOpenChange }: ApkgImportDialogProps) 
               onChange={(e) => setFilePath(e.target.value)}
               placeholder="例如 C:\Users\你\Downloads\deck.apkg"
               spellCheck={false}
-              className="h-9 min-w-0 flex-1 rounded-xl border border-ink-stone-200 bg-tone-white px-3 font-mono text-xs dark:border-tone-stone-700 dark:bg-tone-stone-900"
+              className="h-9 min-w-0 flex-1 rounded-xl border border-ink-stone-200 bg-tone-white px-3 font-mono text-xs dark:border-tone-stone-700 dark:bg-tone-stone-900 transition-colors"
             />
             <Button type="button" size="sm" onClick={handleAnalyze} disabled={analyze.isPending} className="gap-1.5">
               {analyze.isPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <FolderInput className="h-3.5 w-3.5" />}
@@ -154,7 +154,7 @@ export function ApkgImportDialog({ open, onOpenChange }: ApkgImportDialogProps) 
 
           {analysis && (
             <>
-              <div className="rounded-xl border border-line-stone-200o80 p-3 text-xs dark:border-tone-stone-800">
+              <div className="rounded-xl border border-line-stone-200o80 p-3 text-xs dark:border-tone-stone-800 transition-colors">
                 <p className="font-semibold">
                   {analysis.fileLabel}：{analysis.noteCount} 条笔记 / {analysis.cardCount} 张卡
                   {analysis.mediaFileCount ? ` / 媒体 ${analysis.mediaFileCount} 个（${analysis.mediaRefCount} 处引用暂跳过）` : ''}
@@ -163,7 +163,7 @@ export function ApkgImportDialog({ open, onOpenChange }: ApkgImportDialogProps) 
                   {analysis.decks.map((d) => (
                     <label
                       key={d.name}
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-ink-stone-200 px-2.5 py-1 text-[11px] dark:border-tone-stone-700"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-ink-stone-200 px-2.5 py-1 text-[11px] dark:border-tone-stone-700 transition-colors"
                     >
                       <input
                         type="checkbox"
@@ -195,7 +195,7 @@ export function ApkgImportDialog({ open, onOpenChange }: ApkgImportDialogProps) 
               </div>
 
               {analysis.models.map((m) => (
-                <div key={m.modelName} className="rounded-xl border border-line-stone-200o80 p-3 dark:border-tone-stone-800">
+                <div key={m.modelName} className="rounded-xl border border-line-stone-200o80 p-3 dark:border-tone-stone-800 transition-colors">
                   <p className="text-xs font-semibold">
                     {m.modelName}（{m.exampleNoteCount} 条笔记用此模板）
                   </p>

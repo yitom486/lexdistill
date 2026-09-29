@@ -240,7 +240,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="h-8 w-32 rounded-lg border border-ink-stone-200 bg-tone-white px-2 text-xs dark:border-tone-stone-700 dark:bg-tone-stone-900"
+                  className="h-8 w-32 rounded-lg border border-ink-stone-200 bg-tone-white px-2 text-xs dark:border-tone-stone-700 dark:bg-tone-stone-900 transition-colors"
                   placeholder="模板名"
                 />
               </div>
@@ -254,7 +254,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                       key={m}
                       type="button"
                       onClick={() => insertMarker(m)}
-                      className="rounded-md border border-ink-stone-200 px-1.5 py-0.5 font-mono text-[10px] text-ink-stone-500 hover:border-tone-amber-500o50 hover:text-tone-amber-600 dark:border-tone-stone-700 dark:text-ink-stone-400"
+                      className="rounded-md border border-ink-stone-200 px-1.5 py-0.5 font-mono text-[10px] text-ink-stone-500 hover:border-tone-amber-500o50 hover:text-tone-amber-600 dark:border-tone-stone-700 dark:text-ink-stone-400 transition-colors"
                     >
                       {`{${m}}`}
                     </button>
@@ -271,7 +271,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                   {...areaProps('fields')}
                   rows={5}
                   spellCheck={false}
-                  className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900"
+                  className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900 transition-colors"
                 />
               </label>
               {fieldsError && <p className="text-[11px] text-ink-rose-600">{fieldsError}</p>}
@@ -286,7 +286,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                   {...areaProps('front')}
                   rows={3}
                   spellCheck={false}
-                  className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900"
+                  className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900 transition-colors"
                 />
               </label>
               <EditorArea
@@ -351,7 +351,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
                   title="卡片预览"
                   sandbox=""
                   srcDoc={previewDoc}
-                  className="h-72 w-full rounded-xl border border-ink-stone-200 bg-tone-white dark:border-tone-stone-700"
+                  className="h-72 w-full rounded-xl border border-ink-stone-200 bg-tone-white dark:border-tone-stone-700 transition-colors"
                 />
               )}
               {preview.data && preview.data.issues.length > 0 && (
@@ -394,7 +394,7 @@ function EditorArea(props: {
         onFocus={(e) => props.onFocusArea(e.currentTarget)}
         rows={props.rows}
         spellCheck={false}
-        className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900"
+        className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900 transition-colors"
       />
     </label>
   );

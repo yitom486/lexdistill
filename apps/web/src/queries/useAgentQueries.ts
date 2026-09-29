@@ -135,7 +135,10 @@ export function useAgentStatusQuery() {
       if (!res.ok) {
         return {
           available: false,
-          message: '无法获取 Agent 状态，请确认 Gateway 已启动。',
+          message:
+            res.status === 404
+              ? `Gateway（${GATEWAY_BASE_URL}）缺少 /api/agent/status 路由（HTTP 404）；请更新并重启 Gateway。`
+              : `Agent 状态查询失败：Gateway 返回 HTTP ${res.status}（${GATEWAY_BASE_URL}）。`,
         };
       }
       return (await res.json()) as AgentStatusDto;

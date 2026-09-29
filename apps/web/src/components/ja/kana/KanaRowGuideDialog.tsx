@@ -92,7 +92,7 @@ export function KanaRowGuideDialog({
       {open && items.length > 0 && (
         <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden p-0">
           <div className="flex max-h-[90vh] flex-col">
-            <DialogHeader className="shrink-0 border-b border-line-amber-900o10 bg-linear-to-br from-paper-soft via-grad-amber-50-amber-950o35 to-grad-orange-50-orange-950o25 p-5 pr-12 dark:border-wash-amber-500o15 sm:p-6 sm:pr-14">
+            <DialogHeader className="shrink-0 border-b border-line-amber-900o10 bg-linear-to-br from-paper-soft via-grad-amber-50-amber-950o35 to-grad-orange-50-orange-950o25 p-5 pr-12 dark:border-wash-amber-500o15 sm:p-6 sm:pr-14 transition-colors">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="amber">这一行的记忆卡</Badge>
                 <span className="text-xs font-serif text-ink-ghost">
@@ -112,7 +112,7 @@ export function KanaRowGuideDialog({
 
             <div className="min-h-0 overflow-y-auto bg-paper-clean p-4 sm:p-6">
               <div className="mx-auto flex max-w-3xl flex-col gap-4">
-                <section className="rounded-3xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o10">
+                <section className="rounded-3xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o10 transition-colors">
                   <div className="flex items-start gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-wash-amber-500o15 text-accent-ink-strong">
                       <Volume2 className="h-4 w-4" />
@@ -172,7 +172,7 @@ export function KanaRowGuideDialog({
                 </section>
 
                 <div className="grid gap-3 md:grid-cols-2">
-                  <section className="rounded-3xl border border-line-sky-500o20 bg-wash-sky-500o10 p-4 dark:bg-wash-sky-500o10">
+                  <section className="rounded-3xl border border-line-sky-500o20 bg-wash-sky-500o10 p-4 dark:bg-wash-sky-500o10 transition-colors">
                     <div className="flex items-center gap-2 text-sm font-bold text-ink-sky-900-sky-200">
                       <Lightbulb className="h-4 w-4" />
                       记忆抓手
@@ -181,7 +181,7 @@ export function KanaRowGuideDialog({
                       {guide.memoryTip}
                     </p>
                   </section>
-                  <section className="rounded-3xl border border-line-violet-500o20 bg-wash-violet-500o10 p-4 dark:bg-wash-violet-500o10">
+                  <section className="rounded-3xl border border-line-violet-500o20 bg-wash-violet-500o10 p-4 dark:bg-wash-violet-500o10 transition-colors">
                     <div className="flex items-center gap-2 text-sm font-bold text-ink-violet-900-violet-200">
                       <Info className="h-4 w-4" />
                       发音提醒
@@ -192,7 +192,7 @@ export function KanaRowGuideDialog({
                   </section>
                 </div>
 
-                <section className="rounded-3xl border border-line-rose-500o20 bg-wash-rose-500o10 p-4 dark:bg-wash-rose-500o10">
+                <section className="rounded-3xl border border-line-rose-500o20 bg-wash-rose-500o10 p-4 dark:bg-wash-rose-500o10 transition-colors">
                   <div className="flex items-center gap-2 text-sm font-bold text-ink-rose-900-rose-200">
                     <GitCompareArrows className="h-4 w-4" />
                     容易撞脸的地方
@@ -201,7 +201,7 @@ export function KanaRowGuideDialog({
                     {guide.confusions.map((confusion) => (
                       <span
                         key={confusion}
-                        className="rounded-full border border-line-rose-500o20 bg-veil-whiteo70-stone-900o35 px-3 py-1.5 text-xs font-semibold text-tone-stone-700 dark:text-ink-stone-200"
+                        className="rounded-full border border-line-rose-500o20 bg-veil-whiteo70-stone-900o35 px-3 py-1.5 text-xs font-semibold text-tone-stone-700 dark:text-ink-stone-200 transition-colors"
                       >
                         {confusion}
                       </span>
@@ -210,7 +210,7 @@ export function KanaRowGuideDialog({
                 </section>
 
                 {guide.examples.length > 0 && (
-                  <section className="rounded-3xl border border-line-emerald-500o20 bg-wash-emerald-500o10 p-4 dark:bg-wash-emerald-500o10">
+                  <section className="rounded-3xl border border-line-emerald-500o20 bg-wash-emerald-500o10 p-4 dark:bg-wash-emerald-500o10 transition-colors">
                     <div className="flex items-center gap-2 text-sm font-bold text-ink-emerald-900-emerald-200">
                       <ArrowRight className="h-4 w-4" />
                       放进词里，记忆就不飘了
@@ -245,7 +245,7 @@ export function KanaRowGuideDialog({
                   </section>
                 )}
 
-                <p className="rounded-2xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o30 p-3 text-[11px] leading-relaxed text-ink-stone-500 dark:border-tone-stone-800 dark:text-ink-stone-400">
+                <p className="rounded-2xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o30 p-3 text-[11px] leading-relaxed text-ink-stone-500 dark:border-tone-stone-800 dark:text-ink-stone-400 transition-colors">
                   先试着自己读一遍，再点播放按钮核对。读错不扣分，它只是告诉你这一行还需要再见几次。
                 </p>
               </div>

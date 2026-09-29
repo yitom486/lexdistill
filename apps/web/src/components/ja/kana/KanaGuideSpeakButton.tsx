@@ -19,7 +19,7 @@ export function KanaGuideSpeakButton({ text, label, className }: KanaGuideSpeakB
         sound.playClick();
         void speechStudio.speak(text, { lang: 'JA', purpose: 'preview' });
       }}
-      className={`h-7 w-7 rounded-full text-tone-amber-700 hover:bg-wash-amber-500o15 hover:text-ink-amber-800 dark:text-ink-amber-300 dark:hover:text-ink-amber-200${className ?` ${className}` : ''}`}
+      className={`h-7 w-7 rounded-full text-tone-amber-700 hover:bg-wash-amber-500o15 hover:text-ink-amber-800 dark:text-ink-amber-300 dark:hover:text-ink-amber-200 transition-colors${className ?` ${className}` : ''}`}
       aria-label={label}
       title={label}
     >

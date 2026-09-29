@@ -365,7 +365,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
         </div>
 
         {dictionaryQuery && (
-          <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800">
+          <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800 transition-colors">
             {dictionaryLookup.isFetching ? (
               <p className="text-xs text-ink-stone-500">正在查询本地词典…</p>
             ) : dictionaryLookup.data?.entries.length ? (
@@ -376,7 +376,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                     pitchPattern?: string[];
                   } | undefined;
                   return (
-                    <div key={entry.id} className="rounded-xl bg-wash-amber-50o70 p-3 text-sm dark:bg-wash-amber-500o10">
+                    <div key={entry.id} className="rounded-xl bg-wash-amber-50o70 p-3 text-sm dark:bg-wash-amber-500o10 transition-colors">
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                         <span className="font-serif text-lg font-bold text-ink">{entry.headword}</span>
                         {entry.reading && <span className="font-mono text-accent-ink-strong">{entry.reading}</span>}
@@ -413,7 +413,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                   href={dictionaryLookup.data.externalLookup.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-semibold text-tone-amber-700 hover:underline dark:text-ink-amber-300"
+                  className="inline-flex items-center gap-1 font-semibold text-tone-amber-700 hover:underline dark:text-ink-amber-300 transition-colors"
                 >
                   前往 OJAD 查询 <ExternalLink className="h-3.5 w-3.5" />
                 </a>
