@@ -163,7 +163,7 @@ async function main(): Promise<void> {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (/billi|permission|403|404|not found|unsupported/i.test(message)) {
+      if (/billi|permission|precondition|failed_precondition|403|404|not found|unsupported/i.test(message)) {
         console.log(`批量不可用（${message}），自动降级单条合成。`);
         await writeResults(await runSingle(apiKey, voice, model), voice, model);
         return;
