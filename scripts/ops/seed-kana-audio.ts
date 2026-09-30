@@ -1,21 +1,16 @@
 /**
- * 五十音内置音频批量建库（运维脚本，不进安装包）。
+ * 五十音内置音频建库（运维脚本，不进安装包）。
  *
- * 直调 gemini-tts-studio 包（相对路径导入，不依赖 live 网关，
- * 避免网关 node_modules 热更新问题）。用法：
- *   # 批量（优先；建单失败直接退出，不静默降级）
- *   bun scripts/ops/seed-kana-audio.ts --key <GEMINI_API_KEY> [--voice aoede] [--model gemini-3.8-flash-tts]
- *   # 用户确认后，显式改用单条（104 次实时合成，免费额度 3 次/分钟，约 40 分钟）
- *   bun scripts/ops/seed-kana-audio.ts --single --key <GEMINI_API_KEY>
- *   # 任务未完成时稍后继续轮询（读上次 job 名）
- *   bun scripts/ops/seed-kana-audio.ts --resume --key <GEMINI_API_KEY>
- *   # 陈述语调 + lite 模型重生全套（文本为「あ。」形式，key/文件名不变）
- *   bun scripts/ops/seed-kana-audio.ts --key <KEY> --model gemini-3.8-flash-lite-tts --text-suffix 。
+ * 铁律：微文本资产只走单条合成，绝不走批量（批量在单字场景废品率 ~40%，返工更贵）。
+ * 用法：
+ *   # Gemini 单条
+ *   bun scripts/ops/seed-kana-audio.ts --key <GEMINI_KEY> [--voice aoede] [--model gemini-3.8-flash-lite-tts] [--text-suffix 。] [--pace-ms 4000]
+ *   # Azure 单条（F0 每月 50 万字符免费，日语女声默认 Nanami）
+ *   bun scripts/ops/seed-kana-audio.ts --provider azure --azure-key <AZURE_KEY> --region japaneast [--voice ja-JP-NanamiNeural]
  *
- * 流程：读 KANA_SEEDS（104 音）→ 拆成 ≤100/批 → 建批量任务
- * → 轮询到 SUCCEEDED → 落盘 `apps/web/public/audio/kana/*.wav`
- * → 重生成 `apps/web/src/lib/kana-audio-manifest.ts`。
- * 建单不带 speechMetadata：批量通道原文逐字合成，不会有朗读前奏。
+ * 流程：逐条合成 → 立即落盘 `apps/web/public/audio/kana/*.wav`（gitignore）
+ * → 重生成 `apps/web/src/lib/kana-audio-manifest.ts`。断点续跑（进度文件按
+ * provider/voice/model/suffix 隔离）。合成文本默认加 。（陈述语调更稳）。
  */
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -27,27 +22,20 @@ import { KANA_SEEDS } from '../../packages/storage-sqlite/src/seeds/kana-seed.js
 // eslint-disable-next-line import/no-unresolved
 import {
   geminiProvider,
-  validateBatchCreateInput,
+  azureProvider,
 } from '../../apps/gateway/node_modules/gemini-tts-studio/lib/server/app.js';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIO_DIR = join(REPO_ROOT, 'apps/web/public/audio/kana');
 const MANIFEST_TS = join(REPO_ROOT, 'apps/web/src/lib/kana-audio-manifest.ts');
-const STATE_FILE = join(REPO_ROOT, '.studio-internal/kana-batch-jobs.json');
-const MAX_ITEMS_PER_JOB = 100;
+const PROGRESS_FILE = join(REPO_ROOT, '.studio-internal/kana-seed-progress.json');
 
-interface JobState {
-  name: string;
-  keys: string[];
+interface SeedProgress {
+  provider: string;
   voice: string;
   model: string;
-}
-interface SeedState {
-  mode: 'batch' | 'single';
-  voice: string;
-  model: string;
-  createdAt: string;
-  jobs: JobState[];
+  suffix: string;
+  done: string[];
 }
 
 function arg(name: string, fallback = ''): string {
@@ -56,66 +44,29 @@ function arg(name: string, fallback = ''): string {
   return fallback;
 }
 
-async function writeResults(
-  collected: Map<string, { audioBase64: string; mimeType: string }>,
-  voice: string,
-  model: string,
-): Promise<void> {
-  await mkdir(AUDIO_DIR, { recursive: true });
-  const manifest: Record<string, string> = {};
-  let missing = 0;
-  for (const k of KANA_SEEDS) {
-    const hit = collected.get(k.id);
-    if (!hit) {
-      console.error(`缺音频：${k.id}（${k.audioText}）`);
-      missing++;
-      continue;
-    }
-    const file = `${k.id}.wav`;
-    await writeFile(join(AUDIO_DIR, file), Buffer.from(hit.audioBase64, 'base64'));
-    manifest[k.id] = file;
-  }
-  const manifestTs = `/**\n * 假名内置音频清单（批量 TTS 预生成，随安装包发布）。\n *\n * 由 \`scripts/ops/seed-kana-audio.ts\` 生成并提交；key 为假名种子 id\n *（如 \`kana_a\`），value 为 \`public/audio/kana/\` 下的文件名。\n * 平假名/片假名同音，共用同一文件。 voice=${voice} model=${model}。\n */\nexport const KANA_AUDIO_MANIFEST: Record<string, string> = ${JSON.stringify(manifest, null, 2)};\n`;
-  await writeFile(MANIFEST_TS, manifestTs);
-  console.log(`落盘 ${Object.keys(manifest).length} 个音频，缺 ${missing} 个。清单已写 ${MANIFEST_TS}。`);
-  if (missing > 0) process.exit(2);
-}
-
-async function verifyKeyAndVoice(apiKey: string, voice: string): Promise<void> {
-  const voices = (await geminiProvider.listVoices(apiKey)) as Array<{ id?: string; name?: string }>;
-  const ids = voices.map((v) => v.id || v.name).filter(Boolean) as string[];
-  if (!ids.some((id) => id.toLowerCase() === voice.toLowerCase())) {
-    throw new Error(`音色 ${voice} 不在远端列表（共 ${ids.length} 个）：${ids.slice(0, 12).join(', ')}…`);
-  }
-  console.log(`Key 有效，远端 ${ids.length} 个音色，${voice} 存在。`);
-}
-
-const PROGRESS_FILE = join(REPO_ROOT, '.studio-internal/kana-seed-progress.json');
-
-interface SeedProgress {
-  voice: string;
-  model: string;
-  suffix: string;
-  done: string[];
-}
-
-async function loadProgress(voice: string, model: string, suffix: string): Promise<Set<string>> {
+async function loadProgress(identity: Omit<SeedProgress, 'done'>): Promise<Set<string>> {
   try {
     const raw = JSON.parse(await readFile(PROGRESS_FILE, 'utf8')) as SeedProgress;
-    if (raw.voice === voice && raw.model === model && (raw.suffix ?? '') === suffix) return new Set(raw.done);
+    if (
+      raw.provider === identity.provider &&
+      raw.voice === identity.voice &&
+      raw.model === identity.model &&
+      (raw.suffix ?? '') === identity.suffix
+    ) {
+      return new Set(raw.done);
+    }
   } catch { /* 无进度，从头开始 */ }
   return new Set();
 }
 
-async function saveProgress(voice: string, model: string, suffix: string, done: Set<string>): Promise<void> {
+async function saveProgress(identity: Omit<SeedProgress, 'done'>, done: Set<string>): Promise<void> {
   await mkdir(dirname(PROGRESS_FILE), { recursive: true });
-  await writeFile(PROGRESS_FILE, JSON.stringify({ voice, model, suffix, done: [...done] }));
+  await writeFile(PROGRESS_FILE, JSON.stringify({ ...identity, done: [...done] }));
 }
 
 function retryDelayMs(error: unknown): number {
   const message = error instanceof Error ? error.message : String(error);
-  // 官方 retry 信息两种写法都吃，单位毫秒/秒自适应，上限 5 分钟兜底
-  //（曾把 50.362s 误解析成 50362s 睡 14 小时，此处只取秒级数值并封顶）。
+  // 官方 retry 信息两种写法都吃，单位毫秒/秒自适应，上限 5 分钟兜底。
   let seconds = 30;
   const inRetry = message.match(/retry in ([\d.]+)\s*s/i);
   const inDelay =
@@ -131,19 +82,97 @@ function retryDelayMs(error: unknown): number {
   return Math.min(seconds, 300) * 1000 + 2000;
 }
 
-async function runSingle(
-  apiKey: string,
-  voice: string,
-  model: string,
-  paceMs: number,
-  textSuffix: string,
-): Promise<Map<string, { audioBase64: string; mimeType: string }>> {
+async function writeResults(
+  collected: Map<string, { audioBase64: string; mimeType: string }>,
+  label: string,
+): Promise<void> {
   await mkdir(AUDIO_DIR, { recursive: true });
-  const collected = new Map<string, { audioBase64: string; mimeType: string }>();
-  const done = await loadProgress(voice, model, textSuffix);
-  // 免费配额 3 次/分钟：主动 pacing 22 秒/条，429 按官方 retryDelay 睡眠重试。
-  // 每条成功立即落盘 + 写进度，任何中断都可直接重跑续做。
+  const manifest: Record<string, string> = {};
+  let missing = 0;
+  for (const k of KANA_SEEDS) {
+    const hit = collected.get(k.id);
+    if (!hit) {
+      console.error(`缺音频：${k.id}（${k.audioText}）`);
+      missing++;
+      continue;
+    }
+    const file = `${k.id}.wav`;
+    await writeFile(join(AUDIO_DIR, file), Buffer.from(hit.audioBase64, 'base64'));
+    manifest[k.id] = file;
+  }
+  const manifestTs = `/**\n * 假名内置音频清单（单条 TTS 预生成，随包发布但音频本身 gitignore）。\n * ${label}\n */\nexport const KANA_AUDIO_MANIFEST: Record<string, string> = ${JSON.stringify(manifest, null, 2)};\n`;
+  await writeFile(MANIFEST_TS, manifestTs);
+  console.log(`落盘 ${Object.keys(manifest).length} 个音频，缺 ${missing} 个。清单已写 ${MANIFEST_TS}。`);
+  if (missing > 0) process.exit(2);
+}
+
+interface SynthConfig {
+  provider: 'gemini' | 'azure';
+  apiKey: string;
+  voice: string;
+  model: string;
+  region: string;
+  paceMs: number;
+  textSuffix: string;
+}
+
+async function verifyVoice(cfg: SynthConfig): Promise<void> {
+  const voices =
+    cfg.provider === 'azure'
+      ? ((await azureProvider.listVoices(cfg.apiKey, cfg.region)) as Array<{ id?: string; name?: string }>)
+      : ((await geminiProvider.listVoices(cfg.apiKey)) as Array<{ id?: string; name?: string }>);
+  const ids = voices.map((v) => v.id || v.name).filter(Boolean) as string[];
+  if (!ids.some((id) => id.toLowerCase() === cfg.voice.toLowerCase())) {
+    throw new Error(`音色 ${cfg.voice} 不在远端列表（共 ${ids.length} 个）：${ids.slice(0, 12).join(', ')}…`);
+  }
+  console.log(`Key 有效，远端 ${ids.length} 个音色，${cfg.voice} 存在。`);
+}
+
+async function synthesizeOne(cfg: SynthConfig, text: string): Promise<{ audioBuffer: Buffer; mimeType: string }> {
+  if (cfg.provider === 'azure') {
+    return (await azureProvider.synthesize(
+      { text, voiceName: cfg.voice, region: cfg.region },
+      cfg.apiKey,
+    )) as { audioBuffer: Buffer; mimeType: string };
+  }
+  return (await geminiProvider.synthesize(
+    { text, voiceName: cfg.voice, model: cfg.model, languageCode: 'ja' },
+    cfg.apiKey,
+  )) as { audioBuffer: Buffer; mimeType: string };
+}
+
+async function main(): Promise<void> {
+  const provider = arg('provider', 'gemini').toLowerCase() === 'azure' ? 'azure' : 'gemini';
+  const voice =
+    arg('voice') || (provider === 'azure' ? 'ja-JP-NanamiNeural' : 'aoede');
+  const model = arg('model', provider === 'azure' ? 'azure' : 'gemini-3.8-flash-lite-tts');
+  const region = arg('region') || process.env['AZURE_SPEECH_REGION'] || '';
+  const apiKey =
+    provider === 'azure'
+      ? arg('azure-key') || process.env['AZURE_SPEECH_KEY'] || ''
+      : arg('key') || process.env['GEMINI_API_KEY'] || '';
+  if (!apiKey) {
+    console.error(
+      provider === 'azure'
+        ? '缺少 Azure Key：传 --azure-key <key> 或设置 AZURE_SPEECH_KEY。'
+        : '缺少 Gemini Key：传 --key <key> 或设置 GEMINI_API_KEY。',
+    );
+    process.exit(1);
+  }
+  if (provider === 'azure' && !region) {
+    console.error('Azure 缺少 region：传 --region <japaneast等> 或设置 AZURE_SPEECH_REGION（必须与 Key 同区）。');
+    process.exit(1);
+  }
+  const paceMs = Number(arg('pace-ms', provider === 'azure' ? '1500' : '4000')) || 4000;
+  const textSuffix = arg('text-suffix', '。');
+
+  const cfg: SynthConfig = { provider, apiKey, voice, model, region, paceMs, textSuffix };
+  const identity = { provider, voice, model, suffix: textSuffix };
+  await verifyVoice(cfg);
+
   const items = KANA_SEEDS.filter((k) => k.audioText.trim());
+  const done = await loadProgress(identity);
+  const collected = new Map<string, { audioBase64: string; mimeType: string }>();
   let index = 0;
   for (const k of items) {
     index++;
@@ -156,14 +185,11 @@ async function runSingle(
     let audio: { audioBuffer: Buffer; mimeType: string } | null = null;
     for (let attempt = 1; attempt <= 8; attempt++) {
       try {
-        audio = (await geminiProvider.synthesize(
-          { text: `${k.audioText.trim()}${textSuffix}`, voiceName: voice, model, languageCode: 'ja' },
-          apiKey,
-        )) as { audioBuffer: Buffer; mimeType: string };
+        audio = await synthesizeOne(cfg, `${k.audioText.trim()}${textSuffix}`);
         break;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (/429|RESOURCE_EXHAUSTED|quota/i.test(message) && attempt < 8) {
+        if (/429|RESOURCE_EXHAUSTED|quota|throttl/i.test(message) && attempt < 8) {
           const wait = retryDelayMs(error);
           console.log(`  ${k.id} 触发限流，${Math.round(wait / 1000)}s 后重试（${attempt}/8）…`);
           await new Promise((r) => setTimeout(r, wait));
@@ -175,116 +201,12 @@ async function runSingle(
     if (!audio) throw new Error(`${k.id} 重试 8 次仍失败，中断；已落盘的可直接重跑续做。`);
     await writeFile(file, audio.audioBuffer);
     done.add(k.id);
-    await saveProgress(voice, model, textSuffix, done);
+    await saveProgress(identity, done);
     collected.set(k.id, { audioBase64: audio.audioBuffer.toString('base64'), mimeType: audio.mimeType });
     console.log(`单条合成 ${index}/${items.length}（已落盘 ${done.size}）`);
     await new Promise((r) => setTimeout(r, paceMs));
   }
-  return collected;
-}
-
-async function main(): Promise<void> {
-  const resume = process.argv.includes('--resume');
-  const forceSingle = process.argv.includes('--single');
-  const apiKey = arg('key') || process.env['GEMINI_API_KEY'] || '';
-  if (!apiKey) {
-    console.error('缺少 Gemini Key：传 --key <key> 或设置 GEMINI_API_KEY。');
-    process.exit(1);
-  }
-  const voice = arg('voice', 'aoede');
-  const model = arg('model', 'gemini-3.8-flash-tts');
-  const timeoutMin = Number(arg('timeout-min', '120')) || 120;
-  // 单条 pacing（毫秒）：免费 22000（3次/分），付费档可调小（如 3000）。
-  const paceMs = Number(arg('pace-ms', '22000')) || 22000;
-  // 合成文本后缀：传 。即用「あ。」陈述语调，单字语调更稳（key/文件名不变）。
-  const textSuffix = arg('text-suffix', '');
-
-  await verifyKeyAndVoice(apiKey, voice);
-
-  if (forceSingle) {
-    console.log('强制单条模式：104 次实时合成。');
-    await writeResults(await runSingle(apiKey, voice, model, paceMs, textSuffix), voice, model);
-    return;
-  }
-
-  let state: SeedState;
-  if (resume) {
-    if (!existsSync(STATE_FILE)) {
-      console.error(`找不到状态文件 ${STATE_FILE}，先正常建单。`);
-      process.exit(1);
-    }
-    state = JSON.parse(await readFile(STATE_FILE, 'utf8')) as SeedState;
-    console.log(`继续轮询 ${state.jobs.length} 个任务（voice=${state.voice} model=${state.model}）。`);
-  } else {
-    const items = KANA_SEEDS.filter((k) => k.audioText.trim()).map((k) => ({
-      key: k.id,
-      text: `${k.audioText.trim()}${textSuffix}`,
-    }));
-    if (items.length === 0) throw new Error('KANA_SEEDS 为空，无法建单。');
-    const chunks: typeof items[] = [];
-    for (let i = 0; i < items.length; i += MAX_ITEMS_PER_JOB) chunks.push(items.slice(i, i + MAX_ITEMS_PER_JOB));
-    console.log(`共 ${items.length} 音，拆成 ${chunks.length} 批（voice=${voice} model=${model}）。`);
-    const jobs: JobState[] = [];
-    try {
-      for (let b = 0; b < chunks.length; b++) {
-        const input = validateBatchCreateInput({
-          model,
-          voiceName: voice,
-          languageCode: 'ja',
-          displayName: `kana-seed-${voice}-${b + 1}of${chunks.length}`,
-          items: chunks[b],
-        });
-        const job = (await geminiProvider.createBatchJob(apiKey, input)) as { name: string; state: string };
-        if (!job.name) throw new Error(`建单无 name：${JSON.stringify(job)}`);
-        console.log(`batch ${b + 1}: ${job.name}（${job.state}）`);
-        jobs.push({ name: job.name, keys: (chunks[b] ?? []).map((c) => c.key), voice, model });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      // 不静默降级：批量建单失败就直接退出，由用户显式决定是否走单条。
-      // 单条=104 次实时合成、免费额度 3 次/分钟、约 40 分钟，用户确认后再开：
-      //   bun scripts/ops/seed-kana-audio.ts --single --key <KEY>
-      console.error(`批量建单失败，不自动降级：${message}`);
-      console.error('如需改用单条合成（慢、免费额度内），请显式加 --single 重跑。');
-      process.exit(3);
-    }
-    state = { mode: 'batch', voice, model, createdAt: new Date().toISOString(), jobs };
-    await mkdir(dirname(STATE_FILE), { recursive: true });
-    await writeFile(STATE_FILE, JSON.stringify(state, null, 2));
-    console.log(`任务状态已存 ${STATE_FILE}。`);
-  }
-
-  // 轮询：官方异步任务小时级；超时退出后可用 --resume 继续。
-  const deadline = Date.now() + timeoutMin * 60_000;
-  const pending = new Set(state.jobs.map((j) => j.name));
-  const collected = new Map<string, { audioBase64: string; mimeType: string }>();
-  while (pending.size > 0) {
-    for (const job of state.jobs) {
-      if (!pending.has(job.name)) continue;
-      const detail = (await geminiProvider.getBatchJob(apiKey, job.name)) as {
-        state: string;
-        results?: Array<{ key: string; ok: boolean; audioBase64?: string; mimeType?: string; error?: string }>;
-      };
-      console.log(`${job.name}: ${detail.state}`);
-      if (/FAILED|CANCELLED|EXPIRED/.test(detail.state)) throw new Error(`任务失败 ${job.name}: ${detail.state}`);
-      if (detail.state === 'JOB_STATE_SUCCEEDED') {
-        for (const r of detail.results ?? []) {
-          if (r.ok && r.audioBase64) collected.set(r.key, { audioBase64: r.audioBase64, mimeType: r.mimeType ?? 'audio/wav' });
-          else console.error(`  ${r.key} 失败：${r.error ?? '未知'}`);
-        }
-        pending.delete(job.name);
-      }
-    }
-    if (pending.size > 0) {
-      if (Date.now() > deadline) {
-        console.log(`超时（${timeoutMin}min），剩余 ${pending.size} 个任务稍后用 --resume 继续轮询。`);
-        break;
-      }
-      await new Promise((r) => setTimeout(r, 60_000));
-    }
-  }
-  if (pending.size > 0) return;
-  await writeResults(collected, state.voice, state.model);
+  await writeResults(collected, `provider=${provider} voice=${voice} model=${model} suffix=${JSON.stringify(textSuffix)}`);
 }
 
 await main();
