@@ -3,6 +3,8 @@ import { buildPreviewEntries } from './toc-anchor-flow.js';
 import type { EditableTocEntry } from './toc-confirm-flow.js';
 
 export interface TocRecognitionCandidate extends EditableTocEntry {
+  /** 保留四级目录语义；编辑表格的两级缩进不是目录类型。 */
+  directoryLevel?: 'unit' | 'chapter' | 'lesson' | 'section';
   /** PDF bookmarks identify physical pages, never printed pages. */
   physicalPage?: number;
   endPage?: number;

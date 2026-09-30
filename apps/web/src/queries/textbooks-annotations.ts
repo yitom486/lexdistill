@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { logger } from '@study-studio/shared';
-import { parseTextbookAST, SaveTextbookOutlineResultSchema, type SaveTextbookOutlineRequest, type TextbookAST, type TextbookPipelineSettings } from '@study-studio/document-model';
+import { parseTextbookAST, TocEntrySchema, SaveTextbookOutlineResultSchema, type SaveTextbookOutlineRequest, type TextbookAST, type TextbookPipelineSettings } from '@study-studio/document-model';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,
@@ -1053,17 +1053,8 @@ export interface ExtractTocWithLlmVars {
   model?: string;
 }
 
-export interface ExtractTocWithLlmResult {
-  title?: string;
-  entries: Array<{
-    id?: string;
-    parentId?: string;
-    title: string;
-    level: string;
-    startPage: number;
-    endPage?: number;
-  }>;
-}
+const ExtractTocWithLlmResultSchema = z.object({ title: z.string().optional(), entries: z.array(TocEntrySchema) });
+export type ExtractTocWithLlmResult = z.infer<typeof ExtractTocWithLlmResultSchema>;
 
 export async function requestExtractTocWithLlm(
   userId: string,
@@ -1095,7 +1086,7 @@ export async function requestExtractTocWithLlm(
     });
   }
 
-  const payload = (await res.json().catch(() => null)) as ExtractTocWithLlmResult | null;
+  const payload: unknown = await res.json().catch(() => null);
   if (!res.ok || !payload) {
     throw new GatewayRequestError(
       readGatewayUserMessage(payload, `大模型提取目录失败（HTTP ${res.status}）`),
@@ -1105,7 +1096,9 @@ export async function requestExtractTocWithLlm(
       }
     );
   }
-  return payload;
+  const parsed = ExtractTocWithLlmResultSchema.safeParse(payload);
+  if (!parsed.success) throw new GatewayRequestError('目录返回缺少有效身份、层级或页码，请重新识别', { code: 'E_LLM_SCHEMA_INVALID' });
+  return parsed.data;
 }
 
 export function useExtractTocWithLlmMutation(userId = DEFAULT_USER_ID) {
@@ -1205,6 +1198,7 @@ export function lessonSlotsToTocCandidates(slots: TextbookLessonSlotItem[]): Toc
     printedPage: '',
     level: (s.kind === 'chapter' || s.kind === 'section' ? 2 : 1) as 1 | 2,
     kind: (s.kind === 'chapter' || s.kind === 'section' ? 'section' : 'lesson') as 'section' | 'lesson',
+    ...(s.kind === 'unit' || s.kind === 'chapter' || s.kind === 'lesson' || s.kind === 'section' ? { directoryLevel: s.kind } : {}),
     confidence: 'high' as const,
     ...(typeof s.startPage === 'number' && Number.isFinite(s.startPage)
       ? { physicalPage: s.startPage }

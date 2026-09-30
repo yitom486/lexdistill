@@ -55,8 +55,8 @@ export async function inspectTextbookImport(
         status: ready ? 'ready' : 'partial', canDirectlyUse: matched.hasShreddedAssets,
         matchedDocument: matched,
         summary: matched.outlineConfirmed && !matched.hasShreddedAssets
-          ? `《${matched.title}》的目录已保存，共 ${matched.lessonCount} 课；正文尚未提取。`
-          : `已导入《${matched.title}》：${matched.readyLessonCount}/${matched.lessonCount} 课就绪，${matched.passageLessonCount} 课有正文、${matched.vocabCount} 个生词、${matched.grammarCount} 项语法、${matched.exerciseCount} 道习题。`,
+          ? `《${matched.title}》的目录已保存，共 ${matched.lessonCount} 个提取部分；正文尚未提取。`
+          : `已导入《${matched.title}》：${matched.readyLessonCount}/${matched.lessonCount} 个部分就绪，${matched.passageLessonCount} 个部分有正文、${matched.vocabCount} 个生词、${matched.grammarCount} 项语法、${matched.exerciseCount} 道习题。`,
       });
     }
     return ok({ status: 'not_imported', canDirectlyUse: false, summary: '这份 PDF 尚未导入。' });

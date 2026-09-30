@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { logger } from '@study-studio/shared';
 import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
-import type { TextbookPipelineSettings } from '@study-studio/document-model';
+import type { TextbookPipelineSettings, TocEntry } from '@study-studio/document-model';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,
@@ -28,15 +28,7 @@ export interface StartPipelineJobVars extends Partial<TextbookPipelineSettings> 
   effort?: string;
   poolSize?: number;
   forceOverwrite?: boolean;
-  tocEntries: Array<{
-    id: string;
-    title: string;
-    level: string;
-    startPage: number;
-    sortOrder: number;
-    endPage?: number;
-    parentId?: string;
-  }>;
+  tocEntries: Array<TocEntry & { sortOrder: number }>;
   lessonJobs?: Array<{
     lessonId: string;
     ocrText: string;
@@ -226,7 +218,7 @@ export function usePipelineJobSubscription(userId = DEFAULT_USER_ID) {
           if (currentStoreJob?.status === 'running') {
             if (updated.status === 'done') {
               sound.playCorrect();
-              toast.success(`🎉 教材《${updated.title}》全书提炼完成！共 ${updated.successfulLessons} 课已原子就绪`);
+              toast.success(`教材《${updated.title}》目录内的 ${updated.successfulLessons} 个部分已保存`);
               queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TEXTBOOKS });
               queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCUMENTS });
             } else if (updated.status === 'failed') {

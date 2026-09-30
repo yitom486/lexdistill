@@ -27,10 +27,10 @@ export function TextbookImportInspection({ result, document: doc, pending, error
       {doc && (
         <div className="space-y-3">
           <p className="font-semibold text-ink">
-            {doc.outlineConfirmed && !doc.hasShreddedAssets ? `《${doc.title}》的目录已保存，正文尚未提取` : `已导入《${doc.title}》：${doc.readyLessonCount}/${doc.lessonCount} 课就绪`}
+            {doc.outlineConfirmed && !doc.hasShreddedAssets ? `《${doc.title}》的目录已保存，正文尚未提取` : `已导入《${doc.title}》：${doc.readyLessonCount}/${doc.lessonCount} 个部分就绪`}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">正文 {doc.passageLessonCount} 课 / {doc.lineCount} 行</Badge>
+            <Badge variant="secondary">正文 {doc.passageLessonCount} 个部分 / {doc.lineCount} 行</Badge>
             <Badge variant="secondary">生词 {doc.vocabCount} 个</Badge>
             <Badge variant="secondary">语法 {doc.grammarCount} 项</Badge>
             <Badge variant="secondary">习题 {doc.exerciseCount} 道</Badge>
@@ -40,11 +40,11 @@ export function TextbookImportInspection({ result, document: doc, pending, error
             {doc.outlineConfirmed ? '完成情况以已确认目录为准，请对照原书核对内容。' : '目录尚未确认。'}
           </p>
           <details className="rounded-xl border border-line p-3" open>
-            <summary className="cursor-pointer font-semibold text-ink">逐课核对已保存内容</summary>
+            <summary className="cursor-pointer font-semibold text-ink">按目录核对已保存内容</summary>
             <div className="mt-2 max-h-64 overflow-auto">
               <table className="w-full text-left">
                 <thead><tr className="text-ink-muted">
-                  <th className="p-1">课次</th><th className="p-1">状态</th><th className="p-1">正文</th>
+                  <th className="p-1">课次 / 部分</th><th className="p-1">状态</th><th className="p-1">正文</th>
                   <th className="p-1">生词</th><th className="p-1">语法</th><th className="p-1">习题</th>
                   <th className="p-1">预习 / 总结</th>
                 </tr></thead>

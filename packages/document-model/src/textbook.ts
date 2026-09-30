@@ -74,7 +74,7 @@ export const TextbookLessonSchema = z.object({
   title: z.string(),
   summary: z.string().optional(),
   /** 导入底稿保留目录与任务状态，关系表由这些字段派生。旧 AST 可缺省。 */
-  kind: z.enum(['lesson', 'chapter', 'section']).optional(),
+  kind: z.enum(['unit', 'lesson', 'chapter', 'section']).optional(),
   parentId: z.string().nullable().optional(),
   startPage: z.number().int().positive().optional(),
   endPage: z.number().int().positive().optional(),

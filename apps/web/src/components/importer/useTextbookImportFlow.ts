@@ -84,12 +84,9 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
   };
 
   const tocFromCandidates = (candidates: TocRecognitionCandidate[]): TocEntry[] => {
-    let parentLesson: string | undefined;
     return candidates.map(entry => {
-      if (entry.kind === 'lesson') parentLesson = entry.key;
-      const parentId = entry.parentId ?? (entry.kind === 'section' && entry.level === 2 ? parentLesson : undefined);
-      return { id: entry.key, title: entry.title.trim(), level: entry.kind, startPage: entry.physicalPage!,
-        ...(entry.endPage ? { endPage: entry.endPage } : {}), ...(parentId ? { parentId } : {}) };
+      return { id: entry.key, title: entry.title.trim(), level: entry.directoryLevel ?? entry.kind, startPage: entry.physicalPage!,
+        ...(entry.endPage ? { endPage: entry.endPage } : {}), ...(entry.parentId ? { parentId: entry.parentId } : {}) };
     });
   };
 
@@ -104,7 +101,7 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
     });
     if (previousSource.current !== sourceKey) return;
     setEntries(saved.entries.map((entry, index) => ({
-      ...candidates[index]!, key: entry.id, physicalPage: entry.startPage,
+      ...candidates[index]!, key: entry.id, directoryLevel: entry.level, physicalPage: entry.startPage,
       ...(entry.endPage ? { endPage: entry.endPage } : {}),
       ...(entry.parentId ? { parentId: entry.parentId } : {}),
     })));
@@ -122,22 +119,7 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
     const poolSize = Number(pipelinePoolSize);
     const config = TextbookPipelineSettingsSchema.safeParse({ ...pipelineSettings, poolSize });
     if (!config.success) { source.setParseError('提取并发、队列容量或重试预算不符合允许范围'); return; }
-    const oldSlots = slots.data ?? [];
-    const identities = new Map(entries.map((entry) => {
-      const existing = oldSlots.find((s) => s.title === entry.title.trim() && (s.startPage === null || s.startPage === entry.physicalPage));
-      const id = existing?.lessonId ?? (oldSlots.some((s) => s.lessonId === entry.key) ? crypto.randomUUID() : entry.key);
-      return [entry.key, id];
-    }));
-    let parentLesson: string | undefined;
-    const tocEntries = entries.map((entry, index) => {
-      const id = identities.get(entry.key)!;
-      if (entry.kind === 'lesson') parentLesson = id;
-      const parentId = entry.parentId ? identities.get(entry.parentId) : entry.kind === 'section' && entry.level === 2 ? parentLesson : undefined;
-      return {
-        id, title: entry.title.trim(), level: entry.kind, startPage: entry.physicalPage!, sortOrder: index + 1,
-        ...(entry.endPage ? { endPage: entry.endPage } : {}), ...(parentId ? { parentId } : {}),
-      };
-    });
+    const tocEntries = tocFromCandidates(entries).map((entry, index) => ({ ...entry, sortOrder: index + 1 }));
     source.setParseError(null);
     startMutation.mutate({
       ...(targetDocument ? { documentId: targetDocument.documentId } : outlineMutation.variables?.filePath === path && outlineMutation.data ? { documentId: outlineMutation.data.documentId } : {}),

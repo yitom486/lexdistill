@@ -39,7 +39,7 @@ export class LessonSubmission {
     if (task.tocEntries.some(entry => reported.get(entry.id) !== 'EXTRACTED')) return this.reject('E_TOC_COVERAGE_INCOMPLETE', '当前章或子目录未逐项提取；无法辨认的内容不能标记已完成', true);
     if (!items.some(item => item.source === 'TEXTBOOK')) return this.reject('E_TOC_COVERAGE_INCOMPLETE', '章节只有 AI 新增内容，不能据此声明原书已提取', true);
     if (!items.some(item => item.source === 'TEXTBOOK')) return this.reject('E_TOC_COVERAGE_INCOMPLETE', '章节只有 AI 新增内容，不能据此声明原书已提取', true);
-    if (task.tocEntries.some(entry => entry.id !== task.lessonId && !items.some(item => item.source === 'TEXTBOOK' && item.tocId === entry.id))) return this.reject('E_TOC_COVERAGE_INCOMPLETE', '子目录虽报告已提取，但没有关联的原书内容', true);
+    if (task.tocEntries.some(entry => (entry.level === 'lesson' || entry.level === 'section') && !items.some(item => item.source === 'TEXTBOOK' && item.tocId === entry.id))) return this.reject('E_TOC_COVERAGE_INCOMPLETE', '内容目录虽报告已提取，但没有关联的原书内容', true);
     if (!task.allowAiExercises && content.exercises.some(item => item.source === 'AI')) return this.reject('E_LLM_SCHEMA_INVALID', '当前配置不允许新增 AI 习题', true);
     const issues = lessonContentIssues(content);
     if (issues.length) return this.reject('E_LLM_SCHEMA_INVALID', issues.join('; '), true);

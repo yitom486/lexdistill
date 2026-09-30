@@ -62,7 +62,7 @@ describe('seedTextbookTocSkeleton', () => {
     expect(lessons).toHaveLength(3);
     // 单元槽位
     expect(lessons[0]!.lessonId).toBe('u1');
-    expect(lessons[0]!.kind).toBe('chapter');
+    expect(lessons[0]!.kind).toBe('unit');
     expect(lessons[0]!.sortOrder).toBe(1);
     expect(lessons[0]!.status).toBe('pending');
     expect(lessons[0]!.startPage).toBe(1);

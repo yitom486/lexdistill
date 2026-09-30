@@ -12,6 +12,7 @@ import type {
   TextbookPipelineJobSnapshot,
 } from '@study-studio/protocol';
 import type { ContentRepository } from '../ports.js';
+import { planTextbookTasks } from '@study-studio/document-model';
 import {
   executeTextbookPipeline,
   type TextbookPipelineInput,
@@ -58,7 +59,9 @@ export class TextbookPipelineJobRegistry {
     const jobId = generateId('pipejob');
     const now = new Date().toISOString();
     const documentId = input.documentId ?? generateId('doc_tb');
-    const totalLessons = input.tocEntries.filter((entry) => entry.level === 'lesson').length;
+    const planned = planTextbookTasks(input.tocEntries);
+    if (!planned.ok) return planned;
+    const totalLessons = planned.value.length;
 
     const snapshot: TextbookPipelineJobSnapshot = {
       jobId,

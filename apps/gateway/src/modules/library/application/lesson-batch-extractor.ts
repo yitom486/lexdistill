@@ -12,6 +12,7 @@ export interface LessonExtractionJob {
   language: string;
   allowAiExercises: boolean;
   tocEntries: readonly TocEntry[];
+  tocPath: readonly TocEntry[];
   ocrText: string;
 }
 export type LessonStage = 'ocr' | 'queued' | 'extracting' | 'validating' | 'saving' | 'saved' | 'failed';

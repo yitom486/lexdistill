@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { ok, err, BusinessError, translateToBusinessError, nowIso, type Result } from '@study-studio/shared';
-import { TextbookASTSchema, LessonContentSchema, lessonContentIssues, projectLessonContent, type LessonContent, type TextbookAST } from '@study-studio/document-model';
+import { TextbookASTSchema, LessonContentSchema, lessonContentIssues, projectLessonContent, planTextbookTasks, type LessonContent, type TextbookAST } from '@study-studio/document-model';
 import { documents, textbookLessons } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
 import { shredIntoTransaction, type ShredTx } from './textbook-shred.js';
@@ -41,8 +41,11 @@ export async function commitLessonKnowledge(deps: { db: DrizzleDb }, input: Comm
   try {
     return ok(deps.db.transaction(tx => {
       const slot = tx.select().from(textbookLessons).where(and(eq(textbookLessons.documentId, input.documentId), eq(textbookLessons.lessonId, input.lessonId))).get();
-      if (!slot || slot.kind !== 'lesson') throw new BusinessError('E_TOC_SLOT_NOT_FOUND', '提交课次不属于已确认目录', 'VALIDATION');
+      if (!slot) throw new BusinessError('E_TOC_SLOT_NOT_FOUND', '提交部分不属于已确认目录', 'VALIDATION');
       const ast = readAst(tx, input.documentId);
+      const planned = planTextbookTasks(ast.lessons.map(item => ({ ...item, level: item.kind ?? 'lesson' })));
+      if (!planned.ok) throw planned.error;
+      if (!planned.value.some(task => task.root.id === input.lessonId)) throw new BusinessError('E_TOC_SLOT_NOT_FOUND', '提交节点不是当前目录的独立提取部分', 'VALIDATION');
       const lesson = ast.lessons.find(item => item.id === input.lessonId);
       if (!lesson) throw new BusinessError('E_TOC_SLOT_NOT_FOUND', '教材底稿中没有该课次', 'VALIDATION');
       if (slot.submissionId !== input.submissionId) {
@@ -57,7 +60,7 @@ export async function commitLessonKnowledge(deps: { db: DrizzleDb }, input: Comm
       return {
         documentId: input.documentId, lessonId: input.lessonId,
         stats: { vocabCount: content.vocabularies.length, grammarCount: content.knowledgePoints.length, exerciseCount: content.exercises.length, hasPassage: content.blocks.length > 0 },
-        allLessonsReady: ast.lessons.filter(item => item.kind === 'lesson').every(item => item.status === 'ready'),
+        allLessonsReady: planned.value.every(task => ast.lessons.find(item => item.id === task.root.id)?.status === 'ready'),
       };
     }));
   } catch (cause) {
@@ -92,7 +95,7 @@ export function savePipelineAstInTx(tx: ShredTx, docId: string, metadata?: { sou
       return {
         vocabularies: [], grammarPoints: [], dialogues: [], exercises: [], ...retained,
         id: slot.lessonId, lessonNumber: slot.lessonNumber || index + 1, title: slot.title,
-        kind: slot.kind === 'chapter' || slot.kind === 'section' ? slot.kind : 'lesson', parentId: slot.parentId,
+        kind: slot.kind === 'unit' || slot.kind === 'chapter' || slot.kind === 'section' ? slot.kind : 'lesson', parentId: slot.parentId,
         ...(slot.startPage !== null ? { startPage: slot.startPage } : {}),
         ...(slot.endPage !== null ? { endPage: slot.endPage } : {}),
         status: slot.status === 'ready' ? 'ready' : 'pending',

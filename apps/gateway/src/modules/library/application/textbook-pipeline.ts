@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { AgentAdapter } from '@study-studio/agent-runtime';
-import { canonicalizeTocEntries, TextbookPipelineSettingsSchema, type TextbookPipelineSettings, type TocEntry } from '@study-studio/document-model';
+import { canonicalizeTocEntries, planTextbookTasks, TextbookPipelineSettingsSchema, type TextbookPipelineSettings, type TocEntry } from '@study-studio/document-model';
 import { BusinessError, ok, err, generateId, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ImportTask } from '@study-studio/storage-sqlite';
 import type { ContentRepository } from '../ports.js';
@@ -32,6 +32,10 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
   if (!settings.success || !input.adapter || !input.submissionTool) return err(new BusinessError('E_INVALID_INPUT', '教材提取配置或章节会话通道未就绪', 'VALIDATION'));
   const config = settings.data;
   const documentId = input.documentId ?? generateId('doc_tb');
+  const toc = Object.freeze(canonicalizeTocEntries(input.tocEntries).map(entry => Object.freeze({ ...entry })));
+  const planned = planTextbookTasks(toc);
+  if (!planned.ok) return planned;
+  const tasks = planned.value;
   const controller = new AbortController();
   const cancel = () => controller.abort();
   input.signal?.addEventListener('abort', cancel, { once: true });
@@ -44,8 +48,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
   let task: ImportTask | undefined;
   const errors: TextbookPipelineOutput['errors'] = [];
   let successful = 0, completed = 0;
-  const toc = Object.freeze(canonicalizeTocEntries(input.tocEntries).map(entry => Object.freeze({ ...entry })));
-  const lessons = toc.filter(entry => entry.level === 'lesson');
+  const lessons = tasks.map(task => task.root);
   const emptyStats = { vocabCount: 0, grammarCount: 0, exerciseCount: 0, hasPassage: false };
   const emit = (lessonId: string, stage: LessonStage, stats = emptyStats, error?: string, allLessonsReady = false) => input.onProgress?.({
     documentId, lessonId, stage, completedCount: completed, successfulCount: successful, totalCount: lessons.length,
@@ -74,16 +77,9 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
       pool = new ChapterSessionPool({ userId: input.userId, adapter: input.adapter, tool, poolSize: config.poolSize, model: input.model, effort: input.effort, signal: controller.signal });
       const activePool = pool;
       const onText = async (lesson: TocEntry, text: string) => {
-        const sectionIds = new Set([lesson.id]);
-        // 目录可来自手动编辑；按父 ID 闭包关联，不依赖父项恰好排在子项之前。
-        let added = true;
-        while (added) {
-          added = false;
-          for (const entry of toc) if (entry.parentId && sectionIds.has(entry.parentId) && !sectionIds.has(entry.id)) { sectionIds.add(entry.id); added = true; }
-        }
-        const entries = toc.filter(entry => sectionIds.has(entry.id));
+        const task = tasks.find(task => task.root.id === lesson.id)!;
         emit(lesson.id, 'queued');
-        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: entries, ocrText: text });
+        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: task.ancestors, ocrText: text });
       };
       const produce = async () => {
         if (input.lessonJobs?.length) {

@@ -11,6 +11,7 @@ import {
 import {
   validateTocPageOrder,
   canonicalizeTocEntries,
+  planTextbookTasks,
   type TocEntry,
   type TocValidationResult,
 } from '@study-studio/document-model';
@@ -162,7 +163,7 @@ export async function seedTextbookTocSkeleton(
           lessonNumber: entry.sortOrder,
           title: entry.title,
           sortOrder: entry.sortOrder,
-          kind: entry.level === 'unit' || entry.level === 'chapter' ? 'chapter' : entry.level,
+          kind: entry.level,
           parentId: entry.parentId ?? null,
           startPage: entry.startPage,
           endPage: entry.endPage ?? null,
@@ -288,12 +289,15 @@ export async function getTextbookAssetStats(
   }
   try {
     const docId = documentId.trim();
-    const lessonRows = deps.db
+    const rows = deps.db
       .select()
       .from(textbookLessons)
-      .where(and(eq(textbookLessons.documentId, docId), eq(textbookLessons.kind, 'lesson')))
+      .where(eq(textbookLessons.documentId, docId))
       .orderBy(textbookLessons.sortOrder)
       .all();
+    const planned = rows.length ? planTextbookTasks(rows.map(row => ({ ...row, id: row.lessonId, level: row.kind }))) : ok([]);
+    if (!planned.ok) return planned;
+    const lessonRows = planned.value.map(task => task.root);
 
     const countsByLesson = (table: typeof textbookLines | typeof textbookVocab | typeof textbookGrammar | typeof textbookExercises) =>
       new Map(deps.db.select({ lessonId: table.lessonId, count: count() }).from(table)

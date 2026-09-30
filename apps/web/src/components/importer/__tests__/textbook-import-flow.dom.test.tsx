@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { SaveTextbookOutlineRequest } from '@study-studio/document-model';
+import type { SaveTextbookOutlineRequest, TocEntry } from '@study-studio/document-model';
 import type { TextbookInspectionResult, TextbookInspectionDocSummary } from '@study-studio/protocol';
 import { useTextbookImportFlow } from '../useTextbookImportFlow.js';
 import { TextbookImportInspection } from '../TextbookImportInspection.js';
@@ -48,8 +48,8 @@ function Harness({ recognize = false, initialPath = '' }: { recognize?: boolean;
     <button onClick={() => { void flow.browse(); }}>选择本地文件</button>
     <button onClick={() => setPdfPath('D:\\教材\\另一份.pdf')}>换教材</button>
     <button onClick={() => flow.setEntries([
-      { key: 'recognized-1', title: '第1课', printedPage: '1', kind: 'lesson', level: 1, confidence: 'high' },
-      { key: 'recognized-2', title: '第2课', printedPage: '3', kind: 'lesson', level: 1, confidence: 'high' },
+      { key: flow.slots.data![0]!.lessonId, title: '第1课', printedPage: '1', kind: 'lesson', level: 1, confidence: 'high' },
+      { key: flow.slots.data![1]!.lessonId, title: '第2课', printedPage: '3', kind: 'lesson', level: 1, confidence: 'high' },
     ])}>采用已确认目录</button>
     <button onClick={flow.start}>启动提取</button>
     <button onClick={flow.reuseOutline}>复用目录</button>
@@ -222,7 +222,7 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
     await tickUntil(() => currentFlow?.inspection.data?.status === 'partial');
     expect(picked).toBe(1);
     expect(currentFlow?.path).toBe(selectedPath);
-    expect(document.body.textContent).toContain('1/2 课就绪');
+    expect(document.body.textContent).toContain('1/2 个部分就绪');
     const rows = [...document.querySelectorAll('tbody tr')];
     expect(rows).toHaveLength(2);
     expect(rows[0]?.textContent).toContain('第1课已就绪已保存723');
@@ -232,7 +232,7 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
     ready = true;
     await click('重新检测');
     await tickUntil(() => currentFlow?.inspection.data?.status === 'ready');
-    expect(document.body.textContent).toContain('2/2 课就绪');
+    expect(document.body.textContent).toContain('2/2 个部分就绪');
     expect(document.querySelectorAll('tbody tr')[1]?.textContent).toContain('已就绪已保存');
   });
 
@@ -264,6 +264,34 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
       { id: 'old-l1', title: '第1课', level: 'lesson', startPage: 8, sortOrder: 1 },
       { id: 'old-l2', title: '第2课', level: 'lesson', startPage: 10, sortOrder: 2 },
     ]);
+  });
+
+  it('重用已保存目录保留单元、章、独立部分和父节点，不按上一课猜关联', async () => {
+    await prepare();
+    const baseFetch = globalThis.fetch;
+    const directory: TocEntry[] = [
+      { id: 'u', title: '单元', level: 'unit', startPage: 1 },
+      { id: 'c', title: '章', level: 'chapter', parentId: 'u', startPage: 1 },
+      { id: 'i', title: '导入部分', level: 'section', parentId: 'c', startPage: 1 },
+      { id: 'l', title: '课次', level: 'lesson', parentId: 'c', startPage: 4 },
+      { id: 's', title: '课内小节', level: 'section', parentId: 'l', startPage: 5 },
+    ];
+    globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/textbook-lessons/')) return Response.json({ slots: directory.map((entry, index) => ({
+        documentId: 'stored-book', lessonId: entry.id, lessonNumber: index + 1, sortOrder: index + 1,
+        title: entry.title, kind: entry.level, parentId: entry.parentId ?? null, startPage: entry.startPage,
+        endPage: null, status: 'pending', hasPassage: false, hasPreview: false, hasSummary: false,
+      })) });
+      return baseFetch(input, init);
+    }, { preconnect: originalFetch.preconnect });
+    await click('选择本地文件');
+    await tickUntil(() => currentFlow?.slots.data?.length === 5);
+    await click('复用目录');
+    expect(currentFlow?.entries?.map(entry => entry.directoryLevel)).toEqual(directory.map(entry => entry.level));
+    await click('启动提取');
+    await tickUntil(() => Boolean(submitted));
+    expect(submitted?.tocEntries).toEqual(directory.map((entry, index) => ({ ...entry, sortOrder: index + 1 })));
   });
 
   it('目录读取失败不能假装空目录；换文件不会绑定另一份教材', async () => {

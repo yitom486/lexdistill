@@ -214,11 +214,12 @@ export function TocRecognitionPanel({
         }
 
         const candidates: TocRecognitionCandidate[] = data.entries.map((item, index) => ({
-          key: item.id || `llm-${index}`,
+          key: item.id,
           title: item.title,
           printedPage: String(item.startPage),
           level: item.level === 'section' ? 2 : 1,
           kind: item.level === 'lesson' ? 'lesson' : 'section',
+          directoryLevel: item.level,
           confidence: null,
           ...(item.parentId ? { parentId: item.parentId } : {}),
         }));
@@ -468,7 +469,7 @@ export function TocRecognitionPanel({
                   <Select
                     value={entry.kind}
                     onValueChange={(val) => {
-                      if (val === 'lesson' || val === 'section') updateEntry(entry.key, { kind: val });
+                      if (val === 'lesson' || val === 'section') updateEntry(entry.key, { kind: val, directoryLevel: val });
                     }}
                   >
                     <SelectTrigger aria-label={`目录类型 ${index + 1}`} className="h-8 text-xs">
