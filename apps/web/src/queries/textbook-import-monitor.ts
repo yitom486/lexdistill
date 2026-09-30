@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ImportEventSchema, ImportEventPageSchema, type ImportEvent } from '@study-studio/document-model';
+import { ImportEventSchema, ImportEventPageSchema, SavedTextbookContentSchema, type ImportEvent } from '@study-studio/document-model';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { GatewayRequestError, readGatewayUserMessage } from '../lib/gateway-error.js';
 
@@ -59,6 +59,10 @@ export function useImportEventDetail(userId: string, traceId: string, sequence: 
 }
 export function useSavedTextbookContent(userId: string, documentId: string, nodeId: string, enabled: boolean) {
   return useQuery({ queryKey: ['textbook-saved-content', userId, documentId, nodeId], enabled, staleTime: 0,
-    queryFn: () => request(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/textbook-saved/${encodeURIComponent(documentId)}/${encodeURIComponent(nodeId)}`),
+    queryFn: async () => {
+      const parsed = SavedTextbookContentSchema.safeParse(await request(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/textbook-saved/${encodeURIComponent(documentId)}/${encodeURIComponent(nodeId)}`));
+      if (!parsed.success) throw new GatewayRequestError('教材保存结果格式不完整，请重新查询');
+      return parsed.data;
+    },
   });
 }

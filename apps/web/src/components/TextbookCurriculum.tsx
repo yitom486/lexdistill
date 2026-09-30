@@ -3,6 +3,7 @@ import { StructuredLessonPanel } from './textbook/StructuredLessonPanel.js';
 import { StructuredExerciseList } from './textbook/StructuredExerciseList.js';
 import { ContentSource } from './textbook/ContentSource.js';
 import { VocabularyExplanation } from './textbook/VocabularyExplanation.js';
+import { StructuredVocabularyList } from './textbook/StructuredVocabularyList.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen,
@@ -444,7 +445,7 @@ export function TextbookCurriculum({
                   <div className="flex items-start justify-between">
                     <div>
                       <Badge variant="amber" className="rounded text-[11px] font-mono">
-                        Lesson {lesson.lessonNumber}
+                        {lesson.kind === 'section' ? '独立部分' : '课次'}
                       </Badge>
                       <h4 className="text-sm font-bold text-ink mt-1">
                         {lesson.title}
@@ -597,6 +598,8 @@ export function TextbookCurriculum({
 
           {/* 子内容 2: 重点词汇库 */}
           {lessonSubTab === 'VOCAB' && (
+            currentLesson.content ? <StructuredVocabularyList words={currentLesson.content.vocabularies} {...(currentLesson.directory ? { directory: currentLesson.directory } : {})} added={addedCardsMap}
+              onAdd={id => { const word = currentLesson.vocabularies.find(item => item.id === id); if (word) handleAddCard(word); }} /> :
             <div className="bg-paper-soft rounded-2xl p-5 border border-line-accent space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {currentLesson.vocabularies.map((vocab) => {
@@ -665,7 +668,7 @@ export function TextbookCurriculum({
 
           {/* 子内容 3: 核心文法剖析 */}
           {lessonSubTab === 'GRAMMAR' && (
-            currentLesson.content ? <StructuredLessonPanel content={currentLesson.content} tab="GRAMMAR" /> :
+            currentLesson.content ? <StructuredLessonPanel content={currentLesson.content} tab="GRAMMAR" {...(currentLesson.directory ? { directory: currentLesson.directory } : {})} /> :
             <div className="space-y-4">
               {currentLesson.grammarPoints.map((gp) => (
                 <div
@@ -707,7 +710,7 @@ export function TextbookCurriculum({
               ))}
             </div>
           )}
-          {lessonSubTab === 'EXERCISES' && currentLesson.content && <StructuredExerciseList exercises={currentLesson.content.exercises} />}
+          {lessonSubTab === 'EXERCISES' && currentLesson.content && <StructuredExerciseList exercises={currentLesson.content.exercises} {...(currentLesson.directory ? { directory: currentLesson.directory } : {})} />}
         </div>
       </div>
 

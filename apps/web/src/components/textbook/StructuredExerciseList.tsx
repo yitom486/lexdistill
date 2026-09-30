@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { StructuredExercise } from '@study-studio/document-model';
+import type { StructuredExercise, ContentDirectoryNode } from '@study-studio/document-model';
+import { DirectoryGroups } from './DirectoryGroups.js';
 import { Button } from '../ui/button.js';
 import { ContentSource } from './ContentSource.js';
 const typeLabels = { CHOICE: '单选', MULTI_CHOICE: '多选', FILL_BLANK: '填空', TRANSLATION: '翻译', ORDERING: '排序', MATCHING: '匹配', SHORT_ANSWER: '简答' };
@@ -22,6 +23,6 @@ function ExerciseCard({ exercise }: { exercise: StructuredExercise }) {
     </div>}
   </article>;
 }
-export function StructuredExerciseList({ exercises }: { exercises: StructuredExercise[] }) {
-  return <section className="space-y-4" aria-label="教材练习">{exercises.length ? exercises.map(exercise => <ExerciseCard key={exercise.id} exercise={exercise} />) : <p className="text-ink-muted">当前章没有已保存的练习。</p>}</section>;
+export function StructuredExerciseList({ exercises, directory }: { exercises: StructuredExercise[]; directory?: readonly ContentDirectoryNode[] }) {
+  return <section className="space-y-4" aria-label="教材练习">{exercises.length ? <DirectoryGroups {...(directory ? { directory } : {})} items={exercises} render={items => <div className="space-y-3">{items.map(exercise => <ExerciseCard key={exercise.id} exercise={exercise} />)}</div>} /> : <p className="text-ink-muted">当前部分没有已保存的练习。</p>}</section>;
 }

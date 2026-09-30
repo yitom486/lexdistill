@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
-import { TextbookASTSchema } from '@study-studio/document-model';
+import { TextbookASTSchema, planTextbookTasks, SavedTextbookContentSchema } from '@study-studio/document-model';
 import { BusinessError } from '@study-studio/shared';
 import type { ContentRepository } from '../ports.js';
 import { getImportMonitorWarning, IMPORT_MONITOR_REFRESH_MS } from '../application/import-monitor.js';
@@ -54,6 +54,16 @@ export function createImportMonitorRoutes(repo: ContentRepository) {
       if (!ast.success) return formatBusinessErrorResponse(c, new BusinessError('E_INVALID_TEXTBOOK_AST', '教材保存底稿无法读取', 'VALIDATION'));
       const node = ast.data.lessons.find(item => item.id === c.req.param('nodeId'));
       if (!node) return formatBusinessErrorResponse(c, new BusinessError('E_NOT_FOUND', '未找到保存的目录节点', 'LEARNER_STATE'));
-      return c.json({ documentId: document.value.id, nodeId: node.id, readAt: new Date().toISOString(), status: node.status, content: node.content ?? null });
+      const planned = planTextbookTasks(ast.data.lessons.map(item => ({ ...item, level: item.kind ?? 'lesson' })));
+      if (!planned.ok) return formatBusinessErrorResponse(c, planned.error);
+      const task = planned.value.find(task => task.entries.some(entry => entry.id === node.id));
+      const entries = task ? [...task.ancestors, ...task.entries] : [];
+      const stats = await repo.getTextbookAssetStats(document.value.id);
+      if (!stats.ok) return formatBusinessErrorResponse(c, stats.error);
+      const counts = stats.value.lessonDetails.find(item => item.lessonId === node.id);
+      return c.json(SavedTextbookContentSchema.parse({ documentId: document.value.id, nodeId: node.id, title: node.title, readAt: new Date().toISOString(), status: node.status, content: node.content ?? null,
+        directory: entries.map((entry, index) => ({ id: entry.id, title: entry.title, level: entry.level, parentId: entry.parentId, startPage: entry.startPage, endPage: entry.endPage, sortOrder: index + 1 })),
+        counts: counts ? { lines: counts.lineCount, vocabularies: counts.vocabCount, knowledgePoints: counts.grammarCount, exercises: counts.exerciseCount } : null,
+      }));
     });
 }

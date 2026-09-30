@@ -1,4 +1,4 @@
-import type { LessonContent, TextbookAST } from '@study-studio/document-model';
+import type { LessonContent, TextbookAST, ContentDirectoryNode } from '@study-studio/document-model';
 /**
  * 教材前端类型契约。
  * 教材内容 SSOT 在 Gateway SQLite（documents.ast_json），
@@ -50,6 +50,8 @@ export interface TextbookGrammarPoint {
 }
 
 export interface TextbookLesson {
+  directory?: ContentDirectoryNode[];
+  kind?: 'lesson' | 'section';
   content?: LessonContent;
   id: string;
   bookId: string;

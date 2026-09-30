@@ -1,4 +1,4 @@
-import type { TextbookAST } from '@study-studio/document-model';
+import { planTextbookTasks, type TextbookAST } from '@study-studio/document-model';
 import type { TextbookBook, FuriganaWord } from '../../models/textbook.js';
 
 export interface GeneratedCardItem {
@@ -12,7 +12,10 @@ export interface GeneratedCardItem {
  * 将领域模型 TextbookAST 转换为客户端可消费的 TextbookBook 视图结构。
  */
 export function convertAstToTextbookBook(ast: TextbookAST): TextbookBook {
-  const lessons = ast.lessons.filter(lesson => lesson.kind === undefined || lesson.kind === 'lesson');
+  const planned = planTextbookTasks(ast.lessons.map(lesson => ({ ...lesson, level: lesson.kind ?? 'lesson' })));
+  if (!planned.ok) throw planned.error;
+  const tasks = planned.value;
+  const lessons = tasks.map(task => task.root);
   return {
     id: ast.id,
     canonicalAst: ast,
@@ -20,10 +23,12 @@ export function convertAstToTextbookBook(ast: TextbookAST): TextbookBook {
     title: ast.title,
     shortTitle: ast.shortTitle,
     publisher: ast.publisher || '自定义导入',
-    totalLessons: lessons.length,
+    totalLessons: ast.lessons.filter(lesson => (lesson.kind ?? 'lesson') === 'lesson').length,
     level: ast.level,
     lessons: lessons.map((l) => ({
       id: l.id,
+      kind: l.level === 'section' ? 'section' : 'lesson',
+      directory: [...tasks.find(task => task.root.id === l.id)!.ancestors, ...tasks.find(task => task.root.id === l.id)!.entries].map((entry, index) => ({ id: entry.id, title: entry.title, level: entry.level, parentId: entry.parentId, startPage: entry.startPage, endPage: entry.endPage, sortOrder: index + 1 })),
       ...(l.content ? { content: l.content } : {}),
       bookId: ast.id,
       lessonNumber: l.lessonNumber,

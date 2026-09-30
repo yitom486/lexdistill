@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TextbookASTSchema } from '@study-studio/document-model';
+import { convertAstToTextbookBook } from '../../textbook-converter.js';
 import { DrizzleLearnerRepository } from '../../../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
 import { LibraryLessonCommitTool } from '../../../../../../gateway/src/modules/library/tools/library-lesson-commit-tool.js';
 import { createImportMonitorRoutes } from '../../../../../../gateway/src/modules/library/http/import-monitor-routes.js';
@@ -24,15 +26,22 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
     const currentRepo = repo, tool = new LibraryLessonCommitTool(repo), waiting = deferred(), reached = deferred();
     const model = pipelineModel(tool, async ({ input, submit }) => {
       const value = submissionFromPrompt(input.message);
+      value.content.vocabularies[0]!.aiExplanation = '保存的生词独立讲解';
       if (value.lessonId === 'b') { reached.resolve(); await waiting.promise; }
       expect((await submit(value)).ok).toBe(true);
     });
     const running = repo.executeTextbookPipeline({ userId: 'owner', traceId: 'desktop-trace', documentId: 'desktop-book', title: '监视教材', poolSize: 1,
-      tocEntries: [{ id: 'a', level: 'lesson', title: '已保存部分', startPage: 5, endPage: 7 }, { id: 'b', level: 'lesson', title: '当前部分', startPage: 8, endPage: 11 }],
+      tocEntries: [{ id: 'u', level: 'unit', title: '真实单元', startPage: 5, endPage: 11 },
+        { id: 'a', level: 'section', parentId: 'u', title: '已保存部分', startPage: 5, endPage: 7 }, { id: 'ac', level: 'section', parentId: 'a', title: '会话小节', startPage: 6, endPage: 7 },
+        { id: 'b', level: 'lesson', parentId: 'u', title: '当前部分', startPage: 8, endPage: 11 }],
       lessonJobs: [{ lessonId: 'a', ocrText: '历史正文' }, { lessonId: 'b', ocrText: '当前正文' }], adapter: model.adapter, submissionTool: tool,
     });
     try {
       await reached.promise;
+      const document = await currentRepo.getDocumentById('desktop-book'); if (!document.ok) throw document.error;
+      const book = convertAstToTextbookBook(TextbookASTSchema.parse(JSON.parse(document.value!.astJson!)));
+      expect(book.lessons.map(lesson => lesson.id)).toEqual(['a', 'b']); expect(book.totalLessons).toBe(1);
+      expect(book.lessons[0]?.kind).toBe('section'); expect(book.lessons[0]?.directory?.map(node => node.id)).toEqual(['u', 'a', 'ac']);
       const app = createImportMonitorRoutes(currentRepo), reads: string[] = [];
       globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
         const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
@@ -52,13 +61,27 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       expect(doc.querySelector<HTMLDetailsElement>('[data-testid="current-interaction"]')?.open).toBe(true);
       expect(doc.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')?.open).toBe(false);
       expect(doc.body.textContent).toContain('当前正文');
-      await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'a')!.click());
+      await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '已保存部分')!.click());
       await settle();
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '查询数据库当前保存内容')!.click());
       await settle(); await settle();
       expect(doc.body.textContent).toContain('当前版本');
-      expect(doc.body.textContent).toContain('"status": "ready"');
+      expect(doc.querySelector('[data-testid="saved-result"]')?.textContent).toContain('数据库派生行：正文 2');
+      expect(doc.querySelector('[data-testid="saved-result"] [data-toc-id="ac"]')?.textContent).toContain('会话小节');
       expect(doc.body.textContent).toContain('整理后的正文 a');
+      const savedElement = doc.querySelector('[data-testid="saved-result"]')!;
+      await act(async () => [...savedElement.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(button => button.textContent === '生词')!.click()); await settle();
+      expect(savedElement.textContent).toContain('保存的生词独立讲解');
+      await act(async () => [...savedElement.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(button => button.textContent === '知识点与讲解')!.click()); await settle();
+      expect(savedElement.querySelector('[data-field="textbookExplanation"]')?.textContent).toContain('原书说明');
+      expect(savedElement.querySelector('[data-field="aiExplanation"]')?.textContent).toContain('模型补充说明');
+      const previous = doc.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')!;
+      await act(async () => { previous.open = true; previous.dispatchEvent(new dom!.dom.window.Event('toggle')); });
+      await act(async () => [...previous.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(button => button.textContent === '工具')!.click()); await settle();
+      const candidate = [...previous.querySelectorAll<HTMLDetailsElement>('details')].find(item => item.querySelector('summary')?.textContent?.includes('candidate'))!;
+      await act(async () => { candidate.open = true; candidate.dispatchEvent(new dom!.dom.window.Event('toggle')); }); await settle(); await settle();
+      expect(candidate.textContent).toContain('模型提交候选'); expect(candidate.textContent).toContain('尚不能据此认定已保存');
+      expect(candidate.querySelector('[data-toc-id="ac"]')?.textContent).toContain('整理后的正文 ac');
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '本次全部部分')!.click());
       await settle();
       expect(doc.body.textContent).toContain('Agent 会话与当前绑定');
