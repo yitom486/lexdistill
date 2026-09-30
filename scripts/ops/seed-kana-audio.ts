@@ -122,6 +122,7 @@ async function runSingle(
   apiKey: string,
   voice: string,
   model: string,
+  paceMs: number,
 ): Promise<Map<string, { audioBase64: string; mimeType: string }>> {
   await mkdir(AUDIO_DIR, { recursive: true });
   const collected = new Map<string, { audioBase64: string; mimeType: string }>();
@@ -163,7 +164,7 @@ async function runSingle(
     await saveProgress(voice, model, done);
     collected.set(k.id, { audioBase64: audio.audioBuffer.toString('base64'), mimeType: audio.mimeType });
     console.log(`单条合成 ${index}/${items.length}（已落盘 ${done.size}）`);
-    await new Promise((r) => setTimeout(r, 22000));
+    await new Promise((r) => setTimeout(r, paceMs));
   }
   return collected;
 }
@@ -179,12 +180,14 @@ async function main(): Promise<void> {
   const voice = arg('voice', 'aoede');
   const model = arg('model', 'gemini-3.8-flash-tts');
   const timeoutMin = Number(arg('timeout-min', '120')) || 120;
+  // 单条 pacing（毫秒）：免费 22000（3次/分），付费档可调小（如 3000）。
+  const paceMs = Number(arg('pace-ms', '22000')) || 22000;
 
   await verifyKeyAndVoice(apiKey, voice);
 
   if (forceSingle) {
     console.log('强制单条模式：104 次实时合成。');
-    await writeResults(await runSingle(apiKey, voice, model), voice, model);
+    await writeResults(await runSingle(apiKey, voice, model, paceMs), voice, model);
     return;
   }
 
