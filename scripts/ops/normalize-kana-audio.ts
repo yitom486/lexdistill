@@ -68,8 +68,14 @@ for (const f of files) {
   let trail = 0;
   while (trail < n - lead && Math.abs(samples[n - 1 - trail]!) / 32768 < SILENCE) trail++;
   const keep = Math.floor((sampleRate * KEEP_MS) / 1000);
-  const start = Math.max(0, lead - keep);
-  const end = Math.min(n, n - trail + keep);
+  let start = Math.max(0, lead - keep);
+  let end = Math.min(n, n - trail + keep);
+  // 安全阀：裁剪绝不砍掉超过 40% 时长；整文件偏 quiet 时只做增益不裁剪。
+  if (end - start < n * 0.6) {
+    console.log(`${f}: 跳过裁剪（会砍掉超过 40%），只做增益`);
+    start = 0;
+    end = n;
+  }
   const gain = Math.min(TARGET_PEAK / peak, MAX_GAIN);
   const capped = TARGET_PEAK / peak > MAX_GAIN ? ' GAIN-CAPPED需重生' : '';
   console.log(`${f}: peak ${peak.toFixed(3)}→${(Math.min(peak * gain, 1)).toFixed(3)} gain x${gain.toFixed(1)} 裁 ${(lead / sampleRate * 1000).toFixed(0)}/${(trail / sampleRate * 1000).toFixed(0)}ms${capped}`);

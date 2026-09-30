@@ -3,7 +3,7 @@
  *
  * 由 `scripts/ops/seed-kana-audio.ts` 生成并提交；key 为假名种子 id
  *（如 `kana_a`），value 为 `public/audio/kana/` 下的文件名。
- * 平假名/片假名同音，共用同一文件。 voice=aoede model=gemini-3.8-flash-tts。
+ * 平假名/片假名同音，共用同一文件。 voice=aoede model=gemini-3.8-flash-lite-tts。
  */
 export const KANA_AUDIO_MANIFEST: Record<string, string> = {
   "kana_a": "kana_a.wav",
