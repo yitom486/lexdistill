@@ -193,6 +193,7 @@ class SpeechStudioEngine {
   private cachedDefaultAt = 0;
   private abortController: AbortController | null = null;
   private sequence = 0;
+  private stopEpoch = 0;
 
   public subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
@@ -205,6 +206,9 @@ class SpeechStudioEngine {
   }
   public getConfig(): SpeechStudioConfig { return { ...this.config }; }
   public getIsSpeaking(): boolean { return this.isSpeaking; }
+
+  /** stop() 专属代际：自然播完不加，外部停止才加，供连播区分“播完推进”与“被停住”。 */
+  public getStopEpoch(): number { return this.stopEpoch; }
   public getIsStreaming(): boolean { return this.isStreaming; }
   public getStreamedSeconds(): number { return this.streamedSeconds; }
   public getStreamedChunks(): number { return this.streamedChunks; }
@@ -588,6 +592,7 @@ class SpeechStudioEngine {
   }
   public stop(): void {
     this.sequence++;
+    this.stopEpoch++;
     this.abortController?.abort();
     this.currentAudio?.pause();
     if (this.currentAudioUrl && this.currentAudioUrl !== this.lastAudioUrl) URL.revokeObjectURL(this.currentAudioUrl);
