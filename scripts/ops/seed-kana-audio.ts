@@ -114,9 +114,21 @@ async function saveProgress(voice: string, model: string, suffix: string, done: 
 
 function retryDelayMs(error: unknown): number {
   const message = error instanceof Error ? error.message : String(error);
-  const m = message.match(/retry in ([\d.]+)s/i) || message.match(/retryDelay["']?\s*:\s*["']?(\d+)/i);
-  const seconds = m?.[1] ? Number(m[1]) : 30;
-  return (Number.isFinite(seconds) ? seconds : 30) * 1000 + 2000;
+  // 官方 retry 信息两种写法都吃，单位毫秒/秒自适应，上限 5 分钟兜底
+  //（曾把 50.362s 误解析成 50362s 睡 14 小时，此处只取秒级数值并封顶）。
+  let seconds = 30;
+  const inRetry = message.match(/retry in ([\d.]+)\s*s/i);
+  const inDelay =
+    message.match(/retryDelay["']?\s*:\s*["']?([\d.]+)\s*(ms|s)?/i) ??
+    message.match(/retryDelaySeconds["']?\s*:\s*["']?([\d.]+)/i);
+  if (inRetry?.[1]) {
+    seconds = Number(inRetry[1]);
+  } else if (inDelay?.[1]) {
+    const unit = inDelay[2]?.toLowerCase() === 'ms' ? 'ms' : 's';
+    seconds = unit === 'ms' ? Number(inDelay[1]) / 1000 : Number(inDelay[1]);
+  }
+  if (!Number.isFinite(seconds) || seconds <= 0) seconds = 30;
+  return Math.min(seconds, 300) * 1000 + 2000;
 }
 
 async function runSingle(
