@@ -59,7 +59,8 @@ export async function pushCardToAnki(
         const result = await synthesizeUnified({
           text: input.text,
           language: input.trackLanguage,
-          purpose: 'flashcard',
+          // 不传 purpose：上游会把它转成 speechMetadata 并拼成
+          // `Say in a <purpose> style:` 读出来，又是前奏又浪费 token。
           preferredService: input.provider,
           ...(input.model ? { model: input.model } : {}),
           voicePreference: {

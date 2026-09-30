@@ -13,7 +13,6 @@ export interface TtsStreamBody {
   text: string;
   voiceName: string;
   model?: string | undefined;
-  speechMetadata?: string | undefined;
   languageCode?: string | undefined;
   region?: string | undefined;
   endpoint?: string | undefined;
@@ -93,7 +92,6 @@ export function buildTtsStreamBody(input: {
   text: string;
   voiceName: string;
   model?: string;
-  speechMetadata?: string;
   languageCode?: string;
   region?: string;
   endpoint?: string;
@@ -118,7 +116,8 @@ export function buildTtsStreamBody(input: {
     text,
     voiceName,
     ...(model ? { model } : {}),
-    ...(input.speechMetadata?.trim() ? { speechMetadata: input.speechMetadata.trim() } : {}),
+    // speechMetadata 已彻底移除：上游曾把它拼成 `Say in a <x> style:` 读出来，
+    // 既是前奏又是浪费 token。用途只留在本地 purpose，不进请求体。
     ...(input.languageCode?.trim() ? { languageCode: input.languageCode.trim() } : {}),
     ...(input.region?.trim() ? { region: input.region.trim() } : {}),
     ...(input.endpoint?.trim() ? { endpoint: input.endpoint.trim() } : {}),

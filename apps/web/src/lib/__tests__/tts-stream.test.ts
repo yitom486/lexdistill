@@ -14,7 +14,6 @@ describe('buildTtsStreamBody', () => {
       text: 'hello',
       voiceName: 'Achernar',
       model: 'gemini-3.8-flash-tts',
-      speechMetadata: 'preview',
       languageCode: 'en-US',
       speed: 0.9,
     });
@@ -25,6 +24,8 @@ describe('buildTtsStreamBody', () => {
       model: 'gemini-3.8-flash-tts',
       speed: 0.9,
     });
+    // 前奏回归锁：请求体永远不带 speechMetadata。
+    expect(body).not.toHaveProperty('speechMetadata');
   });
 
   it('rejects empty text, missing voice, and missing gemini model', () => {
