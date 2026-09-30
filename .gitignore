@@ -58,6 +58,10 @@ lerna-debug.log*
 .DS_Store
 Thumbs.db
 
+# 假名内置音频（批量 TTS 生成，体积大、可重跑，不入库；清单 TS 入库）
+apps/web/public/audio/kana/*.wav
+!apps/web/public/audio/kana/.gitkeep
+
 # Testing & Coverage
 coverage/
 .nyc_output/
