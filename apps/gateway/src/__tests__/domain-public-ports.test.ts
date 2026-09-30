@@ -21,7 +21,7 @@ const CONTENT_METHODS = [
   'seedTextbookTocSkeleton', 'commitLessonKnowledge', 'listTextbookLessonSlots', 'importDocumentFile',
   'saveAnnotation', 'listAnnotations', 'deleteAnnotation', 'convertAnnotationToCard',
   'saveDocumentStructure', 'getDocumentStructure', 'listDocumentLessonRefs', 'saveReadingPosition',
-  'getReadingPosition', 'shredDocument', 'materializeSeedDocument', 'saveKnowledgePoints',
+  'getReadingPosition', 'shredDocument', 'saveKnowledgePoints',
   'listKnowledgePoints', 'getAdaptiveKanaQueue',
   'getCurriculumHangul', 'getCurriculumKana', 'listReadingSets', 'saveReadingSet',
   'recordKanaPractice', 'recordHangulPractice', 'recordReadingPractice',

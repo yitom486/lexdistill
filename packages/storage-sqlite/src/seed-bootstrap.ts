@@ -24,7 +24,6 @@ import {
   N5_SOURCE_LABEL,
   N5_WORD_SEEDS,
 } from './seeds/n5-words-seed.js';
-import { TEXTBOOK_BOOKS } from './seeds/textbook-seed.js';
 import { ensureSeedDictionarySources, seedSourceRowId, STARTER_SOURCE_ID, N5_SOURCE_ID } from './seeds/seed-sources.js';
 
 /**
@@ -206,35 +205,6 @@ export function seedInitialData(sqlite: Database): void {
       }
     } catch (e) {
       console.warn('[initSchema] Failed to auto-seed reading passages:', e);
-    }
-
-    // 2.5 自动填充内置课程教材（若缺；增量补种，按文档 id 去重）
-    try {
-      const insertTextbookIgnore = sqlite.prepare(`
-        INSERT OR IGNORE INTO documents (
-          id, user_id, title, source_kind, language, content, ast_json, topic, difficulty, source_url, source_publisher, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      const now = new Date().toISOString();
-      for (const book of TEXTBOOK_BOOKS) {
-        insertTextbookIgnore.run(
-          book.id,
-          'default_user',
-          book.title,
-          'curriculum_textbook',
-          (book.language || 'JA').toLowerCase(),
-          book.title,
-          JSON.stringify(book),
-          'curriculum',
-          1,
-          null,
-          book.publisher,
-          now,
-          now
-        );
-      }
-    } catch (e) {
-      console.warn('[initSchema] Failed to auto-seed curriculum textbooks:', e);
     }
 
     // 3. 自动填充 FSRS 闪卡初始种子（按语种分仓）

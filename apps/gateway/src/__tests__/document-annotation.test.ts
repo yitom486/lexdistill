@@ -227,6 +227,7 @@ describe('Document & Annotation Repository (Companion Integration)', () => {
       updatedAt: new Date().toISOString(),
     };
     expect(isOk(await repo.saveDocument(mine))).toBe(true);
+    expect(isOk(await repo.saveDocument({ ...mine, id: `${mine.id}-public`, sourceKind: 'curriculum_textbook' }))).toBe(true);
     const listRes = await repo.listDocuments('someone_else');
     expect(isOk(listRes)).toBe(true);
     if (!isOk(listRes)) return;

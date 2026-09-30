@@ -1,4 +1,5 @@
-import { eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
+import { savePipelineAstInTx } from './commit-lesson-knowledge.js';
 import {
   ok,
   err,
@@ -13,7 +14,14 @@ import {
   type TocEntry,
   type TocValidationResult,
 } from '@study-studio/document-model';
-import { documents, textbookLessons } from '../../schema.js';
+import {
+  documents,
+  textbookLessons,
+  textbookLines,
+  textbookVocab,
+  textbookGrammar,
+  textbookExercises,
+} from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
 
 export interface SeedTocSkeletonInput {
@@ -23,6 +31,7 @@ export interface SeedTocSkeletonInput {
   language?: string | undefined;
   entries: readonly TocEntry[];
   forceOverwrite?: boolean | undefined;
+  sourceFingerprint?: string | undefined;
 }
 
 export interface SavedTocSkeleton {
@@ -78,6 +87,16 @@ export async function seedTextbookTocSkeleton(
         .all();
 
       if (existingDoc.length > 0) {
+        if (existingDoc[0]?.userId !== input.userId) {
+          throw new BusinessError('E_NOT_FOUND', '未找到当前用户的教材', 'VALIDATION');
+        }
+        if (input.sourceFingerprint && existingDoc[0]?.astJson) {
+          const previous: unknown = JSON.parse(existingDoc[0].astJson);
+          if (previous && typeof previous === 'object' && 'sourceFingerprint' in previous &&
+              typeof previous.sourceFingerprint === 'string' && previous.sourceFingerprint !== input.sourceFingerprint) {
+            throw new BusinessError('E_SOURCE_FILE_CONFLICT', '所选 PDF 与这本教材原来的文件不同，请作为新教材导入，避免混入不同版本的内容', 'VALIDATION');
+          }
+        }
         tx.update(documents)
           .set({
             title: docTitle,
@@ -110,6 +129,21 @@ export async function seedTextbookTocSkeleton(
         .all();
       const existingLessonMap = new Map(existingLessons.map((l) => [l.lessonId, l]));
 
+      for (const entry of canonicalEntries) {
+        const prev = existingLessonMap.get(entry.id);
+        if (!input.forceOverwrite && prev?.status === 'ready' &&
+            (prev.title !== entry.title || (prev.startPage !== null && prev.startPage !== entry.startPage))) {
+          throw new BusinessError('E_TOC_SLOT_CONFLICT', '目录中的课次身份与已导入内容不一致，请重新核对目录，避免把旧课文放入新课次', 'VALIDATION');
+        }
+      }
+      for (const prev of existingLessons) {
+        const preserved = !input.forceOverwrite && prev.status === 'ready' && canonicalEntries.some((e) => e.id === prev.lessonId);
+        if (preserved) continue;
+        for (const table of [textbookVocab, textbookGrammar, textbookExercises, textbookLines]) {
+          tx.delete(table).where(and(eq(table.documentId, input.documentId), eq(table.lessonId, prev.lessonId))).run();
+        }
+      }
+
       // 幂等清理该文档现有章节槽位
       tx.delete(textbookLessons).where(eq(textbookLessons.documentId, input.documentId)).run();
 
@@ -123,7 +157,7 @@ export async function seedTextbookTocSkeleton(
           lessonNumber: entry.sortOrder,
           title: entry.title,
           sortOrder: entry.sortOrder,
-          kind: entry.level === 'unit' || entry.level === 'chapter' ? 'chapter' : 'lesson',
+          kind: entry.level === 'unit' || entry.level === 'chapter' ? 'chapter' : entry.level,
           parentId: entry.parentId ?? null,
           startPage: entry.startPage,
           endPage: entry.endPage ?? null,
@@ -137,6 +171,10 @@ export async function seedTextbookTocSkeleton(
       if (lessonRows.length > 0) {
         tx.insert(textbookLessons).values(lessonRows).run();
       }
+      savePipelineAstInTx(tx, input.documentId, {
+        outlineConfirmed: true,
+        ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+      });
     });
 
     return ok({
@@ -148,6 +186,7 @@ export async function seedTextbookTocSkeleton(
       maxPage: validated.value.maxPage,
     });
   } catch (e) {
+    if (e instanceof BusinessError) return err(e);
     return err(translateToBusinessError(e, 'seedTextbookTocSkeleton'));
   }
 }
@@ -208,3 +247,83 @@ export async function listTextbookLessonSlots(
   }
 }
 
+export interface TextbookAssetStats {
+  documentId: string;
+  lessons: number;
+  readyLessons: number;
+  lines: number;
+  vocab: number;
+  grammar: number;
+  exercises: number;
+  passageLessons: number;
+  lessonDetails: Array<{
+    lessonId: string;
+    title: string;
+    status: 'pending' | 'ready' | 'failed';
+    hasPassage: boolean;
+    lineCount: number;
+    vocabCount: number;
+    grammarCount: number;
+    exerciseCount: number;
+    hasPreview: boolean;
+    hasSummary: boolean;
+  }>;
+}
+
+/**
+ * 极速统计指定教材文档在 SQLite 中的真实结构化学习资产（行数、课次、生词、语法、练习）。
+ * 毫秒级返回，作为网关权威诊断决策的第一事实源（SSOT）。
+ */
+export async function getTextbookAssetStats(
+  deps: { db: DrizzleDb },
+  documentId: string
+): Promise<Result<TextbookAssetStats, BusinessError>> {
+  if (!documentId?.trim()) {
+    return err(new BusinessError('E_INVALID_INPUT', '缺少文档标识 documentId', 'VALIDATION', false));
+  }
+  try {
+    const docId = documentId.trim();
+    const lessonRows = deps.db
+      .select()
+      .from(textbookLessons)
+      .where(and(eq(textbookLessons.documentId, docId), eq(textbookLessons.kind, 'lesson')))
+      .orderBy(textbookLessons.sortOrder)
+      .all();
+
+    const countsByLesson = (table: typeof textbookLines | typeof textbookVocab | typeof textbookGrammar | typeof textbookExercises) =>
+      new Map(deps.db.select({ lessonId: table.lessonId, count: count() }).from(table)
+        .where(eq(table.documentId, docId)).groupBy(table.lessonId).all().map((r) => [r.lessonId, r.count]));
+    const lines = countsByLesson(textbookLines);
+    const vocab = countsByLesson(textbookVocab);
+    const grammar = countsByLesson(textbookGrammar);
+    const exercises = countsByLesson(textbookExercises);
+    const lessonDetails: TextbookAssetStats['lessonDetails'] = lessonRows.map((r) => {
+      const lineCount = lines.get(r.lessonId) ?? 0;
+      const vocabCount = vocab.get(r.lessonId) ?? 0;
+      const grammarCount = grammar.get(r.lessonId) ?? 0;
+      const exerciseCount = exercises.get(r.lessonId) ?? 0;
+      const hasPassage = Boolean(r.passageMd?.trim() || lineCount > 0);
+      const hasContent = hasPassage || vocabCount > 0 || grammarCount > 0 || exerciseCount > 0;
+      return {
+        lessonId: r.lessonId, title: r.title,
+        status: r.status === 'ready' && hasContent ? 'ready' : r.status === 'failed' ? 'failed' : 'pending',
+        hasPassage, lineCount, vocabCount, grammarCount, exerciseCount,
+        hasPreview: Boolean(r.previewJson?.trim()), hasSummary: Boolean(r.summaryJson?.trim()),
+      };
+    });
+
+    return ok({
+      documentId: docId,
+      lessons: lessonDetails.length,
+      readyLessons: lessonDetails.filter((r) => r.status === 'ready').length,
+      lines: lessonDetails.reduce((sum, r) => sum + r.lineCount, 0),
+      vocab: lessonDetails.reduce((sum, r) => sum + r.vocabCount, 0),
+      grammar: lessonDetails.reduce((sum, r) => sum + r.grammarCount, 0),
+      exercises: lessonDetails.reduce((sum, r) => sum + r.exerciseCount, 0),
+      passageLessons: lessonDetails.filter((r) => r.hasPassage).length,
+      lessonDetails,
+    });
+  } catch (e) {
+    return err(translateToBusinessError(e, 'getTextbookAssetStats'));
+  }
+}

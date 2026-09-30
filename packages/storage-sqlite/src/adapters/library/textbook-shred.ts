@@ -134,7 +134,7 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
         // P1-B：sort_order 唯一来源 = 最终 canonical AST 数组 index + 1（1-based 连续）。
         // 禁止 sort_order = lessonNumber（可 gap）、禁止从 lesson_id 后缀/插入顺序推导。
         const sortOrder = li + 1;
-        // lesson_number 保持 legacy 兼容写法（positional，可 gap，不排序，不展示）。
+        // lesson_number 为教材课号；查询顺序使用 sort_order。
         const lessonNumber =
           typeof l.lessonNumber === 'number' && Number.isInteger(l.lessonNumber) && l.lessonNumber > 0
             ? l.lessonNumber
@@ -142,7 +142,14 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
         const title = typeof l.title === 'string' ? l.title.slice(0, 200) : '';
         // 注意：drizzle builder 是惰性的——同步事务里必须显式 .run()，
         // 光 tx.insert(...).values(...) 不执行也不报错（静默零写，已实测）。
-        tx.insert(textbookLessons).values({ documentId, lessonId, lessonNumber, title, sortOrder, kind: 'lesson', parentId: null }).run();
+        tx.insert(textbookLessons).values({
+          documentId, lessonId, lessonNumber, title, sortOrder,
+          kind: lesson.kind ?? 'lesson', parentId: lesson.parentId ?? null,
+          startPage: lesson.startPage ?? null, endPage: lesson.endPage ?? null,
+          status: lesson.status ?? 'pending',
+          passageMd: lesson.passageMd ?? null,
+          previewJson: lesson.previewJson ?? null, summaryJson: lesson.summaryJson ?? null,
+        }).run();
         stats.lessons++;
 
         const vocabularies = Array.isArray((lesson as { vocabularies?: unknown }).vocabularies)

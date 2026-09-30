@@ -121,6 +121,8 @@ export interface PdfOcrResult {
   pages?: Array<{ pageNumber: number; markdown: string; spans?: OcrTextSpanLike[] }>;
   pagesRoutedToOcr?: number[];
   pagesRecommendingHosted?: number[];
+  pageCount?: number;
+  ocrTimeMs?: number;
 }
 
 /**
@@ -308,6 +310,7 @@ async function writeEntries(baseDir: string, entries: ArchiveEntry[]): Promise<v
 
 async function findFileByName(dir: string, fileName: string): Promise<string | null> {
   const stack = [dir];
+  let fallbackMatch: string | null = null;
   while (stack.length > 0) {
     const cur = stack.pop() as string;
     let items: import('node:fs').Dirent[];
@@ -318,11 +321,22 @@ async function findFileByName(dir: string, fileName: string): Promise<string | n
     }
     for (const it of items) {
       const full = path.join(cur, it.name);
-      if (it.isDirectory()) stack.push(full);
-      else if (it.name === fileName) return full;
+      if (it.isDirectory()) {
+        stack.push(full);
+      } else if (it.name === fileName) {
+        return full;
+      } else if (!fallbackMatch) {
+        // 跨平台容错匹配（针对 Linux/macOS 压缩包内只有带版本号后缀的实体文件，如 libonnxruntime.so.1.27.0 或 libonnxruntime.1.27.0.dylib）
+        if (
+          (fileName.includes('onnxruntime') && it.name.includes('onnxruntime') && (it.name.includes('.so') || it.name.includes('.dylib') || it.name.endsWith('.dll'))) ||
+          (fileName.includes('pdfium') && it.name.includes('pdfium') && (it.name.includes('.so') || it.name.includes('.dylib') || it.name.endsWith('.dll')))
+        ) {
+          fallbackMatch = full;
+        }
+      }
     }
   }
-  return null;
+  return fallbackMatch;
 }
 
 interface ManifestShape {

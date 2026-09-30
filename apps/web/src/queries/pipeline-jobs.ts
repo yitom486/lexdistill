@@ -24,6 +24,7 @@ export interface StartPipelineJobVars {
   filePath?: string;
   pdfBase64?: string;
   model?: string;
+  effort?: string;
   poolSize?: number;
   forceOverwrite?: boolean;
   tocEntries: Array<{
@@ -32,6 +33,8 @@ export interface StartPipelineJobVars {
     level: string;
     startPage: number;
     sortOrder: number;
+    endPage?: number;
+    parentId?: string;
   }>;
   lessonJobs?: Array<{
     lessonId: string;
@@ -63,6 +66,7 @@ export async function requestStartPipelineJob(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(vars),
+    signal: AbortSignal.timeout(60_000),
   });
   const payload = (await res.json().catch(() => null)) as TextbookPipelineJobSnapshot | null;
   if ((res.status !== 202 && !res.ok) || !payload) {
@@ -195,9 +199,11 @@ export function usePipelineJobSubscription(userId = DEFAULT_USER_ID) {
     requestPipelineJob(userId, activeJobId).then((snapshot) => {
       if (isDisposed || !snapshot) return;
       setActiveJob(snapshot);
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TEXTBOOKS });
 
       // 若已经处于终止状态，无需挂载长连
       if (snapshot.status !== 'running') {
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCUMENTS });
         return;
       }
 
@@ -210,6 +216,10 @@ export function usePipelineJobSubscription(userId = DEFAULT_USER_ID) {
           const updated = JSON.parse(event.data) as TextbookPipelineJobSnapshot;
           const currentStoreJob = usePipelineJobStore.getState().activeJob;
           setActiveJob(updated);
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TEXTBOOKS });
+          if (updated.status !== 'running') {
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCUMENTS });
+          }
 
           // 跃迁到终态时的通知与音效反馈
           if (currentStoreJob?.status === 'running') {

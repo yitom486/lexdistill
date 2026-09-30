@@ -19,7 +19,6 @@ import type {
 } from './application/document-import/document-import-service.js';
 import type { SavedDocumentStructure } from './persistence/document-structure.js';
 import type { ShredStats } from '@study-studio/storage-sqlite';
-import type { MaterializeSeedInput } from '@study-studio/storage-sqlite';
 import type { ReadingPosition } from '@study-studio/storage-sqlite';
 import type {
   SaveKnowledgePointInput,
@@ -29,6 +28,7 @@ import type {
   CommitLessonKnowledgeInput,
   CommitLessonKnowledgeOutput,
   TextbookLessonSlotItem,
+  TextbookAssetStats,
 } from '@study-studio/storage-sqlite';
 import type {
   TextbookPipelineInput,
@@ -56,6 +56,9 @@ export interface ContentRepository {
   listTextbookLessonSlots(
     documentId: string
   ): Promise<Result<TextbookLessonSlotItem[], BusinessError>>;
+  getTextbookAssetStats(
+    documentId: string
+  ): Promise<Result<TextbookAssetStats, BusinessError>>;
   getDocumentById(id: string): Promise<Result<DocumentItem | null, BusinessError>>;
   saveDocument(doc: DocumentItem): Promise<Result<DocumentItem, BusinessError>>;
   listDocuments(
@@ -145,12 +148,6 @@ export interface ContentRepository {
     documentId: string,
     book: TextbookAST
   ): Promise<Result<ShredStats, BusinessError>>;
-  materializeSeedDocument(
-    docBase: MaterializeSeedInput['docBase'],
-    book: TextbookAST,
-    fingerprint: string,
-    materializerVersion: number
-  ): Promise<Result<DocumentItem, BusinessError>>;
   getAdaptiveKanaQueue(
     userId: string,
     options?: AdaptiveKanaQueueOptions

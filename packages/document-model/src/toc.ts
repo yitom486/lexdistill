@@ -124,11 +124,12 @@ export function canonicalizeTocEntries(entries: readonly TocEntry[]): Array<TocE
     let inferredEndPage = entry.endPage;
     if (inferredEndPage === undefined) {
       // 尝试根据下一个同级或高级节点的 startPage 推断
-      const nextEntry = entries.slice(index + 1).find((e) => e.startPage >= entry.startPage);
+      const rank = TocLevelSchema.options.indexOf(entry.level);
+      const nextEntry = entries.slice(index + 1).find((e) =>
+        TocLevelSchema.options.indexOf(e.level) <= rank && e.startPage > entry.startPage
+      );
       if (nextEntry && nextEntry.startPage > entry.startPage) {
         inferredEndPage = nextEntry.startPage - 1;
-      } else {
-        inferredEndPage = entry.startPage;
       }
     }
 

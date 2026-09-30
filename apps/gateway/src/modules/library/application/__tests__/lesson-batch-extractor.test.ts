@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'bun:test';
-import { ok, err, isOk, BusinessError } from '@study-studio/shared';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { DrizzleLearnerRepository } from '../../../../infrastructure/drizzle-learner-repository.js';
+import { ok, isOk } from '@study-studio/shared';
 import {
   LessonBatchExtractor,
   parseLessonExtractionJson,
@@ -8,6 +9,17 @@ import {
   type AgentPoolLease,
 } from '../lesson-batch-extractor.js';
 import type { ContentRepository } from '../../ports.js';
+
+const repositories: DrizzleLearnerRepository[] = [];
+afterEach(() => { for (const repo of repositories.splice(0)) repo.getRawDb().close(); });
+async function persistedOutline(documentId: string, lessonIds: string[]) {
+  const repo = new DrizzleLearnerRepository(':memory:');
+  repositories.push(repo);
+  const seeded = await repo.seedTextbookTocSkeleton({ documentId, userId: 'test-user', title: '测试教材',
+    entries: lessonIds.map((id, index) => ({ id, level: 'lesson', title: id, startPage: index + 1 })) });
+  if (!seeded.ok) throw seeded.error;
+  return repo;
+}
 
 describe('LessonBatchExtractor', () => {
   describe('parseLessonExtractionJson', () => {
@@ -153,23 +165,7 @@ describe('LessonBatchExtractor', () => {
         },
       };
 
-      const committedLessons: string[] = [];
-      const mockRepo: Partial<ContentRepository> = {
-        commitLessonKnowledge: async (input) => {
-          committedLessons.push(input.lessonId);
-          return ok({
-            documentId: input.documentId,
-            lessonId: input.lessonId,
-            stats: {
-              vocabCount: 1,
-              grammarCount: 0,
-              exerciseCount: 0,
-              hasPassage: true,
-            },
-            allLessonsReady: committedLessons.length === 3,
-          });
-        },
-      };
+      const mockRepo = await persistedOutline('doc_tb_1', ['l1', 'l2', 'l3']);
 
       const progressEvents: number[] = [];
       const extractor = new LessonBatchExtractor(mockRepo as ContentRepository);
@@ -193,7 +189,8 @@ describe('LessonBatchExtractor', () => {
       expect(summary.failedJobs).toBe(0);
       expect(summary.allLessonsReady).toBe(true);
       expect(progressEvents.length).toBe(3);
-      expect(committedLessons.length).toBe(3);
+      const stats = await mockRepo.getTextbookAssetStats('doc_tb_1');
+      expect(stats.ok && stats.value.readyLessons).toBe(3);
     });
 
     it('单课失败时不崩溃批处理整体流程，妥善聚合错误', async () => {
@@ -207,11 +204,7 @@ describe('LessonBatchExtractor', () => {
         close: async () => {},
       };
 
-      const mockRepo: Partial<ContentRepository> = {
-        commitLessonKnowledge: async () => {
-          return err(new BusinessError('E_FAIL', '回填失败', 'DATABASE', false));
-        },
-      };
+      const mockRepo = await persistedOutline('doc_tb_1', ['l1']);
 
       const extractor = new LessonBatchExtractor(mockRepo as ContentRepository);
       const summary = await extractor.extractBatch(
@@ -233,6 +226,7 @@ describe('LessonBatchExtractor', () => {
           ask: async () => ({
             text: JSON.stringify({
               title: '第1课',
+              passageMd: '这是实际提取的课文。',
               preview: {
                 keyPoints: ['敬体与简体'],
                 pitfalls: ['は与が'],
@@ -286,29 +280,9 @@ describe('LessonBatchExtractor', () => {
         close: async () => {},
       };
 
-      const mockRepo: Partial<ContentRepository> = {
-        listTextbookLessonSlots: async () =>
-          ok([
-            {
-              documentId: 'doc_ready_01',
-              lessonId: 'l1',
-              lessonNumber: 1,
-              title: '第1课',
-              sortOrder: 1,
-              kind: 'lesson',
-              parentId: null,
-              startPage: 1,
-              endPage: 5,
-              status: 'ready',
-              hasPassage: true,
-              hasPreview: true,
-              hasSummary: true,
-            },
-          ]),
-        commitLessonKnowledge: async () => {
-          throw new Error('should not be called');
-        },
-      };
+      const mockRepo = await persistedOutline('doc_ready_01', ['l1']);
+      const committed = await mockRepo.commitLessonKnowledge({ documentId: 'doc_ready_01', lessonId: 'l1', passageMd: '原来已经保存的课文' });
+      expect(committed.ok).toBe(true);
 
       const extractor = new LessonBatchExtractor(mockRepo as ContentRepository);
       const summary = await extractor.extractBatch(
@@ -373,7 +347,7 @@ describe('LessonBatchExtractor', () => {
       );
 
       expect(res.ok).toBe(true);
-      expect(captured.input?.title).toBe('第1课 原生工具调用');
+      expect(captured.input?.title).toBeUndefined(); // 模型输出不能改写已确认目录标题。
       expect(captured.input?.passageMd).toContain('工具调用回填');
       expect(captured.input?.vocabularies?.length).toBe(1);
       expect(captured.input?.previewJson).toContain('工具调用强类型约束');

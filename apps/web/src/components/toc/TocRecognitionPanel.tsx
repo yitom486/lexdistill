@@ -33,6 +33,7 @@ interface TocRecognitionPanelProps {
     lessonCount: number;
   } | undefined;
   onTocConfirmed?: ((entries: TocRecognitionCandidate[]) => void) | undefined;
+  onTocInvalidated?: (() => void) | undefined;
 }
 
 export function TocRecognitionPanel({
@@ -42,6 +43,7 @@ export function TocRecognitionPanel({
   initialEntries,
   existingDocInfo,
   onTocConfirmed,
+  onTocInvalidated,
 }: TocRecognitionPanelProps) {
   const map = useMapPdfMutation();
   const extractLlm = useExtractTocWithLlmMutation();
@@ -85,6 +87,7 @@ export function TocRecognitionPanel({
   const hasSource = Boolean(file || filePath.trim());
 
   const clearScan = () => {
+    onTocInvalidated?.();
     setEntries([]);
     setScanned(false);
     setConfirmed(false);
@@ -92,6 +95,7 @@ export function TocRecognitionPanel({
   };
 
   const invalidate = () => {
+    onTocInvalidated?.();
     setConfirmed(false);
     setMessage(null);
   };
@@ -208,12 +212,13 @@ export function TocRecognitionPanel({
         }
 
         const candidates: TocRecognitionCandidate[] = data.entries.map((item, index) => ({
-          key: `llm-${index}`,
+          key: item.id || `llm-${index}`,
           title: item.title,
           printedPage: String(item.startPage),
           level: item.level === 'section' ? 2 : 1,
           kind: item.level === 'lesson' ? 'lesson' : 'section',
           confidence: null,
+          ...(item.parentId ? { parentId: item.parentId } : {}),
         }));
 
         setEntries(candidates);

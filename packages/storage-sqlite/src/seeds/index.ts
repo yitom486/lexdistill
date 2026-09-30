@@ -8,7 +8,6 @@ export { HANGUL_SEEDS } from './hangul-seed.js';
 export { LESSON_SEEDS } from './lesson-seed.js';
 export { LEARNING_CONTENT_TEMPLATE_SEEDS } from './content-template-seed.js';
 export { INITIAL_READING_SEEDS } from './reading-seed.js';
-export { TEXTBOOK_BOOKS } from './textbook-seed.js';
 export {
   INITIAL_CARD_SEEDS,
   INITIAL_EN_CARD_SEEDS,

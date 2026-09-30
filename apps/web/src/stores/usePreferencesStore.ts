@@ -46,6 +46,7 @@ export interface PreferencesState {
   tocReviewEffort: string;
   /** 教材正文提炼专职模型 id；空=使用本机 Codex 默认配置 */
   pipelineModel: string;
+  pipelineEffort: string;
   /** 教材提炼 Worker 并发度；默认 '3' */
   pipelinePoolSize: string;
 
@@ -76,6 +77,7 @@ export interface PreferencesState {
   setTocReviewModel: (model: string) => void;
   setTocReviewEffort: (effort: string) => void;
   setPipelineModel: (model: string) => void;
+  setPipelineEffort: (effort: string) => void;
   setPipelinePoolSize: (poolSize: string) => void;
 }
 
@@ -141,6 +143,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       tocReviewModel: '',
       tocReviewEffort: '',
       pipelineModel: '',
+      pipelineEffort: '',
       pipelinePoolSize: '3',
 
       setTheme: (theme: 'light' | 'dark') => {
@@ -193,6 +196,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       setTocReviewModel: (tocReviewModel: string) => set({ tocReviewModel }),
       setTocReviewEffort: (tocReviewEffort: string) => set({ tocReviewEffort }),
       setPipelineModel: (pipelineModel: string) => set({ pipelineModel }),
+      setPipelineEffort: (pipelineEffort: string) => set({ pipelineEffort }),
       setPipelinePoolSize: (pipelinePoolSize: string) => set({ pipelinePoolSize }),
     }),
     {
@@ -200,19 +204,6 @@ export const usePreferencesStore = create<PreferencesState>()(
       onRehydrateStorage: () => (state) => {
         if (state?.theme) {
           applyThemeToDom(state.theme);
-        }
-        // 清洗历史版本可能存留的虚构/硬编码模型名（例如 gpt-6-luna / gpt-5 等），回退为空（跟随本机 Codex 默认）
-        if (
-          state?.pipelineModel &&
-          (state.pipelineModel.includes('gpt-6') || state.pipelineModel.includes('gpt-5'))
-        ) {
-          state.pipelineModel = '';
-        }
-        if (
-          state?.tocReviewModel &&
-          (state.tocReviewModel.includes('gpt-6') || state.tocReviewModel.includes('gpt-5'))
-        ) {
-          state.tocReviewModel = '';
         }
       },
     }

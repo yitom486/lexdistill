@@ -6,6 +6,7 @@ import {
   logger,
   ok,
   type Result,
+  translateToBusinessError,
 } from '@study-studio/shared';
 import type {
   TextbookPipelineJobSnapshot,
@@ -60,7 +61,7 @@ export class TextbookPipelineJobRegistry {
     const jobId = generateId('pipejob');
     const now = new Date().toISOString();
     const documentId = input.documentId ?? generateId('doc_tb');
-    const totalLessons = input.tocEntries.length;
+    const totalLessons = input.tocEntries.filter((entry) => entry.level === 'lesson').length;
 
     const snapshot: TextbookPipelineJobSnapshot = {
       jobId,
@@ -177,7 +178,10 @@ export class TextbookPipelineJobRegistry {
           snapshot.currentLessonId = prog.lessonId;
           const currentEntry = input.tocEntries.find((e) => e.id === prog.lessonId);
           snapshot.currentLessonTitle = currentEntry?.title ?? prog.lessonId;
-          snapshot.successfulLessons = prog.completedCount;
+          snapshot.successfulLessons = prog.successfulCount ?? snapshot.successfulLessons;
+          if (prog.error) {
+            snapshot.failedLessons.push({ lessonId: prog.lessonId, title: currentEntry?.title ?? prog.lessonId, error: prog.error });
+          }
           this.broadcast(snapshot.jobId);
         },
       });
@@ -219,7 +223,7 @@ export class TextbookPipelineJobRegistry {
         snapshot.status = 'cancelled';
       } else {
         snapshot.status = 'failed';
-        snapshot.error = cause instanceof Error ? cause.message : '流水线执行发生未预料异常';
+        snapshot.error = translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '教材提炼中断，请查看已保存内容后重试' }).userMessage;
       }
       snapshot.finishedAt = new Date().toISOString();
       this.broadcast(snapshot.jobId);

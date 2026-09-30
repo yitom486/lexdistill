@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 import { logger } from '@study-studio/shared';
 import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
@@ -29,6 +30,8 @@ async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Respo
 }
 import type { TextbookBook } from '../models/textbook.js';
 import type { TocRecognitionCandidate } from '../lib/toc-recognition.js';
+import { TextbookInspectionResultSchema, type TextbookInspectionResult, type TextbookInspectionDocSummary } from '@study-studio/protocol';
+export type { TextbookInspectionResult, TextbookInspectionDocSummary };
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 
 
@@ -980,6 +983,50 @@ export function useExecuteTextbookPipelineMutation(userId = DEFAULT_USER_ID) {
   });
 }
 
+export interface InspectTextbookImportVars {
+  userId?: string;
+  filename: string;
+  filePath: string;
+}
+
+/**
+ * 权威教材导入预检与就绪诊断（服务端第一事实源）。
+ *
+ * 绝不由前端猜测分词打分，由网关 SQLite 权威核查资产，判定 ready / partial / not_imported。
+ */
+export function useInspectTextbookImportMutation() {
+  return useMutation<TextbookInspectionResult, GatewayRequestError, InspectTextbookImportVars>({
+    mutationFn: (vars) => requestInspectTextbookImport(vars),
+  });
+}
+
+export async function requestInspectTextbookImport({ userId = DEFAULT_USER_ID, filename, filePath }: InspectTextbookImportVars, signal?: AbortSignal): Promise<TextbookInspectionResult> {
+  const res = await fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/inspect-import`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, filePath }),
+    signal: signal ?? AbortSignal.timeout(60_000),
+  });
+  const payload: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new GatewayRequestError(readGatewayUserMessage(payload, '教材检测失败，请重试'), { code: readGatewayErrorCode(payload) });
+  }
+  const parsed = TextbookInspectionResultSchema.safeParse(payload);
+  if (!parsed.success) throw new GatewayRequestError('教材检测结果不完整，请重启网关后重试', { code: 'E_INSPECT_FAILED' });
+  return parsed.data;
+}
+
+export function useTextbookImportInspectionQuery(vars: InspectTextbookImportVars | undefined) {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.TEXTBOOKS, vars?.userId ?? DEFAULT_USER_ID, 'inspection', vars?.filePath ?? '', vars?.filename ?? ''],
+    enabled: Boolean(vars?.filename),
+    queryFn: ({ signal }) => {
+      if (!vars) throw new GatewayRequestError('请先选择教材文件');
+      return requestInspectTextbookImport(vars, AbortSignal.any([signal, AbortSignal.timeout(60_000)]));
+    },
+    staleTime: 0,
+  });
+}
+
 export interface ExtractTocWithLlmVars {
   filePath?: string;
   file?: File;
@@ -993,6 +1040,8 @@ export interface ExtractTocWithLlmVars {
 export interface ExtractTocWithLlmResult {
   title?: string;
   entries: Array<{
+    id?: string;
+    parentId?: string;
     title: string;
     level: string;
     startPage: number;
@@ -1105,25 +1154,28 @@ export function useAllDocumentsQuery(userId = DEFAULT_USER_ID) {
 }
 
 /** 查询指定文档已建立的教材章节槽位列表（textbook_lessons） */
+const LessonSlotsResponseSchema = z.object({ slots: z.array(z.object({
+  documentId: z.string(), lessonId: z.string(), lessonNumber: z.number(), title: z.string(),
+  sortOrder: z.number(), kind: z.string(), parentId: z.string().nullable(),
+  startPage: z.number().int().positive().nullable(), endPage: z.number().int().positive().nullable(),
+  status: z.string(), hasPassage: z.boolean(), hasPreview: z.boolean(), hasSummary: z.boolean(),
+})) });
+
 export function useTextbookLessonSlotsQuery(documentId: string | undefined, userId = DEFAULT_USER_ID) {
   return useQuery<TextbookLessonSlotItem[]>({
     queryKey: [...QUERY_KEYS.TEXTBOOKS, userId, documentId ?? '', 'slots'],
     enabled: Boolean(documentId),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!documentId) return [];
-      try {
-        const res = await fetch(
-          `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/textbook-lessons/${encodeURIComponent(documentId)}`
-        );
-        if (!res.ok) return [];
-        const payload: unknown = await res.json().catch(() => null);
-        if (payload && typeof payload === 'object' && Array.isArray((payload as { slots?: unknown }).slots)) {
-          return (payload as { slots: TextbookLessonSlotItem[] }).slots;
-        }
-      } catch (e) {
-        logger.debug('[useTextbookLessonSlotsQuery] failed to load lesson slots', e);
-      }
-      return [];
+      const res = await fetchPdfGateway(
+        `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/textbook-lessons/${encodeURIComponent(documentId)}`,
+        { signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]) }
+      );
+      const payload: unknown = await res.json().catch(() => null);
+      if (!res.ok) throw new GatewayRequestError(readGatewayUserMessage(payload, '教材目录读取失败，请重试'));
+      const parsed = LessonSlotsResponseSchema.safeParse(payload);
+      if (!parsed.success) throw new GatewayRequestError('教材目录数据不完整，请重新检测');
+      return parsed.data.slots;
     },
     staleTime: 1000 * 60 * 2,
   });
@@ -1134,13 +1186,15 @@ export function lessonSlotsToTocCandidates(slots: TextbookLessonSlotItem[]): Toc
   return slots.map((s, idx) => ({
     key: s.lessonId || `slot-${idx + 1}`,
     title: s.title,
-    printedPage: s.startPage ? String(s.startPage) : String(idx + 1),
+    printedPage: '',
     level: (s.kind === 'chapter' || s.kind === 'section' ? 2 : 1) as 1 | 2,
     kind: (s.kind === 'chapter' || s.kind === 'section' ? 'section' : 'lesson') as 'section' | 'lesson',
     confidence: 'high' as const,
     ...(typeof s.startPage === 'number' && Number.isFinite(s.startPage)
       ? { physicalPage: s.startPage }
       : {}),
+    ...(s.endPage !== null ? { endPage: s.endPage } : {}),
+    ...(s.parentId ? { parentId: s.parentId } : {}),
   }));
 }
 

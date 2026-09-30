@@ -261,7 +261,7 @@ describe('教材匹配与槽位复用纯函数测试', () => {
     expect(candidates).toHaveLength(2);
     expect(candidates[0]!.key).toBe('l1');
     expect(candidates[0]!.title).toBe('第 1 课 初次见面');
-    expect(candidates[0]!.printedPage).toBe('14');
+    expect(candidates[0]!.printedPage).toBe(''); // 槽位只保存 PDF 物理页，不臆造印刷页
     expect(candidates[0]!.level).toBe(1);
     expect(candidates[0]!.kind).toBe('lesson');
     expect(candidates[0]!.physicalPage).toBe(14);

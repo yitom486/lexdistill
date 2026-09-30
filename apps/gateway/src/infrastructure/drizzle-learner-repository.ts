@@ -156,10 +156,6 @@ import {
   type ShredStats,
 } from '@study-studio/storage-sqlite';
 import {
-  materializeSeedIntoTransaction,
-  type MaterializeSeedInput,
-} from '@study-studio/storage-sqlite';
-import {
   saveKnowledgePoints as saveKnowledgePointsDomain,
   listKnowledgePoints as listKnowledgePointsDomain,
 } from '../modules/library/persistence/knowledge-points.js';
@@ -262,11 +258,13 @@ import {
   seedTextbookTocSkeleton as seedTextbookTocSkeletonDomain,
   commitLessonKnowledge as commitLessonKnowledgeDomain,
   listTextbookLessonSlots as listTextbookLessonSlotsDomain,
+  getTextbookAssetStats as getTextbookAssetStatsDomain,
   type SeedTocSkeletonInput,
   type SavedTocSkeleton,
   type CommitLessonKnowledgeInput,
   type CommitLessonKnowledgeOutput,
   type TextbookLessonSlotItem,
+  type TextbookAssetStats,
 } from '@study-studio/storage-sqlite';
 import {
   executeTextbookPipeline as executeTextbookPipelineDomain,
@@ -349,7 +347,7 @@ export class DrizzleLearnerRepository
   //  A 词典读/写      searchLocalDictionary…getTermExamples        → modules/dictionary/persistence/
   //  B 卡片草稿        proposeCardDrafts…dismissCardDraft           → modules/flashcards/persistence/
   //  C 课程与课文      getLevelInfo…listWordlists                   → modules/curriculum/persistence/
-  //  D 文档段/种子     saveDocumentStructure…materializeSeedDocument → modules/library/persistence/ + storage-sqlite
+  //  D 文档段     saveDocumentStructure → modules/library/persistence/ + storage-sqlite
   //  D2 目录挂载知识点 saveKnowledgePoints/listKnowledgePoints     → modules/library/persistence/knowledge-points.ts
   //  E 定级与阅读      getStudyGate…getReadingPosition              → modules/practice/persistence/
   //  F 卡片格式/Anki/媒体 sampleLocalDictionaryEntries止           → modules/flashcards/persistence/ + tts-proxy
@@ -646,6 +644,15 @@ export class DrizzleLearnerRepository
   }
 
   /**
+   * 极速统计指定教材在 SQLite 中的真实资产（课次、正文行、生词、语法、练习）。
+   */
+  public async getTextbookAssetStats(
+    documentId: string
+  ): Promise<Result<TextbookAssetStats, BusinessError>> {
+    return getTextbookAssetStatsDomain(this.deps, documentId);
+  }
+
+  /**
    * 教材 shred（AST 大绳拆关系行 + FTS + 精确映射，同事务全删全插）。
    * AST 落库为主路径；调用方失败只 warn，不推翻已存课文。实现已下沉 library 域。
    */
@@ -759,37 +766,6 @@ export class DrizzleLearnerRepository
       sourcePath: this.dbPath,
       targetPath,
     });
-  }
-
-  /**
-   * Seed 原子 materialize（documents upsert + shred + state 同一事务；失败整体回滚）。
-   * startup gating 专用；用户文档走 saveCanonicalAst。
-   */
-  public async materializeSeedDocument(
-    docBase: MaterializeSeedInput['docBase'],
-    book: TextbookAST,
-    fingerprint: string,
-    materializerVersion: number
-  ): Promise<Result<DocumentItem, BusinessError>> {
-    try {
-      this.deps.db.transaction((tx) => {
-        materializeSeedIntoTransaction(tx, { docBase, book, fingerprint, materializerVersion });
-      });
-      const got = await this.getDocumentById(docBase.id);
-      if (!isOk(got) || !got.value) {
-        return err(new BusinessError('E_INTERNAL', '种子落库后回读失败', 'DATABASE', true));
-      }
-      return ok(got.value);
-    } catch (error) {
-      if (error instanceof BusinessError) return err(error);
-      return err(
-        translateToBusinessError(error, {
-          category: 'DATABASE',
-          action: 'materializeSeedDocument',
-          entityId: docBase.id,
-        })
-      );
-    }
   }
 
   // ==================== E 定级与阅读位置（→ modules/practice/persistence/） ====================

@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import {
   ok,
   err,
@@ -15,7 +15,7 @@ import {
   textbookExercises,
 } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
-import type { ShredTx } from './textbook-shred.js';
+import { shredIntoTransaction, type ShredTx } from './textbook-shred.js';
 import {
   type TextbookAST,
   type TextbookLesson,
@@ -92,6 +92,11 @@ export async function commitLessonKnowledge(
 
   const docId = input.documentId.trim();
   const lId = input.lessonId.trim();
+
+  if (!input.passageMd?.trim() && !input.vocabularies?.some((v) => v.surface.trim()) &&
+      !input.knowledgePoints?.some((g) => g.title.trim()) && !input.exercises?.some((e) => e.prompt.trim())) {
+    return err(new BusinessError('E_LLM_SCHEMA_INVALID', '本课未提取到任何教材内容，请检查页面范围后重试', 'VALIDATION', true));
+  }
 
   try {
     const stats = deps.db.transaction((tx) => {
@@ -259,7 +264,7 @@ export async function commitLessonKnowledge(
         .where(
           and(
             eq(textbookLessons.documentId, docId),
-            eq(textbookLessons.status, 'pending'),
+            ne(textbookLessons.status, 'ready'),
             eq(textbookLessons.kind, 'lesson')
           )
         )
@@ -268,7 +273,7 @@ export async function commitLessonKnowledge(
       const allLessonsReady = pendingRows.length === 0;
 
       // 自动从当前已入库槽位与知识点数据重组规范 TextbookAST，回填底稿
-      syncDocumentAstInTx(tx, docId);
+      savePipelineAstInTx(tx, docId);
 
       return {
         vocabCount: vOrd,
@@ -302,11 +307,17 @@ export async function commitLessonKnowledge(
  * 在 SQLite 事务内自动从已入库的章节、生词、语法和习题数据反向重构合规的 TextbookAST，
  * 并原子回填到 documents.ast_json 底稿，确保派生表与底稿 100% 保持同步（SSOT 不分叉）。
  */
-function syncDocumentAstInTx(tx: ShredTx, docId: string): void {
-  try {
+export function savePipelineAstInTx(tx: ShredTx, docId: string, metadata?: { sourceFingerprint?: string; outlineConfirmed?: boolean }): void {
     const docRows = tx.select().from(documents).where(eq(documents.id, docId)).limit(1).all();
     if (docRows.length === 0) return;
     const doc = docRows[0]!;
+    let previous: TextbookAST | undefined;
+    if (doc.astJson) {
+      try {
+        const parsed = TextbookASTSchema.safeParse(JSON.parse(doc.astJson));
+        if (parsed.success) previous = parsed.data;
+      } catch { /* 损坏底稿不作为内容来源。 */ }
+    }
 
     const lessons = tx
       .select()
@@ -362,6 +373,8 @@ function syncDocumentAstInTx(tx: ShredTx, docId: string): void {
     const astLessons: TextbookLesson[] = [];
     for (let i = 0; i < lessons.length; i++) {
       const l = lessons[i]!;
+      const previousLesson = previous?.lessons.find((item) => item.id === l.lessonId);
+      const { startPage: _oldStart, endPage: _oldEnd, ...previousContent } = previousLesson ?? {};
       const lVocabs = vocabsByLesson.get(l.lessonId) ?? [];
       const lGrammars = grammarsByLesson.get(l.lessonId) ?? [];
       const lExercises = exercisesByLesson.get(l.lessonId) ?? [];
@@ -388,18 +401,29 @@ function syncDocumentAstInTx(tx: ShredTx, docId: string): void {
             });
           }
         }
+      } else if (l.status === 'ready' && previousLesson) {
+        parsedDialogues.push(...previousLesson.dialogues);
       }
 
       astLessons.push({
+        ...previousContent,
         id: l.lessonId,
         lessonNumber: l.lessonNumber > 0 ? l.lessonNumber : i + 1,
         title: l.title,
+        kind: l.kind === 'chapter' || l.kind === 'section' ? l.kind : 'lesson',
+        parentId: l.parentId,
+        ...(l.startPage !== null ? { startPage: l.startPage } : {}),
+        ...(l.endPage !== null ? { endPage: l.endPage } : {}),
+        status: l.status === 'ready' || l.status === 'failed' ? l.status : 'pending',
+        passageMd: l.passageMd,
+        previewJson: l.previewJson,
+        summaryJson: l.summaryJson,
         vocabularies: lVocabs.map((v, idx) => ({
           id: `${l.lessonId}-v${idx + 1}`,
           kanji: v.surface,
-          kana: v.reading || v.surface,
-          pos: v.pos || '名词',
-          pitchAccent: v.pitch || '⓪',
+          kana: v.reading ?? '',
+          pos: v.pos ?? '',
+          pitchAccent: v.pitch ?? '',
           chinese: v.glossZh || '',
           ...(v.exampleJa ? { example: { japanese: v.exampleJa, chinese: v.exampleZh ?? '' } } : {}),
         })),
@@ -462,17 +486,22 @@ function syncDocumentAstInTx(tx: ShredTx, docId: string): void {
       : 'JA';
 
     const candidateAst: TextbookAST = {
+      ...previous,
       id: docId,
       language: lang,
       title: doc.title,
       shortTitle: doc.title.slice(0, 32),
-      level: 'N5',
-      totalLessons: astLessons.length,
+      level: previous?.level ?? '',
+      totalLessons: astLessons.filter((l) => l.kind === 'lesson').length,
       lessons: astLessons,
+      ...metadata,
     };
 
     const validated = TextbookASTSchema.safeParse(candidateAst);
-    if (validated.success) {
+    if (!validated.success) {
+      throw new BusinessError('E_INVALID_TEXTBOOK_AST', '教材底稿与目录无法一致保存，本次写入已撤回，请核对内容', 'VALIDATION');
+    }
+    {
       tx.update(documents)
         .set({
           astJson: JSON.stringify(validated.data),
@@ -480,9 +509,7 @@ function syncDocumentAstInTx(tx: ShredTx, docId: string): void {
         })
         .where(eq(documents.id, docId))
         .run();
+      // 底稿为最终写入依据；所有查询表及 FTS 在同一事务内重新派生，失败整体回滚。
+      shredIntoTransaction(tx, docId, validated.data);
     }
-  } catch {
-    // 忽略 AST 组装异常，不阻断事务主逻辑
-  }
 }
-

@@ -103,27 +103,6 @@ export {
   type ShredTx,
 } from './adapters/library/textbook-shred.js';
 export {
-  materializeSeedIntoTransaction,
-  computeSeedMaterializationFingerprint,
-  computeSeedMapping,
-  buildSeedMaterializationInput,
-  fingerprintSeedMaterialization,
-  shouldSkipSeedMaterialization,
-  describeSeedStatus,
-  isTextbookProjectionHealthy,
-  SEED_MATERIALIZER_VERSION,
-  type SeedMaterializationInput,
-  type MaterializeSeedInput,
-  type ProjectionHealth,
-  type SeedStatusEntry,
-  type SeedSkipDecision,
-} from './adapters/library/seed-materialization.js';
-export {
-  applySeedAstMigration,
-  type SeedMigrationDocReport,
-  type SeedMigrationReport,
-} from './adapters/library/seed-repair.js';
-export {
   getTextbookFocus,
   type TextbookFocus,
 } from './adapters/document/textbook-focus.js';
@@ -188,7 +167,6 @@ export {
   INITIAL_READING_SEEDS,
   LEARNING_CONTENT_TEMPLATE_SEEDS,
   PITCH_LEXICON,
-  TEXTBOOK_BOOKS,
   LESSON_SEEDS,
   STARTER_WORD_SEEDS,
   N5_WORD_SEEDS,
@@ -247,9 +225,11 @@ export {
 export {
   seedTextbookTocSkeleton,
   listTextbookLessonSlots,
+  getTextbookAssetStats,
   type SeedTocSkeletonInput,
   type SavedTocSkeleton,
   type TextbookLessonSlotItem,
+  type TextbookAssetStats,
 } from './adapters/library/toc-skeleton.js';
 export {
   commitLessonKnowledge,

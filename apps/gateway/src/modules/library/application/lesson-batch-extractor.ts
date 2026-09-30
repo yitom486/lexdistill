@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AgentPool } from 'agentpools';
+import { resolveCodexBinary } from '@study-studio/agent-runtime/src/adapters/codex/index.js';
 import {
   ok,
   err,
@@ -44,6 +45,8 @@ export interface BatchExtractionProgress {
   completedCount: number;
   totalCount: number;
   allLessonsReady: boolean;
+  successfulCount?: number;
+  error?: string;
   stats: {
     vocabCount: number;
     grammarCount: number;
@@ -56,10 +59,12 @@ export interface BatchExtractionOptions {
   poolSize?: number | undefined;
   codexProgram?: string | undefined;
   model?: string | undefined;
+  effort?: string | undefined;
   /** 是否强制重新提炼全书（默认 false：若已为 ready 则直接跳过以保全复习记录并节约算力） */
   forceOverwrite?: boolean | undefined;
   onProgress?: ((progress: BatchExtractionProgress) => void) | undefined;
   pool?: AgentPoolLike | undefined;
+  poolFactory?: typeof createDefaultAgentPool | undefined;
   signal?: AbortSignal | undefined;
 }
 
@@ -129,6 +134,8 @@ export const ExtractedLessonSchema = z.object({
       selfCheckQuestions: z.array(z.string()).optional(),
     })
     .optional(),
+}).refine((data) => Boolean(data.passageMd?.trim() || data.vocabularies?.length || data.knowledgePoints?.length || data.exercises?.length), {
+  message: '必须包含实际教材内容',
 });
 
 export type ExtractedLessonData = z.infer<typeof ExtractedLessonSchema>;
@@ -198,18 +205,14 @@ export function createDefaultAgentPool(options: {
   poolSize?: number | undefined;
   program?: string | undefined;
   model?: string | undefined;
+  effort?: string | undefined;
 }): AgentPoolLike {
   const poolSize = options.poolSize ?? 3;
-  const program =
-    options.program ??
-    process.env.STUDY_STUDIO_CODEX_PATH ??
-    process.env.CODEX_BIN ??
-    process.env.CODEX_PATH ??
-    'codex';
+  const program = resolveCodexBinary(options.program ?? process.env.STUDY_STUDIO_CODEX_PATH);
   const agents = Array.from({ length: poolSize }, () => ({
     runtime: 'codexAppServer' as const,
     program,
-    args: ['app-server'],
+    args: ['app-server', ...(options.effort ? ['-c', `model_reasoning_effort=${JSON.stringify(options.effort)}`] : [])],
     cwd: process.cwd(),
     ...(options.model ? { model: options.model } : {}),
   }));
@@ -233,8 +236,12 @@ export class LessonBatchExtractor {
 
   public async extractAndCommitSingleLesson(
     job: LessonExtractionJob,
-    pool: AgentPoolLike
+    pool: AgentPoolLike,
+    signal?: AbortSignal
   ): Promise<Result<{ allLessonsReady: boolean; stats: BatchExtractionProgress['stats'] }, BusinessError>> {
+    if (!job.ocrText.trim()) {
+      return err(new BusinessError('E_LLM_SCHEMA_INVALID', '本课页面未提取到文字，请核对页码或 OCR 结果后重试', 'VALIDATION', true));
+    }
     const prompt = buildLessonExtractionPrompt(job);
 
     let lease: AgentPoolLease | null = null;
@@ -262,6 +269,8 @@ export class LessonBatchExtractor {
         }
       }
     }
+
+    if (signal?.aborted) return err(new BusinessError('E_CANCELLED', '教材提取已中止，已保存内容保留', 'AGENT_RUNTIME'));
 
     let extracted: ExtractedLessonData;
 
@@ -302,7 +311,6 @@ export class LessonBatchExtractor {
     const commitInput: CommitLessonKnowledgeInput = {
       documentId: job.documentId,
       lessonId: job.lessonId,
-      ...(extracted.title ? { title: extracted.title } : {}),
       ...(extracted.passageMd ? { passageMd: extracted.passageMd } : {}),
       ...(extracted.preview ? { previewJson: JSON.stringify(extracted.preview) } : {}),
       ...(extracted.summary ? { summaryJson: JSON.stringify(extracted.summary) } : {}),
@@ -346,21 +354,14 @@ export class LessonBatchExtractor {
     const errors: Array<{ lessonId: string; error: string }> = [];
 
     // 0. 幂等性检查：若非强制覆盖，查询已入库就绪槽位，跳过无谓的 LLM 调用（省算力防覆盖）
-    const readyLessonIds = new Set<string>();
-    if (!options.forceOverwrite && typeof this.repo.listTextbookLessonSlots === 'function') {
-      try {
-        const slotsRes = await this.repo.listTextbookLessonSlots(documentId);
-        if (slotsRes.ok) {
-          for (const s of slotsRes.value) {
-            if (s.status === 'ready') {
-              readyLessonIds.add(s.lessonId);
-            }
-          }
-        }
-      } catch (err) {
-        logger.warn('[LessonBatchExtractor] listTextbookLessonSlots 检查失败，降级为常规提炼:', { error: String(err) });
-      }
-    }
+    const existingStats = await this.repo.getTextbookAssetStats(documentId);
+    if (!existingStats.ok) return {
+      documentId, totalJobs: jobs.length, successfulJobs: 0, failedJobs: jobs.length, allLessonsReady: false,
+      errors: jobs.map((job) => ({ lessonId: job.lessonId, error: existingStats.error.userMessage })),
+    };
+    const existingLessons = new Map(existingStats.value.lessonDetails.map((lesson) => [lesson.lessonId, lesson]));
+    const readyLessonIds = new Set(options.forceOverwrite ? [] : existingStats.value.lessonDetails
+      .filter((lesson) => lesson.status === 'ready').map((lesson) => lesson.lessonId));
 
     const pendingJobs: LessonExtractionJob[] = [];
     for (const job of jobs) {
@@ -372,13 +373,14 @@ export class LessonBatchExtractor {
           documentId: job.documentId,
           lessonId: job.lessonId,
           completedCount,
+          successfulCount: successfulJobs,
           totalCount: jobs.length,
           allLessonsReady: false,
           stats: {
-            vocabCount: 0,
-            grammarCount: 0,
-            exerciseCount: 0,
-            hasPassage: true,
+            vocabCount: existingLessons.get(job.lessonId)?.vocabCount ?? 0,
+            grammarCount: existingLessons.get(job.lessonId)?.grammarCount ?? 0,
+            exerciseCount: existingLessons.get(job.lessonId)?.exerciseCount ?? 0,
+            hasPassage: existingLessons.get(job.lessonId)?.hasPassage ?? false,
           },
         });
       } else {
@@ -394,12 +396,13 @@ export class LessonBatchExtractor {
     });
 
     if (pendingJobs.length === 0) {
+      const stats = await this.repo.getTextbookAssetStats(documentId);
       return {
         documentId,
         totalJobs: jobs.length,
         successfulJobs,
         failedJobs: 0,
-        allLessonsReady: true,
+        allLessonsReady: stats.ok && stats.value.lessons > 0 && stats.value.readyLessons === stats.value.lessons,
         errors: [],
       };
     }
@@ -407,17 +410,21 @@ export class LessonBatchExtractor {
     const shouldClosePool = !options.pool;
     const pool =
       options.pool ??
-      createDefaultAgentPool({
+      (options.poolFactory ?? createDefaultAgentPool)({
         poolSize: options.poolSize,
         program: options.codexProgram,
         model: options.model,
+        effort: options.effort,
       });
 
     try {
-      await Promise.all(
-        pendingJobs.map(async (job) => {
+      let nextJob = 0;
+      const runWorker = async () => {
+        while (nextJob < pendingJobs.length) {
+          const job = pendingJobs[nextJob++];
+          if (!job) return;
           if (options.signal?.aborted) return;
-          const result = await this.extractAndCommitSingleLesson(job, pool);
+          const result = await this.extractAndCommitSingleLesson(job, pool, options.signal);
           if (options.signal?.aborted) return;
           completedCount += 1;
 
@@ -433,6 +440,7 @@ export class LessonBatchExtractor {
               documentId: job.documentId,
               lessonId: job.lessonId,
               completedCount,
+              successfulCount: successfulJobs,
               totalCount: jobs.length,
               allLessonsReady: result.value.allLessonsReady,
               stats: result.value.stats,
@@ -443,14 +451,22 @@ export class LessonBatchExtractor {
               lessonId: job.lessonId,
               error: result.error.userMessage,
             });
+            options.onProgress?.({
+              documentId: job.documentId, lessonId: job.lessonId, completedCount,
+              successfulCount: successfulJobs, totalCount: jobs.length, allLessonsReady: false,
+              error: result.error.userMessage,
+              stats: { vocabCount: 0, grammarCount: 0, exerciseCount: 0, hasPassage: false },
+            });
             logger.warn(`[LessonBatchExtractor] 课次 "${job.lessonId}" 提炼失败`, {
               documentId: job.documentId,
               code: result.error.code,
               error: result.error.userMessage,
             });
           }
-        })
-      );
+        }
+      };
+      const workers = Math.min(pendingJobs.length, Math.max(1, options.poolSize ?? 3));
+      await Promise.all(Array.from({ length: workers }, runWorker));
     } finally {
       if (shouldClosePool) {
         try {
@@ -461,6 +477,9 @@ export class LessonBatchExtractor {
       }
     }
 
+    const finalStats = await this.repo.getTextbookAssetStats(documentId);
+    finalAllLessonsReady = finalStats.ok && finalStats.value.lessons > 0 &&
+      finalStats.value.readyLessons === finalStats.value.lessons;
     logger.info('[LessonBatchExtractor] 批处理提炼结束', {
       documentId,
       totalJobs: jobs.length,

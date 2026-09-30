@@ -28,6 +28,7 @@ export interface SlicePdfLessonsOptions {
   inspector: PdfInspectorLike;
   /** OCR 并发度（默认 3，避免单机 CPU / GPU 过载） */
   concurrency?: number;
+  signal?: AbortSignal;
 }
 
 /**
@@ -57,9 +58,12 @@ export async function slicePdfLessonsWithOcr(
   let totalPdfPages = 0;
   try {
     const info = inspector.processPdf(pdf, [1]);
-    totalPdfPages = info.pageCount ?? 1;
-  } catch {
-    totalPdfPages = 1;
+    totalPdfPages = info.pageCount ?? 0;
+  } catch (cause) {
+    return err(translateToBusinessError(cause, { category: 'TOOL_EXECUTION', fallbackMessage: '无法读取教材总页数，请检查 PDF 文件' }));
+  }
+  if (!Number.isSafeInteger(totalPdfPages) || totalPdfPages < 1) {
+    return err(new BusinessError('E_PDF_PAGE_RANGE_INVALID', '无法确定 PDF 总页数，请检查文件', 'VALIDATION'));
   }
 
   // 3. 并发切片执行（限制最大并发数）
@@ -75,12 +79,16 @@ export async function slicePdfLessonsWithOcr(
 
   async function runWorker(): Promise<void> {
     while (queue.length > 0) {
+      if (options.signal?.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消，已保存内容保留', 'TOOL_EXECUTION');
       const item = queue.shift();
       if (!item) break;
       const { lesson, index } = item;
 
-      const start = Math.max(1, Math.min(lesson.startPage, totalPdfPages));
-      const end = Math.max(start, Math.min(lesson.endPage ?? start, totalPdfPages));
+      const start = lesson.startPage;
+      const end = lesson.endPage ?? totalPdfPages;
+      if (start < 1 || start > totalPdfPages || end < start || end > totalPdfPages) {
+        throw new BusinessError('E_PDF_PAGE_RANGE_INVALID', `课次“${lesson.title}”的 PDF 页码范围无效，请核对印刷页与 PDF 页的映射`, 'VALIDATION');
+      }
       const pageNumbers: number[] = [];
       for (let p = start; p <= end; p++) {
         pageNumbers.push(p);

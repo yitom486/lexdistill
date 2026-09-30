@@ -12,12 +12,10 @@
 | `library-routes` POST /api/documents/:userId | ✅（前端导入主路） | new/existing | whole（前端组装 AST） | **潜在是**（整体覆盖既有 doc 时） | ✅（教材分支） | err |
 | `document-enrich-routes`（单次抽词） | ✅ | existing | partial enrich（课文内容改，序列一般不变） | 序列变化时是 | ✅ | err |
 | `enrich-job-runner` persist/persistLesson | ✅（job） | existing | partial enrich | 序列变化时是 | ✅ | 记 failed，不中断 |
-| `seed-bootstrap` INSERT | ✅（启动） | new（种子） | whole（静态） | 否 | ❌（raw SQL，前 drizzle 时期） | warn/跳过（启动后 shred 补） |
-| `seed-repair.applySeedAstMigration` | ✅（运维/启动） | existing（种子白名单） | whole（方言迁移） | 否（只改文法键，序列不动） | ✅（同事务＋步后验证） | throw（整体失败） |
 | `curriculum-content`（`{questions}`） | ✅ | — | 非教材形 | 否（无 lesson id） | N/A | — |
 
 结论：**当前不存在“用户触发的 existing-document full reparse”入口**。
-parser 升级没有批量 reparse 入口；AST overwrite 调用者全是 import/enrich/append/seed 四类，
+parser 升级没有批量 reparse 入口；AST overwrite 调用者全是 import/enrich/append 三类，
 其中只有 `library-routes` 的整体覆盖分支具备“旧 id 被整体替换”的形状（且前端当前只发新
 document，多为新 id 场景）。
 
@@ -25,7 +23,7 @@ document，多为新 id 场景）。
 
 `library-routes` 的 documents 保存分支是唯一需要 reconciliation 的候选 owner：
 它是唯一“外部组装 AST → 覆盖既有 document”的生产入口。其他路径要么新建（无旧 id），
-要么保序（append/enrich/seed-repair 均已证明 id-preserving）。
+要么保序（append/enrich 均已证明 id-preserving）。
 
 接入形态（未来，不实施）：
 

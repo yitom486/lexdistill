@@ -1,5 +1,7 @@
 # Lingua Studio - 教材导入架构与数据库表设计规格说明书 (Textbook Import Architecture)
 
+> 2026-09-30 更新：产品仅面向 Tauri 桌面。旧教材数据已清空，旧示例补种、物化门控和旧 AST 迁移已删除；PDF 导入检测仅按本地文件 SHA-256 匹配，不按名称猜测，也不提供历史教材绑定入口。
+
 > **版本**：v1.0 (2026-09-29)  
 > **面向对象**：后端工程师、架构师、AI Agent  
 > **核心原则**：SSOT 底稿与结构化拆行（Shredding）同事务保证、教材六层模型、静态表结构（行表达动态）、强类型防线（Result 模式与 Zod 校验）
@@ -158,7 +160,7 @@ sequenceDiagram
 
 #### (5) `textbook_lessons` —— 课文目录表 (Section 层)
 - **`document_id` + `lesson_id`** (`TEXT` + `TEXT`, 复合主键): 锁定特定教材的特定课。
-- **`lesson_number`** (`INTEGER`, NOT NULL): 兼容保留字段（允许 gap，不用于 UI 排序）。
+- **`lesson_number`** (`INTEGER`, NOT NULL): 教材课号字段（允许 gap，不用于 UI 排序）。
 - **`title`** (`TEXT`, NOT NULL): 章节标题。
 - **`sort_order`** (`INTEGER`): **唯一排序真理**（AST 数组中的连续 index + 1，1-based 连续）。
 - **`kind`** (`TEXT`, NOT NULL): 节点层级（`lesson` 课 | `chapter` 章）。

@@ -30,32 +30,3 @@ export function groundGrammarsForTest(titles: string[], lessonId: string): Textb
   }));
   return groundGrammarPoints(structuredClone(raw), lessonId).kept;
 }
-
-/** 真实 seed-repair 文法键迁移的最小复刻（id 逐字保留是断言目标，逻辑与生产一致）。 */
-export function migrateGrammarForTest(item: Record<string, unknown>): { item: Record<string, unknown>; migrated: boolean } {
-  const next: Record<string, unknown> = { ...item };
-  let migrated = false;
-  if (typeof next.structure === 'string' && typeof next.connection !== 'string') {
-    next.connection = next.structure;
-    delete next.structure;
-    migrated = true;
-  }
-  if (Array.isArray(next.examples)) {
-    next.examples = (next.examples as unknown[]).map((e) => {
-      if (!e || typeof e !== 'object') return e;
-      const er = { ...(e as Record<string, unknown>) };
-      if (typeof er.ja === 'string' && typeof er.japanese !== 'string') {
-        er.japanese = er.ja;
-        delete er.ja;
-        migrated = true;
-      }
-      if (typeof er.zh === 'string' && typeof er.chinese !== 'string') {
-        er.chinese = er.zh;
-        delete er.zh;
-        migrated = true;
-      }
-      return er;
-    });
-  }
-  return { item: next, migrated };
-}

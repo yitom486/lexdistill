@@ -58,7 +58,6 @@ createDrizzleDb(path | Database)
 | `lesson-seed.ts` | “先讲后测”的日语语法讲义，如 `で/に`、目的地 `に`、`か`、`の`、`から`、自我介绍和 `たら`。写入 `curriculum_lessons`。 | `LESSON_SEEDS`；`LessonSeed`、`LessonSectionSeed`、`LessonExampleSeed` 描述讲义的章节、例句、易错点、最低等级和排序。Bootstrap 使用 UPSERT 覆盖公共讲义的版本更新。 |
 | `content-template-seed.ts` | `learning.content` 的离线内容模板库：三语选择、填空、讲解、例句、听写、阅读和写作等结构化内容。写入 `learning_content_templates`。 | `LEARNING_CONTENT_TEMPLATE_SEEDS` 是工具无模型或降级时的内容 SSOT；`ContentTemplateAction` 限定可执行动作；`ContentTemplateSeed` 定义语种、题型、技能、难度和 JSON `payload`。工具读取表，不应在工具实现里堆硬编码题干。 |
 | `reading-seed.ts` | AI 生成与新闻形态的示例阅读篇目及配套题目，覆盖 JA / EN / KO。写入 `documents`，题目保存在该文档的 `ast_json`。 | `INITIAL_READING_SEEDS: ReadingPassageSet[]`。首次写入全部篇目；旧库按稳定 id 补新篇目（例如后来增加的韩语篇）。它是冷启动离线阅读资产，不替代真实新闻抓取或用户导入。 |
-| `textbook-seed.ts` | 内置教材的完整 AST：教材元信息、课次、对话、词汇、文法、例句和练习。写入 `documents`，`ast_json` 保存原稿，随后由教材导入/拆分链路生成 `textbook_*` 查询层。 | `TEXTBOOK_BOOKS`。这是教材内容的启动种子与原稿来源；前端不应再内置教材数据作为后备。 |
 | `learning-seed.ts` | 冷启动学习体验用的初始闪卡、题目、错题和画像指标，按 JA / EN / KO 分组。分别写入 `flashcards`、`quiz_questions`、`mistakes`、`skill_metrics`。 | `INITIAL_CARD_SEEDS`、`INITIAL_EN_CARD_SEEDS`、`INITIAL_*_QUESTION_SEEDS`、`INITIAL_MISTAKE_SEEDS`、`INITIAL_SKILL_METRIC_SEEDS`；相关 `*Seed` 接口定义每类数据形状。当前错题和技能指标数组可为空，表示不人为伪造用户学习历史。 |
 | `starter-words-seed.ts` | 日、韩、英各 24 个开箱基础词，使用项目自撰中文释义。写入 `local_dictionary_entries`。 | `STARTER_WORD_SEEDS` 及 `STARTER_SOURCE_ID`、标签、许可常量；`StarterWordSeed` 定义词条字段。它让未安装外部词典的用户也可查词和练习。 |
 | `n5-words-seed.ts` | 日语 N5 核心 100 词（汉字表记、标准读音、自撰释义），与 starter 包和外部词典并存。写入 `local_dictionary_entries`。 | `N5_WORD_SEEDS` 与独立 source/许可常量。独立来源可追溯、可开关，不能误与 starter 包混为一个 source。 |
@@ -71,7 +70,7 @@ createDrizzleDb(path | Database)
 
 1. 将旧的 `learner_profiles` 语种信息补镜像到 `learner_language_profiles`（只补不存在的语种行）。
 2. 初始化或更新五十音学习引导；空库初始化谚文表。
-3. 初始化/补齐阅读文档与内置教材 AST。
+3. 初始化/补齐阅读文档。
 4. 当对应语种卡池或题池为空时，写入冷启动闪卡和题目；错题、技能指标仅在种子数组非空且目标表为空时写入。
 5. 用 `INSERT OR IGNORE` 补齐 `learning_content_templates`，因此不会覆盖已有模板记录。
 6. 将项目自有声调词、starter 词包、N5 词包写入本地词典，并先确保对应 `dictionary_sources` 存在。
@@ -79,24 +78,15 @@ createDrizzleDb(path | Database)
 
 每个种子分段都有独立错误隔离：某一类资产写入失败会记录启动日志，但不阻止其他种子和数据库实例创建。业务代码不应通过重复调用 seed 来“修复”用户数据；应先运行 `doctor` / `repair-plan`，再执行范围受控的 `repair-apply`。
 
-### 内置教材的物化门控
+### 教材内容来源
 
-`seedInitialData()` 只确保内置教材 AST 存在于 `documents`，不直接维护 `textbook_*` 查询层。完整 Gateway 启动后，`bootstrap/create-gateway.ts` 会为每本 `TEXTBOOK_BOOKS` 执行物化门控：
-
-```text
-canonical seed AST + 词典命中切片 + materializer version
-  └─ fingerprint 与 seed_materialization 一致，且 projection 健康 → 跳过（零写）
-  └─ 否则 → documents upsert + shred + FTS + state upsert（同一事务）
-```
-
-因此，修改教材 AST、影响本地词典映射，或改变 shred / 映射语义时，都会触发一次原子重建；最后一种情况还必须提升 `SEED_MATERIALIZER_VERSION`。若落库 AST 非法或与种子文档 id 不一致，启动链路只告警并交由 `doctor` / 修复流程处理，绝不猜测或覆盖。
+教材只通过用户显式导入创建；启动时不补入教材示例。旧教材补种、物化门控、旧 AST 迁移及对应状态脚本已删除。当前 PDF 检测仅按文件 SHA-256 匹配，并查询真实保存的逐课资产。
 
 ## 维护约定
 
 - 新表或新列：同时修改 `ddl.ts`（最新 CREATE）、`schema.ts` 与 `migrations/vNNN-*.ts`；迁移必须登记为可重放版本，不能在导入某本教材时临时 `CREATE TABLE`。
 - 当前已发布迁移到 v30；新增迁移必须在 `migrations/index.ts` 末尾登记。已发布迁移的 version、name 与 SQL 都不可改写。
 - 教材：始终先更新 `documents.ast_json`（原稿），再在同一事务重建 `textbook_*`；不要直接手改 shred 表使其与 AST 分叉。
-- 种子教材物化：通过 `materializeSeedDocument()` / 启动门控进入同一事务；不要在 `seed-bootstrap.ts` 里直接写 `textbook_*` 或伪造 `seed_materialization` 状态。
 - 整书目录导入：准备阶段只能写不可变 session / chunk 计划；首个成功 chunk 在同一事务创建并绑定 session 的目标文档。删除目标文档后，将 session 置为 `target_deleted` 并保留审计行，不恢复或复用它。
 - 种子：使用稳定 id，明确是“首次初始化”“增量补齐”还是“公共资产可覆盖更新”；不得覆盖用户卡片、练习历史、错题或学习画像。
 - 诊断与修复：先执行只读 `runDoctor()` / `buildRepairPlan()`，再有针对性地调用 apply 函数。`applyOrphanCleanup()` 只可删除白名单中的派生孤儿。

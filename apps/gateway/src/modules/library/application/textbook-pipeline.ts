@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   ok,
   err,
@@ -18,6 +19,7 @@ import {
   type AgentPoolLike,
   type BatchExtractionProgress,
   type LessonExtractionJob,
+  type BatchExtractionOptions,
 } from './lesson-batch-extractor.js';
 import { slicePdfLessonsWithOcr } from './pdf-import/lesson-content-slicer.js';
 import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
@@ -49,6 +51,10 @@ export interface TextbookPipelineInput {
   forceOverwrite?: boolean | undefined;
   /** 可选注入的 Worker 池（支持 AgentPool 或测试 Mock） */
   pool?: AgentPoolLike | undefined;
+  poolFactory?: BatchExtractionOptions['poolFactory'];
+  model?: string | undefined;
+  effort?: string | undefined;
+  poolSize?: number | undefined;
   /** 实时进度通知回调 */
   onProgress?: ((progress: BatchExtractionProgress) => void) | undefined;
   /** 任务终止信号 */
@@ -114,6 +120,7 @@ export async function executeTextbookPipeline(
       language: input.language ?? 'ja',
       entries: input.tocEntries,
       forceOverwrite: input.forceOverwrite,
+      ...(input.pdf ? { sourceFingerprint: createHash('sha256').update(input.pdf).digest('hex') } : {}),
     });
 
     if (!isOk(tocResult)) {
@@ -161,6 +168,7 @@ export async function executeTextbookPipeline(
         tocEntries: input.tocEntries,
         inspector: input.inspector,
         concurrency: input.ocrConcurrency ?? 3,
+        ...(input.signal ? { signal: input.signal } : {}),
       });
       if (!isOk(sliceRes)) {
         logger.warn('[TextbookPipeline] PDF 章节切片提取失败', {
@@ -220,6 +228,10 @@ export async function executeTextbookPipeline(
       pool: input.pool,
       forceOverwrite: input.forceOverwrite,
       onProgress: input.onProgress,
+      model: input.model,
+      effort: input.effort,
+      poolFactory: input.poolFactory,
+      poolSize: input.poolSize,
       ...(input.signal ? { signal: input.signal } : {}),
     });
 

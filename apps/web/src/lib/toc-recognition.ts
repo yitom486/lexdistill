@@ -5,6 +5,8 @@ import type { EditableTocEntry } from './toc-confirm-flow.js';
 export interface TocRecognitionCandidate extends EditableTocEntry {
   /** PDF bookmarks identify physical pages, never printed pages. */
   physicalPage?: number;
+  endPage?: number;
+  parentId?: string;
 }
 
 const LESSON_TITLE = /第\s*[0-9０-９一二三四五六七八九十百]+\s*[課课]|\b(?:lesson|unit)\s*\d+\b/i;

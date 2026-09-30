@@ -7,7 +7,6 @@ import {
   groundVocabsForTest,
 } from './vocab-grammar-forensic-helpers.js';
 import { appendPdfToDocument } from '../application/pdf-import/pdf-import-service.js';
-import { TEXTBOOK_BOOKS } from '@study-studio/storage-sqlite';
 
 /**
  * P1-D0 Vocab/Grammar Identity 取证（只调查不迁移）。
@@ -238,32 +237,5 @@ describe('P1-D0 取证：AST→shred 行身份与映射计数', () => {
     if (!isOk(stats)) return;
     // 跨课同面各计一条（PK 含 lesson_id；字符串键歧义由调用方承担）。
     expect(stats.value.mappedEntries + stats.value.unmapped).toBe(2);
-  });
-});
-
-describe('P1-D0 取证：seed 与 PDF parser 差异', () => {
-  it('seed 为手写静态 id（v1-1 形，不嵌入 lessonId），与 PDF 动态形不同源', () => {
-    const seedBook = TEXTBOOK_BOOKS[0];
-    expect(seedBook).toBeDefined();
-    if (!seedBook) return;
-    const firstLesson = (seedBook.lessons as unknown[])[0] as Record<string, unknown>;
-    const vocabs = firstLesson.vocabularies as Array<Record<string, unknown>>;
-    expect(vocabs.length).toBeGreaterThan(0);
-    const seedVid = String(vocabs[0]?.id ?? '');
-    const lessonId = String(firstLesson.id ?? '');
-    expect(seedVid).toMatch(/^v\d+-/);
-    expect(seedVid.startsWith(lessonId + '-v')).toBe(false);
-    const pdfIds = groundVocabsForTest(['食べる'], 'pdf-x-l1').map((v) => v.id);
-    expect(pdfIds).toEqual(['pdf-x-l1-v1']);
-  });
-
-  it('seed repair 只改文法键名不碰 vocab/grammar id（同对象 id 逐字保留）', async () => {
-    const { migrateGrammarForTest } = await import('./vocab-grammar-forensic-helpers.js');
-    const legacy = { id: 'g1', title: '〜ます', structure: '接续', explanation: '说明', examples: [{ ja: '食べます。', zh: '吃。' }] };
-    const { item, migrated } = migrateGrammarForTest(legacy);
-    expect(migrated).toBe(true);
-    expect(item.id).toBe('g1');
-    expect(item.connection).toBe('接续');
-    expect('structure' in item).toBe(false);
   });
 });

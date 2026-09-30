@@ -17,3 +17,4 @@ export type {
   ExternalToolExecutor,
 } from './codex-adapter.js';
 export { mapAppServerNotificationToEvents } from './event-mapper.js';
+export { resolveCodexBinary } from './app-server-protocol.js';

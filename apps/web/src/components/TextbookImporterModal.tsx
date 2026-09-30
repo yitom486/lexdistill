@@ -33,6 +33,8 @@ interface TextbookImporterModalProps {
   onAddCardsBatch: (cards: { front: string; back: string; category: string; prompt: string }[]) => void;
   /** 已有教材（接力追加用；无 documentId 的未入库书不列入） */
   existingBooks?: Array<{ documentId: string; title: string; lessons: number }>;
+  /** 直接激活选择已入库教材 */
+  onSelectBook?: ((documentId: string) => void) | undefined;
 }
 
 export function TextbookImporterModal({
@@ -41,6 +43,7 @@ export function TextbookImporterModal({
   onImportBook,
   onAddCardsBatch,
   existingBooks = [],
+  onSelectBook,
 }: TextbookImporterModalProps) {
   const [activeTab, setActiveTab] = useState<'pipeline' | 'json'>('pipeline');
   const [inputText, setInputText] = useState<string>('');
@@ -172,6 +175,7 @@ export function TextbookImporterModal({
                 existingBooks={existingBooks}
                 onClose={onClose}
                 onSelectJsonFile={handleSelectJsonFile}
+                {...(onSelectBook ? { onSelectBook } : {})}
               />
             </TabsContent>
 

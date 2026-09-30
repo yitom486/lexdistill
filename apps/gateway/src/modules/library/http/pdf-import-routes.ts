@@ -7,11 +7,31 @@ import { extractTocWithLlm } from '../application/toc-extractor.js';
 import { beginTocVisionTrace, listTocVisionTraces } from '../application/toc-vision-diagnostics.js';
 import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
 import { ensurePdfRuntime, type PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
-import type { TocEntry } from '@study-studio/document-model';
+import { TocEntrySchema } from '@study-studio/document-model';
+import { z } from 'zod';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import type { TextbookPipelineInput } from '../application/textbook-pipeline.js';
-import { createDefaultAgentPool } from '../application/lesson-batch-extractor.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
+import { inspectTextbookImport } from '../application/textbook-inspector.js';
+
+const PipelineRequestSchema = z.object({
+  documentId: z.string().optional(),
+  title: z.string().min(1),
+  language: z.string().optional(),
+  filename: z.string().optional(),
+  filePath: z.string().optional(),
+  pdfBase64: z.string().optional(),
+  model: z.string().optional(),
+  effort: z.string().optional(),
+  poolSize: z.number().int().positive().optional(),
+  forceOverwrite: z.boolean().optional(),
+  tocEntries: z.array(TocEntrySchema).min(1),
+  lessonJobs: z.array(z.object({
+    lessonId: z.string(),
+    ocrText: z.string(),
+    title: z.string().optional(),
+  })).optional(),
+});
 
 /**
  * PDF 导入路由：前端上传 PDF → 网关分类/提取/结构化 → 返回 TextbookAST。
@@ -29,6 +49,7 @@ export function createPdfImportRoutes(
   pdfOverrides?: {
     loadInspector?: () => Promise<PdfInspectorLike>;
     runtimeDir?: string;
+    poolFactory?: TextbookPipelineInput['poolFactory'];
   }
 ) {
   return new Hono()
@@ -62,6 +83,37 @@ export function createPdfImportRoutes(
         });
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'importPdfDocument');
+      }
+    })
+    .post('/api/documents/:userId/inspect-import', async (c) => {
+      // 服务端权威预检：根据教材文件名与文件元数据，查询 SQLite 是否已收录且完全就绪
+      try {
+        const userId = c.req.param('userId');
+        if (!userId) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
+          );
+        }
+        const parsed = z.object({ filename: z.string().trim().min(1), filePath: z.string().trim().min(1) })
+          .safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
+          return formatBusinessErrorResponse(
+            c,
+            new BusinessError('E_INVALID_INPUT', '缺少待诊断文件名 filename', 'VALIDATION')
+          );
+        }
+        const body = parsed.data;
+        const res = await inspectTextbookImport(deps.repo, {
+          userId,
+          filename: body.filename.trim(),
+          filePath: body.filePath,
+        });
+
+        if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'inspectTextbookImport');
+        return c.json(res.value);
+      } catch (e) {
+        return formatBusinessErrorResponse(c, e, 'inspectTextbookImport');
       }
     })
     .post('/api/documents/:userId/map-pdf', async (c) => {      // 结构预览（目录感知第一步）：扫一个窗口页，返回每页标题 + 目录条目；
@@ -208,30 +260,14 @@ export function createPdfImportRoutes(
             new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
           );
         }
-        const body = (await c.req.json().catch(() => null)) as {
-          documentId?: string;
-          title?: string;
-          language?: string;
-          filename?: string;
-          filePath?: string;
-          pdfBase64?: string;
-          model?: string;
-          poolSize?: number;
-          forceOverwrite?: boolean;
-          tocEntries?: TocEntry[];
-          lessonJobs?: Array<{
-            lessonId: string;
-            ocrText: string;
-            title?: string;
-          }>;
-        } | null;
-
-        if (!body || !body.title?.trim() || !Array.isArray(body.tocEntries)) {
+        const parsed = PipelineRequestSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
           return formatBusinessErrorResponse(
             c,
             new BusinessError('E_INVALID_INPUT', '请求体格式不正确，缺少 title 或 tocEntries', 'VALIDATION')
           );
         }
+        const body = parsed.data;
 
         let pdfBytes: Uint8Array | undefined = undefined;
         let inspector: PdfInspectorLike | undefined = undefined;
@@ -241,12 +277,12 @@ export function createPdfImportRoutes(
             return formatBusinessErrorResponse(c, fileRes.error, 'readLocalPdfFile');
           }
           pdfBytes = fileRes.value.bytes;
-          const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
+          const runtime = await ensurePdfRuntime({ needOcr: true, ...pdfOverrides });
           inspector = runtime.inspector;
         } else if (body.pdfBase64) {
           try {
             pdfBytes = new Uint8Array(Buffer.from(body.pdfBase64, 'base64'));
-            const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
+            const runtime = await ensurePdfRuntime({ needOcr: true, ...pdfOverrides });
             inspector = runtime.inspector;
           } catch (e) {
             return formatBusinessErrorResponse(
@@ -267,13 +303,6 @@ export function createPdfImportRoutes(
           );
         }
 
-        const pool = body.model || body.poolSize
-          ? createDefaultAgentPool({
-              ...(body.model ? { model: body.model } : {}),
-              ...(body.poolSize ? { poolSize: body.poolSize } : {}),
-            })
-          : undefined;
-
         const pipelineInput: TextbookPipelineInput = {
           userId,
           ...(body.documentId ? { documentId: body.documentId } : {}),
@@ -285,7 +314,10 @@ export function createPdfImportRoutes(
           ...(pdfBytes ? { pdf: pdfBytes } : {}),
           ...(inspector ? { inspector } : {}),
           ...(body.forceOverwrite !== undefined ? { forceOverwrite: Boolean(body.forceOverwrite) } : {}),
-          ...(pool ? { pool } : {}),
+          ...(body.model ? { model: body.model } : {}),
+          ...(body.poolSize ? { poolSize: body.poolSize } : {}),
+          ...(body.effort ? { effort: body.effort } : {}),
+          ...(pdfOverrides?.poolFactory ? { poolFactory: pdfOverrides.poolFactory } : {}),
         };
 
         const res = await deps.repo.executeTextbookPipeline(pipelineInput);
@@ -305,30 +337,14 @@ export function createPdfImportRoutes(
             new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
           );
         }
-        const body = (await c.req.json().catch(() => null)) as {
-          documentId?: string;
-          title?: string;
-          language?: string;
-          filename?: string;
-          filePath?: string;
-          pdfBase64?: string;
-          model?: string;
-          poolSize?: number;
-          forceOverwrite?: boolean;
-          tocEntries?: TocEntry[];
-          lessonJobs?: Array<{
-            lessonId: string;
-            ocrText: string;
-            title?: string;
-          }>;
-        } | null;
-
-        if (!body || !body.title?.trim() || !Array.isArray(body.tocEntries)) {
+        const parsed = PipelineRequestSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
           return formatBusinessErrorResponse(
             c,
             new BusinessError('E_INVALID_INPUT', '请求体格式不正确，缺少 title 或 tocEntries', 'VALIDATION')
           );
         }
+        const body = parsed.data;
 
         let pdfBytes: Uint8Array | undefined = undefined;
         let inspector: PdfInspectorLike | undefined = undefined;
@@ -338,12 +354,12 @@ export function createPdfImportRoutes(
             return formatBusinessErrorResponse(c, fileRes.error, 'readLocalPdfFile');
           }
           pdfBytes = fileRes.value.bytes;
-          const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
+          const runtime = await ensurePdfRuntime({ needOcr: true, ...pdfOverrides });
           inspector = runtime.inspector;
         } else if (body.pdfBase64) {
           try {
             pdfBytes = new Uint8Array(Buffer.from(body.pdfBase64, 'base64'));
-            const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
+            const runtime = await ensurePdfRuntime({ needOcr: true, ...pdfOverrides });
             inspector = runtime.inspector;
           } catch (e) {
             return formatBusinessErrorResponse(
@@ -364,13 +380,6 @@ export function createPdfImportRoutes(
           );
         }
 
-        const pool = body.model || body.poolSize
-          ? createDefaultAgentPool({
-              ...(body.model ? { model: body.model } : {}),
-              ...(body.poolSize ? { poolSize: body.poolSize } : {}),
-            })
-          : undefined;
-
         const pipelineInput: TextbookPipelineInput = {
           userId,
           ...(body.documentId ? { documentId: body.documentId } : {}),
@@ -382,14 +391,13 @@ export function createPdfImportRoutes(
           ...(pdfBytes ? { pdf: pdfBytes } : {}),
           ...(inspector ? { inspector } : {}),
           ...(body.forceOverwrite !== undefined ? { forceOverwrite: Boolean(body.forceOverwrite) } : {}),
-          ...(pool ? { pool } : {}),
-        };
-
-        const res = deps.server.pipelineJobs.start(deps.repo, {
-          ...pipelineInput,
           ...(body.model ? { model: body.model } : {}),
           ...(body.poolSize ? { poolSize: body.poolSize } : {}),
-        });
+          ...(body.effort ? { effort: body.effort } : {}),
+          ...(pdfOverrides?.poolFactory ? { poolFactory: pdfOverrides.poolFactory } : {}),
+        };
+
+        const res = deps.server.pipelineJobs.start(deps.repo, pipelineInput);
 
         if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'startTextbookPipelineJob');
         return c.json(res.value, 202);

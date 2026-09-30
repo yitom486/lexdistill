@@ -100,7 +100,7 @@ export function TextbookCurriculum({
   });
 
   const currentBook =
-    filteredBooks.find((b) => b.id === selectedBookId) ??
+    filteredBooks.find((b) => b.id === selectedBookId || (b.documentId && b.documentId === selectedBookId)) ??
     pickDefaultTextbook(filteredBooks, languageFilter) ??
     pickDefaultTextbook(booksList, languageFilter);
   const currentLesson = currentBook?.lessons.find((l) => l.id === selectedLessonId) ?? currentBook?.lessons[0];
@@ -268,6 +268,10 @@ export function TextbookCurriculum({
             importTextbook.mutate(newBook);
             setSelectedBookId(newBook.id);
             setSelectedLessonId(newBook.lessons[0]?.id ?? '');
+          }}
+          onSelectBook={(documentId) => {
+            setSelectedBookId(documentId);
+            setIsImporterOpen(false);
           }}
           onAddCardsBatch={(cards) => {
             if (onAddCardsBatch) {
@@ -713,6 +717,17 @@ export function TextbookCurriculum({
           importTextbook.mutate(newBook);
           setSelectedBookId(newBook.id);
           setSelectedLessonId(newBook.lessons[0]?.id ?? '');
+        }}
+        onSelectBook={(docId) => {
+          const matched = booksList.find((b) => b.id === docId || (b.documentId && b.documentId === docId));
+          if (matched) {
+            setSelectedBookId(matched.id);
+            setSelectedLessonId(matched.lessons[0]?.id ?? '');
+          } else {
+            setSelectedBookId(docId);
+          }
+          setIsImporterOpen(false);
+          sound.playCorrect();
         }}
         onAddCardsBatch={(cards) => {
           if (onAddCardsBatch) {

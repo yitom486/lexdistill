@@ -94,6 +94,6 @@ describe('canonicalizeTocEntries', () => {
     expect(canonical[0]!.endPage).toBe(14); // 自动推断为 15 - 1
 
     expect(canonical[1]!.sortOrder).toBe(2);
-    expect(canonical[1]!.endPage).toBe(15);
+    expect(canonical[1]!.endPage).toBeUndefined(); // 最后一课由实际 PDF 总页数或用户结束页确定
   });
 });
