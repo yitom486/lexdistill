@@ -87,12 +87,13 @@ export async function playKanaRow(
     const isLast = i === urls.length - 1;
     // playLocalFile 的 promise 在开始播放即 resolve，连播必须等到真正播完，
     // 否则下一条立刻掐掉上一条（只剩最后一个字有声）。
-    // 推进条件：自然播完（stopEpoch 不变）；外部 stop 则链条停住。
-    const epoch = speechStudio.getStopEpoch();
+    // epoch 必须在起播之后取值（playLocalFile 内部会先 stop 一次）：
+    // 自然播完 epoch 不变→推进；外部 stop 使 epoch+1→链条停住。
     await speechStudio.playLocalFile(urls[i]!, ids.join(''), {
       ...(isLast && options?.onEnd ? { onEnd: options.onEnd } : {}),
       ...(options?.onError ? { onError: options.onError } : {}),
     });
+    const epoch = speechStudio.getStopEpoch();
     await new Promise<void>((resolve) => {
       const timer = setInterval(() => {
         if (token !== rowRunToken || speechStudio.getStopEpoch() !== epoch) {
