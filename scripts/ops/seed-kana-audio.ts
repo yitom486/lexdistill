@@ -9,8 +9,8 @@
  *   bun scripts/ops/seed-kana-audio.ts --single --key <GEMINI_API_KEY>
  *   # 任务未完成时稍后继续轮询（读上次 job 名）
  *   bun scripts/ops/seed-kana-audio.ts --resume --key <GEMINI_API_KEY>
- *   # 强制逐条实时合成（104 次，慢但一定能跑）
- *   bun scripts/ops/seed-kana-audio.ts --key <KEY> --single
+ *   # 陈述语调 + lite 模型重生全套（文本为「あ。」形式，key/文件名不变）
+ *   bun scripts/ops/seed-kana-audio.ts --key <KEY> --model gemini-3.8-flash-lite-tts --text-suffix 。
  *
  * 流程：读 KANA_SEEDS（104 音）→ 拆成 ≤100/批 → 建批量任务
  * → 轮询到 SUCCEEDED → 落盘 `apps/web/public/audio/kana/*.wav`
@@ -95,20 +95,21 @@ const PROGRESS_FILE = join(REPO_ROOT, '.studio-internal/kana-seed-progress.json'
 interface SeedProgress {
   voice: string;
   model: string;
+  suffix: string;
   done: string[];
 }
 
-async function loadProgress(voice: string, model: string): Promise<Set<string>> {
+async function loadProgress(voice: string, model: string, suffix: string): Promise<Set<string>> {
   try {
     const raw = JSON.parse(await readFile(PROGRESS_FILE, 'utf8')) as SeedProgress;
-    if (raw.voice === voice && raw.model === model) return new Set(raw.done);
+    if (raw.voice === voice && raw.model === model && (raw.suffix ?? '') === suffix) return new Set(raw.done);
   } catch { /* 无进度，从头开始 */ }
   return new Set();
 }
 
-async function saveProgress(voice: string, model: string, done: Set<string>): Promise<void> {
+async function saveProgress(voice: string, model: string, suffix: string, done: Set<string>): Promise<void> {
   await mkdir(dirname(PROGRESS_FILE), { recursive: true });
-  await writeFile(PROGRESS_FILE, JSON.stringify({ voice, model, done: [...done] }));
+  await writeFile(PROGRESS_FILE, JSON.stringify({ voice, model, suffix, done: [...done] }));
 }
 
 function retryDelayMs(error: unknown): number {
@@ -123,10 +124,11 @@ async function runSingle(
   voice: string,
   model: string,
   paceMs: number,
+  textSuffix: string,
 ): Promise<Map<string, { audioBase64: string; mimeType: string }>> {
   await mkdir(AUDIO_DIR, { recursive: true });
   const collected = new Map<string, { audioBase64: string; mimeType: string }>();
-  const done = await loadProgress(voice, model);
+  const done = await loadProgress(voice, model, textSuffix);
   // 免费配额 3 次/分钟：主动 pacing 22 秒/条，429 按官方 retryDelay 睡眠重试。
   // 每条成功立即落盘 + 写进度，任何中断都可直接重跑续做。
   const items = KANA_SEEDS.filter((k) => k.audioText.trim());
@@ -143,7 +145,7 @@ async function runSingle(
     for (let attempt = 1; attempt <= 8; attempt++) {
       try {
         audio = (await geminiProvider.synthesize(
-          { text: k.audioText.trim(), voiceName: voice, model, languageCode: 'ja' },
+          { text: `${k.audioText.trim()}${textSuffix}`, voiceName: voice, model, languageCode: 'ja' },
           apiKey,
         )) as { audioBuffer: Buffer; mimeType: string };
         break;
@@ -161,7 +163,7 @@ async function runSingle(
     if (!audio) throw new Error(`${k.id} 重试 8 次仍失败，中断；已落盘的可直接重跑续做。`);
     await writeFile(file, audio.audioBuffer);
     done.add(k.id);
-    await saveProgress(voice, model, done);
+    await saveProgress(voice, model, textSuffix, done);
     collected.set(k.id, { audioBase64: audio.audioBuffer.toString('base64'), mimeType: audio.mimeType });
     console.log(`单条合成 ${index}/${items.length}（已落盘 ${done.size}）`);
     await new Promise((r) => setTimeout(r, paceMs));
@@ -182,12 +184,14 @@ async function main(): Promise<void> {
   const timeoutMin = Number(arg('timeout-min', '120')) || 120;
   // 单条 pacing（毫秒）：免费 22000（3次/分），付费档可调小（如 3000）。
   const paceMs = Number(arg('pace-ms', '22000')) || 22000;
+  // 合成文本后缀：传 。即用「あ。」陈述语调，单字语调更稳（key/文件名不变）。
+  const textSuffix = arg('text-suffix', '');
 
   await verifyKeyAndVoice(apiKey, voice);
 
   if (forceSingle) {
     console.log('强制单条模式：104 次实时合成。');
-    await writeResults(await runSingle(apiKey, voice, model, paceMs), voice, model);
+    await writeResults(await runSingle(apiKey, voice, model, paceMs, textSuffix), voice, model);
     return;
   }
 
@@ -202,7 +206,7 @@ async function main(): Promise<void> {
   } else {
     const items = KANA_SEEDS.filter((k) => k.audioText.trim()).map((k) => ({
       key: k.id,
-      text: k.audioText.trim(),
+      text: `${k.audioText.trim()}${textSuffix}`,
     }));
     if (items.length === 0) throw new Error('KANA_SEEDS 为空，无法建单。');
     const chunks: typeof items[] = [];
