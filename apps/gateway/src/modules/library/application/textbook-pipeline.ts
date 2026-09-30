@@ -8,6 +8,7 @@ import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-r
 import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import { ChapterSessionPool, LessonInputQueue, type BatchExtractionProgress, type LessonStage } from './lesson-batch-extractor.js';
 import { producePdfLessons } from './pdf-import/lesson-content-slicer.js';
+import { ImportMonitor } from './import-monitor.js';
 
 export interface TextbookPipelineInput extends Partial<TextbookPipelineSettings> {
   userId: string; documentId?: string | undefined; title: string;
@@ -18,6 +19,7 @@ export interface TextbookPipelineInput extends Partial<TextbookPipelineSettings>
   forceOverwrite?: boolean | undefined;
   adapter?: AgentAdapter | undefined; submissionTool?: LibraryLessonCommitTool | undefined;
   model?: string | undefined; effort?: string | undefined;
+  traceId?: string | undefined; jobId?: string | undefined;
   onProgress?: ((progress: BatchExtractionProgress) => void) | undefined; signal?: AbortSignal | undefined;
 }
 export interface TextbookPipelineOutput {
@@ -32,6 +34,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
   if (!settings.success || !input.adapter || !input.submissionTool) return err(new BusinessError('E_INVALID_INPUT', '教材提取配置或章节会话通道未就绪', 'VALIDATION'));
   const config = settings.data;
   const documentId = input.documentId ?? generateId('doc_tb');
+  const monitor = new ImportMonitor(repo, input.userId, input.traceId ?? generateId('import'), { documentId, ...(input.jobId ? { jobId: input.jobId } : {}) });
   const toc = Object.freeze(canonicalizeTocEntries(input.tocEntries).map(entry => Object.freeze({ ...entry })));
   const planned = planTextbookTasks(toc);
   if (!planned.ok) return planned;
@@ -50,12 +53,16 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
   let successful = 0, completed = 0;
   const lessons = tasks.map(task => task.root);
   const emptyStats = { vocabCount: 0, grammarCount: 0, exerciseCount: 0, hasPassage: false };
-  const emit = (lessonId: string, stage: LessonStage, stats = emptyStats, error?: string, allLessonsReady = false) => input.onProgress?.({
+  const emit = (lessonId: string, stage: LessonStage, stats = emptyStats, error?: string, allLessonsReady = false) => {
+    monitor.record('task', stage, { stats, error: error ?? null }, { nodeId: lessonId });
+    input.onProgress?.({
     documentId, lessonId, stage, completedCount: completed, successfulCount: successful, totalCount: lessons.length,
     stats, allLessonsReady, ...(error ? { error } : {}),
-  });
+    });
+  };
   const fail = (lessonId: string, error: BusinessError) => { completed++; errors.push({ lessonId, error: error.userMessage }); emit(lessonId, 'failed', emptyStats, error.userMessage); };
   try {
+    monitor.record('task', 'started', { title: input.title, directory: toc, settings: config, model: input.model ?? null, effort: input.effort ?? null });
     if (controller.signal.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消', 'TOOL_EXECUTION');
     const created = await repo.createImportTask({ userId: input.userId, sourceKind: 'pdf', filename: input.filename ?? `${input.title}.pdf` });
     if (!created.ok) return created;
@@ -64,6 +71,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
       ...(input.pdf ? { sourceFingerprint: createHash('sha256').update(input.pdf).digest('hex') } : {}),
     });
     if (!seeded.ok) throw seeded.error;
+    monitor.record('directory', 'saved_outline', seeded.value);
     const existing = await repo.getTextbookAssetStats(documentId);
     if (!existing.ok) throw existing.error;
     const ready = new Set(input.forceOverwrite ? [] : existing.value.lessonDetails.filter(item => item.status === 'ready').map(item => item.lessonId));
@@ -74,12 +82,14 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
     }
     if (pending.length) {
       const tool = input.submissionTool;
-      pool = new ChapterSessionPool({ userId: input.userId, adapter: input.adapter, tool, poolSize: config.poolSize, model: input.model, effort: input.effort, signal: controller.signal });
+      pool = new ChapterSessionPool({ userId: input.userId, adapter: input.adapter, tool, poolSize: config.poolSize, model: input.model, effort: input.effort, signal: controller.signal, monitor });
       const activePool = pool;
       const onText = async (lesson: TocEntry, text: string) => {
         const task = tasks.find(task => task.root.id === lesson.id)!;
+        monitor.record('text', 'ready', { text, startPage: lesson.startPage, endPage: lesson.endPage ?? null }, { nodeId: lesson.id });
         emit(lesson.id, 'queued');
         await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: task.ancestors, ocrText: text });
+        monitor.record('queue', 'enqueued', { size: queue.size }, { nodeId: lesson.id });
       };
       const produce = async () => {
         if (input.lessonJobs?.length) {
@@ -93,6 +103,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
           }
         } else if (input.pdf && input.inspector) {
           await producePdfLessons({ pdf: input.pdf, inspector: input.inspector, lessons: pending, concurrency: config.ocrConcurrency, retries: config.ocrRetries, signal: controller.signal,
+            onDiagnostic: (lesson, name, detail) => monitor.record('text', name, detail, { nodeId: lesson.id }),
             onStart: lesson => emit(lesson.id, 'ocr'), onText, onFailure: (lesson, error) => fail(lesson.id, error),
           });
         } else throw new BusinessError('E_INVALID_INPUT', '请选择教材 PDF 或提供章节文字', 'VALIDATION');
@@ -101,10 +112,15 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
       const consume = async () => {
         await activePool.initialize();
         await activePool.consume(queue, async (session, job) => {
+          monitor.record('queue', 'dequeued', undefined, { nodeId: job.lessonId, sessionId: session.sessionId });
           let lastError: BusinessError | undefined;
           for (let attempt = 0; attempt <= config.modelRetries && !controller.signal.aborted; attempt++) {
             const assignmentId = generateId('chapter_attempt');
+            const binding = { nodeId: job.lessonId, sessionId: session.sessionId, ...(session.threadId ? { threadId: session.threadId } : {}), attemptId: assignmentId };
+            monitor.record('session', 'bound', { attempt: attempt + 1 }, binding);
+            if (attempt) monitor.record('model', 'retry', { previousError: lastError?.userMessage, attempt: attempt + 1 }, binding);
             const submission = tool.bind(session.sessionId, { userId: input.userId, documentId, lessonId: job.lessonId, assignmentId, tocEntries: job.tocEntries, signal: controller.signal, allowAiExercises: config.allowAiExercises,
+              monitor, sessionId: session.sessionId,
               onStage: stage => {
                 if (stage === 'saved' && submission.receipt) { successful++; completed++; emit(job.lessonId, stage, submission.receipt.stats, undefined, submission.receipt.allLessonsReady); }
                 else emit(job.lessonId, stage);
@@ -116,6 +132,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
               if (submission.receipt) return;
               if (submission.candidate) {
                 for (let retry = 0; retry < config.storageRetries && !controller.signal.aborted && submission.error?.retryable; retry++) {
+                  monitor.record('storage', 'retry', { retry: retry + 1, error: submission.error.userMessage }, binding);
                   const saved = await submission.persist(); if (saved.ok) return;
                 }
                 // 有效候选只重试保存，不能再次生成。
@@ -126,7 +143,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
               if (!lastError.retryable) break;
             } catch (cause) {
               lastError = translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本章模型处理失败' });
-            } finally { tool.end(session.sessionId); }
+            } finally { tool.end(session.sessionId); monitor.record('session', 'unbound', undefined, binding); }
           }
           if (!controller.signal.aborted) fail(job.lessonId, lastError ?? new BusinessError('E_INTERNAL', '本章提取未完成', 'TOOL_EXECUTION'));
         }, (job, error) => fail(job.lessonId, error));
@@ -147,9 +164,12 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
   } catch (cause) {
     const error = cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'TOOL_EXECUTION', fallbackMessage: '教材处理失败，已保存章节保留' });
     if (task) await repo.updateImportTask(task.id, { status: 'failed', documentId, error: error.userMessage });
+    monitor.record('task', 'error', { code: error.code, message: error.userMessage });
     return err(error);
   } finally {
     controller.abort(); await pool?.close();
+    monitor.record('task', 'ended', { successful, errors, cancelled: input.signal?.aborted ?? false });
+    await monitor.flush();
     input.signal?.removeEventListener('abort', cancel); controller.signal.removeEventListener('abort', stopQueue);
   }
 }

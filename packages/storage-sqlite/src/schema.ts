@@ -1,5 +1,13 @@
 import { sqliteTable, text, integer, real, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+export const textbookImportEvents = sqliteTable('textbook_import_events', {
+  sequence: integer('sequence').primaryKey({ autoIncrement: true }),
+  userId: text('user_id').notNull(), traceId: text('trace_id').notNull(),
+  documentId: text('document_id'), jobId: text('job_id'), nodeId: text('node_id'),
+  sessionId: text('session_id'), threadId: text('thread_id'), attemptId: text('attempt_id'), callId: text('call_id'),
+  category: text('category').notNull(), name: text('name').notNull(), occurredAt: text('occurred_at').notNull(), detailJson: text('detail_json').notNull(),
+}, table => [index('idx_textbook_import_events_trace').on(table.userId, table.traceId, table.sequence)]);
+
 /**
  * 学习者档案表 (Learner Profiles)
  * displayName + 当前激活轨道 target_language；其余学情字段为「当前轨道镜像」，

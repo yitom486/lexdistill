@@ -1,4 +1,6 @@
 import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
+import { useState } from 'react';
+import { TextbookImportMonitor } from './monitor/TextbookImportMonitor.js';
 import { planTextbookTasks } from '@study-studio/document-model';
 import { useTextbookLessonSlotsQuery } from '../../queries/textbooks-annotations.js';
 import { useCancelPipelineJobMutation } from '../../queries/pipeline-jobs.js';
@@ -14,6 +16,8 @@ interface Props {
 const stageLabels = { ocr: '提取文字 / OCR', queued: '等待会话', extracting: '模型整理', validating: '校验目录与格式', saving: '保存中', saved: '已保存', failed: '未完成' };
 
 export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: Props) {
+  const [monitorOpen, setMonitorOpen] = useState(false);
+  const [monitorNode, setMonitorNode] = useState<string | undefined>();
   const slots = useTextbookLessonSlotsQuery(job.documentId);
   const cancel = useCancelPipelineJobMutation();
   const planned = slots.data?.length ? planTextbookTasks(slots.data.map(slot => ({ ...slot, id: slot.lessonId, level: slot.kind }))) : undefined;
@@ -33,14 +37,15 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
         {(planned?.ok ? planned.value.map(task => task.root) : []).map((slot) => {
           const failure = job.failedLessons.find((item) => item.lessonId === slot.lessonId);
           return (
-            <div key={slot.lessonId} className="flex justify-between gap-2 border-b border-line-soft py-2 text-ink">
+            <button type="button" key={slot.lessonId} onClick={() => { setMonitorNode(slot.lessonId); setMonitorOpen(true); }} className="flex w-full justify-between gap-2 border-b border-line-soft py-2 text-left text-ink">
               <span>{slot.title}</span>
               <span className="text-ink-muted">{slot.status === 'ready' ? '已保存' : failure ? failure.error : job.status === 'running' && job.lessonStages?.[slot.lessonId] ? stageLabels[job.lessonStages[slot.lessonId]!] : job.status === 'running' ? '等待处理' : '未完成'}</span>
-            </div>
+            </button>
           );
         })}
       </div>
       <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => { setMonitorNode(undefined); setMonitorOpen(true); }}>运行详情</Button>
         {job.status === 'running' ? (
           <>
             <Button variant="outline" disabled={cancel.isPending} onClick={() => cancel.mutate(job.jobId)}>中止提取</Button>
@@ -53,6 +58,7 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
           </>
         )}
       </div>
+      {monitorOpen && (job.traceId ? <TextbookImportMonitor open onOpenChange={setMonitorOpen} userId={job.userId} traceId={job.traceId} job={job} {...(monitorNode ? { nodeId: monitorNode } : {})} /> : <p>此任务没有可回溯的交互记录。</p>)}
     </section>
   );
 }

@@ -23,6 +23,7 @@ export interface TocDetectedCandidate {
 }
 
 interface TocRecognitionPanelProps {
+  traceId?: string;
   file: File | null;
   filePath: string;
   azure?: PdfAzureCredential | undefined;
@@ -38,6 +39,7 @@ interface TocRecognitionPanelProps {
 }
 
 export function TocRecognitionPanel({
+  traceId,
   file,
   filePath,
   azure,
@@ -127,7 +129,7 @@ export function TocRecognitionPanel({
           ...(azure ? { azure } : {}),
         };
 
-    map.mutate(vars, {
+    map.mutate({ ...vars, ...(traceId ? { traceId } : {}) }, {
       onSuccess: (result) => {
         sound.playCorrect();
         if (result.detectedTocRange) {
@@ -199,6 +201,7 @@ export function TocRecognitionPanel({
 
     const vars = {
       ...(file ? { file } : { filePath: filePath.trim() }),
+      ...(traceId ? { traceId } : {}),
       startPage,
       endPage,
       ...(effectiveTocReviewModel !== '__default__' ? { model: effectiveTocReviewModel } : {}),
@@ -213,7 +216,7 @@ export function TocRecognitionPanel({
           return;
         }
 
-        const candidates: TocRecognitionCandidate[] = data.entries.map((item, index) => ({
+        const candidates: TocRecognitionCandidate[] = data.entries.map((item) => ({
           key: item.id,
           title: item.title,
           printedPage: String(item.startPage),

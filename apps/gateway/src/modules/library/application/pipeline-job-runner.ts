@@ -57,6 +57,7 @@ export class TextbookPipelineJobRegistry {
     }
 
     const jobId = generateId('pipejob');
+    const traceId = input.traceId ?? generateId('import');
     const now = new Date().toISOString();
     const documentId = input.documentId ?? generateId('doc_tb');
     const planned = planTextbookTasks(input.tocEntries);
@@ -65,6 +66,7 @@ export class TextbookPipelineJobRegistry {
 
     const snapshot: TextbookPipelineJobSnapshot = {
       jobId,
+      traceId,
       userId: input.userId,
       documentId,
       title: input.title,
@@ -89,6 +91,7 @@ export class TextbookPipelineJobRegistry {
       promise: this.runPipeline(repo, snapshot, controller.signal, {
         ...input,
         documentId,
+        traceId, jobId,
       }),
     };
 

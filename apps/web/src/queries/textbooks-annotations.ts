@@ -667,14 +667,14 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
     mutationFn: async (
       vars:
-        | { file: File; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
-        | { filePath: string; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
+        | { file: File; startPage?: number; endPage?: number; azure?: PdfAzureCredential; traceId?: string }
+        | { filePath: string; startPage?: number; endPage?: number; azure?: PdfAzureCredential; traceId?: string }
     ): Promise<MapPdfResult> => {
       const hasPath = 'filePath' in vars;
       const res = hasPath
         ? await fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/map-pdf`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(vars.traceId ? { 'X-Textbook-Trace': vars.traceId } : {}) },
             body: JSON.stringify({
               filePath: vars.filePath,
               ...(vars.startPage !== undefined ? { startPage: vars.startPage } : {}),
@@ -690,6 +690,7 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
             azureFormFields(form, vars.azure);
             return fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/map-pdf`, {
               method: 'POST',
+              ...(vars.traceId ? { headers: { 'X-Textbook-Trace': vars.traceId } } : {}),
               body: form,
             });
           })();
@@ -1027,7 +1028,7 @@ export function useSaveTextbookOutlineMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
     mutationFn: async (vars: SaveTextbookOutlineRequest) => {
       const response = await fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/textbook-outline`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vars),
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...(vars.traceId ? { 'X-Textbook-Trace': vars.traceId } : {}) }, body: JSON.stringify(vars),
         signal: AbortSignal.timeout(60_000),
       });
       const payload: unknown = await response.json().catch(() => null);
@@ -1044,6 +1045,7 @@ export function useSaveTextbookOutlineMutation(userId = DEFAULT_USER_ID) {
 }
 
 export interface ExtractTocWithLlmVars {
+  traceId?: string;
   filePath?: string;
   file?: File;
   startPage: number;
@@ -1070,7 +1072,7 @@ export async function requestExtractTocWithLlm(
     if (vars.title) fd.append('title', vars.title);
     if (vars.language) fd.append('language', vars.language);
     if (vars.model) fd.append('model', vars.model);
-    res = await fetchPdfGateway(url, { method: 'POST', body: fd });
+    res = await fetchPdfGateway(url, { method: 'POST', body: fd, ...(vars.traceId ? { headers: { 'X-Textbook-Trace': vars.traceId } } : {}) });
   } else {
     res = await fetchPdfGateway(url, {
       method: 'POST',
@@ -1083,6 +1085,7 @@ export async function requestExtractTocWithLlm(
         ...(vars.language ? { language: vars.language } : {}),
         ...(vars.model ? { model: vars.model } : {}),
       }),
+      ...(vars.traceId ? { headers: { 'Content-Type': 'application/json', 'X-Textbook-Trace': vars.traceId } } : {}),
     });
   }
 

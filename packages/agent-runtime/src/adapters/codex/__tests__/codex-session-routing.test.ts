@@ -137,6 +137,7 @@ describe('P3.4B-FIX 单连接并发工具路由', () => {
     expect(isOk(reviewRes)).toBe(true);
     if (!isOk(mainRes) || !isOk(reviewRes)) return;
     expect(fake.handlerInstalls).toBe(1);
+    expect(mainRes.value.toolSpecs).toEqual([{ name: 'learning_content', businessName: 'learning.content', description: 'test tool learning.content', inputSchema: { type: 'object', properties: {}, additionalProperties: false } }]);
 
     // 交错：主→审→主→审（旧设计下全部走后创建的 review 身份）
     const r1 = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-m1', tool: 'learning.content' });

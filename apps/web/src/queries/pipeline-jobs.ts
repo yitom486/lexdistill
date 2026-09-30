@@ -19,6 +19,7 @@ import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { usePipelineJobStore } from '../stores/usePipelineJobStore.js';
 
 export interface StartPipelineJobVars extends Partial<TextbookPipelineSettings> {
+  traceId?: string;
   documentId?: string;
   title: string;
   language?: string;

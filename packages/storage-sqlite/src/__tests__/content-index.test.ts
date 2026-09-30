@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { isOk } from '@study-studio/shared';
-import { initSchema, runMigrations } from '../ddl.js';
+import { initSchema, runMigrations, SCHEMA_MIGRATIONS } from '../ddl.js';
 import {
   projectContentSegments,
   listContentSegments,
@@ -272,6 +272,7 @@ describe('P1-3 v22 旧库升级 v23–v30', () => {
     db.run('ALTER TABLE encountered_terms DROP COLUMN lookup_count');
     db.run('ALTER TABLE encountered_terms DROP COLUMN read_count');
     db.run('DELETE FROM schema_migrations WHERE version >= 23');
+    db.run('DROP TABLE textbook_import_events');
     // 历史行（旧列形状）。
     db.run(
       `INSERT INTO encountered_terms
@@ -286,7 +287,8 @@ describe('P1-3 v22 旧库升级 v23–v30', () => {
               ('o2', 'u9', 'ja', 'k', 'reading', 'd1', NULL, 't2')`
     );
     const res = runMigrations(db);
-    expect(res.applied).toEqual([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]);
+    expect(res.applied).toEqual(SCHEMA_MIGRATIONS.filter(migration => migration.version >= 23).map(migration => migration.version));
+    expect(db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'textbook_import_events'").all()).toHaveLength(1);
     expect(db.query('PRAGMA table_info(textbook_lessons)').all().some(row =>
       typeof row === 'object' && row !== null && 'name' in row && row.name === 'submission_id'
     )).toBe(true);

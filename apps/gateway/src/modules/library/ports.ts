@@ -10,7 +10,7 @@ import type {
   ReadingPassageSet,
   SubmitReadingPractice,
 } from '@study-studio/protocol';
-import type { TextbookAST } from '@study-studio/document-model';
+import type { TextbookAST, ImportEvent, ImportEventInput, ImportEventQuery } from '@study-studio/document-model';
 import type { ImportTask, ImportTaskStatus } from '@study-studio/storage-sqlite';
 import type {
   DocumentImportInput,
@@ -44,6 +44,9 @@ import type {
  *   所有权归属 M5 再定，本契约暂不收录。
  */
 export interface ContentRepository {
+  appendImportEvent(input: ImportEventInput): Promise<Result<ImportEvent, BusinessError>>;
+  listImportEvents(query: ImportEventQuery): Promise<Result<ImportEvent[], BusinessError>>;
+  getImportEvent(userId: string, traceId: string, sequence: number): Promise<Result<ImportEvent | null, BusinessError>>;
   executeTextbookPipeline(
     input: TextbookPipelineInput
   ): Promise<Result<TextbookPipelineOutput, BusinessError>>;
@@ -189,4 +192,3 @@ export type {
   TextbookPipelineInput,
   TextbookPipelineOutput,
 };
-

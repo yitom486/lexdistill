@@ -138,7 +138,8 @@ export class CodexSession implements AgentSession {
     private readonly connection: CodexAppServerConnection,
     private readonly executeTool?: ExternalToolExecutor,
     private readonly toolNameMap?: Map<string, string>,
-    private readonly onClose?: () => void
+    private readonly onClose?: () => void,
+    public readonly toolSpecs: NonNullable<AgentSession['toolSpecs']> = []
   ) {
     // 注意：工具调用与审批处理器一律由 CodexAdapter 在连接层统一安装一次
     //（按 thread/turn 路由到归属会话），本构造不再逐会话覆盖连接处理器——
@@ -725,7 +726,8 @@ export class CodexAdapter implements AgentAdapter {
         conn.value,
         this.options.executeTool,
         bridge.nameMap,
-        () => this.unregisterToolRoute(route)
+        () => this.unregisterToolRoute(route),
+        bridge.specs.map(spec => ({ name: spec.name, businessName: bridge.nameMap.get(spec.name) ?? spec.name, description: spec.description, inputSchema: spec.inputSchema }))
       );
       route.noteTurn = (turnId: string) => sess.noteActiveTurn(turnId);
       route.turnPolicyOf = () => sess.currentTurnPolicy();

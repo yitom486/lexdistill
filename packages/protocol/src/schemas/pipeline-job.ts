@@ -23,6 +23,7 @@ export type TextbookPipelineFailedLesson = z.infer<typeof TextbookPipelineFailed
 
 export const TextbookPipelineJobSnapshotSchema = z.object({
   jobId: z.string(),
+  traceId: z.string().optional(),
   userId: z.string(),
   documentId: z.string(),
   title: z.string(),

@@ -11,6 +11,8 @@ export interface PipelineJobState {
   isWidgetMinimized: boolean;
   /** 全局教材导入模态框显隐 */
   isImporterModalOpen: boolean;
+  currentImportTrace: { sourceKey: string; traceId: string } | null;
+  setImportTrace: (trace: { sourceKey: string; traceId: string }) => void;
 
   setActiveJobId: (jobId: string | null) => void;
   setActiveJob: (job: TextbookPipelineJobSnapshot | null) => void;
@@ -27,6 +29,8 @@ export const usePipelineJobStore = create<PipelineJobState>()(
       activeJob: null,
       isWidgetMinimized: false,
       isImporterModalOpen: false,
+      currentImportTrace: null,
+      setImportTrace: currentImportTrace => set({ currentImportTrace }),
 
       setActiveJobId: (activeJobId: string | null) => set({ activeJobId }),
       setActiveJob: (activeJob: TextbookPipelineJobSnapshot | null) => {
@@ -46,6 +50,7 @@ export const usePipelineJobStore = create<PipelineJobState>()(
       // 仅持久化 jobId 与最小化偏好；具体内存快照在重连时由 SSE 或接口恢复
       partialize: (state) => ({
         activeJobId: state.activeJobId,
+        currentImportTrace: state.currentImportTrace,
         isWidgetMinimized: state.isWidgetMinimized,
       }),
     }

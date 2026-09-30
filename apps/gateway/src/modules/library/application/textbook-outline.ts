@@ -4,6 +4,7 @@ import { canonicalizeTocEntries, type SaveTextbookOutlineRequest, type SaveTextb
 import type { ContentRepository } from '../ports.js';
 import { readLocalPdfFile } from './pdf-import/local-file.js';
 import { findTextbookByFingerprint } from './textbook-inspector.js';
+import { ImportMonitor } from './import-monitor.js';
 
 /** 独立保存已确认目录，不启动 OCR 或模型会话。 */
 export async function saveTextbookOutline(
@@ -35,6 +36,11 @@ export async function saveTextbookOutline(
       sourceFingerprint, entries, forceOverwrite: false,
     });
     if (!saved.ok) return saved;
+    if (input.traceId) {
+      const monitor = new ImportMonitor(repo, userId, input.traceId, { documentId });
+      monitor.record('directory', 'confirmed_saved', { entries: canonicalizeTocEntries(entries), receipt: saved.value });
+      await monitor.flush();
+    }
     return ok({ ...saved.value, entries: canonicalizeTocEntries(entries) });
   } catch (cause) {
     return err(translateToBusinessError(cause, { category: 'DATABASE', action: 'saveTextbookOutline' }));

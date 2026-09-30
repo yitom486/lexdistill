@@ -2,6 +2,8 @@ import type { AgentAdapter, AgentImageAttachment } from '@study-studio/agent-run
 import { BusinessError, err, generateId, ok, translateToBusinessError, type Result } from '@study-studio/shared';
 import { buildTocExtractionPrompt } from './prompts/toc-extraction-prompt.js';
 import { LibraryProposeTocTool, type ProposedToc } from '../tools/library-propose-toc-tool.js';
+import type { ImportMonitor } from './import-monitor.js';
+import type { TocEntry } from '@study-studio/document-model';
 
 export interface ExtractTocWithLlmInput {
   userId: string;
@@ -13,13 +15,14 @@ export interface ExtractTocWithLlmInput {
   adapter: AgentAdapter;
   proposalTool: LibraryProposeTocTool;
   traceId?: string;
+  monitor?: ImportMonitor;
   onDiagnostic?: (stage: string, details?: Record<string, string | number | boolean | number[]>) => void;
 }
 
 /** 专用视觉会话只收目录图片，只开放只读草稿工具，结果须由工具成功校验。 */
 export async function extractTocWithLlm(
   input: ExtractTocWithLlmInput
-): Promise<Result<ProposedToc, BusinessError>> {
+): Promise<Result<Omit<ProposedToc, 'entries'> & { entries: TocEntry[] }, BusinessError>> {
   if (input.pageImages.length === 0 || input.pageImages.length !== input.pageNumbers.length) {
     return err(new BusinessError('E_INVALID_INPUT', '目录图片数量与所选 PDF 页不一致', 'VALIDATION'));
   }
@@ -28,8 +31,10 @@ export async function extractTocWithLlm(
   }
 
   const sessionId = input.traceId ?? generateId('toc_review');
+  const attemptId = generateId('toc_attempt');
   const note = input.onDiagnostic ?? (() => {});
   input.proposalTool.begin(sessionId, input.userId, (result) => {
+    input.monitor?.record('validation', result.accepted ? 'accepted' : 'rejected', result, { sessionId, attemptId });
     note(result.accepted ? 'tool_validation_accepted' : 'tool_validation_rejected', {
       ...(result.code ? { code: result.code } : {}),
       ...(result.entryCount !== undefined ? { entryCount: result.entryCount } : {}),
@@ -51,14 +56,21 @@ export async function extractTocWithLlm(
       return err(created.error);
     }
     const session = created.value;
+    input.monitor?.record('session', 'opened', { model: input.model ?? null, tools: session.toolSpecs ?? null }, { sessionId, ...(session.threadId ? { threadId: session.threadId } : {}) });
+    const turn = input.monitor?.turn(session, { attemptId });
     note('session_started');
     try {
       let completed = false;
       note('turn_starting');
+      input.monitor?.record('model', 'input', { message: buildTocExtractionPrompt(input),
+        systemPrompt: '你负责根据教材目录页图片整理目录草稿。只依据所见，不编造。必须通过本会话提供的目录草稿工具提交结果，不要仅在普通回复中输出目录。',
+        attachments: input.pageImages.map(image => ({ label: image.label, pngBase64: Buffer.from(image.png).toString('base64') })), pageNumbers: input.pageNumbers,
+      }, turn?.binding);
       for await (const event of session.send({
         message: buildTocExtractionPrompt(input),
         attachments: input.pageImages,
       })) {
+        turn?.event(event);
         if (event.type === 'TOOL_CALL_REQUESTED') {
           note('tool_call_requested', { tool: event.toolName });
         } else if (event.type === 'TOOL_CALL_COMPLETED') {
@@ -86,8 +98,12 @@ export async function extractTocWithLlm(
         ));
       }
       note('proposal_ready', { entryCount: proposal.entries.length });
-      return ok(proposal);
+      const entries = proposal.entries.map((entry, index) => ({ ...entry, id: `toc-${index + 1}`,
+        ...(entry.parentIndex !== undefined ? { parentId: `toc-${entry.parentIndex + 1}` } : {}),
+      }));
+      return ok({ ...proposal, entries });
     } finally {
+      turn?.flush(); input.monitor?.record('model', 'turn_ended', undefined, turn?.binding);
       note('session_closing');
       await session.close();
       note('session_closed');
@@ -98,5 +114,6 @@ export async function extractTocWithLlm(
     return err(error);
   } finally {
     input.proposalTool.end(sessionId);
+    await input.monitor?.flush();
   }
 }

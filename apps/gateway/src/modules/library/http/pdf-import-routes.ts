@@ -15,8 +15,11 @@ import type { TextbookPipelineInput } from '../application/textbook-pipeline.js'
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 import { inspectTextbookImport } from '../application/textbook-inspector.js';
 import { saveTextbookOutline } from '../application/textbook-outline.js';
+import { createImportMonitorRoutes } from './import-monitor-routes.js';
+import { ImportMonitor } from '../application/import-monitor.js';
 
 const PipelineRequestSchema = TextbookPipelineSettingsSchema.extend({
+  traceId: z.string().min(1).optional(),
   documentId: z.string().optional(),
   title: z.string().min(1),
   language: z.enum(['ja', 'en', 'ko']).optional(),
@@ -60,6 +63,18 @@ export function createPdfImportRoutes(
     return { adapter, submissionTool: tool };
   };
   return new Hono()
+    .route('', createImportMonitorRoutes(deps.repo))
+    .use('/api/documents/:userId/*', async (c, next) => {
+      const traceId = c.req.header('X-Textbook-Trace');
+      const monitored = ['map-pdf', 'extract-toc-llm', 'textbook-outline'].includes(c.req.path.split('/').at(-1) ?? '');
+      if (!traceId || !monitored) { await next(); return; }
+      const monitor = new ImportMonitor(deps.repo, c.req.param('userId')!, traceId);
+      const operation = c.req.path.split('/').at(-1)!;
+      monitor.record('directory', `${operation}_started`);
+      await next();
+      monitor.record('directory', `${operation}_result`, { status: c.res.status, result: await c.res.clone().json().catch(() => null) });
+      await monitor.flush();
+    })
     .post('/api/documents/:userId/import-pdf', async (c) => {
       const input = await readPdfInput(c);
       if (!input.ok) return formatBusinessErrorResponse(c, input.error);
@@ -248,6 +263,7 @@ export function createPdfImportRoutes(
           proposalTool,
           traceId: trace.id,
           onDiagnostic: trace.record,
+          ...(c.req.header('X-Textbook-Trace') ? { monitor: new ImportMonitor(deps.repo, userId, c.req.header('X-Textbook-Trace')!) } : {}),
           ...(input.value.model ? { model: input.value.model } : {}),
         });
 
@@ -320,6 +336,7 @@ export function createPdfImportRoutes(
 
         const pipelineInput: TextbookPipelineInput = {
           userId,
+          ...(body.traceId ? { traceId: body.traceId } : {}),
           ...(body.documentId ? { documentId: body.documentId } : {}),
           title: body.title.trim(),
           ...(body.language ? { language: body.language } : {}),
@@ -398,6 +415,7 @@ export function createPdfImportRoutes(
 
         const pipelineInput: TextbookPipelineInput = {
           userId,
+          ...(body.traceId ? { traceId: body.traceId } : {}),
           ...(body.documentId ? { documentId: body.documentId } : {}),
           title: body.title.trim(),
           ...(body.language ? { language: body.language } : {}),
@@ -430,7 +448,7 @@ export function createPdfImportRoutes(
     .get('/api/documents/:userId/textbook-pipeline-jobs/:jobId', (c) => {
       const jobId = c.req.param('jobId');
       const job = deps.server.pipelineJobs.get(jobId);
-      if (!job) {
+      if (!job || job.userId !== c.req.param('userId')) {
         return formatBusinessErrorResponse(
           c,
           new BusinessError('E_NOT_FOUND', '未找到指定的提炼任务', 'LEARNER_STATE')
@@ -441,7 +459,7 @@ export function createPdfImportRoutes(
     .get('/api/documents/:userId/textbook-pipeline-jobs/:jobId/events', (c) => {
       const jobId = c.req.param('jobId');
       const job = deps.server.pipelineJobs.get(jobId);
-      if (!job) {
+      if (!job || job.userId !== c.req.param('userId')) {
         return formatBusinessErrorResponse(
           c,
           new BusinessError('E_NOT_FOUND', '未找到指定的提炼任务', 'LEARNER_STATE')
@@ -487,6 +505,7 @@ export function createPdfImportRoutes(
     })
     .post('/api/documents/:userId/textbook-pipeline-jobs/:jobId/cancel', (c) => {
       const jobId = c.req.param('jobId');
+      if (deps.server.pipelineJobs.get(jobId)?.userId !== c.req.param('userId')) return formatBusinessErrorResponse(c, new BusinessError('E_NOT_FOUND', '未找到指定的提炼任务', 'LEARNER_STATE'));
       const res = deps.server.pipelineJobs.cancel(jobId);
       if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'cancelPipelineJob');
       return c.json(res.value);

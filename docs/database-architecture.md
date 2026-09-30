@@ -24,6 +24,13 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 
 ## 1. 教材组（Textbook）
 
+### textbook_import_events —— 导入诊断历史（v035）
+
+- 固定表，按导入事件加行；sequence 自增，索引 `(user_id, trace_id, sequence)`。
+- 列保存实际教材/job/目录节点/session/thread/attempt/call 关联、事件类型和时间；详情 JSON 按需读取。目录创建前允许关联身份为空。
+- writer：Gateway 导入监视器；reader：桌面通过 Gateway 的任务查询及 SSE。用户和 trace 双重过滤。
+- classification：Event；历史交互不能由教材重建。它不是内容 SSOT，不参与教材完成判断；记录失败与教材事务隔离并显示缺失。
+
 ### documents —— 一书一行，系统统一资源 ID
 - PK `id`；归属 `user_id` + `source_kind`；当前教材从用户导入建立，不再补种旧教材。
 - 底稿 `ast_json`（完整 TextbookAST，SSOT），保存已确认目录、文件指纹和模型整理的规范章节内容；`content` 是摘要，不是正文事实源。

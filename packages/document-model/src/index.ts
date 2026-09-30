@@ -7,6 +7,7 @@
 export * from './textbook.js';
 export * from './lesson-content.js';
 export * from './textbook-tasks.js';
+export * from './import-monitor.js';
 export * from './lesson-projection.js';
 export * from './textbook-pipeline-settings.js';
 export * from './toc.js';

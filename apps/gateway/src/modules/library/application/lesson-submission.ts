@@ -1,6 +1,7 @@
 import { LessonSubmissionSchema, lessonContentIssues, type LessonSubmission as SubmissionInput, type TocEntry } from '@study-studio/document-model';
 import { BusinessError, err, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ContentRepository, CommitLessonKnowledgeOutput } from '../ports.js';
+import type { ImportMonitor } from './import-monitor.js';
 
 export interface LessonAssignment {
   userId: string;
@@ -10,6 +11,8 @@ export interface LessonAssignment {
   tocEntries: readonly TocEntry[];
   signal: AbortSignal;
   allowAiExercises: boolean;
+  monitor?: ImportMonitor;
+  sessionId?: string;
   onStage?: (stage: 'validating' | 'saving' | 'saved') => void;
 }
 export class LessonSubmission {
@@ -20,6 +23,7 @@ export class LessonSubmission {
   constructor(readonly assignment: LessonAssignment, private readonly repo: ContentRepository) {}
 
   accept(raw: unknown): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
+    this.note('tool', 'candidate', raw);
     if (this.assignment.signal.aborted) return Promise.resolve(err(new BusinessError('E_CANCELLED', '本次教材任务已结束，不能继续提交', 'VALIDATION')));
     const parsed = LessonSubmissionSchema.safeParse(raw);
     if (!parsed.success) return this.reject('E_LLM_SCHEMA_INVALID', parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '), true);
@@ -44,9 +48,11 @@ export class LessonSubmission {
     const issues = lessonContentIssues(content);
     if (issues.length) return this.reject('E_LLM_SCHEMA_INVALID', issues.join('; '), true);
     this.candidate ??= value;
+    this.note('validation', 'accepted', { coverage: content.coverage });
     return this.persist();
   }
   private reject(code: string, message: string, retryable: boolean): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
+    this.note('validation', 'rejected', { code, message, retryable });
     this.error = new BusinessError(code, message, 'VALIDATION', retryable);
     return Promise.resolve(err(this.error));
   }
@@ -58,17 +64,25 @@ export class LessonSubmission {
     if (!this.candidate) return this.reject('E_LESSON_SUBMISSION_MISSING', '模型未通过原生工具提交有效章节内容', true);
     this.assignment.onStage?.('saving');
     const value = this.candidate;
-    this.inFlight = this.repo.commitLessonKnowledge({ documentId: value.documentId, lessonId: value.lessonId, submissionId: value.assignmentId, content: value.content }).then(result => {
+    this.note('storage', 'commit_requested', { documentId: value.documentId, nodeId: value.lessonId });
+    this.inFlight = this.repo.commitLessonKnowledge({ documentId: value.documentId, lessonId: value.lessonId, submissionId: value.assignmentId, content: value.content,
+      onTransaction: phase => this.note('storage', `transaction_${phase}`, { documentId: value.documentId, nodeId: value.lessonId }),
+    }).then(result => {
       if (result.ok) {
+        this.note('storage', 'committed', result.value);
         this.receipt = result.value;
         this.error = undefined;
         this.assignment.onStage?.('saved');
-      } else this.error = result.error;
+      } else { this.error = result.error; this.note('storage', 'commit_failed', { code: result.error.code, message: result.error.userMessage }); }
       return result;
     }).catch(cause => {
       this.error = translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage: '章节保存失败，已校验内容保留，可重试保存' });
+      this.note('storage', 'commit_failed', { code: this.error.code, message: this.error.userMessage });
       return err(this.error);
     }).finally(() => { this.inFlight = undefined; });
     return this.inFlight;
+  }
+  private note(category: 'tool' | 'validation' | 'storage', name: string, detail: unknown): void {
+    this.assignment.monitor?.record(category, name, detail, { nodeId: this.assignment.lessonId, attemptId: this.assignment.assignmentId, ...(this.assignment.sessionId ? { sessionId: this.assignment.sessionId } : {}) });
   }
 }

@@ -9,6 +9,7 @@ export interface ProducePdfLessonsOptions {
   onStart: (lesson: TocEntry) => void;
   onText: (lesson: TocEntry, text: string) => Promise<void>;
   onFailure: (lesson: TocEntry, error: BusinessError) => void;
+  onDiagnostic?: (lesson: TocEntry, name: string, detail: unknown) => void;
 }
 
 /** 原生层已有 Rayon 识别池。首个真实扫描批次负责冷启动，其结果保留，后续共享缓存。 */
@@ -23,6 +24,7 @@ export async function producePdfLessons(options: ProducePdfLessonsOptions): Prom
     if (lesson.startPage < 1 || end < lesson.startPage || end > pageCount) throw new BusinessError('E_PDF_PAGE_RANGE_INVALID', `“${lesson.title}”的物理页范围无效，请核对目录`, 'VALIDATION');
     const pageNumbers = Array.from({ length: end - lesson.startPage + 1 }, (_, index) => lesson.startPage + index);
     const direct = inspector.processPdf(pdf, pageNumbers);
+    options.onDiagnostic?.(lesson, 'native_text', { pageNumbers, text: direct.markdown ?? '', pagesNeedingOcr: direct.pagesNeedingOcr ?? [] });
     let text = direct.markdown ?? '';
     if (direct.pagesNeedingOcr?.length || !text.trim()) {
       const parts: string[] = [];
@@ -31,6 +33,8 @@ export async function producePdfLessons(options: ProducePdfLessonsOptions): Prom
         let part = batches.get(offset);
         if (part === undefined) {
           const batchPages = pageNumbers.slice(offset, offset + MAX_OCR_PAGES_PER_IMPORT);
+          const started = Date.now();
+          options.onDiagnostic?.(lesson, 'ocr_started', { pageNumbers: batchPages });
           if (!warming) {
             const first = inspector.processPdfWithOcr(pdf, { pageNumbers: batchPages });
             warming = first;
@@ -43,6 +47,7 @@ export async function producePdfLessons(options: ProducePdfLessonsOptions): Prom
           }
           if (!part.trim()) throw new BusinessError('E_OCR_TEXT_EMPTY', `“${lesson.title}”有页面批次未识别到文字，请核对页码`, 'TOOL_EXECUTION', true);
           batches.set(offset, part);
+          options.onDiagnostic?.(lesson, 'ocr_completed', { pageNumbers: batchPages, elapsedMs: Date.now() - started, text: part });
         }
         parts.push(part);
       }
@@ -61,7 +66,8 @@ export async function producePdfLessons(options: ProducePdfLessonsOptions): Prom
         try { text = await extract(lesson, batches); }
         catch (cause) {
           const error = cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'TOOL_EXECUTION', fallbackMessage: `“${lesson.title}”文字提取失败` });
-          if (attempt < options.retries && error.retryable) continue;
+          options.onDiagnostic?.(lesson, 'extraction_failed', { attempt: attempt + 1, code: error.code, message: error.userMessage });
+          if (attempt < options.retries && error.retryable) { options.onDiagnostic?.(lesson, 'ocr_retry', { attempt: attempt + 2 }); continue; }
           if (!signal.aborted) options.onFailure(lesson, error);
           break;
         }

@@ -10,6 +10,8 @@ export type ApprovalDecision =
   | 'cancel';
 
 export interface AgentSession {
+  /** 实际注入的原生工具声明，由 Adapter 提供；诊断不得重新推导厂商协议。 */
+  readonly toolSpecs?: readonly { name: string; businessName: string; description: string; inputSchema: Record<string, unknown> }[];
   readonly sessionId: string;
   /** Codex App Server thread id（若引擎支持） */
   readonly threadId?: string;

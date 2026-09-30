@@ -7,6 +7,12 @@ export { SCHEMA_MIGRATIONS };
  * 自动迁移/初始化数据表 DDL（P2-5 拆分：仅结构，不含种子数据）
  */
 export function initSchema(sqlite: Database): void {
+  // DDL：固定导入诊断表；历史库同结构由 v035 升级。
+  sqlite.run(`CREATE TABLE IF NOT EXISTS textbook_import_events (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, trace_id TEXT NOT NULL,
+    document_id TEXT, job_id TEXT, node_id TEXT, session_id TEXT, thread_id TEXT, attempt_id TEXT, call_id TEXT,
+    category TEXT NOT NULL, name TEXT NOT NULL, occurred_at TEXT NOT NULL, detail_json TEXT NOT NULL
+  ); CREATE INDEX IF NOT EXISTS idx_textbook_import_events_trace ON textbook_import_events(user_id, trace_id, sequence);`);
   sqlite.run(`
     CREATE TABLE IF NOT EXISTS learner_profiles (
       user_id TEXT PRIMARY KEY,

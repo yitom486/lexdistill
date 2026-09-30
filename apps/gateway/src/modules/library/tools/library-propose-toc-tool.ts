@@ -9,6 +9,7 @@ import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import { TocLevelSchema, validateTocPageOrder, type TocEntry } from '@study-studio/document-model';
 
 export const ProposedTocEntrySchema = z.object({
+  parentIndex: z.number().int().nonnegative().optional().describe('父节点在 entries 中的从 0 开始的下标；无父节点则省略，不能凭 section 层级猜测父节点'),
   title: z.string().trim().min(1).describe(
     '目录中印刷的条目标题原文（保持原文，包括课次名称、课下次级句型/语法条目、对话会话主题、复习测试、入门发音准备等）'
   ),
@@ -81,6 +82,14 @@ export class LibraryProposeTocTool implements ToolDefinition<ProposedToc, Propos
       return err(new BusinessError('E_LLM_SCHEMA_INVALID', '目录草稿结构不符合要求，请重新核对图片', 'VALIDATION'));
     }
     const value = parsed.data;
+    for (let index = 0; index < value.entries.length; index++) {
+      let parent = value.entries[index]!.parentIndex;
+      const visited = new Set([index]);
+      while (parent !== undefined) {
+        if (!value.entries[parent] || visited.has(parent)) return err(new BusinessError('E_TOC_HIERARCHY_INVALID', '目录父节点不存在或形成循环，请核对层级', 'VALIDATION', true));
+        visited.add(parent); parent = value.entries[parent]!.parentIndex;
+      }
+    }
     const entries: TocEntry[] = value.entries.map((entry, index) => ({
       id: `toc-${index + 1}`,
       level: entry.level,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { TextbookPipelineSettingsSchema, type TocEntry } from '@study-studio/document-model';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -32,6 +32,11 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
   const filename = path.split(/[/\\]/).pop() || source.pdfFile?.name || '';
   const sourceKey = path || (source.pdfFile ? `${source.pdfFile.name}:${source.pdfFile.size}:${source.pdfFile.lastModified}` : '');
   const activeJob = usePipelineJobStore((s) => s.activeJob);
+  const traceId = useMemo(() => {
+    const previous = usePipelineJobStore.getState().currentImportTrace;
+    return previous?.sourceKey === sourceKey ? previous.traceId : crypto.randomUUID();
+  }, [sourceKey]);
+  useEffect(() => { if (sourceKey) usePipelineJobStore.getState().setImportTrace({ sourceKey, traceId }); }, [sourceKey, traceId]);
   const [step, setStep] = useState<1 | 2 | 3>(() => activeJob ? 3 : 1);
   const [entries, setEntries] = useState<TocRecognitionCandidate[] | null>(null);
   const [forceOverwrite, setForceOverwrite] = useState(false);
@@ -95,6 +100,7 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
       throw new Error('请先核对目录条目对应的 PDF 实际页码');
     }
     const saved = await outlineMutation.mutateAsync({
+      traceId,
       ...(targetDocument ? { documentId: targetDocument.documentId } : {}),
       title: targetDocument?.title ?? filename.replace(/\.[^/.]+$/, ''),
       filePath: path, language: pipelineLanguage, tocEntries: tocFromCandidates(candidates),
@@ -122,6 +128,7 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
     const tocEntries = tocFromCandidates(entries).map((entry, index) => ({ ...entry, sortOrder: index + 1 }));
     source.setParseError(null);
     startMutation.mutate({
+      traceId,
       ...(targetDocument ? { documentId: targetDocument.documentId } : outlineMutation.variables?.filePath === path && outlineMutation.data ? { documentId: outlineMutation.data.documentId } : {}),
       title: targetDocument?.title ?? filename.replace(/\.[^/.]+$/, ''),
       filePath: path, tocEntries, forceOverwrite, language: pipelineLanguage, ...config.data, ...(pipelineModel ? { model: pipelineModel } : {}),
@@ -148,7 +155,7 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
   };
 
   return {
-    path, filename, sourceKey, step, setStep, entries, setEntries, activeJob, inspection, displayDocument,
+    path, filename, sourceKey, traceId, step, setStep, entries, setEntries, activeJob, inspection, displayDocument,
     targetDocument, slots, forceOverwrite, setForceOverwrite, startMutation, documentMutation,
     outlineMutation, rescanOutline, confirmOutline, beginRescan,
     browse, reuseOutline, start, importDocument, recheck,

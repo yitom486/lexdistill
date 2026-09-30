@@ -7,6 +7,17 @@
 
 ---
 
+## 教材导入监视（2026-10-01）
+
+所有接口位于本机 Gateway，桌面不直接读取 SQLite。目录定位、目录模型、独立目录保存及正文 job 使用 `traceId` 关联；PDF 目录请求使用 `X-Textbook-Trace`，正文启动体和快照保留 trace。
+
+- `GET /api/documents/:userId/textbook-imports/:traceId?after=<sequence>`：分页元数据（最多 200 项）、cursor 和可选缺失警告。
+- `GET .../:traceId/details/:sequence`：读取单项实际 payload。
+- `GET .../:traceId/events`：`monitor.event` SSE（id=sequence）；初连 after、重连 Last-Event-ID，客户端按 sequence 去重；`monitor.warning` 报告记录不完整。
+- `GET /api/documents/:userId/textbook-saved/:documentId/:nodeId`：当前 AST 保存内容及 readAt，区别于历史候选和回执。
+
+查询按用户与 trace 过滤；正文内容还核对文档归属。进度快照及取消同样核对 job.userId。详情采用 `packages/document-model` 的 ImportEvent 契约，不在每次进度快照复制长文本。
+
 ## 一、协议信封规范 (Message Envelope)
 
 所有通过 WebSocket 传输的消息均采用统一标准的信封（Envelope）包裹。

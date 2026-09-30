@@ -43,9 +43,10 @@ export interface DomHandle {
 
 let createRootFn: ((container: Element) => Root) | null = null;
 
-export async function setupDom(): Promise<DomHandle> {
+export async function setupDom(visual = false): Promise<DomHandle> {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
     url: 'http://localhost/',
+    pretendToBeVisual: visual,
   });
   const win = dom.window as unknown as Record<string, unknown>;
   const g = globalThis as Record<string, unknown>;

@@ -23,6 +23,7 @@ export type TocEntry = z.infer<typeof TocEntrySchema>;
 
 /** 用户确认后的独立目录保存；页码已换算为 PDF 物理页。 */
 export const SaveTextbookOutlineRequestSchema = z.object({
+  traceId: z.string().min(1).optional(),
   documentId: z.string().min(1).optional(),
   title: z.string().trim().min(1),
   filePath: z.string().trim().min(1),

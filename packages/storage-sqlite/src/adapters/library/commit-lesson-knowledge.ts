@@ -10,6 +10,7 @@ export interface CommitLessonKnowledgeInput {
   lessonId: string;
   submissionId: string;
   content: LessonContent;
+  onTransaction?: (phase: 'begin' | 'committed' | 'rolled_back') => void;
 }
 export interface CommitLessonKnowledgeOutput {
   documentId: string;
@@ -39,7 +40,8 @@ export async function commitLessonKnowledge(deps: { db: DrizzleDb }, input: Comm
     return err(new BusinessError('E_LLM_SCHEMA_INVALID', '章节内容或提交身份不符合要求', 'VALIDATION', true));
   }
   try {
-    return ok(deps.db.transaction(tx => {
+    const saved = deps.db.transaction(tx => {
+      input.onTransaction?.('begin');
       const slot = tx.select().from(textbookLessons).where(and(eq(textbookLessons.documentId, input.documentId), eq(textbookLessons.lessonId, input.lessonId))).get();
       if (!slot) throw new BusinessError('E_TOC_SLOT_NOT_FOUND', '提交部分不属于已确认目录', 'VALIDATION');
       const ast = readAst(tx, input.documentId);
@@ -62,8 +64,11 @@ export async function commitLessonKnowledge(deps: { db: DrizzleDb }, input: Comm
         stats: { vocabCount: content.vocabularies.length, grammarCount: content.knowledgePoints.length, exerciseCount: content.exercises.length, hasPassage: content.blocks.length > 0 },
         allLessonsReady: planned.value.every(task => ast.lessons.find(item => item.id === task.root.id)?.status === 'ready'),
       };
-    }));
+    });
+    input.onTransaction?.('committed');
+    return ok(saved);
   } catch (cause) {
+    input.onTransaction?.('rolled_back');
     return err(cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage: '章节保存失败，已撤回本次写入，可重试保存' }));
   }
 }

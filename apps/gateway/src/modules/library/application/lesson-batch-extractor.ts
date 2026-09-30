@@ -4,6 +4,7 @@ import { BusinessError, generateId, translateToBusinessError, logger, type Resul
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
 import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import { buildLessonExtractionPrompt } from './prompts/lesson-extraction-prompt.js';
+import type { ImportMonitor } from './import-monitor.js';
 
 export interface LessonExtractionJob {
   documentId: string;
@@ -49,6 +50,7 @@ export class LessonInputQueue {
 export interface ChapterSessionOptions {
   userId: string; poolSize: number; model?: string | undefined; effort?: string | undefined;
   adapter: AgentAdapter; tool: LibraryLessonCommitTool; signal: AbortSignal;
+  monitor?: ImportMonitor;
 }
 
 /** 只负责模型会话和发送；不引用 Repository，不解析文本 JSON，不调用落库。 */
@@ -64,6 +66,9 @@ export class ChapterSessionPool {
     });
     if (!created.ok) throw created.error;
     this.sessions.push(created.value);
+    this.options.monitor?.record('session', 'opened', { model: this.options.model ?? null, effort: this.options.effort ?? null,
+      tools: created.value.toolSpecs ?? null, toolDescriptions: [{ name: this.options.tool.name, description: this.options.tool.description }],
+    }, { sessionId: created.value.sessionId, ...(created.value.threadId ? { threadId: created.value.threadId } : {}) });
     return created.value;
   }
   async initialize(): Promise<void> {
@@ -104,14 +109,18 @@ export class ChapterSessionPool {
     }));
   }
   async send(session: AgentSession, job: LessonExtractionJob, assignmentId: string, correction?: string): Promise<Result<void, BusinessError>> {
+    const turn = this.options.monitor?.turn(session, { nodeId: job.lessonId, attemptId: assignmentId });
+    const message = buildLessonExtractionPrompt(job, assignmentId, this.options.tool.name.replaceAll('.', '_'), correction);
+    this.options.monitor?.record('model', 'input', { message, model: this.options.model ?? null, effort: this.options.effort ?? null, correction: correction ?? null }, turn?.binding);
     const interrupt = () => { void session.interrupt().catch(cause => logger.warn('教材会话中断失败', { cause: String(cause) })); };
     this.options.signal.addEventListener('abort', interrupt, { once: true });
     try {
       if (this.options.signal.aborted) return { ok: false, error: new BusinessError('E_CANCELLED', '教材提取已取消', 'AGENT_RUNTIME') };
       for await (const event of session.send({
-        message: buildLessonExtractionPrompt(job, assignmentId, this.options.tool.name.replaceAll('.', '_'), correction),
+        message,
         ...(this.options.effort ? { turnOptions: { effort: this.options.effort } } : {}),
       })) {
+        turn?.event(event);
         if (event.type === 'APPROVAL_REQUESTED') {
           const declined = await session.submitApproval(event.approvalId, 'decline');
           if (!declined.ok) return declined;
@@ -125,11 +134,12 @@ export class ChapterSessionPool {
       const error = translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本章模型处理失败，请重试本章' });
       if (!this.options.signal.aborted) this.faults.set(session.sessionId, error);
       return { ok: false, error };
-    } finally { this.options.signal.removeEventListener('abort', interrupt); }
+    } finally { turn?.flush(); this.options.monitor?.record('model', 'turn_ended', undefined, turn?.binding); this.options.signal.removeEventListener('abort', interrupt); }
   }
   async close(): Promise<void> {
     const sessions = this.sessions.splice(0);
     const results = await Promise.allSettled(sessions.map(session => session.close()));
+    for (const session of sessions) this.options.monitor?.record('session', 'closed', undefined, { sessionId: session.sessionId });
     for (const result of results) {
       if (result.status === 'rejected') logger.warn('教材会话关闭失败', { cause: String(result.reason) });
       else if (!result.value.ok) logger.warn('教材会话关闭失败', { code: result.value.error.code });

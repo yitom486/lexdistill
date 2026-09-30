@@ -89,6 +89,7 @@ describe('目录视觉识别 HTTP 闭环', () => {
     expect(response.status).toBe(200);
     const body = await response.json() as { entries: Array<{ title: string; startPage: number }> };
     expect(body.entries.map((entry) => entry.startPage)).toEqual([6, 18]);
+    expect(body.entries).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'toc-1', level: 'lesson' }), expect.objectContaining({ id: 'toc-2', level: 'lesson' })]));
     expect(flow.renderedPages).toEqual([16, 17]);
     expect(flow.ocrCalls).toBe(0);
     expect(flow.seenInput?.attachments?.map((attachment) => attachment.png)).toEqual([png, png]);

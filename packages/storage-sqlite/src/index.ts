@@ -6,6 +6,7 @@
  *   连接工厂与数据层实现（schema/DDL/迁移/种子/诊断/修复/排序）。
  */
 export * from './schema.js';
+export { appendImportEvent, listImportEvents, getImportEvent } from './adapters/library/import-events.js';
 
 export { createDrizzleDb, type DrizzleDb, type DrizzleInstance } from './connection.js';
 export { initSchema, runMigrations, ensureDictionaryFts } from './ddl.js';

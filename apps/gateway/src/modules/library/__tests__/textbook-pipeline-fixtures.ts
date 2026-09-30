@@ -39,8 +39,11 @@ export function pipelineModel(tool: LibraryLessonCommitTool, handle?: (turn: Mod
           const submit = (raw: unknown) => tool.execute(raw, { sessionId: options.sessionId, userId: options.userId });
           if (handle) await handle({ sessionId: options.sessionId, input, submit });
           else {
-            const result = await submit(submissionFromPrompt(input.message));
-            yield { type: 'TOOL_CALL_COMPLETED', callId: `call:${inputs.length}`, result };
+            const callId = `call:${inputs.length}`;
+            const candidate = submissionFromPrompt(input.message);
+            yield { type: 'TOOL_CALL_REQUESTED', callId, toolName: tool.name.replaceAll('.', '_'), input: candidate };
+            const result = await submit(candidate);
+            yield { type: 'TOOL_CALL_COMPLETED', callId, result };
           }
           yield { type: 'COMPLETED' };
         },

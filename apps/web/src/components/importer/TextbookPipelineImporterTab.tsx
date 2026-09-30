@@ -1,4 +1,7 @@
 import { BookOpen, ArrowRight, ArrowLeft, FolderOpen } from 'lucide-react';
+import { useState } from 'react';
+import { TextbookImportMonitor } from './monitor/TextbookImportMonitor.js';
+import { DEFAULT_USER_ID } from '../../queries/query-keys.js';
 import type { TextbookAST } from '@study-studio/document-model';
 import { Button } from '../ui/button.js';
 import { TocRecognitionPanel } from '../toc/TocRecognitionPanel.js';
@@ -27,6 +30,7 @@ interface TextbookPipelineImporterTabProps extends TextbookImportSource {
 
 export function TextbookPipelineImporterTab(props: TextbookPipelineImporterTabProps) {
   const flow = useTextbookImportFlow(props);
+  const [monitorOpen, setMonitorOpen] = useState(false);
   const azureEndpoint = useOcrStore((s) => s.azureDiEndpoint);
   const azureKey = useOcrStore((s) => s.azureDiKey);
   const azure = azureEndpoint.trim() && azureKey.trim() ? { endpoint: azureEndpoint.trim(), key: azureKey.trim() } : undefined;
@@ -46,6 +50,8 @@ export function TextbookPipelineImporterTab(props: TextbookPipelineImporterTabPr
         <Button variant={flow.step === 2 ? 'secondary' : 'outline'} size="sm" disabled={!flow.filename} onClick={() => flow.setStep(2)}>2. 核对目录</Button>
         <Button variant={flow.step === 3 ? 'secondary' : 'outline'} size="sm" disabled={!flow.entries && !flow.activeJob} onClick={() => flow.setStep(3)}>3. 提取与检查内容</Button>
       </nav>
+      {!flow.activeJob && flow.filename && <Button size="sm" variant="outline" onClick={() => setMonitorOpen(true)}>目录运行详情</Button>}
+      {monitorOpen && <TextbookImportMonitor open onOpenChange={setMonitorOpen} userId={DEFAULT_USER_ID} traceId={flow.traceId} />}
       {flow.step === 1 && (
         <div className="space-y-4">
           <div className="space-y-3 rounded-2xl border border-line bg-surface p-4 text-xs">
@@ -112,6 +118,7 @@ export function TextbookPipelineImporterTab(props: TextbookPipelineImporterTabPr
                 )}
               </section>
             ) : <TocRecognitionPanel key={flow.sourceKey} file={props.pdfFile} filePath={flow.path}
+            traceId={flow.traceId}
             {...(azure ? { azure } : {})}
             {...(flow.entries ? { initialEntries: flow.entries } : {})}
             onTocConfirmed={flow.confirmOutline} confirmPending={flow.outlineMutation.isPending} onTocInvalidated={() => flow.setEntries(null)} />}

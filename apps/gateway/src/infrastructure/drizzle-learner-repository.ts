@@ -256,6 +256,7 @@ import {
 } from '@study-studio/storage-sqlite';
 import {
   seedTextbookTocSkeleton as seedTextbookTocSkeletonDomain,
+  appendImportEvent, listImportEvents, getImportEvent,
   commitLessonKnowledge as commitLessonKnowledgeDomain,
   listTextbookLessonSlots as listTextbookLessonSlotsDomain,
   getTextbookAssetStats as getTextbookAssetStatsDomain,
@@ -624,6 +625,10 @@ export class DrizzleLearnerRepository
   ): Promise<Result<SavedTocSkeleton, BusinessError>> {
     return seedTextbookTocSkeletonDomain(this.deps, input);
   }
+
+  public appendImportEvent(input: Parameters<typeof appendImportEvent>[1]) { return appendImportEvent(this.deps, input); }
+  public listImportEvents(query: Parameters<typeof listImportEvents>[1]) { return listImportEvents(this.deps, query); }
+  public getImportEvent(userId: string, traceId: string, sequence: number) { return getImportEvent(this.deps, userId, traceId, sequence); }
 
   /**
    * 章节内容提炼原子回填（TOC 白名单对齐核验 + 槽位状态翻转为 ready）。
