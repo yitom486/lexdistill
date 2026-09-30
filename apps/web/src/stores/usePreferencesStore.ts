@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { DEFAULT_TEXTBOOK_PIPELINE_SETTINGS, type TextbookPipelineSettings } from '@study-studio/document-model';
 
 export interface PreferencesState {
   theme: 'light' | 'dark';
@@ -49,6 +50,10 @@ export interface PreferencesState {
   pipelineEffort: string;
   /** 教材提炼 Worker 并发度；默认 '3' */
   pipelinePoolSize: string;
+  pipelineSettings: TextbookPipelineSettings;
+  pipelineLanguage: 'ja' | 'en' | 'ko';
+  setPipelineSettings: (settings: Partial<TextbookPipelineSettings>) => void;
+  setPipelineLanguage: (language: 'ja' | 'en' | 'ko') => void;
 
   setTheme: (theme: 'light' | 'dark') => void;
   toggleTheme: () => void;
@@ -144,7 +149,9 @@ export const usePreferencesStore = create<PreferencesState>()(
       tocReviewEffort: '',
       pipelineModel: '',
       pipelineEffort: '',
-      pipelinePoolSize: '3',
+      pipelinePoolSize: String(DEFAULT_TEXTBOOK_PIPELINE_SETTINGS.poolSize),
+      pipelineSettings: DEFAULT_TEXTBOOK_PIPELINE_SETTINGS,
+      pipelineLanguage: 'ja',
 
       setTheme: (theme: 'light' | 'dark') => {
         runThemeTransition(() => {
@@ -198,6 +205,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       setPipelineModel: (pipelineModel: string) => set({ pipelineModel }),
       setPipelineEffort: (pipelineEffort: string) => set({ pipelineEffort }),
       setPipelinePoolSize: (pipelinePoolSize: string) => set({ pipelinePoolSize }),
+      setPipelineSettings: (settings) => set((state) => ({ pipelineSettings: { ...state.pipelineSettings, ...settings } })),
+      setPipelineLanguage: (pipelineLanguage) => set({ pipelineLanguage }),
     }),
     {
       name: 'study_studio_user_preferences',

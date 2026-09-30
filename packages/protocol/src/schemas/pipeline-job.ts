@@ -31,6 +31,8 @@ export const TextbookPipelineJobSnapshotSchema = z.object({
   doneLessons: z.number().int().nonnegative(),
   currentLessonId: z.string().optional(),
   currentLessonTitle: z.string().optional(),
+  currentStage: z.enum(['ocr', 'queued', 'extracting', 'validating', 'saving', 'saved', 'failed']).optional(),
+  lessonStages: z.record(z.string(), z.enum(['ocr', 'queued', 'extracting', 'validating', 'saving', 'saved', 'failed'])).optional(),
   successfulLessons: z.number().int().nonnegative(),
   failedLessons: z.array(TextbookPipelineFailedLessonSchema),
   concurrency: z.number().int().positive().optional(),

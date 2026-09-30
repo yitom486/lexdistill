@@ -32,7 +32,8 @@ interface TocRecognitionPanelProps {
     title: string;
     lessonCount: number;
   } | undefined;
-  onTocConfirmed?: ((entries: TocRecognitionCandidate[]) => void) | undefined;
+  onTocConfirmed?: ((entries: TocRecognitionCandidate[]) => void | Promise<void>) | undefined;
+  confirmPending?: boolean;
   onTocInvalidated?: (() => void) | undefined;
 }
 
@@ -43,6 +44,7 @@ export function TocRecognitionPanel({
   initialEntries,
   existingDocInfo,
   onTocConfirmed,
+  confirmPending = false,
   onTocInvalidated,
 }: TocRecognitionPanelProps) {
   const map = useMapPdfMutation();
@@ -232,7 +234,7 @@ export function TocRecognitionPanel({
     });
   };
 
-  const confirm = () => {
+  const confirm = async () => {
     const error = validateTocCandidates(entries);
     if (error) {
       setMessage(error);
@@ -240,9 +242,19 @@ export function TocRecognitionPanel({
       return;
     }
     setMessage(null);
-    setConfirmed(true);
-    sound.playCorrect();
-    onTocConfirmed?.(entries);
+    const tocEndPage = Number(end);
+    // 用户指定的默认规则：正文紧接目录，印刷页从 1 开始；偏移取本次目录结束页。
+    const defaultEntries = Number.isSafeInteger(tocEndPage) && tocEndPage > 0
+      ? entries.map(entry => entry.physicalPage !== undefined ? entry : {
+          ...entry, physicalPage: Number(entry.printedPage) + tocEndPage,
+        })
+      : entries;
+    try {
+      await onTocConfirmed?.(defaultEntries);
+      setEntries(defaultEntries); setConfirmed(true); sound.playCorrect();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : '目录保存失败，请重试'); sound.playMistake();
+    }
   };
 
   return (
@@ -525,12 +537,12 @@ export function TocRecognitionPanel({
               <Button
                 type="button"
                 size="sm"
-                disabled={entries.length === 0 || confirmed}
+                disabled={entries.length === 0 || confirmed || confirmPending}
                 onClick={confirm}
                 className="gap-1.5"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                {confirmed ? `已核对 ${entries.length} 条目录` : '确认目录草稿'}
+                {confirmPending ? '正在保存目录…' : confirmed ? `已核对 ${entries.length} 条目录` : '确认目录草稿'}
               </Button>
             </div>
           </div>

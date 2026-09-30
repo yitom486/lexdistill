@@ -7,13 +7,14 @@ interface Props {
   onChange: (entries: TocRecognitionCandidate[]) => void;
 }
 
-/** 只根据用户确认的页码对应关系换算，绝不默认印刷页等于 PDF 页。 */
+/** 目录确认时已按目录结束页填入默认物理页；这里允许整体或逐项调整。 */
 export function TextbookPageMapping({ entries, onChange }: Props) {
-  const [firstPhysicalPage, setFirstPhysicalPage] = useState('');
+  const [firstPhysicalPage, setFirstPhysicalPage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const first = entries[0];
+  const physicalPageInput = firstPhysicalPage ?? String(first?.physicalPage ?? '');
   const applyOffset = () => {
-    const physical = Number(firstPhysicalPage);
+    const physical = Number(physicalPageInput);
     const printed = Number(first?.printedPage);
     if (!Number.isSafeInteger(physical) || physical < 1 || !Number.isSafeInteger(printed) || printed < 1) {
       setError('请填写核对后的 PDF 实际页码'); return;
@@ -27,12 +28,12 @@ export function TextbookPageMapping({ entries, onChange }: Props) {
   };
   return (
     <section className="space-y-3 rounded-2xl border border-line bg-surface p-4 text-xs">
-      <h3 className="font-semibold text-ink">核对正文的 PDF 实际页码</h3>
-      <p className="text-ink-muted">请在 PDF 阅读器中查看实际页序。若正文印刷页连续，可确认一组对应关系后换算；有插页或页码重新编号时，请逐条修改。</p>
-      {first && (
+      <h3 className="font-semibold text-ink">正文的 PDF 页码</h3>
+      <p className="text-ink-muted">目录识别后，默认按“印刷页码 + 目录结束页”填入 PDF 页码，可直接开始提取。需要调整时，可修改一组对应关系后换算；有插页或页码重新编号时，可逐条修改。</p>
+      {first?.printedPage && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink">{first.title} · 印刷第 {first.printedPage} 页，对应 PDF 第</span>
-          <input aria-label="第一条目录对应的 PDF 页" inputMode="numeric" value={firstPhysicalPage} onChange={(event) => setFirstPhysicalPage(event.target.value)} className="w-20 rounded-lg border border-line bg-surface p-2 text-ink" />
+          <input aria-label="第一条目录对应的 PDF 页" inputMode="numeric" value={physicalPageInput} onChange={(event) => setFirstPhysicalPage(event.target.value)} className="w-20 rounded-lg border border-line bg-surface p-2 text-ink" />
           <Button size="sm" variant="outline" onClick={applyOffset}>确认页码对应并换算</Button>
         </div>
       )}
@@ -40,7 +41,7 @@ export function TextbookPageMapping({ entries, onChange }: Props) {
       <div className="max-h-52 space-y-2 overflow-auto">
         {entries.map((entry) => (
           <label key={entry.key} className="flex items-center justify-between gap-2 text-ink">
-            <span>{entry.title}（印刷页 {entry.printedPage || '未记录'}）</span>
+            <span>{entry.title}（{entry.printedPage ? `印刷页 ${entry.printedPage}` : 'PDF 起始页'}）</span>
             <input aria-label={`${entry.title} PDF 起始页`} inputMode="numeric" value={entry.physicalPage ?? ''}
               onChange={(event) => onChange(entries.map((item) => item.key === entry.key ? { ...item, physicalPage: Number(event.target.value) } : item))}
               className="w-20 shrink-0 rounded-lg border border-line bg-surface p-2 text-ink" />

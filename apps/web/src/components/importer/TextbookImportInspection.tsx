@@ -27,7 +27,7 @@ export function TextbookImportInspection({ result, document: doc, pending, error
       {doc && (
         <div className="space-y-3">
           <p className="font-semibold text-ink">
-            已导入《{doc.title}》：{doc.readyLessonCount}/{doc.lessonCount} 课就绪
+            {doc.outlineConfirmed && !doc.hasShreddedAssets ? `《${doc.title}》的目录已保存，正文尚未提取` : `已导入《${doc.title}》：${doc.readyLessonCount}/${doc.lessonCount} 课就绪`}
           </p>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">正文 {doc.passageLessonCount} 课 / {doc.lineCount} 行</Badge>

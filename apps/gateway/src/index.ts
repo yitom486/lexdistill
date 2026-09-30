@@ -51,7 +51,10 @@ if (import.meta.main) {
   // 限制：Windows 直接关终端窗口不投递任何信号，仍会留孤儿——必须配合
   // `bun run dev:clean` 定期核对，禁止要求用户逐个杀进程。
   const shutdown = createShutdownController({
-    stop: (closeActiveConnections) => listener.stop(closeActiveConnections),
+    stop: async (closeActiveConnections) => {
+      await listener.stop(closeActiveConnections);
+      await gatewayServer.pipelineJobs.shutdown();
+    },
     exit: (code) => process.exit(code),
     reportError: (error) => {
       console.error(`[gateway] 关闭监听失败：${error instanceof Error ? error.message : String(error)}`);

@@ -6,6 +6,7 @@ import { isOk } from '@study-studio/shared';
 import { initSchema } from '../ddl.js';
 import * as schema from '../schema.js';
 import { seedTextbookTocSkeleton, listTextbookLessonSlots } from '../adapters/library/toc-skeleton.js';
+import { commitLessonKnowledge } from '../adapters/library/commit-lesson-knowledge.js';
 import type { TocEntry } from '@study-studio/document-model';
 
 function freshDb() {
@@ -210,15 +211,17 @@ describe('seedTextbookTocSkeleton', () => {
       }
     );
 
-    // 模拟 l1 已提炼完成
-    db.update(schema.textbookLessons)
-      .set({
-        status: 'ready',
-        passageMd: '# 第1课正文',
-        previewJson: JSON.stringify({ goal: '问候' }),
-      })
-      .where(eq(schema.textbookLessons.lessonId, 'l1'))
-      .run();
+    // 通过实际事务保存规范章节，而非绕过 AST 直接改派生行。
+    const saved = await commitLessonKnowledge({ db }, {
+      documentId: 'doc_ready_preserve', lessonId: 'l1', submissionId: 'attempt-1',
+      content: {
+        coverage: [{ tocId: 'l1', status: 'EXTRACTED' }],
+        blocks: [{ id: 'p1', kind: 'PARAGRAPH', text: '第1课正文', source: 'TEXTBOOK', tocId: 'l1' }],
+        vocabularies: [], knowledgePoints: [], exercises: [],
+        preview: { keyPoints: ['问候'], pitfalls: [], canDoGoal: '可以问候' },
+      },
+    });
+    expect(saved.ok).toBe(true);
 
     // 再次 seed（forceOverwrite: false）
     await seedTextbookTocSkeleton(
@@ -240,5 +243,8 @@ describe('seedTextbookTocSkeleton', () => {
       expect(slots.value[0]!.hasPreview).toBe(true);
       expect(slots.value[1]!.status).toBe('pending');
     }
+    const lesson = db.select().from(schema.textbookLessons).where(eq(schema.textbookLessons.lessonId, 'l1')).get();
+    expect(lesson?.submissionId).toBe('attempt-1');
+    expect(JSON.parse(lesson!.contentJson!).blocks[0].text).toBe('第1课正文');
   });
 });

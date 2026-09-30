@@ -1,5 +1,5 @@
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
+import { parseTextbookAST, projectLessonContent, type TextbookAST } from '@study-studio/document-model';
 import { eq, sql } from 'drizzle-orm';
 import {
   textbookExercises,
@@ -65,7 +65,7 @@ export function tryParseTextbookAst(raw: unknown): TextbookAST | null {
 export type ShredTx = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];
 
 /**
- * P1-D1 term_map 去重键 = 持久化完整主键（截断/清洗之后计算）。
+ * term_map 去重键使用持久化的完整文本，清洗空白但不截断。
  * shred 与 seed projection health 共用，保证两边口径一字相同。
  */
 export function termMapDedupKey(documentId: string, lessonId: string, kind: string, refText: string): string {
@@ -97,7 +97,7 @@ export function shredDocument(
  * 注：函数体缩进保持原事务闭包层级，仅外层包装变化，行为一字未动。
  */
 export function shredIntoTransaction(tx: ShredTx, documentId: string, book: TextbookAST): ShredStats {
-  const lessons = Array.isArray(book?.lessons) ? book.lessons : [];
+  const lessons = Array.isArray(book?.lessons) ? book.lessons.map(lesson => lesson.content ? { ...lesson, ...projectLessonContent(lesson.content) } : lesson) : [];
   const dictLang = toDictLanguage(book?.language);
   const stats: ShredStats = {
     lessons: 0,
@@ -139,7 +139,7 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
           typeof l.lessonNumber === 'number' && Number.isInteger(l.lessonNumber) && l.lessonNumber > 0
             ? l.lessonNumber
             : stats.lessons + 1;
-        const title = typeof l.title === 'string' ? l.title.slice(0, 200) : '';
+        const title = typeof l.title === 'string' ? l.title : '';
         // 注意：drizzle builder 是惰性的——同步事务里必须显式 .run()，
         // 光 tx.insert(...).values(...) 不执行也不报错（静默零写，已实测）。
         tx.insert(textbookLessons).values({
@@ -149,6 +149,8 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
           status: lesson.status ?? 'pending',
           passageMd: lesson.passageMd ?? null,
           previewJson: lesson.previewJson ?? null, summaryJson: lesson.summaryJson ?? null,
+          contentJson: lesson.content ? JSON.stringify(lesson.content) : null,
+          submissionId: lesson.submissionId ?? null,
         }).run();
         stats.lessons++;
 
@@ -162,17 +164,20 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
           if (!v || typeof v !== 'object') continue;
           const r = v as Record<string, unknown>;
           if (typeof r.kanji !== 'string' || !r.kanji.trim()) continue;
-          const surface = r.kanji.trim().slice(0, 64);
-          const reading = typeof r.kana === 'string' ? r.kana.slice(0, 64) : null;
-          const pos = typeof r.pos === 'string' ? r.pos.slice(0, 32) : null;
-          const gloss = typeof r.chinese === 'string' ? r.chinese.slice(0, 500) : null;
-          const pitch = typeof r.pitchAccent === 'string' ? r.pitchAccent.slice(0, 16) : null;
+          const surface = r.kanji.trim();
+          const reading = typeof r.kana === 'string' ? r.kana : null;
+          const pos = typeof r.pos === 'string' ? r.pos : null;
+          const gloss = typeof r.chinese === 'string' ? r.chinese : null;
+          const pitch = typeof r.pitchAccent === 'string' ? r.pitchAccent : null;
           const ex = r.example && typeof r.example === 'object' ? (r.example as Record<string, unknown>) : null;
-          const exJa = ex && typeof ex.japanese === 'string' ? ex.japanese.slice(0, 500) : null;
-          const exZh = ex && typeof ex.chinese === 'string' ? ex.chinese.slice(0, 500) : null;
+          const exJa = ex && typeof ex.japanese === 'string' ? ex.japanese : null;
+          const exZh = ex && typeof ex.chinese === 'string' ? ex.chinese : null;
           vocabRows.push({
             documentId, lessonId, ord: vOrd, surface, reading, pos,
             glossZh: gloss, pitch, exampleJa: exJa, exampleZh: exZh,
+            source: lesson.content?.vocabularies[vOrd]?.source ?? null,
+            tocId: lesson.content?.vocabularies[vOrd]?.tocId ?? null,
+            fieldSourcesJson: lesson.content?.vocabularies[vOrd]?.fieldSources ? JSON.stringify(lesson.content.vocabularies[vOrd]!.fieldSources) : null,
           });
           vocabFts.push({ surface, reading, gloss, ord: vOrd });
           stats.vocab++;
@@ -197,9 +202,9 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
           if (!g || typeof g !== 'object') continue;
           const r = g as Record<string, unknown>;
           if (typeof r.title !== 'string' || !r.title.trim()) continue;
-          const gTitle = r.title.trim().slice(0, 200);
-          const connection = typeof r.connection === 'string' ? r.connection.slice(0, 500) : null;
-          const explanation = typeof r.explanation === 'string' ? r.explanation.slice(0, 2000) : null;
+          const gTitle = r.title.trim();
+          const connection = typeof r.connection === 'string' ? r.connection : null;
+          const explanation = typeof r.explanation === 'string' ? r.explanation : null;
           // 文法例句全量存 JSON（v16 前只在 AST，查询面够不着；上限 10 条防异常膨胀）。
           const rawExamples = Array.isArray(r.examples) ? (r.examples as unknown[]) : [];
           const examplesJson = JSON.stringify(
@@ -208,14 +213,17 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
                 (e): e is Record<string, unknown> =>
                   !!e && typeof e === 'object' && typeof (e as Record<string, unknown>).japanese === 'string'
               )
-              .slice(0, 10)
               .map((e) => ({
-                japanese: String(e.japanese).slice(0, 500),
-                chinese: typeof e.chinese === 'string' ? e.chinese.slice(0, 500) : '',
+                japanese: String(e.japanese),
+                chinese: typeof e.chinese === 'string' ? e.chinese : '',
               }))
           );
           grammarRows.push({
             documentId, lessonId, ord: gOrd, title: gTitle, connection, explanation, examplesJson,
+            source: lesson.content?.knowledgePoints[gOrd]?.source ?? null,
+            tocId: lesson.content?.knowledgePoints[gOrd]?.tocId ?? null,
+            aiExplanation: lesson.content?.knowledgePoints[gOrd]?.aiExplanation ?? null,
+            fieldSourcesJson: lesson.content?.knowledgePoints[gOrd]?.fieldSources ? JSON.stringify(lesson.content.knowledgePoints[gOrd]!.fieldSources) : null,
           });
           grammarTitles.push(gTitle);
           stats.grammar++;
@@ -251,10 +259,14 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
           if (!d || typeof d !== 'object') continue;
           const r = d as Record<string, unknown>;
           if (typeof r.japanese !== 'string' || !r.japanese.trim()) continue;
-          const ja = r.japanese.trim().slice(0, 2000);
-          const zh = typeof r.chinese === 'string' ? r.chinese.slice(0, 2000) : null;
-          const speaker = typeof r.speaker === 'string' ? r.speaker.slice(0, 64) : null;
-          lineRows.push({ documentId, lessonId, ord: dOrd, speaker, ja, zh });
+          const ja = r.japanese.trim();
+          const zh = typeof r.chinese === 'string' ? r.chinese : null;
+          const speaker = typeof r.speaker === 'string' ? r.speaker : null;
+          const block = lesson.content?.blocks[dOrd];
+          lineRows.push({ documentId, lessonId, ord: dOrd, speaker, ja, zh,
+            blockId: block?.id ?? null, kind: block?.kind ?? null, source: block?.source ?? null, tocId: block?.tocId ?? null,
+            fieldSourcesJson: block?.fieldSources ? JSON.stringify(block.fieldSources) : null,
+          });
           stats.lines++;
           dOrd++;
         }
@@ -279,17 +291,22 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
           const r = e as Record<string, unknown>;
           if (typeof r.type !== 'string' || !r.type.trim()) continue;
           if (typeof r.prompt !== 'string' || !r.prompt.trim()) continue;
-          const exerciseId = typeof r.id === 'string' && r.id ? r.id.slice(0, 64) : null;
-          const type = r.type.trim().slice(0, 32);
-          const prompt = r.prompt.trim().slice(0, 2000);
+          const exerciseId = typeof r.id === 'string' && r.id ? r.id : null;
+          const type = r.type.trim();
+          const prompt = r.prompt.trim();
           const rawOptions = Array.isArray(r.options) ? r.options : [];
           const optionsJson = JSON.stringify(
-            rawOptions.filter((o): o is string => typeof o === 'string').slice(0, 10).map((o) => o.slice(0, 500))
+            rawOptions.filter((o): o is string => typeof o === 'string').map((o) => o)
           );
-          const answer = typeof r.answer === 'string' ? r.answer.slice(0, 2000) : '';
-          const explanation = typeof r.explanation === 'string' ? r.explanation.slice(0, 2000) : null;
+          const answer = typeof r.answer === 'string' ? r.answer : '';
+          const explanation = typeof r.explanation === 'string' ? r.explanation : null;
           exerciseRows.push({
             documentId, lessonId, ord: eOrd, exerciseId, type, prompt, optionsJson, answer, explanation,
+            source: lesson.content?.exercises[eOrd]?.source ?? null,
+            tocId: lesson.content?.exercises[eOrd]?.tocId ?? null,
+            answerJson: lesson.content?.exercises[eOrd] ? JSON.stringify(lesson.content.exercises[eOrd]!.answer) : null,
+            contentJson: lesson.content?.exercises[eOrd] ? JSON.stringify(lesson.content.exercises[eOrd]) : null,
+            fieldSourcesJson: lesson.content?.exercises[eOrd]?.fieldSources ? JSON.stringify(lesson.content.exercises[eOrd]!.fieldSources) : null,
           });
           stats.exercises++;
           eOrd++;

@@ -17,10 +17,7 @@ import {
   type TextbookPipelineInput,
 } from './textbook-pipeline.js';
 
-export interface StartPipelineJobInput extends TextbookPipelineInput {
-  model?: string | undefined;
-  poolSize?: number | undefined;
-}
+export type StartPipelineJobInput = TextbookPipelineInput;
 
 interface RunningPipelineJob {
   snapshot: TextbookPipelineJobSnapshot;
@@ -73,6 +70,7 @@ export class TextbookPipelineJobRegistry {
       doneLessons: 0,
       successfulLessons: 0,
       failedLessons: [],
+      lessonStages: {},
       ...(input.poolSize ? { concurrency: input.poolSize } : {}),
       ...(input.model ? { model: input.model } : {}),
       startedAt: now,
@@ -127,6 +125,13 @@ export class TextbookPipelineJobRegistry {
     return ok({ ...job.snapshot, failedLessons: [...job.snapshot.failedLessons] });
   }
 
+  /** 网关退出先取消任务并等待原生批次/会话释放；检查点是已提交章节。 */
+  public async shutdown(): Promise<void> {
+    const jobs = [...this.jobs.values()];
+    for (const job of jobs) if (job.snapshot.status === 'running') this.cancel(job.snapshot.jobId);
+    await Promise.allSettled(jobs.map(job => job.promise));
+  }
+
   public subscribe(
     jobId: string,
     listener: (snapshot: TextbookPipelineJobSnapshot) => void
@@ -176,6 +181,8 @@ export class TextbookPipelineJobRegistry {
           if (signal.aborted) return;
           snapshot.doneLessons = prog.completedCount;
           snapshot.currentLessonId = prog.lessonId;
+          snapshot.currentStage = prog.stage;
+          snapshot.lessonStages = { ...snapshot.lessonStages, [prog.lessonId]: prog.stage };
           const currentEntry = input.tocEntries.find((e) => e.id === prog.lessonId);
           snapshot.currentLessonTitle = currentEntry?.title ?? prog.lessonId;
           snapshot.successfulLessons = prog.successfulCount ?? snapshot.successfulLessons;

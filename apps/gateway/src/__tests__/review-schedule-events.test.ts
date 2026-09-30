@@ -72,10 +72,8 @@ const ROW = {
 };
 
 describe('v22 review-schedule-events migration', () => {
-  it('版本目录末位即 v33（名/号锁定；v33 教学增强字段）', () => {
-    const last = SCHEMA_MIGRATIONS[SCHEMA_MIGRATIONS.length - 1];
-    expect(last?.version).toBe(33);
-    expect(last?.name).toBe('textbook-lesson-pedagogy');
+  it('v22 复习事件迁移保持登记，允许后续前向迁移', () => {
+    expect(SCHEMA_MIGRATIONS.find(item => item.version === 22)?.name).toBe('review-schedule-events');
   });
 
   it('新库：表/列/索引齐备，drizzle 写入后可按用户/卡片/时间查回', () => {

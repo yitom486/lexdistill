@@ -5,4 +5,7 @@
  * 只依赖 shared 与 zod；不触 Gateway/learner/Agent/Web/SQLite/Drizzle。
  */
 export * from './textbook.js';
+export * from './lesson-content.js';
+export * from './lesson-projection.js';
+export * from './textbook-pipeline-settings.js';
 export * from './toc.js';

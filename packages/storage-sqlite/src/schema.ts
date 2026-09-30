@@ -638,6 +638,8 @@ export const textbookLessons = sqliteTable(
     /** v33 AI 教学增强字段：预习导学与课后总结 */
     previewJson: text('preview_json'),
     summaryJson: text('summary_json'),
+    contentJson: text('content_json'),
+    submissionId: text('submission_id'),
   },
   (table) => [primaryKey({ columns: [table.documentId, table.lessonId] })]
 );
@@ -655,6 +657,9 @@ export const textbookVocab = sqliteTable(
     pitch: text('pitch'),
     exampleJa: text('example_ja'),
     exampleZh: text('example_zh'),
+    source: text('source'),
+    tocId: text('toc_id'),
+    fieldSourcesJson: text('field_sources_json'),
   },
   (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
 );
@@ -669,6 +674,10 @@ export const textbookGrammar = sqliteTable(
     connection: text('connection'),
     explanation: text('explanation'),
     examplesJson: text('examples_json').notNull().default('[]'),
+    source: text('source'),
+    tocId: text('toc_id'),
+    aiExplanation: text('ai_explanation'),
+    fieldSourcesJson: text('field_sources_json'),
   },
   (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
 );
@@ -682,6 +691,11 @@ export const textbookLines = sqliteTable(
     speaker: text('speaker'),
     ja: text('ja').notNull(),
     zh: text('zh'),
+    blockId: text('block_id'),
+    kind: text('kind'),
+    source: text('source'),
+    tocId: text('toc_id'),
+    fieldSourcesJson: text('field_sources_json'),
   },
   (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
 );
@@ -698,6 +712,11 @@ export const textbookExercises = sqliteTable(
     optionsJson: text('options_json').notNull().default('[]'),
     answer: text('answer').notNull().default(''),
     explanation: text('explanation'),
+    source: text('source'),
+    tocId: text('toc_id'),
+    answerJson: text('answer_json'),
+    contentJson: text('content_json'),
+    fieldSourcesJson: text('field_sources_json'),
   },
   (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
 );

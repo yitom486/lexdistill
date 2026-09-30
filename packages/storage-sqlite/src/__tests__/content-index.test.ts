@@ -286,7 +286,10 @@ describe('P1-3 v22 旧库升级 v23–v30', () => {
               ('o2', 'u9', 'ja', 'k', 'reading', 'd1', NULL, 't2')`
     );
     const res = runMigrations(db);
-    expect(res.applied).toEqual([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33]);
+    expect(res.applied).toEqual([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]);
+    expect(db.query('PRAGMA table_info(textbook_lessons)').all().some(row =>
+      typeof row === 'object' && row !== null && 'name' in row && row.name === 'submission_id'
+    )).toBe(true);
     const tables = db
       .query(`SELECT name AS n FROM sqlite_master WHERE type = 'table' AND name IN ('textbook_term_map', 'knowledge_points')`)
       .all() as Array<{ n: string }>;

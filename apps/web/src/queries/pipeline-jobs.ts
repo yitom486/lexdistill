@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { logger } from '@study-studio/shared';
 import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
+import type { TextbookPipelineSettings } from '@study-studio/document-model';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,
@@ -17,7 +18,7 @@ import { toast } from 'sonner';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { usePipelineJobStore } from '../stores/usePipelineJobStore.js';
 
-export interface StartPipelineJobVars {
+export interface StartPipelineJobVars extends Partial<TextbookPipelineSettings> {
   documentId?: string;
   title: string;
   language?: string;

@@ -5,7 +5,7 @@
  * 不改动 index.ts（导入即建仓储/路由对象，但不监听；监听只在此入口显式启动，
  * 避免单测与 Hono RPC 导入时误起端口）。
  */
-import { startGatewayServer } from './index.js';
+import { startGatewayServer, gatewayServer } from './index.js';
 import {
   attachShutdownSignals,
   attachShutdownStdin,
@@ -14,7 +14,10 @@ import {
 
 const listener = startGatewayServer();
 const shutdown = createShutdownController({
-  stop: (closeActiveConnections) => listener.stop(closeActiveConnections),
+  stop: async (closeActiveConnections) => {
+    await listener.stop(closeActiveConnections);
+    await gatewayServer.pipelineJobs.shutdown();
+  },
   exit: (code) => process.exit(code),
   reportError: (error) => {
     console.error(`[gateway] 关闭监听失败：${error instanceof Error ? error.message : String(error)}`);

@@ -86,24 +86,38 @@ export function TextbookPipelineImporterTab(props: TextbookPipelineImporterTabPr
             <Button variant="ghost" size="sm" onClick={clear}>清除选择</Button>
             <Button disabled={!flow.filename || flow.inspection.isFetching || flow.inspection.isError} onClick={() => {
               flow.setStep(2);
-            }}>{flow.targetDocument ? '重新识别这本教材的目录' : '识别新教材目录'}<ArrowRight className="h-4 w-4" /></Button>
+            }}>{flow.targetDocument ? '查看已保存目录' : '识别新教材目录'}<ArrowRight className="h-4 w-4" /></Button>
           </div>
         </div>
       )}
       {flow.step === 2 && (
         <div className="space-y-4">
-          <p className="text-xs text-ink-muted">核对《{flow.filename}》的课次、课内小节和印刷页码。正式提取前还需确认 PDF 实际页码。</p>
-          {flow.targetDocument && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 text-xs text-ink">
-            <span>已选择《{flow.targetDocument.title}》，可复用已保存目录。</span>
-            <Button size="sm" variant="outline" disabled={flow.slots.isFetching} onClick={flow.reuseOutline}>复用已存目录并核对页码</Button>
-          </div>}
-          <TocRecognitionPanel key={flow.sourceKey} file={props.pdfFile} filePath={flow.path}
+          <p className="text-xs text-ink-muted">核对《{flow.filename}》的课次、课内小节和印刷页码。确认后默认用本次目录结束页换算 PDF 页码，也可调整。</p>
+          {flow.inspection.isFetching ? <p className="text-xs text-ink-muted">正在检查已保存目录…</p>
+            : flow.inspection.isError ? <p role="alert" className="text-xs text-ink-rose-700-rose-400">{flow.inspection.error.message}</p>
+            : flow.targetDocument?.outlineConfirmed && !flow.rescanOutline ? (
+              <section aria-label="已保存目录" className="space-y-3 rounded-2xl border border-line bg-surface p-4 text-xs text-ink">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold">《{flow.targetDocument.title}》的目录已保存</span>
+                  <Button size="sm" variant="outline" onClick={flow.beginRescan}>重新识别目录</Button>
+                </div>
+                {flow.slots.isFetching ? <p>正在读取目录…</p> : flow.slots.isError ? <p role="alert">{flow.slots.error.message}</p> : (
+                  <div className="max-h-64 overflow-auto"><table className="w-full text-left">
+                    <thead><tr><th className="p-1">目录条目</th><th className="p-1">PDF 物理页</th><th className="p-1">内容状态</th></tr></thead>
+                    <tbody>{flow.slots.data?.map(slot => <tr key={slot.lessonId} className="border-t border-line-soft">
+                      <td className="p-1.5">{slot.title}</td><td className="p-1.5">{slot.startPage}{slot.endPage ? `–${slot.endPage}` : ''}</td>
+                      <td className="p-1.5">{slot.status === 'ready' ? '已提取' : slot.status === 'failed' ? '待重试' : '待提取'}</td>
+                    </tr>)}</tbody>
+                  </table></div>
+                )}
+              </section>
+            ) : <TocRecognitionPanel key={flow.sourceKey} file={props.pdfFile} filePath={flow.path}
             {...(azure ? { azure } : {})}
             {...(flow.entries ? { initialEntries: flow.entries } : {})}
-            onTocConfirmed={flow.setEntries} onTocInvalidated={() => flow.setEntries(null)} />
+            onTocConfirmed={flow.confirmOutline} confirmPending={flow.outlineMutation.isPending} onTocInvalidated={() => flow.setEntries(null)} />}
           <div className="flex justify-between gap-2">
             <Button size="sm" variant="outline" onClick={() => flow.setStep(1)}><ArrowLeft className="h-4 w-4" />返回检测</Button>
-            <Button disabled={!flow.entries?.length} onClick={() => flow.setStep(3)}>目录已核对，确认正文页码<ArrowRight className="h-4 w-4" /></Button>
+            <Button disabled={!flow.entries?.length || flow.outlineMutation.isPending || flow.slots.isError} onClick={() => flow.setStep(3)}>目录已保存，继续提取<ArrowRight className="h-4 w-4" /></Button>
           </div>
         </div>
       )}
@@ -113,8 +127,12 @@ export function TextbookPipelineImporterTab(props: TextbookPipelineImporterTabPr
             onRecheck={() => { void flow.recheck(); flow.setStep(1); }} /> : flow.entries && (
             <>
               <TextbookPageMapping entries={flow.entries} onChange={flow.setEntries} />
+              <Button variant="outline" size="sm" disabled={flow.outlineMutation.isPending} onClick={() => {
+                if (flow.entries) void flow.confirmOutline(flow.entries).catch(error => props.setParseError(error instanceof Error ? error.message : '目录保存失败，请重试'));
+              }}>{flow.outlineMutation.isPending ? '正在保存目录…' : '保存目录调整'}</Button>
+              {flow.outlineMutation.error && <p role="alert" className="text-xs text-ink-rose-700-rose-400">{flow.outlineMutation.error.message}</p>}
               <TextbookExtractionSettings forceOverwrite={flow.forceOverwrite} onForceOverwrite={flow.setForceOverwrite}
-                pending={flow.startMutation.isPending} onStart={flow.start} />
+                pending={flow.startMutation.isPending || flow.outlineMutation.isPending} onStart={flow.start} />
               <Button variant="outline" size="sm" onClick={() => flow.setStep(2)}>返回修改目录</Button>
             </>
           )}

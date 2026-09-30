@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { logger } from '@study-studio/shared';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
+import { parseTextbookAST, SaveTextbookOutlineResultSchema, type SaveTextbookOutlineRequest, type TextbookAST, type TextbookPipelineSettings } from '@study-studio/document-model';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,
@@ -29,6 +29,7 @@ async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Respo
   }
 }
 import type { TextbookBook } from '../models/textbook.js';
+import { convertAstToTextbookBook } from '../components/importer/textbook-converter.js';
 import type { TocRecognitionCandidate } from '../lib/toc-recognition.js';
 import { TextbookInspectionResultSchema, type TextbookInspectionResult, type TextbookInspectionDocSummary } from '@study-studio/protocol';
 export type { TextbookInspectionResult, TextbookInspectionDocSummary };
@@ -59,10 +60,8 @@ export function useTextbooksQuery(userId = DEFAULT_USER_ID) {
             for (const doc of docs) {
               if (doc.astJson) {
                 try {
-                  const parsed = JSON.parse(doc.astJson);
-                  if (parsed && parsed.id && Array.isArray(parsed.lessons)) {
-                    dynamicBooks.push({ ...(parsed as TextbookBook), documentId: doc.id });
-                  }
+                  const parsed = parseTextbookAST(JSON.parse(doc.astJson));
+                  if (parsed.ok) dynamicBooks.push({ ...convertAstToTextbookBook(parsed.value), documentId: doc.id });
                 } catch {
                   // ignore corrupt ast
                 }
@@ -86,10 +85,9 @@ export function useImportTextbookMutation(userId = DEFAULT_USER_ID) {
 
   return useMutation({
     mutationFn: async (book: TextbookBook) => {
-      try {
-        // TextbookBook 类型无 description；导入 AST 运行时可能携带该字段，兼容读取。
-        const bookDescription = (book as { description?: unknown }).description;
-        await apiClient.api.documents[':userId'].$post({
+      const ast = book.canonicalAst;
+      if (!ast) throw new Error('缺少教材规范底稿，请重新选择结构化文件');
+      const response = await apiClient.api.documents[':userId'].$post({
           param: { userId },
           json: {
             id: book.id,
@@ -97,14 +95,12 @@ export function useImportTextbookMutation(userId = DEFAULT_USER_ID) {
             sourceKind: 'user_import',
             // E：入库语种跟 AST（JA/EN/KO → ja/en/ko），缺席回退 ja，不写死。
             language: book.language === 'EN' ? 'en' : book.language === 'KO' ? 'ko' : 'ja',
-            content: (typeof bookDescription === 'string' && bookDescription) || book.title,
-            astJson: JSON.stringify(book),
+            content: ast.description || book.title,
+            astJson: JSON.stringify(ast),
             sourcePublisher: book.publisher || '用户自主导入',
           },
         });
-      } catch (e) {
-        logger.debug('[useImportTextbookMutation] Hono RPC failed to save textbook to gateway', e);
-      }
+      if (!response.ok) throw new Error('教材保存失败，请重试导入');
       return book;
     },
     onSuccess: (book) => {
@@ -920,20 +916,19 @@ export function useDocumentStructureQuery(documentId: string | undefined, userId
 
 
 
-export interface ExecuteTextbookPipelineVars {
+export interface ExecuteTextbookPipelineVars extends Partial<TextbookPipelineSettings> {
   documentId?: string;
   title: string;
   language?: string;
   filename?: string;
   filePath?: string;
   model?: string;
-  poolSize?: number;
+  effort?: string;
   forceOverwrite?: boolean;
   tocEntries: unknown[];
   lessonJobs?: Array<{
     lessonId: string;
     ocrText: string;
-    title?: string;
   }>;
 }
 
@@ -1024,6 +1019,27 @@ export function useTextbookImportInspectionQuery(vars: InspectTextbookImportVars
       return requestInspectTextbookImport(vars, AbortSignal.any([signal, AbortSignal.timeout(60_000)]));
     },
     staleTime: 0,
+  });
+}
+
+export function useSaveTextbookOutlineMutation(userId = DEFAULT_USER_ID) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: SaveTextbookOutlineRequest) => {
+      const response = await fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/textbook-outline`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vars),
+        signal: AbortSignal.timeout(60_000),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok) throw new GatewayRequestError(readGatewayUserMessage(payload, '目录保存失败，请重试'), { code: readGatewayErrorCode(payload) });
+      const parsed = SaveTextbookOutlineResultSchema.safeParse(payload);
+      if (!parsed.success) throw new GatewayRequestError('目录保存回执不完整，请重新检测');
+      return parsed.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TEXTBOOKS });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCUMENTS });
+    },
   });
 }
 

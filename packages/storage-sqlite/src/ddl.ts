@@ -576,6 +576,39 @@ export function initSchema(sqlite: Database): void {
     /* ignore */
   }
 
+  // 最新教材表结构；已有库的列升级仍只由已登记的前向迁移执行。
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS textbook_lessons (
+      document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, lesson_number INTEGER NOT NULL,
+      title TEXT NOT NULL, sort_order INTEGER, kind TEXT NOT NULL DEFAULT 'lesson', parent_id TEXT,
+      start_page INTEGER, end_page INTEGER, status TEXT NOT NULL DEFAULT 'pending', passage_md TEXT,
+      preview_json TEXT, summary_json TEXT, content_json TEXT, submission_id TEXT,
+      PRIMARY KEY (document_id, lesson_id)
+    );
+    CREATE TABLE IF NOT EXISTS textbook_vocab (
+      document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, surface TEXT NOT NULL,
+      reading TEXT, pos TEXT, gloss_zh TEXT, pitch TEXT, example_ja TEXT, example_zh TEXT,
+      source TEXT, toc_id TEXT, field_sources_json TEXT, PRIMARY KEY (document_id, lesson_id, ord)
+    );
+    CREATE TABLE IF NOT EXISTS textbook_grammar (
+      document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, title TEXT NOT NULL,
+      connection TEXT, explanation TEXT, examples_json TEXT NOT NULL DEFAULT '[]',
+      source TEXT, toc_id TEXT, ai_explanation TEXT, field_sources_json TEXT,
+      PRIMARY KEY (document_id, lesson_id, ord)
+    );
+    CREATE TABLE IF NOT EXISTS textbook_lines (
+      document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, speaker TEXT,
+      ja TEXT NOT NULL, zh TEXT, block_id TEXT, kind TEXT, source TEXT, toc_id TEXT, field_sources_json TEXT,
+      PRIMARY KEY (document_id, lesson_id, ord)
+    );
+    CREATE TABLE IF NOT EXISTS textbook_exercises (
+      document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, exercise_id TEXT,
+      type TEXT NOT NULL, prompt TEXT NOT NULL, options_json TEXT NOT NULL DEFAULT '[]',
+      answer TEXT NOT NULL DEFAULT '', explanation TEXT, source TEXT, toc_id TEXT,
+      answer_json TEXT, content_json TEXT, field_sources_json TEXT,
+      PRIMARY KEY (document_id, lesson_id, ord)
+    );
+  `);
   ensureDictionaryFts(sqlite);
   runMigrations(sqlite);
 }

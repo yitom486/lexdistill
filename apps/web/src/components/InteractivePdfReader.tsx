@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { StructuredLessonPanel } from './textbook/StructuredLessonPanel.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen,
@@ -50,7 +51,7 @@ export function InteractivePdfReader({
   onStartLessonQuiz,
   onAskAiTutor,
 }: InteractivePdfReaderProps) {
-  const [viewMode, setViewMode] = useState<'STRUCTURED' | 'PDF_PAGE'>('PDF_PAGE');
+  const [viewMode, setViewMode] = useState<'STRUCTURED' | 'PDF_PAGE'>(() => lesson.content ? 'STRUCTURED' : 'PDF_PAGE');
   const [showChineseTranslation, setShowChineseTranslation] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -260,10 +261,10 @@ export function InteractivePdfReader({
         >
           <TabsList className="bg-veil-stone-200o70-stone-800o80">
             <TabsIndicator />
-            <TabsTrigger value="PDF_PAGE" className="px-3 py-1.5 text-xs gap-1.5">
+            {!lesson.content && <TabsTrigger value="PDF_PAGE" className="px-3 py-1.5 text-xs gap-1.5">
               <BookOpen className="w-3.5 h-3.5" />
               原版教材排版精读
-            </TabsTrigger>
+            </TabsTrigger>}
             <TabsTrigger value="STRUCTURED" className="px-3 py-1.5 text-xs gap-1.5">
               <Layers className="w-3.5 h-3.5" />
               结构分解导读
@@ -295,7 +296,7 @@ export function InteractivePdfReader({
             )}
           </Button>
 
-          {viewMode === 'PDF_PAGE' && (
+          {!lesson.content && viewMode === 'PDF_PAGE' && (
             <div className="flex items-center gap-1 border border-line-soft rounded-xl px-1 py-0.5">
               <Button
                 variant="ghost"
@@ -351,7 +352,8 @@ export function InteractivePdfReader({
         className="relative min-h-[600px] p-6 sm:p-10 rounded-3xl bg-surface-dusk border border-line-accent shadow-sm overflow-hidden select-text"
         style={{ fontSize: `${(zoomLevel / 100) * 16}px` }}
       >
-        {viewMode === 'PDF_PAGE' ? (
+        {lesson.content ? <StructuredLessonPanel content={lesson.content} tab="READER" {...(book.language ? { language: book.language } : {})} showTranslation={showChineseTranslation}
+          onCollectSentence={handleCollectSentence} onAskAiTutor={text => onAskAiTutor(text, `《${book.title}》${lesson.title}的教材语境`)} /> : viewMode === 'PDF_PAGE' ? (
           /* 仿真原版双栏教材排版 */
           <div className="max-w-4xl mx-auto space-y-8">
             {/* 顶栏教材标识 */}
@@ -624,7 +626,7 @@ export function InteractivePdfReader({
       </div>
 
       {/* 底部页码控制 (PDF 模式) */}
-      {viewMode === 'PDF_PAGE' && (
+      {!lesson.content && viewMode === 'PDF_PAGE' && (
         <div className="flex items-center justify-center gap-4 py-2">
           <Button
             variant="outline"

@@ -5,7 +5,7 @@
 > 行数为例行线上库（`study-studio.db`）快照。
 > 原则：**无 FOREIGN KEY**（全库 0 条约束），关系靠列名约定 + 应用层保证。
 > 详见专题规范：[教材导入架构与数据表设计说明](./textbook-import-architecture.md)。
-> 本轮 P0 只记录事实，不做 schema 重构。
+> 教材组已按 2026-09-30 批准的章节流水线更新；其他章节保留原事实地图口径。
 
 ## 0. 分类定义
 
@@ -25,26 +25,28 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 ## 1. 教材组（Textbook）
 
 ### documents —— 一书一行，系统统一资源 ID
-- PK `id`；归属 `user_id` + `source_kind`（`user_import` 私产 / `curriculum_textbook` 公共种子 / `news` 等）
-- 底稿 `ast_json`（完整 TextbookAST，SSOT）；`content` 仅预览（PDF 只存前 2000 字）
+- PK `id`；归属 `user_id` + `source_kind`；当前教材从用户导入建立，不再补种旧教材。
+- 底稿 `ast_json`（完整 TextbookAST，SSOT），保存已确认目录、文件指纹和模型整理的规范章节内容；`content` 是摘要，不是正文事实源。
 - 描述：`title/language/topic/difficulty/source_url/source_publisher/exam_tag`
-- writer：`documents-annotations.saveDocument`（导入/enrich/append 全调它）；reader：几乎所有教材读路径
-- lifecycle：导入建，enrich/append 原地改 `ast_json`；**删除只清 annotations + documents 本行（`deleteDocument`），shred 行/reading_positions/document_structure 全部残留——已知孤儿源（见 §5）**
+- writer：JSON 导入使用文档保存入口；PDF 流水线由 `toc-skeleton` 建底稿、`commitLessonKnowledge` 逐章事务更新。reader：教材读取、导入检测。
+- lifecycle：建目录底稿 → 每章提交更新 AST 并同事务 shred → 全部课次实际 ready。删除/级联策略见 §5，不能从阶段进度推断内容已保存。
 - classification：Canonical。source of truth：是（教材底稿）。rebuildable：否。
 
 ### textbook_lessons —— 课目录（Derived 查询面）
-- PK `(document_id, lesson_id)`；`lesson_number INTEGER`（**legacy positional，可 gap，不排序，不展示**）；`title`（raw parser/OCR heading candidate，含噪，不是 canonical display）；`sort_order INTEGER`（v17，**唯一 ordering truth**：最终 canonical AST lessons[] index+1，1-based dense；DB 列 nullable，invariant 由 shred 全写 + doctor FAIL 锁）
-- 语义（P1-B）：lesson_id=冻结的 positional identity；sort_order=顺序；lesson_number=兼容；title=原文候选；展示归一走 `normalizeLessonDisplayTitle`（Gateway 纯函数，不落库）
-- 来源：`documents.ast_json` shred 全删全插；writers：`shredDocument`；回填：`lesson-ordering-apply --apply`（仅 UPDATE sort_order）；readers：教材页/组卷/focus
+- PK `(document_id, lesson_id)`；`lesson_id` 是已确认目录的任务身份，不能从标题猜测；`lesson_number` 为课号，查询按 `sort_order`（最终 AST 数组位置）排序。
+- `kind/parent_id/start_page/end_page` 保存目录层级和物理页范围；`status` 表示提取状态。
+- v034：`content_json` 保存规范章节投影，`submission_id` 保存实际已提交尝试身份；`passage_md` 是整理后正文的文本投影，不能用它逆向猜角色。
+- 来源：`documents.ast_json` 同事务全删全插；writer：`shredIntoTransaction`；reader：教材页、组卷、逐课导入检测。
 - lifecycle：随 shred 重建；rebuildable：是（由 ast_json）。source of truth：否（真相在 ast_json）
 
 ### textbook_lines / textbook_vocab / textbook_grammar / textbook_exercises —— 行/词/文法/习题（Derived 查询面）
 - PK `(document_id, lesson_id, ord)`；`ord` 为课内序号（0-based dense，但**代码不强制连续**，只靠 shred 全量重写保证）
-- 来源：一律由 `documents.ast_json`（Canonical SSOT）经 `shredDocument` 拆出；enrich 先写回 AST 再 shred，故 AI 抽取词也在 AST 里有源
+- 来源：一律由 `documents.ast_json`（Canonical SSOT）同事务拆出；原书整理内容与 AI 补充内容都在规范底稿内，OCR 原文不作为正式正文落库。
 - vocab 列：`surface/reading/pos/gloss_zh/pitch/example_ja/example_zh`
 - grammar 列：`title/connection/explanation/examples_json`（v16，`[{japanese,chinese}]` 全量）
-- exercises 列：`exercise_id/type/prompt/options_json/answer/explanation`（v16；线上主书 0 行——AST 本来就没有习题，不是 bug）
-- 注意：vocab/grammar 的 AST `id`（zod 必填）是 generation-local 的位置性 ID（PDF 路径为 `${lessonId}-v/g${kept序号}`，种子为手写 `v1-1` 形；插入/删除/重排/enrich 都会移位，P1-D0），**不是稳定 identity**；shred 丢弃 id，只用 `ord` 做行身份（P1 事项）
+- v034：各类行新增 `source/toc_id/field_sources_json`；正文另有 `block_id/kind`，文法另有 `ai_explanation`，原书与 AI 讲解分别存储。
+- exercises：七种题型，`answer_json/content_json` 保存选项 ID、排序或匹配答案和完整题目；`answer` 是查询用文本投影。新增 AI 习题不要求目录含练习项，但不能替代原书目录覆盖。
+- vocab/grammar 查询行按 `ord` 定位；完整内容 ID、例句和来源保留在规范章节与 AST。派生时不截断长词或正文。
 - lifecycle：随 shred 重建；rebuildable：是
 
 ### textbook_term_map —— 已退役（v30 `knowledge-points`，表已 DROP）
@@ -115,7 +117,7 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 ### quiz_questions —— 题库池（Canonical + 池复用）
 - PK `id`；`user_id='default_user'` 为公共池；`tested_skill_id/difficulty/extras_json`（仅 dictation 用 extras）
 - writer：`saveQuestion(s)`（生成后持久化）+ 种子；reader：组卷装配（只读池不改池）
-- 与 `textbook_exercises` 的分工：前者系统生成、后者教材原生，来源与生命周期不同，拆开是对的
+- 与 `textbook_exercises` 的分工：前者是学习任务中生成的试题；后者是持久化教材章节的习题，包含原书题和明确标记的 AI 补题，生命周期随教材底稿。
 
 ### quiz_attempts / practice_item_attempts —— 作答事件（Event）
 - 纯追加（attempts 按 `(run,item)` upsert 状态机 `DRAFT→SUBMITTED→GRADED`，批改后原子落 `quiz_attempts`/错题/打卡）

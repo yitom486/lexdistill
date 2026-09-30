@@ -21,6 +21,23 @@ export const TocEntrySchema = z.object({
 });
 export type TocEntry = z.infer<typeof TocEntrySchema>;
 
+/** 用户确认后的独立目录保存；页码已换算为 PDF 物理页。 */
+export const SaveTextbookOutlineRequestSchema = z.object({
+  documentId: z.string().min(1).optional(),
+  title: z.string().trim().min(1),
+  filePath: z.string().trim().min(1),
+  language: z.enum(['ja', 'en', 'ko']),
+  tocEntries: z.array(TocEntrySchema).min(1),
+});
+export type SaveTextbookOutlineRequest = z.infer<typeof SaveTextbookOutlineRequestSchema>;
+export const SaveTextbookOutlineResultSchema = z.object({
+  documentId: z.string().min(1), title: z.string(),
+  lessonCount: z.number().int().nonnegative(), totalEntries: z.number().int().positive(),
+  minPage: z.number().int().positive(), maxPage: z.number().int().positive(),
+  entries: z.array(TocEntrySchema).min(1),
+});
+export type SaveTextbookOutlineResult = z.infer<typeof SaveTextbookOutlineResultSchema>;
+
 export const TextbookTocPlanSchema = z.object({
   documentId: z.string().min(1).describe('所属教材文档ID'),
   title: z.string().min(1).describe('教材全名'),

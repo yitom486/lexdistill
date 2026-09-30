@@ -8,7 +8,7 @@
 
 | 规格文档 | 核心内容 | 关键架构规范 |
 | :--- | :--- | :--- |
-| [**原生工具调用 vs 结构化 JSON 提示词**](./tool-calling-vs-json-prompting.md) | 深度解析为什么原生工具调用（Native Tool Calling）是一等公民，剖析纯文本 JSON 的三大脆弱故障模式（引号逃逸、截断损坏、脱靶造课），详述双轨自愈与 Zod Schema 原地执行设计。 | AGENTS.md §1.6 原生工具优先于自由文本；§1.6b 专精会话白名单与设防 |
+| [**教材原生工具提交**](./tool-calling-vs-json-prompting.md) | 运行时工具注入、会话绑定、独立校验、事务回执和有界重试；已删除文本 JSON 回填。 | AGENTS.md §1.6 原生工具；§1.6b 专精会话白名单与设防 |
 | [**教材导入六层模型与拆行架构**](../textbook-import-architecture.md) | 教材全生命周期六大阶段：格式解析、AST 校验、SQLite 拆行（Shredding）、底稿 SSOT 同步、FTS 全文检索。 | AGENTS.md §1.8 静态表结构行表达动态；§1.9 Drizzle ORM 规范 |
 | [**智能体运行时与适配器体系**](../agent-runtime.md) | `AgentAdapter`、`AgentSession`、`AgentEvent` 抽象契约与零厂商泄漏隔离（Zero Provider Leak）。 | AGENTS.md §1.1 业务与模型厂商强解耦；§1.2 网关边界 |
 

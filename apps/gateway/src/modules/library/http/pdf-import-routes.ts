@@ -6,37 +6,37 @@ import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from
 import { extractTocWithLlm } from '../application/toc-extractor.js';
 import { beginTocVisionTrace, listTocVisionTraces } from '../application/toc-vision-diagnostics.js';
 import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
+import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import { ensurePdfRuntime, type PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
-import { TocEntrySchema } from '@study-studio/document-model';
+import { TocEntrySchema, TextbookPipelineSettingsSchema, SaveTextbookOutlineRequestSchema } from '@study-studio/document-model';
 import { z } from 'zod';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import type { TextbookPipelineInput } from '../application/textbook-pipeline.js';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 import { inspectTextbookImport } from '../application/textbook-inspector.js';
+import { saveTextbookOutline } from '../application/textbook-outline.js';
 
-const PipelineRequestSchema = z.object({
+const PipelineRequestSchema = TextbookPipelineSettingsSchema.extend({
   documentId: z.string().optional(),
   title: z.string().min(1),
-  language: z.string().optional(),
+  language: z.enum(['ja', 'en', 'ko']).optional(),
   filename: z.string().optional(),
   filePath: z.string().optional(),
   pdfBase64: z.string().optional(),
   model: z.string().optional(),
   effort: z.string().optional(),
-  poolSize: z.number().int().positive().optional(),
   forceOverwrite: z.boolean().optional(),
   tocEntries: z.array(TocEntrySchema).min(1),
   lessonJobs: z.array(z.object({
     lessonId: z.string(),
     ocrText: z.string(),
-    title: z.string().optional(),
   })).optional(),
 });
 
 /**
  * PDF 导入路由：前端上传 PDF → 网关分类/提取/结构化 → 返回 TextbookAST。
  * 持久化复用前端既有 useImportTextbookMutation（POST /api/documents/:userId），
- * 本路由只做 PDF→AST（无状态转换），不直接写库。
+ * 目录确认可独立保存；正文流水线按章保存。
  *
  * 两种输入（二选一）：
  * - multipart：file(+startPage/endPage)——常规文件；
@@ -49,9 +49,16 @@ export function createPdfImportRoutes(
   pdfOverrides?: {
     loadInspector?: () => Promise<PdfInspectorLike>;
     runtimeDir?: string;
-    poolFactory?: TextbookPipelineInput['poolFactory'];
+    adapter?: TextbookPipelineInput['adapter'];
+    submissionTool?: LibraryLessonCommitTool;
   }
 ) {
+  const pipelineChannels = () => {
+    const tool = pdfOverrides?.submissionTool ?? deps.server.toolRegistry.get('library.commit_lesson_knowledge');
+    const adapter = pdfOverrides?.adapter ?? deps.server.agentAdapter;
+    if (!(tool instanceof LibraryLessonCommitTool) || !adapter) throw new BusinessError('E_AGENT_UNAVAILABLE', '章节工具或模型通道尚未就绪，请检查桌面运行时', 'AGENT_RUNTIME');
+    return { adapter, submissionTool: tool };
+  };
   return new Hono()
     .post('/api/documents/:userId/import-pdf', async (c) => {
       const input = await readPdfInput(c);
@@ -115,6 +122,14 @@ export function createPdfImportRoutes(
       } catch (e) {
         return formatBusinessErrorResponse(c, e, 'inspectTextbookImport');
       }
+    })
+    .post('/api/documents/:userId/textbook-outline', async (c) => {
+      try {
+        const parsed = SaveTextbookOutlineRequestSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) return formatBusinessErrorResponse(c, new BusinessError('E_INVALID_INPUT', '目录或 PDF 页码不完整，请核对后保存', 'VALIDATION'));
+        const result = await saveTextbookOutline(deps.repo, c.req.param('userId'), parsed.data);
+        return result.ok ? c.json(result.value) : formatBusinessErrorResponse(c, result.error);
+      } catch (cause) { return formatBusinessErrorResponse(c, cause, 'saveTextbookOutline'); }
     })
     .post('/api/documents/:userId/map-pdf', async (c) => {      // 结构预览（目录感知第一步）：扫一个窗口页，返回每页标题 + 目录条目；
       // 调用方按标题页选范围，再调 import-pdf 精确导入。
@@ -317,7 +332,8 @@ export function createPdfImportRoutes(
           ...(body.model ? { model: body.model } : {}),
           ...(body.poolSize ? { poolSize: body.poolSize } : {}),
           ...(body.effort ? { effort: body.effort } : {}),
-          ...(pdfOverrides?.poolFactory ? { poolFactory: pdfOverrides.poolFactory } : {}),
+          ...TextbookPipelineSettingsSchema.parse(body),
+          ...pipelineChannels(),
         };
 
         const res = await deps.repo.executeTextbookPipeline(pipelineInput);
@@ -394,7 +410,8 @@ export function createPdfImportRoutes(
           ...(body.model ? { model: body.model } : {}),
           ...(body.poolSize ? { poolSize: body.poolSize } : {}),
           ...(body.effort ? { effort: body.effort } : {}),
-          ...(pdfOverrides?.poolFactory ? { poolFactory: pdfOverrides.poolFactory } : {}),
+          ...TextbookPipelineSettingsSchema.parse(body),
+          ...pipelineChannels(),
         };
 
         const res = deps.server.pipelineJobs.start(deps.repo, pipelineInput);

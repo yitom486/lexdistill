@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import { StructuredLessonPanel } from './textbook/StructuredLessonPanel.js';
+import { StructuredExerciseList } from './textbook/StructuredExerciseList.js';
+import { ContentSource } from './textbook/ContentSource.js';
+import { ContentExamples } from './textbook/ContentExamples.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen,
@@ -74,7 +78,7 @@ export function TextbookCurriculum({
   const enrichLesson = useEnrichLessonMutation();
   const [selectedBookId, setSelectedBookId] = useState<string>('');
   const [selectedLessonId, setSelectedLessonId] = useState<string>('');
-  const [lessonSubTab, setLessonSubTab] = useState<'READER' | 'VOCAB' | 'GRAMMAR'>('READER');
+  const [lessonSubTab, setLessonSubTab] = useState<'READER' | 'VOCAB' | 'GRAMMAR' | 'EXERCISES'>('READER');
   const [activeWordCard, setActiveWordCard] = useState<FuriganaWord | null>(null);
   const [addedCardsMap, setAddedCardsMap] = useState<Record<string, boolean>>({});
   const isImporterOpen = usePipelineJobStore((s) => s.isImporterModalOpen);
@@ -572,6 +576,7 @@ export function TextbookCurriculum({
                   >
                     💡 核心文法剖析 ({currentLesson.grammarPoints.length})
                   </TabsTrigger>
+                  {currentLesson.content && <TabsTrigger value="EXERCISES" className="px-3 py-1.5 text-xs">教材练习 ({currentLesson.content.exercises.length})</TabsTrigger>}
                 </TabsList>
               </Tabs>
             </div>
@@ -596,11 +601,13 @@ export function TextbookCurriculum({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {currentLesson.vocabularies.map((vocab) => {
                   const isAdded = addedCardsMap[vocab.id];
+                  const provenance = currentLesson.content?.vocabularies.find(item => item.id === vocab.id);
                   return (
                     <div
                       key={vocab.id}
                       className="p-3.5 rounded-xl bg-veil-stone-100o70-stone-900o50 border border-tone-stone-200o80-stone-800 flex flex-col justify-between gap-2"
                     >
+                      {provenance && <div className="flex flex-wrap gap-1"><ContentSource source={provenance.source} />{provenance.fieldSources?.gloss && <ContentSource source={provenance.fieldSources.gloss} field="释义" />}{provenance.fieldSources?.reading && <ContentSource source={provenance.fieldSources.reading} field="注音" />}</div>}
                       <div className="flex items-start justify-between">
                         <div>
                           <div className="flex items-baseline gap-2">
@@ -623,10 +630,10 @@ export function TextbookCurriculum({
                         </div>
                       </div>
 
-                      <div className="text-[11px] text-ink-ghost bg-veil-stone-200o50-stone-800o40 p-2 rounded-lg">
+                      {provenance ? <ContentExamples examples={provenance.examples} /> : <div className="text-[11px] text-ink-ghost bg-veil-stone-200o50-stone-800o40 p-2 rounded-lg">
                         <p className="font-medium text-ink-mute">{vocab.exampleSentence}</p>
                         <p className="text-ink-stone-500">{vocab.exampleTranslation}</p>
-                      </div>
+                      </div>}
 
                       <div className="flex justify-end pt-1">
                         <Button
@@ -658,6 +665,7 @@ export function TextbookCurriculum({
 
           {/* 子内容 3: 核心文法剖析 */}
           {lessonSubTab === 'GRAMMAR' && (
+            currentLesson.content ? <StructuredLessonPanel content={currentLesson.content} tab="GRAMMAR" /> :
             <div className="space-y-4">
               {currentLesson.grammarPoints.map((gp) => (
                 <div
@@ -699,6 +707,7 @@ export function TextbookCurriculum({
               ))}
             </div>
           )}
+          {lessonSubTab === 'EXERCISES' && currentLesson.content && <StructuredExerciseList exercises={currentLesson.content.exercises} />}
         </div>
       </div>
 

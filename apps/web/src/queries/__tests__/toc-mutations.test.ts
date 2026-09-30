@@ -80,8 +80,8 @@ describe('requestExecuteTextbookPipeline 请求层', () => {
         { title: '第2課', printedPage: 26, physicalPage: 30 },
       ],
       lessonJobs: [
-        { lessonId: 'lesson-1', title: '第1課', ocrText: '第1課 私の友達' },
-        { lessonId: 'lesson-2', title: '第2課', ocrText: '第2課 これは本です' },
+        { lessonId: 'lesson-1', ocrText: '第1課 私の友達' },
+        { lessonId: 'lesson-2', ocrText: '第2課 これは本です' },
       ],
     };
 

@@ -37,7 +37,7 @@ describe('schema migrations catalog (ddl.ts ↔ migrations/)', () => {
     initSchema(sqlite);
     // 验证当前已经迁移到最新
     const maxVer = (sqlite.query('SELECT MAX(version) as max_v FROM schema_migrations').get() as { max_v: number }).max_v;
-    expect(maxVer).toBe(33);
+    expect(maxVer).toBe(catalog.at(-1)!.version);
 
     // 模拟场景：删掉 v31、v32、v33 迁移记录，模拟由于某种原因表已有 start_page，但 migration 尚未记录
     sqlite.run('DELETE FROM schema_migrations WHERE version >= 31');

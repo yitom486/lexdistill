@@ -94,7 +94,7 @@ describe('P1-D1 映射去重计数', () => {
     expect(res.value.mappedEntries + res.value.unmapped).toBe(2);
   });
 
-  it('截断后碰撞：两不同长文本经 slice(0,64) 相同，去重后只计一条但 occurrence 两行', async () => {
+  it('长文本完整保存：相同前缀的不同词不碰撞，映射计数分别统计', async () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     repos.push(repo);
     const prefix = 'あ'.repeat(64);
@@ -104,7 +104,9 @@ describe('P1-D1 映射去重计数', () => {
     if (!isOk(res)) return;
     const v = repo.getRawDb().query('SELECT COUNT(*) AS n FROM textbook_vocab WHERE document_id=?').get('d1') as { n: number };
     expect(v.n).toBe(2);
-    expect(res.value.mappedEntries + res.value.unmapped).toBe(1);
+    expect(res.value.mappedEntries + res.value.unmapped).toBe(2);
+    const rows = repo.getRawDb().query('SELECT surface FROM textbook_vocab WHERE document_id=? ORDER BY ord').all('d1');
+    expect(rows).toEqual([{ surface: prefix + 'X' }, { surface: prefix + 'Y' }]);
   });
 
   it('非映射的真实 shred 错误仍整体回滚（去重不掩盖）', async () => {

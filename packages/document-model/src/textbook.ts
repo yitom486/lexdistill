@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { LessonContentSchema, ExerciseTypeSchema, lessonContentIssues } from './lesson-content.js';
+import { projectLessonContent } from './lesson-projection.js';
 import { ok, err, Result, BusinessError } from '@study-studio/shared';
 
 /** M8-1 自 protocol 迁入 document-model（字节一致，行为不变）。 */
@@ -57,7 +59,7 @@ export type DialogueLine = z.infer<typeof DialogueLineSchema>;
 
 export const ExerciseItemSchema = z.object({
   id: z.string(),
-  type: z.enum(['CHOICE', 'FILL_BLANK', 'TRANSLATION']),
+  type: ExerciseTypeSchema,
   prompt: z.string(),
   options: z.array(z.string()).optional(),
   answer: z.string(),
@@ -80,6 +82,8 @@ export const TextbookLessonSchema = z.object({
   passageMd: z.string().nullable().optional(),
   previewJson: z.string().nullable().optional(),
   summaryJson: z.string().nullable().optional(),
+  content: LessonContentSchema.optional(),
+  submissionId: z.string().optional(),
   vocabularies: z.array(TextbookVocabularySchema),
   grammarPoints: z.array(TextbookGrammarSchema),
   dialogues: z.array(DialogueLineSchema),
@@ -113,8 +117,12 @@ export const TextbookASTSchema = z.object({
       });
     }
     seen.add(lesson.id);
+    if (lesson.content) for (const message of lessonContentIssues(lesson.content)) ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['lessons', i, 'content'] });
   });
-});
+}).transform(ast => ({
+  ...ast,
+  lessons: ast.lessons.map(lesson => lesson.content ? { ...lesson, ...projectLessonContent(lesson.content) } : lesson),
+}));
 export type TextbookAST = z.infer<typeof TextbookASTSchema>;
 
 

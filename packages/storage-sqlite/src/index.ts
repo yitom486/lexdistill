@@ -235,8 +235,5 @@ export {
   commitLessonKnowledge,
   type CommitLessonKnowledgeInput,
   type CommitLessonKnowledgeOutput,
-  type LessonVocabularyInput,
-  type LessonKnowledgePointInput,
-  type LessonExerciseInput,
 } from './adapters/library/commit-lesson-knowledge.js';
 export { getVisibleDocument, type VisibleDocument } from './adapters/library/document-visibility.js';

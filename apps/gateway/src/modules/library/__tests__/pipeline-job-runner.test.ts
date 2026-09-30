@@ -1,80 +1,49 @@
-import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { expect, it } from 'bun:test';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { TextbookPipelineJobRegistry } from '../application/pipeline-job-runner.js';
-import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
+import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
+import { deferred, pipelineModel, submissionFromPrompt } from './textbook-pipeline-fixtures.js';
 
-describe('TextbookPipelineJobRegistry (流水线异步任务注册表与 SSE 广播)', () => {
-  it('启动任务并支持单例防重、快照查询与取消控制', async () => {
-    const repo = new DrizzleLearnerRepository(':memory:');
-    const registry = new TextbookPipelineJobRegistry();
-
-    const tocEntries = [
-      { id: 'l1', title: '第1课 初次见面', level: 'lesson' as const, startPage: 5, sortOrder: 1 },
-      { id: 'l2', title: '第2课 这是什么', level: 'lesson' as const, startPage: 12, sortOrder: 2 },
-    ];
-
-    // 1. 启动任务
-    const startRes = registry.start(repo, {
-      userId: 'test_user_001',
-      documentId: 'doc_tb_001',
-      title: '测试教材第一册',
-      tocEntries,
-      lessonJobs: [
-        { lessonId: 'l1', ocrText: '第1课 初次见面 わたしはワンです。', title: '第1课 初次见面' },
-        { lessonId: 'l2', ocrText: '第2课 这是什么 これは本です。', title: '第2课 这是什么' },
-      ],
-      poolSize: 2,
-    });
-
-    expect(isOk(startRes)).toBe(true);
-    if (!isOk(startRes)) return;
-
-    const initialSnapshot = startRes.value;
-    expect(initialSnapshot.status).toBe('running');
-    expect(initialSnapshot.totalLessons).toBe(2);
-    expect(initialSnapshot.doneLessons).toBe(0);
-    expect(initialSnapshot.documentId).toBe('doc_tb_001');
-
-    // 2. 防重测试：同文档运行中重复 start 直接返回相同快照
-    const duplicateRes = registry.start(repo, {
-      userId: 'test_user_001',
-      documentId: 'doc_tb_001',
-      title: '测试教材第一册',
-      tocEntries,
-    });
-    expect(isOk(duplicateRes)).toBe(true);
-    if (isOk(duplicateRes)) {
-      expect(duplicateRes.value.jobId).toBe(initialSnapshot.jobId);
-    }
-
-    // 3. 快照查询与活跃任务查询
-    const queried = registry.get(initialSnapshot.jobId);
-    expect(queried).not.toBeNull();
-    expect(queried?.jobId).toBe(initialSnapshot.jobId);
-
-    const active = registry.getActive('test_user_001');
-    expect(active).not.toBeNull();
-    expect(active?.jobId).toBe(initialSnapshot.jobId);
-
-    // 4. 事件订阅与广播 (Pub/Sub)
-    const receivedSnapshots: TextbookPipelineJobSnapshot[] = [];
-    const unsubscribe = registry.subscribe(initialSnapshot.jobId, (snap) => {
-      receivedSnapshots.push(snap);
-    });
-    // 刚订阅时应立即收到当前快照
-    expect(receivedSnapshots.length).toBeGreaterThanOrEqual(1);
-
-    // 5. 中止取消任务
-    const cancelRes = registry.cancel(initialSnapshot.jobId);
-    expect(isOk(cancelRes)).toBe(true);
-    if (isOk(cancelRes)) {
-      expect(cancelRes.value.status).toBe('cancelled');
-    }
-
-    const cancelledSnapshot = registry.get(initialSnapshot.jobId);
-    expect(cancelledSnapshot?.status).toBe('cancelled');
-
-    unsubscribe();
+it('后台任务防重与阶段广播对应实际 SQLite 提交，取消后关闭会话并保留已保存章节', async () => {
+  const repo = new DrizzleLearnerRepository(':memory:');
+  const registry = new TextbookPipelineJobRegistry();
+  const tool = new LibraryLessonCommitTool(repo);
+  const saved = deferred(), release = deferred();
+  const model = pipelineModel(tool, async ({ input, submit }) => {
+    expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true);
+    saved.resolve();
+    await release.promise;
   });
+  const input = {
+    userId: 'owner', documentId: 'job-book', title: '后台集成教材', poolSize: 1,
+    tocEntries: [{ id: 'l1', title: '第一章', level: 'lesson' as const, startPage: 1 }],
+    lessonJobs: [{ lessonId: 'l1', ocrText: '第一章内容' }], adapter: model.adapter, submissionTool: tool,
+  };
+  let unsubscribe: (() => void) | undefined;
+  try {
+    const start = registry.start(repo, input);
+    expect(start.ok).toBe(true);
+    if (!start.ok) return;
+    const duplicate = registry.start(repo, input);
+    expect(duplicate.ok && duplicate.value.jobId).toBe(start.value.jobId);
+    const stages: string[] = [];
+    unsubscribe = registry.subscribe(start.value.jobId, snapshot => {
+      if (snapshot.currentStage) stages.push(snapshot.currentStage);
+    });
+    await saved.promise;
+    expect(registry.getActive('owner')?.jobId).toBe(start.value.jobId);
+    expect(registry.get(start.value.jobId)?.successfulLessons).toBe(1);
+    expect(stages).toContain('saved');
+    const stats = await repo.getTextbookAssetStats('job-book');
+    expect(stats.ok && stats.value.readyLessons).toBe(1);
+    const cancelled = registry.cancel(start.value.jobId);
+    expect(cancelled.ok && cancelled.value.status).toBe('cancelled');
+    release.resolve();
+    await registry.shutdown();
+    expect(model.interrupted).toHaveLength(1);
+    expect(model.closed).toHaveLength(1);
+    expect(registry.get(start.value.jobId)?.status).toBe('cancelled');
+  } finally {
+    unsubscribe?.(); release.resolve(); await registry.shutdown(); repo.getRawDb().close();
+  }
 });

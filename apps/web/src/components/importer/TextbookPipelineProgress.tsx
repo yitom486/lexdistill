@@ -10,6 +10,7 @@ interface Props {
   onClose: () => void;
   onReset: () => void;
 }
+const stageLabels = { ocr: '提取文字 / OCR', queued: '等待会话', extracting: '模型整理', validating: '校验目录与格式', saving: '保存中', saved: '已保存', failed: '未完成' };
 
 export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: Props) {
   const slots = useTextbookLessonSlotsQuery(job.documentId);
@@ -30,7 +31,7 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
           return (
             <div key={slot.lessonId} className="flex justify-between gap-2 border-b border-line-soft py-2 text-ink">
               <span>{slot.title}</span>
-              <span className="text-ink-muted">{slot.status === 'ready' ? '已保存' : failure ? failure.error : job.status === 'running' ? '尚未保存' : '未完成'}</span>
+              <span className="text-ink-muted">{slot.status === 'ready' ? '已保存' : failure ? failure.error : job.status === 'running' && job.lessonStages?.[slot.lessonId] ? stageLabels[job.lessonStages[slot.lessonId]!] : job.status === 'running' ? '等待处理' : '未完成'}</span>
             </div>
           );
         })}

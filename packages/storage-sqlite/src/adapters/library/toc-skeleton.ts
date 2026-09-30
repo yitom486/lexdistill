@@ -90,6 +90,7 @@ export async function seedTextbookTocSkeleton(
         if (existingDoc[0]?.userId !== input.userId) {
           throw new BusinessError('E_NOT_FOUND', '未找到当前用户的教材', 'VALIDATION');
         }
+        if (existingDoc[0]?.language !== lang) throw new BusinessError('E_TEXTBOOK_LANGUAGE_CONFLICT', '已有教材的语种与当前提取配置不同，请核对教材语种后重试', 'VALIDATION');
         if (input.sourceFingerprint && existingDoc[0]?.astJson) {
           const previous: unknown = JSON.parse(existingDoc[0].astJson);
           if (previous && typeof previous === 'object' && 'sourceFingerprint' in previous &&
@@ -128,6 +129,10 @@ export async function seedTextbookTocSkeleton(
         .where(eq(textbookLessons.documentId, input.documentId))
         .all();
       const existingLessonMap = new Map(existingLessons.map((l) => [l.lessonId, l]));
+
+      if (!input.forceOverwrite && existingLessons.some(prev => prev.status === 'ready' && !canonicalEntries.some(entry => entry.id === prev.lessonId))) {
+        throw new BusinessError('E_TOC_SLOT_CONFLICT', '新目录缺少已有正文的课次，请核对目录，避免删除已保存内容', 'VALIDATION');
+      }
 
       for (const entry of canonicalEntries) {
         const prev = existingLessonMap.get(entry.id);

@@ -12,16 +12,19 @@ export interface GeneratedCardItem {
  * 将领域模型 TextbookAST 转换为客户端可消费的 TextbookBook 视图结构。
  */
 export function convertAstToTextbookBook(ast: TextbookAST): TextbookBook {
+  const lessons = ast.lessons.filter(lesson => lesson.kind === undefined || lesson.kind === 'lesson');
   return {
     id: ast.id,
+    canonicalAst: ast,
     language: ast.language,
     title: ast.title,
     shortTitle: ast.shortTitle,
     publisher: ast.publisher || '自定义导入',
-    totalLessons: ast.lessons.length,
+    totalLessons: lessons.length,
     level: ast.level,
-    lessons: ast.lessons.map((l) => ({
+    lessons: lessons.map((l) => ({
       id: l.id,
+      ...(l.content ? { content: l.content } : {}),
       bookId: ast.id,
       lessonNumber: l.lessonNumber,
       title: l.title,
@@ -52,11 +55,11 @@ export function convertAstToTextbookBook(ast: TextbookAST): TextbookBook {
         chinese: v.chinese,
         pos: v.pos,
         pitchAccent: v.pitchAccent,
-        pitchType: v.pitchAccent.includes('⓪')
+        pitchType: v.pitchAccent.includes('平板型') || v.pitchAccent.includes('⓪')
           ? '平板型'
-          : v.pitchAccent.includes('①')
+          : v.pitchAccent.includes('头高型') || v.pitchAccent.includes('①')
             ? '头高型'
-            : '中高型',
+            : v.pitchAccent.includes('中高型') ? '中高型' : v.pitchAccent.includes('尾高型') ? '尾高型' : '',
         exampleSentence: v.example?.japanese || '',
         exampleTranslation: v.example?.chinese || '',
       })),

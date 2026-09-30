@@ -30,6 +30,7 @@ import { migration as v030 } from './v030-knowledge-points.js';
 import { migration as v031 } from './v031-textbook-slots-and-prune.js';
 import { migration as v032 } from './v032-drop-toc-import-sessions.js';
 import { migration as v033 } from './v033-textbook-lesson-pedagogy.js';
+import { migration as v034 } from './v034-textbook-structured-content.js';
 import type { SchemaMigration } from './types.js';
 
 export type { SchemaMigration } from './types.js';
@@ -72,5 +73,6 @@ export const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
   v031,
   v032,
   v033,
+  v034,
 ];
 
