@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '../../ui/dialog.js';
 import { KanaGuideSpeakButton } from './KanaGuideSpeakButton.js';
+import { useKanaAudio } from '../../../hooks/useKanaAudio.js';
 import { DAKUTEN_ROW_GUIDES } from './dakuten/dakuten-row-guide.js';
 import { HIRAGANA_ROW_GUIDES } from './hiragana/hiragana-row-guide.js';
 import { KATAKANA_ROW_GUIDES } from './katakana/katakana-row-guide.js';
@@ -86,6 +87,7 @@ export function KanaRowGuideDialog({
   const guide = resolveRowGuide(rowName, items, scriptMode);
   const rowAudioText = items.map((item) => item.audioText).join('');
   const kind = typeLabel(items);
+  const { playText: playRowText } = useKanaAudio();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -134,7 +136,11 @@ export function KanaRowGuideDialog({
                           className="gap-1.5"
                           onClick={() => {
                             sound.playClick();
-                            void speechStudio.speak(rowAudioText, { lang: 'JA', purpose: 'preview' });
+                            void playRowText(rowAudioText, { sequence: true }).then((played) => {
+                              if (!played) {
+                                void speechStudio.speak(rowAudioText, { lang: 'JA', purpose: 'preview' });
+                              }
+                            });
                           }}
                         >
                           <Volume2 className="h-3.5 w-3.5" />

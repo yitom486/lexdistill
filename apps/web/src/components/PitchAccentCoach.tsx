@@ -26,6 +26,7 @@ import { useDictionaryLookupQuery, usePitchLexiconQuery } from '../queries/useLe
 import type { PitchLexiconItem } from '../queries/useLearnerQueries.js';
 import type { AiTutorContext } from './AiTutorDrawer.js';
 import { buildPitchTutorContext } from '../lib/pitch-tutor.js';
+import { playKanaText } from '../lib/kana-audio.js';
 import { readCssCustomProperty } from '../lib/css-tokens.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import {
@@ -112,10 +113,12 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
     );
   }
 
-  // 真人示范音：走中央 TTS 引擎（系统/云端跟随设置），不再用正弦哔哔声冒充原音
+  // 真人示范音：单假名播内置；单词走实时 TTS（整词语调不能拼接）。
   const playModelVoice = (kana: string) => {
     sound.playClick();
-    void speechStudio.speak(kana, { lang: 'JA', purpose: 'preview' });
+    void playKanaText(kana).then((played) => {
+      if (!played) void speechStudio.speak(kana, { lang: 'JA', purpose: 'preview' });
+    });
   };
 
   // 请 AI 老师讲这个词的声调（上下文由 lib/pitch-tutor 构造，UI 只调用）
