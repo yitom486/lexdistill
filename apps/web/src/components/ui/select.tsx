@@ -38,19 +38,31 @@ SelectTrigger.displayName = 'SelectTrigger';
 
 const SelectContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentPropsWithoutRef<typeof BaseSelect.Popup>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof BaseSelect.Popup> & {
+    /**
+     * Base UI 默认 true：弹窗用“选中项盖住触发器”的对齐模式。
+     * 该模式下 Positioner 被强制 position:fixed、且浮动锚点跟踪被关闭，
+     * 弹窗位置只在打开瞬间算一次，之后祖先滚动/布局变化不再跟随，
+     * 必然出现飘移脱钩。本组件默认 false，走标准 popper 锚定 + autoUpdate 跟随。
+     */
+    alignItemWithTrigger?: boolean;
+  }
+>(({ className, alignItemWithTrigger = false, children, ...props }, ref) => (
   <BaseSelect.Portal>
-    <BaseSelect.Positioner sideOffset={6} className="z-50 outline-none">
+    <BaseSelect.Positioner
+      sideOffset={6}
+      alignItemWithTrigger={alignItemWithTrigger}
+      className="z-50 outline-none"
+    >
       <BaseSelect.Popup
         ref={ref}
         className={cn(
-          'relative z-50 max-h-96 min-w-[10rem] overflow-hidden rounded-xl border border-line-amber-900o15-amber-500o20 bg-surface-paper-coal p-1 text-ink shadow-xl transition-all',
+          'relative z-50 max-h-96 min-w-[10rem] overflow-hidden rounded-xl border border-line-amber-900o15-amber-500o20 bg-surface-paper-coal p-1 text-ink shadow-xl outline-none',
           className
         )}
         {...props}
       >
-        <BaseSelect.List className="outline-none">
+        <BaseSelect.List className="max-h-[22rem] overflow-y-auto overscroll-contain outline-none">
           {children}
         </BaseSelect.List>
       </BaseSelect.Popup>
