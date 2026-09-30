@@ -145,7 +145,7 @@ async function main(): Promise<void> {
   const provider = arg('provider', 'gemini').toLowerCase() === 'azure' ? 'azure' : 'gemini';
   const voice =
     arg('voice') || (provider === 'azure' ? 'ja-JP-NanamiNeural' : 'aoede');
-  const model = arg('model', provider === 'azure' ? 'azure' : 'gemini-3.8-flash-lite-tts');
+  const model = arg('model', provider === 'azure' ? 'azure' : 'gemini-3.8-flash-tts');
   const region = arg('region') || process.env['AZURE_SPEECH_REGION'] || '';
   const apiKey =
     provider === 'azure'
