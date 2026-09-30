@@ -118,16 +118,32 @@ async function main(): Promise<void> {
   for (let i = 0; i < count; i++) samples[i] = bytes.readInt16LE(dataStart + i * 2 * channels);
 
   const segments = splitSegments(samples, sampleRate, minSilenceMs);
-  console.log(`切出 ${segments.length} 段，期望 ${items.length} 段。`);
-  if (segments.length !== items.length) {
-    segments.forEach(([s, e], i) => console.log(`  段${i}: ${((e - s) / sampleRate).toFixed(2)}s`));
-    throw new Error(`段数不符（${segments.length} vs ${items.length}），停止，不落盘。请检查整段录音。`);
+  console.log(`初切 ${segments.length} 段，期望 ${items.length} 段。`);
+  // 碎片合并：塞音闭塞/咔哒声会被切成 <0.12s 的碎片，并入上一段；合并后仍对不上就报错。
+  const merged: Array<[number, number]> = [];
+  for (const [s, e] of segments) {
+    const dur = (e - s) / sampleRate;
+    const prev = merged[merged.length - 1];
+    if (dur < 0.12 && merged.length > 0 && prev) {
+      // 中间碎片（塞音闭塞/咔哒声）并入上一段；首段碎片直接丢弃（不能抢 kana_a 的槽位）。
+      prev[1] = e;
+    } else if (dur < 0.12) {
+      console.log(`  丢弃首部碎片 ${(dur).toFixed(2)}s`);
+    } else {
+      merged.push([s, e]);
+    }
+  }
+  console.log(`合并碎片后 ${merged.length} 段。`);
+  const finalSegments = merged;
+  if (finalSegments.length !== items.length) {
+    finalSegments.forEach(([s, e], i) => console.log(`  段${i}: ${((e - s) / sampleRate).toFixed(2)}s`));
+    throw new Error(`段数不符（${finalSegments.length} vs ${items.length}），停止，不落盘。请检查整段录音。`);
   }
 
   await mkdir(AUDIO_DIR, { recursive: true });
   const manifest: Record<string, string> = {};
-  for (let i = 0; i < segments.length; i++) {
-    const [s, e] = segments[i]!;
+  for (let i = 0; i < finalSegments.length; i++) {
+    const [s, e] = finalSegments[i]!;
     const k = items[i]!;
     const dur = (e - s) / sampleRate;
     if (dur < 0.12 || dur > 3) throw new Error(`段${i}（${k.id}）时长异常 ${dur.toFixed(2)}s，停止。`);

@@ -1,9 +1,6 @@
 /**
- * 假名内置音频清单（批量 TTS 预生成，随安装包发布）。
- *
- * 由 `scripts/ops/seed-kana-audio.ts` 生成并提交；key 为假名种子 id
- *（如 `kana_a`），value 为 `public/audio/kana/` 下的文件名。
- * 平假名/片假名同音，共用同一文件。 voice=aoede model=gemini-3.8-flash-lite-tts。
+ * 假名内置音频清单（整段合成一切分，随包发布但音频本身 gitignore）。
+ * voice=aoede model=gemini-3.8-flash-lite-tts text=顿号连接整段。
  */
 export const KANA_AUDIO_MANIFEST: Record<string, string> = {
   "kana_a": "kana_a.wav",
