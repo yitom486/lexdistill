@@ -433,7 +433,9 @@ class SpeechStudioEngine {
         text,
         voiceName: voice,
         ...(provider === 'gemini' ? { model } : {}),
-        ...(provider === 'gemini' && options?.purpose ? { speechMetadata: options.purpose } : {}),
+        // 不再透传 speechMetadata：上游 gemini-tts-studio 会把它拼成
+        // `Say in a <purpose> style: <正文>` 发给模型，导致读出英文前奏。
+        // purpose 只留在本地 lastRequest/缓存键，不进合成正文。
         // 未传轨道语种时省略 languageCode，网关按自动识别处理（参考站默认行为）。
         ...(provider === 'gemini' && language ? { languageCode: language } : {}),
         ...(provider === 'azure' && config.azureRegion ? { region: config.azureRegion } : {}),
