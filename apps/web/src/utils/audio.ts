@@ -232,6 +232,47 @@ class SpeechStudioEngine {
     return matchTtsRequest(this.lastRequest, this.describeRequest(text, options));
   }
 
+  /** 播放本地/内置音频文件（假名打包音频）：复用同一套播放状态，停止键同样生效。 */
+  public async playLocalFile(
+    url: string,
+    label: string,
+    options?: {
+      onEnd?: () => void;
+      onError?: (error?: unknown) => void;
+    },
+  ): Promise<void> {
+    this.stop();
+    const sequence = ++this.sequence;
+    const audio = new Audio(url);
+    this.currentAudio = audio;
+    this.currentAudioUrl = url;
+    this.isSpeaking = true;
+    this.isStreaming = false;
+    this.currentText = label;
+    this.notify();
+    audio.onended = () => {
+      if (sequence !== this.sequence) return;
+      this.finishPlayback();
+      options?.onEnd?.();
+    };
+    audio.onerror = () => {
+      if (sequence !== this.sequence) return;
+      const error = new BusinessError('E_TTS_AUDIO', '本地音频播放失败。', 'TOOL_EXECUTION', false);
+      this.finishPlayback();
+      toast.error(error.userMessage);
+      options?.onError?.(error);
+    };
+    try {
+      await audio.play();
+    } catch (error) {
+      if (sequence !== this.sequence) return;
+      const userError = translateToBusinessError(error, 'TTS_LOCAL_CLIENT');
+      this.finishPlayback();
+      toast.error(userError.userMessage);
+      options?.onError?.(userError);
+    }
+  }
+
   /** 重播本地缓存（免费）：复用同一套播放状态，停止键同样生效。无缓存返回 false。 */
   public async replayLast(options?: {
     onEnd?: () => void;

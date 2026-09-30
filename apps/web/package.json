@@ -26,7 +26,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^13.2.0",
     "hono": "^4.13.5",
-    "gemini-tts-studio": "0.3.0",
+    "gemini-tts-studio": "0.3.1",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -42,6 +42,7 @@ import {
   type KanaWordItem,
 } from '../queries/useLearnerQueries.js';
 import { romajiToKana, toHiragana } from '../lib/kana-input.js';
+import { playKanaAudio } from '../lib/kana-audio.js';
 import { confusionDistractorItems, confusionDistractors } from '../lib/kana-confusion.js';
 import { buildKanaTutorContext } from '../lib/kana-tutor.js';
 import type { KanaItem } from '@study-studio/protocol';
@@ -168,11 +169,13 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
     }));
   }, [filteredKanaList]);
 
-  // 播放假名发音
+  // 播放假名发音：优先安装包内置音频（批量预生成），缺失才走实时 TTS。
   const handlePlayAudio = (kana: KanaItem, e?: React.MouseEvent) => {
     e?.stopPropagation();
     sound.playClick();
-    speechStudio.speak(kana.audioText, { lang: 'JA', purpose: 'preview' });
+    void playKanaAudio(kana).then((played) => {
+      if (!played) void speechStudio.speak(kana.audioText, { lang: 'JA', purpose: 'preview' });
+    });
   };
 
   // 点击假名主体只播放发音，并保留当前格子的高亮
