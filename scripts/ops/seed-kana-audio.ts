@@ -3,8 +3,10 @@
  *
  * 直调 gemini-tts-studio 包（相对路径导入，不依赖 live 网关，
  * 避免网关 node_modules 热更新问题）。用法：
- *   # 批量（优先；免费 Key 若不支持 Batch API 会自动降级单条合成）
- *   bun scripts/ops/seed-kana-audio.ts --key <GEMINI_API_KEY> [--voice Kore] [--model gemini-3.8-flash-tts]
+ *   # 批量（优先；建单失败直接退出，不静默降级）
+ *   bun scripts/ops/seed-kana-audio.ts --key <GEMINI_API_KEY> [--voice aoede] [--model gemini-3.8-flash-tts]
+ *   # 用户确认后，显式改用单条（104 次实时合成，免费额度 3 次/分钟，约 40 分钟）
+ *   bun scripts/ops/seed-kana-audio.ts --single --key <GEMINI_API_KEY>
  *   # 任务未完成时稍后继续轮询（读上次 job 名）
  *   bun scripts/ops/seed-kana-audio.ts --resume --key <GEMINI_API_KEY>
  *   # 强制逐条实时合成（104 次，慢但一定能跑）
@@ -220,12 +222,12 @@ async function main(): Promise<void> {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (/billi|permission|precondition|failed_precondition|403|404|not found|unsupported/i.test(message)) {
-        console.log(`批量不可用（${message}），自动降级单条合成。`);
-        await writeResults(await runSingle(apiKey, voice, model), voice, model);
-        return;
-      }
-      throw error;
+      // 不静默降级：批量建单失败就直接退出，由用户显式决定是否走单条。
+      // 单条=104 次实时合成、免费额度 3 次/分钟、约 40 分钟，用户确认后再开：
+      //   bun scripts/ops/seed-kana-audio.ts --single --key <KEY>
+      console.error(`批量建单失败，不自动降级：${message}`);
+      console.error('如需改用单条合成（慢、免费额度内），请显式加 --single 重跑。');
+      process.exit(3);
     }
     state = { mode: 'batch', voice, model, createdAt: new Date().toISOString(), jobs };
     await mkdir(dirname(STATE_FILE), { recursive: true });
