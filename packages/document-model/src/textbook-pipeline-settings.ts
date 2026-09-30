@@ -8,6 +8,10 @@ export const TextbookPipelineSettingsSchema = z.object({
   modelRetries: z.number().int().min(0).max(5).default(1),
   storageRetries: z.number().int().min(0).max(5).default(2),
   allowAiExercises: z.boolean().default(true),
+  firstResponseTimeoutMs: z.number().int().positive().max(600_000).default(60_000),
+  stallTimeoutMs: z.number().int().positive().max(600_000).default(120_000),
 });
 export type TextbookPipelineSettings = z.infer<typeof TextbookPipelineSettingsSchema>;
 export const DEFAULT_TEXTBOOK_PIPELINE_SETTINGS = TextbookPipelineSettingsSchema.parse({});
+export const TextbookLessonStageSchema = z.enum(['ocr', 'queued', 'extracting', 'validating', 'correcting', 'model_retrying', 'saving', 'storage_retrying', 'saved', 'failed']);
+export type TextbookLessonStage = z.infer<typeof TextbookLessonStageSchema>;

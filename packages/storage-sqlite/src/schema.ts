@@ -659,6 +659,7 @@ export const textbookVocab = sqliteTable(
     lessonId: text('lesson_id').notNull(),
     ord: integer('ord').notNull(),
     surface: text('surface').notNull(),
+    aiExplanation: text('ai_explanation'),
     reading: text('reading'),
     pos: text('pos'),
     glossZh: text('gloss_zh'),

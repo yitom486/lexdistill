@@ -103,7 +103,7 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     ['非法题型', 'E_LLM_SCHEMA_INVALID', (value: ReturnType<typeof submissionFromPrompt>) => ({ ...value, content: { ...value.content, exercises: [{ ...value.content.exercises[0], type: 'UNKNOWN' }] } })],
     ['目录缺项', 'E_TOC_COVERAGE_INCOMPLETE', (value: ReturnType<typeof submissionFromPrompt>) => ({ ...value, content: { ...value.content, coverage: value.content.coverage.map(item => ({ ...item, status: 'UNREADABLE' })) } })],
     ['目录越界', 'E_TOC_SLOT_NOT_FOUND', (value: ReturnType<typeof submissionFromPrompt>) => ({ ...value, content: { ...value.content, coverage: [...value.content.coverage, { tocId: 'ghost', status: 'EXTRACTED' }] } })],
-    ['只用 AI 内容冒充提取', 'E_TOC_COVERAGE_INCOMPLETE', (value: ReturnType<typeof submissionFromPrompt>) => ({ ...value, content: { ...value.content, blocks: [{ id: 'ai-only', kind: 'PARAGRAPH', text: '新增内容', source: 'AI' }], vocabularies: [], knowledgePoints: [], exercises: [] } })],
+    ['只用 AI 内容冒充提取', 'E_TOC_COVERAGE_INCOMPLETE', (value: ReturnType<typeof submissionFromPrompt>) => ({ ...value, content: { ...value.content, blocks: [{ id: 'ai-only', kind: 'PARAGRAPH', text: '新增内容', source: 'AI', tocId: value.lessonId }], vocabularies: [], knowledgePoints: [], exercises: [] } })],
   ] as const) {
     it(`${name}返回明确回执，修正后才能写库`, async () => {
       const env = environment(async ({ input, submit }) => {
@@ -226,6 +226,7 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
         ...(['FILL_BLANK', 'TRANSLATION', 'SHORT_ANSWER'] as const).map(type => ({ id: type, type, prompt: '新增练习', source: 'AI' as const, knowledgePointIds: ['g1'], answer: { text: '答案' }, fieldSources: { answer: 'AI' as const } })),
         { id: 'match', type: 'MATCHING', prompt: '匹配', source: 'AI', knowledgePointIds: ['g1'], left: [{ id: 'a', text: '甲' }], right: [{ id: 'b', text: '乙' }], answer: { pairs: [{ leftId: 'a', rightId: 'b' }] }, fieldSources: { answer: 'AI' } },
       ];
+      value.content.exercises = value.content.exercises.map(item => ({ ...item, tocId: value.lessonId }));
       const badAnswer = await submit({ ...value, content: { ...value.content, exercises: [{ ...value.content.exercises[0], answer: { optionIds: ['ghost'] } }] } });
       expect(badAnswer.ok).toBe(false); if (!badAnswer.ok) expect(badAnswer.error.code).toBe('E_LLM_SCHEMA_INVALID');
       expect((await submit(value)).ok).toBe(true);

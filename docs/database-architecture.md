@@ -50,6 +50,7 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 - PK `(document_id, lesson_id, ord)`；`ord` 为课内序号（0-based dense，但**代码不强制连续**，只靠 shred 全量重写保证）
 - 来源：一律由 `documents.ast_json`（Canonical SSOT）同事务拆出；原书整理内容与 AI 补充内容都在规范底稿内，OCR 原文不作为正式正文落库。
 - vocab 列：`surface/reading/pos/gloss_zh/pitch/example_ja/example_zh`
+- v036：生词独立 AI 讲解 `ai_explanation`，来源为 AST `content.vocabularies[].aiExplanation`，与词义及原书正文分开。
 - grammar 列：`title/connection/explanation/examples_json`（v16，`[{japanese,chinese}]` 全量）
 - v034：各类行新增 `source/toc_id/field_sources_json`；正文另有 `block_id/kind`，文法另有 `ai_explanation`，原书与 AI 讲解分别存储。
 - exercises：七种题型，`answer_json/content_json` 保存选项 ID、排序或匹配答案和完整题目；`answer` 是查询用文本投影。新增 AI 习题不要求目录含练习项，但不能替代原书目录覆盖。

@@ -6,7 +6,7 @@ const id = z.string().trim().min(1).max(128);
 const text = z.string().trim().min(1);
 const provenance = {
   source: ContentSourceSchema,
-  tocId: id.optional().describe('原书内容所属的当前章或子目录 ID；AI 新增内容可只关联当前章'),
+  tocId: id.optional().describe('所有内容必须关联本任务目录 ID；AI 新增内容至少关联当前任务根节点'),
 };
 export const FieldSourcesSchema = z.object({
   translation: ContentSourceSchema.optional(),
@@ -23,12 +23,13 @@ export const LessonContentSchema = z.object({
     status: z.enum(['EXTRACTED', 'UNREADABLE']).describe('逐项报告当前章及所有子目录；无法辨认不能声称完成'),
   }).strict()).min(1),
   blocks: z.array(z.object({
-    id, kind: z.enum(['PARAGRAPH', 'DIALOGUE']), text,
+    id, kind: z.enum(['PARAGRAPH', 'DIALOGUE']), text: text.describe('仅整理后的课文正文或对话，不混入讲解、词义或新增例句；知识点讲解和例句写入各自字段'),
     speaker: text.optional().describe('DIALOGUE 必填；PARAGRAPH 不需要角色'),
-    translation: text.optional(), ...provenance, fieldSources: FieldSourcesSchema.optional(),
+    translation: text.optional().describe('正文译文独立存放，并注明 fieldSources.translation'), ...provenance, fieldSources: FieldSourcesSchema.optional(),
   }).strict()),
   vocabularies: z.array(z.object({
     id, surface: text, reading: text.optional(), pos: text.optional(), gloss: text.optional(), pitch: text.optional(),
+    aiExplanation: text.optional().describe('生词独立的 AI 补充讲解；不混进词义 gloss 或原书正文'),
     examples: z.array(example), ...provenance, fieldSources: FieldSourcesSchema.optional(),
   }).strict()),
   knowledgePoints: z.array(z.object({
@@ -58,7 +59,7 @@ export type StructuredExercise = LessonContent['exercises'][number];
 
 /** 原生工具注册使用普通 Zod object；交叉字段规则由提交服务执行。 */
 export const LessonSubmissionSchema = z.object({
-  documentId: id, lessonId: id,
+  documentId: id.describe('原样使用当前输入的 documentId'), lessonId: id.describe('原样使用当前输入的 lessonId；独立 section 也用自己的目录身份'),
   assignmentId: id.describe('必须原样使用本次输入中的 assignmentId；上一章/上一尝试的 ID 不可复用'),
   content: LessonContentSchema,
 }).strict();

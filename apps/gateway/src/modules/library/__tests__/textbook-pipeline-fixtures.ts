@@ -9,7 +9,7 @@ export function contentFor(tocIds: string[]): LessonContent {
     coverage: tocIds.map(tocId => ({ tocId, status: 'EXTRACTED' })),
     blocks: tocIds.map((tocId, index) => ({ id: `b${index}`, kind: index ? 'DIALOGUE' : 'PARAGRAPH', text: `整理后的正文 ${tocId}`, source: 'TEXTBOOK', tocId, ...(index ? { speaker: '甲' } : {}) })),
     vocabularies: [{ id: 'v1', surface: '学ぶ', reading: 'まなぶ', gloss: '学习', source: 'TEXTBOOK', tocId: tocIds[0]!, examples: [], fieldSources: { reading: 'TEXTBOOK', gloss: 'AI' } }],
-    knowledgePoints: [{ id: 'g1', title: '知识点', source: 'TEXTBOOK', tocId: tocIds[0]!, textbookExplanation: '原书说明', aiExplanation: '模型补充说明', examples: [{ id: 'eg1', text: '追加例句', source: 'AI' }] }],
+    knowledgePoints: [{ id: 'g1', title: '知识点', source: 'TEXTBOOK', tocId: tocIds[0]!, textbookExplanation: '原书说明', aiExplanation: '模型补充说明', examples: [{ id: 'eg1', text: '追加例句', source: 'AI', tocId: tocIds[0]! }] }],
     exercises: [{ id: 'ex1', type: 'SHORT_ANSWER', prompt: '原书问题', source: 'TEXTBOOK', tocId: tocIds[0]!, knowledgePointIds: ['g1'], answer: { text: '补充答案' }, explanation: '补充解析', fieldSources: { answer: 'AI', explanation: 'AI' } }],
     preview: { keyPoints: ['知识点'], pitfalls: [], canDoGoal: '理解当前课' },
     summary: { goldenSentences: [], selfCheckQuestions: ['理解了吗'] },
@@ -36,10 +36,10 @@ export function pipelineModel(tool: LibraryLessonCommitTool, handle?: (turn: Mod
         sessionId: options.sessionId, threadId: `thread:${options.sessionId}`,
         async *send(input): AsyncIterable<AgentEvent> {
           inputs.push({ sessionId: options.sessionId, input });
-          const submit = (raw: unknown) => tool.execute(raw, { sessionId: options.sessionId, userId: options.userId });
+          const callId = `call:${inputs.length}`;
+          const submit = (raw: unknown) => tool.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId });
           if (handle) await handle({ sessionId: options.sessionId, input, submit });
           else {
-            const callId = `call:${inputs.length}`;
             const candidate = submissionFromPrompt(input.message);
             yield { type: 'TOOL_CALL_REQUESTED', callId, toolName: tool.name.replaceAll('.', '_'), input: candidate };
             const result = await submit(candidate);

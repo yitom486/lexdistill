@@ -6,6 +6,7 @@ import { convertAstToTextbookBook } from '../importer/textbook-converter.js';
 import { useImportTextbookMutation, useTextbooksQuery } from '../../queries/textbooks-annotations.js';
 import { StructuredLessonPanel } from './StructuredLessonPanel.js';
 import { StructuredExerciseList } from './StructuredExerciseList.js';
+import { VocabularyExplanation } from './VocabularyExplanation.js';
 import { act, setupDom, type DomHandle } from '../toc/__tests__/dom-setup.js';
 
 let dom: DomHandle | undefined, client: QueryClient | undefined;
@@ -16,7 +17,7 @@ it('规范 AST 导入和教材查询沿用同一契约；段落/对话、原书/
   const content: LessonContent = {
     coverage: [{ tocId: 'lesson', status: 'EXTRACTED' }],
     blocks: [{ id: 'p', kind: 'PARAGRAPH', text: '正文段落', tocId: 'lesson', source: 'TEXTBOOK' }, { id: 'd', kind: 'DIALOGUE', speaker: '角色甲', text: '规范对白', source: 'TEXTBOOK', tocId: 'lesson', translation: '补充译文', fieldSources: { translation: 'AI' } }],
-    vocabularies: [{ id: 'v', surface: '学ぶ', source: 'TEXTBOOK', tocId: 'lesson', examples: [] }], knowledgePoints: [{ id: 'g', title: '知识标题', source: 'TEXTBOOK', tocId: 'lesson', textbookExplanation: '原书讲解内容', aiExplanation: '新增讲解内容', examples: [] }],
+    vocabularies: [{ id: 'v', surface: '学ぶ', source: 'TEXTBOOK', tocId: 'lesson', aiExplanation: '生词独立补充讲解', examples: [] }], knowledgePoints: [{ id: 'g', title: '知识标题', source: 'TEXTBOOK', tocId: 'lesson', textbookExplanation: '原书讲解内容', aiExplanation: '新增讲解内容', examples: [] }],
     exercises: [
       ...(['CHOICE', 'MULTI_CHOICE', 'ORDERING'] as const).map(type => ({ id: type, type, prompt: `${type} 题干`, source: 'AI' as const, knowledgePointIds: ['g'], options: [{ id: 'a', text: '选项甲' }, { id: 'b', text: '选项乙' }], answer: { optionIds: type === 'CHOICE' ? ['a'] : ['b', 'a'] }, fieldSources: { answer: 'AI' as const } })),
       ...(['FILL_BLANK', 'TRANSLATION', 'SHORT_ANSWER'] as const).map(type => ({ id: type, type, prompt: `${type} 题干`, source: 'AI' as const, knowledgePointIds: ['g'], answer: { text: `${type} 参考答案` }, fieldSources: { answer: 'AI' as const } })),
@@ -36,7 +37,7 @@ it('规范 AST 导入和教材查询沿用同一契约；段落/对话、原书/
   function Harness() {
     const mutation = useImportTextbookMutation('render-user'), books = useTextbooksQuery('render-user');
     const book = books.data?.[0], lesson = book?.lessons[0];
-    return <><button onClick={() => mutation.mutate(convertAstToTextbookBook(ast))}>导入规范底稿</button>{book && <h2>{book.title} / {book.totalLessons} 课</h2>}{lesson?.content && <><StructuredLessonPanel content={lesson.content} tab="READER" /><StructuredLessonPanel content={lesson.content} tab="GRAMMAR" /><StructuredExerciseList exercises={lesson.content.exercises} /></>}</>;
+    return <><button onClick={() => mutation.mutate(convertAstToTextbookBook(ast))}>导入规范底稿</button>{book && <h2>{book.title} / {book.totalLessons} 课</h2>}{lesson?.content && <><StructuredLessonPanel content={lesson.content} tab="READER" /><StructuredLessonPanel content={lesson.content} tab="GRAMMAR" /><VocabularyExplanation word={lesson.content.vocabularies[0]!} /><StructuredExerciseList exercises={lesson.content.exercises} /></>}</>;
   }
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } } });
   act(() => dom!.root.render(<QueryClientProvider client={client!}><Harness /></QueryClientProvider>));
@@ -47,6 +48,7 @@ it('规范 AST 导入和教材查询沿用同一契约；段落/对话、原书/
   expect(document.querySelector('[data-content-kind="PARAGRAPH"]')?.textContent).toContain('正文段落');
   expect(document.querySelector('[data-content-kind="DIALOGUE"]')?.textContent).toContain('角色甲');
   expect(document.body.textContent).toContain('译文：AI 补充'); expect(document.body.textContent).toContain('讲解：原书整理'); expect(document.body.textContent).toContain('讲解：AI 补充');
+  expect(document.body.textContent).toContain('生词讲解：AI 补充'); expect(document.body.textContent).toContain('生词独立补充讲解');
   const buttons = [...document.querySelectorAll('button')].filter(button => button.textContent === '查看参考答案');
   expect(buttons).toHaveLength(7);
   await act(async () => { for (const button of buttons) button.dispatchEvent(new MouseEvent('click', { bubbles: true })); });

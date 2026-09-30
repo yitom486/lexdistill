@@ -40,6 +40,8 @@ export function createDefaultAgentAdapterFactory(): AgentAdapterFactory {
         const res = await tool.execute(input as never, {
           userId: ctx.userId,
           sessionId: ctx.sessionId,
+          ...(ctx.turnId ? { turnId: ctx.turnId } : {}),
+          ...(ctx.callId ? { callId: ctx.callId } : {}),
         });
         if (!isOk(res)) {
           throw res.error;

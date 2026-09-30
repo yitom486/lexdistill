@@ -10,50 +10,66 @@ export interface LessonAssignment {
   assignmentId: string;
   tocEntries: readonly TocEntry[];
   signal: AbortSignal;
+  turnSignal?: AbortSignal;
   allowAiExercises: boolean;
   monitor?: ImportMonitor;
   sessionId?: string;
-  onStage?: (stage: 'validating' | 'saving' | 'saved') => void;
+  onStage?: (stage: 'validating' | 'correcting' | 'saving' | 'saved') => void;
 }
 export class LessonSubmission {
   candidate: SubmissionInput | undefined;
   receipt: CommitLessonKnowledgeOutput | undefined;
   error: BusinessError | undefined;
   private inFlight: Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> | undefined;
+  private candidateCallId: string | undefined;
   constructor(readonly assignment: LessonAssignment, private readonly repo: ContentRepository) {}
 
-  accept(raw: unknown): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
-    this.note('tool', 'candidate', raw);
-    if (this.assignment.signal.aborted) return Promise.resolve(err(new BusinessError('E_CANCELLED', '本次教材任务已结束，不能继续提交', 'VALIDATION')));
+  accept(raw: unknown, callId?: string): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
+    const startedAt = Date.now();
+    const reject = (code: string, message: string, details: unknown, retryable = true) => this.reject(code, message, retryable, { details, elapsedMs: Date.now() - startedAt }, callId);
+    const passed = (check: string, details?: unknown) => this.note('validation', 'check_passed', { check, details, elapsedMs: Date.now() - startedAt }, callId);
+    this.note('tool', 'candidate', raw, callId);
+    if (this.assignment.signal.aborted || this.assignment.turnSignal?.aborted) return reject('E_CANCELLED', '本次章节尝试已结束，不能继续提交', undefined, false);
+    this.assignment.onStage?.('validating');
     const parsed = LessonSubmissionSchema.safeParse(raw);
-    if (!parsed.success) return this.reject('E_LLM_SCHEMA_INVALID', parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '), true);
+    if (!parsed.success) return reject('E_LLM_SCHEMA_INVALID', `章节字段格式不符合要求（${parsed.error.issues.length} 项）；请修正 ${parsed.error.issues[0]?.path.join('.') || '提交结构'}`, parsed.error.issues);
+    passed('field_format');
     const value = parsed.data;
     const task = this.assignment;
-    if (value.documentId !== task.documentId || value.lessonId !== task.lessonId || value.assignmentId !== task.assignmentId) return this.reject('E_SUBMISSION_SCOPE_INVALID', '提交身份不属于当前会话绑定的章节和尝试', false);
+    const mismatches = (['documentId', 'lessonId', 'assignmentId'] as const).filter(key => value[key] !== task[key]).map(path => ({ path, expected: task[path], received: value[path] }));
+    if (mismatches.length) return reject('E_SUBMISSION_SCOPE_INVALID', `当前任务身份不一致：${mismatches.map(item => `${item.path} 应为 ${item.expected}，收到 ${item.received}`).join('；')}`, mismatches);
+    passed('task_identity');
     if (this.receipt) return Promise.resolve({ ok: true, value: this.receipt });
     if (this.inFlight) return this.inFlight;
     if (this.candidate && this.error) return Promise.resolve(err(this.error));
-    this.assignment.onStage?.('validating');
     const ids = new Set(task.tocEntries.map(entry => entry.id));
     const content = value.content;
     const items = [...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises, ...content.vocabularies.flatMap(item => item.examples), ...content.knowledgePoints.flatMap(item => item.examples)];
-    if (content.coverage.some(item => !ids.has(item.tocId)) || items.some(item => item.tocId && !ids.has(item.tocId))) return this.reject('E_TOC_SLOT_NOT_FOUND', '内容关联了当前章节目录之外的 ID', false);
-    if (items.some(item => item.source === 'TEXTBOOK' && !item.tocId)) return this.reject('E_LLM_SCHEMA_INVALID', '原书内容必须关联目录 ID', true);
+    const outsideIds = [...new Set([...content.coverage, ...items].flatMap(item => item.tocId && !ids.has(item.tocId) ? [item.tocId] : []))];
+    if (outsideIds.length) return reject('E_TOC_SLOT_NOT_FOUND', `内容关联了当前目录之外的 ID：${outsideIds.join('、')}`, { expected: [...ids], received: outsideIds });
+    const missingLinks = items.filter(item => !item.tocId).map(item => item.id);
+    if (missingLinks.length) return reject('E_LLM_SCHEMA_INVALID', '全部内容及例句必须关联当前目录 ID', { itemIds: missingLinks, expected: [...ids] });
+    passed('directory_membership');
     const reported = new Map(content.coverage.map(item => [item.tocId, item.status]));
-    if (task.tocEntries.some(entry => reported.get(entry.id) !== 'EXTRACTED')) return this.reject('E_TOC_COVERAGE_INCOMPLETE', '当前章或子目录未逐项提取；无法辨认的内容不能标记已完成', true);
-    if (!items.some(item => item.source === 'TEXTBOOK')) return this.reject('E_TOC_COVERAGE_INCOMPLETE', '章节只有 AI 新增内容，不能据此声明原书已提取', true);
-    if (!items.some(item => item.source === 'TEXTBOOK')) return this.reject('E_TOC_COVERAGE_INCOMPLETE', '章节只有 AI 新增内容，不能据此声明原书已提取', true);
-    if (task.tocEntries.some(entry => (entry.level === 'lesson' || entry.level === 'section') && !items.some(item => item.source === 'TEXTBOOK' && item.tocId === entry.id))) return this.reject('E_TOC_COVERAGE_INCOMPLETE', '内容目录虽报告已提取，但没有关联的原书内容', true);
-    if (!task.allowAiExercises && content.exercises.some(item => item.source === 'AI')) return this.reject('E_LLM_SCHEMA_INVALID', '当前配置不允许新增 AI 习题', true);
+    const missingCoverage = task.tocEntries.filter(entry => reported.get(entry.id) !== 'EXTRACTED');
+    if (missingCoverage.length) return reject('E_TOC_COVERAGE_INCOMPLETE', '当前部分或子目录未逐项提取；无法辨认的内容不能标记已完成', missingCoverage.map(entry => ({ id: entry.id, title: entry.title, received: reported.get(entry.id) ?? null })));
+    if (!items.some(item => item.source === 'TEXTBOOK')) return reject('E_TOC_COVERAGE_INCOMPLETE', '章节只有 AI 新增内容，不能据此声明原书已提取', { expected: 'TEXTBOOK' });
+    const emptySlots = task.tocEntries.filter(entry => (entry.level === 'lesson' || entry.level === 'section') && !items.some(item => item.source === 'TEXTBOOK' && item.tocId === entry.id));
+    if (emptySlots.length) return reject('E_TOC_COVERAGE_INCOMPLETE', '内容目录虽报告已提取，但没有关联的原书内容', emptySlots.map(entry => ({ id: entry.id, title: entry.title })));
+    passed('directory_coverage');
+    if (!task.allowAiExercises && content.exercises.some(item => item.source === 'AI')) return reject('E_LLM_SCHEMA_INVALID', '当前配置不允许新增 AI 习题', { expected: 'TEXTBOOK' });
     const issues = lessonContentIssues(content);
-    if (issues.length) return this.reject('E_LLM_SCHEMA_INVALID', issues.join('; '), true);
+    if (issues.length) return reject('E_LLM_SCHEMA_INVALID', issues.join('; '), issues);
+    passed('content_format');
     this.candidate ??= value;
-    this.note('validation', 'accepted', { coverage: content.coverage });
+    this.candidateCallId = callId;
+    this.note('validation', 'accepted', { coverage: content.coverage, elapsedMs: Date.now() - startedAt }, callId);
     return this.persist();
   }
-  private reject(code: string, message: string, retryable: boolean): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
-    this.note('validation', 'rejected', { code, message, retryable });
-    this.error = new BusinessError(code, message, 'VALIDATION', retryable);
+  private reject(code: string, message: string, retryable: boolean, details?: unknown, callId?: string): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
+    this.note('validation', 'rejected', { code, message, retryable, details }, callId);
+    this.error = new BusinessError(code, message, 'VALIDATION', retryable, details);
+    if (retryable) this.assignment.onStage?.('correcting');
     return Promise.resolve(err(this.error));
   }
   /** 暂时性数据库错误由调度器重试这里；不重新调用模型。 */
@@ -82,7 +98,7 @@ export class LessonSubmission {
     }).finally(() => { this.inFlight = undefined; });
     return this.inFlight;
   }
-  private note(category: 'tool' | 'validation' | 'storage', name: string, detail: unknown): void {
-    this.assignment.monitor?.record(category, name, detail, { nodeId: this.assignment.lessonId, attemptId: this.assignment.assignmentId, ...(this.assignment.sessionId ? { sessionId: this.assignment.sessionId } : {}) });
+  private note(category: 'tool' | 'validation' | 'storage', name: string, detail: unknown, callId = this.candidateCallId): void {
+    this.assignment.monitor?.record(category, name, detail, { nodeId: this.assignment.lessonId, attemptId: this.assignment.assignmentId, ...(this.assignment.sessionId ? { sessionId: this.assignment.sessionId } : {}), ...(callId ? { callId } : {}) });
   }
 }

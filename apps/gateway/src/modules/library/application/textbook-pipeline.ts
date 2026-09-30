@@ -82,7 +82,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
     }
     if (pending.length) {
       const tool = input.submissionTool;
-      pool = new ChapterSessionPool({ userId: input.userId, adapter: input.adapter, tool, poolSize: config.poolSize, model: input.model, effort: input.effort, signal: controller.signal, monitor });
+      pool = new ChapterSessionPool({ userId: input.userId, adapter: input.adapter, tool, poolSize: config.poolSize, model: input.model, effort: input.effort, signal: controller.signal, monitor, firstResponseTimeoutMs: config.firstResponseTimeoutMs, stallTimeoutMs: config.stallTimeoutMs });
       const activePool = pool;
       const onText = async (lesson: TocEntry, text: string) => {
         const task = tasks.find(task => task.root.id === lesson.id)!;
@@ -116,11 +116,14 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
           let lastError: BusinessError | undefined;
           for (let attempt = 0; attempt <= config.modelRetries && !controller.signal.aborted; attempt++) {
             const assignmentId = generateId('chapter_attempt');
+            const turnController = new AbortController();
+            const cancelTurn = () => turnController.abort();
+            controller.signal.addEventListener('abort', cancelTurn, { once: true });
             const binding = { nodeId: job.lessonId, sessionId: session.sessionId, ...(session.threadId ? { threadId: session.threadId } : {}), attemptId: assignmentId };
             monitor.record('session', 'bound', { attempt: attempt + 1 }, binding);
-            if (attempt) monitor.record('model', 'retry', { previousError: lastError?.userMessage, attempt: attempt + 1 }, binding);
+            if (attempt) { emit(job.lessonId, 'model_retrying'); monitor.record('model', 'retry', { previousError: lastError?.userMessage, attempt: attempt + 1 }, binding); }
             const submission = tool.bind(session.sessionId, { userId: input.userId, documentId, lessonId: job.lessonId, assignmentId, tocEntries: job.tocEntries, signal: controller.signal, allowAiExercises: config.allowAiExercises,
-              monitor, sessionId: session.sessionId,
+              monitor, sessionId: session.sessionId, turnSignal: turnController.signal,
               onStage: stage => {
                 if (stage === 'saved' && submission.receipt) { successful++; completed++; emit(job.lessonId, stage, submission.receipt.stats, undefined, submission.receipt.allLessonsReady); }
                 else emit(job.lessonId, stage);
@@ -128,10 +131,11 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
             });
             try {
               emit(job.lessonId, 'extracting');
-              const sent = await activePool.send(session, job, assignmentId, lastError?.userMessage);
+              const sent = await activePool.send(session, job, assignmentId, turnController, lastError?.userMessage);
               if (submission.receipt) return;
               if (submission.candidate) {
                 for (let retry = 0; retry < config.storageRetries && !controller.signal.aborted && submission.error?.retryable; retry++) {
+                  emit(job.lessonId, 'storage_retrying');
                   monitor.record('storage', 'retry', { retry: retry + 1, error: submission.error.userMessage }, binding);
                   const saved = await submission.persist(); if (saved.ok) return;
                 }
@@ -139,11 +143,11 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
                 lastError = submission.error ?? new BusinessError('E_INTERNAL', '章节未能保存', 'DATABASE');
                 break;
               }
-              lastError = submission.error ?? (!sent.ok ? sent.error : new BusinessError('E_LESSON_SUBMISSION_MISSING', '模型未通过工具提交有效内容', 'AGENT_RUNTIME', true));
+              lastError = !sent.ok ? sent.error : submission.error ?? new BusinessError('E_LESSON_SUBMISSION_MISSING', '模型未通过工具提交有效内容', 'AGENT_RUNTIME', true);
               if (!lastError.retryable) break;
             } catch (cause) {
               lastError = translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本章模型处理失败' });
-            } finally { tool.end(session.sessionId); monitor.record('session', 'unbound', undefined, binding); }
+            } finally { turnController.abort(); controller.signal.removeEventListener('abort', cancelTurn); tool.end(session.sessionId); monitor.record('session', 'unbound', undefined, binding); }
           }
           if (!controller.signal.aborted) fail(job.lessonId, lastError ?? new BusinessError('E_INTERNAL', '本章提取未完成', 'TOOL_EXECUTION'));
         }, (job, error) => fail(job.lessonId, error));

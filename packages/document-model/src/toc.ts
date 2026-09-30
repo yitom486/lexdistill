@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ok, err, Result, BusinessError } from '@study-studio/shared';
+import { planTextbookTasks } from './textbook-tasks.js';
 
 /**
  * 教材目录层级枚举（语义枚举）：
@@ -93,22 +94,25 @@ export function validateTocPageOrder(entries: readonly TocEntry[]): Result<TocVa
     }
   }
 
-  // 2. 提取所有课（lesson）节点检查单调递增
+  // 2. 独立部分也属于内容任务；课内小节不作为另一份独立任务检查。
   const lessons = entries.filter((e) => e.level === 'lesson');
-  if (lessons.length === 0) {
+  if (!entries.some(entry => entry.level === 'lesson' || entry.level === 'section')) {
     return err(
       new BusinessError(
         'E_TOC_NO_LESSONS',
-        '目录中未检测到任何核心课次（level: "lesson"），请至少保留具体的课次条目',
+        '目录只有层级容器，请至少保留具体课次或独立部分',
         'VALIDATION',
         false
       )
     );
   }
 
-  for (let i = 0; i < lessons.length - 1; i++) {
-    const curr = lessons[i]!;
-    const next = lessons[i + 1]!;
+  const planned = planTextbookTasks(entries);
+  if (!planned.ok) return planned;
+  const roots = planned.value.map(task => task.root);
+  for (let i = 0; i < roots.length - 1; i++) {
+    const curr = roots[i]!;
+    const next = roots[i + 1]!;
 
     if (next.startPage < curr.startPage) {
       return err(

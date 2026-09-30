@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StructuredLessonPanel } from './textbook/StructuredLessonPanel.js';
 import { StructuredExerciseList } from './textbook/StructuredExerciseList.js';
 import { ContentSource } from './textbook/ContentSource.js';
-import { ContentExamples } from './textbook/ContentExamples.js';
+import { VocabularyExplanation } from './textbook/VocabularyExplanation.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen,
@@ -630,7 +630,7 @@ export function TextbookCurriculum({
                         </div>
                       </div>
 
-                      {provenance ? <ContentExamples examples={provenance.examples} /> : <div className="text-[11px] text-ink-ghost bg-veil-stone-200o50-stone-800o40 p-2 rounded-lg">
+                      {provenance ? <VocabularyExplanation word={provenance} /> : <div className="text-[11px] text-ink-ghost bg-veil-stone-200o50-stone-800o40 p-2 rounded-lg">
                         <p className="font-medium text-ink-mute">{vocab.exampleSentence}</p>
                         <p className="text-ink-stone-500">{vocab.exampleTranslation}</p>
                       </div>}

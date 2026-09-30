@@ -176,6 +176,7 @@ export function shredIntoTransaction(tx: ShredTx, documentId: string, book: Text
             documentId, lessonId, ord: vOrd, surface, reading, pos,
             glossZh: gloss, pitch, exampleJa: exJa, exampleZh: exZh,
             source: lesson.content?.vocabularies[vOrd]?.source ?? null,
+            aiExplanation: lesson.content?.vocabularies[vOrd]?.aiExplanation ?? null,
             tocId: lesson.content?.vocabularies[vOrd]?.tocId ?? null,
             fieldSourcesJson: lesson.content?.vocabularies[vOrd]?.fieldSources ? JSON.stringify(lesson.content.vocabularies[vOrd]!.fieldSources) : null,
           });

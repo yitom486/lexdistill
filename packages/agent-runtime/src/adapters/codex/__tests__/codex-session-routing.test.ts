@@ -44,6 +44,7 @@ interface FakeConn {
   threadSeq: number;
   connection: CodexAppServerConnection;
   calls: RecordedCall[];
+  nativeContexts: Array<{ turnId?: string; callId?: string }>;
   approvalPolicyDefault: string;
   turnGates: Map<string, () => void>;
 }
@@ -55,6 +56,7 @@ function makeFakeConnection(approvalPolicyDefault = 'never'): FakeConn {
     handlerInstalls: 0,
     threadSeq: 0,
     calls: [],
+    nativeContexts: [],
     approvalPolicyDefault,
     turnGates: new Map(),
     connection: undefined as never,
@@ -90,8 +92,9 @@ function makeFakeConnection(approvalPolicyDefault = 'never'): FakeConn {
 function makeAdapter(fake: FakeConn): CodexAdapter {
   return new CodexAdapter({
     connection: fake.connection,
-    executeTool: async (toolName: string, _input: Record<string, unknown>, ctx: { sessionId: string; userId: string }) => {
+    executeTool: async (toolName: string, _input: Record<string, unknown>, ctx: { sessionId: string; userId: string; turnId?: string; callId?: string }) => {
       fake.calls.push({ toolName, sessionId: ctx.sessionId, userId: ctx.userId });
+      fake.nativeContexts.push({ ...(ctx.turnId ? { turnId: ctx.turnId } : {}), ...(ctx.callId ? { callId: ctx.callId } : {}) });
       if (!KNOWN_TOOLS.has(toolName)) throw new Error(`tool not found: ${toolName}`);
       // 忠实建模审核工具自带会话登记门
       //（P3.4B-ISO 注册检查），未登记会话在执行侧拒绝。
@@ -145,6 +148,7 @@ describe('P3.4B-FIX 单连接并发工具路由', () => {
     const r3 = await toolCall(fake, { threadId: 'thread-1', turnId: 'turn-m2', tool: 'learning.content' });
     const r4 = await toolCall(fake, { threadId: 'thread-2', turnId: 'turn-r2', tool: 'session_review.synthetic_tool' });
     for (const r of [r1, r2, r3, r4]) expect(r.success).toBe(true);
+    expect(fake.nativeContexts).toEqual(['turn-m1', 'turn-r1', 'turn-m2', 'turn-r2'].map(turnId => ({ turnId, callId: `item-${turnId}` })));
     expect(fake.calls).toEqual([
       { toolName: 'learning.content', sessionId: 'sess-main', userId: 'u-main' },
       { toolName: 'session_review.synthetic_tool', sessionId: 'sess-review', userId: 'u-review' },

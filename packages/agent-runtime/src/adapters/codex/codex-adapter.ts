@@ -54,7 +54,7 @@ import {
 export type ExternalToolExecutor = (
   toolName: string,
   input: Record<string, unknown>,
-  ctx: { sessionId: string; userId: string }
+  ctx: { sessionId: string; userId: string; turnId?: string; callId?: string }
 ) => Promise<unknown>;
 
 export interface CodexAdapterOptions {
@@ -563,6 +563,8 @@ export class CodexAdapter implements AgentAdapter {
           const result = await route.executeTool(name, args, {
             sessionId: route.sessionId,
             userId: route.userId,
+            turnId: params.turnId,
+            callId: params.itemId,
           });
           return {
             contentItems: [{ type: 'inputText', text: JSON.stringify(result ?? null) }],

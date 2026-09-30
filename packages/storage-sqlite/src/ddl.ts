@@ -594,7 +594,7 @@ export function initSchema(sqlite: Database): void {
     CREATE TABLE IF NOT EXISTS textbook_vocab (
       document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, surface TEXT NOT NULL,
       reading TEXT, pos TEXT, gloss_zh TEXT, pitch TEXT, example_ja TEXT, example_zh TEXT,
-      source TEXT, toc_id TEXT, field_sources_json TEXT, PRIMARY KEY (document_id, lesson_id, ord)
+      source TEXT, toc_id TEXT, field_sources_json TEXT, ai_explanation TEXT, PRIMARY KEY (document_id, lesson_id, ord)
     );
     CREATE TABLE IF NOT EXISTS textbook_grammar (
       document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, title TEXT NOT NULL,

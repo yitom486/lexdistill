@@ -101,7 +101,7 @@ export const TextbookASTSchema = z.object({
   description: z.string().optional(),
   sourceFingerprint: z.string().optional(),
   outlineConfirmed: z.boolean().optional(),
-  totalLessons: z.number().int().positive().optional(),
+  totalLessons: z.number().int().nonnegative().optional(),
   lessons: z.array(TextbookLessonSchema).min(1),
 }).superRefine((ast, ctx) => {
   // P1-C0.75 Task 3：同一 book 内 lesson.id 必须唯一（duplicate id 会让

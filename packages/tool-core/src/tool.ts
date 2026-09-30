@@ -6,6 +6,7 @@ export interface ToolExecutionContext {
   userId: string;
   sessionId: string;
   turnId?: string;
+  callId?: string;
 }
 
 export interface ToolDefinition<TInput = unknown, TOutput = unknown> {

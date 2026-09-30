@@ -1,10 +1,11 @@
 import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
-import type { TocEntry } from '@study-studio/document-model';
+import type { TocEntry, TextbookLessonStage } from '@study-studio/document-model';
 import { BusinessError, generateId, translateToBusinessError, logger, type Result } from '@study-studio/shared';
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
 import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import { buildLessonExtractionPrompt } from './prompts/lesson-extraction-prompt.js';
 import type { ImportMonitor } from './import-monitor.js';
+import { awaitModelActivity } from './model-activity-deadline.js';
 
 export interface LessonExtractionJob {
   documentId: string;
@@ -16,7 +17,7 @@ export interface LessonExtractionJob {
   tocPath: readonly TocEntry[];
   ocrText: string;
 }
-export type LessonStage = 'ocr' | 'queued' | 'extracting' | 'validating' | 'saving' | 'saved' | 'failed';
+export type LessonStage = TextbookLessonStage;
 export interface BatchExtractionProgress {
   documentId: string; lessonId: string; stage: LessonStage;
   completedCount: number; totalCount: number; successfulCount?: number;
@@ -51,6 +52,7 @@ export interface ChapterSessionOptions {
   userId: string; poolSize: number; model?: string | undefined; effort?: string | undefined;
   adapter: AgentAdapter; tool: LibraryLessonCommitTool; signal: AbortSignal;
   monitor?: ImportMonitor;
+  firstResponseTimeoutMs: number; stallTimeoutMs: number;
 }
 
 /** 只负责模型会话和发送；不引用 Repository，不解析文本 JSON，不调用落库。 */
@@ -108,18 +110,20 @@ export class ChapterSessionPool {
       }
     }));
   }
-  async send(session: AgentSession, job: LessonExtractionJob, assignmentId: string, correction?: string): Promise<Result<void, BusinessError>> {
+  async send(session: AgentSession, job: LessonExtractionJob, assignmentId: string, controller: AbortController, correction?: string): Promise<Result<void, BusinessError>> {
     const turn = this.options.monitor?.turn(session, { nodeId: job.lessonId, attemptId: assignmentId });
     const message = buildLessonExtractionPrompt(job, assignmentId, this.options.tool.name.replaceAll('.', '_'), correction);
     this.options.monitor?.record('model', 'input', { message, model: this.options.model ?? null, effort: this.options.effort ?? null, correction: correction ?? null }, turn?.binding);
     const interrupt = () => { void session.interrupt().catch(cause => logger.warn('教材会话中断失败', { cause: String(cause) })); };
-    this.options.signal.addEventListener('abort', interrupt, { once: true });
+    controller.signal.addEventListener('abort', interrupt, { once: true });
+    const iterator = session.send({ message, ...(this.options.effort ? { turnOptions: { effort: this.options.effort } } : {}) })[Symbol.asyncIterator]();
     try {
-      if (this.options.signal.aborted) return { ok: false, error: new BusinessError('E_CANCELLED', '教材提取已取消', 'AGENT_RUNTIME') };
-      for await (const event of session.send({
-        message,
-        ...(this.options.effort ? { turnOptions: { effort: this.options.effort } } : {}),
-      })) {
+      if (controller.signal.aborted) return { ok: false, error: new BusinessError('E_CANCELLED', '教材提取已取消', 'AGENT_RUNTIME') };
+      let first = true;
+      while (true) {
+        const next = await awaitModelActivity(iterator.next(), controller, first ? this.options.firstResponseTimeoutMs : this.options.stallTimeoutMs, first);
+        if (next.done) break;
+        const event = next.value; first = false;
         turn?.event(event);
         if (event.type === 'APPROVAL_REQUESTED') {
           const declined = await session.submitApproval(event.approvalId, 'decline');
@@ -131,10 +135,15 @@ export class ChapterSessionPool {
       }
       return { ok: true, value: undefined };
     } catch (cause) {
-      const error = translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本章模型处理失败，请重试本章' });
+      const error = cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本章模型处理失败，请重试本章' });
+      this.options.monitor?.record('model', 'failed', { code: error.code, message: error.userMessage, retryable: error.retryable, details: error.internalDetails }, turn?.binding);
       if (!this.options.signal.aborted) this.faults.set(session.sessionId, error);
       return { ok: false, error };
-    } finally { turn?.flush(); this.options.monitor?.record('model', 'turn_ended', undefined, turn?.binding); this.options.signal.removeEventListener('abort', interrupt); }
+    } finally {
+      // 不等待失去响应的生成器 return；迟到工具已经被 turnSignal 拒绝。
+      void iterator.return?.().catch(cause => logger.warn('教材响应流收尾失败', { cause: String(cause) }));
+      turn?.flush(); this.options.monitor?.record('model', 'turn_ended', undefined, turn?.binding); controller.signal.removeEventListener('abort', interrupt);
+    }
   }
   async close(): Promise<void> {
     const sessions = this.sessions.splice(0);

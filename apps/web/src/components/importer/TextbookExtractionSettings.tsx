@@ -28,6 +28,7 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
   const budgetFields: Array<{ key: Exclude<keyof TextbookPipelineSettings, 'poolSize' | 'allowAiExercises'>; label: string }> = [
     { key: 'ocrConcurrency', label: '同时提取的章节数' }, { key: 'queueCapacity', label: '待提交队列容量' },
     { key: 'ocrRetries', label: '文字提取重试次数' }, { key: 'modelRetries', label: '模型修正重试次数' }, { key: 'storageRetries', label: '保存重试次数' },
+    { key: 'firstResponseTimeoutMs', label: '模型首响应超时（毫秒）' }, { key: 'stallTimeoutMs', label: '模型无活动超时（毫秒）' },
   ];
   return (
     <section className="space-y-3 rounded-2xl border border-line bg-surface p-4 text-xs">
@@ -68,7 +69,7 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {budgetFields.map(({ key, label }) => (
           <label key={key} className="flex items-center justify-between gap-2 text-ink">{label}
-            <input aria-label={label} type="number" step="1" min={key === 'ocrConcurrency' || key === 'queueCapacity' ? 1 : 0} value={settings[key]} disabled={pending}
+            <input aria-label={label} type="number" step="1" min={key === 'ocrConcurrency' || key === 'queueCapacity' || key.endsWith('TimeoutMs') ? 1 : 0} value={settings[key] ?? TextbookPipelineSettingsSchema.shape[key].parse(undefined)} disabled={pending}
               onChange={event => { const value = Number(event.target.value); if (TextbookPipelineSettingsSchema.shape[key].safeParse(value).success) setSettings({ [key]: value }); }}
               className="w-20 rounded-lg border border-line bg-surface p-2" />
           </label>

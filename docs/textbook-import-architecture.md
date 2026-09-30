@@ -65,11 +65,15 @@ P1 集成验证实际会话收到的目录结构和页码、独立部分失败�
 
 ## 规范章节内容
 
+P3 提交校验先检查字段格式，再比较当前 `documentId/lessonId/assignmentId`，记录具体字段、实际值、期望值及 call ID；有权限的会话可修正旧身份，但错误身份永不替换后放行。全部内容及 AI 例句需有本任务内 `tocId`。拒绝后显示“等待模型修正”；新 Turn 与仅保存重试使用不同阶段。
+
+模型首响应与无活动期限集中在 `TextbookPipelineSettingsSchema`，默认分别 60000 / 120000 毫秒，桌面可配置并记住。公开响应活动重置后续期限，超时撤销本次工具提交资格并中断 Turn；迟到提交不能写入。正常章节与格式重试仍复用线程，运行时故障才替换会话。已校验候选保留给保存重试。
+
 唯一契约：`packages/document-model/src/lesson-content.ts`。
 
 - `coverage`：当前章及全部子目录 ID 逐项报告 `EXTRACTED` / `UNREADABLE`。缺项、未知 ID、无法辨认或没有关联内容的小节不能标记成功。
 - `blocks`：`PARAGRAPH` / `DIALOGUE`，文字、角色、译文和来源明确。正文是模型纠错后的结构，不保存 OCR 文本作为正式正文，不用 Markdown 正则猜角色。
-- `vocabularies`：词面、读音、词性、释义、声调和例句。
+- `vocabularies`：词面、读音、词性、释义、声调、独立 `aiExplanation` 和例句；AI 讲解不混进 `gloss` 或正文。v036 将讲解同事务派生到 `textbook_vocab.ai_explanation`。
 - `knowledgePoints`：原书 `textbookExplanation` 与补充 `aiExplanation` 分开，例句各自记录来源。
 - `exercises`：单选、多选、填空、翻译、排序、匹配、简答；答案分别使用 `text`、`optionIds`、`pairs`，检查选项引用、排序覆盖和匹配结构。
 - `source` 为 `TEXTBOOK` / `AI`；译文、注音、释义、答案、解析、接续的字段来源另记。原书题干可以搭配 AI 答案和解析。

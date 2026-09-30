@@ -273,6 +273,7 @@ describe('P1-3 v22 旧库升级 v23–v30', () => {
     db.run('ALTER TABLE encountered_terms DROP COLUMN read_count');
     db.run('DELETE FROM schema_migrations WHERE version >= 23');
     db.run('DROP TABLE textbook_import_events');
+    db.run('ALTER TABLE textbook_vocab DROP COLUMN ai_explanation');
     // 历史行（旧列形状）。
     db.run(
       `INSERT INTO encountered_terms
