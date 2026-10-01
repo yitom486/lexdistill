@@ -1,79 +1,79 @@
+import { PDFDocument } from 'pdf-lib';
 import { BusinessError, translateToBusinessError } from '@study-studio/shared';
-import type { TocEntry } from '@study-studio/document-model';
+import { type ChapterSource, type TocEntry, TextbookPipelineSettingsSchema } from '@study-studio/document-model';
 import type { PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
-import { MAX_OCR_PAGES_PER_IMPORT } from './pdf-import-service.js';
+import { createMineruParser, type ChapterParser } from '../../../../infrastructure/mineru/parser.js';
 
 export interface ProducePdfLessonsOptions {
   pdf: Uint8Array; inspector: PdfInspectorLike; lessons: readonly TocEntry[];
   concurrency: number; retries: number; signal: AbortSignal;
+  parser?: ChapterParser; settings?: Parameters<typeof createMineruParser>[0];
   onStart: (lesson: TocEntry) => void;
-  onText: (lesson: TocEntry, text: string) => Promise<void>;
+  onText: (lesson: TocEntry, text: string, source: ChapterSource) => Promise<void>;
   onFailure: (lesson: TocEntry, error: BusinessError) => void;
   onDiagnostic?: (lesson: TocEntry, name: string, detail: unknown) => void;
 }
 
-/** 原生层已有 Rayon 识别池。首个真实扫描批次负责冷启动，其结果保留，后续共享缓存。 */
+/** 页级原始材料 → 有界章节队列；模型池与生产者并行启动。 */
 export async function producePdfLessons(options: ProducePdfLessonsOptions): Promise<void> {
   const { pdf, inspector, signal } = options;
-  const pageCount = inspector.processPdf(pdf, [1]).pageCount;
-  if (!pageCount || !Number.isSafeInteger(pageCount)) throw new BusinessError('E_PDF_PAGE_RANGE_INVALID', '无法确定教材总页数', 'VALIDATION');
-  let warming: Promise<unknown> | undefined;
+  const settings = options.settings ?? TextbookPipelineSettingsSchema.parse({});
+  const document = await PDFDocument.load(pdf);
+  const pageCount = document.getPageCount();
   let next = 0;
-  const extract = async (lesson: TocEntry, batches: Map<number, string>): Promise<string> => {
+  let parser = options.parser;
+  const extract = async (lesson: TocEntry, batches: Map<number, ChapterSource>, files: Map<number, Uint8Array>): Promise<ChapterSource> => {
     const end = lesson.endPage ?? pageCount;
-    if (lesson.startPage < 1 || end < lesson.startPage || end > pageCount) throw new BusinessError('E_PDF_PAGE_RANGE_INVALID', `“${lesson.title}”的物理页范围无效，请核对目录`, 'VALIDATION');
-    const pageNumbers = Array.from({ length: end - lesson.startPage + 1 }, (_, index) => lesson.startPage + index);
-    const direct = inspector.processPdf(pdf, pageNumbers);
-    options.onDiagnostic?.(lesson, 'native_text', { pageNumbers, text: direct.markdown ?? '', pagesNeedingOcr: direct.pagesNeedingOcr ?? [] });
-    let text = direct.markdown ?? '';
-    if (direct.pagesNeedingOcr?.length || !text.trim()) {
-      const parts: string[] = [];
-      for (let offset = 0; offset < pageNumbers.length; offset += MAX_OCR_PAGES_PER_IMPORT) {
-        if (signal.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消', 'TOOL_EXECUTION');
-        let part = batches.get(offset);
-        if (part === undefined) {
-          const batchPages = pageNumbers.slice(offset, offset + MAX_OCR_PAGES_PER_IMPORT);
-          const started = Date.now();
-          options.onDiagnostic?.(lesson, 'ocr_started', { pageNumbers: batchPages });
-          if (!warming) {
-            const first = inspector.processPdfWithOcr(pdf, { pageNumbers: batchPages });
-            warming = first;
-            try { part = (await first).markdown ?? ''; }
-            catch (cause) { warming = undefined; throw cause; }
-          } else {
-            await warming;
-            if (signal.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消', 'TOOL_EXECUTION');
-            part = (await inspector.processPdfWithOcr(pdf, { pageNumbers: batchPages })).markdown ?? '';
+    if (lesson.startPage < 1 || end < lesson.startPage || end > pageCount) throw new BusinessError('E_PDF_PAGE_RANGE_INVALID', '章节物理页范围无效，请核对目录：' + lesson.title, 'VALIDATION');
+    const pages = Array.from({ length: end - lesson.startPage + 1 }, (_, index) => lesson.startPage + index);
+    const result: ChapterSource = { parser: 'native', blocks: [] };
+    for (let offset = 0; offset < pages.length; offset += settings.parsePageLimit) {
+      if (signal.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消', 'TOOL_EXECUTION');
+      let part = batches.get(offset);
+      if (!part) {
+        const batchPages = pages.slice(offset, offset + settings.parsePageLimit);
+        const direct = inspector.processPdf(pdf, batchPages);
+        if (direct.pagesNeedingOcr?.length || !direct.markdown?.trim()) {
+          let file = files.get(offset);
+          if (!file) {
+            const slice = await PDFDocument.create();
+            for (const page of await slice.copyPages(document, batchPages.map(page => page - 1))) slice.addPage(page);
+            file = await slice.save(); files.set(offset, file);
           }
-          if (!part.trim()) throw new BusinessError('E_OCR_TEXT_EMPTY', `“${lesson.title}”有页面批次未识别到文字，请核对页码`, 'TOOL_EXECUTION', true);
-          batches.set(offset, part);
-          options.onDiagnostic?.(lesson, 'ocr_completed', { pageNumbers: batchPages, elapsedMs: Date.now() - started, text: part });
+          parser ??= createMineruParser(settings);
+          part = await parser.parse(file, batchPages, signal, (name, detail) => options.onDiagnostic?.(lesson, name, detail));
+        } else {
+          part = { parser: 'native', blocks: batchPages.flatMap(page => {
+            const text = inspector.processPdf(pdf, [page]).markdown?.trim();
+            return text ? [{ id: 'p' + page + 'b0', page, kind: 'TEXT' as const, text }] : [];
+          }) };
         }
-        parts.push(part);
+        if (!part.blocks.length) throw new BusinessError('E_PARSE_CONTENT_INVALID', '章节没有可用内容，请核对页码：' + lesson.title, 'VALIDATION', true);
+        batches.set(offset, part);
       }
-      text = parts.join('\n\n');
+      if (part.parser !== 'native') result.parser = part.parser;
+      result.blocks.push(...part.blocks);
     }
-    if (!text.trim()) throw new BusinessError('E_OCR_TEXT_EMPTY', `“${lesson.title}”未识别到文字，请核对页码`, 'TOOL_EXECUTION', true);
-    return text.trim();
+    return result;
   };
   await Promise.all(Array.from({ length: Math.min(options.concurrency, options.lessons.length) }, async () => {
     while (!signal.aborted) {
       const lesson = options.lessons[next++]; if (!lesson) return;
       options.onStart(lesson);
-      const batches = new Map<number, string>();
+      const batches = new Map<number, ChapterSource>();
+      const files = new Map<number, Uint8Array>();
+      let source: ChapterSource | undefined;
       for (let attempt = 0; attempt <= options.retries && !signal.aborted; attempt++) {
-        let text: string;
-        try { text = await extract(lesson, batches); }
+        try { source = await extract(lesson, batches, files); break; }
         catch (cause) {
-          const error = cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'TOOL_EXECUTION', fallbackMessage: `“${lesson.title}”文字提取失败` });
-          options.onDiagnostic?.(lesson, 'extraction_failed', { attempt: attempt + 1, code: error.code, message: error.userMessage });
-          if (attempt < options.retries && error.retryable) { options.onDiagnostic?.(lesson, 'ocr_retry', { attempt: attempt + 2 }); continue; }
+          const error = cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'TOOL_EXECUTION', fallbackMessage: '章节解析失败：' + lesson.title });
+          options.onDiagnostic?.(lesson, 'parse_failed', { attempt: attempt + 1, code: error.code, message: error.userMessage });
+          if (attempt < options.retries && error.retryable) { options.onDiagnostic?.(lesson, 'parse_retry', { attempt: attempt + 2 }); continue; }
           if (!signal.aborted) options.onFailure(lesson, error);
           break;
         }
-        if (!signal.aborted) await options.onText(lesson, text);
-        break;
       }
+      if (source && !signal.aborted) await options.onText(lesson, JSON.stringify(source), source);
     }
   }));
 }

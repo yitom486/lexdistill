@@ -16,7 +16,7 @@ function setup(handle?: (turn: ModelTurn) => Promise<void>) {
   const model = pipelineModel(tool, handle), stages: TextbookLessonStage[] = [];
   const input = { userId: 'owner', documentId: 'book', traceId: 'correction', title: '纠错集成教材',
     tocEntries: [{ id: 'a', title: '独立部分', level: 'section' as const, startPage: 3 }],
-    lessonJobs: [{ lessonId: 'a', ocrText: '正文' }], adapter: model.adapter, submissionTool: tool, poolSize: 1, modelRetries: 0,
+    lessonJobs: [{ lessonId: 'a', text: '正文' }], adapter: model.adapter, submissionTool: tool, poolSize: 1, modelRetries: 0,
     onProgress: (progress: { stage: TextbookLessonStage }) => { stages.push(progress.stage); },
   };
   return { repo, db, tool, model, input, stages };
@@ -125,7 +125,7 @@ describe('提交修正集成：准确身份反馈、字段保留、阶段与有�
     });
     try {
       const result = await env.repo.executeTextbookPipeline({ ...env.input, modelRetries: 1, firstResponseTimeoutMs: 30,
-        tocEntries: [...env.input.tocEntries, { id: 'b', title: '后一部分', level: 'lesson', startPage: 4 }], lessonJobs: [...env.input.lessonJobs, { lessonId: 'b', ocrText: '后一部分正文' }],
+        tocEntries: [...env.input.tocEntries, { id: 'b', title: '后一部分', level: 'lesson', startPage: 4 }], lessonJobs: [...env.input.lessonJobs, { lessonId: 'b', text: '后一部分正文' }],
       });
       expect(result.ok && result.value.allLessonsReady).toBe(true); expect(env.model.created).toHaveLength(2);
       expect(env.model.inputs.map(turn => turn.sessionId)).toEqual([env.model.created[0]!.sessionId, env.model.created[1]!.sessionId, env.model.created[1]!.sessionId]);

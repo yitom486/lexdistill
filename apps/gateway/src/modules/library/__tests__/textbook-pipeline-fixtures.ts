@@ -3,6 +3,17 @@ import { LessonSubmissionSchema, type LessonContent, type LessonSubmission } fro
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
+import { PDFDocument } from 'pdf-lib';
+import type { ChapterSource } from '@study-studio/document-model';
+
+export async function fixturePdf(pageCount: number): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  for (let index = 0; index < pageCount; index++) pdf.addPage();
+  return pdf.save();
+}
+export function parsedText(text: string, pages: readonly number[]): ChapterSource {
+  return { parser: 'mineru-cloud', blocks: pages.map(page => ({ id: `p${page}b0`, page, kind: 'TEXT', text })) };
+}
 
 export function contentFor(tocIds: string[]): LessonContent {
   return {

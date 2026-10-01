@@ -13,7 +13,7 @@ interface Props {
   onClose: () => void;
   onReset: () => void;
 }
-const stageLabels = { ocr: '提取文字 / OCR', queued: '等待会话', extracting: '模型整理', validating: '校验目录与格式', correcting: '等待模型修正', model_retrying: '模型重试', saving: '保存中', storage_retrying: '保存重试', saved: '已保存', failed: '未完成' };
+const stageLabels = { parsing: '解析章节内容', queued: '等待会话', extracting: '模型整理', validating: '校验目录与格式', correcting: '等待模型修正', model_retrying: '模型重试', saving: '保存中', storage_retrying: '保存重试', saved: '已保存', failed: '未完成' };
 
 export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: Props) {
   const [monitorOpen, setMonitorOpen] = useState(false);

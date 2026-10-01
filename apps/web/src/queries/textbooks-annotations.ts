@@ -929,7 +929,7 @@ export interface ExecuteTextbookPipelineVars extends Partial<TextbookPipelineSet
   tocEntries: unknown[];
   lessonJobs?: Array<{
     lessonId: string;
-    ocrText: string;
+    text: string;
   }>;
 }
 

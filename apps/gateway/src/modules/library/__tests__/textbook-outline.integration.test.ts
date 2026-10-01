@@ -90,7 +90,7 @@ describe('独立目录保存：HTTP → SQLite → 文件指纹检测 → 正文
         documentId: saved.documentId, userId: 'owner', title: input.title, tocEntries: saved.entries,
         pdf: new Uint8Array(await Bun.file(fixture).arrayBuffer()),
         adapter: model.adapter, submissionTool: tool, poolSize: 1,
-        lessonJobs: entries.map(entry => ({ lessonId: entry.id, ocrText: entry.title })),
+        lessonJobs: entries.map(entry => ({ lessonId: entry.id, text: entry.title })),
       });
       expect(result.ok).toBe(true);
       const repeated = await save(app, { ...input, tocEntries: entries.map(entry => ({ ...entry, id: `new-${entry.id}` })) });

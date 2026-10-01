@@ -8,6 +8,6 @@ export function buildLessonExtractionPrompt(job: LessonExtractionJob, assignment
     `目录路径（所属单元与章）：\n${JSON.stringify(job.tocPath)}`,
     `本章目录:\n${JSON.stringify(job.tocEntries)}`,
     ...(correction ? [`上次未完成的原因：${correction}`] : []),
-    `本章内容:\n${job.ocrText}`,
+    `本章内容:\n${job.text}`,
   ].join('\n\n');
 }

@@ -28,7 +28,7 @@ function setup(failIntro = false) {
     expect((await submit(value)).ok).toBe(true);
   });
   return { repo, db, model, input: { userId: 'owner', documentId: 'directory-book', title: '目录任务集成教材', language: 'ja', tocEntries: entries,
-    lessonJobs: ['intro', 'lesson-a', 'lesson-b'].map(lessonId => ({ lessonId, ocrText: `当前部分文字 ${lessonId}` })),
+    lessonJobs: ['intro', 'lesson-a', 'lesson-b'].map(lessonId => ({ lessonId, text: `当前部分文字 ${lessonId}` })),
     adapter: model.adapter, submissionTool: tool, poolSize: 1, modelRetries: 0 } };
 }
 describe('目录任务：实际会话输入 → 原生工具 → SQLite → 完成回执', () => {
@@ -86,7 +86,7 @@ describe('目录任务：实际会话输入 → 原生工具 → SQLite → 完�
         { id: 'lesson-a', title: '主题', level: 'lesson', startPage: 5, endPage: 9 },
         { id: 'container', title: '练习组', level: 'chapter', parentId: 'lesson-a', startPage: 6, endPage: 9 },
         { id: 'detail', title: '练习', level: 'section', parentId: 'container', startPage: 6, endPage: 9 },
-      ], lessonJobs: [{ lessonId: 'lesson-a', ocrText: '原书内容' }],
+      ], lessonJobs: [{ lessonId: 'lesson-a', text: '原书内容' }],
     });
     expect(result.ok && result.value.allLessonsReady).toBe(true);
     expect(env.db.select().from(schema.textbookLines).all().some(line => line.tocId === 'container')).toBe(false);

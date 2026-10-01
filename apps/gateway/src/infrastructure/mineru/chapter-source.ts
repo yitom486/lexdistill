@@ -39,8 +39,8 @@ export function cloudChapterSource(raw: unknown, physicalPages: readonly number[
 /** 当前本地 V1 structured_content 契约；不兼容废弃 file_parse 返回。 */
 export function localChapterSource(raw: unknown, physicalPages: readonly number[]): ChapterSource {
   const result = z.object({ pages: z.array(z.object({ page_idx: z.number().int().nonnegative(), blocks: z.array(z.object({
-    type: z.string(), content: z.union([z.string(), z.array(z.object({ type: z.string(), content: z.string().optional() }))]),
-    bbox: bbox.optional(),
+    type: z.string(), content: z.string(), bbox: bbox.nullish(),
+    captions: z.array(z.object({ content: z.string() })).optional(), footnotes: z.array(z.object({ content: z.string() })).optional(),
   }).passthrough()) })) }).safeParse(raw);
   if (!result.success || result.data.pages.length !== physicalPages.length || new Set(result.data.pages.map(page => page.page_idx)).size !== physicalPages.length) {
     throw new BusinessError('E_PARSE_PAGE_MAP_INVALID', '本地解析返回的页数或结构不正确，请检查 MinerU V1 服务', 'VALIDATION', true);
@@ -50,9 +50,9 @@ export function localChapterSource(raw: unknown, physicalPages: readonly number[
     const physicalPage = physicalPages[page.page_idx];
     if (!physicalPage) throw new BusinessError('E_PARSE_PAGE_MAP_INVALID', '本地解析返回了章节范围以外的页码', 'VALIDATION', true);
     page.blocks.forEach((block, index) => {
-      const text = typeof block.content === 'string' ? block.content : block.content.map(part => part.content ?? '').join('\n');
-      const kind = block.type === 'table' ? 'TABLE' : block.type === 'image' ? 'IMAGE' : ['title', 'paragraph_title'].includes(block.type) ? 'TITLE' : 'TEXT';
-      blocks.push({ id: `p${physicalPage}b${index}`, page: physicalPage, kind, text, ...(block.bbox ? { bbox: block.bbox } : {}), ...(kind === 'TABLE' ? { rows: tableRows(text) } : {}) });
+      const text = [block.content, ...(block.captions ?? []).map(part => part.content), ...(block.footnotes ?? []).map(part => part.content)].filter(Boolean).join('\n');
+      const kind = block.type === 'table' ? 'TABLE' : ['image', 'chart', 'equation'].includes(block.type) ? 'IMAGE' : ['doc_title', 'paragraph_title'].includes(block.type) ? 'TITLE' : 'TEXT';
+      blocks.push({ id: `p${physicalPage}b${index}`, page: physicalPage, kind, text, ...(block.bbox ? { bbox: block.bbox } : {}), ...(kind === 'TABLE' ? { rows: tableRows(block.content) } : {}) });
     });
   }
   return checked(blocks, 'mineru-local');

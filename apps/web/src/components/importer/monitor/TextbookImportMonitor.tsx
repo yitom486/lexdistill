@@ -32,7 +32,7 @@ export function TextbookImportMonitor({ open, onOpenChange, userId, traceId, job
       <div className="space-y-3 overflow-auto text-xs">
         <p className="break-all text-ink-muted">本次记录：{traceId}</p>
         {job && <p>进度 {job.doneLessons}/{job.totalLessons} · 成功 {job.successfulLessons} · 失败 {job.failedLessons.length} · Agent 并发 {job.concurrency ?? '见启动配置'} · 模型 {job.model ?? '运行时默认，见会话记录'}</p>}
-        {snapshot && <p>目录 {directory.length} 项 · OCR 章节并发 {snapshot.settings.ocrConcurrency} · Agent 并发 {snapshot.settings.poolSize} · 等待队列容量 {snapshot.settings.queueCapacity}</p>}
+        {snapshot && <p>目录 {directory.length} 项 · OCR 章节并发 {snapshot.settings.parseConcurrency} · Agent 并发 {snapshot.settings.poolSize} · 等待队列容量 {snapshot.settings.queueCapacity}</p>}
         <Button variant="outline" size="sm" onClick={() => { void query.refetch(); }}>刷新记录</Button>
         {query.isPending && <p>正在读取本次记录…</p>}
         {query.isError && <p role="alert">{query.error.message}</p>}

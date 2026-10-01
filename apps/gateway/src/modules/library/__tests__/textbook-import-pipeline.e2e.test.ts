@@ -7,9 +7,8 @@ import * as schema from '@study-studio/storage-sqlite';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import { TextbookPipelineJobRegistry } from '../application/pipeline-job-runner.js';
-import { MAX_OCR_PAGES_PER_IMPORT } from '../application/pdf-import/pdf-import-service.js';
 import type { TextbookPipelineInput } from '../application/textbook-pipeline.js';
-import { contentFor, deferred, pipelineModel, submissionFromPrompt, type ModelTurn } from './textbook-pipeline-fixtures.js';
+import { contentFor, deferred, fixturePdf, parsedText, pipelineModel, submissionFromPrompt, type ModelTurn } from './textbook-pipeline-fixtures.js';
 
 const repos: DrizzleLearnerRepository[] = [];
 afterEach(() => { for (const repo of repos.splice(0)) repo.getRawDb().close(); });
@@ -24,7 +23,7 @@ function environment(handle?: (turn: ModelTurn) => Promise<void>) {
   const tool = new LibraryLessonCommitTool(repo);
   const model = pipelineModel(tool, handle);
   const input: TextbookPipelineInput = { userId: 'owner', documentId: 'book', title: '集成教材', language: 'ja', tocEntries: toc,
-    lessonJobs: [{ lessonId: 'l1', ocrText: '第一章原文' }, { lessonId: 'l2', ocrText: '第二章原文' }],
+    lessonJobs: [{ lessonId: 'l1', text: '第一章原文' }, { lessonId: 'l2', text: '第二章原文' }],
     adapter: model.adapter, submissionTool: tool, poolSize: 1, model: 'chosen-model', effort: 'low', modelRetries: 0,
   };
   return { repo, db, tool, model, input };
@@ -39,14 +38,15 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
       expect((await submit(submission)).ok).toBe(true);
     });
     let secondFinished = false;
-    const run = env.repo.executeTextbookPipeline({ ...env.input, lessonJobs: undefined, pdf: new Uint8Array([1]), ocrConcurrency: 2,
+    const run = env.repo.executeTextbookPipeline({ ...env.input, lessonJobs: undefined, pdf: await fixturePdf(2), parseConcurrency: 2,
       inspector: {
         processPdf: () => ({ pageCount: 2, markdown: '', pagesNeedingOcr: [1] }),
-        processPdfWithOcr: async (_bytes, options) => {
-          if (options?.pageNumbers?.[0] === 2) { secondStarted.resolve(); await releaseSecond.promise; secondFinished = true; }
-          return { markdown: '原生文字接口的受控结果' };
-        },
+        processPdfWithOcr: async () => { throw new Error('旧正文 OCR 不得被调用'); },
       },
+      chapterParser: { parse: async (_bytes, pages) => {
+        if (pages[0] === 2) { secondStarted.resolve(); await releaseSecond.promise; secondFinished = true; }
+        return parsedText('受控 MinerU 内容', pages);
+      } },
       onProgress: progress => {
         if (progress.lessonId === 'l1' && progress.stage === 'saved') {
           expect(secondFinished).toBe(false);
@@ -89,7 +89,7 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     const entries = Array.from({ length: 7 }, (_, index): TocEntry => ({ id: `l${index + 1}`, title: `章 ${index + 1}`, level: 'lesson', startPage: index + 1 }));
     const saved: string[] = [];
     const result = await env.repo.executeTextbookPipeline({ ...env.input, poolSize: 2, queueCapacity: 1, tocEntries: entries,
-      lessonJobs: entries.map(entry => ({ lessonId: entry.id, ocrText: '输入文字' })), onProgress: progress => { if (progress.stage === 'saved') saved.push(progress.lessonId); },
+      lessonJobs: entries.map(entry => ({ lessonId: entry.id, text: '输入文字' })), onProgress: progress => { if (progress.stage === 'saved') saved.push(progress.lessonId); },
     });
     expect(result.ok && result.value.successfulLessons).toBe(7);
     expect(saved[0]).toBe('l2'); expect(env.model.created).toHaveLength(2); expect(env.model.closed).toHaveLength(2);
@@ -192,8 +192,9 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     env.model.adapter.createSession = async options => { expect(options.tools?.map(tool => tool.name)).toEqual([env.tool.name]); await releaseInit.promise; return createSession(options); };
     const entries = Array.from({ length: 8 }, (_, index): TocEntry => ({ id: `l${index + 1}`, title: `章 ${index + 1}`, level: 'lesson', startPage: index + 1, endPage: index + 1 }));
     let queued = 0;
-    const run = env.repo.executeTextbookPipeline({ ...env.input, tocEntries: entries, lessonJobs: undefined, poolSize: 2, ocrConcurrency: 2, queueCapacity: 1, pdf: new Uint8Array([1]),
-      inspector: { processPdf: () => ({ pageCount: 8 }), processPdfWithOcr: async () => { ocrCalls++; ocrActive++; ocrPeak = Math.max(ocrPeak, ocrActive); await new Promise(resolve => setTimeout(resolve, 1)); ocrActive--; return { markdown: '文字' }; } },
+    const run = env.repo.executeTextbookPipeline({ ...env.input, tocEntries: entries, lessonJobs: undefined, poolSize: 2, parseConcurrency: 2, queueCapacity: 1, pdf: await fixturePdf(8),
+      inspector: { processPdf: () => ({ pageCount: 8 }), processPdfWithOcr: async () => { throw new Error('不得调用旧 OCR'); } },
+      chapterParser: { parse: async (_bytes, pages) => { ocrCalls++; ocrActive++; ocrPeak = Math.max(ocrPeak, ocrActive); await new Promise(resolve => setTimeout(resolve, 1)); ocrActive--; return parsedText('文字', pages); } },
       onProgress: progress => { if (progress.stage === 'queued' && ++queued === 3) thirdText.resolve(); },
     });
     await thirdText.promise; await new Promise(resolve => setTimeout(resolve, 10));
@@ -239,28 +240,30 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     expect(env.db.select().from(schema.textbookExercises).all()).toHaveLength(14);
     expect(env.db.select().from(schema.textbookExercises).all().every(row => row.source === 'AI' && row.answerJson)).toBe(true);
   });
-  it('长章节按受限原生批次处理，失败重试保留成功批次，只生成一次章节', async () => {
+  it('长章节按配置解析批次处理，失败重试保留成功批次，只生成一次章节', async () => {
     const env = environment(), calls: number[][] = [];
-    const pages = MAX_OCR_PAGES_PER_IMPORT + 2;
+    const limit = 2, pages = limit + 2;
     let failed = false;
-    const result = await env.repo.executeTextbookPipeline({ ...env.input, lessonJobs: undefined, ocrRetries: 1, pdf: new Uint8Array([1]),
+    const result = await env.repo.executeTextbookPipeline({ ...env.input, lessonJobs: undefined, parseRetries: 1, parsePageLimit: limit, pdf: await fixturePdf(pages),
       tocEntries: [{ id: 'l1', title: '长章节', level: 'lesson', startPage: 1, endPage: pages }],
-      inspector: { processPdf: () => ({ pageCount: pages }), processPdfWithOcr: async (_bytes, options) => {
-        const batch = options?.pageNumbers ?? []; calls.push(batch);
-        if (batch[0] !== 1 && !failed) { failed = true; throw new BusinessError('E_OCR_BUSY', 'OCR 暂时忙', 'TOOL_EXECUTION', true); }
-        return { markdown: batch[0] === 1 ? '前半章' : '后半章' };
+      inspector: { processPdf: () => ({ pageCount: pages }), processPdfWithOcr: async () => { throw new Error('不得调用旧 OCR'); } },
+      chapterParser: { parse: async (_bytes, batch) => {
+        calls.push([...batch]);
+        if (batch[0] !== 1 && !failed) { failed = true; throw new BusinessError('E_MINERU_BUSY', '解析服务暂时忙', 'TOOL_EXECUTION', true); }
+        return parsedText(batch[0] === 1 ? '前半章' : '后半章', batch);
       } },
     });
     expect(result.ok && result.value.allLessonsReady).toBe(true);
-    expect(calls.map(batch => batch.length)).toEqual([MAX_OCR_PAGES_PER_IMPORT, 2, 2]);
+    expect(calls.map(batch => batch.length)).toEqual([limit, 2, 2]);
     expect(calls.filter(batch => batch[0] === 1)).toHaveLength(1);
-    expect(env.model.inputs).toHaveLength(1); expect(env.model.inputs[0]?.input.message).toContain('前半章\n\n后半章');
+    expect(env.model.inputs).toHaveLength(1); expect(env.model.inputs[0]?.input.message).toContain('前半章'); expect(env.model.inputs[0]?.input.message).toContain('后半章');
   });
-  it('网关关闭取消后台任务并等待不可中断原生批次返回，再释放会话，迟到文字不入库', async () => {
+  it('网关关闭取消后台任务，收尾在途解析并释放会话，迟到内容不入库', async () => {
     const env = environment(), registry = new TextbookPipelineJobRegistry(), nativeStarted = deferred(), releaseNative = deferred();
     let nativeCalls = 0, settled = false;
-    const result = registry.start(env.repo, { ...env.input, lessonJobs: undefined, pdf: new Uint8Array([1]), ocrConcurrency: 1,
-      inspector: { processPdf: () => ({ pageCount: 2 }), processPdfWithOcr: async () => { nativeCalls++; nativeStarted.resolve(); await releaseNative.promise; return { markdown: '迟到文字' }; } },
+    const result = registry.start(env.repo, { ...env.input, lessonJobs: undefined, pdf: await fixturePdf(2), parseConcurrency: 1,
+      inspector: { processPdf: () => ({ pageCount: 2 }), processPdfWithOcr: async () => { throw new Error('不得调用旧 OCR'); } },
+      chapterParser: { parse: async (_bytes, pages) => { nativeCalls++; nativeStarted.resolve(); await releaseNative.promise; return parsedText('迟到文字', pages); } },
     });
     expect(result.ok).toBe(true); if (!result.ok) throw result.error;
     await nativeStarted.promise;

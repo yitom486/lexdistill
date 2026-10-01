@@ -115,7 +115,7 @@ describe('目录视觉识别 HTTP 闭环', () => {
       const before = await repo.getTextbookAssetStats(saved.documentId); expect(before.ok && before.value.lines).toBe(0);
       const tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool);
       const completed = await repo.executeTextbookPipeline({ userId: 'u1', documentId: saved.documentId, traceId: 'directory-to-content', title: saved.title, tocEntries: saved.entries,
-        lessonJobs: [{ lessonId: 'toc-2', ocrText: '独立部分的文字' }, { lessonId: 'toc-3', ocrText: '当前课与小节的文字' }], adapter: model.adapter, submissionTool: tool, poolSize: 1, modelRetries: 0,
+        lessonJobs: [{ lessonId: 'toc-2', text: '独立部分的文字' }, { lessonId: 'toc-3', text: '当前课与小节的文字' }], adapter: model.adapter, submissionTool: tool, poolSize: 1, modelRetries: 0,
       });
       expect(completed.ok && completed.value.allLessonsReady).toBe(true);
       const promptDirectory = (message: string) => JSON.parse(message.split('本章目录:\n')[1]!.split('\n')[0]!);

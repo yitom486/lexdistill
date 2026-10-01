@@ -16,7 +16,7 @@ async function run(repo: DrizzleLearnerRepository, traceId = 'this-import') {
   const tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool);
   const result = await repo.executeTextbookPipeline({ userId: 'owner', traceId, documentId: 'monitored-book', title: '监视集成教材',
     tocEntries: [{ id: 'a', title: '第一部分', level: 'lesson', startPage: 7, endPage: 9 }, { id: 'b', title: '第二部分', level: 'lesson', startPage: 10, endPage: 15 }],
-    lessonJobs: [{ lessonId: 'a', ocrText: '第一部分真实输入' }, { lessonId: 'b', ocrText: '第二部分真实输入' }],
+    lessonJobs: [{ lessonId: 'a', text: '第一部分真实输入' }, { lessonId: 'b', text: '第二部分真实输入' }],
     adapter: model.adapter, submissionTool: tool, poolSize: 2, modelRetries: 0,
   });
   return { result, model, app: createImportMonitorRoutes(repo) };

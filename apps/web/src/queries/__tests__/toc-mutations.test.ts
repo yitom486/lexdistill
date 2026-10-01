@@ -80,8 +80,8 @@ describe('requestExecuteTextbookPipeline 请求层', () => {
         { title: '第2課', printedPage: 26, physicalPage: 30 },
       ],
       lessonJobs: [
-        { lessonId: 'lesson-1', ocrText: '第1課 私の友達' },
-        { lessonId: 'lesson-2', ocrText: '第2課 これは本です' },
+        { lessonId: 'lesson-1', text: '第1課 私の友達' },
+        { lessonId: 'lesson-2', text: '第2課 これは本です' },
       ],
     };
 
@@ -119,7 +119,7 @@ describe('requestExecuteTextbookPipeline 请求层', () => {
     const vars: ExecuteTextbookPipelineVars = {
       title: '测试教材',
       tocEntries: [],
-      lessonJobs: [{ lessonId: 'missing-slot', ocrText: 'some text' }],
+      lessonJobs: [{ lessonId: 'missing-slot', text: 'some text' }],
     };
 
     const err = await requestExecuteTextbookPipeline('u1', vars).then(

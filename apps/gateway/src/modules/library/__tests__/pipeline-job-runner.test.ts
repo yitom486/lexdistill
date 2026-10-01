@@ -17,7 +17,7 @@ it('后台任务防重与阶段广播对应实际 SQLite 提交，取消后关�
   const input = {
     userId: 'owner', documentId: 'job-book', title: '后台集成教材', poolSize: 1,
     tocEntries: [{ id: 'l1', title: '第一章', level: 'lesson' as const, startPage: 1 }],
-    lessonJobs: [{ lessonId: 'l1', ocrText: '第一章内容' }], adapter: model.adapter, submissionTool: tool,
+    lessonJobs: [{ lessonId: 'l1', text: '第一章内容' }], adapter: model.adapter, submissionTool: tool,
   };
   let unsubscribe: (() => void) | undefined;
   try {

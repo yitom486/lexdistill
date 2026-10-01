@@ -18,7 +18,7 @@ describe('教材检测：真实指纹、内容统计、补课与重复导入', (
     const app = createPdfImportRoutes({ repo, server: {} as never, port: 0 });
     const input = { userId: 'owner', documentId: 'book', title: '教材', pdf: new Uint8Array(await Bun.file(fixture).arrayBuffer()), poolSize: 1, modelRetries: 0, adapter: model.adapter, submissionTool: tool,
       tocEntries: [{ id: 'l1', title: '第一章', level: 'lesson' as const, startPage: 1 }, { id: 'l2', title: '第二章', level: 'lesson' as const, startPage: 2 }],
-      lessonJobs: [{ lessonId: 'l1', ocrText: '第一章' }, { lessonId: 'l2', ocrText: '第二章' }],
+      lessonJobs: [{ lessonId: 'l1', text: '第一章' }, { lessonId: 'l2', text: '第二章' }],
     };
     const inspect = async (user = 'owner', file = fixture) => {
       const response = await app.request(`/api/documents/${user}/inspect-import`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: '改名.pdf', filePath: fileURLToPath(file) }) });

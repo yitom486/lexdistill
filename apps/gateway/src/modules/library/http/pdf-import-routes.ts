@@ -32,7 +32,7 @@ const PipelineRequestSchema = TextbookPipelineSettingsSchema.extend({
   tocEntries: z.array(TocEntrySchema).min(1),
   lessonJobs: z.array(z.object({
     lessonId: z.string(),
-    ocrText: z.string(),
+    text: z.string(),
   })).optional(),
 });
 
@@ -54,13 +54,14 @@ export function createPdfImportRoutes(
     runtimeDir?: string;
     adapter?: TextbookPipelineInput['adapter'];
     submissionTool?: LibraryLessonCommitTool;
+    chapterParser?: TextbookPipelineInput['chapterParser'];
   }
 ) {
   const pipelineChannels = () => {
     const tool = pdfOverrides?.submissionTool ?? deps.server.toolRegistry.get('library.commit_lesson_knowledge');
     const adapter = pdfOverrides?.adapter ?? deps.server.agentAdapter;
     if (!(tool instanceof LibraryLessonCommitTool) || !adapter) throw new BusinessError('E_AGENT_UNAVAILABLE', '章节工具或模型通道尚未就绪，请检查桌面运行时', 'AGENT_RUNTIME');
-    return { adapter, submissionTool: tool };
+    return { adapter, submissionTool: tool, ...(pdfOverrides?.chapterParser ? { chapterParser: pdfOverrides.chapterParser } : {}) };
   };
   return new Hono()
     .route('', createImportMonitorRoutes(deps.repo))
@@ -308,12 +309,12 @@ export function createPdfImportRoutes(
             return formatBusinessErrorResponse(c, fileRes.error, 'readLocalPdfFile');
           }
           pdfBytes = fileRes.value.bytes;
-          const runtime = await ensurePdfRuntime({ needOcr: true, ...pdfOverrides });
+          const runtime = await ensurePdfRuntime({ needOcr: false, needPdfium: true, ...pdfOverrides });
           inspector = runtime.inspector;
         } else if (body.pdfBase64) {
           try {
             pdfBytes = new Uint8Array(Buffer.from(body.pdfBase64, 'base64'));
-            const runtime = await ensurePdfRuntime({ needOcr: true, ...pdfOverrides });
+            const runtime = await ensurePdfRuntime({ needOcr: false, needPdfium: true, ...pdfOverrides });
             inspector = runtime.inspector;
           } catch (e) {
             return formatBusinessErrorResponse(
@@ -387,12 +388,12 @@ export function createPdfImportRoutes(
             return formatBusinessErrorResponse(c, fileRes.error, 'readLocalPdfFile');
           }
           pdfBytes = fileRes.value.bytes;
-          const runtime = await ensurePdfRuntime({ needOcr: true, ...pdfOverrides });
+          const runtime = await ensurePdfRuntime({ needOcr: false, needPdfium: true, ...pdfOverrides });
           inspector = runtime.inspector;
         } else if (body.pdfBase64) {
           try {
             pdfBytes = new Uint8Array(Buffer.from(body.pdfBase64, 'base64'));
-            const runtime = await ensurePdfRuntime({ needOcr: true, ...pdfOverrides });
+            const runtime = await ensurePdfRuntime({ needOcr: false, needPdfium: true, ...pdfOverrides });
             inspector = runtime.inspector;
           } catch (e) {
             return formatBusinessErrorResponse(

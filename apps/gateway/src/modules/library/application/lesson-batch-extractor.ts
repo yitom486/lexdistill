@@ -1,5 +1,5 @@
 import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
-import type { TocEntry, TextbookLessonStage } from '@study-studio/document-model';
+import type { ChapterSource, TocEntry, TextbookLessonStage } from '@study-studio/document-model';
 import { BusinessError, generateId, translateToBusinessError, logger, type Result } from '@study-studio/shared';
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
 import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
@@ -15,7 +15,8 @@ export interface LessonExtractionJob {
   allowAiExercises: boolean;
   tocEntries: readonly TocEntry[];
   tocPath: readonly TocEntry[];
-  ocrText: string;
+  text: string;
+  source?: ChapterSource;
 }
 export type LessonStage = TextbookLessonStage;
 export interface BatchExtractionProgress {

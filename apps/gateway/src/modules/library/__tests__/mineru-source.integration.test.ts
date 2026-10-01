@@ -21,7 +21,7 @@ it('逐页表格保持跨页边界，原书物理页随实际章节输入进入�
   });
   const result = await repo.executeTextbookPipeline({ userId: 'source-owner', documentId: 'source-book', title: '解析材料集成验证',
     tocEntries: [{ id: 'chapter', title: '当前章节', level: 'lesson', startPage: 7, endPage: 8 }],
-    lessonJobs: [{ lessonId: 'chapter', ocrText: JSON.stringify(source) }], adapter: model.adapter, submissionTool: tool, poolSize: 1 });
+    lessonJobs: [{ lessonId: 'chapter', text: JSON.stringify(source) }], adapter: model.adapter, submissionTool: tool, poolSize: 1 });
   expect(result.ok && result.value.allLessonsReady).toBe(true);
   const assets = await repo.getTextbookAssetStats('source-book');
   expect(assets.ok && assets.value.readyLessons).toBe(1);

@@ -24,7 +24,8 @@
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5",
     "gemini-tts-studio": "0.3.1",
-    "jsdom": "^30.0.1"
+    "jsdom": "^30.0.1",
+    "pdf-lib": "1.17.1"
   },
   "scripts": {
     "dev": "bun --watch src/index.ts",
@@ -35,7 +36,6 @@
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",
-    "fontkit": "1.9.0",
-    "pdf-lib": "1.17.1"
+    "fontkit": "1.9.0"
   }
 }

@@ -25,9 +25,10 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
   const setSettings = usePreferencesStore((s) => s.setPipelineSettings);
   const language = usePreferencesStore((s) => s.pipelineLanguage);
   const setLanguage = usePreferencesStore((s) => s.setPipelineLanguage);
-  const budgetFields: Array<{ key: Exclude<keyof TextbookPipelineSettings, 'poolSize' | 'allowAiExercises'>; label: string }> = [
-    { key: 'ocrConcurrency', label: '同时提取的章节数' }, { key: 'queueCapacity', label: '待提交队列容量' },
-    { key: 'ocrRetries', label: '文字提取重试次数' }, { key: 'modelRetries', label: '模型修正重试次数' }, { key: 'storageRetries', label: '保存重试次数' },
+  type NumericSetting = { [K in keyof TextbookPipelineSettings]: TextbookPipelineSettings[K] extends number ? K : never }[keyof TextbookPipelineSettings];
+  const budgetFields: Array<{ key: Exclude<NumericSetting, 'poolSize'>; label: string }> = [
+    { key: 'parseConcurrency', label: '同时提取的章节数' }, { key: 'queueCapacity', label: '待提交队列容量' },
+    { key: 'parseRetries', label: '文字提取重试次数' }, { key: 'modelRetries', label: '模型修正重试次数' }, { key: 'storageRetries', label: '保存重试次数' },
     { key: 'firstResponseTimeoutMs', label: '模型首响应超时（毫秒）' }, { key: 'stallTimeoutMs', label: '模型无活动超时（毫秒）' },
   ];
   return (
@@ -69,13 +70,13 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {budgetFields.map(({ key, label }) => (
           <label key={key} className="flex items-center justify-between gap-2 text-ink">{label}
-            <input aria-label={label} type="number" step="1" min={key === 'ocrConcurrency' || key === 'queueCapacity' || key.endsWith('TimeoutMs') ? 1 : 0} value={settings[key] ?? TextbookPipelineSettingsSchema.shape[key].parse(undefined)} disabled={pending}
+            <input aria-label={label} type="number" step="1" min={key === 'parseConcurrency' || key === 'queueCapacity' || key.endsWith('TimeoutMs') ? 1 : 0} value={settings[key] ?? TextbookPipelineSettingsSchema.shape[key].parse(undefined)} disabled={pending}
               onChange={event => { const value = Number(event.target.value); if (TextbookPipelineSettingsSchema.shape[key].safeParse(value).success) setSettings({ [key]: value }); }}
               className="w-20 rounded-lg border border-line bg-surface p-2" />
           </label>
         ))}
       </div>
-      <p className="text-ink-muted">原生 OCR 使用底层自动配置的识别线程池；上面的章节数控制在途任务与 PDF 内存复制。队列满后会等待模型消费。取消后已进入原生的批次需返回后才能释放。</p>
+      <p className="text-ink-muted">扫描正文使用 MinerU 解析，数字原生 PDF 直接读取文字。章节数控制在途解析任务；队列满后等待模型消费。停止提取会停止本地等待，已被解析服务接受的任务可能继续运行。</p>
       <label className="flex items-center justify-between gap-3 text-ink">允许 AI 补充习题（单独标注来源）
         <Switch checked={settings.allowAiExercises} onCheckedChange={allowAiExercises => setSettings({ allowAiExercises })} disabled={pending} />
       </label>

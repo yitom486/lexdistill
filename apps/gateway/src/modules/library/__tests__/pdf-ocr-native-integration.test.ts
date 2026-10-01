@@ -15,6 +15,11 @@ pinProcessToTestRuntime();
 const { inspector } = await ensurePdfTestRuntime();
 const fixture = new URL('./fixtures/scanned-lesson-dialect.pdf', import.meta.url);
 const bytes = new Uint8Array(await Bun.file(fixture).arrayBuffer());
+// 实际原生识别仅验证目录探测所需能力；在正文链路边界注入受控解析器，禁止测试调用付费云端。
+const chapterParser = { parse: async (pdf: Uint8Array, pages: readonly number[]) => {
+  const raw = await inspector.processPdfWithOcr(pdf, { pageNumbers: pages.map((_, index) => index + 1) });
+  return { parser: 'mineru-cloud' as const, blocks: pages.map((page, index) => ({ id: `p${page}b0`, page, kind: 'TEXT' as const, text: raw.pages?.[index]?.markdown ?? raw.markdown ?? '' })) };
+} };
 const repos: DrizzleLearnerRepository[] = [];
 afterEach(() => { for (const repo of repos.splice(0)) repo.getRawDb().close(); });
 async function threadCpuSnapshot(): Promise<Map<number, number>> {
@@ -63,7 +68,7 @@ describe('真实原生 OCR 与教材流水线', () => {
       { id: 'bad', title: '越界', level: 'lesson', startPage: 4 },
     ]);
     const texts = new Map<string, string>(), failed: string[] = [];
-    await producePdfLessons({ pdf: bytes, inspector, lessons: entries.filter(entry => entry.level === 'lesson'), concurrency: 2, retries: 0, signal: new AbortController().signal,
+    await producePdfLessons({ pdf: bytes, inspector, parser: chapterParser, lessons: entries.filter(entry => entry.level === 'lesson'), concurrency: 2, retries: 0, signal: new AbortController().signal,
       onStart: () => {}, onText: async (lesson, text) => { texts.set(lesson.id, text); }, onFailure: (lesson, error) => { failed.push(error.code); expect(lesson.id).toBe('bad'); },
     });
     expect(texts.get('l1')).toContain('第2課'); expect(texts.get('l2')).toContain('ふくしゅう'); expect(failed).toEqual(['E_PDF_PAGE_RANGE_INVALID']);
@@ -76,7 +81,7 @@ describe('真实原生 OCR 与教材流水线', () => {
       expect(input.message).not.toContain('properties'); expect(input.message).not.toContain('passageMd');
       expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true);
     });
-    const result = await repo.executeTextbookPipeline({ userId: 'native', title: '扫描教材', pdf: bytes, inspector,
+    const result = await repo.executeTextbookPipeline({ userId: 'native', title: '扫描教材', pdf: bytes, inspector, chapterParser,
       tocEntries: [{ id: 'l1', title: '第一章', level: 'lesson', startPage: 1, endPage: 1 }], poolSize: 1, adapter: model.adapter, submissionTool: tool });
     expect(isOk(result)).toBe(true); expect(result.ok && result.value.allLessonsReady).toBe(true);
     expect(model.closed).toHaveLength(1);
@@ -86,7 +91,7 @@ describe('真实原生 OCR 与教材流水线', () => {
   it('HTTP 本地路径 → 后台注册 → 原生 OCR → 工具 → SQLite 完成，透传用户模型和思考等级', async () => {
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
     const registry = new TextbookPipelineJobRegistry(), tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool);
-    const app = createPdfImportRoutes({ repo, server: { pipelineJobs: registry } as never, port: 0 }, { adapter: model.adapter, submissionTool: tool });
+    const app = createPdfImportRoutes({ repo, server: { pipelineJobs: registry } as never, port: 0 }, { adapter: model.adapter, submissionTool: tool, chapterParser });
     const response = await app.request('/api/documents/native/textbook-pipeline-jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
       filePath: fileURLToPath(fixture), title: '扫描教材', model: 'user-model', effort: 'low', poolSize: 1,
       tocEntries: [{ id: 'l1', title: '第一章', level: 'lesson', startPage: 1, endPage: 1 }],

@@ -32,7 +32,7 @@ export interface StartPipelineJobVars extends Partial<TextbookPipelineSettings> 
   tocEntries: Array<TocEntry & { sortOrder: number }>;
   lessonJobs?: Array<{
     lessonId: string;
-    ocrText: string;
+    text: string;
     title?: string;
   }>;
 }

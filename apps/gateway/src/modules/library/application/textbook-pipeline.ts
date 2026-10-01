@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { AgentAdapter } from '@study-studio/agent-runtime';
-import { canonicalizeTocEntries, planTextbookTasks, TextbookPipelineSettingsSchema, type TextbookPipelineSettings, type TocEntry } from '@study-studio/document-model';
+import { canonicalizeTocEntries, planTextbookTasks, TextbookPipelineSettingsSchema, type ChapterSource, type TextbookPipelineSettings, type TocEntry } from '@study-studio/document-model';
 import { BusinessError, ok, err, generateId, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ImportTask } from '@study-studio/storage-sqlite';
 import type { ContentRepository } from '../ports.js';
@@ -9,12 +9,14 @@ import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-too
 import { ChapterSessionPool, LessonInputQueue, type BatchExtractionProgress, type LessonStage } from './lesson-batch-extractor.js';
 import { producePdfLessons } from './pdf-import/lesson-content-slicer.js';
 import { ImportMonitor } from './import-monitor.js';
+import type { ChapterParser } from '../../../infrastructure/mineru/parser.js';
 
 export interface TextbookPipelineInput extends Partial<TextbookPipelineSettings> {
   userId: string; documentId?: string | undefined; title: string;
   language?: string | undefined; filename?: string | undefined;
   tocEntries: readonly TocEntry[];
-  lessonJobs?: Array<{ lessonId: string; ocrText: string }> | undefined;
+  lessonJobs?: Array<{ lessonId: string; text: string; source?: ChapterSource }> | undefined;
+  chapterParser?: ChapterParser | undefined;
   pdf?: Uint8Array | undefined; inspector?: PdfInspectorLike | undefined;
   forceOverwrite?: boolean | undefined;
   adapter?: AgentAdapter | undefined; submissionTool?: LibraryLessonCommitTool | undefined;
@@ -84,11 +86,11 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
       const tool = input.submissionTool;
       pool = new ChapterSessionPool({ userId: input.userId, adapter: input.adapter, tool, poolSize: config.poolSize, model: input.model, effort: input.effort, signal: controller.signal, monitor, firstResponseTimeoutMs: config.firstResponseTimeoutMs, stallTimeoutMs: config.stallTimeoutMs });
       const activePool = pool;
-      const onText = async (lesson: TocEntry, text: string) => {
+      const onText = async (lesson: TocEntry, text: string, source?: ChapterSource) => {
         const task = tasks.find(task => task.root.id === lesson.id)!;
-        monitor.record('text', 'ready', { text, startPage: lesson.startPage, endPage: lesson.endPage ?? null }, { nodeId: lesson.id });
+        monitor.record('text', 'ready', { text, source: source ?? null, startPage: lesson.startPage, endPage: lesson.endPage ?? null }, { nodeId: lesson.id });
         emit(lesson.id, 'queued');
-        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: task.ancestors, ocrText: text });
+        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: task.ancestors, text, ...(source ? { source } : {}) });
         monitor.record('queue', 'enqueued', { size: queue.size }, { nodeId: lesson.id });
       };
       const produce = async () => {
@@ -97,14 +99,15 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
           if (supplied.size !== input.lessonJobs.length || input.lessonJobs.some(job => !lessons.some(lesson => lesson.id === job.lessonId))) throw new BusinessError('E_TOC_SLOT_NOT_FOUND', '章节输入含重复或未知目录 ID', 'VALIDATION');
           for (const lesson of pending) {
             if (controller.signal.aborted) return;
-            const text = supplied.get(lesson.id)?.ocrText.trim();
+            const text = supplied.get(lesson.id)?.text.trim();
             if (!text) { fail(lesson.id, new BusinessError('E_OCR_TEXT_EMPTY', '该章没有可用文字', 'VALIDATION')); continue; }
-            await onText(lesson, text);
+            await onText(lesson, text, supplied.get(lesson.id)?.source);
           }
         } else if (input.pdf && input.inspector) {
-          await producePdfLessons({ pdf: input.pdf, inspector: input.inspector, lessons: pending, concurrency: config.ocrConcurrency, retries: config.ocrRetries, signal: controller.signal,
+          await producePdfLessons({ pdf: input.pdf, inspector: input.inspector, lessons: pending, concurrency: config.parseConcurrency, retries: config.parseRetries, signal: controller.signal,
+            settings: config, ...(input.chapterParser ? { parser: input.chapterParser } : {}),
             onDiagnostic: (lesson, name, detail) => monitor.record('text', name, detail, { nodeId: lesson.id }),
-            onStart: lesson => emit(lesson.id, 'ocr'), onText, onFailure: (lesson, error) => fail(lesson.id, error),
+            onStart: lesson => emit(lesson.id, 'parsing'), onText, onFailure: (lesson, error) => fail(lesson.id, error),
           });
         } else throw new BusinessError('E_INVALID_INPUT', '请选择教材 PDF 或提供章节文字', 'VALIDATION');
         queue.end();
