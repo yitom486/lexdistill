@@ -12,3 +12,4 @@ export * from './directory-content.js';
 export * from './lesson-projection.js';
 export * from './textbook-pipeline-settings.js';
 export * from './toc.js';
+export * from './chapter-source.js';
