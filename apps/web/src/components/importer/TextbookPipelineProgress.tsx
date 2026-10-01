@@ -18,7 +18,7 @@ const stageLabels = { parsing: '解析章节内容', queued: '等待会话', ext
 export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: Props) {
   const [monitorOpen, setMonitorOpen] = useState(false);
   const [monitorNode, setMonitorNode] = useState<string | undefined>();
-  const slots = useTextbookLessonSlotsQuery(job.documentId);
+  const slots = useTextbookLessonSlotsQuery(job.documentId, job.userId);
   const cancel = useCancelPipelineJobMutation();
   const planned = slots.data?.length ? planTextbookTasks(slots.data.map(slot => ({ ...slot, id: slot.lessonId, level: slot.kind }))) : undefined;
   return (
@@ -36,10 +36,15 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
       <div className="max-h-60 space-y-2 overflow-auto">
         {(planned?.ok ? planned.value.map(task => task.root) : []).map((slot) => {
           const failure = job.failedLessons.find((item) => item.lessonId === slot.lessonId);
+          const activity = job.lessonActivities?.[slot.lessonId];
           return (
             <button type="button" key={slot.lessonId} onClick={() => { setMonitorNode(slot.lessonId); setMonitorOpen(true); }} className="flex w-full justify-between gap-2 border-b border-line-soft py-2 text-left text-ink">
               <span>{slot.title}</span>
-              <span className="text-ink-muted">{slot.status === 'ready' ? '已保存' : failure ? failure.error : job.status === 'running' && job.lessonStages?.[slot.lessonId] ? stageLabels[job.lessonStages[slot.lessonId]!] : job.status === 'running' ? '等待处理' : '未完成'}</span>
+              <span className="text-right text-ink-muted">{slot.status === 'ready' ? '已保存' : failure ? failure.error : job.status === 'running' && job.lessonStages?.[slot.lessonId] ? stageLabels[job.lessonStages[slot.lessonId]!] : job.status === 'running' ? '等待处理' : '未完成'}
+                {activity && slot.status !== 'ready' && <span className="mt-1 block">第 {activity.attempt} 次尝试 · 提交拒绝 {activity.correctionCount} 次 · 引擎重试 {activity.engineRetryCount} 次<br />
+                  最近活动 {new Date(activity.lastActivityAt).toLocaleTimeString()} · {activity.event === 'runtime_retry' ? activity.message ?? '引擎重试中' : activity.nativeTurnId ? '原生轮次已启动' : '等待原生轮次启动'}
+                </span>}
+              </span>
             </button>
           );
         })}

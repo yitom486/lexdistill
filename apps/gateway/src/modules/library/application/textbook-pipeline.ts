@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { AgentAdapter, AgentImageAttachment } from '@study-studio/agent-runtime';
-import { canonicalizeTocEntries, planTextbookTasks, TextbookPipelineSettingsSchema, type ChapterSource, type TextbookPipelineSettings, type TocEntry } from '@study-studio/document-model';
+import { canonicalizeTocEntries, planTextbookTasks, TextbookPipelineSettingsSchema, type ChapterSource, type TextbookPipelineSettings, type TocEntry, type TextbookModelActivity } from '@study-studio/document-model';
 import { BusinessError, ok, err, generateId, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ImportTask } from '@study-studio/storage-sqlite';
 import type { ContentRepository } from '../ports.js';
@@ -8,7 +8,7 @@ import type { PdfInspectorLike, RenderedPagePng } from '../../../infrastructure/
 import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import { ChapterSessionPool, LessonInputQueue, type BatchExtractionProgress, type LessonStage } from './lesson-batch-extractor.js';
 import { producePdfLessons } from './pdf-import/lesson-content-slicer.js';
-import { ImportMonitor } from './import-monitor.js';
+import { ImportMonitor, IMPORT_MONITOR_REFRESH_MS } from './import-monitor.js';
 import type { ChapterParser } from '../../../infrastructure/mineru/parser.js';
 
 export interface TextbookPipelineInput extends Partial<TextbookPipelineSettings> {
@@ -55,11 +55,11 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
   let successful = 0, completed = 0;
   const lessons = tasks.map(task => task.root);
   const emptyStats = { vocabCount: 0, grammarCount: 0, exerciseCount: 0, hasPassage: false };
-  const emit = (lessonId: string, stage: LessonStage, stats = emptyStats, error?: string, allLessonsReady = false) => {
-    monitor.record('task', stage, { stats, error: error ?? null }, { nodeId: lessonId });
+  const emit = (lessonId: string, stage: LessonStage, stats = emptyStats, error?: string, allLessonsReady = false, modelActivity?: TextbookModelActivity, activityOnly = false) => {
+    if (!activityOnly) monitor.record('task', stage, { stats, error: error ?? null }, { nodeId: lessonId });
     input.onProgress?.({
     documentId, lessonId, stage, completedCount: completed, successfulCount: successful, totalCount: lessons.length,
-    stats, allLessonsReady, ...(error ? { error } : {}),
+    stats, allLessonsReady, ...(error ? { error } : {}), ...(modelActivity ? { modelActivity } : {}),
     });
   };
   const fail = (lessonId: string, error: BusinessError) => { completed++; errors.push({ lessonId, error: error.userMessage }); emit(lessonId, 'failed', emptyStats, error.userMessage); };
@@ -141,6 +141,9 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
             const session = worker.session;
             const assignmentId = generateId('chapter_attempt');
             const turnController = new AbortController();
+            let activity: TextbookModelActivity = { attempt: attempt + 1, lastActivityAt: new Date().toISOString(), event: 'input', engineRetryCount: 0, correctionCount: 0 };
+            let currentStage: LessonStage = 'extracting';
+            let lastActivityBroadcast = 0;
             const cancelTurn = () => turnController.abort();
             controller.signal.addEventListener('abort', cancelTurn, { once: true });
             const binding = { nodeId: job.lessonId, sessionId: session.sessionId, ...(session.threadId ? { threadId: session.threadId } : {}), attemptId: assignmentId };
@@ -149,15 +152,25 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
             const submission = tool.bind(session.sessionId, { userId: input.userId, documentId, lessonId: job.lessonId, assignmentId, tocEntries: job.tocEntries, signal: controller.signal, allowAiExercises: config.allowAiExercises,
               ...(job.source ? { sourceBlocks: job.source.blocks } : {}),
               monitor, sessionId: session.sessionId, turnSignal: turnController.signal,
+              toolRepairRetries: config.toolRepairRetries, onRepairLimit: error => turnController.abort(error),
               onStage: stage => {
-                if (stage === 'saved' && submission.receipt) { successful++; completed++; emit(job.lessonId, stage, submission.receipt.stats, undefined, submission.receipt.allLessonsReady); }
-                else emit(job.lessonId, stage);
+                currentStage = stage;
+                if (stage === 'correcting') activity = { ...activity, correctionCount: activity.correctionCount + 1, event: 'validation_rejected', lastActivityAt: new Date().toISOString() };
+                if (stage === 'saved' && submission.receipt) { successful++; completed++; emit(job.lessonId, stage, submission.receipt.stats, undefined, submission.receipt.allLessonsReady, activity); }
+                else emit(job.lessonId, stage, emptyStats, undefined, false, activity);
               },
             });
             try {
               emit(job.lessonId, 'extracting');
               const correction = lastError ? `${lastError.userMessage}${lastError.category === 'VALIDATION' && lastError.internalDetails ? `\n具体校验问题：${JSON.stringify(lastError.internalDetails)}` : ''}` : undefined;
-              const sent = await activePool.send(session, job, assignmentId, turnController, correction);
+              const sent = await activePool.send(session, job, assignmentId, turnController, correction, update => {
+                // 事务完成后只保留真实模型日志，不重复广播 saved 阶段。
+                if (submission.receipt) return;
+                activity = { ...activity, ...update }; if (!update.message) delete activity.message;
+                if (update.event.endsWith('_delta') && Date.now() - lastActivityBroadcast < IMPORT_MONITOR_REFRESH_MS) return;
+                lastActivityBroadcast = Date.now();
+                emit(job.lessonId, currentStage, emptyStats, undefined, false, activity, true);
+              });
               if (submission.receipt) return;
               if (submission.candidate) {
                 for (let retry = 0; retry < config.storageRetries && !controller.signal.aborted && submission.error?.retryable; retry++) {

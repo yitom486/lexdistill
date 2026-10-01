@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TextbookLessonStageSchema } from '@study-studio/document-model';
+import { TextbookLessonStageSchema, TextbookModelActivitySchema } from '@study-studio/document-model';
 
 /**
  * 整书 AI 流水线并发提炼后台任务状态契约（HTTP 轮询 + SSE 流式推送同源）。
@@ -35,6 +35,7 @@ export const TextbookPipelineJobSnapshotSchema = z.object({
   currentLessonTitle: z.string().optional(),
   currentStage: TextbookLessonStageSchema.optional(),
   lessonStages: z.record(z.string(), TextbookLessonStageSchema).optional(),
+  lessonActivities: z.record(z.string(), TextbookModelActivitySchema).optional(),
   successfulLessons: z.number().int().nonnegative(),
   failedLessons: z.array(TextbookPipelineFailedLessonSchema),
   concurrency: z.number().int().positive().optional(),

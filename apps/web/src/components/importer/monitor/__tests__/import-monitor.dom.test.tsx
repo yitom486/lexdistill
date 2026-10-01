@@ -34,6 +34,16 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       }
       expect((await submit(value)).ok).toBe(true);
     });
+    const create = model.adapter.createSession;
+    model.adapter.createSession = async options => {
+      const created = await create(options); if (!created.ok) return created;
+      const send = created.value.send.bind(created.value);
+      created.value.send = async function* (input) {
+        yield { type: 'RUNTIME_RETRY', code: 'E_ENGINE_BUSY', message: '受控引擎繁忙，当前轮次继续重试', category: 'AGENT_RUNTIME' };
+        yield* send(input);
+      };
+      return created;
+    };
     const running = repo.executeTextbookPipeline({ userId: 'owner', traceId: 'desktop-trace', documentId: 'desktop-book', title: '监视教材', poolSize: 1,
       tocEntries: [{ id: 'u', level: 'unit', title: '真实单元', startPage: 5, endPage: 11 },
         { id: 'a', level: 'section', parentId: 'u', title: '已保存部分', startPage: 5, endPage: 7 }, { id: 'ac', level: 'section', parentId: 'a', title: '会话小节', startPage: 6, endPage: 7 },
@@ -70,6 +80,10 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       expect(doc.querySelector('[data-testid="sent-directory"]')?.textContent).toContain('目录已随本轮输入发送');
       expect(doc.body.textContent).toContain('本 Worker 会复用线程');
       expect(doc.querySelector<HTMLDetailsElement>('[data-testid="current-interaction"]')?.open).toBe(true);
+      expect(doc.body.textContent).toContain('引擎内部重试（本轮尚未结束）');
+      for (let attempt = 0; attempt < 20 && !doc.body.textContent?.includes('受控引擎繁忙'); attempt++) await settle();
+      expect(doc.body.textContent).toContain('受控引擎繁忙');
+      expect(doc.body.textContent).toContain('不刷新模型输出等待期限');
       expect(doc.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')?.open).toBe(false);
       expect(doc.body.textContent).toContain('当前正文');
       expect(reads.some(path => path.endsWith('/details/' + historyInput.sequence))).toBe(false);
@@ -96,7 +110,7 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       expect(doc.querySelector<HTMLButtonElement>('nav [aria-pressed="true"]')?.textContent).toBe('已保存部分');
       expect(recent.open).toBe(false);
       await act(async () => { recent.open = true; recent.dispatchEvent(new dom!.dom.window.Event('toggle')); }); await settle();
-      const successCall = [...recent.querySelectorAll<HTMLElement>('[data-testid="model-tool-call"]')].find(item => item.querySelector('h4')?.textContent?.includes('事务已提交'))!;
+      const successCall = [...recent.querySelectorAll<HTMLElement>('[data-testid="model-tool-call"]')].find(item => item.querySelector('summary')?.textContent?.includes('事务已提交'))!;
       const checks = [...successCall.querySelectorAll<HTMLDetailsElement>('details')].find(item => item.querySelector('summary')?.textContent === '逐项校验与系统生成的内容')!;
       await act(async () => { checks.open = true; checks.dispatchEvent(new dom!.dom.window.Event('toggle')); });
       const candidate = [...checks.querySelectorAll<HTMLDetailsElement>('details')].find(item => item.querySelector('summary')?.textContent?.includes('系统生成 ID 后的规范内容'))!;
@@ -105,7 +119,12 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       expect(candidate.querySelector('[data-toc-id="ac"]')?.textContent).toContain('整理后的正文 ac');
       expect(recent.querySelectorAll('[data-testid="model-tool-call"]')).toHaveLength(2);
       expect(recent.textContent).toContain('事务已提交');
-      const failureCall = [...recent.querySelectorAll<HTMLElement>('[data-testid="model-tool-call"]')].find(item => item.textContent?.includes('invalid-coverage'))!;
+      const failureCall = [...recent.querySelectorAll<HTMLDetailsElement>('[data-testid="model-tool-call"]')].find(item => item.querySelector('summary')?.textContent?.includes('此前拒绝'))!;
+      expect(failureCall.open).toBe(false);
+      await act(async () => failureCall.querySelector<HTMLElement>('summary')!.click()); await settle();
+      expect(failureCall.open).toBe(true);
+      const rejection = [...failureCall.querySelectorAll<HTMLDetailsElement>('details')].find(item => item.querySelector('summary')?.textContent?.includes('校验拒绝与修正反馈'))!;
+      await act(async () => { rejection.open = true; rejection.dispatchEvent(new dom!.dom.window.Event('toggle')); }); await settle();
       expect(failureCall.textContent).toContain('content.coverage.0.status');
       const feedback = [...failureCall.querySelectorAll<HTMLDetailsElement>('details')].find(item => item.querySelector('summary')?.textContent === '反馈字段、合法值与失败详情')!;
       await act(async () => { feedback.open = true; feedback.dispatchEvent(new dom!.dom.window.Event('toggle')); });

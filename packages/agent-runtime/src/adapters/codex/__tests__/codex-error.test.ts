@@ -24,7 +24,7 @@ describe('Codex error pipeline (App Server notify → user copy)', () => {
     expectNotVague(error.userMessage);
   });
 
-  it('skips willRetry=true so a transient notify is not a terminal failure', () => {
+  it('willRetry=true 给出非终止诊断，仍不翻译为终态错误', () => {
     expect(
       translateCodexNotificationParams({
         willRetry: true,
@@ -42,7 +42,7 @@ describe('Codex error pipeline (App Server notify → user copy)', () => {
         willRetry: true,
         error: { message: 'temporary overload', codexErrorInfo: 'serverOverloaded' },
       })
-    ).toEqual([]);
+    ).toEqual([expect.objectContaining({ type: 'RUNTIME_RETRY', code: 'E_CODEX_OVERLOADED' })]);
   });
 
   it('emits ERROR once willRetry is false after a skipped retry notify', () => {
@@ -54,7 +54,7 @@ describe('Codex error pipeline (App Server notify → user copy)', () => {
       willRetry: false,
       error: { message: 'still overloaded', codexErrorInfo: 'serverOverloaded' },
     });
-    expect(skipped).toEqual([]);
+    expect(skipped[0]?.type).toBe('RUNTIME_RETRY');
     expect(terminal[0]?.type).toBe('ERROR');
     if (terminal[0]?.type === 'ERROR') {
       expect(terminal[0].error.code).toBe('E_CODEX_OVERLOADED');

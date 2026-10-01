@@ -1,5 +1,5 @@
 import type { AgentAdapter, AgentSession, AgentImageAttachment } from '@study-studio/agent-runtime';
-import type { ChapterSource, TocEntry, TextbookLessonStage } from '@study-studio/document-model';
+import type { ChapterSource, TocEntry, TextbookLessonStage, TextbookModelActivity } from '@study-studio/document-model';
 import { BusinessError, generateId, translateToBusinessError, logger, type Result } from '@study-studio/shared';
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
 import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
@@ -25,7 +25,9 @@ export interface BatchExtractionProgress {
   completedCount: number; totalCount: number; successfulCount?: number;
   allLessonsReady: boolean; error?: string;
   stats: CommitLessonKnowledgeOutput['stats'];
+  modelActivity?: TextbookModelActivity;
 }
+type ModelTurnActivity = Pick<TextbookModelActivity, 'lastActivityAt' | 'event' | 'nativeTurnId' | 'engineRetryCount' | 'message'>;
 
 /** 教材专用有界交接队列；满时阻塞解析生产者，结束/取消唤醒双方。 */
 export class LessonInputQueue {
@@ -115,7 +117,7 @@ export class ChapterSessionPool {
       }
     }));
   }
-  async send(session: AgentSession, job: LessonExtractionJob, assignmentId: string, controller: AbortController, correction?: string): Promise<Result<void, BusinessError>> {
+  async send(session: AgentSession, job: LessonExtractionJob, assignmentId: string, controller: AbortController, correction?: string, onActivity?: (activity: ModelTurnActivity) => void): Promise<Result<void, BusinessError>> {
     const turn = this.options.monitor?.turn(session, { nodeId: job.lessonId, attemptId: assignmentId });
     const message = buildLessonExtractionPrompt(job, this.options.tool.name.replaceAll('.', '_'), correction);
     this.options.monitor?.record('model', 'input', { message, model: this.options.model ?? null, effort: this.options.effort ?? null, correction: correction ?? null,
@@ -123,19 +125,47 @@ export class ChapterSessionPool {
       attachments: job.attachments?.map(image => ({ label: image.label, pngBase64: Buffer.from(image.png).toString('base64') })) ?? [],
     }, turn?.binding);
     const interrupt = () => { void session.interrupt().catch(cause => logger.warn('教材会话中断失败', { cause: String(cause) })); };
+    const startedAt = Date.now();
+    let nativeTurnId: string | undefined, lastActivityAt = startedAt, lastEvent: string | undefined;
+    let engineRetryCount = 0, lastEngineError: { code: string; message: string } | undefined;
+    let first = true, deadline = startedAt + this.options.firstResponseTimeoutMs;
+    const activity = (event: string, message?: string) => onActivity?.({ event, lastActivityAt: new Date().toISOString(), engineRetryCount,
+      ...(nativeTurnId ? { nativeTurnId } : {}), ...(message ? { message } : {}),
+    });
+    activity('input');
     controller.signal.addEventListener('abort', interrupt, { once: true });
-    const iterator = session.send({ message, onTurnStarted: nativeTurnId => {
-      this.options.tool.startTurn(session.sessionId, assignmentId, nativeTurnId);
-      this.options.monitor?.record('session', 'turn_started', { nativeTurnId }, turn?.binding);
+    const iterator = session.send({ message, onTurnStarted: id => {
+      if (controller.signal.aborted) return;
+      nativeTurnId = id;
+      this.options.tool.startTurn(session.sessionId, assignmentId, id);
+      this.options.monitor?.record('session', 'turn_started', { nativeTurnId: id }, turn?.binding);
+      activity('turn_started');
     }, ...(job.attachments?.length ? { attachments: job.attachments } : {}), ...(this.options.effort ? { turnOptions: { effort: this.options.effort } } : {}) })[Symbol.asyncIterator]();
     try {
       if (controller.signal.aborted) return { ok: false, error: new BusinessError('E_CANCELLED', '教材提取已取消', 'AGENT_RUNTIME') };
-      let first = true;
       while (true) {
-        const next = await awaitModelActivity(iterator.next(), controller, first ? this.options.firstResponseTimeoutMs : this.options.stallTimeoutMs, first);
+        const next = await awaitModelActivity(() => iterator.next(), controller, Math.max(0, deadline - Date.now()), first, () => ({
+          timeoutMs: first ? this.options.firstResponseTimeoutMs : this.options.stallTimeoutMs,
+          elapsedMs: Date.now() - startedAt, idleMs: Date.now() - lastActivityAt,
+          nativeTurnId: nativeTurnId ?? null, nativeTurnAccepted: !!nativeTurnId, lastModelEvent: lastEvent ?? null,
+          engineRetryCount, lastEngineError: lastEngineError ?? null,
+          inputCharacters: message.length, attachmentCount: job.attachments?.length ?? 0,
+          attachmentBytes: job.attachments?.reduce((sum, image) => sum + image.png.byteLength, 0) ?? 0,
+        }));
         if (next.done) break;
-        const event = next.value; first = false;
+        const event = next.value;
         turn?.event(event);
+        if (event.type === 'RUNTIME_RETRY') {
+          engineRetryCount++; lastEngineError = { code: event.code, message: event.message };
+          activity('runtime_retry', event.message);
+          continue;
+        }
+        if (event.type === 'TEXT_DELTA' || event.type === 'REASONING_DELTA') {
+          if (!event.delta) continue;
+        }
+        first = false; lastActivityAt = Date.now(); lastEvent = event.type;
+        deadline = lastActivityAt + this.options.stallTimeoutMs;
+        activity(event.type.toLowerCase());
         if (event.type === 'APPROVAL_REQUESTED') {
           const declined = await session.submitApproval(event.approvalId, 'decline');
           if (!declined.ok) return declined;

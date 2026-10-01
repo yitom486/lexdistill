@@ -1,5 +1,5 @@
 import type { AgentEvent } from '../../contracts/index.js';
-import { translateCodexNotificationParams, translateCodexTurnError } from './codex-error.js';
+import { translateCodexNotificationParams, translateCodexRetryNotification, translateCodexTurnError } from './codex-error.js';
 
 /**
  * 将 Codex App Server v2 通知映射为内部 AgentEvent。
@@ -97,6 +97,8 @@ export function mapAppServerNotificationToEvents(
       break;
     }
     case 'error': {
+      const retry = translateCodexRetryNotification(params);
+      if (retry) { events.push({ type: 'RUNTIME_RETRY', ...retry }); break; }
       const error = translateCodexNotificationParams(params);
       if (error) {
         events.push({ type: 'ERROR', error });

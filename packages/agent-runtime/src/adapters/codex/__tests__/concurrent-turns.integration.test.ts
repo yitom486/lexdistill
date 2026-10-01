@@ -68,6 +68,14 @@ describe('共享 Codex 连接的并行模型交互', () => {
     try {
       await waitFor(() => rpc.started.size === 2); await Bun.sleep(5);
       const turnA = rpc.started.get(a.threadId!)!, turnB = rpc.started.get(b.threadId!)!;
+      const retry = { willRetry: true, error: { codexErrorInfo: 'serverOverloaded', message: 'private-credential-in-raw', additionalDetails: 'private-credential-in-details' } };
+      rpc.emit('error', { ...retry, threadId: a.threadId, turnId: 'stale-A' });
+      rpc.emit('error', { ...retry, threadId: a.threadId, turnId: turnA });
+      await waitFor(() => seenA.some(event => event.type === 'RUNTIME_RETRY'));
+      expect(seenA.filter(event => event.type === 'RUNTIME_RETRY')).toHaveLength(1);
+      expect(seenB.some(event => event.type === 'RUNTIME_RETRY')).toBe(false);
+      expect(JSON.stringify(seenA)).not.toContain('private-credential');
+      expect(endedA).toBe(false);
       rpc.emit('item/agentMessage/delta', { threadId: a.threadId, turnId: turnA, delta: 'A 正文' });
       rpc.emit('item/agentMessage/delta', { threadId: b.threadId, turnId: turnB, delta: 'B 正文' });
       rpc.emit('turn/completed', { threadId: a.threadId, turn: { id: 'stale-A', status: 'completed' } });

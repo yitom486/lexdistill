@@ -145,4 +145,6 @@ export interface GeneratedQuestionPayload {
 - `GET /api/documents/:userId/textbook-parsers/config` 只返回 `{ cloudTokenConfigured: boolean }`；不返回 Token、不验证额度，不向客户端透露云端上传签名。路径避开文档按 ID 的通配路由。
 - 正文任务仍使用既有 `/textbook-pipeline-jobs` 接口。`parserBackend` 为 `mineru-cloud` / `mineru-local`，显式本地配置 `mineruLocalUrl` 与 `mineruLocalTier`（basic/standard/advanced）。资源配置为 `parseConcurrency`、`parsePageLimit`、`parsePollIntervalMs`、`parseTimeoutMs`、`parseRetries`，其边界由 `TextbookPipelineSettingsSchema` 定义。旧正文 OCR 字段已删除，不提供别名。
 - 阶段 `parsing` 表示章节解析；`parse_submitted/uploaded/progress/downloading/completed/resumed/failed/retry` 在既有监视 `text` 类别中记录本次实际远端任务身份、页段和进度，不新增模型能力或伪造逐页流。
-- 解析块格式由 `ChapterSourceSchema` 定义，统一保留原 PDF 1 起物理页和块 ID。模型工具的 `sourceRefs` 为 `{ blockId, page, row? }`，`row` 从 0 开始。`E_SOURCE_REFERENCE_INVALID` 拒绝未知块、错误页和越界表格行，返回具体可修正反馈；正式保存仍经既有 AST/派生事务。
+- 解析块格式由 `ChapterSourceSchema` 定义，统一保留原 PDF 1 起物理页和块 ID。当前模型工具的 `sourceRefs` 为 `{ blockId, row? }`，`row` 从 0 开始；物理页由 Gateway 从当前实际块映射后保存，不接受模型提交 page。`E_SOURCE_REFERENCE_INVALID` 拒绝未知块和越界表格行，反馈使用原始字段路径；正式保存仍经既有 AST/派生事务。
+- `toolRepairRetries` 控制同轮首次拒绝后的工具修正次数，`modelRetries` 控制新轮次数，`storageRetries` 控制候选保存重试；`E_TOOL_REPAIR_LIMIT` 带最后校验问题。后台快照的 `lessonActivities` 按章节携带实际尝试、原生轮次、最近活动和拒绝/引擎重试数。
+- 规范化 `RUNTIME_RETRY` 为非终止模型事件，当前轮次继续；业务等待期限不因该通知刷新。原始错误和凭据不写入其诊断内容。

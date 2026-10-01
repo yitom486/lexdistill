@@ -30,7 +30,7 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
   const budgetFields: Array<{ key: Exclude<NumericSetting, 'poolSize'>; label: string }> = [
     { key: 'parseConcurrency', label: '同时提取的章节数' }, { key: 'queueCapacity', label: '待提交队列容量' },
     { key: 'parsePageLimit', label: '每个解析任务最多页数' }, { key: 'parseTimeoutMs', label: '解析等待超时（毫秒）' },
-    { key: 'parseRetries', label: '解析重试次数' }, { key: 'modelRetries', label: '模型修正重试次数' }, { key: 'storageRetries', label: '保存重试次数' },
+    { key: 'parseRetries', label: '解析重试次数' }, { key: 'modelRetries', label: '模型新轮重试次数' }, { key: 'toolRepairRetries', label: '每轮工具修正次数' }, { key: 'storageRetries', label: '保存重试次数' },
     { key: 'firstResponseTimeoutMs', label: '模型首响应超时（毫秒）' }, { key: 'stallTimeoutMs', label: '模型无活动超时（毫秒）' },
   ];
   return (
@@ -79,6 +79,7 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
           </label>
         ))}
       </div>
+      <p className="text-ink-muted">每轮工具修正次数控制同一会话轮次内的重新提交；用尽后结束该轮，再按模型新轮重试次数处理。引擎内部重试单独显示，不延长所选等待期限。</p>
       <p className="text-ink-muted">扫描正文使用 MinerU 解析，数字原生 PDF 直接读取文字。章节数控制在途解析任务；队列满后等待模型消费。停止提取会停止本地等待，已被解析服务接受的任务可能继续运行。</p>
       <label className="flex items-center justify-between gap-3 text-ink">允许 AI 补充习题（单独标注来源）
         <Switch checked={settings.allowAiExercises} onCheckedChange={allowAiExercises => setSettings({ allowAiExercises })} disabled={pending} />

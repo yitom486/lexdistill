@@ -189,6 +189,7 @@ export class TextbookPipelineJobRegistry {
           snapshot.currentLessonId = prog.lessonId;
           snapshot.currentStage = prog.stage;
           snapshot.lessonStages = { ...snapshot.lessonStages, [prog.lessonId]: prog.stage };
+          if (prog.modelActivity) snapshot.lessonActivities = { ...snapshot.lessonActivities, [prog.lessonId]: prog.modelActivity };
           const currentEntry = input.tocEntries.find((e) => e.id === prog.lessonId);
           snapshot.currentLessonTitle = currentEntry?.title ?? prog.lessonId;
           snapshot.successfulLessons = prog.successfulCount ?? snapshot.successfulLessons;

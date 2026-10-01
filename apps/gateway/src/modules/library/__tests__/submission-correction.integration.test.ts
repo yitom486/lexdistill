@@ -31,6 +31,47 @@ async function eventDetails(repo: DrizzleLearnerRepository, name: string) {
   }));
 }
 describe('提交修正集成：准确身份反馈、字段保留、阶段与有界模型等待', () => {
+  for (const retry of [false, true]) it(`工具修正用尽会结束该轮，迟到提交零写入；${retry ? '新轮修正成功并继续复用' : '零新轮预算明确失败'}`, async () => {
+    const lateDone = deferred(); let turns = 0, rejectedLate: boolean | undefined;
+    const env = setup(async ({ input, submit }) => {
+      const value = submissionFromPrompt(input.message);
+      if (!turns++) {
+        expect((await submit({ ...value, content: { ...value.content, blocks: [{ ...value.content.blocks[0], kind: 'UNKNOWN' }] } })).ok).toBe(false);
+        const exhausted = await submit({ ...value, content: { ...value.content, blocks: [{ ...value.content.blocks[0], kind: 'UNKNOWN' }] } });
+        expect(exhausted.ok).toBe(false); if (!exhausted.ok) { expect(exhausted.error.code).toBe('E_TOOL_REPAIR_LIMIT'); expect(JSON.stringify(exhausted.error.internalDetails)).toContain('kind'); }
+        rejectedLate = !(await submit(value)).ok; lateDone.resolve(); return;
+      }
+      expect(input.message).toContain('本轮工具修正次数已用尽'); expect(input.message).toContain('content');
+      expect((await submit(value)).ok).toBe(true);
+    });
+    const result = await env.repo.executeTextbookPipeline({ ...env.input, toolRepairRetries: 1, modelRetries: retry ? 1 : 0 });
+    await lateDone.promise;
+    expect(rejectedLate).toBe(true); expect(env.model.interrupted).toHaveLength(1);
+    expect(result.ok && result.value.allLessonsReady).toBe(retry);
+    expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(retry ? 1 : 0);
+    expect(env.model.inputs).toHaveLength(retry ? 2 : 1);
+    const records = await eventDetails(env.repo, 'repair_limit'); expect(records).toHaveLength(1);
+  });
+  for (const first of [true, false]) it(`引擎连续重试不会延长${first ? '首响应' : '停滞'}期限，失败记录含启动身份、输入规模和最后原因`, async () => {
+    const env = setup(), create = env.model.adapter.createSession;
+    env.model.adapter.createSession = async options => {
+      const created = await create(options); if (!created.ok) return created;
+      created.value.send = async function* (input) {
+        input.onTurnStarted?.('accepted-turn');
+        if (!first) yield { type: 'TEXT_DELTA', delta: '首段回复' };
+        for (let index = 0; index < 15; index++) { await Bun.sleep(10); yield { type: 'RUNTIME_RETRY', code: 'E_ENGINE_BUSY', message: '引擎繁忙', category: 'AGENT_RUNTIME' }; }
+      };
+      return created;
+    };
+    const result = await env.repo.executeTextbookPipeline({ ...env.input, firstResponseTimeoutMs: 40, stallTimeoutMs: 40 });
+    expect(result.ok && result.value.failedLessons).toBe(1); expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(0);
+    const failed = await eventDetails(env.repo, 'failed');
+    expect(failed.find(event => event?.category === 'model')?.detail).toEqual(expect.objectContaining({ code: first ? 'E_AGENT_FIRST_RESPONSE_TIMEOUT' : 'E_AGENT_STALL_TIMEOUT',
+      details: expect.objectContaining({ timeoutMs: 40, nativeTurnAccepted: true, nativeTurnId: 'accepted-turn', attachmentCount: 0, lastModelEvent: first ? null : 'TEXT_DELTA', lastEngineError: { code: 'E_ENGINE_BUSY', message: '引擎繁忙' } }),
+    }));
+    expect((await eventDetails(env.repo, 'runtime_retry')).length).toBeGreaterThan(0);
+    expect((await eventDetails(env.repo, 'runtime_retry')).length).toBeLessThan(15);
+  });
   it('原生旧轮次零写入，模型不提交身份，合法内容生成系统 ID 并保存独立讲解', async () => {
     const env = setup(async ({ input, submit, sessionId }) => {
       const value = submissionFromPrompt(input.message);
@@ -152,7 +193,7 @@ describe('提交修正集成：准确身份反馈、字段保留、阶段与有�
   it('超时会话先关闭再重试，旧工具零写入，新会话持续复用到下一部分', async () => {
     const gate = deferred(), lateDone = deferred(); let calls = 0, oldAccepted: boolean | undefined;
     const env = setup(async ({ input, submit }) => {
-      if (!calls++) { await gate.promise; oldAccepted = (await submit(submissionFromPrompt(input.message))).ok; lateDone.resolve(); return; }
+      if (!calls++) { await gate.promise; input.onTurnStarted?.('late-old-turn'); oldAccepted = (await submit(submissionFromPrompt(input.message))).ok; lateDone.resolve(); return; }
       expect(env.model.closed).toHaveLength(1);
       expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true);
     });
@@ -165,5 +206,7 @@ describe('提交修正集成：准确身份反馈、字段保留、阶段与有�
       expect(env.model.closed).toHaveLength(2);
     } finally { gate.resolve(); await lateDone.promise; }
     expect(oldAccepted).toBe(false); expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(2);
+    const starts = await eventDetails(env.repo, 'turn_started'); expect(starts).toHaveLength(3);
+    expect(JSON.stringify(starts)).not.toContain('late-old-turn');
   });
 });

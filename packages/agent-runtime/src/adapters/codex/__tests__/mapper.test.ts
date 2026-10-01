@@ -108,7 +108,7 @@ describe('Agent Codex - Mapper & Adapter', () => {
     }
   });
 
-  it('ignores Codex error notifications that will retry', () => {
+  it('maps Codex retry notifications as nonterminal runtime diagnostics', () => {
     const events = mapAppServerNotificationToEvents('error', {
       threadId: 't1',
       turnId: 'turn_1',
@@ -119,7 +119,7 @@ describe('Agent Codex - Mapper & Adapter', () => {
         additionalDetails: null,
       },
     });
-    expect(events).toEqual([]);
+    expect(events).toEqual([expect.objectContaining({ type: 'RUNTIME_RETRY', code: 'E_CODEX_OVERLOADED' })]);
   });
 
   it('maps usageLimitExceeded to a specific quota message', () => {

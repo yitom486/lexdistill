@@ -17,6 +17,8 @@ export interface LessonAssignment {
   allowAiExercises: boolean;
   monitor?: ImportMonitor;
   sessionId?: string;
+  toolRepairRetries?: number;
+  onRepairLimit?: (error: BusinessError) => void;
   onStage?: (stage: 'validating' | 'correcting' | 'saving' | 'saved') => void;
 }
 export class LessonSubmission {
@@ -26,14 +28,23 @@ export class LessonSubmission {
   error: BusinessError | undefined;
   private inFlight: Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> | undefined;
   private candidateCallId: string | undefined;
+  private rejectedCount = 0;
   constructor(readonly assignment: LessonAssignment, private readonly repo: ContentRepository) {}
 
-  acceptProposal(raw: unknown, turnId: string | undefined, callId?: string): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
+  async acceptProposal(raw: unknown, turnId: string | undefined, callId?: string): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
     if (!turnId || turnId !== this.nativeTurnId) return this.reject('E_SUBMISSION_SCOPE_INVALID', '该工具调用不属于当前章节的运行轮次，已拒绝迟到提交', false, undefined, callId);
+    if (this.assignment.signal.aborted || this.assignment.turnSignal?.aborted) return this.reject('E_CANCELLED', '本次章节尝试已结束，不能继续提交', false, undefined, callId);
     this.note('tool', 'proposal', raw, callId);
     const normalized = normalizeLessonProposal(raw, this.assignment);
-    if (!normalized.ok) return this.reject(normalized.error.code, normalized.error.userMessage, true, normalized.error.internalDetails, callId);
-    return this.accept(normalized.value.submission, callId, normalized.value.issues);
+    const result = await (normalized.ok ? this.accept(normalized.value.submission, callId, normalized.value.issues) : this.reject(normalized.error.code, normalized.error.userMessage, true, normalized.error.internalDetails, callId));
+    if (!result.ok && result.error.category === 'VALIDATION' && result.error.retryable && this.assignment.toolRepairRetries !== undefined && ++this.rejectedCount > this.assignment.toolRepairRetries) {
+      this.error = new BusinessError('E_TOOL_REPAIR_LIMIT', `本轮工具修正次数已用尽（${this.assignment.toolRepairRetries} 次）；最后问题：${result.error.userMessage}`, 'VALIDATION', true,
+        { rejectedCount: this.rejectedCount, repairRetries: this.assignment.toolRepairRetries, lastFailure: { code: result.error.code, message: result.error.userMessage, details: result.error.internalDetails } });
+      this.note('validation', 'repair_limit', { code: this.error.code, message: this.error.userMessage, retryable: true, details: this.error.internalDetails }, callId);
+      this.assignment.onRepairLimit?.(this.error);
+      return err(this.error);
+    }
+    return result;
   }
 
   accept(raw: unknown, callId?: string, sourceIssues: LessonValidationIssue[] = []): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {

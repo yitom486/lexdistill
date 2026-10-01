@@ -12,6 +12,14 @@ interface MappedCodexError {
   retryable: boolean;
 }
 
+/** 重试诊断只输出已翻译的原因，不复制可能含凭据的原始文本/附加详情。 */
+export function translateCodexRetryNotification(params: unknown): { code: string; message: string; category: ErrorCategory } | null {
+  if (!params || typeof params !== 'object' || !('willRetry' in params) || params.willRetry !== true) return null;
+  const mapped = mapCodexErrorInfo(parseTurnErrorShape(params)?.codexErrorInfo);
+  return mapped ? { code: mapped.code, message: mapped.userMessage, category: mapped.category }
+    : { code: 'E_AGENT_RUNTIME_RETRY', message: '模型引擎正在重试，但未提供可分类的原因', category: 'AGENT_RUNTIME' };
+}
+
 /**
  * App Server `error` 通知：`{ error: TurnError, willRetry, threadId, turnId }`
  * TurnError：`{ message, codexErrorInfo, additionalDetails }`

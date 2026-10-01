@@ -76,7 +76,8 @@ export function pipelineModel(tool: LibraryLessonCommitTool, handle?: (turn: Mod
           const callId = `call:${inputs.length}`;
           const turnId = `turn:${inputs.length}`;
           input.onTurnStarted?.(turnId);
-          const submit = (raw: unknown) => tool.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId, turnId });
+          let toolCalls = 0;
+          const submit = (raw: unknown) => tool.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId: ++toolCalls === 1 ? callId : `${callId}:${toolCalls}`, turnId });
           if (handle) await handle({ sessionId: options.sessionId, turnId, input, submit });
           else {
             const candidate = submissionFromPrompt(input.message);

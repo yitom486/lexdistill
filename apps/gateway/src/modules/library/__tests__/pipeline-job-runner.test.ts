@@ -10,6 +10,7 @@ it('后台任务防重与阶段广播对应实际 SQLite 提交，取消后关�
   const tool = new LibraryLessonCommitTool(repo);
   const saved = deferred(), release = deferred();
   const model = pipelineModel(tool, async ({ input, submit }) => {
+    expect((await submit({ content: null })).ok).toBe(false);
     expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true);
     saved.resolve();
     await release.promise;
@@ -33,6 +34,7 @@ it('后台任务防重与阶段广播对应实际 SQLite 提交，取消后关�
     await saved.promise;
     expect(registry.getActive('owner')?.jobId).toBe(start.value.jobId);
     expect(registry.get(start.value.jobId)?.successfulLessons).toBe(1);
+    expect(registry.get(start.value.jobId)?.lessonActivities?.l1).toEqual(expect.objectContaining({ attempt: 1, nativeTurnId: 'turn:1', correctionCount: 1, engineRetryCount: 0 }));
     expect(stages).toContain('saved');
     const stats = await repo.getTextbookAssetStats('job-book');
     expect(stats.ok && stats.value.readyLessons).toBe(1);

@@ -13,6 +13,7 @@ export const TextbookPipelineSettingsSchema = z.object({
   queueCapacity: z.number().int().min(1).max(32).default(2),
   parseRetries: z.number().int().min(0).max(5).default(1),
   modelRetries: z.number().int().min(0).max(5).default(1),
+  toolRepairRetries: z.number().int().min(0).max(10).default(3).describe('每个原生轮次首次提交被拒绝后最多修正次数；与重新发起模型轮次分别计数'),
   storageRetries: z.number().int().min(0).max(5).default(2),
   allowAiExercises: z.boolean().default(true),
   firstResponseTimeoutMs: z.number().int().positive().max(600_000).default(60_000),
@@ -24,3 +25,15 @@ export const TextbookParserConfigSchema = z.object({ cloudTokenConfigured: z.boo
 export const DEFAULT_TEXTBOOK_PIPELINE_SETTINGS = TextbookPipelineSettingsSchema.parse({});
 export const TextbookLessonStageSchema = z.enum(['parsing', 'queued', 'extracting', 'validating', 'correcting', 'model_retrying', 'saving', 'storage_retrying', 'saved', 'failed']);
 export type TextbookLessonStage = z.infer<typeof TextbookLessonStageSchema>;
+
+/** 进度取实际模型活动，不用定时器伪造处理进展。 */
+export const TextbookModelActivitySchema = z.object({
+  attempt: z.number().int().positive(),
+  lastActivityAt: z.string(),
+  event: z.string(),
+  nativeTurnId: z.string().optional(),
+  engineRetryCount: z.number().int().nonnegative(),
+  correctionCount: z.number().int().nonnegative(),
+  message: z.string().optional(),
+}).strict();
+export type TextbookModelActivity = z.infer<typeof TextbookModelActivitySchema>;

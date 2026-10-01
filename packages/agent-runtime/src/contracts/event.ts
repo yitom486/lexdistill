@@ -1,4 +1,4 @@
-import type { BusinessError } from '@study-studio/shared';
+import type { BusinessError, ErrorCategory } from '@study-studio/shared';
 
 /**
  * 业务层标准规范化的 Agent 内部事件流
@@ -9,6 +9,8 @@ export type AgentEvent =
   | { type: 'REASONING_STARTED' }
   | { type: 'REASONING_DELTA'; delta: string }
   | { type: 'REASONING_COMPLETED' }
+  /** 引擎仍在当前原生轮次内重试；不是终态错误或有效模型输出。 */
+  | { type: 'RUNTIME_RETRY'; code: string; message: string; category: ErrorCategory }
   | {
       type: 'TOOL_CALL_REQUESTED';
       callId: string;
