@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { LearningContentPanel } from './textbook/LearningContentPanel.js';
-import { TextbookPreviewLauncher } from './textbook/preview/TextbookPreviewLauncher.js';
 import { StructuredLessonPanel } from './textbook/StructuredLessonPanel.js';
 import { StructuredExerciseList } from './textbook/StructuredExerciseList.js';
 import { ContentSource } from './textbook/ContentSource.js';
@@ -69,7 +68,17 @@ interface TextbookCurriculumProps {
   onAskAiTutor?: (selectedText: string, contextPrompt: string) => void;
 }
 
-export function TextbookCurriculum({
+const TextbookLearningPreview = import.meta.env?.DEV ? React.lazy(() =>
+  import('./textbook/preview/TextbookLearningPreview.js').then(module => ({ default: module.TextbookLearningPreview }))
+) : null;
+
+export function TextbookCurriculum(props: TextbookCurriculumProps) {
+  return TextbookLearningPreview
+    ? <React.Suspense fallback={<p className="p-6 text-sm text-ink-muted">正在打开教材学习页面…</p>}><TextbookLearningPreview {...props} /></React.Suspense>
+    : <StoredTextbookCurriculum {...props} />;
+}
+
+function StoredTextbookCurriculum({
   onStartLessonQuiz,
   onAddCardFromTextbook,
   onAddCardsBatch,
@@ -243,7 +252,6 @@ export function TextbookCurriculum({
   if (!currentBook || !currentLesson) {
     return (
       <div className="p-10 text-center space-y-3">
-        {import.meta.env.DEV && <TextbookPreviewLauncher />}
         <p className="text-sm text-ink-stone-500">
           {booksList.length === 0
             ? '暂无教材。内置课程教材由 Gateway 启动时自动入库；也可导入自定义教材 AST。'
@@ -335,7 +343,6 @@ export function TextbookCurriculum({
 
           {/* 语种筛选与教材快速切换 Tab 与导入入口 */}
           <div className="flex flex-wrap items-center gap-2">
-            {import.meta.env.DEV && <TextbookPreviewLauncher />}
             <Select
               value={languageFilter}
               onValueChange={(val) => {

@@ -1,13 +1,16 @@
 import { afterEach, expect, it } from 'bun:test';
 import * as React from 'react';
-import { TextbookLearningContentSchema } from '@study-studio/document-model';
-import { previewLesson } from '../../../fixtures/textbook-learning-preview.js';
+import { TextbookLearningContentSchema, TextbookASTSchema } from '@study-studio/document-model';
+import { previewLesson, previewBooks } from '../../../fixtures/textbook-learning-preview.js';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, setupDom, type DomHandle } from '../../toc/__tests__/dom-setup.js';
 
 let dom: DomHandle | undefined;
-afterEach(() => { dom?.teardown(); dom = undefined; });
+let client: QueryClient | undefined;
+const originalFetch = globalThis.fetch;
+afterEach(() => { dom?.teardown(); dom = undefined; client?.clear(); globalThis.fetch = originalFetch; });
 
-it('临时学习预览：同一内容契约 → 分类与译文 → 试答反馈；切换保留、退出重置、空分类不显示', async () => {
+it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学习试答 → 返回；Zustand恢复导航且不保存作答', async () => {
   // Base UI chooses its DOM effects at import time. Match the existing desktop DOM test isolation.
   if (process.env['LINGUA_LEARNING_PREVIEW_DOM_CHILD'] !== '1') {
     const child = Bun.spawn([process.execPath, 'test', '--path-ignore-patterns', '**/dist/**', import.meta.path], {
@@ -20,6 +23,19 @@ it('临时学习预览：同一内容契约 → 分类与译文 → 试答反馈
   expect(TextbookLearningContentSchema.safeParse(previewLesson.content).success).toBe(true);
   dom = await setupDom(true);
   const { LearningPreviewPage } = await import('./LearningPreviewPage.js');
+  const { TextbookLearningPreview } = await import('./TextbookLearningPreview.js');
+  const { useTextbookNavigationStore: navigation } = await import('../../../stores/useTextbookNavigationStore.js');
+  navigation.setState({ view: 'LIBRARY', selectedBookId: null, chaptersByBook: {}, sectionsByChapter: {}, showTranslation: false });
+  const savedAst = TextbookASTSchema.parse({ id: 'saved-book', language: 'JA', title: '已保存的教材', shortTitle: '已保存教材', level: '', lessons: [
+    { id: 'saved-chapter', lessonNumber: 1, title: '待提取章节', vocabularies: [], grammarPoints: [], dialogues: [], exercises: [] },
+  ] });
+  const methods: string[] = [];
+  globalThis.fetch = Object.assign(async (_input: string | URL | Request, init?: RequestInit) => {
+    methods.push(init?.method ?? 'GET');
+    return Response.json([{ id: 'saved-book', astJson: JSON.stringify(savedAst) }]);
+  }, { preconnect: originalFetch.preconnect });
+  client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  const renderLibrary = () => <QueryClientProvider client={client!}><TextbookLearningPreview onAddCardFromTextbook={() => { throw new Error('Preview must not create real cards'); }} /></QueryClientProvider>;
   const doc = dom.dom.window.document;
   const settle = async () => act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
   const click = async (element: HTMLElement | null | undefined) => { expect(element).toBeTruthy(); await act(async () => { element!.click(); }); await settle(); };
@@ -27,8 +43,20 @@ it('临时学习预览：同一内容契约 → 分类与译文 → 试答反馈
   const activePanel = () => doc.querySelector<HTMLElement>('[role="tabpanel"]:not([hidden])')!;
   const button = (element: ParentNode, name: string) => [...element.querySelectorAll<HTMLButtonElement>('button')].find(value => value.textContent?.includes(name));
 
-  await act(async () => { dom!.root.render(<LearningPreviewPage {...previewLesson} />); });
-  await settle();
+  await act(async () => { dom!.root.render(renderLibrary()); });
+  for (let attempt = 0; !doc.body.textContent?.includes('已保存的教材') && attempt < 80; attempt++) await settle();
+  expect(doc.querySelector('[data-testid="textbook-library-home"]')).not.toBeNull();
+  expect(doc.querySelector('[role="dialog"]')).toBeNull();
+  expect(doc.querySelectorAll('article')).toHaveLength(previewBooks.length + 1);
+  expect(doc.body.textContent).toContain('已保存的教材');
+  await click(button(doc.querySelector(`article[aria-label="教材：${previewBooks[0]!.title}"]`)!, '打开教材'));
+  expect(doc.querySelector('[data-testid="learning-preview-page"]')).not.toBeNull();
+  await click(doc.querySelector<HTMLElement>('[aria-label="选择章节"]'));
+  const chapterOption = [...doc.querySelectorAll<HTMLElement>('[role="option"]')].find(option => option.textContent === previewLesson.chapterTitle);
+  expect(chapterOption).toBeTruthy();
+  await act(async () => { chapterOption!.focus(); });
+  await click(chapterOption);
+  expect(doc.querySelector('[aria-label="选择章节"]')?.textContent).toContain(previewLesson.chapterTitle);
   expect(doc.querySelectorAll('[role="tab"]')).toHaveLength(5);
   expect(activePanel().textContent).toContain(previewLesson.content.articles[0]!.text);
   expect(activePanel().textContent).not.toContain('那是一本日语书。');
@@ -76,11 +104,31 @@ it('临时学习预览：同一内容契约 → 分类与译文 → 试答反馈
   await click(tab('练习'));
   expect(single.textContent).toContain('回答正确');
 
-  // Closing/reopening creates a new preview, so temporary selections cannot become learner records.
-  await act(async () => { dom!.root.render(null); });
-  await act(async () => { dom!.root.render(<LearningPreviewPage {...previewLesson} />); });
-  await settle(); await click(tab('练习'));
+  await click(button(doc, '返回教材首页'));
+  expect(doc.querySelector('[data-testid="textbook-library-home"]')).not.toBeNull();
+  expect(doc.querySelector('[data-testid="learning-preview-page"]')).toBeNull();
+  await click(button(doc.querySelector(`article[aria-label="教材：${previewBooks[1]!.title}"]`)!, '打开教材'));
+  expect(doc.querySelectorAll('[role="tab"]')).toHaveLength(4);
+  expect(tab('句子')).toBeUndefined();
+  await click(button(doc, '返回教材首页'));
+  await click(button(doc.querySelector(`article[aria-label="教材：${previewBooks[0]!.title}"]`)!, '继续学习'));
+  expect(doc.querySelector('[aria-label="选择章节"]')?.textContent).toContain(previewLesson.chapterTitle);
+  expect(tab('练习')?.getAttribute('aria-selected')).toBe('true');
   expect(doc.querySelector('article[aria-label="练习 1：单选"]')?.textContent).not.toContain('回答正确');
+
+  // Reload navigation from persisted preferences; preserve location, not learner records.
+  const preferences = dom.dom.window.localStorage.getItem('lingua-textbook-navigation');
+  expect(preferences).toContain(previewLesson.chapterId);
+  await act(async () => { dom!.root.render(null); });
+  navigation.setState({ view: 'LIBRARY', selectedBookId: null, chaptersByBook: {}, sectionsByChapter: {} });
+  dom.dom.window.localStorage.setItem('lingua-textbook-navigation', preferences!);
+  await navigation.persist.rehydrate();
+  await act(async () => { dom!.root.render(renderLibrary()); });
+  await settle();
+  expect(tab('练习')?.getAttribute('aria-selected')).toBe('true');
+  expect(doc.querySelector('[aria-label="选择章节"]')?.textContent).toContain(previewLesson.chapterTitle);
+  expect(doc.querySelector('article[aria-label="练习 1：单选"]')?.textContent).not.toContain('回答正确');
+  expect(methods.every(method => method === 'GET')).toBe(true);
   await act(async () => { dom!.root.render(<LearningPreviewPage key="empty-categories" {...previewLesson} content={{ ...previewLesson.content, grammar: [], articles: [], sentences: [], exercises: [] }} />); });
   await settle();
   expect(doc.querySelectorAll('[role="tab"]')).toHaveLength(1);

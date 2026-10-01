@@ -1,7 +1,9 @@
 import { TextbookLearningContentSchema, type TextbookLearningContent } from '@study-studio/document-model';
+import type { LearningLibraryBook } from '../components/textbook/preview/library-view.js';
 
 /** Temporary, user-authorized sample. Uses the current SQLite read contract; never written to a database. */
 export const previewLesson = {
+  bookId: 'preview-japanese-basics', chapterId: 'preview-objects',
   bookTitle: '日语入门 · 演示教材',
   chapterTitle: '第 2 课 · これは何ですか',
   subtitle: '指认身边的物品，询问名称与归属。',
@@ -40,3 +42,25 @@ export const previewLesson = {
 
 // Check the same contract used when reading actual saved content.
 TextbookLearningContentSchema.parse(previewLesson.content);
+
+export const previewBooks: LearningLibraryBook[] = [
+  { id: previewLesson.bookId, title: '日语入门：从问候到日常表达', language: 'JA', level: 'N5', temporary: true, chapters: [
+    { id: 'preview-greetings', title: '第 1 课 · はじめまして', subtitle: '初次见面时，介绍自己并回应对方。', content: {
+      vocabulary: [{ id: 'preview-greeting-v1', vocabularyId: 'preview-greeting-global-v1', word: '学生', reading: 'がくせい', meaning: '学生', level: 'N5', examples: [{ text: 'わたしは学生です。', translation: '我是学生。' }] }],
+      grammar: [{ id: 'preview-greeting-g1', kind: 'GRAMMAR', title: '名词 ＋ は ＋ 名词 ＋ です', connection: 'わたし ＋ は ＋ 学生 ＋ です', explanation: '「は」提示话题，「です」用于礼貌地说明身份。这里的「は」读作 wa。', examples: [{ text: 'わたしは李です。', translation: '我姓李。' }], source: 'AI' }],
+      articles: [{ id: 'preview-greeting-a1', title: '初次见面', text: '李：はじめまして。李です。\n田中：田中です。よろしくお願いします。\n李：こちらこそ、よろしくお願いします。', translation: '李：初次见面，我姓李。\n田中：我姓田中。请多关照。\n李：也请您多关照。', source: 'AI' }],
+      sentences: [{ id: 'preview-greeting-s1', text: 'よろしくお願いします。', translation: '请多关照。', explanation: '初次见面、开始合作或请别人帮忙时使用。', source: 'AI' }],
+      exercises: [{ id: 'preview-greeting-e1', type: 'CHOICE', prompt: '请选择礼貌的自我介绍。', options: ['わたしは李です。', 'これは李です。'], answer: 'わたしは李です。', explanation: '介绍自己用「わたしは」。', source: 'AI' }], material: null,
+    } },
+    { id: previewLesson.chapterId, title: previewLesson.chapterTitle, subtitle: previewLesson.subtitle, content: previewLesson.content },
+  ] },
+  { id: 'preview-travel-japanese', title: '旅行日语：在城市里问路', language: 'JA', level: 'N5', temporary: true, chapters: [
+    { id: 'preview-directions', title: '第 1 课 · 駅はどこですか', subtitle: '礼貌问路，听懂简单的方向指引。', content: {
+      vocabulary: [{ id: 'preview-travel-v1', vocabularyId: 'preview-travel-global-v1', word: '駅', reading: 'えき', meaning: '车站', level: 'N5', examples: [{ text: '駅はどこですか。', translation: '车站在哪里？' }] }, { id: 'preview-travel-v2', vocabularyId: 'preview-travel-global-v2', word: '右', reading: 'みぎ', meaning: '右；右侧', level: 'N5', examples: [{ text: '右に曲がってください。', translation: '请向右转。' }] }],
+      grammar: [{ id: 'preview-travel-g1', kind: 'USAGE', title: 'すみません：礼貌地引起注意', explanation: '向陌生人问路前先说「すみません」，表示“打扰一下”。', examples: [{ text: 'すみません。駅はどこですか。', translation: '打扰一下，车站在哪里？' }], source: 'AI' }],
+      articles: [{ id: 'preview-travel-a1', title: '去车站的路', text: '旅行者：すみません。駅はどこですか。\n通行人：まっすぐ行って、右に曲がってください。\n旅行者：ありがとうございます。', translation: '旅行者：打扰一下，车站在哪里？\n路人：请直走，然后向右转。\n旅行者：谢谢。', source: 'AI' }],
+      sentences: [], exercises: [{ id: 'preview-travel-e1', type: 'MATCHING', prompt: '把方向与词义配对。', left: ['右', '左'], right: ['左侧', '右侧'], answer: [{ left: '右', right: '右侧' }, { left: '左', right: '左侧' }], source: 'AI' }], material: null,
+    } },
+  ] },
+];
+for (const book of previewBooks) for (const chapter of book.chapters) TextbookLearningContentSchema.parse(chapter.content);
