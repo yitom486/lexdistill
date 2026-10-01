@@ -145,7 +145,7 @@ describe('C+D+E. 分段 import → 落库 → append', () => {
     expect(ast.lessons[0]?.id).toBe(firstLessonId);
 
     const rows = repo.getRawDb().query(
-      'SELECT lesson_id AS id, sort_order AS s FROM textbook_lessons WHERE document_id = ? ORDER BY sort_order'
+      "SELECT json_extract(value,'$.id') AS id,json_extract(value,'$.order') AS s FROM documents,json_each(chapters_json) WHERE documents.id=? ORDER BY s"
     ).all(documentId) as Array<{ id: string; s: number }>;
     expect(rows.map((r) => r.s)).toEqual([1, 2, 3]);
     expect(rows).toHaveLength(3);

@@ -1,0 +1,55 @@
+import { z } from 'zod';
+
+export const JlptLevelSchema = z.enum(['N5', 'N4', 'N3', 'N2', 'N1']);
+const text = z.string().trim().min(1);
+export const TextbookExampleSchema = z.object({ text, translation: text.optional() }).strict();
+const origin = z.enum(['TEXTBOOK', 'AI']);
+export const GrammarItemSchema = z.object({
+  title: text, kind: z.enum(['GRAMMAR', 'PRONUNCIATION', 'USAGE']).default('GRAMMAR'),
+  explanation: text, connection: text.optional(), aiExplanation: text.optional(), examples: z.array(TextbookExampleSchema).default([]),
+}).strict();
+export const VocabularyItemSchema = z.object({
+  word: text, reading: text.optional(), meaning: text, level: JlptLevelSchema,
+  partOfSpeech: text.optional(), pitch: text.optional(), explanation: text.optional(), examples: z.array(TextbookExampleSchema).default([]),
+}).strict();
+export const ArticleItemSchema = z.object({ title: text.optional(), text, translation: text.optional() }).strict();
+export const SentenceItemSchema = z.object({ text, translation: text.optional(), explanation: text.optional(), speaker: text.optional() }).strict();
+export const LearningExerciseItemSchema = z.object({
+  type: z.enum(['CHOICE', 'MULTI_CHOICE', 'FILL_BLANK', 'TRANSLATION', 'ORDERING', 'MATCHING', 'SHORT_ANSWER']),
+  prompt: text, options: z.array(text).optional(), left: z.array(text).optional(), right: z.array(text).optional(),
+  answer: z.union([text, z.array(text).min(1), z.array(z.object({ left: text, right: text }).strict()).min(1)]),
+  explanation: text.optional(), gradingNotes: text.optional(),
+}).strict();
+export const TextbookWriteSchemas = {
+  grammar: z.object({ items: z.array(GrammarItemSchema).min(1), source: origin.default('TEXTBOOK') }).strict(),
+  vocabulary: z.object({ items: z.array(VocabularyItemSchema).min(1) }).strict(),
+  articles: z.object({ items: z.array(ArticleItemSchema).min(1), source: origin.default('TEXTBOOK') }).strict(),
+  sentences: z.object({ items: z.array(SentenceItemSchema).min(1), source: origin.default('TEXTBOOK') }).strict(),
+  exercises: z.object({ items: z.array(LearningExerciseItemSchema).min(1), source: origin.default('TEXTBOOK') }).strict(),
+  material: z.object({ text }).strict(),
+} as const;
+export type TextbookContentKind = keyof typeof TextbookWriteSchemas;
+export type GrammarItem = z.infer<typeof GrammarItemSchema>;
+export type VocabularyItem = z.infer<typeof VocabularyItemSchema>;
+export type ArticleItem = z.infer<typeof ArticleItemSchema>;
+export type SentenceItem = z.infer<typeof SentenceItemSchema>;
+export type LearningExerciseItem = z.infer<typeof LearningExerciseItemSchema>;
+
+/** Read contract: storage identity is added by the system, never requested from the model. */
+export const TextbookLearningContentSchema = z.object({
+  grammar: z.array(GrammarItemSchema.extend({ id: text, source: origin, explanation: z.string() })),
+  vocabulary: z.array(VocabularyItemSchema.omit({ level: true }).extend({ id: text, vocabularyId: text, meaning: z.string(), level: JlptLevelSchema.nullable() })),
+  articles: z.array(ArticleItemSchema.extend({ id: text, source: origin })),
+  sentences: z.array(SentenceItemSchema.extend({ id: text, source: origin })),
+  exercises: z.array(LearningExerciseItemSchema.extend({ id: text, source: origin })),
+  material: z.string().nullable(),
+});
+export type TextbookLearningContent = z.infer<typeof TextbookLearningContentSchema>;
+export const StringListSchema = z.array(z.string());
+export const ChapterManifestSchema = z.array(z.object({
+  id: z.string().min(1), title: z.string().min(1), order: z.number().int().positive(),
+  kind: z.enum(['lesson','section']).default('lesson'),
+  startPage: z.number().int().positive().nullable(), endPage: z.number().int().positive().nullable(),
+  status: z.enum(['pending','ready','failed']),
+}).strict());
+export type ChapterManifest = z.infer<typeof ChapterManifestSchema>;

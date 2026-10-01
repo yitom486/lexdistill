@@ -249,69 +249,6 @@ describe('P1-3 selection-contexts（SI-1/2/3）', () => {
   });
 });
 
-describe('P1-3 v22 旧库升级 v23–v30', () => {
-  it('旧库应用 23–30：新表/加列/退役一次到位，重跑零重复', () => {
-    const db = freshDb();
-    // 退回 v22 时代形状（含 v30 回退：去 kind/parent 列、去知识点表；term_map 在 v22 时代存在，保留）。
-    db.run('DROP TABLE content_segments');
-    db.run('DROP TABLE content_sources');
-    db.run('DROP TABLE selection_contexts');
-    db.run('DROP TABLE ai_artifact_runs');
-    db.run('DROP TABLE knowledge_points');
-    db.run('ALTER TABLE textbook_lessons DROP COLUMN kind');
-    db.run('ALTER TABLE textbook_lessons DROP COLUMN parent_id');
-    db.run('ALTER TABLE textbook_lessons DROP COLUMN start_page');
-    db.run('ALTER TABLE textbook_lessons DROP COLUMN end_page');
-    db.run('ALTER TABLE textbook_lessons DROP COLUMN status');
-    db.run('ALTER TABLE textbook_lessons DROP COLUMN passage_md');
-    db.run('ALTER TABLE textbook_lessons DROP COLUMN preview_json');
-    db.run('ALTER TABLE textbook_lessons DROP COLUMN summary_json');
-    db.run('ALTER TABLE card_drafts DROP COLUMN selection_context_id');
-    db.run('ALTER TABLE term_occurrences DROP COLUMN segment_id');
-    db.run('ALTER TABLE term_occurrences DROP COLUMN lesson_id');
-    db.run('ALTER TABLE encountered_terms DROP COLUMN lookup_count');
-    db.run('ALTER TABLE encountered_terms DROP COLUMN read_count');
-    db.run('DELETE FROM schema_migrations WHERE version >= 23');
-    db.run('DROP TABLE textbook_import_events');
-    db.run('ALTER TABLE textbook_vocab DROP COLUMN ai_explanation');
-    // 历史行（旧列形状）。
-    db.run(
-      `INSERT INTO encountered_terms
-         (user_id, language, term_key, headword, reading, status,
-          exposure_count, first_seen_at, last_seen_at, flashcard_id)
-       VALUES ('u9', 'ja', 'k', '橋', 'はし', 'new', 2, 't1', 't2', NULL)`
-    );
-    db.run(
-      `INSERT INTO term_occurrences
-         (id, user_id, language, term_key, source, document_id, quote, created_at)
-       VALUES ('o1', 'u9', 'ja', 'k', 'lookup', NULL, NULL, 't1'),
-              ('o2', 'u9', 'ja', 'k', 'reading', 'd1', NULL, 't2')`
-    );
-    const res = runMigrations(db);
-    expect(res.applied).toEqual(SCHEMA_MIGRATIONS.filter(migration => migration.version >= 23).map(migration => migration.version));
-    expect(db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'textbook_import_events'").all()).toHaveLength(1);
-    expect(db.query('PRAGMA table_info(textbook_lessons)').all().some(row =>
-      typeof row === 'object' && row !== null && 'name' in row && row.name === 'submission_id'
-    )).toBe(true);
-    const tables = db
-      .query(`SELECT name AS n FROM sqlite_master WHERE type = 'table' AND name IN ('textbook_term_map', 'knowledge_points')`)
-      .all() as Array<{ n: string }>;
-    expect(tables.map((t) => t.n)).toEqual(['knowledge_points']);
-    const row = db
-      .query(
-        'SELECT exposure_count AS e, lookup_count AS l, read_count AS r FROM encountered_terms'
-      )
-      .get() as { e: number; l: number; r: number };
-    expect(row).toEqual({ e: 2, l: 1, r: 1 });
-    const seg = db.query('SELECT COUNT(*) AS n FROM content_segments').get() as { n: number };
-    expect(seg.n).toBe(0);
-    const src = db.query('SELECT COUNT(*) AS n FROM content_sources').get() as { n: number };
-    expect(src.n).toBe(0);
-    // 重跑幂等：无新 apply。
-    expect(runMigrations(db).applied).toEqual([]);
-  });
-});
-
 describe('P1-3 encountered-term counts（CI-1/2/3/5）', () => {
   let db: Database;
   beforeEach(() => {
@@ -585,10 +522,11 @@ describe('P2-2a lines 投影（PDF／课程）', () => {
   });
 
   function seedLines(docId: string, lessonId: string, rows: Array<[number, string | null, string]>): void {
-    const stmt = db.prepare(
-      'INSERT INTO textbook_lines (document_id, lesson_id, ord, speaker, ja, zh) VALUES (?, ?, ?, ?, ?, NULL)'
-    );
-    for (const [ord, speaker, ja] of rows) stmt.run(docId, lessonId, ord, speaker, ja);
+    for (const [ord,speaker,text] of rows) {
+      const id=JSON.stringify([docId,lessonId,ord]);
+      if(speaker) db.prepare("INSERT INTO textbook_sentences(id,document_id,chapter_id,ord,text,speaker,source) VALUES(?,?,?,?,?,?,'TEXTBOOK')").run(id,docId,lessonId,ord,text,speaker);
+      else db.prepare("INSERT INTO textbook_articles(id,document_id,chapter_id,ord,text,source) VALUES(?,?,?,?,?,'TEXTBOOK')").run(id,docId,lessonId,ord,text);
+    }
   }
 
   function seedPdfDoc(docId: string, userId: string): void {
@@ -636,6 +574,16 @@ describe('P2-2a lines 投影（PDF／课程）', () => {
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.inserted).toBe(1);
+  });
+
+  it('文章和句子各自从零排序时，合并投影不产生重复段序号', async () => {
+    seedPdfDoc('dPdf', 'u1');
+    db.run("INSERT INTO textbook_articles(id,document_id,chapter_id,ord,text,source) VALUES('a','dPdf','l1',0,'Article','TEXTBOOK')");
+    db.run("INSERT INTO textbook_sentences(id,document_id,chapter_id,ord,text,speaker,source) VALUES('s','dPdf','l1',0,'Sentence','Speaker','TEXTBOOK')");
+    const projected = await projectLinesSegments({sqlite:db},{userId:'u1',documentId:'dPdf'});
+    expect(projected.ok && projected.value.inserted).toBe(2);
+    const segments = await listContentSegments({sqlite:db},'dPdf');
+    expect(segments.ok && segments.value.map(row=>row.ord)).toEqual([0,1]);
   });
 
   it('已有 pilot 段：整单跳过不删不合并', async () => {

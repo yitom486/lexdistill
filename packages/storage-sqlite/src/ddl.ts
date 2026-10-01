@@ -582,8 +582,10 @@ export function initSchema(sqlite: Database): void {
     /* ignore */
   }
 
-  // 最新教材表结构；已有库的列升级仍只由已登记的前向迁移执行。
-  sqlite.run(`
+  // Only pre-v37 migration bootstrap uses the retired tables; never recreate them after v37.
+  const hasMigrationTable = sqlite.query("SELECT 1 FROM sqlite_master WHERE name='schema_migrations'").get();
+  const contentMigrated = hasMigrationTable && sqlite.query('SELECT 1 FROM schema_migrations WHERE version=37').get();
+  if (!contentMigrated) sqlite.run(`
     CREATE TABLE IF NOT EXISTS textbook_lessons (
       document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, lesson_number INTEGER NOT NULL,
       title TEXT NOT NULL, sort_order INTEGER, kind TEXT NOT NULL DEFAULT 'lesson', parent_id TEXT,
@@ -617,6 +619,54 @@ export function initSchema(sqlite: Database): void {
   `);
   ensureDictionaryFts(sqlite);
   runMigrations(sqlite);
+  // Latest textbook DDL: static tables, identical to schema.ts and v037.
+  sqlite.run(`
+CREATE TABLE IF NOT EXISTS global_vocabulary (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL, language TEXT NOT NULL,
+  word TEXT NOT NULL, reading TEXT NOT NULL DEFAULT '', meaning TEXT NOT NULL,
+  jlpt_level TEXT CHECK(jlpt_level IS NULL OR jlpt_level IN ('N5','N4','N3','N2','N1')),
+  level_source TEXT CHECK(level_source IS NULL OR level_source = 'MODEL_ESTIMATE'), created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_global_vocabulary_identity ON global_vocabulary(user_id, language, word, reading);
+CREATE TABLE IF NOT EXISTS textbook_vocabulary (
+  id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  chapter_id TEXT NOT NULL, ord INTEGER NOT NULL, vocabulary_id TEXT NOT NULL REFERENCES global_vocabulary(id),
+  meaning TEXT NOT NULL, part_of_speech TEXT, pitch TEXT, explanation TEXT, examples_json TEXT NOT NULL DEFAULT '[]'
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_textbook_vocabulary_word ON textbook_vocabulary(document_id, chapter_id, vocabulary_id);
+CREATE TABLE IF NOT EXISTS textbook_knowledge (
+  id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  chapter_id TEXT NOT NULL, ord INTEGER NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('GRAMMAR','PRONUNCIATION','USAGE')),
+  title TEXT NOT NULL, explanation TEXT NOT NULL, connection TEXT, ai_explanation TEXT,
+  examples_json TEXT NOT NULL DEFAULT '[]', source TEXT NOT NULL CHECK(source IN ('TEXTBOOK','AI'))
+);
+CREATE TABLE IF NOT EXISTS textbook_articles (
+  id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  chapter_id TEXT NOT NULL, ord INTEGER NOT NULL, title TEXT, text TEXT NOT NULL, translation TEXT,
+  source TEXT NOT NULL CHECK(source IN ('TEXTBOOK','AI'))
+);
+CREATE TABLE IF NOT EXISTS textbook_sentences (
+  id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  chapter_id TEXT NOT NULL, ord INTEGER NOT NULL, text TEXT NOT NULL, translation TEXT, explanation TEXT, speaker TEXT,
+  source TEXT NOT NULL CHECK(source IN ('TEXTBOOK','AI'))
+);
+CREATE TABLE IF NOT EXISTS textbook_exercise_items (
+  id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  chapter_id TEXT NOT NULL, ord INTEGER NOT NULL, type TEXT NOT NULL CHECK(type IN ('CHOICE','MULTI_CHOICE','FILL_BLANK','TRANSLATION','ORDERING','MATCHING','SHORT_ANSWER')), prompt TEXT NOT NULL,
+  options_json TEXT, left_json TEXT, right_json TEXT, answer_json TEXT NOT NULL, explanation TEXT, grading_notes TEXT,
+  source TEXT NOT NULL CHECK(source IN ('TEXTBOOK','AI'))
+);
+CREATE TABLE IF NOT EXISTS textbook_materials (
+  document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE, chapter_id TEXT NOT NULL,
+  text TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(document_id, chapter_id)
+);
+CREATE INDEX IF NOT EXISTS idx_textbook_vocabulary_chapter ON textbook_vocabulary(document_id, chapter_id, ord);
+CREATE INDEX IF NOT EXISTS idx_textbook_knowledge_chapter ON textbook_knowledge(document_id, chapter_id, ord);
+CREATE INDEX IF NOT EXISTS idx_textbook_articles_chapter ON textbook_articles(document_id, chapter_id, ord);
+CREATE INDEX IF NOT EXISTS idx_textbook_sentences_chapter ON textbook_sentences(document_id, chapter_id, ord);
+CREATE INDEX IF NOT EXISTS idx_textbook_exercises_chapter ON textbook_exercise_items(document_id, chapter_id, ord);
+
+  `);
 }
 
 /**
@@ -690,7 +740,7 @@ export function runMigrations(sqlite: Database): { applied: number[] } {
     if (applied.has(m.version)) continue;
     sqlite.run('BEGIN');
     try {
-      sqlite.run(m.sql);
+      for (const statement of m.statements ?? [m.sql]) sqlite.run(statement);
       sqlite
         .query('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
         .run(m.version, m.name, new Date().toISOString());

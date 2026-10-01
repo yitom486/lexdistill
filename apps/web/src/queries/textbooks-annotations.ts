@@ -1165,7 +1165,7 @@ export function useAllDocumentsQuery(userId = DEFAULT_USER_ID) {
   });
 }
 
-/** 查询指定文档已建立的教材章节槽位列表（textbook_lessons） */
+/** 查询指定文档已建立的教材章节列表（documents.chapters_json） */
 const LessonSlotsResponseSchema = z.object({ slots: z.array(z.object({
   documentId: z.string(), lessonId: z.string(), lessonNumber: z.number(), title: z.string(),
   sortOrder: z.number(), kind: z.string(), parentId: z.string().nullable(),

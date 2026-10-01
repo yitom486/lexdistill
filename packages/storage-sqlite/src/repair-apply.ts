@@ -30,11 +30,11 @@ export interface OrphanApplyReport {
  * 白名单之外即使有 document_id 列也不得自动扩大——只报告。
  */
 export const REPAIR_ALLOWLIST = [
-  'textbook_lessons',
-  'textbook_lines',
-  'textbook_vocab',
-  'textbook_grammar',
-  'textbook_exercises',
+  'textbook_materials',
+  'textbook_articles', 'textbook_sentences',
+  'textbook_vocabulary',
+  'textbook_knowledge',
+  'textbook_exercise_items',
   'knowledge_points',
   'textbook_fts',
   'reading_positions',

@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
-import type { AgentAdapter, AgentImageAttachment } from '@study-studio/agent-runtime';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
 import { canonicalizeTocEntries, planTextbookTasks, TextbookPipelineSettingsSchema, type ChapterSource, type TextbookPipelineSettings, type TocEntry, type TextbookModelActivity } from '@study-studio/document-model';
 import { BusinessError, ok, err, generateId, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ImportTask } from '@study-studio/storage-sqlite';
 import type { ContentRepository } from '../ports.js';
-import type { PdfInspectorLike, RenderedPagePng } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
-import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
+import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
+import type { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { ChapterSessionPool, LessonInputQueue, type BatchExtractionProgress, type LessonStage } from './lesson-batch-extractor.js';
 import { producePdfLessons } from './pdf-import/lesson-content-slicer.js';
 import { ImportMonitor, IMPORT_MONITOR_REFRESH_MS } from './import-monitor.js';
@@ -19,7 +19,7 @@ export interface TextbookPipelineInput extends Partial<TextbookPipelineSettings>
   chapterParser?: ChapterParser | undefined;
   pdf?: Uint8Array | undefined; inspector?: PdfInspectorLike | undefined;
   forceOverwrite?: boolean | undefined;
-  adapter?: AgentAdapter | undefined; submissionTool?: LibraryLessonCommitTool | undefined;
+  adapter?: AgentAdapter | undefined; submissionTool?: TextbookContentTools | undefined;
   model?: string | undefined; effort?: string | undefined;
   traceId?: string | undefined; jobId?: string | undefined;
   onProgress?: ((progress: BatchExtractionProgress) => void) | undefined; signal?: AbortSignal | undefined;
@@ -88,24 +88,9 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
       const activePool = pool;
       const onText = async (lesson: TocEntry, text: string, source?: ChapterSource) => {
         const task = tasks.find(task => task.root.id === lesson.id)!;
-        let attachments: AgentImageAttachment[] = [];
-        const visualPages = [...new Set(source?.blocks.filter(block => block.kind === 'TABLE' || block.kind === 'IMAGE').map(block => block.page) ?? [])];
-        if (visualPages.length && input.pdf && input.inspector) {
-          try {
-            if (!input.inspector.renderPdfPages || input.adapter?.supportsImageInput?.() !== true) throw new BusinessError('E_AGENT_CAPABILITY', '当前章节含表格或图片，需要 PDF 页渲染与支持图片的模型通道', 'AGENT_RUNTIME');
-            // Pinned pdf-inspector permits at most 8 pages per native call; keep every requested page.
-            const rendered: RenderedPagePng[] = [];
-            for (let offset = 0; offset < visualPages.length; offset += 8) {
-              if (controller.signal.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消', 'TOOL_EXECUTION');
-              rendered.push(...await input.inspector.renderPdfPages(input.pdf, visualPages.slice(offset, offset + 8)));
-            }
-            if (rendered.length !== visualPages.length || visualPages.some(page => !rendered.some(image => image.pageNumber === page && image.png.length))) throw new BusinessError('E_PARSE_IMAGE_INVALID', '章节原页图片不完整，请检查 PDF 渲染运行时', 'VALIDATION', true);
-            attachments = rendered.map(image => ({ label: `原书 PDF 第 ${image.pageNumber} 页`, png: image.png, width: image.width, height: image.height }));
-          } catch (cause) { fail(lesson.id, cause instanceof BusinessError ? cause : new BusinessError('E_PDF_RENDER_FAILED', '章节原页图片准备失败，请检查 PDF 渲染运行时后重试本章', 'TOOL_EXECUTION', true)); return; }
-        }
         monitor.record('text', 'ready', { text, source: source ?? null, startPage: lesson.startPage, endPage: lesson.endPage ?? null }, { nodeId: lesson.id });
         emit(lesson.id, 'queued');
-        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: task.ancestors, text, ...(source ? { source } : {}), ...(attachments.length ? { attachments } : {}) });
+        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: [task.root], tocPath: [], text, ...(source ? { source } : {}) });
         monitor.record('queue', 'enqueued', { size: queue.size }, { nodeId: lesson.id });
       };
       const produce = async () => {
@@ -149,8 +134,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
             const binding = { nodeId: job.lessonId, sessionId: session.sessionId, ...(session.threadId ? { threadId: session.threadId } : {}), attemptId: assignmentId };
             monitor.record('session', 'bound', { attempt: attempt + 1 }, binding);
             if (attempt) { emit(job.lessonId, 'model_retrying'); monitor.record('model', 'retry', { previousError: lastError?.userMessage, attempt: attempt + 1 }, binding); }
-            const submission = tool.bind(session.sessionId, { userId: input.userId, documentId, lessonId: job.lessonId, assignmentId, tocEntries: job.tocEntries, signal: controller.signal, allowAiExercises: config.allowAiExercises,
-              ...(job.source ? { sourceBlocks: job.source.blocks } : {}),
+            const submission = tool.bind(session.sessionId, { userId: input.userId, documentId, lessonId: job.lessonId, assignmentId, signal: controller.signal, allowAiExercises: config.allowAiExercises,
               monitor, sessionId: session.sessionId, turnSignal: turnController.signal,
               toolRepairRetries: config.toolRepairRetries, onRepairLimit: error => turnController.abort(error),
               onStage: stage => {
@@ -172,7 +156,8 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
                 emit(job.lessonId, currentStage, emptyStats, undefined, false, activity, true);
               });
               if (submission.receipt) return;
-              if (submission.candidate) {
+              if (sent.ok && submission.candidate) {
+                const finalized = await submission.persist(); if (finalized.ok) return;
                 for (let retry = 0; retry < config.storageRetries && !controller.signal.aborted && submission.error?.retryable; retry++) {
                   emit(job.lessonId, 'storage_retrying');
                   monitor.record('storage', 'retry', { retry: retry + 1, error: submission.error.userMessage }, binding);
@@ -180,7 +165,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
                 }
                 // 有效候选只重试保存，不能再次生成。
                 lastError = submission.error ?? new BusinessError('E_INTERNAL', '章节未能保存', 'DATABASE');
-                break;
+                if (lastError.category === 'DATABASE') break;
               }
               lastError = !sent.ok ? sent.error : submission.error ?? new BusinessError('E_LESSON_SUBMISSION_MISSING', '模型未通过工具提交有效内容', 'AGENT_RUNTIME', true);
               if (!lastError.retryable) break;

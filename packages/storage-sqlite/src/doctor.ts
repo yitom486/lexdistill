@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { Database } from 'bun:sqlite';
 
 export interface DoctorFinding {
@@ -44,8 +43,6 @@ export function runDoctor(db: Database): DoctorReport {
     return row ? row.n : 0;
   };
 
-  /** 与持久化指纹同口径（UTF-8 字节 SHA-256 hex），避免跨层 import。 */
-  const sha256HexTextLocal = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
 
   const push = (rule: string, level: DoctorFinding['level'], n: number, detail: string) => {
     findings.push({ rule, level, count: n, detail });
@@ -55,8 +52,8 @@ export function runDoctor(db: Database): DoctorReport {
   // 注意：缺席只 WARN 不 FAIL——doctor 也跑在部分库/测试库上，缺席本身不是数据错。
   const EXPECTED_TABLES = [
     'documents',
-    'textbook_lessons', 'textbook_lines', 'textbook_vocab', 'textbook_grammar',
-    'textbook_exercises', 'textbook_fts', 'knowledge_points',
+    'global_vocabulary', 'textbook_materials', 'textbook_articles', 'textbook_sentences', 'textbook_vocabulary', 'textbook_knowledge',
+    'textbook_exercise_items', 'textbook_fts', 'knowledge_points',
     'local_dictionary_entries', 'dictionary_sources',
     'document_imports', 'document_structure', 'reading_positions', 'annotations',
     'flashcards', 'card_drafts', 'dictionary_search_history', 'practice_items',
@@ -71,11 +68,7 @@ export function runDoctor(db: Database): DoctorReport {
   // document_imports 不在此列：任务行是审计（删除生命周期表 §8），悬空由 import:done-doc 置 WARN。
   // term_occurrences.document_id 存 docRef=documentId/lessonId 字符串，不是 FK，永不按此查。
   const docChildren: Array<[string, string]> = [
-    ['textbook_lessons', 'document_id'],
-    ['textbook_lines', 'document_id'],
-    ['textbook_vocab', 'document_id'],
-    ['textbook_grammar', 'document_id'],
-    ['textbook_exercises', 'document_id'],
+    ...['textbook_materials','textbook_articles','textbook_sentences','textbook_vocabulary','textbook_knowledge','textbook_exercise_items'].map(table => [table, 'document_id'] as [string,string]),
     ['textbook_fts', 'document_id'],
     ['reading_positions', 'document_id'],
     ['annotations', 'document_id'],
@@ -104,44 +97,19 @@ export function runDoctor(db: Database): DoctorReport {
     // 注意：term_occurrences.document_id 存 docRef=documentId/lessonId 字符串，不是 FK，排除。
   }
 
-  // ---- 2. lesson 孤儿（必须 document_id + lesson_id 双列对） ----
-  // knowledge_points 同样锚目录节点，一并检查（表缺席即跳过，见 has 守卫）。
-  if (has('textbook_lessons')) {
-    for (const table of ['textbook_lines', 'textbook_vocab', 'textbook_grammar', 'textbook_exercises', 'knowledge_points']) {
-      if (!has(table)) continue;
-      const n = count(
-        `SELECT COUNT(*) AS n FROM "${table}" t WHERE NOT EXISTS (SELECT 1 FROM textbook_lessons l WHERE l.document_id = t.document_id AND l.lesson_id = t.lesson_id)`
-      );
-      push(`lesson-orphan:${table}`, n > 0 ? 'FAIL' : 'PASS', n, n > 0 ? `${n} 行课不存在` : '无孤儿');
-    }
-  }
-
-  // ---- 2b. sort_order（v17 P1-B：唯一 ordering truth，1-based dense 连续） ----
-  // - 缺列即跳过（旧测试最小 schema / 未迁移库不炸，由迁移测试覆盖）；
-  // - 不查 lessonNumber（可 gap 是合法 legacy），不查 title 唯一（復習/重名合法）。
-  if (hasColumn('textbook_lessons', 'sort_order')) {
-    const nullN = count(`SELECT COUNT(*) AS n FROM textbook_lessons WHERE sort_order IS NULL`);
-    push('lesson:sortorder-null', nullN > 0 ? 'FAIL' : 'PASS', nullN, nullN > 0 ? `${nullN} 行 sort_order 为空（未回填？）` : '顺序齐全');
-    const badAff = count(`SELECT COUNT(*) AS n FROM textbook_lessons WHERE sort_order IS NOT NULL AND typeof(sort_order) != 'integer'`);
-    push('lesson:sortorder-affinity', badAff > 0 ? 'FAIL' : 'PASS', badAff, badAff > 0 ? `${badAff} 行 sort_order 非整数亲和` : '亲和正常');
-    const nonPos = count(`SELECT COUNT(*) AS n FROM textbook_lessons WHERE typeof(sort_order) = 'integer' AND sort_order <= 0`);
-    push('lesson:sortorder-nonpositive', nonPos > 0 ? 'FAIL' : 'PASS', nonPos, nonPos > 0 ? `${nonPos} 行 sort_order <= 0` : '无非正值');
-    const dup = count(
-      `SELECT COUNT(*) AS n FROM (SELECT document_id, sort_order FROM textbook_lessons WHERE sort_order IS NOT NULL GROUP BY document_id, sort_order HAVING COUNT(*) > 1)`
-    );
-    push('lesson:sortorder-dup', dup > 0 ? 'FAIL' : 'PASS', dup, dup > 0 ? `${dup} 组同文档重复 sort_order` : '无重复');
-    const gap = count(
-      `SELECT COUNT(*) AS n FROM (SELECT document_id FROM textbook_lessons WHERE sort_order IS NOT NULL GROUP BY document_id HAVING COUNT(*) != COUNT(sort_order) OR MIN(sort_order) != 1 OR MAX(sort_order) != COUNT(*))`
-    );
-    push('lesson:sortorder-gap', gap > 0 ? 'FAIL' : 'PASS', gap, gap > 0 ? `${gap} 个文档顺序不连续（非 1-based dense）` : '顺序连续');
+  // Chapter membership is stored once in documents.chapters_json.
+  if (hasColumn('documents', 'chapters_json')) for (const table of ['textbook_articles','textbook_sentences','textbook_vocabulary','textbook_knowledge','textbook_exercise_items','textbook_materials']) {
+    if (!has(table)) continue;
+    const n = count(`SELECT COUNT(*) AS n FROM "${table}" t JOIN documents d ON d.id=t.document_id WHERE NOT EXISTS (SELECT 1 FROM json_each(d.chapters_json) c WHERE json_extract(c.value,'$.id')=t.chapter_id)`);
+    push(`chapter-orphan:${table}`, n ? 'FAIL' : 'PASS', n, n ? '内容没有对应章节' : '章节关联有效');
   }
 
   // ---- 3. ord 完整性（代码不强制连续，只查重复/负值/非法亲和） ----
   // 非法亲和说明：SQLite INTEGER 列可存 'abc' 文本（affinity 不强制），裸写/外部工具会埋雷。
-  for (const table of ['textbook_lines', 'textbook_vocab', 'textbook_grammar', 'textbook_exercises']) {
+  for (const table of ['textbook_articles','textbook_sentences','textbook_vocabulary','textbook_knowledge','textbook_exercise_items']) {
     if (!has(table)) continue;
     const dup = count(
-      `SELECT COUNT(*) AS n FROM (SELECT document_id, lesson_id, ord FROM "${table}" GROUP BY document_id, lesson_id, ord HAVING COUNT(*) > 1)`
+      `SELECT COUNT(*) AS n FROM (SELECT document_id, chapter_id, ord FROM "${table}" GROUP BY document_id, chapter_id, ord HAVING COUNT(*) > 1)`
     );
     push(`ord-dup:${table}`, dup > 0 ? 'FAIL' : 'PASS', dup, dup > 0 ? `${dup} 组重复 ord` : '无重复');
     const neg = count(`SELECT COUNT(*) AS n FROM "${table}" WHERE ord < 0`);
@@ -155,63 +123,6 @@ export function runDoctor(db: Database): DoctorReport {
   if (has('knowledge_points')) {
     const emptyConcept = count(`SELECT COUNT(*) AS n FROM knowledge_points WHERE concept IS NULL OR TRIM(concept) = ''`);
     push('knowledge:concept-empty', emptyConcept > 0 ? 'FAIL' : 'PASS', emptyConcept, emptyConcept > 0 ? `${emptyConcept} 行 concept 为空` : '概念齐全');
-  }
-
-  // ---- 5. FTS 双向（textbook_fts 是可重建索引，FAIL=该重建了） ----
-  // 为何 stale 检查曾对孤儿行误报 PASS：stale 只验 fts↔源行表（vocab/lines）一致，
-  // 而孤儿行仍躺在源行表里（删文档不清 shred），所以能 resolve；文档级孤儿由
-  // documents-orphan 规则负责。两层各查各的，不重叠。
-  if (has('textbook_fts')) {
-    const badKind = count(`SELECT COUNT(*) AS n FROM textbook_fts WHERE kind NOT IN ('vocab','line')`);
-    push('fts:kind', badKind > 0 ? 'FAIL' : 'PASS', badKind, badKind > 0 ? `${badKind} 行非法 kind` : 'kind 合法');
-    const dupRef = count(
-      `SELECT COUNT(*) AS n FROM (SELECT document_id, lesson_id, kind, ref FROM textbook_fts GROUP BY document_id, lesson_id, kind, ref HAVING COUNT(*) > 1)`
-    );
-    push('fts:dup-ref', dupRef > 0 ? 'FAIL' : 'PASS', dupRef, dupRef > 0 ? `${dupRef} 组重复映射（同源被索引两次）` : '无重复映射');
-    if (has('textbook_vocab')) {
-      const missing = count(
-        `SELECT COUNT(*) AS n FROM textbook_vocab v WHERE NOT EXISTS (SELECT 1 FROM textbook_fts f WHERE f.document_id = v.document_id AND f.lesson_id = v.lesson_id AND f.kind = 'vocab' AND f.ref = v.lesson_id || '#v' || v.ord)`
-      );
-      push('fts:vocab-missing', missing > 0 ? 'WARN' : 'PASS', missing, missing > 0 ? `${missing} 个生词缺索引（重跑 shred 可修）` : '索引齐全');
-    }
-    if (has('textbook_lines')) {
-      const missing = count(
-        `SELECT COUNT(*) AS n FROM textbook_lines l WHERE NOT EXISTS (SELECT 1 FROM textbook_fts f WHERE f.document_id = l.document_id AND f.lesson_id = l.lesson_id AND f.kind = 'line' AND f.ref = l.lesson_id || '#d' || l.ord)`
-      );
-      push('fts:line-missing', missing > 0 ? 'WARN' : 'PASS', missing, missing > 0 ? `${missing} 个课文行缺索引` : '索引齐全');
-    }
-    // stale：fts 行找不到源（ref 格式 lesson#v3 / lesson#d7，lesson_id 含 # 时按最后一个 # 切）
-    const staleRows = has('textbook_vocab', 'textbook_lines')
-      ? (db
-          .query(`SELECT document_id AS d, lesson_id AS l, kind AS k, ref AS r FROM textbook_fts WHERE kind IN ('vocab','line')`)
-          .all() as Array<{ d: string; l: string; k: string; r: string }>)
-      : [];
-    let stale = 0;
-    if (staleRows.length > 0) {
-      // key 用 JSON 数组（两边同构，无分隔符碰撞问题）
-      const keyOf = (d: string, l: string, o: number) => JSON.stringify([d, l, o]);
-      const vocabKeys = new Set(
-        (db.query('SELECT document_id AS d, lesson_id AS l, ord AS o FROM textbook_vocab').all() as Array<{ d: string; l: string; o: number }>).map((x) => keyOf(x.d, x.l, x.o))
-      );
-      const lineKeys = new Set(
-        (db.query('SELECT document_id AS d, lesson_id AS l, ord AS o FROM textbook_lines').all() as Array<{ d: string; l: string; o: number }>).map((x) => keyOf(x.d, x.l, x.o))
-      );
-      for (const row of staleRows) {
-        const sep = row.k === 'vocab' ? '#v' : '#d';
-        const idx = row.r.lastIndexOf(sep);
-        if (idx < 0) {
-          stale++;
-          continue;
-        }
-        const ord = Number(row.r.slice(idx + sep.length));
-        if (!Number.isInteger(ord)) {
-          stale++;
-          continue;
-        }
-        if (!(row.k === 'vocab' ? vocabKeys : lineKeys).has(keyOf(row.d, row.l, ord))) stale++;
-      }
-    }
-    push('fts:stale', stale > 0 ? 'WARN' : 'PASS', stale, stale > 0 ? `${stale} 条索引找不到源（stale）` : '无 stale');
   }
 
   // ---- 6. 词典引用 ----
@@ -264,81 +175,6 @@ export function runDoctor(db: Database): DoctorReport {
         `SELECT COUNT(*) AS n FROM document_imports i LEFT JOIN documents d ON d.id = i.document_id WHERE i.status = 'done' AND (i.document_id IS NULL OR d.id IS NULL)`
       );
       push('import:done-doc', dangling > 0 ? 'WARN' : 'PASS', dangling, dangling > 0 ? `${dangling} 个 done 任务找不到文档（审计保留，未删）` : 'done 任务齐全');
-      // 空课文档：只查教材形 AST（含 lessons 数组）却 0 课的；阅读/新闻是 {questions} 形，天生 0 课，不算。
-      const candidates = db
-        .query(
-          `SELECT d.id AS id, d.ast_json AS ast FROM documents d WHERE d.ast_json IS NOT NULL AND NOT EXISTS (SELECT 1 FROM textbook_lessons l WHERE l.document_id = d.id)`
-        )
-        .all() as Array<{ id: string; ast: string }>;
-      let empty = 0;
-      for (const c of candidates) {
-        try {
-          const o: unknown = JSON.parse(c.ast);
-          if (o && typeof o === 'object' && Array.isArray((o as Record<string, unknown>).lessons)) empty++;
-        } catch {
-          // 坏 JSON 不归本规则（导入层负责）
-        }
-      }
-      push('import:empty-lessons', empty > 0 ? 'WARN' : 'PASS', empty, empty > 0 ? `${empty} 个教材形文档有 AST 但 0 课（种子未 shred？）` : '教材文档皆有课');
-      // 课数漂移：canonical AST lessons 数 vs derived 行数不一致（append/enrich 的
-      // “AST 已更新、shred 失败仅 WARN”即此形状；原子写普及后应恒为 0，留作护栏）。
-      if (has('textbook_lessons')) {
-        const shaped = db
-          .query(`SELECT d.id AS id, d.ast_json AS ast FROM documents d WHERE d.ast_json IS NOT NULL`)
-          .all() as Array<{ id: string; ast: string }>;
-        let drift = 0;
-        for (const c of shaped) {
-          try {
-            const o: unknown = JSON.parse(c.ast);
-            if (!o || typeof o !== 'object' || !Array.isArray((o as Record<string, unknown>).lessons)) continue;
-            const astN = ((o as Record<string, unknown>).lessons as unknown[]).length;
-            const row = db.query('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?').get(c.id) as { n: number };
-            if (row.n !== astN) drift++;
-          } catch {
-            // 坏 JSON 不归本规则
-          }
-        }
-        push('import:lesson-count-drift', drift > 0 ? 'WARN' : 'PASS', drift, drift > 0 ? `${drift} 个文档 AST 课数与 derived 行数不一致（双源漂移，需回填）` : '课数一致');
-      }
-      // projection drift：行数相等也可能 id/排序/标题错位。逐课比对
-      // lesson_id 集合 × lesson_number × title × sort_order(=AST index+1)。
-      // derived 可重建，故 WARN；doctor 是第二防线，不替代写事务。
-      if (has('textbook_lessons')) {
-        const shaped = db
-          .query(`SELECT d.id AS id, d.ast_json AS ast FROM documents d WHERE d.ast_json IS NOT NULL`)
-          .all() as Array<{ id: string; ast: string }>;
-        let projDrift = 0;
-        for (const c of shaped) {
-          try {
-            const o: unknown = JSON.parse(c.ast);
-            if (!o || typeof o !== 'object' || !Array.isArray((o as Record<string, unknown>).lessons)) continue;
-            const astLessons = (o as Record<string, unknown>).lessons as Array<Record<string, unknown>>;
-            const derived = db.query(
-              'SELECT lesson_id AS lessonId, lesson_number AS lessonNumber, title AS title, sort_order AS sortOrder FROM textbook_lessons WHERE document_id = ?'
-            ).all(c.id) as Array<{ lessonId: string; lessonNumber: number; title: string; sortOrder: number | null }>;
-            if (derived.length !== astLessons.length) continue; // 行数差由 lesson-count-drift 报
-            let bad = false;
-            const byId = new Map(derived.map((r) => [r.lessonId, r]));
-            if (byId.size !== derived.length) {
-              bad = true; // derived 侧重复 id
-            } else {
-              for (let i = 0; i < astLessons.length && !bad; i++) {
-                const l = astLessons[i] as { id?: unknown; lessonNumber?: unknown; title?: unknown };
-                if (typeof l.id !== 'string') { bad = true; break; }
-                const row = byId.get(l.id);
-                if (!row) { bad = true; break; }
-                if (typeof l.lessonNumber === 'number' && Number.isInteger(l.lessonNumber) && l.lessonNumber > 0 && row.lessonNumber !== l.lessonNumber) bad = true;
-                if (typeof l.title === 'string' && row.title !== l.title.slice(0, 200)) bad = true;
-                if (row.sortOrder !== i + 1) bad = true;
-              }
-            }
-            if (bad) projDrift++;
-          } catch {
-            // 坏 JSON 不归本规则
-          }
-        }
-        push('import:projection-drift', projDrift > 0 ? 'WARN' : 'PASS', projDrift, projDrift > 0 ? `${projDrift} 个文档 AST 与 derived 课行错位（id/number/title/sort_order，需重 shred）` : '投影一致');
-      }
     }
     const stuck = count(`SELECT COUNT(*) AS n FROM document_imports WHERE status = 'processing'`);
     push('import:processing', stuck > 0 ? 'WARN' : 'PASS', stuck, stuck > 0 ? `${stuck} 个 processing（在跑或卡死，请结合网关日志看）` : '无卡住任务');

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LessonContentSchema, ExerciseTypeSchema, lessonContentIssues } from './lesson-content.js';
+import { TextbookLearningContentSchema } from './textbook-learning-content.js';
 import { projectLessonContent } from './lesson-projection.js';
 import { ok, err, Result, BusinessError } from '@study-studio/shared';
 
@@ -83,6 +84,7 @@ export const TextbookLessonSchema = z.object({
   previewJson: z.string().nullable().optional(),
   summaryJson: z.string().nullable().optional(),
   content: LessonContentSchema.optional(),
+  learningContent: TextbookLearningContentSchema.optional(),
   submissionId: z.string().optional(),
   vocabularies: z.array(TextbookVocabularySchema),
   grammarPoints: z.array(TextbookGrammarSchema),

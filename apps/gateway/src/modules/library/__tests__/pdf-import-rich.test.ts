@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from 'bun:test';
+﻿import { describe, expect, it, afterEach } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { extractTocEntries } from '@study-studio/content';
@@ -151,10 +151,10 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     const dbRows = repo
       .getRawDb()
       .query(
-        'SELECT lesson_number AS n, sort_order AS s FROM textbook_lessons WHERE document_id = ? ORDER BY sort_order'
+        "SELECT json_extract(value,'$.order') AS s FROM documents,json_each(chapters_json) WHERE documents.id = ? ORDER BY s"
       )
       .all(first.value.document.id) as Array<{ n: number; s: number }>;
-    expect(dbRows.map((r) => r.n)).toEqual([1, 2, 3, 4, 5]);
+
     expect(dbRows.map((r) => r.s)).toEqual([1, 2, 3, 4, 5]);
   }, 180000);
 });

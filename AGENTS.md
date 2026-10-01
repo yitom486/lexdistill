@@ -84,13 +84,13 @@
 
 - **禁止运行时动态建表**：任何"新教材 / 新用户 / 新内容"的需求一律用**加行**表达（`documents` / `textbook_*` 按 `document_id`、`user_id` 扩展行），绝不 `CREATE TABLE book_xxx` / `user_123_progress`。动态表名意味着 SQL 字符串拼接（注入风险）、迁移不可管、drizzle 类型不可见（只能 `as any` 糊，直接违反 §2.3）。
 - **新维度才值得一次版本化迁移**：只有"以前从没存过的一类信息"（如文法例句列、自带习题表）才允许 `ALTER TABLE` / 新表，且必须走 `schema_migrations` 版本登记（`ddl.ts` 的 `runMigrations` 可重放、可断言；升级 SQL 放 `packages/storage-sqlite/src/migrations/`），随发版一次性升级，不在导入某本书的瞬间现造。禁止改已发布迁移的 version / name / sql，修复用更高 version 前向迁移。
-- **教材六层模型对号入座**（新增教材相关表必须能映射进这六层，映射不进就说明设计错了）：
-  - `material/document` → `documents`（`source_kind` 区分私产 `user_import` / 公共种子）；
-  - `section` → `textbook_lessons`；`content_block` → `textbook_lines`；
-  - `knowledge_point` → `textbook_vocab` + `textbook_grammar`（文法例句存 `examples_json`，v16）；
-  - `exercise` → `textbook_exercises`（v16 起 shred 落库；此前仅 AST 内）；
-  - 底稿 `documents.ast_json` 为 SSOT，shred 表永远由它同事务拆出（全删全插），两边永不分叉。
-- **JSON 列只当底稿**：`ast_json` / `*_json` 存动态结构可以，但查询面要用的字段必须 shred 成列；全文检索走 FTS 虚表（建表语句静态，变的只是行）。
+- **教材采用已批准的内容表设计**：
+  - 教材元信息在 `documents`；保留章节列表在 `chapters_json`，页码仅用于内部切分，不进入模型内容工具参数。
+  - 可学习内容分别存于 `textbook_knowledge`、`textbook_vocabulary`、`textbook_articles`、`textbook_sentences`、`textbook_exercise_items`；整理材料独立存于 `textbook_materials`。
+  - `global_vocabulary` 按用户、语种、词形和读音唯一；新词登记模型估计的 JLPT 等级，已有词不覆盖；难度不等于掌握度。
+  - 内容表为教材内容事实源，不再重复持久化全书 AST、章节 content_json 或逐行正文。旧表与统一提交工具退役；既有内容仅通过版本化迁移一次转入，不保留旧运行入口。
+  - 模型只填写内容；用户、教材、章节、执行身份、新内容 ID、顺序和时间由系统补充。不要求小目录覆盖、页码、sourceRefs、关联下标。
+- **JSON 仅保存局部结构**：章节列表、例句和练习答案可用 JSON；需要查询的词汇等级、内容类别和关联使用列。全文检索走可重建的 FTS。
 
 ### 1.9 ORM 使用边界 (Drizzle First, Raw When Forced)
 

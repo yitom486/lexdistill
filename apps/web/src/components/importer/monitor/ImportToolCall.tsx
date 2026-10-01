@@ -7,7 +7,7 @@ export function ImportToolCall({ events, directory, resolved = false }: { events
   const [open, setOpen] = useState(!resolved);
   const manuallyChanged = useRef(false);
   useEffect(() => { if (!manuallyChanged.current) setOpen(!resolved); }, [resolved]);
-  const committed = events.some(event => event.name === 'committed');
+  const committed = events.some(event => event.name === 'committed' || event.name === 'content_saved');
   const rejected = events.some(event => event.name === 'rejected');
   const proposal = events.find(event => event.name === 'requested') ?? events.find(event => event.name === 'proposal');
   const state = committed ? '事务已提交' : rejected ? '校验拒绝 / 查看修正反馈' : '等待回执';
@@ -17,9 +17,9 @@ export function ImportToolCall({ events, directory, resolved = false }: { events
     {open && <div className="space-y-2">
     <p className="break-all text-ink-muted">原生调用 {events[0]?.callId ?? '未记录调用身份'}</p>
     {proposal && <ImportEventDetail event={proposal} expanded directory={directory} />}
-    {details.filter(event => event.name === 'rejected' || event.name === 'repair_limit' || event.name === 'result' || event.name === 'committed' || event.name === 'commit_failed').map(event => <ImportEventDetail key={event.sequence} event={event} expanded={!resolved} directory={directory} />)}
+    {details.filter(event => event.name === 'rejected' || event.name === 'repair_limit' || event.name === 'result' || event.name === 'content_saved' || event.name === 'committed' || event.name === 'commit_failed').map(event => <ImportEventDetail key={event.sequence} event={event} expanded={!resolved} directory={directory} />)}
     <details><summary className="cursor-pointer">逐项校验与系统生成的内容</summary>
-      <div className="mt-2 space-y-2">{details.filter(event => !['rejected', 'repair_limit', 'result', 'committed', 'commit_failed'].includes(event.name)).map(event => <ImportEventDetail key={event.sequence} event={event} directory={directory} />)}</div>
+      <div className="mt-2 space-y-2">{details.filter(event => !['rejected', 'repair_limit', 'result', 'content_saved', 'committed', 'commit_failed'].includes(event.name)).map(event => <ImportEventDetail key={event.sequence} event={event} directory={directory} />)}</div>
     </details>
     </div>}
   </details>;

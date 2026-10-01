@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { ImportEventPageSchema, ImportEventSchema } from '@study-studio/document-model';
 import { BusinessError, err } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
+import { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { createImportMonitorRoutes } from '../http/import-monitor-routes.js';
 import { pipelineModel } from './textbook-pipeline-fixtures.js';
 import { ImportMonitor } from '../application/import-monitor.js';
@@ -13,7 +13,7 @@ import { ImportMonitor } from '../application/import-monitor.js';
 const repos: DrizzleLearnerRepository[] = [], dirs: string[] = [];
 afterEach(async () => { for (const repo of repos.splice(0)) repo.getRawDb().close(); Bun.gc(true); for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
 async function run(repo: DrizzleLearnerRepository, traceId = 'this-import') {
-  const tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool);
+  const tool = new TextbookContentTools(repo), model = pipelineModel(tool);
   const result = await repo.executeTextbookPipeline({ userId: 'owner', traceId, documentId: 'monitored-book', title: '监视集成教材',
     tocEntries: [{ id: 'a', title: '第一部分', level: 'lesson', startPage: 7, endPage: 9 }, { id: 'b', title: '第二部分', level: 'lesson', startPage: 10, endPage: 15 }],
     lessonJobs: [{ lessonId: 'a', text: '第一部分真实输入' }, { lessonId: 'b', text: '第二部分真实输入' }],
@@ -37,11 +37,11 @@ describe('导入监视：实际会话工具 → SQLite 事件 → Gateway 查询
       const input = interactions.find(event => event.name === 'input')!;
       const detail = ImportEventSchema.parse(await (await flow.app.request(`${base}/details/${input.sequence}`)).json());
       expect(detail.detail).toEqual(expect.objectContaining({ message: flow.model.inputs.find(turn => turn.sessionId === binding.sessionId)!.input.message }));
-      expect(interactions.map(event => event.name)).toEqual(expect.arrayContaining(['requested', 'candidate', 'accepted', 'transaction_begin', 'transaction_committed', 'committed', 'result', 'turn_ended', 'unbound']));
+      expect(interactions.map(event => event.name)).toEqual(expect.arrayContaining(['requested', 'content_saved', 'committed', 'result', 'turn_ended', 'unbound']));
       const request = interactions.find(event => event.name === 'requested')!, response = interactions.find(event => event.name === 'result')!;
       expect(request.callId).toBe(response.callId);
       const saved = await flow.app.request(`/api/documents/owner/textbook-saved/monitored-book/${binding.nodeId}`);
-      expect(await saved.json()).toEqual(expect.objectContaining({ status: 'ready', content: expect.objectContaining({ blocks: expect.any(Array) }) }));
+      expect(await saved.json()).toEqual(expect.objectContaining({ status: 'ready', learningContent: expect.objectContaining({ articles: expect.any(Array) }) }));
     }
     const foreign = ImportEventPageSchema.parse(await (await flow.app.request(base.replace('/owner/', '/another/'))).json());
     expect(foreign.events).toHaveLength(0);
@@ -64,7 +64,7 @@ describe('导入监视：实际会话工具 → SQLite 事件 → Gateway 查询
     try { const chunk = await reader.read(); expect(new TextDecoder().decode(chunk.value)).toContain(`id: ${page.cursor}`); }
     finally { controller.abort(); await reader.cancel(); }
     const input = page.events.find(event => event.name === 'input')!;
-    expect(ImportEventSchema.parse(await (await app.request(`${base}/details/${input.sequence}`)).json()).detail).toEqual(expect.objectContaining({ message: expect.stringContaining('本章目录:') }));
+    expect(ImportEventSchema.parse(await (await app.request(`${base}/details/${input.sequence}`)).json()).detail).toEqual(expect.objectContaining({ message: expect.stringContaining('章节:') }));
   });
   it('导入事件写入失败显式报告记录不完整，不改变成功保存的教材', async () => {
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);

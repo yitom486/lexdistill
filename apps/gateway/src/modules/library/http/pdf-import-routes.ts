@@ -6,7 +6,7 @@ import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from
 import { extractTocWithLlm } from '../application/toc-extractor.js';
 import { beginTocVisionTrace, listTocVisionTraces } from '../application/toc-vision-diagnostics.js';
 import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
-import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
+import { TextbookContentTool, TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { ensurePdfRuntime, type PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { TocEntrySchema, TextbookPipelineSettingsSchema, SaveTextbookOutlineRequestSchema, ChapterSourceSchema } from '@study-studio/document-model';
 import { z } from 'zod';
@@ -54,14 +54,15 @@ export function createPdfImportRoutes(
     loadInspector?: () => Promise<PdfInspectorLike>;
     runtimeDir?: string;
     adapter?: TextbookPipelineInput['adapter'];
-    submissionTool?: LibraryLessonCommitTool;
+    submissionTool?: TextbookContentTools;
     chapterParser?: TextbookPipelineInput['chapterParser'];
   }
 ) {
   const pipelineChannels = () => {
-    const tool = pdfOverrides?.submissionTool ?? deps.server.toolRegistry.get('library.commit_lesson_knowledge');
+    const registered = pdfOverrides?.submissionTool ? undefined : deps.server.toolRegistry.get('library.write_vocabulary');
+    const tool = pdfOverrides?.submissionTool ?? (registered instanceof TextbookContentTool ? registered.owner : undefined);
     const adapter = pdfOverrides?.adapter ?? deps.server.agentAdapter;
-    if (!(tool instanceof LibraryLessonCommitTool) || !adapter) throw new BusinessError('E_AGENT_UNAVAILABLE', '章节工具或模型通道尚未就绪，请检查桌面运行时', 'AGENT_RUNTIME');
+    if (!(tool instanceof TextbookContentTools) || !adapter) throw new BusinessError('E_AGENT_UNAVAILABLE', '章节工具或模型通道尚未就绪，请检查桌面运行时', 'AGENT_RUNTIME');
     return { adapter, submissionTool: tool, ...(pdfOverrides?.chapterParser ? { chapterParser: pdfOverrides.chapterParser } : {}) };
   };
   return new Hono()

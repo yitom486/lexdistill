@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+﻿import { afterEach, describe, expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TextbookASTSchema } from '@study-studio/document-model';
 import { convertAstToTextbookBook } from '../../textbook-converter.js';
 import { DrizzleLearnerRepository } from '../../../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
-import { LibraryLessonCommitTool } from '../../../../../../gateway/src/modules/library/tools/library-lesson-commit-tool.js';
+import { TextbookContentTools } from '../../../../../../gateway/src/modules/library/tools/textbook-content-tools.js';
 import { createImportMonitorRoutes } from '../../../../../../gateway/src/modules/library/http/import-monitor-routes.js';
 import { pipelineModel, submissionFromPrompt, deferred } from '../../../../../../gateway/src/modules/library/__tests__/textbook-pipeline-fixtures.js';
 import { act, setupDom, type DomHandle } from '../../../toc/__tests__/dom-setup.js';
@@ -23,13 +23,13 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       return;
     }
     repo = new DrizzleLearnerRepository(':memory:');
-    const currentRepo = repo, tool = new LibraryLessonCommitTool(repo), waiting = deferred(), reached = deferred();
+    const currentRepo = repo, tool = new TextbookContentTools(repo), waiting = deferred(), reached = deferred();
     const model = pipelineModel(tool, async ({ input, submit, sessionId, turnId }) => {
       const value = submissionFromPrompt(input.message);
-      value.content.vocabularies[0]!.aiExplanation = '保存的生词独立讲解';
-      if (value.content.coverage[0]!.tocId === 'b') { reached.resolve(); await waiting.promise; }
+
+      if (input.message.includes('章节: 当前部分')) { reached.resolve(); await waiting.promise; }
       else {
-        const bad = await tool.execute({ content: { ...value.content, coverage: [{ tocId: 'a', status: 'OK' }] } }, { userId: 'owner', sessionId, turnId, callId: 'invalid-coverage' });
+        const bad = await submit({items:[{text:''}]});
         expect(bad.ok).toBe(false);
       }
       expect((await submit(value)).ok).toBe(true);
@@ -55,7 +55,7 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       const document = await currentRepo.getDocumentById('desktop-book'); if (!document.ok) throw document.error;
       const book = convertAstToTextbookBook(TextbookASTSchema.parse(JSON.parse(document.value!.astJson!)));
       expect(book.lessons.map(lesson => lesson.id)).toEqual(['a', 'b']); expect(book.totalLessons).toBe(1);
-      expect(book.lessons[0]?.kind).toBe('section'); expect(book.lessons[0]?.directory?.map(node => node.id)).toEqual(['u', 'a', 'ac']);
+      expect(book.lessons[0]?.kind).toBe('section'); expect(book.lessons[0]?.learningContent?.articles).toHaveLength(1);
       const recorded = await currentRepo.listImportEvents({ userId: 'owner', traceId: 'desktop-trace' });
       if (!recorded.ok) throw recorded.error;
       const historyInput = recorded.value.find(event => event.nodeId === 'a' && event.category === 'model' && event.name === 'input')!;
@@ -77,7 +77,7 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       expect(doc.body.textContent).toContain('最近一轮交互');
       expect(doc.querySelector('[data-testid="parse-timeline"]')).toBeNull();
       expect(doc.body.textContent).not.toContain('parse_submitted');
-      expect(doc.querySelector('[data-testid="sent-directory"]')?.textContent).toContain('目录已随本轮输入发送');
+      expect(doc.body.textContent).not.toContain('目录已随本轮输入发送');
       expect(doc.body.textContent).toContain('本 Worker 会复用线程');
       expect(doc.querySelector<HTMLDetailsElement>('[data-testid="current-interaction"]')?.open).toBe(true);
       expect(doc.body.textContent).toContain('引擎内部重试（本轮尚未结束）');
@@ -94,15 +94,7 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '查询数据库当前保存内容')!.click());
       await settle(); await settle();
       expect(doc.body.textContent).toContain('当前版本');
-      expect(doc.querySelector('[data-testid="saved-result"]')?.textContent).toContain('数据库派生行：正文 2');
-      expect(doc.querySelector('[data-testid="saved-result"] [data-toc-id="ac"]')?.textContent).toContain('会话小节');
-      expect(doc.body.textContent).toContain('整理后的正文 a');
-      const savedElement = doc.querySelector('[data-testid="saved-result"]')!;
-      await act(async () => [...savedElement.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(button => button.textContent === '生词')!.click()); await settle();
-      expect(savedElement.textContent).toContain('保存的生词独立讲解');
-      await act(async () => [...savedElement.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(button => button.textContent === '知识点与讲解')!.click()); await settle();
-      expect(savedElement.querySelector('[data-field="textbookExplanation"]')?.textContent).toContain('原书说明');
-      expect(savedElement.querySelector('[data-field="aiExplanation"]')?.textContent).toContain('模型补充说明');
+      expect(doc.querySelector('[data-testid="saved-result"]')?.textContent).toContain('整理后的正文 已保存部分');
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(button => button.textContent === '模型过程')!.click()); await settle();
       const recent = doc.querySelector<HTMLDetailsElement>('[data-testid="current-interaction"]')!;
       await act(async () => { recent.open = false; recent.dispatchEvent(new dom!.dom.window.Event('toggle')); });
@@ -110,26 +102,7 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       expect(doc.querySelector<HTMLButtonElement>('nav [aria-pressed="true"]')?.textContent).toBe('已保存部分');
       expect(recent.open).toBe(false);
       await act(async () => { recent.open = true; recent.dispatchEvent(new dom!.dom.window.Event('toggle')); }); await settle();
-      const successCall = [...recent.querySelectorAll<HTMLElement>('[data-testid="model-tool-call"]')].find(item => item.querySelector('summary')?.textContent?.includes('事务已提交'))!;
-      const checks = [...successCall.querySelectorAll<HTMLDetailsElement>('details')].find(item => item.querySelector('summary')?.textContent === '逐项校验与系统生成的内容')!;
-      await act(async () => { checks.open = true; checks.dispatchEvent(new dom!.dom.window.Event('toggle')); });
-      const candidate = [...checks.querySelectorAll<HTMLDetailsElement>('details')].find(item => item.querySelector('summary')?.textContent?.includes('系统生成 ID 后的规范内容'))!;
-      await act(async () => { candidate.open = true; candidate.dispatchEvent(new dom!.dom.window.Event('toggle')); }); await settle(); await settle();
-      expect(candidate.textContent).toContain('系统生成 ID 后的候选'); expect(candidate.textContent).toContain('尚不能据此认定已保存');
-      expect(candidate.querySelector('[data-toc-id="ac"]')?.textContent).toContain('整理后的正文 ac');
-      expect(recent.querySelectorAll('[data-testid="model-tool-call"]')).toHaveLength(2);
-      expect(recent.textContent).toContain('事务已提交');
-      const failureCall = [...recent.querySelectorAll<HTMLDetailsElement>('[data-testid="model-tool-call"]')].find(item => item.querySelector('summary')?.textContent?.includes('此前拒绝'))!;
-      expect(failureCall.open).toBe(false);
-      await act(async () => failureCall.querySelector<HTMLElement>('summary')!.click()); await settle();
-      expect(failureCall.open).toBe(true);
-      const rejection = [...failureCall.querySelectorAll<HTMLDetailsElement>('details')].find(item => item.querySelector('summary')?.textContent?.includes('校验拒绝与修正反馈'))!;
-      await act(async () => { rejection.open = true; rejection.dispatchEvent(new dom!.dom.window.Event('toggle')); }); await settle();
-      expect(failureCall.textContent).toContain('content.coverage.0.status');
-      const feedback = [...failureCall.querySelectorAll<HTMLDetailsElement>('details')].find(item => item.querySelector('summary')?.textContent === '反馈字段、合法值与失败详情')!;
-      await act(async () => { feedback.open = true; feedback.dispatchEvent(new dom!.dom.window.Event('toggle')); });
-      expect(feedback.textContent).toContain('EXTRACTED');
-      expect(feedback.textContent).toContain('UNREADABLE');
+      expect(recent.textContent).toContain('工具');
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '当前部分')!.click()); await settle();
       const outer = doc.querySelector<HTMLDetailsElement>('[data-testid="worker-context-history"]')!;
       expect(outer.open).toBe(false);

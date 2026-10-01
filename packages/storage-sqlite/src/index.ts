@@ -6,6 +6,8 @@
  *   连接工厂与数据层实现（schema/DDL/迁移/种子/诊断/修复/排序）。
  */
 export * from './schema.js';
+export { writeTextbookContent, readTextbookMaterial, type TextbookScope, type ContentWriteReceipt } from './adapters/library/textbook-content.js';
+export { completeTextbookChapter, textbookViewInTx, type CommitLessonKnowledgeOutput } from './adapters/library/textbook-view.js';
 export { appendImportEvent, listImportEvents, getImportEvent } from './adapters/library/import-events.js';
 
 export { createDrizzleDb, type DrizzleDb, type DrizzleInstance } from './connection.js';
@@ -38,15 +40,6 @@ export {
   type SeedSourceApplyRow,
   type SeedSourceApplyReport,
 } from './repair-apply.js';
-export {
-  planLessonOrdering,
-  applyLessonOrdering,
-  verifyDense,
-  formatOrderingPlan,
-  type LessonOrderingDocPlan,
-  type LessonOrderingPlan,
-  type LessonOrderingApplyResult,
-} from './lesson-ordering.js';
 export { canonicalJson, fingerprintCanonical } from './canonical-fingerprint.js';
 export {
   getAnkiSettings,
@@ -232,9 +225,4 @@ export {
   type TextbookLessonSlotItem,
   type TextbookAssetStats,
 } from './adapters/library/toc-skeleton.js';
-export {
-  commitLessonKnowledge,
-  type CommitLessonKnowledgeInput,
-  type CommitLessonKnowledgeOutput,
-} from './adapters/library/commit-lesson-knowledge.js';
 export { getVisibleDocument, type VisibleDocument } from './adapters/library/document-visibility.js';

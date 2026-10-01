@@ -7,7 +7,7 @@ import { TextbookASTSchema, SaveTextbookOutlineResultSchema } from '@study-studi
 import { TextbookInspectionResultSchema } from '@study-studio/protocol';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';
-import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
+import { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { pipelineModel } from './textbook-pipeline-fixtures.js';
 
 const fixture = new URL('./fixtures/smoke-native-2lessons.pdf', import.meta.url);
@@ -85,7 +85,7 @@ describe('独立目录保存：HTTP → SQLite → 文件指纹检测 → 正文
     try {
       const app = routes(repo);
       const saved = SaveTextbookOutlineResultSchema.parse(await (await save(app)).json());
-      const tool = new LibraryLessonCommitTool(repo); const model = pipelineModel(tool);
+      const tool = new TextbookContentTools(repo); const model = pipelineModel(tool);
       const result = await repo.executeTextbookPipeline({
         documentId: saved.documentId, userId: 'owner', title: input.title, tocEntries: saved.entries,
         pdf: new Uint8Array(await Bun.file(fixture).arrayBuffer()),
@@ -98,7 +98,7 @@ describe('独立目录保存：HTTP → SQLite → 文件指纹检测 → 正文
       expect(SaveTextbookOutlineResultSchema.parse(await repeated.json()).entries.map(entry => entry.id)).toEqual(['l1', 'l2']);
       const before = await repo.getTextbookAssetStats(saved.documentId);
       if (!before.ok) throw before.error;
-      expect(before.value.readyLessons).toBe(2); expect(before.value.vocab).toBe(2);
+      expect(before.value.readyLessons).toBe(2); expect(before.value.lines).toBe(2);
       const rejected = await save(app, { ...input, tocEntries: [entries[0]] });
       expect(rejected.ok).toBe(false); expect(JSON.stringify(await rejected.json())).toContain('E_TOC_SLOT_CONFLICT');
       expect(await repo.getTextbookAssetStats(saved.documentId)).toEqual(before);

@@ -1,13 +1,13 @@
 import { expect, it } from 'bun:test';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { TextbookPipelineJobRegistry } from '../application/pipeline-job-runner.js';
-import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
+import { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { deferred, pipelineModel, submissionFromPrompt } from './textbook-pipeline-fixtures.js';
 
 it('后台任务防重与阶段广播对应实际 SQLite 提交，取消后关闭会话并保留已保存章节', async () => {
   const repo = new DrizzleLearnerRepository(':memory:');
   const registry = new TextbookPipelineJobRegistry();
-  const tool = new LibraryLessonCommitTool(repo);
+  const tool = new TextbookContentTools(repo);
   const saved = deferred(), release = deferred();
   const model = pipelineModel(tool, async ({ input, submit }) => {
     expect((await submit({ content: null })).ok).toBe(false);
@@ -33,11 +33,11 @@ it('后台任务防重与阶段广播对应实际 SQLite 提交，取消后关�
     });
     await saved.promise;
     expect(registry.getActive('owner')?.jobId).toBe(start.value.jobId);
-    expect(registry.get(start.value.jobId)?.successfulLessons).toBe(1);
+    expect(registry.get(start.value.jobId)?.successfulLessons).toBe(0);
     expect(registry.get(start.value.jobId)?.lessonActivities?.l1).toEqual(expect.objectContaining({ attempt: 1, nativeTurnId: 'turn:1', correctionCount: 1, engineRetryCount: 0 }));
-    expect(stages).toContain('saved');
+    expect(stages).toContain('saving');
     const stats = await repo.getTextbookAssetStats('job-book');
-    expect(stats.ok && stats.value.readyLessons).toBe(1);
+    expect(stats.ok && stats.value.readyLessons).toBe(0); expect(stats.ok && stats.value.lines).toBe(1);
     const cancelled = registry.cancel(start.value.jobId);
     expect(cancelled.ok && cancelled.value.status).toBe('cancelled');
     release.resolve();

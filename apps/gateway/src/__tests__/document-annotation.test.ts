@@ -363,14 +363,14 @@ describe('deleteDocument 生命周期（P0.5）', () => {
   it('删除清掉 shred/FTS/位置/批注/结构，doctor 无孤儿', async () => {
     const { runDoctor } = await import('@study-studio/storage-sqlite');
     await seedFullDoc('doc_life_01');
-    expect(countFor('doc_life_01', 'textbook_vocab')).toBe(1);
+    expect(countFor('doc_life_01', 'textbook_vocabulary')).toBe(1);
     expect(countFor('doc_life_01', 'textbook_fts')).toBe(2);
 
     const del = await repo.deleteDocument('doc_life_01', testUserId);
     expect(isOk(del)).toBe(true);
     for (const t of [
-      'textbook_lessons', 'textbook_lines', 'textbook_vocab', 'textbook_grammar',
-      'textbook_exercises', 'knowledge_points', 'textbook_fts',
+      'textbook_materials', 'textbook_sentences', 'textbook_vocabulary', 'textbook_knowledge',
+      'textbook_exercise_items', 'knowledge_points', 'textbook_fts',
       'reading_positions', 'annotations', 'document_structure',
     ]) {
       expect(countFor('doc_life_01', t)).toBe(0);
@@ -385,12 +385,11 @@ describe('deleteDocument 生命周期（P0.5）', () => {
   it('事务中途失败整体回滚，不留半删除', async () => {
     await seedFullDoc('doc_life_02');
     // 破坏一张子表：事务内必抛，验证原子性
-    repo.getRawDb().run('DROP TABLE textbook_lines');
+    repo.getRawDb().run('DROP TABLE textbook_sentences');
     const del = await repo.deleteDocument('doc_life_02', testUserId);
     expect(isOk(del)).toBe(false);
     // documents 本行与批注都在（回滚了）
-    const got = await repo.getDocumentById('doc_life_02');
-    expect(isOk(got) && got.value !== null).toBe(true);
+    expect(repo.getRawDb().query("SELECT id FROM documents WHERE id='doc_life_02'").get()).toEqual({id:'doc_life_02'});
     const anns = await repo.listAnnotations('doc_life_02', testUserId);
     expect(isOk(anns) && anns.value.length).toBe(1);
   });
@@ -401,6 +400,6 @@ describe('deleteDocument 生命周期（P0.5）', () => {
     expect(isOk(del)).toBe(false);
     const got = await repo.getDocumentById('doc_life_03');
     expect(isOk(got) && got.value !== null).toBe(true);
-    expect(countFor('doc_life_03', 'textbook_vocab')).toBe(1);
+    expect(countFor('doc_life_03', 'textbook_vocabulary')).toBe(1);
   });
 });

@@ -1,11 +1,9 @@
 import type { AgentAdapter, AgentEvent, AgentInput, CreateSessionOptions, AgentSession } from '@study-studio/agent-runtime';
-import { LessonProposalSchema, type LessonContent, type LessonProposal, type ContentSourceReference } from '@study-studio/document-model';
+import type { LessonContent } from '@study-studio/document-model';
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
-import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
-import type { CommitLessonKnowledgeOutput } from '../ports.js';
+import type { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { PDFDocument } from 'pdf-lib';
 import type { ChapterSource } from '@study-studio/document-model';
-import { z } from 'zod';
 
 /** 受控模型的图片输入夹具，不代表真实书页。 */
 export const fixturePng = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR3cAAAAASUVORK5CYII=', 'base64'));
@@ -30,40 +28,15 @@ export function contentFor(tocIds: string[]): LessonContent {
     summary: { goldenSentences: [], selfCheckQuestions: ['理解了吗'] },
   };
 }
-export function submissionFromPrompt(message: string): LessonProposal {
-  const tocLine = message.split('本章目录:\n')[1]?.split('\n')[0] ?? '[]';
-  const raw: unknown = JSON.parse(tocLine);
-  const ids = Array.isArray(raw) ? raw.map(item => typeof item === 'object' && item && 'id' in item && typeof item.id === 'string' ? item.id : '') : [];
-  const root = /^当前目录节点: (.+)$/m.exec(message)?.[1] ?? '';
-  const content = contentFor([root, ...ids.filter(id => id !== root)]);
-  const material = message.split('章节解析材料:\n')[1]?.split('\n')[0];
-  if (material) {
-    const source = z.object({ blocks: z.array(z.object({ id: z.string(), page: z.number() })).min(1) }).parse(JSON.parse(material));
-    for (const item of [...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises]) if (item.source === 'TEXTBOOK') item.sourceRefs = [{ blockId: source.blocks[0]!.id, page: source.blocks[0]!.page }];
-  }
-  const withoutId = <T extends { id: string }>({ id: _id, ...item }: T) => item;
-  const proposalItem = <T extends { id: string; sourceRefs?: ContentSourceReference[] | undefined }>(item: T) => {
-    const { sourceRefs, ...rest } = withoutId(item);
-    return { ...rest, ...(sourceRefs ? { sourceRefs: sourceRefs.map(({ page: _page, ...ref }) => ref) } : {}) };
-  };
-  return LessonProposalSchema.parse({ content: { ...content, blocks: content.blocks.map(proposalItem),
-    vocabularies: content.vocabularies.map(item => ({ ...proposalItem(item), examples: item.examples.map(proposalItem) })),
-    knowledgePoints: content.knowledgePoints.map(item => ({ ...proposalItem(item), examples: item.examples.map(proposalItem) })),
-    exercises: content.exercises.map(({ knowledgePointIds, options, left, right, answer, ...item }) => ({ ...proposalItem(item),
-      knowledgePointIndexes: knowledgePointIds.map(id => content.knowledgePoints.findIndex(point => point.id === id)),
-      ...(options ? { options: options.map(withoutId) } : {}), ...(left ? { left: left.map(withoutId) } : {}), ...(right ? { right: right.map(withoutId) } : {}),
-      answer: { ...(answer.text ? { text: answer.text } : {}),
-        ...(answer.optionIds ? { optionIndexes: answer.optionIds.map(id => options!.findIndex(option => option.id === id)) } : {}),
-        ...(answer.pairs ? { pairs: answer.pairs.map(pair => ({ leftIndex: left!.findIndex(option => option.id === pair.leftId), rightIndex: right!.findIndex(option => option.id === pair.rightId) })) } : {}),
-      },
-    })),
-  } });
+export function submissionFromPrompt(message: string) {
+  const title = /^章节: (.+)$/m.exec(message)?.[1] ?? '当前章节';
+  return { items: [{ text: `整理后的正文 ${title}` }] };
 }
 export interface ModelTurn {
   sessionId: string; turnId: string; input: AgentInput;
-  submit: (raw: unknown) => Promise<Result<CommitLessonKnowledgeOutput, BusinessError>>;
+  submit: (raw: unknown, kind?: import('@study-studio/document-model').TextbookContentKind | 'read_material') => Promise<Result<unknown, BusinessError>>;
 }
-export function pipelineModel(tool: LibraryLessonCommitTool, handle?: (turn: ModelTurn) => Promise<void>) {
+export function pipelineModel(tool: TextbookContentTools, handle?: (turn: ModelTurn) => Promise<void>) {
   const created: CreateSessionOptions[] = [], inputs: Array<{ sessionId: string; input: AgentInput }> = [], closed: string[] = [], interrupted: string[] = [];
   const adapter: AgentAdapter = {
     id: 'controlled-tool-model', name: 'Integration model output', supportsImageInput: () => true,
@@ -77,11 +50,11 @@ export function pipelineModel(tool: LibraryLessonCommitTool, handle?: (turn: Mod
           const turnId = `turn:${inputs.length}`;
           input.onTurnStarted?.(turnId);
           let toolCalls = 0;
-          const submit = (raw: unknown) => tool.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId: ++toolCalls === 1 ? callId : `${callId}:${toolCalls}`, turnId });
+          const submit = (raw: unknown, kind: import('@study-studio/document-model').TextbookContentKind | 'read_material' = 'articles') => tool.tools.find(item => item.kind === kind)!.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId: ++toolCalls === 1 ? callId : `${callId}:${toolCalls}`, turnId });
           if (handle) await handle({ sessionId: options.sessionId, turnId, input, submit });
           else {
             const candidate = submissionFromPrompt(input.message);
-            yield { type: 'TOOL_CALL_REQUESTED', callId, toolName: tool.name.replaceAll('.', '_'), input: candidate };
+            yield { type: 'TOOL_CALL_REQUESTED', callId, toolName: 'library_write_articles', input: candidate };
             const result = await submit(candidate);
             yield { type: 'TOOL_CALL_COMPLETED', callId, result };
           }

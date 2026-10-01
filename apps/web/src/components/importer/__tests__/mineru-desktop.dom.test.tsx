@@ -7,7 +7,7 @@ import { DrizzleLearnerRepository } from '../../../../../gateway/src/infrastruct
 import { createPdfImportRoutes } from '../../../../../gateway/src/modules/library/http/pdf-import-routes.js';
 import { createLibraryRoutes } from '../../../../../gateway/src/modules/library/http/library-routes.js';
 import type { GatewayDeps } from '../../../../../gateway/src/composition/gateway-deps.js';
-import { LibraryLessonCommitTool } from '../../../../../gateway/src/modules/library/tools/library-lesson-commit-tool.js';
+import { TextbookContentTools } from '../../../../../gateway/src/modules/library/tools/textbook-content-tools.js';
 import { TextbookPipelineJobRegistry } from '../../../../../gateway/src/modules/library/application/pipeline-job-runner.js';
 import { fixturePdf, fixturePng, deferred, submissionFromPrompt, pipelineModel } from '../../../../../gateway/src/modules/library/__tests__/textbook-pipeline-fixtures.js';
 import { pinProcessToTestRuntime } from '../../../../../gateway/src/modules/library/__tests__/pdf-test-runtime.js';
@@ -38,7 +38,7 @@ it('桌面解析选择与资源配置 → Gateway → MinerU V1 HTTP → 工具 
   } });
   const priorLocalToken = process.env.MINERU_LOCAL_TOKEN; delete process.env.MINERU_LOCAL_TOKEN;
   const releaseModel = deferred(), modelWaiting = deferred();
-  const tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool, async ({ input, submit }) => {
+  const tool = new TextbookContentTools(repo), model = pipelineModel(tool, async ({ input, submit }) => {
     expect((await submit({ content: null })).ok).toBe(false);
     modelWaiting.resolve(); await releaseModel.promise;
     expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true);
@@ -115,10 +115,10 @@ it('桌面解析选择与资源配置 → Gateway → MinerU V1 HTTP → 工具 
     await act(async () => usePipelineJobStore.getState().setActiveJob(await requestPipelineJob('desktop-owner', runningJobId)));
     expect(doc.body.textContent).toContain('已处理 1/1');
     expect(parsed).toBe(1); expect(submitted[0]).toMatchObject({ parserBackend: 'mineru-local', mineruLocalUrl: service.url.href, parseConcurrency: 1, parseTimeoutMs: 3000, toolRepairRetries: 2 });
-    expect(model.created[0]?.model).toBe('user-model'); expect(model.inputs[0]?.input.attachments?.[0]?.label).toBe('原书 PDF 第 2 页');
+    expect(model.created[0]?.model).toBe('user-model'); expect(model.inputs[0]?.input.attachments).toBeUndefined();
     const saved = await repo.getDocumentById('desktop-book'); if (!saved.ok || !saved.value?.astJson) throw new Error('教材未保存');
     const ast = TextbookASTSchema.parse(JSON.parse(saved.value.astJson));
-    expect(ast.lessons[0]?.content?.vocabularies[0]?.sourceRefs).toEqual([{ blockId: 'p2b0', page: 2 }]);
+    expect(ast.lessons[0]?.learningContent?.articles[0]?.text).toContain('整理后的正文');
     await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '查看本次运行')!.click());
     await until(() => !!doc.querySelector('[data-testid="model-process"]'));
     expect(doc.querySelector('[data-testid="parse-timeline"]')).toBeNull();
@@ -130,8 +130,8 @@ it('桌面解析选择与资源配置 → Gateway → MinerU V1 HTTP → 工具 
     await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(button => button.textContent === '保存结果')!.click());
     await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '查询数据库当前保存内容')!.click());
     await until(() => !!doc.querySelector('[data-testid="saved-result"]'));
-    expect(doc.querySelector('[data-testid="saved-result"]')?.textContent).toContain('原书来源定位');
-    expect(doc.querySelector('[data-testid="saved-result"]')?.textContent).toContain('p2b0');
+    expect(doc.querySelector('[data-testid="saved-result"]')?.textContent).toContain('文章');
+    expect(doc.querySelector('[data-testid="saved-result"]')?.textContent).toContain('整理后的正文');
     await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Close')!.click());
     await start(); await until(() => submitted.length === 2 && registry.getActive('desktop-owner') === null);
     expect(parsed).toBe(1); expect(model.inputs).toHaveLength(1);

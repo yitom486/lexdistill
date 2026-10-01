@@ -61,7 +61,7 @@ export function createImportMonitorRoutes(repo: ContentRepository) {
       const stats = await repo.getTextbookAssetStats(document.value.id);
       if (!stats.ok) return formatBusinessErrorResponse(c, stats.error);
       const counts = stats.value.lessonDetails.find(item => item.lessonId === node.id);
-      return c.json(SavedTextbookContentSchema.parse({ documentId: document.value.id, nodeId: node.id, title: node.title, readAt: new Date().toISOString(), status: node.status, content: node.content ?? null,
+      return c.json(SavedTextbookContentSchema.parse({ documentId: document.value.id, nodeId: node.id, title: node.title, readAt: new Date().toISOString(), status: node.status, content: node.content ?? null, ...(node.learningContent ? { learningContent: node.learningContent } : {}),
         directory: entries.map((entry, index) => ({ id: entry.id, title: entry.title, level: entry.level, parentId: entry.parentId, startPage: entry.startPage, endPage: entry.endPage, sortOrder: index + 1 })),
         counts: counts ? { lines: counts.lineCount, vocabularies: counts.vocabCount, knowledgePoints: counts.grammarCount, exercises: counts.exerciseCount } : null,
       }));

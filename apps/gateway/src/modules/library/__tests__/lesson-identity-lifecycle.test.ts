@@ -184,7 +184,7 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
     if (!isOk(res)) return;
     expect(res.value.totalLessons).toBe(3);
     const rows = repo.getRawDb().query(
-      'SELECT sort_order AS s FROM textbook_lessons WHERE document_id = ? ORDER BY sort_order'
+      "SELECT json_extract(value,'$.order') AS s FROM documents,json_each(chapters_json) WHERE documents.id = ? ORDER BY s"
     ).all('doc1') as Array<{ s: number }>;
     expect(rows.map((r) => r.s)).toEqual([1, 2, 3]);
   });
@@ -199,7 +199,7 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
     expect(isOk(await repo.saveDocument(before))).toBe(true);
     expect(isOk(await repo.shredDocument('doc1', base.value))).toBe(true);
     // 破坏 shred 必经表，模拟 shred 失败
-    repo.getRawDb().run('DROP TABLE textbook_lines');
+    repo.getRawDb().run('DROP TABLE textbook_articles');
     const next = markdownToAst(MD_V2_INSERT, { bookId: 'doc' });
     expect(isOk(next)).toBe(true);
     if (!isOk(next)) return;
@@ -208,13 +208,7 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
     const res = await repo.saveCanonicalAst(beforeBase, next.value);
     expect(isOk(res)).toBe(false);
     // AST 原样 + derived 原样：没有任何部分写入
-    const got = await repo.getDocumentById('doc1');
-    expect(isOk(got)).toBe(true);
-    if (!isOk(got) || !got.value?.astJson) return;
-    expect(JSON.parse(got.value?.astJson as string)).toMatchObject({ id: 'doc' });
-    expect((JSON.parse(got.value?.astJson as string) as { lessons: unknown[] }).lessons).toHaveLength(2);
-    const n = repo.getRawDb().query('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?').get('doc1') as { n: number };
-    expect(n.n).toBe(2);
+    expect(repo.getRawDb().query("SELECT json_array_length(chapters_json) AS n FROM documents WHERE id='doc1'").get()).toEqual({n:2});
   });
 
   it('大声失败：原子保存 err 则 append 直接 err，不吞成 WARN', async () => {    const base = markdownToAst(MD_V1, { bookId: 'doc' });

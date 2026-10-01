@@ -1,250 +1,29 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { eq } from 'drizzle-orm';
-import { isOk } from '@study-studio/shared';
 import { initSchema } from '../ddl.js';
 import * as schema from '../schema.js';
-import { seedTextbookTocSkeleton, listTextbookLessonSlots } from '../adapters/library/toc-skeleton.js';
-import { commitLessonKnowledge } from '../adapters/library/commit-lesson-knowledge.js';
-import type { TocEntry } from '@study-studio/document-model';
-
-function freshDb() {
-  const sqlite = new Database(':memory:');
-  initSchema(sqlite);
-  const db = drizzle(sqlite, { schema });
-  return { sqlite, db };
-}
-
-describe('seedTextbookTocSkeleton', () => {
-  it('合规递增目录：成功原子落库，文档创建且全量章节槽位处于 pending 状态', async () => {
-    const { db } = freshDb();
-    const entries: TocEntry[] = [
-      { id: 'u1', level: 'unit', title: 'Unit 1 基础篇', startPage: 1 },
-      { id: 'l1', level: 'lesson', title: '第1课 打招呼', startPage: 5, endPage: 12, parentId: 'u1' },
-      { id: 'l2', level: 'lesson', title: '第2课 自我介绍', startPage: 13, endPage: 20, parentId: 'u1' },
-    ];
-
-    const res = await seedTextbookTocSkeleton(
-      { db },
-      {
-        documentId: 'doc_tb_01',
-        userId: 'user_01',
-        title: '新编日语第一册',
-        language: 'ja',
-        entries,
-      }
-    );
-
-    expect(isOk(res)).toBe(true);
-    if (isOk(res)) {
-      expect(res.value.documentId).toBe('doc_tb_01');
-      expect(res.value.lessonCount).toBe(2);
-      expect(res.value.totalEntries).toBe(3);
-      expect(res.value.minPage).toBe(1);
-      expect(res.value.maxPage).toBe(20);
-    }
-
-    // 检查 documents 记录
-    const docs = db.select().from(schema.documents).where(eq(schema.documents.id, 'doc_tb_01')).all();
-    expect(docs).toHaveLength(1);
-    expect(docs[0]!.title).toBe('新编日语第一册');
-    expect(docs[0]!.language).toBe('ja');
-
-    // 检查 textbook_lessons 槽位记录
-    const lessons = db
-      .select()
-      .from(schema.textbookLessons)
-      .where(eq(schema.textbookLessons.documentId, 'doc_tb_01'))
-      .orderBy(schema.textbookLessons.sortOrder)
-      .all();
-
-    expect(lessons).toHaveLength(3);
-    // 单元槽位
-    expect(lessons[0]!.lessonId).toBe('u1');
-    expect(lessons[0]!.kind).toBe('unit');
-    expect(lessons[0]!.sortOrder).toBe(1);
-    expect(lessons[0]!.status).toBe('pending');
-    expect(lessons[0]!.startPage).toBe(1);
-
-    // 第1课
-    expect(lessons[1]!.lessonId).toBe('l1');
-    expect(lessons[1]!.kind).toBe('lesson');
-    expect(lessons[1]!.parentId).toBe('u1');
-    expect(lessons[1]!.sortOrder).toBe(2);
-    expect(lessons[1]!.status).toBe('pending');
-    expect(lessons[1]!.startPage).toBe(5);
-    expect(lessons[1]!.endPage).toBe(12);
-
-    // 第2课
-    expect(lessons[2]!.lessonId).toBe('l2');
-    expect(lessons[2]!.sortOrder).toBe(3);
-    expect(lessons[2]!.status).toBe('pending');
-    expect(lessons[2]!.startPage).toBe(13);
-    expect(lessons[2]!.endPage).toBe(20);
-  });
-
-  it('页码倒退时拦截并拒绝，零写入', async () => {
-    const { db } = freshDb();
-    const entries: TocEntry[] = [
-      { id: 'l1', level: 'lesson', title: '第1课', startPage: 20 },
-      { id: 'l2', level: 'lesson', title: '第2课', startPage: 10 }, // 倒退
-    ];
-
-    const res = await seedTextbookTocSkeleton(
-      { db },
-      {
-        documentId: 'doc_invalid_01',
-        userId: 'user_01',
-        title: '倒退教材',
-        entries,
-      }
-    );
-
-    expect(isOk(res)).toBe(false);
-    if (!isOk(res)) {
-      expect(res.error.code).toBe('E_TOC_PAGE_ORDER_INVALID');
-    }
-
-    // 确认零写入
-    const docs = db.select().from(schema.documents).where(eq(schema.documents.id, 'doc_invalid_01')).all();
-    expect(docs).toHaveLength(0);
-    const lessons = db
-      .select()
-      .from(schema.textbookLessons)
-      .where(eq(schema.textbookLessons.documentId, 'doc_invalid_01'))
-      .all();
-    expect(lessons).toHaveLength(0);
-  });
-
-  it('幂等更新：用户微调确认后再次提交，槽位全量更新且无脏数据', async () => {
-    const { db } = freshDb();
-    const v1Entries: TocEntry[] = [
-      { id: 'l1', level: 'lesson', title: '第1课', startPage: 1 },
-      { id: 'l2', level: 'lesson', title: '第2课', startPage: 10 },
-    ];
-
-    await seedTextbookTocSkeleton(
-      { db },
-      {
-        documentId: 'doc_update_01',
-        userId: 'user_01',
-        title: '初始标题',
-        entries: v1Entries,
-      }
-    );
-
-    // 用户在前端微调了标题和页码
-    const v2Entries: TocEntry[] = [
-      { id: 'l1', level: 'lesson', title: '第1课（精校标题）', startPage: 2 },
-      { id: 'l2', level: 'lesson', title: '第2课（精校标题）', startPage: 15 },
-    ];
-
-    const res2 = await seedTextbookTocSkeleton(
-      { db },
-      {
-        documentId: 'doc_update_01',
-        userId: 'user_01',
-        title: '最终确认标题',
-        entries: v2Entries,
-      }
-    );
-
-    expect(isOk(res2)).toBe(true);
-
-    const lessons = db
-      .select()
-      .from(schema.textbookLessons)
-      .where(eq(schema.textbookLessons.documentId, 'doc_update_01'))
-      .orderBy(schema.textbookLessons.sortOrder)
-      .all();
-
-    expect(lessons).toHaveLength(2);
-    expect(lessons[0]!.title).toBe('第1课（精校标题）');
-    expect(lessons[0]!.startPage).toBe(2);
-    expect(lessons[1]!.title).toBe('第2课（精校标题）');
-    expect(lessons[1]!.startPage).toBe(15);
-  });
-
-  it('listTextbookLessonSlots: 能够按 sortOrder 准确返回已入库课次槽位及就绪状态', async () => {
-    const { db } = freshDb();
-    const entries: TocEntry[] = [
-      { id: 'l1', level: 'lesson', title: '第1课', startPage: 1, endPage: 5 },
-      { id: 'l2', level: 'lesson', title: '第2课', startPage: 6, endPage: 10 },
-    ];
-
-    await seedTextbookTocSkeleton(
-      { db },
-      {
-        documentId: 'doc_slots_01',
-        userId: 'user_01',
-        title: '测试槽位查询',
-        entries,
-      }
-    );
-
-    const slotsRes = await listTextbookLessonSlots({ db }, 'doc_slots_01');
-    expect(isOk(slotsRes)).toBe(true);
-    if (isOk(slotsRes)) {
-      expect(slotsRes.value).toHaveLength(2);
-      expect(slotsRes.value[0]!.lessonId).toBe('l1');
-      expect(slotsRes.value[0]!.status).toBe('pending');
-      expect(slotsRes.value[1]!.lessonId).toBe('l2');
-      expect(slotsRes.value[1]!.status).toBe('pending');
-    }
-  });
-
-  it('幂等落库：若课次已处于 ready 状态且 forceOverwrite=false，保留 ready 状态及正文等内容', async () => {
-    const { db } = freshDb();
-    const entries: TocEntry[] = [
-      { id: 'l1', level: 'lesson', title: '第1课', startPage: 1, endPage: 5 },
-      { id: 'l2', level: 'lesson', title: '第2课', startPage: 6, endPage: 10 },
-    ];
-
-    await seedTextbookTocSkeleton(
-      { db },
-      {
-        documentId: 'doc_ready_preserve',
-        userId: 'user_01',
-        title: '已完成测试',
-        entries,
-      }
-    );
-
-    // 通过实际事务保存规范章节，而非绕过 AST 直接改派生行。
-    const saved = await commitLessonKnowledge({ db }, {
-      documentId: 'doc_ready_preserve', lessonId: 'l1', submissionId: 'attempt-1',
-      content: {
-        coverage: [{ tocId: 'l1', status: 'EXTRACTED' }],
-        blocks: [{ id: 'p1', kind: 'PARAGRAPH', text: '第1课正文', source: 'TEXTBOOK', tocId: 'l1' }],
-        vocabularies: [], knowledgePoints: [], exercises: [],
-        preview: { keyPoints: ['问候'], pitfalls: [], canDoGoal: '可以问候' },
-      },
-    });
-    expect(saved.ok).toBe(true);
-
-    // 再次 seed（forceOverwrite: false）
-    await seedTextbookTocSkeleton(
-      { db },
-      {
-        documentId: 'doc_ready_preserve',
-        userId: 'user_01',
-        title: '已完成测试',
-        entries,
-        forceOverwrite: false,
-      }
-    );
-
-    const slots = await listTextbookLessonSlots({ db }, 'doc_ready_preserve');
-    expect(isOk(slots)).toBe(true);
-    if (isOk(slots)) {
-      expect(slots.value[0]!.status).toBe('ready');
-      expect(slots.value[0]!.hasPassage).toBe(true);
-      expect(slots.value[0]!.hasPreview).toBe(true);
-      expect(slots.value[1]!.status).toBe('pending');
-    }
-    const lesson = db.select().from(schema.textbookLessons).where(eq(schema.textbookLessons.lessonId, 'l1')).get();
-    expect(lesson?.submissionId).toBe('attempt-1');
-    expect(JSON.parse(lesson!.contentJson!).blocks[0].text).toBe('第1课正文');
-  });
+import { seedTextbookTocSkeleton, listTextbookLessonSlots, getTextbookAssetStats } from '../adapters/library/toc-skeleton.js';
+import { writeTextbookContent } from '../adapters/library/textbook-content.js';
+import { completeTextbookChapter } from '../adapters/library/textbook-view.js';
+let sqlite: Database|undefined;afterEach(()=>{sqlite?.close();sqlite=undefined;});
+it('章节清单和内容独立存储，复核目录保留已保存内容；显式覆盖仅清本书内容、不清全局词汇',async()=>{
+ sqlite=new Database(':memory:');initSchema(sqlite);const db=drizzle(sqlite,{schema});
+ const input={documentId:'book',userId:'owner',title:'教材',language:'ja',sourceFingerprint:'file',entries:[{id:'root',title:'第一章',level:'lesson' as const,startPage:10},{id:'small',parentId:'root',title:'小节',level:'section' as const,startPage:10}]};
+ expect((await seedTextbookTocSkeleton({db},input)).ok).toBe(true);
+ const scope={userId:'owner',documentId:'book',chapterId:'root'};
+ expect((await writeTextbookContent({db},scope,'vocabulary',{items:[{word:'本',reading:'ほん',meaning:'书',level:'N5'}]})).ok).toBe(true);
+ expect((await completeTextbookChapter({db},scope)).ok).toBe(true);
+ expect((await seedTextbookTocSkeleton({db},input)).ok).toBe(true);
+ const slots=await listTextbookLessonSlots({db},'book');expect(slots.ok&&slots.value.map(row=>[row.lessonId,row.status])).toEqual([['root','ready']]);
+ expect((await seedTextbookTocSkeleton({db},{...input,sourceFingerprint:'other'})).ok).toBe(false);
+ expect((await seedTextbookTocSkeleton({db},{...input,userId:'other'})).ok).toBe(false);
+ expect((await seedTextbookTocSkeleton({db},{...input,forceOverwrite:true})).ok).toBe(true);
+ expect(db.select().from(schema.globalVocabulary).all()).toHaveLength(1);expect(db.select().from(schema.textbookVocabulary).all()).toHaveLength(0);
+ const stats=await getTextbookAssetStats({db},'book');expect(stats.ok&&stats.value.readyLessons).toBe(0);
+});
+it('目录页码倒序不能保存任何章节',async()=>{
+ sqlite=new Database(':memory:');initSchema(sqlite);const db=drizzle(sqlite,{schema});
+ const result=await seedTextbookTocSkeleton({db},{documentId:'book',userId:'owner',title:'教材',entries:[{id:'a',title:'一',level:'lesson',startPage:5},{id:'b',title:'二',level:'lesson',startPage:2}]});
+ expect(result.ok).toBe(false);expect(db.select().from(schema.documents).all()).toHaveLength(0);
 });

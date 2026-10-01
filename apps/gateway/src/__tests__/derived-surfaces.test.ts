@@ -71,10 +71,10 @@ describe('A. 干净输入派生全链', () => {
     const db = repo.getRawDb();
     const count = (table: string): number =>
       (db.query(`SELECT COUNT(*) AS n FROM ${table} WHERE document_id = ?`).get('derived_doc') as { n: number }).n;
-    expect(count('textbook_lessons')).toBe(1);
-    expect(count('textbook_vocab')).toBe(1);
-    expect(count('textbook_grammar')).toBe(1);
-    expect(count('textbook_lines')).toBe(2);
+    expect(db.query("SELECT json_array_length(chapters_json) AS n FROM documents WHERE id='derived_doc'").get()).toEqual({n:1});
+    expect(count('textbook_vocabulary')).toBe(1);
+    expect(count('textbook_knowledge')).toBe(1);
+    expect(count('textbook_sentences')).toBe(2);
 
     // FTS 可查（词面 + 对话）
     const fts = db

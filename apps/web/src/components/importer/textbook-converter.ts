@@ -30,6 +30,7 @@ export function convertAstToTextbookBook(ast: TextbookAST): TextbookBook {
       kind: l.level === 'section' ? 'section' : 'lesson',
       directory: [...tasks.find(task => task.root.id === l.id)!.ancestors, ...tasks.find(task => task.root.id === l.id)!.entries].map((entry, index) => ({ id: entry.id, title: entry.title, level: entry.level, parentId: entry.parentId, startPage: entry.startPage, endPage: entry.endPage, sortOrder: index + 1 })),
       ...(l.content ? { content: l.content } : {}),
+      ...(l.learningContent ? { learningContent: l.learningContent } : {}),
       bookId: ast.id,
       lessonNumber: l.lessonNumber,
       title: l.title,

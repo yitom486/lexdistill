@@ -8,7 +8,7 @@ import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learne
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 import { producePdfLessons } from '../application/pdf-import/lesson-content-slicer.js';
 import { TextbookPipelineJobRegistry } from '../application/pipeline-job-runner.js';
-import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
+import { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { pipelineModel, submissionFromPrompt } from './textbook-pipeline-fixtures.js';
 
 pinProcessToTestRuntime();
@@ -75,7 +75,7 @@ describe('真实原生 OCR 与教材流水线', () => {
   }, 120000);
   it('真实扫描文字进入工具会话后结构化落库，OCR 原文没有写作正式正文', async () => {
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
-    const tool = new LibraryLessonCommitTool(repo);
+    const tool = new TextbookContentTools(repo);
     const model = pipelineModel(tool, async ({ input, submit }) => {
       expect(input.message).toContain('第1課'); expect(input.message).toContain('会話');
       expect(input.message).not.toContain('properties'); expect(input.message).not.toContain('passageMd');
@@ -86,17 +86,17 @@ describe('真实原生 OCR 与教材流水线', () => {
     expect(isOk(result)).toBe(true); expect(result.ok && result.value.allLessonsReady).toBe(true);
     expect(model.closed).toHaveLength(1);
     const doc = await repo.getDocumentById(result.ok ? result.value.documentId : '');
-    expect(doc.ok && doc.value?.astJson).toContain('整理后的正文 l1');
+    expect(doc.ok && doc.value?.astJson).toContain('整理后的正文 第一章');
   }, 120000);
   it('HTTP 本地路径 → 后台注册 → 原生 OCR → 工具 → SQLite 完成，透传用户模型和思考等级', async () => {
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
-    const registry = new TextbookPipelineJobRegistry(), tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool);
+    const registry = new TextbookPipelineJobRegistry(), tool = new TextbookContentTools(repo), model = pipelineModel(tool);
     const app = createPdfImportRoutes({ repo, server: { pipelineJobs: registry } as never, port: 0 }, { adapter: model.adapter, submissionTool: tool, chapterParser });
     const response = await app.request('/api/documents/native/textbook-pipeline-jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
       filePath: fileURLToPath(fixture), title: '扫描教材', model: 'user-model', effort: 'low', poolSize: 1,
       tocEntries: [{ id: 'l1', title: '第一章', level: 'lesson', startPage: 1, endPage: 1 }],
     }) });
-    expect(response.status).toBe(202);
+    expect({status:response.status,...(response.status!==202 ? {body:await response.text()} : {})}).toEqual({status:202});
     const initial = await response.json() as { jobId: string };
     const deadline = Date.now() + 90000;
     while (registry.get(initial.jobId)?.status === 'running' && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));

@@ -6,4 +6,6 @@ export interface SchemaMigration {
   version: number;
   name: string;
   sql: string;
+  /** Statements executed individually inside the migration transaction; surfaces batch errors. */
+  statements?: readonly string[];
 }

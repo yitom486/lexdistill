@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+﻿import { describe, expect, it } from 'bun:test';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { SCHEMA_MIGRATIONS as inline } from '../ddl.js';
@@ -30,34 +30,11 @@ describe('schema migrations catalog (ddl.ts ↔ migrations/)', () => {
     }
   });
 
-  it('遇到重复列时能够安全自愈并补齐缺失列', async () => {
-    const { Database } = await import('bun:sqlite');
-    const { initSchema, runMigrations } = await import('../ddl.js');
-    const sqlite = new Database(':memory:');
-    initSchema(sqlite);
-    // 验证当前已经迁移到最新
-    const maxVer = (sqlite.query('SELECT MAX(version) as max_v FROM schema_migrations').get() as { max_v: number }).max_v;
-    expect(maxVer).toBe(catalog.at(-1)!.version);
-
-    // 模拟场景：删掉 v31、v32、v33 迁移记录，模拟由于某种原因表已有 start_page，但 migration 尚未记录
-    sqlite.run('DELETE FROM schema_migrations WHERE version >= 31');
-    
-    // 重新跑 runMigrations，验证不会抛 duplicate column name 异常，且自愈后版本补齐
-    const res = runMigrations(sqlite);
-    expect(res.applied).toContain(31);
-    expect(res.applied).toContain(32);
-    expect(res.applied).toContain(33);
-
-    // 验证 textbook_lessons 的字段依然完好
-    const columns = sqlite.query<{ name: string }, []>('PRAGMA table_info(textbook_lessons)').all();
-    const colNames = new Set(columns.map((c) => c.name));
-    expect(colNames.has('start_page')).toBe(true);
-    expect(colNames.has('end_page')).toBe(true);
-    expect(colNames.has('status')).toBe(true);
-    expect(colNames.has('passage_md')).toBe(true);
-    expect(colNames.has('preview_json')).toBe(true);
-    expect(colNames.has('summary_json')).toBe(true);
-    sqlite.close();
+  it('当前教材迁移已删除旧表，重复启动不会再创建', async () => {
+    const { Database }=await import('bun:sqlite');const {initSchema}=await import('../ddl.js');const sqlite=new Database(':memory:');
+    try { initSchema(sqlite);initSchema(sqlite);
+      expect(sqlite.query("SELECT name FROM sqlite_master WHERE name IN ('textbook_lessons','textbook_lines','textbook_vocab','textbook_grammar','textbook_exercises')").all()).toEqual([]);
+      expect(sqlite.query('SELECT max(version) AS version FROM schema_migrations').get()).toEqual({version:catalog.at(-1)!.version});
+    } finally {sqlite.close();}
   });
 });
-

@@ -1,8 +1,8 @@
-import type { AgentAdapter, AgentSession, AgentImageAttachment } from '@study-studio/agent-runtime';
+import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
 import type { ChapterSource, TocEntry, TextbookLessonStage, TextbookModelActivity } from '@study-studio/document-model';
 import { BusinessError, generateId, translateToBusinessError, logger, type Result } from '@study-studio/shared';
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
-import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
+import type { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { buildLessonExtractionPrompt } from './prompts/lesson-extraction-prompt.js';
 import type { ImportMonitor } from './import-monitor.js';
 import { awaitModelActivity } from './model-activity-deadline.js';
@@ -17,7 +17,6 @@ export interface LessonExtractionJob {
   tocPath: readonly TocEntry[];
   text: string;
   source?: ChapterSource;
-  attachments?: AgentImageAttachment[];
 }
 export type LessonStage = TextbookLessonStage;
 export interface BatchExtractionProgress {
@@ -54,7 +53,7 @@ export class LessonInputQueue {
 
 export interface ChapterSessionOptions {
   userId: string; poolSize: number; model?: string | undefined; effort?: string | undefined;
-  adapter: AgentAdapter; tool: LibraryLessonCommitTool; signal: AbortSignal;
+  adapter: AgentAdapter; tool: TextbookContentTools; signal: AbortSignal;
   monitor?: ImportMonitor;
   firstResponseTimeoutMs: number; stallTimeoutMs: number;
 }
@@ -68,13 +67,13 @@ export class ChapterSessionPool {
   private async createSession(): Promise<AgentSession> {
     const created = await this.options.adapter.createSession({
       sessionId: generateId('textbook_worker'), userId: this.options.userId,
-      tools: [this.options.tool], ...(this.options.model ? { model: this.options.model } : {}),
+      tools: this.options.tool.tools, ...(this.options.model ? { model: this.options.model } : {}),
       approvalPolicy: 'on-request', ephemeral: true,
     });
     if (!created.ok) throw created.error;
     this.sessions.push(created.value);
     this.options.monitor?.record('session', 'opened', { model: this.options.model ?? null, effort: this.options.effort ?? null,
-      tools: created.value.toolSpecs ?? null, toolDescriptions: [{ name: this.options.tool.name, description: this.options.tool.description }],
+      tools: created.value.toolSpecs ?? null, toolDescriptions: this.options.tool.tools.map(tool => ({ name: tool.name, description: tool.description })),
     }, { sessionId: created.value.sessionId, ...(created.value.threadId ? { threadId: created.value.threadId } : {}) });
     return created.value;
   }
@@ -119,10 +118,9 @@ export class ChapterSessionPool {
   }
   async send(session: AgentSession, job: LessonExtractionJob, assignmentId: string, controller: AbortController, correction?: string, onActivity?: (activity: ModelTurnActivity) => void): Promise<Result<void, BusinessError>> {
     const turn = this.options.monitor?.turn(session, { nodeId: job.lessonId, attemptId: assignmentId });
-    const message = buildLessonExtractionPrompt(job, this.options.tool.name.replaceAll('.', '_'), correction);
+    const message = buildLessonExtractionPrompt(job, this.options.tool.tools.map(tool => tool.name.replaceAll('.', '_')), correction);
     this.options.monitor?.record('model', 'input', { message, model: this.options.model ?? null, effort: this.options.effort ?? null, correction: correction ?? null,
-      tocPath: job.tocPath, tocEntries: job.tocEntries, contextMode: 'worker-thread-reuse',
-      attachments: job.attachments?.map(image => ({ label: image.label, pngBase64: Buffer.from(image.png).toString('base64') })) ?? [],
+      chapterTitle: job.title, contextMode: 'worker-thread-reuse',
     }, turn?.binding);
     const interrupt = () => { void session.interrupt().catch(cause => logger.warn('教材会话中断失败', { cause: String(cause) })); };
     const startedAt = Date.now();
@@ -140,7 +138,7 @@ export class ChapterSessionPool {
       this.options.tool.startTurn(session.sessionId, assignmentId, id);
       this.options.monitor?.record('session', 'turn_started', { nativeTurnId: id }, turn?.binding);
       activity('turn_started');
-    }, ...(job.attachments?.length ? { attachments: job.attachments } : {}), ...(this.options.effort ? { turnOptions: { effort: this.options.effort } } : {}) })[Symbol.asyncIterator]();
+    }, ...(this.options.effort ? { turnOptions: { effort: this.options.effort } } : {}) })[Symbol.asyncIterator]();
     try {
       if (controller.signal.aborted) return { ok: false, error: new BusinessError('E_CANCELLED', '教材提取已取消', 'AGENT_RUNTIME') };
       while (true) {
@@ -149,8 +147,7 @@ export class ChapterSessionPool {
           elapsedMs: Date.now() - startedAt, idleMs: Date.now() - lastActivityAt,
           nativeTurnId: nativeTurnId ?? null, nativeTurnAccepted: !!nativeTurnId, lastModelEvent: lastEvent ?? null,
           engineRetryCount, lastEngineError: lastEngineError ?? null,
-          inputCharacters: message.length, attachmentCount: job.attachments?.length ?? 0,
-          attachmentBytes: job.attachments?.reduce((sum, image) => sum + image.png.byteLength, 0) ?? 0,
+          inputCharacters: message.length,
         }));
         if (next.done) break;
         const event = next.value;

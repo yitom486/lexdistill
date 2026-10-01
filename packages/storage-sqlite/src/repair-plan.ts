@@ -63,8 +63,8 @@ export function buildRepairPlan(db: Database): RepairPlan {
 
   // ---- 1. 可安全删除的 derived/cache 孤儿（与 deleteDocument 清单同源） ----
   const derived: string[] = [
-    'textbook_lessons', 'textbook_lines', 'textbook_vocab', 'textbook_grammar',
-    'textbook_exercises', 'textbook_fts',
+    'textbook_materials', 'textbook_articles', 'textbook_sentences', 'textbook_vocabulary', 'textbook_knowledge',
+    'textbook_exercise_items', 'textbook_fts',
     'reading_positions', 'annotations', 'document_structure',
   ].filter((t) => tables.has(t));
   for (const table of derived) {
@@ -114,32 +114,6 @@ export function buildRepairPlan(db: Database): RepairPlan {
     }
   }
 
-  // ---- 4. 种子 shred 候选（教材形 AST 但 0 课） ----
-  const docCols = new Set(
-    (db.query('PRAGMA table_info(documents)').all() as Array<{ name: string }>).map((c) => c.name)
-  );
-  if (tables.has('textbook_lessons') && docCols.has('ast_json')) {
-    const hasTitle = docCols.has('title');
-    const docs = db.query(
-      `SELECT d.id AS id${hasTitle ? ', d.title AS t' : ''}, d.ast_json AS ast FROM documents d WHERE d.ast_json IS NOT NULL AND NOT EXISTS (SELECT 1 FROM textbook_lessons l WHERE l.document_id = d.id)`
-    ).all() as Array<{ id: string; t?: string; ast: string }>;
-    for (const d of docs) {
-      try {
-        const o: unknown = JSON.parse(d.ast);
-        const lessons = o && typeof o === 'object' ? (o as Record<string, unknown>).lessons : null;
-        if (Array.isArray(lessons)) {
-          plan.seedShredCandidates.push({
-            documentId: d.id,
-            title: d.t ?? d.id,
-            lessonsInAst: lessons.length,
-            note: '跑一次 shredDocument 即可回填（幂等）。注意：旧种子底稿可能是方言形，先以 repair 同步底稿再 shred。',
-          });
-        }
-      } catch {
-        // 坏 JSON 不归本计划
-      }
-    }
-  }
   return plan;
 }
 

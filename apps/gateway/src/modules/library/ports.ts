@@ -10,7 +10,8 @@ import type {
   ReadingPassageSet,
   SubmitReadingPractice,
 } from '@study-studio/protocol';
-import type { TextbookAST, ImportEvent, ImportEventInput, ImportEventQuery } from '@study-studio/document-model';
+import type { TextbookAST, ImportEvent, ImportEventInput, ImportEventQuery, TextbookContentKind } from '@study-studio/document-model';
+import type { TextbookScope, ContentWriteReceipt } from '@study-studio/storage-sqlite';
 import type { ImportTask, ImportTaskStatus } from '@study-studio/storage-sqlite';
 import type {
   DocumentImportInput,
@@ -25,7 +26,6 @@ import type {
   KnowledgePoint,
   SeedTocSkeletonInput,
   SavedTocSkeleton,
-  CommitLessonKnowledgeInput,
   CommitLessonKnowledgeOutput,
   TextbookLessonSlotItem,
   TextbookAssetStats,
@@ -44,6 +44,9 @@ import type {
  *   所有权归属 M5 再定，本契约暂不收录。
  */
 export interface ContentRepository {
+  writeTextbookContent(scope: TextbookScope, kind: TextbookContentKind, input: unknown): Promise<Result<ContentWriteReceipt, BusinessError>>;
+  readTextbookMaterial(scope: TextbookScope): Promise<Result<{ text: string | null }, BusinessError>>;
+  completeTextbookChapter(scope: TextbookScope): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>>;
   appendImportEvent(input: ImportEventInput): Promise<Result<ImportEvent, BusinessError>>;
   listImportEvents(query: ImportEventQuery): Promise<Result<ImportEvent[], BusinessError>>;
   getImportEvent(userId: string, traceId: string, sequence: number): Promise<Result<ImportEvent | null, BusinessError>>;
@@ -53,9 +56,6 @@ export interface ContentRepository {
   seedTextbookTocSkeleton(
     input: SeedTocSkeletonInput
   ): Promise<Result<SavedTocSkeleton, BusinessError>>;
-  commitLessonKnowledge(
-    input: CommitLessonKnowledgeInput
-  ): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>>;
   listTextbookLessonSlots(
     documentId: string
   ): Promise<Result<TextbookLessonSlotItem[], BusinessError>>;
@@ -187,7 +187,6 @@ export interface ContentRepository {
 export type {
   SeedTocSkeletonInput,
   SavedTocSkeleton,
-  CommitLessonKnowledgeInput,
   CommitLessonKnowledgeOutput,
   TextbookPipelineInput,
   TextbookPipelineOutput,

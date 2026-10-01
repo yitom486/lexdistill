@@ -1,11 +1,11 @@
-# Database Architecture Map（P0 事实地图）
+﻿# Database Architecture Map（P0 事实地图）
 
 > 生成方式：逐表对照 `packages/storage-sqlite/src/ddl.ts`（建表 SSOT）、
 > `packages/storage-sqlite/src/schema.ts`（drizzle 类型）、`modules/*/persistence/*.ts`（writer/reader），
 > 行数为例行线上库（`study-studio.db`）快照。
-> 原则：**无 FOREIGN KEY**（全库 0 条约束），关系靠列名约定 + 应用层保证。
+> 旧事实地图不作为当前教材表规范。v37 的新教材内容表有文档及全局词汇外键，当前完整字段与生命周期见 [教材学习内容表](textbook-learning-tables.md)。
 > 详见专题规范：[教材导入架构与数据表设计说明](./textbook-import-architecture.md)。
-> 教材组已按 2026-09-30 批准的章节流水线更新；其他章节保留原事实地图口径。
+> 教材组的旧 AST/派生行说明已被 v37 内容表设计替代；其他章节仍是历史事实地图，行数不代表当前数据库快照。
 
 ## 0. 分类定义
 
@@ -19,7 +19,7 @@
 
 **重建链**：Canonical/Event →（shred/聚合/索引）→ Derived/Cache-Index。
 `textbook_fts`、`local_dictionary_fts` 坏了随时 `DROP+重建`，绝不反向当 truth source。
-注意两张 FTS 都是 **contentful FTS5**（自带数据拷贝，非 `content=` 外挂）：textbook_fts 由 shred 手工全量同步，
+注意两张 FTS 都是 **contentful FTS5**（自带数据拷贝，非 `content=` 外挂）：textbook_fts 由内容事务手工同步，
 local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触发器）+ 启动计数比对重建。
 
 ## 1. 教材组（Textbook）
@@ -31,36 +31,29 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 - writer：Gateway 导入监视器；reader：桌面通过 Gateway 的任务查询及 SSE。用户和 trace 双重过滤。
 - classification：Event；历史交互不能由教材重建。它不是内容 SSOT，不参与教材完成判断；记录失败与教材事务隔离并显示缺失。
 
-### documents —— 一书一行，系统统一资源 ID
-- PK `id`；归属 `user_id` + `source_kind`；当前教材从用户导入建立，不再补种旧教材。
-- 底稿 `ast_json`（完整 TextbookAST，SSOT），保存已确认目录、文件指纹和模型整理的规范章节内容；`content` 是摘要，不是正文事实源。
-- 描述：`title/language/topic/difficulty/source_url/source_publisher/exam_tag`
-- writer：JSON 导入使用文档保存入口；PDF 流水线由 `toc-skeleton` 建底稿、`commitLessonKnowledge` 逐章事务更新。reader：教材读取、导入检测。
-- lifecycle：建目录底稿 → 每章提交更新 AST 并同事务 shred → 全部课次实际 ready。删除/级联策略见 §5，不能从阶段进度推断内容已保存。
-- classification：Canonical。source of truth：是（教材底稿）。rebuildable：否。
+### documents —— 教材元信息与章节列表
 
-### textbook_lessons —— 课目录（Derived 查询面）
-- PK `(document_id, lesson_id)`；`lesson_id` 是已确认目录的任务身份，不能从标题猜测；`lesson_number` 为课号，查询按 `sort_order`（最终 AST 数组位置）排序。
-- `kind/parent_id/start_page/end_page` 保存目录层级和物理页范围；`status` 表示提取状态。
-- v034：`content_json` 保存规范章节投影，`submission_id` 保存实际已提交尝试身份；`passage_md` 是整理后正文的文本投影，不能用它逆向猜角色。
-- 来源：`documents.ast_json` 同事务全删全插；writer：`shredIntoTransaction`；reader：教材页、组卷、逐课导入检测。
-- lifecycle：随 shred 重建；rebuildable：是（由 ast_json）。source of truth：否（真相在 ast_json）
+- 保存教材身份、标题、语种及来源；chapters_json 保存章节列表和系统内部的页码/状态，source_fingerprint 用于文件检测。
+- 教材内容直接以七张内容表为事实源，不再保存同一教材的 AST 底稿副本；教材的 ast_json 为空。
+- 模型不填写文档/章节身份、页码、内容 ID 或小目录覆盖；Gateway 绑定章节后执行分类内容工具。
 
-### textbook_lines / textbook_vocab / textbook_grammar / textbook_exercises —— 行/词/文法/习题（Derived 查询面）
-- PK `(document_id, lesson_id, ord)`；`ord` 为课内序号（0-based dense，但**代码不强制连续**，只靠 shred 全量重写保证）
-- 来源：一律由 `documents.ast_json`（Canonical SSOT）同事务拆出；原书整理内容与 AI 补充内容都在规范底稿内，OCR 原文不作为正式正文落库。
-- vocab 列：`surface/reading/pos/gloss_zh/pitch/example_ja/example_zh`
-- v036：生词独立 AI 讲解 `ai_explanation`，来源为 AST `content.vocabularies[].aiExplanation`，与词义及原书正文分开。
-- grammar 列：`title/connection/explanation/examples_json`（v16，`[{japanese,chinese}]` 全量）
-- v034：各类行新增 `source/toc_id/field_sources_json`；正文另有 `block_id/kind`，文法另有 `ai_explanation`，原书与 AI 讲解分别存储。
-- exercises：七种题型，`answer_json/content_json` 保存选项 ID、排序或匹配答案和完整题目；`answer` 是查询用文本投影。新增 AI 习题不要求目录含练习项，但不能替代原书目录覆盖。
-- vocab/grammar 查询行按 `ord` 定位；完整内容 ID、例句和来源保留在规范章节与 AST。派生时不截断长词或正文。
-- lifecycle：随 shred 重建；rebuildable：是
+### 七张教材学习内容表 —— Canonical
 
-### textbook_term_map —— 已退役（v30 `knowledge-points`，表已 DROP）
-- v30 前它是教材词→词典标准条目的桥（best-effort，`entry_id` 可空）；退役原因：无用户面读者
-- 映射计数职能由 shred 内存统计（`mappedEntries/unmapped`，同课同 kind 同面只计首条）延续，去重口径不变
-- 后继：目录挂载蒸馏点见 `knowledge_points`（下）；词典精确匹配仍由 shred `findEntry` 在内存执行
+| 表 | 保存的内容 |
+| --- | --- |
+| global_vocabulary | 同一学习者跨教材的词汇、读音、首次释义和估计等级 |
+| textbook_vocabulary | 本章与全局词汇的关联、语境释义、讲解和例句 |
+| textbook_knowledge | 语法/发音/用法的标题、说明、接续、AI 补充和例句 |
+| textbook_articles | 完整文章或会话及独立译文 |
+| textbook_sentences | 独立句子、译文、讲解和可选说话人 |
+| textbook_exercise_items | 题型、题干、文字选项、参考答案、解析和评分要点 |
+| textbook_materials | 整理后的章节材料，支持查询和写入 |
+
+完整字段、去重规则及工具参数见 [教材学习内容表](textbook-learning-tables.md)。
+
+- 这些内容表是学习资产，不能作为缓存删除。已有内容仅在 v37 前向迁移时转换一次，旧五表随后删除。
+- 全局词汇按用户、语种、词形和读音去重；已有词不覆盖。等级是模型估计，未知的旧词不猜等级。用户掌握度仍来自作答和复习记录。
+- 删除教材会删除六张章节内容表的对应行；全局词汇继续保留。
 
 ### knowledge_points —— 目录挂载蒸馏点（Derived，可悬空原文）
 - PK `id`；`lesson_id` 锚目录节点（含章 kind）；`kind ∈ {concept}`（预留 vocab_ref/grammar_ref/rule）；`ord` 课内序
@@ -68,13 +61,13 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 - lifecycle：幂等投影、可重建；写入口收归领域命令（v30 只建表，写入 Tool 未接线）
 
 ### textbook_fts —— 全文索引（Cache-Index，contentful）
-- FTS5 虚表（**contentful，自带拷贝**，手工同步）；`kind ∈ {vocab, line}`；`ref = {lesson}#v{ord} / #d{ord}`
-- lifecycle：shred 同事务重建；坏了可 DROP 重建；rebuildable：是。绝不反向当 truth。
+- FTS5 虚表（**contentful，自带拷贝**，手工同步）；`kind ∈ {vocab, line}`；`ref` 为对应内容的真实 ID
+- lifecycle：内容写入同事务重建；坏了可 DROP 重建；rebuildable：是。绝不反向当 truth。
 
 ### document_structure —— 目录分类观测（Derived/观测）
 - 一文档一行（PK `document_id`）；`headings_json` 输入候选 / `classes_json` 校验后输出 / `model/effort/dropped`
 - writer：`saveDocumentStructure`（后跑覆盖先跑）；reader：导入页目录预览
-- **与 textbook_lessons 的关系**：observation vs canonical。目录真相以 lessons 为准，structure 只是 parser 中间结果。两者课数不一致时信 lessons。
+- 目录候选仅为解析观测；已确认的章节列表以 documents.chapters_json 为准。
 
 ### document_imports —— 导入任务台账（Event）
 - `status ∈ {processing, done, failed}`（非法值读侧回退 processing）；`document_id/lessons/error` 回填
@@ -125,7 +118,7 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 ### quiz_questions —— 题库池（Canonical + 池复用）
 - PK `id`；`user_id='default_user'` 为公共池；`tested_skill_id/difficulty/extras_json`（仅 dictation 用 extras）
 - writer：`saveQuestion(s)`（生成后持久化）+ 种子；reader：组卷装配（只读池不改池）
-- 与 `textbook_exercises` 的分工：前者是学习任务中生成的试题；后者是持久化教材章节的习题，包含原书题和明确标记的 AI 补题，生命周期随教材底稿。
+- 与 `textbook_exercise_items` 的分工：前者是学习任务中生成的试题；后者是持久化教材章节的习题，包含原书题和明确标记的 AI 补题，生命周期随教材。
 
 ### quiz_attempts / practice_item_attempts —— 作答事件（Event）
 - 纯追加（attempts 按 `(run,item)` upsert 状态机 `DRAFT→SUBMITTED→GRADED`，批改后原子落 `quiz_attempts`/错题/打卡）
@@ -162,7 +155,7 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 
 ### curriculum_kana / curriculum_hangul / curriculum_lessons —— 公共课程底座（Config）
 - 无 `user_id` 列；冷启动种子，升级覆盖；`curriculum_lessons.id == skill_id`（与 quiz `testedSkillId`、`lesson_progress.skill_id` 同一命名空间）
-- 注意与 `textbook_lessons` 的区别：**textbook = 内容来源（大家的日语第1课），curriculum = 教学路径（N5 第一阶段）**。AI 以后做"多教材拼一路"就靠这层隔离。
+- 注意与教材章节的区别：**textbook = 内容来源（大家的日语第1课），curriculum = 教学路径（N5 第一阶段）**。AI 以后做"多教材拼一路"就靠这层隔离。
 
 ### kana_practice_states —— 假名逐项记忆状态（Derived）
 - PK `(user_id, kana_id, script_type)`；每次作答原地更新 FSRS；供自适应队列（与聚合的 skill_metrics 分离）
@@ -179,7 +172,7 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 
 ### local_dictionary_fts —— 词典全文索引（Cache-Index，contentful）
 - FTS5（contentful，自带拷贝）；**触发器增量同步（insert/delete，无 update 触发器）** + 启动计数比对重建；生产唯一读者是释义 `MATCH+bm25`
-- 与 textbook_fts 的不对称：词典用触发器、教材用 shred 手工重建——两者都标 Cache-Index，坏了都可重建
+- 与 textbook_fts 的不对称：词典用触发器、教材由内容事务手工重建——两者都标 Cache-Index，坏了都可重建
 
 ### dictionary_sources —— 词典包目录/开关（Config）
 - `enabled/priority` 即时影响查词过滤排序；`listDictionaryPackages` 以它判定 installed
@@ -211,32 +204,15 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 ### dictionary_media —— 媒体库索引（Canonical 索引，文件落盘）
 - 内容寻址（`file_hash` 去重，`path` 相对根）；`source_id` 可存 `apkg:<deck>` 非 FK 字符串
 
-## 4. lesson_number 调查结论（Task 4）
+## 4. 当前教材身份与顺序
 
-事实（线上 177 行 + 代码）：
-- parser（`markdown-to-ast.ts:284`）：`lessonNumber: si + 1`——**切课顺序计数器**，与书无关
-- shred：透传（非法回退 `stats.lessons + 1`，同样是计数器）
-- UI：`TextbookCurriculum.tsx:413` 显示 `Lesson {n}`，`ListeningShadowingWorkbench.tsx:313` 显示`第 {n} 课`；课表按 AST 数组序渲染，**无排序**
-- 线上实况：
-  - 主书：復習A/B 占 n=24/25，**第11課 显示为 Lesson 26**（展示错误，真实存在）
-  - 旧书：n=17/19 缺失（当年 TOC 串课掉的课，gap 是历史残留）；同一文档 57 课含两套"第1課"序列（接力追加跨书连号，n=25 起是第二本书）
-  - 前言/CIP/出版说明被当成课（n=2–15 是杂页），`pdf-mtpsy4se` 更把"学生/会社员/練習A/問題"全当成课（18 课里一半是垃圾粒度）
-- 回答：
-  - lesson_number 当前 = **sort order + display number 二合一**，不是稳定 identity（identity 是 lesson_id）
-  - 非数字 lesson 存法：硬塞连续整数，信息（"这是复习/附录/杂页"）**只留在 title 里**，结构化丢失
-  - 排序错误风险：无（数组序即展示序，稳定但"稳定地错"）
-  - 展示错误风险：**有，线上正在发生**（第11課→Lesson 26）
-- P1 候选（本轮不动）：`lesson_id`（稳定身份，保持）+ `sort_order`（物理序，保持导入序）+ `lesson_label`（展示串，如"第11課"/"復習A"，parser 填，缺失回退 `第{n}課`）
-- P1-B 落定（v17，已实施）：只加 `sort_order`，**不加 `lesson_label`**（raw title 已在 AST/DB；归一是廉价纯函数；持久化只增同步债）。
-  `lesson_number` 正式定为 legacy compatibility；relay 保持 `maxNo+1`（Gate 0：不得改长度续排）；
-  展示走 Gateway `displayTitle`（focus 计算）→ learner-core 只消费；`第11課→Lesson 26` 类文本已在 daily-plan 消除（UI 组件 debt 另记）。
-
+教材身份为 documents.id，章节身份与展示顺序在 chapters_json 中由系统保存。标题按教材的实际章节标题展示。章节内容分别有 id 和本章同类 ord；模型只填写内容，不生成这些字段。文章与句子合并生成阅读段时，由系统重新计算连续顺序，避免两类内容各自从零开始导致冲突。
 ## 5. 已知一致性风险（doctor 覆盖项的依据）
 
-1. **删文档留孤儿（已证实，已修）**：`deleteDocument` 曾只删 annotations + documents 本行。现随删集：shred 五表 + `knowledge_points` + FTS + reading_positions + document_structure + annotations（v30 起含知识点）。
+1. **删文档留孤儿（已证实，已修）**：`deleteDocument` 曾只删 annotations + documents 本行。现随删集：六张章节内容表 + `knowledge_points` + FTS + reading_positions + document_structure + annotations（v30 起含知识点）。
 2. **lesson_number 展示错位**（见 §4，数据问题非孤儿，doctor 不查，P1 修模型）。
 3. ~~**term_map.entry_id 悬空**~~（v30 删除：表已 DROP；词典卸载不再有悬空行可言）。
-4. **FTS stale**：textbook_fts 只在 shred 重建；若有人直写行表（运维脚本！）就会 stale。doctor 双向查。
+4. **FTS stale**：textbook_fts 在内容事务中重建；若有人直写行表（运维脚本！）就会 stale。doctor 双向查。
 5. **practice_items.passage_document_id 恒 NULL**：预留列，勿当关系用（doctor 跳过 NULL，只查非空悬空）。
 6. **`term_occurrences.document_id` 是 docRef 字符串**：doctor 不得误报（规则写死排除）。
 7. **skill_id 命名空间**：`curriculum_lessons.id == lesson_progress.skill_id == quiz testedSkillId`，靠字符串相等，无约束。拼错即静默失联，靠单测锁。
@@ -246,8 +222,8 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 > 首次 doctor 运行（2026-09-09，线上库）：5 errors / 1 warning，见 P1 Ready Report。
 > 新增规则先加 `db-doctor.test.ts` 用例，再进 `doctor.ts`。
 
-- 可删重建：`textbook_fts`、`local_dictionary_fts`（+影子表）、`textbook_lines/vocab/grammar/exercises/lessons`（由 ast_json 经 shred）、`knowledge_points`（由目录+AI 提取重投影）、`skill_metrics`（由 attempts 重算，算法固定时）、`unit_progress`（由证据重算）、`daily_study_plans`（每日重冻）、`term_examples`（调模型重生，慢但可）、`study_activity_logs`（由各域事件重放，工程量大但可能）
-- 不可删：`documents`（底稿）、`learner_language_profiles`、`flashcards`、`card_drafts`、`mistakes`（复合状态不可重放，见 §2）、`quiz_attempts`、`practice_item_attempts`、`encountered_terms`（聚合可重算但 first_seen 语义丢失，算半可）、`annotations`、`reading_positions`、`learner_profiles`（可由语种行重建镜像，displayName 除外）
+- 可删重建：`textbook_fts`、`local_dictionary_fts`（+影子表）、`knowledge_points`（由目录+AI 提取重投影）、`skill_metrics`（由 attempts 重算，算法固定时）、`unit_progress`（由证据重算）、`daily_study_plans`（每日重冻）、`term_examples`（调模型重生，慢但可）、`study_activity_logs`（由各域事件重放，工程量大但可能）
+- 不可删：`documents`（教材元信息）、七张教材学习内容表、`learner_language_profiles`、`flashcards`、`card_drafts`、`mistakes`（复合状态不可重放，见 §2）、`quiz_attempts`、`practice_item_attempts`、`encountered_terms`（聚合可重算但 first_seen 语义丢失，算半可）、`annotations`、`reading_positions`、`learner_profiles`（可由语种行重建镜像，displayName 除外）
 
 ## 7. 系统表
 
@@ -268,7 +244,8 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 
 | 表 | 删文档时 | 理由 |
 |---|---|---|
-| textbook_lessons / lines / vocab / grammar / exercises | **随删**（同事务） | doc-scoped Derived，源 AST 已删，留即孤儿 |
+| 六张章节内容表 | **随删**（同事务） | 内容归属当前教材 |
+| global_vocabulary | **保留** | 跨教材复用的个人词汇资产 |
 | knowledge_points | **随删**（同事务） | 目录挂载蒸馏点，源文档已删，留即孤儿 |
 | textbook_fts | **随删**（同事务） | doc-scoped 索引 |
 | document_structure | **随删**（同事务） | 1:1 观测，源没了观测无意义 |
@@ -300,22 +277,6 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 
 本轮不改 migration runner 行为，不新增 approval flag；顺序即 guardrail。
 
-## 9. Identity scope 结论（P1-C2-A / P1-D0 决议，不改 schema）
+## 9. 内容身份
 
-### Durable identity：lesson.id
-- 当前作为 durable lesson reference 使用（`reading_positions.locator.lessonId`、
-  `sourceRef/docRef` 的 lesson 段、quiz/enrich 请求）。
-- positional 生成是已知债（P1-C 系列跟踪），但引用关系本身以 opaque 字符串成立；
-  reconciliation（shadow-ready）是未来的对齐手段，不是本轮改动。
-
-### Generation-local identity：vocab.id / grammar.id
-- 形如 `${lessonId}-v/g${kept序号}`，只在同一次 parse+enrich generation 内有效；
-- re-enrich / 列表顺序变化即整体重编（实测，见 `vocab-grammar-identity.test.ts`）；
-- **禁止未来 durable consumer 未经重新设计直接依赖这些 id**（它们跨代必变）。
-- v30 起 term_map 表已退役，映射计数只在 shred 内存统计；目录挂载蒸馏点见 knowledge_points。
-
-### Projection locator（同代定位，不跨代）
-- textbook vocab/grammar 当前定位方式：
-  `document + lesson + kind + ord/ref`（`ref = lesson#v{ord}/#d{ord}`），
-  仅在同一 canonical generation 内有效，由 shred 同事务全量重建保证一致。
-- exercise.id 无生成器（种子手写或 null），不纳入 identity 体系。
+新内容 ID 由系统在当前教材和章节作用域内生成；重复调用不会重复入库。迁移保留可用的唯一 ID；旧模型在不同章节重复生成的 ID 由系统重新分配，确保每条内容仍独立保存。全文索引引用实际内容 ID，不再依赖旧的章节/序号拼接引用。

@@ -32,18 +32,18 @@ describe('repair-plan dry-run', () => {
     const db = mem();
     db.run(`
       CREATE TABLE documents (id TEXT PRIMARY KEY);
-      CREATE TABLE textbook_lessons (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, PRIMARY KEY (document_id, lesson_id));
-      CREATE TABLE textbook_lines (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, ja TEXT NOT NULL, PRIMARY KEY (document_id, lesson_id, ord));
+      CREATE TABLE textbook_materials (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, PRIMARY KEY (document_id, lesson_id));
+      CREATE TABLE textbook_articles (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, ord INTEGER NOT NULL, ja TEXT NOT NULL, PRIMARY KEY (document_id, lesson_id, ord));
       INSERT INTO documents VALUES ('keep');
-      INSERT INTO textbook_lessons VALUES ('keep','l1'),('gone','l1');
-      INSERT INTO textbook_lines VALUES ('gone','l1',0,'x'),('gone','l1',1,'y');
+      INSERT INTO textbook_materials VALUES ('keep','l1'),('gone','l1');
+      INSERT INTO textbook_articles VALUES ('gone','l1',0,'x'),('gone','l1',1,'y');
     `);
     const before = snapshot(db);
     const plan = buildRepairPlan(db);
     // 只发现 gone 的，不碰 keep 的
     expect(plan.orphanTargets).toHaveLength(2);
     expect(plan.orphanTargets.every((t) => t.documentId === 'gone')).toBe(true);
-    const lines = plan.orphanTargets.find((t) => t.table === 'textbook_lines');
+    const lines = plan.orphanTargets.find((t) => t.table === 'textbook_articles');
     expect(lines?.rows).toBe(2);
     expect(plan.orphanTargets.every((t) => t.action === 'delete-derived-orphan')).toBe(true);
     // 只读：前后快照一致
@@ -81,18 +81,6 @@ describe('repair-plan dry-run', () => {
     expect(en?.note).toContain('需先补源行');
   });
 
-  it('种子 shred 候选只收教材形（新闻形排除）', () => {
-    const db = mem();
-    db.run(`
-      CREATE TABLE documents (id TEXT PRIMARY KEY, title TEXT NOT NULL, ast_json TEXT);
-      CREATE TABLE textbook_lessons (document_id TEXT NOT NULL, lesson_id TEXT NOT NULL, PRIMARY KEY (document_id, lesson_id));
-      INSERT INTO documents VALUES ('seed1','种子书','{"lessons":[{},{}]}');
-      INSERT INTO documents VALUES ('news1','新闻','{"questions":[]}');
-    `);
-    const plan = buildRepairPlan(db);
-    expect(plan.seedShredCandidates.map((c) => c.documentId)).toEqual(['seed1']);
-    expect(plan.seedShredCandidates[0]?.lessonsInAst).toBe(2);
-  });
 
   it('空库不炸', () => {
     const plan = buildRepairPlan(mem());

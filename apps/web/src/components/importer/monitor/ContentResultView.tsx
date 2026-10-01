@@ -12,7 +12,7 @@ export function ContentResultView({ content, directory, counts }: { content: Les
     <p>{counts ? '数据库派生行' : '候选内容数量'}：正文 {counts?.lines ?? content.blocks.length} · 生词 {counts?.vocabularies ?? content.vocabularies.length} · 知识点 {counts?.knowledgePoints ?? content.knowledgePoints.length} · 习题 {counts?.exercises ?? content.exercises.length}</p>
     <details className="rounded-lg border border-line p-3"><summary className="cursor-pointer">目录覆盖与字段存放位置</summary>
       <table className="mt-2 w-full text-left"><thead><tr><th>目录</th><th>提交状态</th><th>关联内容</th></tr></thead><tbody>{content.coverage.map(entry => <tr key={entry.tocId}><td>{headings.get(entry.tocId) ?? entry.tocId}</td><td>{entry.status === 'EXTRACTED' ? '报告已提取' : '无法辨认'}</td><td>{[...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises].filter(item => item.tocId === entry.tocId).length}</td></tr>)}</tbody></table>
-      <p className="mt-2 text-ink-muted">底稿：documents.ast_json；目录：textbook_lessons；正文：textbook_lines；生词：textbook_vocab；知识点：textbook_grammar；习题：textbook_exercises。同一事务派生，覆盖自述不代替提交回执。</p>
+      <p className="mt-2 text-ink-muted">章节内容由教材学习表保存；这里展示文件导入内容。保存状态以数据库回执为准。</p>
     </details>
     {!!referenced.length && <details className="rounded-lg border border-line p-3"><summary className="cursor-pointer">原书来源定位 · {referenced.length} 项</summary>
       <p className="text-ink-muted">来源引用保存在规范 AST 和章节 content_json；定位合法不等于语义已核实。</p>

@@ -1,5 +1,39 @@
 import { sqliteTable, text, integer, real, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+/** Global means across this learner's textbooks; dictionary packages remain separate. */
+export const globalVocabulary = sqliteTable('global_vocabulary', {
+  id: text('id').primaryKey(), userId: text('user_id').notNull(), language: text('language').notNull(),
+  word: text('word').notNull(), reading: text('reading').notNull().default(''), meaning: text('meaning').notNull(),
+  jlptLevel: text('jlpt_level'), levelSource: text('level_source'), createdAt: text('created_at').notNull(),
+}, table => [uniqueIndex('idx_global_vocabulary_identity').on(table.userId, table.language, table.word, table.reading)]);
+
+const textbookContentColumns = () => ({
+  id: text('id').primaryKey(), documentId: text('document_id').notNull().references(() => documents.id, { onDelete: 'cascade' }), chapterId: text('chapter_id').notNull(), ord: integer('ord').notNull(),
+});
+export const textbookVocabulary = sqliteTable('textbook_vocabulary', {
+  ...textbookContentColumns(), vocabularyId: text('vocabulary_id').notNull().references(() => globalVocabulary.id), meaning: text('meaning').notNull(),
+  partOfSpeech: text('part_of_speech'), pitch: text('pitch'), explanation: text('explanation'), examplesJson: text('examples_json').notNull().default('[]'),
+}, table => [index('idx_textbook_vocabulary_chapter').on(table.documentId, table.chapterId, table.ord),
+  uniqueIndex('idx_textbook_vocabulary_word').on(table.documentId, table.chapterId, table.vocabularyId)]);
+export const textbookKnowledge = sqliteTable('textbook_knowledge', {
+  ...textbookContentColumns(), kind: text('kind').notNull(), title: text('title').notNull(), explanation: text('explanation').notNull(),
+  connection: text('connection'), aiExplanation: text('ai_explanation'), examplesJson: text('examples_json').notNull().default('[]'), source: text('source').notNull(),
+}, table => [index('idx_textbook_knowledge_chapter').on(table.documentId, table.chapterId, table.ord)]);
+export const textbookArticles = sqliteTable('textbook_articles', {
+  ...textbookContentColumns(), title: text('title'), text: text('text').notNull(), translation: text('translation'), source: text('source').notNull(),
+}, table => [index('idx_textbook_articles_chapter').on(table.documentId, table.chapterId, table.ord)]);
+export const textbookSentences = sqliteTable('textbook_sentences', {
+  ...textbookContentColumns(), text: text('text').notNull(), translation: text('translation'), explanation: text('explanation'), speaker: text('speaker'), source: text('source').notNull(),
+}, table => [index('idx_textbook_sentences_chapter').on(table.documentId, table.chapterId, table.ord)]);
+export const textbookExerciseItems = sqliteTable('textbook_exercise_items', {
+  ...textbookContentColumns(), type: text('type').notNull(), prompt: text('prompt').notNull(), optionsJson: text('options_json'),
+  leftJson: text('left_json'), rightJson: text('right_json'), answerJson: text('answer_json').notNull(), explanation: text('explanation'),
+  gradingNotes: text('grading_notes'), source: text('source').notNull(),
+}, table => [index('idx_textbook_exercises_chapter').on(table.documentId, table.chapterId, table.ord)]);
+export const textbookMaterials = sqliteTable('textbook_materials', {
+  documentId: text('document_id').notNull().references(() => documents.id, { onDelete: 'cascade' }), chapterId: text('chapter_id').notNull(), text: text('text').notNull(), updatedAt: text('updated_at').notNull(),
+}, table => [primaryKey({ columns: [table.documentId, table.chapterId] })]);
+
 export const textbookImportEvents = sqliteTable('textbook_import_events', {
   sequence: integer('sequence').primaryKey({ autoIncrement: true }),
   userId: text('user_id').notNull(), traceId: text('trace_id').notNull(),
@@ -187,6 +221,8 @@ export const documents = sqliteTable('documents', {
   language: text('language').notNull().default('ja'),
   content: text('content').notNull(),
   astJson: text('ast_json'),
+  chaptersJson: text('chapters_json'),
+  sourceFingerprint: text('source_fingerprint'),
   topic: text('topic'),
   difficulty: integer('difficulty'),
   sourceUrl: text('source_url'),
@@ -613,121 +649,6 @@ export const reviewScheduleEvents = sqliteTable(
     index('idx_review_schedule_user_card_time').on(table.userId, table.cardId, table.createdAt),
     index('idx_review_schedule_card_time').on(table.cardId, table.createdAt),
   ]
-);
-
-/**
- * 教材 shred 行表（v14/v16/v17；与 ddl.ts 的建表 SQL 一字对齐，SSOT 是 ddl.ts）。
- * - 查询面：组卷/检索/统计读这里，不读 ast_json；
- * - 底稿 documents.ast_json 改后由 shredDocument 同事务全删全插重建；
- * - FTS 虚表 drizzle 无一等支持，保持原生 SQL（见 textbook-shred.ts），故不在此声明。
- * - v17 语义：lesson_id=冻结的 positional identity；sort_order=canonical 顺序唯一 truth
- *   （最终 AST lessons[] index+1，1-based 连续）；lesson_number=legacy compatibility
- *   （可 gap，不排序，不展示）；title=raw parser/OCR heading candidate。
- * - DB 列 sort_order 保持 nullable（SQLite 不支持事后加 NOT NULL）：invariant 由
- *   shred 全写 + doctor FAIL 规则锁，读侧必须收窄后使用。
- */
-export const textbookLessons = sqliteTable(
-  'textbook_lessons',
-  {
-    documentId: text('document_id').notNull(),
-    lessonId: text('lesson_id').notNull(),
-    lessonNumber: integer('lesson_number').notNull(),
-    title: text('title').notNull(),
-    sortOrder: integer('sort_order'),
-    /** v30 章层级：'lesson' | 'chapter'；章经 parent_id 挂课（可空即顶层）。 */
-    kind: text('kind').notNull().default('lesson'),
-    parentId: text('parent_id'),
-    /** v31 目录识别页码与槽位生命周期支持 */
-    startPage: integer('start_page'),
-    endPage: integer('end_page'),
-    status: text('status').notNull().default('pending'),
-    /** v31 整篇精读课文/对话 Markdown（取代旧行级碎片表 textbook_lines） */
-    passageMd: text('passage_md'),
-    /** v33 AI 教学增强字段：预习导学与课后总结 */
-    previewJson: text('preview_json'),
-    summaryJson: text('summary_json'),
-    contentJson: text('content_json'),
-    submissionId: text('submission_id'),
-  },
-  (table) => [primaryKey({ columns: [table.documentId, table.lessonId] })]
-);
-
-export const textbookVocab = sqliteTable(
-  'textbook_vocab',
-  {
-    documentId: text('document_id').notNull(),
-    lessonId: text('lesson_id').notNull(),
-    ord: integer('ord').notNull(),
-    surface: text('surface').notNull(),
-    aiExplanation: text('ai_explanation'),
-    reading: text('reading'),
-    pos: text('pos'),
-    glossZh: text('gloss_zh'),
-    pitch: text('pitch'),
-    exampleJa: text('example_ja'),
-    exampleZh: text('example_zh'),
-    source: text('source'),
-    tocId: text('toc_id'),
-    fieldSourcesJson: text('field_sources_json'),
-  },
-  (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
-);
-
-export const textbookGrammar = sqliteTable(
-  'textbook_grammar',
-  {
-    documentId: text('document_id').notNull(),
-    lessonId: text('lesson_id').notNull(),
-    ord: integer('ord').notNull(),
-    title: text('title').notNull(),
-    connection: text('connection'),
-    explanation: text('explanation'),
-    examplesJson: text('examples_json').notNull().default('[]'),
-    source: text('source'),
-    tocId: text('toc_id'),
-    aiExplanation: text('ai_explanation'),
-    fieldSourcesJson: text('field_sources_json'),
-  },
-  (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
-);
-
-export const textbookLines = sqliteTable(
-  'textbook_lines',
-  {
-    documentId: text('document_id').notNull(),
-    lessonId: text('lesson_id').notNull(),
-    ord: integer('ord').notNull(),
-    speaker: text('speaker'),
-    ja: text('ja').notNull(),
-    zh: text('zh'),
-    blockId: text('block_id'),
-    kind: text('kind'),
-    source: text('source'),
-    tocId: text('toc_id'),
-    fieldSourcesJson: text('field_sources_json'),
-  },
-  (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
-);
-
-export const textbookExercises = sqliteTable(
-  'textbook_exercises',
-  {
-    documentId: text('document_id').notNull(),
-    lessonId: text('lesson_id').notNull(),
-    ord: integer('ord').notNull(),
-    exerciseId: text('exercise_id'),
-    type: text('type').notNull(),
-    prompt: text('prompt').notNull(),
-    optionsJson: text('options_json').notNull().default('[]'),
-    answer: text('answer').notNull().default(''),
-    explanation: text('explanation'),
-    source: text('source'),
-    tocId: text('toc_id'),
-    answerJson: text('answer_json'),
-    contentJson: text('content_json'),
-    fieldSourcesJson: text('field_sources_json'),
-  },
-  (table) => [primaryKey({ columns: [table.documentId, table.lessonId, table.ord] })]
 );
 
 /**

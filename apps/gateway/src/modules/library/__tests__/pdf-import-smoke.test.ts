@@ -226,9 +226,9 @@ describe('smoke 入库集成（:memory:，跑完即弃）', () => {
     const count = (sql: string, id: string): number =>
       (db.query(sql).get(id) as { n: number }).n;
     const docId = res.value.document.id;
-    expect(count('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?', docId)).toBe(2);
+    expect(count('SELECT coalesce(json_array_length(chapters_json),0) AS n FROM documents WHERE id = ?', docId)).toBe(2);
     expect(
-      count('SELECT COUNT(*) AS n FROM textbook_lines WHERE document_id = ?', docId)
+      count('SELECT COUNT(*) AS n FROM (SELECT document_id FROM textbook_articles UNION ALL SELECT document_id FROM textbook_sentences) WHERE document_id = ?', docId)
     ).toBe(res.value.stats.dialogues);
     expect(count('SELECT COUNT(*) AS n FROM textbook_fts WHERE document_id = ?', docId)).toBeGreaterThan(0);
   }, 120000);

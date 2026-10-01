@@ -45,7 +45,7 @@ async function post(app: Hono, userId: string, body: Record<string, unknown>): P
 function counts(repo: DrizzleLearnerRepository, docId: string): { docs: number; lessons: number } {
   const db = repo.getRawDb();
   const docs = (db.query('SELECT COUNT(*) AS n FROM documents WHERE id = ?').get(docId) as { n: number }).n;
-  const lessons = (db.query('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?').get(docId) as { n: number }).n;
+  const lessons = (db.query('SELECT coalesce(sum(json_array_length(chapters_json)),0) AS n FROM documents WHERE id = ?').get(docId) as { n: number }).n;
   return { docs, lessons };
 }
 

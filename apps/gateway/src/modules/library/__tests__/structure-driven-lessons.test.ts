@@ -282,7 +282,7 @@ describe('D. 导入链路：classes 参与切课且观测可查、行数一致',
       '第1課:lesson',
       '第2課:lesson',
     ]);
-    const n = repo.getRawDb().query('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?').get(docId) as { n: number };
+    const n = repo.getRawDb().query('SELECT coalesce(json_array_length(chapters_json),0) AS n FROM documents WHERE id = ?').get(docId) as { n: number };
     expect(n.n).toBe(converted.value.book.lessons.length);
   });
 });

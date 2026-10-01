@@ -153,7 +153,7 @@ describe('authorized replacement shadow（只观察）', () => {
     const { result, events } = await captureShadow(() => postDoc(app, 'u1', body));
     expect(result.status).toBe(200);
     expect(events).toEqual([]);
-    const n = repo.getRawDb().query('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?').get('doc-same') as { n: number };
+    const n = repo.getRawDb().query('SELECT coalesce(json_array_length(chapters_json),0) AS n FROM documents WHERE id = ?').get('doc-same') as { n: number };
     expect(n.n).toBe(3);
   });
 
@@ -248,7 +248,7 @@ describe('authorized replacement shadow（只观察）', () => {
       const next = [L('n1', '第1課', JA), L('nR', '復習A', JR), L('n2', '第2課', JB), L('n3', '第3課', JC)];
       const res = await postDoc(app, 'u1', { id: 'doc-fault', title: 'B', sourceKind: 'user_import', language: 'ja', content: 'c', astJson: JSON.stringify(book(next)) });
       expect(res.status).toBe(200);
-      const n = repo.getRawDb().query('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?').get('doc-fault') as { n: number };
+      const n = repo.getRawDb().query('SELECT coalesce(json_array_length(chapters_json),0) AS n FROM documents WHERE id = ?').get('doc-fault') as { n: number };
       expect(n.n).toBe(4);
     } finally {
       logger.info = origInfo;
@@ -667,7 +667,7 @@ describe('P1-C0.8a fail-open 与载荷安全', () => {
       if (!isOk(got) || !got.value?.astJson) return;
       const saved = JSON.parse(got.value.astJson as string) as { lessons: Array<{ id: string }> };
       expect(saved.lessons.map((l) => l.id)).toEqual(['n1', 'nR', 'n2', 'n3']);
-      const n = repo.getRawDb().query('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?').get(docId) as { n: number };
+      const n = repo.getRawDb().query('SELECT coalesce(json_array_length(chapters_json),0) AS n FROM documents WHERE id = ?').get(docId) as { n: number };
       expect(n.n).toBe(4);
     } finally {
       repo.saveCanonicalAst = origCanonical;

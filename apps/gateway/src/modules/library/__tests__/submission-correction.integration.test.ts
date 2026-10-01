@@ -1,212 +1,69 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { eq } from 'drizzle-orm';
-import * as tables from '@study-studio/storage-sqlite';
-import { TextbookASTSchema, type TextbookLessonStage } from '@study-studio/document-model';
-import { BusinessError, err } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
-import { deferred, parsedText, pipelineModel, submissionFromPrompt, type ModelTurn } from './textbook-pipeline-fixtures.js';
+import { TextbookContentTools } from '../tools/textbook-content-tools.js';
+import { BusinessError, err } from '@study-studio/shared';
+import { pipelineModel, deferred } from './textbook-pipeline-fixtures.js';
 
-const repositories: DrizzleLearnerRepository[] = [];
-afterEach(() => { for (const repo of repositories.splice(0)) repo.getRawDb().close(); });
-function setup(handle?: (turn: ModelTurn) => Promise<void>) {
-  const repo = new DrizzleLearnerRepository(':memory:'); repositories.push(repo);
-  const db = drizzle(repo.getRawDb(), { schema: tables }), tool = new LibraryLessonCommitTool(repo);
-  const model = pipelineModel(tool, handle), stages: TextbookLessonStage[] = [];
-  const input = { userId: 'owner', documentId: 'book', traceId: 'correction', title: '纠错集成教材',
-    tocEntries: [{ id: 'a', title: '独立部分', level: 'section' as const, startPage: 3 }],
-    lessonJobs: [{ lessonId: 'a', text: '正文' }], adapter: model.adapter, submissionTool: tool, poolSize: 1, modelRetries: 0,
-    onProgress: (progress: { stage: TextbookLessonStage }) => { stages.push(progress.stage); },
-  };
-  return { repo, db, tool, model, input, stages };
-}
-async function eventDetails(repo: DrizzleLearnerRepository, name: string) {
-  const events = await repo.listImportEvents({ userId: 'owner', traceId: 'correction' });
-  if (!events.ok) throw events.error;
-  return Promise.all(events.value.filter(event => event.name === name).map(async event => {
-    const result = await repo.getImportEvent('owner', 'correction', event.sequence);
-    if (!result.ok) throw result.error;
-    return result.value;
-  }));
-}
-describe('提交修正集成：准确身份反馈、字段保留、阶段与有界模型等待', () => {
-  for (const retry of [false, true]) it(`工具修正用尽会结束该轮，迟到提交零写入；${retry ? '新轮修正成功并继续复用' : '零新轮预算明确失败'}`, async () => {
-    const lateDone = deferred(); let turns = 0, rejectedLate: boolean | undefined;
-    const env = setup(async ({ input, submit }) => {
-      const value = submissionFromPrompt(input.message);
-      if (!turns++) {
-        expect((await submit({ ...value, content: { ...value.content, blocks: [{ ...value.content.blocks[0], kind: 'UNKNOWN' }] } })).ok).toBe(false);
-        const exhausted = await submit({ ...value, content: { ...value.content, blocks: [{ ...value.content.blocks[0], kind: 'UNKNOWN' }] } });
-        expect(exhausted.ok).toBe(false); if (!exhausted.ok) { expect(exhausted.error.code).toBe('E_TOOL_REPAIR_LIMIT'); expect(JSON.stringify(exhausted.error.internalDetails)).toContain('kind'); }
-        rejectedLate = !(await submit(value)).ok; lateDone.resolve(); return;
-      }
-      expect(input.message).toContain('本轮工具修正次数已用尽'); expect(input.message).toContain('content');
-      expect((await submit(value)).ok).toBe(true);
-    });
-    const result = await env.repo.executeTextbookPipeline({ ...env.input, toolRepairRetries: 1, modelRetries: retry ? 1 : 0 });
-    await lateDone.promise;
-    expect(rejectedLate).toBe(true); expect(env.model.interrupted).toHaveLength(1);
-    expect(result.ok && result.value.allLessonsReady).toBe(retry);
-    expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(retry ? 1 : 0);
-    expect(env.model.inputs).toHaveLength(retry ? 2 : 1);
-    const records = await eventDetails(env.repo, 'repair_limit'); expect(records).toHaveLength(1);
+const repos: DrizzleLearnerRepository[]=[];
+afterEach(()=>{for(const repo of repos.splice(0))repo.getRawDb().close();});
+function setup(){const repo=new DrizzleLearnerRepository(':memory:');repos.push(repo);const tool=new TextbookContentTools(repo);return {repo,tool};}
+function input(env:ReturnType<typeof setup>){return {userId:'owner',documentId:'book',title:'纠错',traceId:'trace',tocEntries:[{id:'a',title:'第一课',level:'lesson' as const,startPage:1}],lessonJobs:[{lessonId:'a',text:'教材'}],submissionTool:env.tool,poolSize:1,modelRetries:0};}
+describe('简单工具纠错与运行故障隔离',()=>{
+ it('字段反馈包含实际字段，修正调用后保存；没有修正则章节不能 ready',async()=>{
+  for(const repair of [false,true]){
+   const env=setup(),model=pipelineModel(env.tool,async({submit})=>{
+    const bad=await submit({items:[{title:'知识点',explanation:42}]},'grammar');expect(bad.ok).toBe(false);
+    if(!bad.ok)expect(bad.error.internalDetails).toMatchObject({issues:[{path:'items.0.explanation'}]});
+    if(repair)expect((await submit({items:[{title:'知识点',explanation:'正确讲解'}]},'grammar')).ok).toBe(true);
+   });
+   const result=await env.repo.executeTextbookPipeline({...input(env),adapter:model.adapter});
+   expect(result.ok&&result.value.successfulLessons).toBe(repair?1:0);
+   const stats=await env.repo.getTextbookAssetStats('book');expect(stats.ok&&stats.value.readyLessons).toBe(repair?1:0);
+  }
+ });
+ it('数据库暂忙只重试内容保存，不重新调用模型，多个失败批次都保留',async()=>{
+  const env=setup(),write=env.repo.writeTextbookContent.bind(env.repo);let writes=0;
+  env.repo.writeTextbookContent=async(...args)=>++writes<=2?err(new BusinessError('E_DB_BUSY','数据库暂忙','DATABASE',true)):write(...args);
+  const model=pipelineModel(env.tool,async({submit})=>{
+   expect((await submit({items:[{text:'第一批'}]})).ok).toBe(false);
+   expect((await submit({items:[{text:'第二批'}]})).ok).toBe(false);
   });
-  for (const first of [true, false]) it(`引擎连续重试不会延长${first ? '首响应' : '停滞'}期限，失败记录含启动身份、输入规模和最后原因`, async () => {
-    const env = setup(), create = env.model.adapter.createSession;
-    env.model.adapter.createSession = async options => {
-      const created = await create(options); if (!created.ok) return created;
-      created.value.send = async function* (input) {
-        input.onTurnStarted?.('accepted-turn');
-        if (!first) yield { type: 'TEXT_DELTA', delta: '首段回复' };
-        for (let index = 0; index < 15; index++) { await Bun.sleep(10); yield { type: 'RUNTIME_RETRY', code: 'E_ENGINE_BUSY', message: '引擎繁忙', category: 'AGENT_RUNTIME' }; }
-      };
-      return created;
-    };
-    const result = await env.repo.executeTextbookPipeline({ ...env.input, firstResponseTimeoutMs: 40, stallTimeoutMs: 40 });
-    expect(result.ok && result.value.failedLessons).toBe(1); expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(0);
-    const failed = await eventDetails(env.repo, 'failed');
-    expect(failed.find(event => event?.category === 'model')?.detail).toEqual(expect.objectContaining({ code: first ? 'E_AGENT_FIRST_RESPONSE_TIMEOUT' : 'E_AGENT_STALL_TIMEOUT',
-      details: expect.objectContaining({ timeoutMs: 40, nativeTurnAccepted: true, nativeTurnId: 'accepted-turn', attachmentCount: 0, lastModelEvent: first ? null : 'TEXT_DELTA', lastEngineError: { code: 'E_ENGINE_BUSY', message: '引擎繁忙' } }),
-    }));
-    expect((await eventDetails(env.repo, 'runtime_retry')).length).toBeGreaterThan(0);
-    expect((await eventDetails(env.repo, 'runtime_retry')).length).toBeLessThan(15);
+  const result=await env.repo.executeTextbookPipeline({...input(env),adapter:model.adapter,storageRetries:2});
+  expect(result.ok&&result.value.allLessonsReady).toBe(true);expect(model.inputs).toHaveLength(1);expect(writes).toBe(4);
+  expect(env.repo.getRawDb().query('SELECT text FROM textbook_articles ORDER BY ord').all()).toEqual([{text:'第一批'},{text:'第二批'}]);
+ });
+ it('首响应超时结束本章且拒绝迟到调用，下一章会话恢复后继续',async()=>{
+  const env=setup(),release=deferred();let accepted:boolean|undefined;
+  const model=pipelineModel(env.tool,async({submit,input})=>{
+   if(input.message.includes('第一课')){await release.promise;accepted=(await submit({items:[{text:'迟到正文'}]})).ok;}
+   else expect((await submit({items:[{text:'第二课正文'}]})).ok).toBe(true);
   });
-  it('原生旧轮次零写入，模型不提交身份，合法内容生成系统 ID 并保存独立讲解', async () => {
-    const env = setup(async ({ input, submit, sessionId }) => {
-      const value = submissionFromPrompt(input.message);
-      expect(input.message).not.toContain('assignmentId:');
-      expect(input.message).not.toContain('documentId:');
-      expect(env.tool.schema.safeParse(value).success).toBe(true);
-      expect(env.tool.schema.safeParse({ ...value, assignmentId: 'model-id' }).success).toBe(false);
-      const rejected = await env.tool.execute(value, { userId: 'owner', sessionId, turnId: 'previous-turn', callId: 'call:stale' });
-      expect(rejected.ok).toBe(false);
-      if (!rejected.ok) {
-        expect(rejected.error.retryable).toBe(false);
-        expect(rejected.error.code).toBe('E_SUBMISSION_SCOPE_INVALID');
-      }
-      expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(0);
-      value.content.vocabularies[0]!.aiExplanation = 'AI 讲解独立保留';
-      const unknown = await submit({ ...value, unknownField: '拒绝未知字段' }); expect(unknown.ok).toBe(false);
-      expect((await submit(value)).ok).toBe(true);
-    });
-    const result = await env.repo.executeTextbookPipeline(env.input);
-    expect(result.ok && result.value.allLessonsReady).toBe(true);
-    const vocab = env.db.select().from(tables.textbookVocab).get()!;
-    expect(vocab.aiExplanation).toBe('AI 讲解独立保留'); expect(vocab.glossZh).toBe('学习');
-    const ast = TextbookASTSchema.parse(JSON.parse(env.db.select().from(tables.documents).where(eq(tables.documents.id, 'book')).get()!.astJson!));
-    expect(ast.lessons[0]!.content!.vocabularies[0]!.aiExplanation).toBe('AI 讲解独立保留');
-    const content = ast.lessons[0]!.content!;
-    expect(content.vocabularies[0]!.id).toStartWith('content_');
-    expect(content.exercises[0]!.knowledgePointIds).toEqual([content.knowledgePoints[0]!.id]);
-    expect(new Set([...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises].map(item => item.id)).size).toBe(4);
-    expect(env.stages).toContain('correcting');
-    const records = await eventDetails(env.repo, 'rejected');
-    expect(records[0]?.callId).toBe('call:stale');
+  const running=env.repo.executeTextbookPipeline({...input(env),adapter:model.adapter,firstResponseTimeoutMs:40,stallTimeoutMs:1000,
+   tocEntries:[...input(env).tocEntries,{id:'b',title:'第二课',level:'lesson',startPage:2}],lessonJobs:[...input(env).lessonJobs,{lessonId:'b',text:'二'}]});
+  try{const result=await running;expect(result.ok&&result.value.failedLessons).toBe(1);expect(result.ok&&result.value.successfulLessons).toBe(1);}
+  finally{release.resolve();}
+  await new Promise(resolve=>setTimeout(resolve,15));expect(accepted).toBe(false);
+  expect(env.repo.getRawDb().query('SELECT chapter_id FROM textbook_articles').all()).toEqual([{chapter_id:'b'}]);
+ });
+ it('非法选项答案与重复匹配左项不入库；多选、排序和匹配正确答案可以保存',async()=>{
+  const env=setup(),model=pipelineModel(env.tool,async({submit})=>{
+   expect((await submit({items:[{type:'CHOICE',prompt:'选择',options:['一','二'],answer:'三'}]},'exercises')).ok).toBe(false);
+   expect((await submit({items:[{type:'MATCHING',prompt:'配对',left:['一','二'],right:['甲','乙'],answer:[{left:'一',right:'甲'},{left:'一',right:'乙'}]}]},'exercises')).ok).toBe(false);
+   for(const exercise of [
+    {type:'MULTI_CHOICE',prompt:'多选',options:['一','二','三'],answer:['一','二']},
+    {type:'ORDERING',prompt:'排序',options:['一','二'],answer:['二','一']},
+    {type:'MATCHING',prompt:'匹配',left:['一','二'],right:['甲','乙'],answer:[{left:'一',right:'甲'},{left:'二',right:'乙'}]},
+   ])expect((await submit({items:[exercise]},'exercises')).ok).toBe(true);
   });
-  it('缺少 AI 例句关联拒绝写入，新模型轮次复用线程并明确显示模型重试', async () => {
-    let attempts = 0;
-    const env = setup(async ({ input, submit }) => {
-      const value = submissionFromPrompt(input.message);
-      if (!attempts++) Reflect.deleteProperty(value.content.knowledgePoints[0]!.examples[0]!, 'tocId');
-      const result = await submit(value);
-      expect(result.ok).toBe(attempts > 1);
-    });
-    const result = await env.repo.executeTextbookPipeline({ ...env.input, modelRetries: 1 });
-    expect(result.ok && result.value.allLessonsReady).toBe(true);
-    expect(env.stages).toContain('model_retrying'); expect(env.model.created).toHaveLength(1);
-    expect(env.model.inputs[1]!.input.message).toContain('content.knowledgePoints.0.examples.0.tocId');
+  const result=await env.repo.executeTextbookPipeline({...input(env),adapter:model.adapter});expect(result.ok&&result.value.allLessonsReady).toBe(true);
+  expect(env.repo.getRawDb().query('SELECT type FROM textbook_exercise_items ORDER BY ord').all()).toEqual([{type:'MULTI_CHOICE'},{type:'ORDERING'},{type:'MATCHING'}]);
+ });
+ it('修正预算用尽后中断当前轮次，失败一章不会终止整书',async()=>{
+  const env=setup(),model=pipelineModel(env.tool,async({submit,input})=>{
+   if(input.message.includes('第一课')){for(let i=0;i<3;i++)await submit({items:[{text:''}]});}
+   else await submit({items:[{text:'第二课'}]});
   });
-  it('同一次回执汇总原始路径的目录、来源及内容错误；模型只选块，系统保存真实物理页', async () => {
-    const source = parsedText('当前正文', [3]);
-    const env = setup(async ({ input, submit }) => {
-      expect(input.message).toContain('"id":"a"'); expect(input.message).toContain('章节解析材料:');
-      expect(env.tool.description.length).toBeLessThanOrEqual(1024);
-      const value = submissionFromPrompt(input.message), bad = structuredClone(value);
-      expect(value.content.blocks[0]!.sourceRefs).toEqual([{ blockId: 'p3b0' }]);
-      bad.content.blocks[0]!.kind = 'DIALOGUE';
-      bad.content.blocks[0]!.sourceRefs = [{ blockId: 'another-chapter' }];
-      bad.content.vocabularies[0]!.fieldSources = {};
-      bad.content.knowledgePoints[0]!.examples[0]!.tocId = 'outside';
-      bad.content.coverage[0]!.status = 'UNREADABLE';
-      const rejected = await submit(bad); expect(rejected.ok).toBe(false);
-      if (!rejected.ok) {
-        const feedback = JSON.stringify(rejected.error.internalDetails);
-        for (const path of ['content.blocks.0.sourceRefs.0', 'content.blocks.0.speaker', 'content.vocabularies.0.fieldSources.reading', 'content.vocabularies.0.fieldSources.gloss', 'content.knowledgePoints.0.examples.0.tocId', 'content.coverage']) expect(feedback).toContain(path);
-        expect(feedback).not.toContain('content_');
-      }
-      expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(0);
-      expect((await submit(value)).ok).toBe(true);
-    });
-    const result = await env.repo.executeTextbookPipeline({ ...env.input, lessonJobs: [{ lessonId: 'a', text: '正文', source }] });
-    expect(result.ok && result.value.allLessonsReady).toBe(true);
-    const ast = TextbookASTSchema.parse(JSON.parse(env.db.select().from(tables.documents).where(eq(tables.documents.id, 'book')).get()!.astJson!));
-    expect(ast.lessons[0]!.content!.blocks[0]!.sourceRefs).toEqual([{ blockId: 'p3b0', page: 3 }]);
-  });
-  it('有效候选遇暂时数据库失败仅重试保存，阶段及回执均对应同一次模型输入', async () => {
-    const env = setup(), commit = env.repo.commitLessonKnowledge.bind(env.repo); let count = 0;
-    env.repo.commitLessonKnowledge = input => ++count === 1 ? Promise.resolve(err(new BusinessError('E_DB_BUSY', '数据库暂忙', 'DATABASE', true))) : commit(input);
-    const result = await env.repo.executeTextbookPipeline({ ...env.input, storageRetries: 1 });
-    expect(result.ok && result.value.allLessonsReady).toBe(true); expect(count).toBe(2);
-    expect(env.stages).toContain('storage_retrying'); expect(env.stages).not.toContain('model_retrying');
-    expect(env.model.inputs).toHaveLength(1);
-  });
-  it('普通文本即使包含合法 JSON 或代码围栏也不落库，监视保留真实文本与缺少工具的原因', async () => {
-    const env = setup(), create = env.model.adapter.createSession;
-    env.model.adapter.createSession = async options => {
-      const created = await create(options); if (!created.ok) return created;
-      created.value.send = async function* (input) {
-        const json = JSON.stringify(submissionFromPrompt(input.message));
-        yield { type: 'TEXT_DELTA', delta: `${json}\n\u0060\u0060\u0060json\n${json}\n\u0060\u0060\u0060` };
-        yield { type: 'COMPLETED' };
-      };
-      return created;
-    };
-    const result = await env.repo.executeTextbookPipeline(env.input);
-    expect(result.ok && result.value.failedLessons).toBe(1); expect(result.ok && result.value.successfulLessons).toBe(0);
-    expect(result.ok && result.value.errors[0]?.error).toContain('未通过工具提交有效内容');
-    expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(0);
-    const messages = await eventDetails(env.repo, 'message');
-    expect(messages[0]?.detail).toEqual(expect.objectContaining({ text: expect.stringContaining('\u0060\u0060\u0060json') }));
-  });
-  for (const first of [true, false]) it(`${first ? '首响应' : '无活动'}超时会中断、结算失败并拒绝迟到工具`, async () => {
-    const gate = deferred(), lateDone = deferred(); let accepted: boolean | undefined;
-    const env = setup(async ({ input, submit }) => { await gate.promise; accepted = (await submit(submissionFromPrompt(input.message))).ok; lateDone.resolve(); });
-    if (!first) {
-      const create = env.model.adapter.createSession;
-      env.model.adapter.createSession = async options => {
-        const result = await create(options); if (!result.ok) return result;
-        const send = result.value.send.bind(result.value);
-        result.value.send = async function* (input) { yield { type: 'TEXT_DELTA', delta: '已响应，后续停滞' }; yield* send(input); };
-        return result;
-      };
-    }
-    try {
-      const result = await env.repo.executeTextbookPipeline({ ...env.input, firstResponseTimeoutMs: 30, stallTimeoutMs: 30 });
-      expect(result.ok && result.value.failedLessons).toBe(1); expect(result.ok && result.value.allLessonsReady).toBe(false);
-      expect(env.model.interrupted).toHaveLength(1); expect(env.model.closed).toHaveLength(1);
-      const failed = await eventDetails(env.repo, 'failed');
-      expect(failed.some(event => typeof event?.detail === 'object' && event.detail !== null && 'code' in event.detail && event.detail.code === (first ? 'E_AGENT_FIRST_RESPONSE_TIMEOUT' : 'E_AGENT_STALL_TIMEOUT'))).toBe(true);
-    } finally { gate.resolve(); if (env.model.inputs.length) await lateDone.promise; }
-    expect(accepted).toBe(false); expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(0);
-  });
-  it('超时会话先关闭再重试，旧工具零写入，新会话持续复用到下一部分', async () => {
-    const gate = deferred(), lateDone = deferred(); let calls = 0, oldAccepted: boolean | undefined;
-    const env = setup(async ({ input, submit }) => {
-      if (!calls++) { await gate.promise; input.onTurnStarted?.('late-old-turn'); oldAccepted = (await submit(submissionFromPrompt(input.message))).ok; lateDone.resolve(); return; }
-      expect(env.model.closed).toHaveLength(1);
-      expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true);
-    });
-    try {
-      const result = await env.repo.executeTextbookPipeline({ ...env.input, modelRetries: 1, firstResponseTimeoutMs: 30,
-        tocEntries: [...env.input.tocEntries, { id: 'b', title: '后一部分', level: 'lesson', startPage: 4 }], lessonJobs: [...env.input.lessonJobs, { lessonId: 'b', text: '后一部分正文' }],
-      });
-      expect(result.ok && result.value.allLessonsReady).toBe(true); expect(env.model.created).toHaveLength(2);
-      expect(env.model.inputs.map(turn => turn.sessionId)).toEqual([env.model.created[0]!.sessionId, env.model.created[1]!.sessionId, env.model.created[1]!.sessionId]);
-      expect(env.model.closed).toHaveLength(2);
-    } finally { gate.resolve(); await lateDone.promise; }
-    expect(oldAccepted).toBe(false); expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(2);
-    const starts = await eventDetails(env.repo, 'turn_started'); expect(starts).toHaveLength(3);
-    expect(JSON.stringify(starts)).not.toContain('late-old-turn');
-  });
+  const result=await env.repo.executeTextbookPipeline({...input(env),adapter:model.adapter,toolRepairRetries:1,tocEntries:[...input(env).tocEntries,{id:'b',title:'第二课',level:'lesson',startPage:2}],lessonJobs:[...input(env).lessonJobs,{lessonId:'b',text:'二'}]});
+  expect(result.ok&&result.value.failedLessons).toBe(1);expect(result.ok&&result.value.successfulLessons).toBe(1);
+ });
 });

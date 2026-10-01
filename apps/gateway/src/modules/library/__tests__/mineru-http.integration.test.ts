@@ -4,7 +4,7 @@ import { createMineruParser } from '../../../infrastructure/mineru/parser.js';
 import { MineruHttpClient } from '../../../infrastructure/mineru/http-client.js';
 import { TextbookPipelineSettingsSchema } from '@study-studio/document-model';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
+import { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { fixturePdf, fixturePng, pipelineModel } from './textbook-pipeline-fixtures.js';
 import { modelZip } from './mineru-http-fixtures.js';
 
@@ -38,7 +38,7 @@ it('云端真实 HTTP 上传章节 PDF、轮询和下载重试，既有任务复
   try {
     const settings = TextbookPipelineSettingsSchema.parse({ parsePollIntervalMs: 10, parseRetries: 1, poolSize: 1 });
     const parser = createMineruParser(settings, { cloudBaseUrl: server.url.href, cloudToken: 'test-cloud-key' });
-    const tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool);
+    const tool = new TextbookContentTools(repo), model = pipelineModel(tool);
     const result = await repo.executeTextbookPipeline({ ...settings, userId: 'http-owner', documentId: 'http-book', title: 'HTTP 集成验证',
       tocEntries: [{ id: 'part', title: '章节', level: 'lesson', startPage: 2, endPage: 3 }], pdf: await fixturePdf(4),
       inspector: { processPdf: () => ({ markdown: '', pagesNeedingOcr: [2, 3] }), processPdfWithOcr: async () => { throw new Error('旧 OCR 不得被调用'); }, renderPdfPages: async (_pdf, pages) => pages.map(pageNumber => ({ pageNumber, png: fixturePng, width: 1, height: 1 })) },
@@ -47,7 +47,7 @@ it('云端真实 HTTP 上传章节 PDF、轮询和下载重试，既有任务复
     expect(result.ok && result.value.allLessonsReady).toBe(true);
     expect([created, uploaded, polls, downloads]).toEqual([1, 1, 2, 2]);
     expect(notes).toContain('parse_resumed');
-    expect(model.inputs[0]?.input.message).toContain('p2b0');
+    expect(model.inputs[0]?.input.message).toContain('页甲'); expect(model.inputs[0]?.input.message).not.toContain('p2b0');
     expect((await repo.getTextbookAssetStats('http-book')).ok).toBe(true);
   } finally { repo.getRawDb().close(); await server.stop(true); }
 });
@@ -71,7 +71,7 @@ it('云端限流、无效 Token、损坏解析包与页数漂移不进入模型�
     for (const fault of ['rate', 'token', 'zip', 'pages'] as const) {
       mode = fault;
       const parser = createMineruParser(settings, { cloudBaseUrl: server.url.href, cloudToken: 'test-key' });
-      const tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool);
+      const tool = new TextbookContentTools(repo), model = pipelineModel(tool);
       const result = await repo.executeTextbookPipeline({ ...settings, userId: 'fault-owner', documentId: 'fault-' + fault, title: '解析故障验证', pdf,
         tocEntries: [{ id: 'part', title: '章节', level: 'lesson', startPage: 1, endPage: 1 }], chapterParser: parser,
         inspector: { processPdf: () => ({ markdown: '', pagesNeedingOcr: [1] }), processPdfWithOcr: async () => { throw new Error('不得降级为旧 OCR'); } },

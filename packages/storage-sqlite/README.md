@@ -33,7 +33,6 @@ createDrizzleDb(path | Database)
 | `index.ts` | 本包唯一公共出口（白名单制）与数据库实例工厂。 | `createDrizzleDb()` 创建 SQLite + Drizzle 实例并完成初始化/补种；`DrizzleDb`、`DrizzleInstance` 描述返回类型；同时 re-export schema、常用种子、`initSchema` 和 `seedInitialData`。连接工厂实现见 `connection.ts`。 |
 | `seed-bootstrap.ts` | 把 `seeds/` 中的静态课程资产写进 SQLite 的唯一启动编排器。 | `seedInitialData(sqlite)`：以“空库首次写入”或 `INSERT OR IGNORE`“旧库增量补齐”的策略导入资产；`pitchMeaningToGlosses()`：把声调词表的“中文 (English)”标签转为通用词典使用的英文 gloss。课程资产可随版本更新，用户学习资产不可被它覆盖。 |
 | `canonical-fingerprint.ts` | 确定性的 canonical JSON 与 SHA-256 指纹工具。 | `canonicalJson()` 会递归排序对象键、保留数组顺序；`fingerprintCanonical()` 用于判断种子教材的派生投影是否仍新鲜。调用方不得将时间戳、临时 id 等易变字段纳入输入。 |
-| `lesson-ordering.ts` | 教材 shred 表中课次排序的专项校验与回填。`documents.ast_json` 是唯一事实源。 | `planLessonOrdering(db)` 只读比较 AST 中 lesson 顺序与 `textbook_lessons`；`applyLessonOrdering(db, plan)` 仅在计划完全可解析时写回 `sort_order`；`verifyDense()` 检查序号是否连续；`formatOrderingPlan()` 供 CLI/日志展示。遇到不一致不会猜测。 |
 | `doctor.ts` | 数据完整性体检，设计为只读。 | `runDoctor(db)` 检查预期表覆盖、文档衍生表孤儿、词典来源、导入审计等不变量，返回结构化 `DoctorReport`；`formatDoctorReport()` 输出可读报告。适合先于任何修复操作执行。 |
 | `repair-plan.ts` | 历史数据修复的 **dry-run** 规划器，不写库。 | `buildRepairPlan(db)` 找出可安全删除的衍生孤儿、需人工决定的导入记录、错误的种子 source id、可重建的教材 shred 候选；`formatRepairPlan()` 生成文本计划。 |
 | `repair-apply.ts` | 与 `repair-plan.ts` 对应的受限写入操作。 | `applyOrphanCleanup(db)` 只清理 `REPAIR_ALLOWLIST` 中、父 `documents` 已不存在的衍生行，并以事务执行；`applySeedSourceFix(db)` 只修复种子词条白名单中的 source id；两个格式化函数用于报告。白名单外的数据仅报告、不自动删除。 |
@@ -43,7 +42,7 @@ createDrizzleDb(path | Database)
 
 - 学习者资产：`learner_profiles` / `learner_language_profiles`、`skill_metrics`、`flashcards`、`quiz_attempts`、`mistakes`、学习计划及其运行记录。
 - 公共课程资产：`curriculum_kana`、`curriculum_hangul`、`curriculum_lessons`、`learning_content_templates`、词典种子。
-- 文档与教材：`documents.ast_json` 是教材原稿 SSOT；`textbook_lessons`（v30 起 kind/parent_id 支撑章层级）、`textbook_lines`、`textbook_vocab`、`textbook_grammar`、`textbook_exercises` 是由原稿拆出的查询层；`knowledge_points` 是目录挂载的蒸馏知识点（v30，可悬空原文）；相关 FTS 表用于全文检索。`seed_materialization` 只记录内置教材的派生状态（指纹与 materializer 版本），不保存用户文档。
+- 文档与教材：教材五类内容表为事实源，章节列表位于 `documents.chapters_json`；`global_vocabulary` 跨教材复用词汇，`textbook_materials` 保存整理材料。字段与工具见 [教材内容表](../../docs/textbook-learning-tables.md)。
 - 导入审计：`document_imports` 记录单文档导入；`toc_import_sessions` 与 `toc_import_chunks` 记录整书目录导入的冻结计划、分块执行状态与最终目标文档。会话拥有 `document_id`；chunk 的历史 `document_id` 列必须保持 `NULL`，不能作为所有权来源。
 - 用户学习痕迹：批注、阅读位置、导入任务、卡片、做题和错题记录都按用户与语种保存，不能用种子覆盖。
 
@@ -86,7 +85,7 @@ createDrizzleDb(path | Database)
 
 - 新表或新列：同时修改 `ddl.ts`（最新 CREATE）、`schema.ts` 与 `migrations/vNNN-*.ts`；迁移必须登记为可重放版本，不能在导入某本教材时临时 `CREATE TABLE`。
 - 当前已发布迁移到 v30；新增迁移必须在 `migrations/index.ts` 末尾登记。已发布迁移的 version、name 与 SQL 都不可改写。
-- 教材：始终先更新 `documents.ast_json`（原稿），再在同一事务重建 `textbook_*`；不要直接手改 shred 表使其与 AST 分叉。
+- 教材：原生内容工具在当前章节权限下直接写内容表；完成状态在模型轮次结束后更新。FTS 可从内容表重建。全书 AST 仅可作结构化文件输入或读取视图，不另存第二份内容。
 - 整书目录导入：准备阶段只能写不可变 session / chunk 计划；首个成功 chunk 在同一事务创建并绑定 session 的目标文档。删除目标文档后，将 session 置为 `target_deleted` 并保留审计行，不恢复或复用它。
 - 种子：使用稳定 id，明确是“首次初始化”“增量补齐”还是“公共资产可覆盖更新”；不得覆盖用户卡片、练习历史、错题或学习画像。
 - 诊断与修复：先执行只读 `runDoctor()` / `buildRepairPlan()`，再有针对性地调用 apply 函数。`applyOrphanCleanup()` 只可删除白名单中的派生孤儿。

@@ -96,7 +96,7 @@ describe('E. 入库行数 == AST 课数', () => {
     );
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
-    const n = repo.getRawDb().query('SELECT COUNT(*) AS n FROM textbook_lessons WHERE document_id = ?').get(res.value.document.id) as { n: number };
+    const n = repo.getRawDb().query('SELECT coalesce(json_array_length(chapters_json),0) AS n FROM documents WHERE id = ?').get(res.value.document.id) as { n: number };
     expect(n.n).toBe(res.value.book.lessons.length);
     expect(n.n).toBe(3);
   }, 120000);

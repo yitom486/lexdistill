@@ -351,8 +351,10 @@ export async function listTextbookLines(
   try {
     const rows = deps.sqlite
       .query(
-        `SELECT lesson_id AS lessonId, ord AS ord, speaker AS speaker, ja AS ja
-         FROM textbook_lines WHERE document_id = ? ORDER BY lesson_id, ord`
+        `SELECT lessonId, row_number() OVER(PARTITION BY lessonId ORDER BY ord, category, id)-1 AS ord, speaker, ja FROM (
+         SELECT id, chapter_id AS lessonId, ord, 0 AS category, speaker, text AS ja FROM textbook_sentences WHERE document_id = ?1
+         UNION ALL SELECT id, chapter_id AS lessonId, ord, 1 AS category, NULL AS speaker, text AS ja FROM textbook_articles WHERE document_id = ?1
+         ) ORDER BY lessonId, ord`
       )
       .all(doc) as TextbookLineRef[];
     return ok(rows);
@@ -469,7 +471,7 @@ export async function findDocumentsMissingLineSegments(
             `SELECT d.id AS id, d.user_id AS userId, d.source_kind AS sourceKind
              FROM documents d
              WHERE NOT EXISTS (SELECT 1 FROM content_segments s WHERE s.document_id = d.id)
-               AND EXISTS (SELECT 1 FROM textbook_lines l WHERE l.document_id = d.id)
+               AND (EXISTS (SELECT 1 FROM textbook_sentences l WHERE l.document_id = d.id) OR EXISTS (SELECT 1 FROM textbook_articles l WHERE l.document_id = d.id))
                AND (d.source_kind = 'curriculum_textbook'
                  OR (d.source_kind = 'user_import'
                    AND (SELECT t.source_kind FROM document_imports t
@@ -480,7 +482,7 @@ export async function findDocumentsMissingLineSegments(
             `SELECT d.id AS id, d.user_id AS userId, d.source_kind AS sourceKind
              FROM documents d
              WHERE NOT EXISTS (SELECT 1 FROM content_segments s WHERE s.document_id = d.id)
-               AND EXISTS (SELECT 1 FROM textbook_lines l WHERE l.document_id = d.id)
+               AND (EXISTS (SELECT 1 FROM textbook_sentences l WHERE l.document_id = d.id) OR EXISTS (SELECT 1 FROM textbook_articles l WHERE l.document_id = d.id))
                AND (d.source_kind = 'curriculum_textbook'
                  OR (d.source_kind = 'user_import'
                    AND (SELECT t.source_kind FROM document_imports t

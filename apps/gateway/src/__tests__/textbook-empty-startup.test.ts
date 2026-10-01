@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { count, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { documents, textbookLessons, seedMaterialization } from '@study-studio/storage-sqlite';
+import { documents, textbookArticles, seedMaterialization } from '@study-studio/storage-sqlite';
 import { createGateway } from '../bootstrap/create-gateway.js';
 
 it('a fresh database stays free of textbook examples after gateway restart', async () => {
@@ -16,7 +16,7 @@ it('a fresh database stays free of textbook examples after gateway restart', asy
         const db = drizzle(repo.getRawDb());
         expect(db.select({ total: count() }).from(documents)
           .where(eq(documents.sourceKind, 'curriculum_textbook')).all()[0]?.total).toBe(0);
-        expect(db.select({ total: count() }).from(textbookLessons).all()[0]?.total).toBe(0);
+        expect(db.select({ total: count() }).from(textbookArticles).all()[0]?.total).toBe(0);
         expect(db.select({ total: count() }).from(seedMaterialization).all()[0]?.total).toBe(0);
       } finally {
         repo.getRawDb().close();

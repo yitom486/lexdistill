@@ -19,7 +19,7 @@ import {
   DocumentSourceKindSchema,
   type DocumentSourceKind,
 } from '@study-studio/protocol';
-import { documents, annotations, textbookLessons, textbookLines, textbookVocab, textbookGrammar, textbookExercises, knowledgePoints, documentStructures, readingPositions, captureSelectionContext } from '@study-studio/storage-sqlite';
+import { documents, annotations, textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials, textbookViewInTx, knowledgePoints, documentStructures, readingPositions, captureSelectionContext } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { shredIntoTransaction } from '@study-studio/storage-sqlite';
 import { recordTermExposure } from '../../dictionary/public.js';
@@ -136,8 +136,8 @@ export async function saveCanonicalAst(
             title: doc.title,
             sourceKind: doc.sourceKind,
             language: doc.language,
-            content: doc.content,
-            astJson: doc.astJson ?? null,
+            content: '',
+            astJson: null,
             topic: doc.topic ?? null,
             difficulty: doc.difficulty ?? null,
             sourceUrl: doc.sourceUrl ?? null,
@@ -169,7 +169,7 @@ export async function saveCanonicalAst(
       }
       shredIntoTransaction(tx, doc.id, canonical);
     });
-    return ok(doc);
+    return getDocumentById(deps, doc.id).then(result => result.ok && result.value ? ok(result.value) : err(result.ok ? new BusinessError('E_NOT_FOUND', '教材保存结果不可读取', 'DATABASE') : result.error));
   } catch (error) {
     if (error instanceof BusinessError) return err(error);
     return err(
@@ -206,7 +206,7 @@ export async function listDocuments(
       sourceKind: coerceDocumentSourceKind(r.sourceKind),
       language: r.language,
       content: r.content,
-      astJson: r.astJson ?? undefined,
+      astJson: r.chaptersJson ? JSON.stringify(deps.db.transaction(tx => textbookViewInTx(tx, r.id))) : r.astJson ?? undefined,
       topic: r.topic ?? undefined,
       difficulty: r.difficulty ?? undefined,
       sourceUrl: r.sourceUrl ?? undefined,
@@ -251,7 +251,7 @@ export async function getDocumentById(
       sourceKind: coerceDocumentSourceKind(r.sourceKind),
       language: r.language,
       content: r.content,
-      astJson: r.astJson ?? undefined,
+      astJson: r.chaptersJson ? JSON.stringify(deps.db.transaction(tx => textbookViewInTx(tx, r.id))) : r.astJson ?? undefined,
       topic: r.topic ?? undefined,
       difficulty: r.difficulty ?? undefined,
       sourceUrl: r.sourceUrl ?? undefined,
@@ -293,12 +293,8 @@ export async function deleteDocument(
       tx.delete(annotations)
         .where(and(eq(annotations.documentId, id), eq(annotations.userId, userId)))
         .run();
-      tx.delete(textbookVocab).where(eq(textbookVocab.documentId, id)).run();
-      tx.delete(textbookGrammar).where(eq(textbookGrammar.documentId, id)).run();
+      for (const table of [textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials]) tx.delete(table).where(eq(table.documentId, id)).run();
       tx.delete(knowledgePoints).where(eq(knowledgePoints.documentId, id)).run();
-      tx.delete(textbookLines).where(eq(textbookLines.documentId, id)).run();
-      tx.delete(textbookExercises).where(eq(textbookExercises.documentId, id)).run();
-      tx.delete(textbookLessons).where(eq(textbookLessons.documentId, id)).run();
       tx.run(sql`DELETE FROM textbook_fts WHERE document_id = ${id}`);
       tx.delete(documentStructures).where(eq(documentStructures.documentId, id)).run();
       tx.delete(readingPositions).where(eq(readingPositions.documentId, id)).run();

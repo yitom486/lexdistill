@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LearningContentPanel } from './textbook/LearningContentPanel.js';
 import { StructuredLessonPanel } from './textbook/StructuredLessonPanel.js';
 import { StructuredExerciseList } from './textbook/StructuredExerciseList.js';
 import { ContentSource } from './textbook/ContentSource.js';
@@ -668,7 +669,7 @@ export function TextbookCurriculum({
 
           {/* 子内容 3: 核心文法剖析 */}
           {lessonSubTab === 'GRAMMAR' && (
-            currentLesson.content ? <StructuredLessonPanel content={currentLesson.content} tab="GRAMMAR" {...(currentLesson.directory ? { directory: currentLesson.directory } : {})} /> :
+            currentLesson.learningContent ? <LearningContentPanel content={currentLesson.learningContent} section="GRAMMAR" /> : currentLesson.content ? <StructuredLessonPanel content={currentLesson.content} tab="GRAMMAR" {...(currentLesson.directory ? { directory: currentLesson.directory } : {})} /> :
             <div className="space-y-4">
               {currentLesson.grammarPoints.map((gp) => (
                 <div

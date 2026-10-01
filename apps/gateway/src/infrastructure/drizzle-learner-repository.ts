@@ -256,13 +256,12 @@ import {
 } from '@study-studio/storage-sqlite';
 import {
   seedTextbookTocSkeleton as seedTextbookTocSkeletonDomain,
+  writeTextbookContent, readTextbookMaterial, completeTextbookChapter, type TextbookScope,
   appendImportEvent, listImportEvents, getImportEvent,
-  commitLessonKnowledge as commitLessonKnowledgeDomain,
   listTextbookLessonSlots as listTextbookLessonSlotsDomain,
   getTextbookAssetStats as getTextbookAssetStatsDomain,
   type SeedTocSkeletonInput,
   type SavedTocSkeleton,
-  type CommitLessonKnowledgeInput,
   type CommitLessonKnowledgeOutput,
   type TextbookLessonSlotItem,
   type TextbookAssetStats,
@@ -625,6 +624,11 @@ export class DrizzleLearnerRepository
   ): Promise<Result<SavedTocSkeleton, BusinessError>> {
     return seedTextbookTocSkeletonDomain(this.deps, input);
   }
+  public writeTextbookContent(scope: TextbookScope, kind: import('@study-studio/document-model').TextbookContentKind, input: unknown) {
+    return writeTextbookContent(this.deps, scope, kind, input);
+  }
+  public readTextbookMaterial(scope: TextbookScope) { return readTextbookMaterial(this.deps, scope); }
+  public completeTextbookChapter(scope: TextbookScope) { return completeTextbookChapter(this.deps, scope); }
 
   public appendImportEvent(input: Parameters<typeof appendImportEvent>[1]) { return appendImportEvent(this.deps, input); }
   public listImportEvents(query: Parameters<typeof listImportEvents>[1]) { return listImportEvents(this.deps, query); }
@@ -633,11 +637,6 @@ export class DrizzleLearnerRepository
   /**
    * 章节内容提炼原子回填（TOC 白名单对齐核验 + 槽位状态翻转为 ready）。
    */
-  public async commitLessonKnowledge(
-    input: CommitLessonKnowledgeInput
-  ): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
-    return commitLessonKnowledgeDomain(this.deps, input);
-  }
 
   /**
    * 查询指定教材文档已建立的章节槽位状态列表。
