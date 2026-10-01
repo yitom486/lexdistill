@@ -5,7 +5,7 @@ import { Badge } from '../../ui/badge.js';
 import { Switch } from '../../ui/switch.js';
 import { Button } from '../../ui/button.js';
 import { PreviewGrammar, PreviewSentences, PreviewVocabulary, PreviewMaterial } from './PreviewContentSections.js';
-import { PreviewExercise } from './PreviewExercise.js';
+import { PreviewExercises } from './PreviewExercises.js';
 import { useTextbookNavigationStore, type LearningSection } from '../../../stores/useTextbookNavigationStore.js';
 import { InteractiveReading } from './InteractiveReading.js';
 import { StudyExplanation } from './StudyExplanation.js';
@@ -57,7 +57,7 @@ export function LearningPreviewPage({ content, bookTitle, chapterTitle, chapterI
           <TabsContent value="vocabulary" keepMounted className="m-0"><PreviewVocabulary {...props} /></TabsContent>
           <TabsContent value="grammar" keepMounted className="m-0"><PreviewGrammar {...props} /></TabsContent>
           <TabsContent value="sentences" keepMounted className="m-0"><PreviewSentences {...props} /></TabsContent>
-          <TabsContent value="exercises" keepMounted className="m-0"><div className="space-y-5">{content.exercises.map((exercise, index) => <PreviewExercise key={exercise.id} exercise={exercise} index={index} />)}</div></TabsContent>
+          <TabsContent value="exercises" keepMounted className="m-0"><PreviewExercises exercises={content.exercises} /></TabsContent>
           {study && <TabsContent value="summary" keepMounted className="m-0"><StudyGuide study={study} summary onNavigate={setActive} /></TabsContent>}
           {next && <div className="mt-7 flex justify-end"><Button variant="outline" onClick={() => setActive(next.key)}>继续学习{next.title}<ArrowRight className="h-4 w-4" /></Button></div>}
         </div>

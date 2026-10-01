@@ -132,11 +132,49 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   await click(button(single, 'これは本です。'));
   await click(button(single, '检查答案'));
   expect(single.textContent).toContain('回答正确');
+  const typeFilters = doc.querySelector<HTMLElement>('[aria-label="筛选练习题型"]')!;
+  expect(typeFilters.querySelectorAll('button')).toHaveLength(8);
+  await click(button(typeFilters, '多选 1'));
+  expect(single.parentElement?.hidden).toBe(true);
+  const multi = doc.querySelector<HTMLElement>('article[aria-label="练习 6：多选"]')!;
+  expect(multi.parentElement?.hidden).toBe(false);
+  await click(button(multi, 'これ'));
+  await click(button(multi, 'あれ'));
+  await click(button(multi, '检查答案'));
+  expect(multi.textContent).toContain('回答正确');
+  await click(button(typeFilters, '全部 7'));
+  expect(single.textContent).toContain('回答正确'); // Filtering does not discard answers.
+  const enter = async (input: HTMLTextAreaElement, value: string) => {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom!.dom.window.HTMLTextAreaElement.prototype, 'value')!.set!.call(input, value);
+      input.dispatchEvent(new dom!.dom.window.Event('input', { bubbles: true }));
+    });
+  };
+  const fill = doc.querySelector<HTMLElement>('article[aria-label="练习 2：填空"]')!;
+  await enter(fill.querySelector('textarea')!, 'の');
+  await click(button(fill, '检查答案'));
+  expect(fill.textContent).toContain('回答正确');
+  const ordering = doc.querySelector<HTMLElement>('article[aria-label="练习 5：排序"]')!;
+  const pool = ordering.querySelector<HTMLElement>('[aria-label="待选词块"]')!;
+  for (const word of ['これは', 'わたし', 'の', '本', 'です。']) await click(button(pool, word));
+  await click(button(ordering, '检查答案'));
+  expect(ordering.textContent).toContain('回答正确');
   // Matching must expose both sides before any answer is shown.
   const matching = doc.querySelector<HTMLElement>('article[aria-label="练习 3：配对"]')!;
   expect(matching.querySelectorAll('[role="combobox"]')).toHaveLength(3);
   expect(matching.textContent).toContain('辞書');
   expect(matching.textContent).not.toContain('参考答案：');
+  for (const [left, right] of [['辞書', '词典'], ['時計', '钟；手表'], ['鉛筆', '铅笔']]) {
+    const trigger = matching.querySelector<HTMLElement>(`[aria-label="匹配：${left}"]`)!;
+    await click(trigger);
+    const popup = doc.getElementById(trigger.getAttribute('aria-controls')!);
+    expect(popup).toBeTruthy();
+    const option = [...popup!.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent === right);
+    await act(async () => { option!.focus(); });
+    await click(option);
+  }
+  await click(button(matching, '检查答案'));
+  expect(matching.textContent).toContain('回答正确');
 
   const translation = doc.querySelector<HTMLElement>('article[aria-label="练习 4：翻译"]')!;
   const input = translation.querySelector('textarea')!;
@@ -147,6 +185,11 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   await click(button(translation, '对照参考答案'));
   expect(translation.textContent).toContain('尚未评分');
   expect(translation.textContent).not.toContain('回答正确');
+  const shortAnswer = doc.querySelector<HTMLElement>('article[aria-label="练习 7：简答"]')!;
+  await enter(shortAnswer.querySelector('textarea')!, 'この后面要接名词，これ可以单独用。');
+  await click(button(shortAnswer, '对照参考答案'));
+  expect(shortAnswer.textContent).toContain('尚未评分');
+  expect(shortAnswer.textContent).toContain('评分要点');
   await click(tab('词汇'));
   expect(activePanel().querySelector('[aria-label="取消复习：本"]')).not.toBeNull();
   await click(tab('练习'));
@@ -182,6 +225,34 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   expect(activePanel().textContent).not.toContain('用これ，因为书靠近说话人。');
   await click(button(activePanel(), '对照参考要点'));
   expect(activePanel().textContent).toContain('用これ，因为书靠近说话人。');
+  // Same read contract, multiple blanks and repeated ordering words; no persistence calls.
+  const special = { ...previewLesson.content, exercises: [
+    { id: 'test-multiple-blanks', type: 'FILL_BLANK' as const, prompt: 'わたし（ ）本（ ）これです。', answer: ['の', 'は'], source: 'AI' as const },
+    { id: 'test-repeated-words', type: 'ORDERING' as const, prompt: '按给出的顺序重组台词词块。', options: ['はい', 'そうです', 'はい'], answer: ['はい', 'はい', 'そうです'], source: 'AI' as const },
+  ] };
+  expect(TextbookLearningContentSchema.safeParse(special).success).toBe(true);
+  await act(async () => { dom!.root.render(<LearningPreviewPage key="multiple-answer-types" {...previewLesson} content={special} />); });
+  await settle();
+  await click(tab('练习'));
+  const blanks = doc.querySelector<HTMLElement>('article[aria-label="练习 1：填空"]')!;
+  const fields = blanks.querySelectorAll('textarea');
+  expect(fields).toHaveLength(2);
+  await enter(fields[0]!, 'の');
+  expect(button(blanks, '检查答案')?.disabled).toBe(true);
+  await enter(fields[1]!, 'は');
+  await click(button(blanks, '检查答案'));
+  expect(blanks.textContent).toContain('回答正确');
+  const repeated = doc.querySelector<HTMLElement>('article[aria-label="练习 2：排序"]')!;
+  const tokens = repeated.querySelector<HTMLElement>('[aria-label="待选词块"]')!.querySelectorAll<HTMLButtonElement>('button');
+  await click(tokens[0]);
+  expect(tokens[2]?.disabled).toBe(false);
+  await click(tokens[2]);
+  await click(tokens[1]);
+  await click(button(repeated, '检查答案'));
+  expect(repeated.textContent).toContain('回答正确');
+  await click(button(repeated, '重新作答'));
+  expect(tokens[0]?.disabled).toBe(false);
+  expect(repeated.textContent).not.toContain('回答正确');
   await act(async () => { dom!.root.render(<LearningPreviewPage key="empty-categories" {...previewLesson} content={{ ...previewLesson.content, grammar: [], articles: [], sentences: [], exercises: [] }} />); });
   await settle();
   expect(doc.querySelectorAll('[role="tab"]')).toHaveLength(1);
