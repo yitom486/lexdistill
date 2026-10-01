@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { TextbookLearningContent } from '@study-studio/document-model';
 
-export type LearningSection = Exclude<keyof TextbookLearningContent, 'material'>;
+export type LearningSection = Exclude<keyof TextbookLearningContent, 'material'> | 'overview' | 'summary';
 interface TextbookNavigation {
   view: 'LIBRARY' | 'STUDY'; selectedBookId: string | null;
   chaptersByBook: Record<string, string>; sectionsByChapter: Record<string, LearningSection>; showTranslation: boolean;

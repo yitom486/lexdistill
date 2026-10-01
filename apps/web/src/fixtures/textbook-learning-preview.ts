@@ -1,9 +1,11 @@
 import { TextbookLearningContentSchema, type TextbookLearningContent } from '@study-studio/document-model';
 import type { LearningLibraryBook } from '../components/textbook/preview/library-view.js';
+import { previewStudy, segmentText } from './textbook-study-preview.js';
 
 /** Temporary, user-authorized sample. Uses the current SQLite read contract; never written to a database. */
 export const previewLesson = {
   bookId: 'preview-japanese-basics', chapterId: 'preview-objects',
+  language: 'JA',
   bookTitle: '日语入门 · 演示教材',
   chapterTitle: '第 2 课 · これは何ですか',
   subtitle: '指认身边的物品，询问名称与归属。',
@@ -21,7 +23,7 @@ export const previewLesson = {
       { id: 'preview-g2', kind: 'GRAMMAR', title: '「の」：表达物品的归属', explanation: '名词之间的「の」可以表示所属关系。询问物品属于谁时，用「だれの」。', connection: '人 ＋ の ＋ 物品', aiExplanation: '物品名称已明确时，可以省略：「田中さんのです」表示“是田中的”。这里的「の」代替前面提到的物品。', examples: [{ text: 'これはだれのノートですか。', translation: '这是谁的笔记本？' }, { text: 'わたしのです。', translation: '是我的。' }], source: 'AI' },
       { id: 'preview-g3', kind: 'USAGE', title: 'そうです／違います：确认与否认', explanation: '确认对方的判断时用「はい、そうです」。否认时可以用「いいえ、違います」，再说明实际是什么。', examples: [{ text: 'それは辞書ですか。いいえ、違います。ノートです。', translation: '那是词典吗？不，不是。是笔记本。' }], source: 'AI' },
     ],
-    articles: [{ id: 'preview-a1', title: '教室里的一段对话', text: '田中：これは何ですか。\n李：それは日本語の本です。\n田中：そうですか。これはだれの本ですか。\n李：わたしのです。\n田中：あれも李さんのですか。\n李：いいえ、違います。あれは先生の辞書です。', translation: '田中：这是什么？\n李：那是一本日语书。\n田中：这样啊。这是谁的书？\n李：是我的。\n田中：那个也是李的东西吗？\n李：不，不是。那个是老师的词典。', source: 'AI' }],
+    articles: [{ id: 'preview-a1', title: '教室里的一段对话', text: segmentText(previewStudy['preview-objects']!.articles['preview-a1']!), translation: segmentText(previewStudy['preview-objects']!.articles['preview-a1']!, true), source: 'AI' }],
     sentences: [
       { id: 'preview-s1', text: 'これは何ですか。', translation: '这是什么？', explanation: '询问物品的名称。「何」在这里读作「なん」。', source: 'AI' },
       { id: 'preview-s2', text: 'それは日本語の本です。', translation: '那是一本日语书。', explanation: '「日本語の本」中的「の」说明书的类别。', source: 'AI' },
@@ -48,7 +50,7 @@ export const previewBooks: LearningLibraryBook[] = [
     { id: 'preview-greetings', title: '第 1 课 · はじめまして', subtitle: '初次见面时，介绍自己并回应对方。', content: {
       vocabulary: [{ id: 'preview-greeting-v1', vocabularyId: 'preview-greeting-global-v1', word: '学生', reading: 'がくせい', meaning: '学生', level: 'N5', examples: [{ text: 'わたしは学生です。', translation: '我是学生。' }] }],
       grammar: [{ id: 'preview-greeting-g1', kind: 'GRAMMAR', title: '名词 ＋ は ＋ 名词 ＋ です', connection: 'わたし ＋ は ＋ 学生 ＋ です', explanation: '「は」提示话题，「です」用于礼貌地说明身份。这里的「は」读作 wa。', examples: [{ text: 'わたしは李です。', translation: '我姓李。' }], source: 'AI' }],
-      articles: [{ id: 'preview-greeting-a1', title: '初次见面', text: '李：はじめまして。李です。\n田中：田中です。よろしくお願いします。\n李：こちらこそ、よろしくお願いします。', translation: '李：初次见面，我姓李。\n田中：我姓田中。请多关照。\n李：也请您多关照。', source: 'AI' }],
+      articles: [{ id: 'preview-greeting-a1', title: '初次见面', text: segmentText(previewStudy['preview-greetings']!.articles['preview-greeting-a1']!), translation: segmentText(previewStudy['preview-greetings']!.articles['preview-greeting-a1']!, true), source: 'AI' }],
       sentences: [{ id: 'preview-greeting-s1', text: 'よろしくお願いします。', translation: '请多关照。', explanation: '初次见面、开始合作或请别人帮忙时使用。', source: 'AI' }],
       exercises: [{ id: 'preview-greeting-e1', type: 'CHOICE', prompt: '请选择礼貌的自我介绍。', options: ['わたしは李です。', 'これは李です。'], answer: 'わたしは李です。', explanation: '介绍自己用「わたしは」。', source: 'AI' }], material: null,
     } },
@@ -58,7 +60,7 @@ export const previewBooks: LearningLibraryBook[] = [
     { id: 'preview-directions', title: '第 1 课 · 駅はどこですか', subtitle: '礼貌问路，听懂简单的方向指引。', content: {
       vocabulary: [{ id: 'preview-travel-v1', vocabularyId: 'preview-travel-global-v1', word: '駅', reading: 'えき', meaning: '车站', level: 'N5', examples: [{ text: '駅はどこですか。', translation: '车站在哪里？' }] }, { id: 'preview-travel-v2', vocabularyId: 'preview-travel-global-v2', word: '右', reading: 'みぎ', meaning: '右；右侧', level: 'N5', examples: [{ text: '右に曲がってください。', translation: '请向右转。' }] }],
       grammar: [{ id: 'preview-travel-g1', kind: 'USAGE', title: 'すみません：礼貌地引起注意', explanation: '向陌生人问路前先说「すみません」，表示“打扰一下”。', examples: [{ text: 'すみません。駅はどこですか。', translation: '打扰一下，车站在哪里？' }], source: 'AI' }],
-      articles: [{ id: 'preview-travel-a1', title: '去车站的路', text: '旅行者：すみません。駅はどこですか。\n通行人：まっすぐ行って、右に曲がってください。\n旅行者：ありがとうございます。', translation: '旅行者：打扰一下，车站在哪里？\n路人：请直走，然后向右转。\n旅行者：谢谢。', source: 'AI' }],
+      articles: [{ id: 'preview-travel-a1', title: '去车站的路', text: segmentText(previewStudy['preview-directions']!.articles['preview-travel-a1']!), translation: segmentText(previewStudy['preview-directions']!.articles['preview-travel-a1']!, true), source: 'AI' }],
       sentences: [], exercises: [{ id: 'preview-travel-e1', type: 'MATCHING', prompt: '把方向与词义配对。', left: ['右', '左'], right: ['左侧', '右侧'], answer: [{ left: '右', right: '右侧' }, { left: '左', right: '左侧' }], source: 'AI' }], material: null,
     } },
   ] },

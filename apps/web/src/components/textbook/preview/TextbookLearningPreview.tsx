@@ -6,6 +6,7 @@ import { useUserProfileStore } from '../../../stores/useUserProfileStore.js';
 import { usePipelineJobStore } from '../../../stores/usePipelineJobStore.js';
 import { DEFAULT_USER_ID } from '../../../queries/query-keys.js';
 import { previewBooks } from '../../../fixtures/textbook-learning-preview.js';
+import { previewStudy } from '../../../fixtures/textbook-study-preview.js';
 import { TextbookLibraryHome } from './TextbookLibraryHome.js';
 import { LearningPreviewPage } from './LearningPreviewPage.js';
 import { savedBookView, type LearningLibraryBook } from './library-view.js';
@@ -13,8 +14,9 @@ import { TextbookImporterModal } from '../../TextbookImporterModal.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select.js';
 
 type Card = { front: string; back: string; category: string; prompt: string };
-export function TextbookLearningPreview({ onAddCardFromTextbook, onAddCardsBatch }: {
+export function TextbookLearningPreview({ onAddCardFromTextbook, onAddCardsBatch, onAskAiTutor }: {
   onAddCardFromTextbook: (card: Card) => void; onAddCardsBatch?: (cards: Card[]) => void;
+  onAskAiTutor?: ((text: string, context: string) => void) | undefined;
 }) {
   const userId = useUserProfileStore(state => state.profile.userId) || DEFAULT_USER_ID;
   const query = useTextbooksQuery(userId), importBook = useImportTextbookMutation(userId);
@@ -32,7 +34,7 @@ export function TextbookLearningPreview({ onAddCardFromTextbook, onAddCardsBatch
   return <>
     {showStudy ? <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3"><Button variant="outline" size="sm" onClick={navigation.backToLibrary}><ArrowLeft className="h-4 w-4" />返回教材首页</Button><Select value={chapter.id} onValueChange={id => id && navigation.selectChapter(selectedBook.id, id)}><SelectTrigger className="w-[min(420px,100%)]" aria-label="选择章节"><SelectValue>{chapter.title}</SelectValue></SelectTrigger><SelectContent>{selectedBook.chapters.map(item => <SelectItem key={item.id} value={item.id}>{item.title}</SelectItem>)}</SelectContent></Select></div>
-      <div className="flex h-[calc(100dvh-220px)] min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line-soft"><LearningPreviewPage key={chapter.id} bookTitle={selectedBook.title} chapterTitle={chapter.title} chapterId={chapter.id} subtitle={chapter.subtitle} content={chapter.content} temporary={selectedBook.temporary} /></div>
+      <div className="flex h-[calc(100dvh-220px)] min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line-soft"><LearningPreviewPage key={chapter.id} bookTitle={selectedBook.title} chapterTitle={chapter.title} chapterId={chapter.id} subtitle={chapter.subtitle} language={selectedBook.language} content={chapter.content} temporary={selectedBook.temporary} study={selectedBook.temporary ? previewStudy[chapter.id] : undefined} onAskAiTutor={onAskAiTutor} /></div>
     </div> : <TextbookLibraryHome books={books} rememberedChapters={navigation.chaptersByBook} onOpen={openBook} onImport={() => setImporterOpen(true)} onRefresh={() => { void query.refetch(); }} loading={query.isFetching} />}
     {importerOpen && <TextbookImporterModal isOpen={importerOpen} onClose={() => setImporterOpen(false)} existingBooks={(query.data ?? []).flatMap(book => book.documentId ? [{ documentId: book.documentId, title: book.title, lessons: book.lessons.length }] : [])}
       onImportBook={book => { importBook.mutate(book); openBook(savedBookView(book)); }}
