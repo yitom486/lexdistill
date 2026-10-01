@@ -6,6 +6,7 @@
  */
 export * from './textbook.js';
 export * from './lesson-content.js';
+export * from './lesson-proposal.js';
 export * from './textbook-tasks.js';
 export * from './import-monitor.js';
 export * from './directory-content.js';

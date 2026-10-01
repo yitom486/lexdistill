@@ -1,5 +1,5 @@
 import type { AgentAdapter, AgentEvent, AgentInput, CreateSessionOptions, AgentSession } from '@study-studio/agent-runtime';
-import { LessonSubmissionSchema, type LessonContent, type LessonSubmission } from '@study-studio/document-model';
+import { LessonProposalSchema, type LessonContent, type LessonProposal } from '@study-studio/document-model';
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
@@ -30,21 +30,33 @@ export function contentFor(tocIds: string[]): LessonContent {
     summary: { goldenSentences: [], selfCheckQuestions: ['理解了吗'] },
   };
 }
-export function submissionFromPrompt(message: string): LessonSubmission {
-  const value = (key: string) => new RegExp(`^${key}: (.+)$`, 'm').exec(message)?.[1] ?? '';
+export function submissionFromPrompt(message: string): LessonProposal {
   const tocLine = message.split('本章目录:\n')[1]?.split('\n')[0] ?? '[]';
   const raw: unknown = JSON.parse(tocLine);
   const ids = Array.isArray(raw) ? raw.map(item => typeof item === 'object' && item && 'id' in item && typeof item.id === 'string' ? item.id : '') : [];
-  const content = contentFor(ids);
+  const root = /^当前目录节点: (.+)$/m.exec(message)?.[1] ?? '';
+  const content = contentFor([root, ...ids.filter(id => id !== root)]);
   const material = message.split('章节解析材料:\n')[1]?.split('\n')[0];
   if (material) {
     const source = z.object({ blocks: z.array(z.object({ id: z.string(), page: z.number() })).min(1) }).parse(JSON.parse(material));
     for (const item of [...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises]) if (item.source === 'TEXTBOOK') item.sourceRefs = [{ blockId: source.blocks[0]!.id, page: source.blocks[0]!.page }];
   }
-  return LessonSubmissionSchema.parse({ documentId: value('documentId'), lessonId: value('lessonId'), assignmentId: value('assignmentId'), content });
+  const withoutId = <T extends { id: string }>({ id: _id, ...item }: T) => item;
+  return LessonProposalSchema.parse({ content: { ...content, blocks: content.blocks.map(withoutId),
+    vocabularies: content.vocabularies.map(item => ({ ...withoutId(item), examples: item.examples.map(withoutId) })),
+    knowledgePoints: content.knowledgePoints.map(item => ({ ...withoutId(item), examples: item.examples.map(withoutId) })),
+    exercises: content.exercises.map(({ id: _id, knowledgePointIds, options, left, right, answer, ...item }) => ({ ...item,
+      knowledgePointIndexes: knowledgePointIds.map(id => content.knowledgePoints.findIndex(point => point.id === id)),
+      ...(options ? { options: options.map(withoutId) } : {}), ...(left ? { left: left.map(withoutId) } : {}), ...(right ? { right: right.map(withoutId) } : {}),
+      answer: { ...(answer.text ? { text: answer.text } : {}),
+        ...(answer.optionIds ? { optionIndexes: answer.optionIds.map(id => options!.findIndex(option => option.id === id)) } : {}),
+        ...(answer.pairs ? { pairs: answer.pairs.map(pair => ({ leftIndex: left!.findIndex(option => option.id === pair.leftId), rightIndex: right!.findIndex(option => option.id === pair.rightId) })) } : {}),
+      },
+    })),
+  } });
 }
 export interface ModelTurn {
-  sessionId: string; input: AgentInput;
+  sessionId: string; turnId: string; input: AgentInput;
   submit: (raw: unknown) => Promise<Result<CommitLessonKnowledgeOutput, BusinessError>>;
 }
 export function pipelineModel(tool: LibraryLessonCommitTool, handle?: (turn: ModelTurn) => Promise<void>) {
@@ -58,8 +70,10 @@ export function pipelineModel(tool: LibraryLessonCommitTool, handle?: (turn: Mod
         async *send(input): AsyncIterable<AgentEvent> {
           inputs.push({ sessionId: options.sessionId, input });
           const callId = `call:${inputs.length}`;
-          const submit = (raw: unknown) => tool.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId });
-          if (handle) await handle({ sessionId: options.sessionId, input, submit });
+          const turnId = `turn:${inputs.length}`;
+          input.onTurnStarted?.(turnId);
+          const submit = (raw: unknown) => tool.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId, turnId });
+          if (handle) await handle({ sessionId: options.sessionId, turnId, input, submit });
           else {
             const candidate = submissionFromPrompt(input.message);
             yield { type: 'TOOL_CALL_REQUESTED', callId, toolName: tool.name.replaceAll('.', '_'), input: candidate };

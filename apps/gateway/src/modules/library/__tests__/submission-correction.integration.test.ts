@@ -31,14 +31,18 @@ async function eventDetails(repo: DrizzleLearnerRepository, name: string) {
   }));
 }
 describe('提交修正集成：准确身份反馈、字段保留、阶段与有界模型等待', () => {
-  it('旧尝试身份精确反馈并零写入，当前身份纠正后保存生词 AI 讲解且不混进词义', async () => {
-    const env = setup(async ({ input, submit }) => {
+  it('原生旧轮次零写入，模型不提交身份，合法内容生成系统 ID 并保存独立讲解', async () => {
+    const env = setup(async ({ input, submit, sessionId }) => {
       const value = submissionFromPrompt(input.message);
-      const rejected = await submit({ ...value, assignmentId: 'previous-attempt' });
+      expect(input.message).not.toContain('assignmentId:');
+      expect(input.message).not.toContain('documentId:');
+      expect(env.tool.schema.safeParse(value).success).toBe(true);
+      expect(env.tool.schema.safeParse({ ...value, assignmentId: 'model-id' }).success).toBe(false);
+      const rejected = await env.tool.execute(value, { userId: 'owner', sessionId, turnId: 'previous-turn', callId: 'call:stale' });
       expect(rejected.ok).toBe(false);
       if (!rejected.ok) {
-        expect(rejected.error.retryable).toBe(true);
-        expect(rejected.error.userMessage).toContain(`assignmentId 应为 ${value.assignmentId}`);
+        expect(rejected.error.retryable).toBe(false);
+        expect(rejected.error.code).toBe('E_SUBMISSION_SCOPE_INVALID');
       }
       expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(0);
       value.content.vocabularies[0]!.aiExplanation = 'AI 讲解独立保留';
@@ -51,10 +55,13 @@ describe('提交修正集成：准确身份反馈、字段保留、阶段与有�
     expect(vocab.aiExplanation).toBe('AI 讲解独立保留'); expect(vocab.glossZh).toBe('学习');
     const ast = TextbookASTSchema.parse(JSON.parse(env.db.select().from(tables.documents).where(eq(tables.documents.id, 'book')).get()!.astJson!));
     expect(ast.lessons[0]!.content!.vocabularies[0]!.aiExplanation).toBe('AI 讲解独立保留');
+    const content = ast.lessons[0]!.content!;
+    expect(content.vocabularies[0]!.id).toStartWith('content_');
+    expect(content.exercises[0]!.knowledgePointIds).toEqual([content.knowledgePoints[0]!.id]);
+    expect(new Set([...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises].map(item => item.id)).size).toBe(4);
     expect(env.stages).toContain('correcting');
     const records = await eventDetails(env.repo, 'rejected');
-    expect(records[0]?.callId).toBe('call:1');
-    expect(records[0]?.detail).toEqual(expect.objectContaining({ details: expect.objectContaining({ details: [expect.objectContaining({ path: 'assignmentId', received: 'previous-attempt' })] }) }));
+    expect(records[0]?.callId).toBe('call:stale');
   });
   it('缺少 AI 例句关联拒绝写入，新模型轮次复用线程并明确显示模型重试', async () => {
     let attempts = 0;

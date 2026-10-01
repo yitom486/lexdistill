@@ -14,7 +14,7 @@ describe('教材检测：真实指纹、内容统计、补课与重复导入', (
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
     const tool = new LibraryLessonCommitTool(repo);
     let partial = true;
-    const model = pipelineModel(tool, async ({ input, submit }) => { const value = submissionFromPrompt(input.message); if (!partial || value.lessonId === 'l1') await submit(value); });
+    const model = pipelineModel(tool, async ({ input, submit }) => { const value = submissionFromPrompt(input.message); if (!partial || value.content.coverage[0]!.tocId === 'l1') await submit(value); });
     const app = createPdfImportRoutes({ repo, server: {} as never, port: 0 });
     const input = { userId: 'owner', documentId: 'book', title: '教材', pdf: new Uint8Array(await Bun.file(fixture).arrayBuffer()), poolSize: 1, modelRetries: 0, adapter: model.adapter, submissionTool: tool,
       tocEntries: [{ id: 'l1', title: '第一章', level: 'lesson' as const, startPage: 1 }, { id: 'l2', title: '第二章', level: 'lesson' as const, startPage: 2 }],

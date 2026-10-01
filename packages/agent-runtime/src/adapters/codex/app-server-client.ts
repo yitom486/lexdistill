@@ -311,6 +311,7 @@ export class CodexAppServerConnection {
   public async *runTurn(params: {
     threadId: string;
     message: string;
+    onTurnStarted?: (turnId: string) => void;
     signal?: AbortSignal;
     /** 本轮临时图片绝对路径（Adapter 已物化；按序转为 localImage 输入）。 */
     imagePaths?: string[];
@@ -365,6 +366,11 @@ export class CodexAppServerConnection {
       return;
     }
     const turnId = startRes.value?.turn?.id ?? null;
+    if (!turnId) {
+      yield { type: 'ERROR', error: new BusinessError('E_CODEX_TURN', '模型引擎未返回运行轮次身份', 'AGENT_RUNTIME', true) };
+      return;
+    }
+    params.onTurnStarted?.(turnId);
     yield* this.consumeTurnNotifications({
       threadId: params.threadId,
       turnId,

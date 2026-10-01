@@ -117,13 +117,17 @@ export class ChapterSessionPool {
   }
   async send(session: AgentSession, job: LessonExtractionJob, assignmentId: string, controller: AbortController, correction?: string): Promise<Result<void, BusinessError>> {
     const turn = this.options.monitor?.turn(session, { nodeId: job.lessonId, attemptId: assignmentId });
-    const message = buildLessonExtractionPrompt(job, assignmentId, this.options.tool.name.replaceAll('.', '_'), correction);
+    const message = buildLessonExtractionPrompt(job, this.options.tool.name.replaceAll('.', '_'), correction);
     this.options.monitor?.record('model', 'input', { message, model: this.options.model ?? null, effort: this.options.effort ?? null, correction: correction ?? null,
+      tocPath: job.tocPath, tocEntries: job.tocEntries, contextMode: 'worker-thread-reuse',
       attachments: job.attachments?.map(image => ({ label: image.label, pngBase64: Buffer.from(image.png).toString('base64') })) ?? [],
     }, turn?.binding);
     const interrupt = () => { void session.interrupt().catch(cause => logger.warn('教材会话中断失败', { cause: String(cause) })); };
     controller.signal.addEventListener('abort', interrupt, { once: true });
-    const iterator = session.send({ message, ...(job.attachments?.length ? { attachments: job.attachments } : {}), ...(this.options.effort ? { turnOptions: { effort: this.options.effort } } : {}) })[Symbol.asyncIterator]();
+    const iterator = session.send({ message, onTurnStarted: nativeTurnId => {
+      this.options.tool.startTurn(session.sessionId, assignmentId, nativeTurnId);
+      this.options.monitor?.record('session', 'turn_started', { nativeTurnId }, turn?.binding);
+    }, ...(job.attachments?.length ? { attachments: job.attachments } : {}), ...(this.options.effort ? { turnOptions: { effort: this.options.effort } } : {}) })[Symbol.asyncIterator]();
     try {
       if (controller.signal.aborted) return { ok: false, error: new BusinessError('E_CANCELLED', '教材提取已取消', 'AGENT_RUNTIME') };
       let first = true;

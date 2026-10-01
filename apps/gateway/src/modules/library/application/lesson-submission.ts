@@ -2,6 +2,7 @@ import { LessonSubmissionSchema, lessonContentIssues, type LessonSubmission as S
 import { BusinessError, err, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ContentRepository, CommitLessonKnowledgeOutput } from '../ports.js';
 import type { ImportMonitor } from './import-monitor.js';
+import { normalizeLessonProposal } from './normalize-lesson-proposal.js';
 
 export interface LessonAssignment {
   userId: string;
@@ -18,12 +19,21 @@ export interface LessonAssignment {
   onStage?: (stage: 'validating' | 'correcting' | 'saving' | 'saved') => void;
 }
 export class LessonSubmission {
+  nativeTurnId: string | undefined;
   candidate: SubmissionInput | undefined;
   receipt: CommitLessonKnowledgeOutput | undefined;
   error: BusinessError | undefined;
   private inFlight: Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> | undefined;
   private candidateCallId: string | undefined;
   constructor(readonly assignment: LessonAssignment, private readonly repo: ContentRepository) {}
+
+  acceptProposal(raw: unknown, turnId: string | undefined, callId?: string): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
+    if (!turnId || turnId !== this.nativeTurnId) return this.reject('E_SUBMISSION_SCOPE_INVALID', '该工具调用不属于当前章节的运行轮次，已拒绝迟到提交', false, undefined, callId);
+    this.note('tool', 'proposal', raw, callId);
+    const normalized = normalizeLessonProposal(raw, this.assignment);
+    if (!normalized.ok) return this.reject(normalized.error.code, normalized.error.userMessage, true, normalized.error.internalDetails, callId);
+    return this.accept(normalized.value, callId);
+  }
 
   accept(raw: unknown, callId?: string): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
     const startedAt = Date.now();

@@ -256,6 +256,7 @@ export class CodexSession implements AgentSession {
     const turnOpts: {
       threadId: string;
       message: string;
+      onTurnStarted?: (turnId: string) => void;
       signal: AbortSignal;
       imagePaths?: string[];
       model?: string;
@@ -269,6 +270,7 @@ export class CodexSession implements AgentSession {
     } = {
       threadId: this.threadId,
       message: resolveTurnUserText(input),
+      onTurnStarted: turnId => { this.noteActiveTurn(turnId); input.onTurnStarted?.(turnId); },
       signal: this.abort.signal,
     };
     if (imagePaths.length > 0) turnOpts.imagePaths = imagePaths;

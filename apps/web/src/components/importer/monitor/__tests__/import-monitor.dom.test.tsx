@@ -27,7 +27,7 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
     const model = pipelineModel(tool, async ({ input, submit }) => {
       const value = submissionFromPrompt(input.message);
       value.content.vocabularies[0]!.aiExplanation = '保存的生词独立讲解';
-      if (value.lessonId === 'b') { reached.resolve(); await waiting.promise; }
+      if (value.content.coverage[0]!.tocId === 'b') { reached.resolve(); await waiting.promise; }
       expect((await submit(value)).ok).toBe(true);
     });
     const running = repo.executeTextbookPipeline({ userId: 'owner', traceId: 'desktop-trace', documentId: 'desktop-book', title: '监视教材', poolSize: 1,

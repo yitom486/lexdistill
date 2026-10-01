@@ -34,7 +34,7 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     const secondStarted = deferred(), releaseSecond = deferred(), firstSaved = deferred();
     const env = environment(async ({ input, submit }) => {
       const submission = submissionFromPrompt(input.message);
-      if (submission.lessonId === 'l1') await secondStarted.promise;
+      if (submission.content.coverage[0]!.tocId === 'l1') await secondStarted.promise;
       expect((await submit(submission)).ok).toBe(true);
     });
     let secondFinished = false;
@@ -82,9 +82,9 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     const secondSaved = deferred();
     const env = environment(async ({ input, submit }) => {
       const submission = submissionFromPrompt(input.message);
-      if (submission.lessonId === 'l1') await secondSaved.promise;
+      if (submission.content.coverage[0]!.tocId === 'l1') await secondSaved.promise;
       expect((await submit(submission)).ok).toBe(true);
-      if (submission.lessonId === 'l2') secondSaved.resolve();
+      if (submission.content.coverage[0]!.tocId === 'l2') secondSaved.resolve();
     });
     const entries = Array.from({ length: 7 }, (_, index): TocEntry => ({ id: `l${index + 1}`, title: `章 ${index + 1}`, level: 'lesson', startPage: index + 1 }));
     const saved: string[] = [];
@@ -103,14 +103,14 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     ['非法题型', 'E_LLM_SCHEMA_INVALID', (value: ReturnType<typeof submissionFromPrompt>) => ({ ...value, content: { ...value.content, exercises: [{ ...value.content.exercises[0], type: 'UNKNOWN' }] } })],
     ['目录缺项', 'E_TOC_COVERAGE_INCOMPLETE', (value: ReturnType<typeof submissionFromPrompt>) => ({ ...value, content: { ...value.content, coverage: value.content.coverage.map(item => ({ ...item, status: 'UNREADABLE' })) } })],
     ['目录越界', 'E_TOC_SLOT_NOT_FOUND', (value: ReturnType<typeof submissionFromPrompt>) => ({ ...value, content: { ...value.content, coverage: [...value.content.coverage, { tocId: 'ghost', status: 'EXTRACTED' }] } })],
-    ['只用 AI 内容冒充提取', 'E_TOC_COVERAGE_INCOMPLETE', (value: ReturnType<typeof submissionFromPrompt>) => ({ ...value, content: { ...value.content, blocks: [{ id: 'ai-only', kind: 'PARAGRAPH', text: '新增内容', source: 'AI', tocId: value.lessonId }], vocabularies: [], knowledgePoints: [], exercises: [] } })],
+    ['只用 AI 内容冒充提取', 'E_TOC_COVERAGE_INCOMPLETE', (value: ReturnType<typeof submissionFromPrompt>) => ({ ...value, content: { ...value.content, blocks: [{ kind: 'PARAGRAPH', text: '新增内容', source: 'AI', tocId: value.content.coverage[0]!.tocId }], vocabularies: [], knowledgePoints: [], exercises: [] } })],
   ] as const) {
     it(`${name}返回明确回执，修正后才能写库`, async () => {
       const env = environment(async ({ input, submit }) => {
         const value = submissionFromPrompt(input.message);
         const bad = await submit(corrupt(value));
         expect(bad.ok).toBe(false); if (!bad.ok) expect(bad.error.code).toBe(code);
-        expect(env.db.select().from(schema.textbookLessons).all().find(row => row.lessonId === value.lessonId)?.status).toBe('pending');
+        expect(env.db.select().from(schema.textbookLessons).all().find(row => row.lessonId === value.content.coverage[0]!.tocId)?.status).toBe('pending');
         expect((await submit(value)).ok).toBe(true);
       });
       const result = await env.repo.executeTextbookPipeline(env.input);
@@ -118,7 +118,7 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     });
   }
   it('无工具提交只失败该章；普通 JSON 文本不成为成功回填', async () => {
-    const env = environment(async ({ input, submit }) => { if (submissionFromPrompt(input.message).lessonId === 'l2') await submit(submissionFromPrompt(input.message)); });
+    const env = environment(async ({ input, submit }) => { if (submissionFromPrompt(input.message).content.coverage[0]!.tocId === 'l2') await submit(submissionFromPrompt(input.message)); });
     const result = await env.repo.executeTextbookPipeline(env.input);
     expect(result.ok).toBe(true); if (!result.ok) throw result.error;
     expect(result.value.successfulLessons).toBe(1); expect(result.value.failedLessons).toBe(1);
@@ -141,17 +141,18 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
   });
   it('切章后旧绑定、其他用户和取消后迟到提交全部拒绝；取消释放会话', async () => {
     let previous: ReturnType<typeof submissionFromPrompt> | undefined;
+    let previousSubmit: ModelTurn['submit'] | undefined;
     const controller = new AbortController();
     const env = environment(async ({ input, sessionId, submit }) => {
       const value = submissionFromPrompt(input.message);
       const wrongUser = await env.tool.execute(value, { userId: 'other', sessionId });
       expect(wrongUser.ok).toBe(false);
       if (previous) {
-        const stale = await submit(previous); expect(stale.ok).toBe(false); if (!stale.ok) expect(stale.error.code).toBe('E_SUBMISSION_SCOPE_INVALID');
+        const stale = await previousSubmit!(previous); expect(stale.ok).toBe(false); if (!stale.ok) expect(stale.error.code).toBe('E_SUBMISSION_SCOPE_INVALID');
         controller.abort();
         const late = await submit(value); expect(late.ok).toBe(false); return;
       }
-      await submit(value); previous = value;
+      await submit(value); previous = value; previousSubmit = submit;
     });
     const result = await env.repo.executeTextbookPipeline({ ...env.input, signal: controller.signal });
     expect(result.ok).toBe(false); expect(env.model.closed).toHaveLength(1); expect(env.model.interrupted).toHaveLength(1);
@@ -161,7 +162,7 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
   });
   it('成功提交后 Turn 失败仍保留成功回执；另一章异常隔离', async () => {
     const env = environment(async ({ input, submit }) => {
-      if (submissionFromPrompt(input.message).lessonId === 'l1') await submit(submissionFromPrompt(input.message));
+      if (submissionFromPrompt(input.message).content.coverage[0]!.tocId === 'l1') await submit(submissionFromPrompt(input.message));
       throw new Error('模型流中断');
     });
     const result = await env.repo.executeTextbookPipeline(env.input);
@@ -211,12 +212,13 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     const result = await env.repo.executeTextbookPipeline({ ...env.input, poolSize: 2, queueCapacity: 1 });
     expect(result.ok).toBe(false); expect(created).toBe(2); expect(env.model.closed).toHaveLength(1); expect(env.db.select().from(schema.textbookLines).all()).toHaveLength(0);
   });
-  it('格式重试复用当前线程，旧尝试 ID 被拒绝；纠错详情交给模型', async () => {
+  it('格式重试复用当前线程，旧原生轮次被拒绝；纠错详情交给模型', async () => {
     let previous: ReturnType<typeof submissionFromPrompt> | undefined;
+    let previousSubmit: ModelTurn['submit'] | undefined;
     const env = environment(async ({ input, submit }) => {
       const value = submissionFromPrompt(input.message);
-      if (!previous) { previous = value; await submit({ ...value, content: null }); return; }
-      const old = await submit(previous); expect(old.ok).toBe(false);
+      if (!previous) { previous = value; previousSubmit = submit; await submit({ ...value, content: null }); return; }
+      const old = await previousSubmit!(previous); expect(old.ok).toBe(false);
       expect(input.message).toContain('上次未完成的原因'); expect((await submit(value)).ok).toBe(true);
     });
     const result = await env.repo.executeTextbookPipeline({ ...env.input, tocEntries: [toc[0]!], lessonJobs: [env.input.lessonJobs![0]!], modelRetries: 1 });
@@ -226,12 +228,12 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     const env = environment(async ({ input, submit }) => {
       const value = submissionFromPrompt(input.message);
       value.content.exercises = [
-        ...(['CHOICE', 'MULTI_CHOICE', 'ORDERING'] as const).map(type => ({ id: type, type, prompt: '新增练习', source: 'AI' as const, knowledgePointIds: ['g1'], options: [{ id: 'a', text: '甲' }, { id: 'b', text: '乙' }], answer: { optionIds: type === 'CHOICE' ? ['a'] : ['b', 'a'] }, fieldSources: { answer: 'AI' as const } })),
-        ...(['FILL_BLANK', 'TRANSLATION', 'SHORT_ANSWER'] as const).map(type => ({ id: type, type, prompt: '新增练习', source: 'AI' as const, knowledgePointIds: ['g1'], answer: { text: '答案' }, fieldSources: { answer: 'AI' as const } })),
-        { id: 'match', type: 'MATCHING', prompt: '匹配', source: 'AI', knowledgePointIds: ['g1'], left: [{ id: 'a', text: '甲' }], right: [{ id: 'b', text: '乙' }], answer: { pairs: [{ leftId: 'a', rightId: 'b' }] }, fieldSources: { answer: 'AI' } },
+        ...(['CHOICE', 'MULTI_CHOICE', 'ORDERING'] as const).map(type => ({ type, prompt: '新增练习', source: 'AI' as const, knowledgePointIndexes: [0], options: [{ text: '甲' }, { text: '乙' }], answer: { optionIndexes: type === 'CHOICE' ? [0] : [1, 0] }, fieldSources: { answer: 'AI' as const } })),
+        ...(['FILL_BLANK', 'TRANSLATION', 'SHORT_ANSWER'] as const).map(type => ({ type, prompt: '新增练习', source: 'AI' as const, knowledgePointIndexes: [0], answer: { text: '答案' }, fieldSources: { answer: 'AI' as const } })),
+        { type: 'MATCHING', prompt: '匹配', source: 'AI', knowledgePointIndexes: [0], left: [{ text: '甲' }], right: [{ text: '乙' }], answer: { pairs: [{ leftIndex: 0, rightIndex: 0 }] }, fieldSources: { answer: 'AI' } },
       ];
-      value.content.exercises = value.content.exercises.map(item => ({ ...item, tocId: value.lessonId }));
-      const badAnswer = await submit({ ...value, content: { ...value.content, exercises: [{ ...value.content.exercises[0], answer: { optionIds: ['ghost'] } }] } });
+      value.content.exercises = value.content.exercises.map(item => ({ ...item, tocId: value.content.coverage[0]!.tocId }));
+      const badAnswer = await submit({ ...value, content: { ...value.content, exercises: [{ ...value.content.exercises[0], answer: { optionIndexes: [99] } }] } });
       expect(badAnswer.ok).toBe(false); if (!badAnswer.ok) expect(badAnswer.error.code).toBe('E_LLM_SCHEMA_INVALID');
       expect((await submit(value)).ok).toBe(true);
     });

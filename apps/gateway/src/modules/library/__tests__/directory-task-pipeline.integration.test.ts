@@ -24,7 +24,7 @@ function setup(failIntro = false) {
   const tool = new LibraryLessonCommitTool(repo);
   const model = pipelineModel(tool, async ({ input, submit }) => {
     const value = submissionFromPrompt(input.message);
-    if (failIntro && value.lessonId === 'intro') return;
+    if (failIntro && value.content.coverage[0]!.tocId === 'intro') return;
     expect((await submit(value)).ok).toBe(true);
   });
   return { repo, db, model, input: { userId: 'owner', documentId: 'directory-book', title: '目录任务集成教材', language: 'ja', tocEntries: entries,
@@ -45,10 +45,10 @@ describe('目录任务：实际会话输入 → 原生工具 → SQLite → 完�
       const message = turn.input.message;
       const submission = submissionFromPrompt(message);
       const actual: unknown = JSON.parse(message.split('本章目录:\n')[1]!.split('\n')[0]!);
-      expect(actual).toEqual(normalized.filter(entry => expected.get(submission.lessonId)!.includes(entry.id)));
+      expect(actual).toEqual(normalized.filter(entry => expected.get(submission.content.coverage[0]!.tocId)!.includes(entry.id)));
       const path: unknown = JSON.parse(message.split('目录路径（所属单元与章）：\n')[1]!.split('\n')[0]!);
       expect(path).toEqual(normalized.filter(entry => entry.id === 'unit' || entry.id === 'chapter'));
-      expect(message).toContain(`当前部分文字 ${submission.lessonId}`);
+      expect(message).toContain(`当前部分文字 ${submission.content.coverage[0]!.tocId}`);
       expect(message).toContain('library_commit_lesson_knowledge');
       expect(message).not.toContain('"$schema"');
       expect(message).not.toContain('"properties"');
@@ -56,7 +56,7 @@ describe('目录任务：实际会话输入 → 原生工具 → SQLite → 完�
     const ast = TextbookASTSchema.parse(JSON.parse(env.db.select().from(schema.documents).where(eq(schema.documents.id, 'directory-book')).get()!.astJson!));
     expect(ast.lessons.find(entry => entry.id === 'unit')?.kind).toBe('unit');
     expect(ast.lessons.find(entry => entry.id === 'intro')?.status).toBe('ready');
-    expect(env.db.select().from(schema.textbookLines).all().filter(line => line.lessonId === 'intro').map(line => line.tocId)).toEqual(['intro-child', 'intro']);
+    expect(env.db.select().from(schema.textbookLines).all().filter(line => line.lessonId === 'intro').map(line => line.tocId).sort()).toEqual(['intro', 'intro-child']);
     const stats = await env.repo.getTextbookAssetStats('directory-book');
     expect(stats.ok && stats.value.readyLessons).toBe(3);
     expect(stats.ok && stats.value.lessonDetails.map(item => item.lessonId)).toEqual(['intro', 'lesson-a', 'lesson-b']);
@@ -72,7 +72,7 @@ describe('目录任务：实际会话输入 → 原生工具 → SQLite → 完�
     const second = await env.repo.executeTextbookPipeline({ ...env.input, adapter: model.adapter, submissionTool: tool });
     expect(second.ok && second.value.allLessonsReady).toBe(true);
     expect(model.inputs).toHaveLength(1);
-    expect(submissionFromPrompt(model.inputs[0]!.input.message).lessonId).toBe('intro');
+    expect(submissionFromPrompt(model.inputs[0]!.input.message).content.coverage[0]!.tocId).toBe('intro');
   });
   it('课内层级容器可汇总覆盖，不要求模型为容器编造正文', async () => {
     const env = setup(), tool = new LibraryLessonCommitTool(env.repo);

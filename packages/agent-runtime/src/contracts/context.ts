@@ -102,6 +102,8 @@ export interface AgentImageAttachment {
 
 export interface AgentInput {
   message: string;
+  /** 引擎开始本轮时绑定原生轮次身份；只用于执行侧路由，不发送给模型。 */
+  onTurnStarted?: (turnId: string) => void;
   contextSnapshot?: ContextSnapshot | undefined;
   /**
    * 内存态 PNG 附件（Gateway 已知事实，非 Tool，Agent 不得反向读取）。
