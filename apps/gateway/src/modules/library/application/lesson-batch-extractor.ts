@@ -54,6 +54,7 @@ export interface ChapterSessionOptions {
   monitor?: ImportMonitor;
   firstResponseTimeoutMs: number; stallTimeoutMs: number;
 }
+interface ChapterWorker { session: AgentSession }
 
 /** 只负责模型会话和发送；不引用 Repository，不解析文本 JSON，不调用落库。 */
 export class ChapterSessionPool {
@@ -84,29 +85,31 @@ export class ChapterSessionPool {
     }
     if (this.options.signal.aborted) { await this.close(); throw new BusinessError('E_CANCELLED', '教材提取已取消', 'AGENT_RUNTIME'); }
   }
-  async consume(queue: LessonInputQueue, run: (session: AgentSession, job: LessonExtractionJob) => Promise<void>, onSessionFailure: (job: LessonExtractionJob, error: BusinessError) => void): Promise<void> {
+  async recover(session: AgentSession): Promise<AgentSession> {
+    const fault = this.faults.get(session.sessionId);
+    if (!fault) return session;
+    logger.warn('替换发生运行时故障的教材会话', { sessionId: session.sessionId, code: fault.code });
+    const index = this.sessions.indexOf(session);
+    if (index >= 0) {
+      const closed = await session.close(); if (!closed.ok) throw closed.error;
+      this.sessions.splice(index, 1);
+      this.options.monitor?.record('session', 'closed', { reason: fault.code }, { sessionId: session.sessionId });
+    }
+    const replacement = await this.createSession();
+    this.faults.delete(session.sessionId);
+    return replacement;
+  }
+  async consume(queue: LessonInputQueue, run: (worker: ChapterWorker, job: LessonExtractionJob) => Promise<void>, onSessionFailure: (job: LessonExtractionJob, error: BusinessError) => void): Promise<void> {
     await Promise.all([...this.sessions].map(async initial => {
-      let session = initial;
+      const worker = { session: initial };
       while (!this.options.signal.aborted) {
         const job = await queue.take(); if (!job) return;
-        const fault = this.faults.get(session.sessionId);
-        if (fault) {
-          logger.warn('替换发生运行时故障的教材会话', { sessionId: session.sessionId, code: fault.code, lessonId: job.lessonId });
-          try {
-            const index = this.sessions.indexOf(session);
-            if (index >= 0) {
-              const closed = await session.close();
-              if (!closed.ok) throw closed.error;
-              this.sessions.splice(index, 1);
-            }
-            const replacement = await this.createSession();
-            this.faults.delete(session.sessionId); session = replacement;
-          } catch (cause) {
-            onSessionFailure(job, translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本章会话恢复失败，其他章节继续处理' }));
-            continue;
-          }
+        try { worker.session = await this.recover(worker.session); }
+        catch (cause) {
+          onSessionFailure(job, translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本章会话恢复失败，其他章节继续处理' }));
+          continue;
         }
-        await run(session, job);
+        await run(worker, job);
       }
     }));
   }

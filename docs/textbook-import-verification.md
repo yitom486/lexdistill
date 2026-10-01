@@ -1,0 +1,69 @@
+# 教材目录与运行监视：集成验收记录
+
+日期：2026-10-01。按用户批准的 Plan 33，以 P1 → P5 顺序实施、验证并分别提交。产品为 Tauri 桌面，`apps/web` 是其 WebView 源码目录。
+
+## 交付与核对
+
+| 阶段 | 实际交付 | 阶段门禁 | 提交 |
+| --- | --- | --- | --- |
+| P1 | 独立部分纳入任务；模型收到真实目录路径、完整子树、顺序及物理页码；完成判断覆盖全部任务 | 1660 通过、0 失败；类型检查通过 | `6ebad7af` |
+| P2 | 持久化实际输入、会话、原生工具、校验、重试与事务事件；查询/SSE 与桌面折叠弹窗 | 1665 通过、0 失败；类型检查通过 | `f3b7a34c` |
+| P3 | 生词独立 AI 讲解；准确身份反馈；修正/生成重试/保存重试分开；首响应与停滞期限 | 1670 通过、0 失败；类型检查通过 | `a369aca1` |
+| P4 | 正文、生词、知识点及习题按保存目录分组；两类讲解分开；候选与当前数据库版本分别展示 | 1670 通过、0 失败；类型检查通过 | `9b334ab2` |
+| P5 | 目录模型到正文保存的贯通验收；严格父关系校验；超时故障会话先关闭再重试；本记录及实现文档 | 1674 通过、0 失败；类型检查通过 | 本记录随 P5 提交 |
+
+每次全量门禁均有 3 个既有实时新闻 RSS 网络测试跳过；教材原生 PDF/OCR 测试没有跳过。上述数量是全仓库结果，业务证据如下。
+
+## 需求对应的集成证据
+
+模型输出在 `AgentAdapter` / 原生工具参数边界受控替代；业务工具、任务绑定、Repository、SQLite 和 Gateway 路由使用真实实现。原生 OCR 使用实际扫描夹具及 ONNX 引擎。桌面交互在 DOM 中运行真实 Query、Hook 和 Base UI 组件，不等同于人工操作 Tauri 窗口。
+
+| 核对项 | 观察与断言 | 测试入口 |
+| --- | --- | --- |
+| **提示词确实带目录** | 从实际 `session.send` 输入解析目录，与规范目录逐项比较 ID、父节点、层级、标题、顺序、物理页；祖先路径单独比较；包含当前文字和工具名，不复制参数 Schema | [directory-task-pipeline.integration.test.ts](../apps/gateway/src/modules/library/__tests__/directory-task-pipeline.integration.test.ts) |
+| 目录模型结果贯通后续输入 | 受控目录模型通过实际草稿工具提交单元、独立部分、课次及小节；HTTP 父关系保留；独立保存时正文数量为零；正文输入与保存子树完全相等；trace 保留目录结果、保存、候选及事务回执 | [toc-vision-route.test.ts](../apps/gateway/src/modules/library/__tests__/toc-vision-route.test.ts) |
+| 默认物理页换算与再次导入 | 使用不同目录结束页验证动态换算与手工修改；保存失败可重试；重进读取已有目录，不再次探测或调用模型；保持原目录身份 | [textbook-import-flow.dom.test.tsx](../apps/web/src/components/importer/__tests__/textbook-import-flow.dom.test.tsx)、[textbook-outline.integration.test.ts](../apps/gateway/src/modules/library/__tests__/textbook-outline.integration.test.ts) |
+| OCR、会话池与逐章保存 | 首章提交时后章仍在 OCR；队列背压与配置并发上限有效；两条固定会话处理多章；乱序完成仍按目录读取；长章成功批次不重复 OCR | [textbook-import-pipeline.e2e.test.ts](../apps/gateway/src/modules/library/__tests__/textbook-import-pipeline.e2e.test.ts) |
+| 真实扫描文字进入保存链路 | 本地路径 → 后台任务 → 原生 OCR → 工具 → SQLite；透传模型与思考等级；实际扫描返回日语、坐标和置信度；正式正文使用结构化内容 | [pdf-ocr-native-integration.test.ts](../apps/gateway/src/modules/library/__tests__/pdf-ocr-native-integration.test.ts) |
+| 独立部分不能遗漏 | 课次全部成功但独立部分失败时，不能标记全书完成；恢复只处理未完成部分；父项缺失或循环在模型和内容写入之前拒绝 | [directory-task-pipeline.integration.test.ts](../apps/gateway/src/modules/library/__tests__/directory-task-pipeline.integration.test.ts) |
+| 校验与模型修正 | 旧尝试身份、未知字段、缺少 AI 例句关联、目录越界及非法答案拒绝写入；准确错误回填；合法修正成功；普通格式重试复用线程；新增七种 AI 题型不要求原书另有习题目录 | [submission-correction.integration.test.ts](../apps/gateway/src/modules/library/__tests__/submission-correction.integration.test.ts)、[textbook-import-pipeline.e2e.test.ts](../apps/gateway/src/modules/library/__tests__/textbook-import-pipeline.e2e.test.ts) |
+| 停滞与迟到提交 | 首响应及无活动超时能结算；旧工具不能写入；发生运行时故障的会话先关闭，再创建替代会话完成本章并复用到下一部分 | [submission-correction.integration.test.ts](../apps/gateway/src/modules/library/__tests__/submission-correction.integration.test.ts) |
+| 文本不能冒充工具回执 | 模型只返回合法 JSON 文本或代码围栏仍失败且零写入；监视保存实际文本及无工具提交的原因 | [submission-correction.integration.test.ts](../apps/gateway/src/modules/library/__tests__/submission-correction.integration.test.ts) |
+| 保存、幂等与事务回滚 | 数据库暂忙仅重试有效候选保存，不重新生成；重复提交不覆盖首次内容；派生写入故障时 AST、正文和 ready 状态整体回滚；监视只有回滚事件，没有成功提交事件 | [textbook-import-pipeline.e2e.test.ts](../apps/gateway/src/modules/library/__tests__/textbook-import-pipeline.e2e.test.ts) |
+| 全程监视与隔离 | 两 Worker 的提示词、工具与事务关联到实际会话；列表不携带大参数；SSE 游标补取；文件库重开保存提示词；用户与 trace 隔离；记录失败不改变教材保存结果 | [import-monitor.integration.test.ts](../apps/gateway/src/modules/library/__tests__/import-monitor.integration.test.ts) |
+| 桌面可核对的结果 | 当前交互展开、结束轮次折叠；详情按需读取；关闭重开历史仍在；真实目录分组；原书/AI 讲解独立；候选与 Gateway 当前 AST 及派生计数分别呈现 | [import-monitor.dom.test.tsx](../apps/web/src/components/importer/monitor/__tests__/import-monitor.dom.test.tsx)、[structured-textbook.dom.test.tsx](../apps/web/src/components/textbook/structured-textbook.dom.test.tsx) |
+
+## P5 验收中修正的两个问题
+
+1. 目录草稿转换用于校验时没有传入父关系，会把有效容器误判为空。现在沿用工具真实 `parentIndex` 转成 `parentId`；父循环和不存在的父项记录具体失败，未知字段严格拒绝，不静默丢弃。
+2. 停滞超时后立即在旧会话重试，旧响应流可能还未收尾。现在在下一次生成之前关闭已记录运行时故障的会话，再创建替代会话；旧尝试资格已撤销。正常章节和字段修正保留原会话。
+
+这两项由对应集成测试覆盖，没有添加教材内容兜底、固定页码或旧数据兼容。
+
+## 最终门禁与运行环境
+
+- `bun run test:all`：**1674 通过、3 跳过、0 失败**，252 个测试文件，62.22 秒。
+- `bun run typecheck`：通过，`tsc -b --force` 退出码 0。
+- Windows 桌面账户，Bun 1.3.14，本机 Codex CLI 0.159.2。
+- 最终全量测试进程已退出；收尾清理了启动时间、完整命令和日志均已核对的本轮 P3 遗留测试进程，不触碰应用服务。
+
+第一次 P5 全量执行有一个既有连接生命周期测试超过 5 秒。独立复核同样失败，定位到连接构造时自动探测多个 Codex 安装版本，尚未进入连接并发断言。使用项目已有的 `CODEX_BIN` 配置指定系统解析且已核实版本的可执行文件后，独立测试 4 项通过，最终全量门禁通过；超时、断言、测试清单均未放宽。未在本计划内修改 Codex 安装探测代码。
+
+复核命令（PowerShell，仅影响该 shell 子进程环境）：
+
+```powershell
+$env:CODEX_BIN = (Get-Command codex -ErrorAction Stop).Source
+bun run test:all
+bun run typecheck
+```
+
+完整输出保存在忽略目录 `.studio-internal/plan33-p5-tests-configured.log`、`plan33-p5-connection-configured.log` 和 `plan33-p5-typecheck.log`；失败的初次记录也保留，不将其计为通过。
+
+## 实际限制
+
+- 没有调用付费真实模型，也没有重新提取、清空或修复用户现有教材。既有错误段落不会因更新界面自动变成正确结构。
+- 测试证明目录传递、结构校验、归属保护和事务一致性；不能证明模型对原书内容的语义还原完全正确。真实模型与实际 Tauri 操作需要单独验收。
+- 监视只能展示实际捕获的公开事件；此前未记录的提示词不能回溯。查询“数据库当前保存版本”不代表历史时刻的内容。
+- 会话复用仍保留模型历史及其 token 成本。原生 OCR 正在执行的批次不能立即中断；在途文字和队列没有跨进程持久化。
+
+实现链路见[教材导入架构](textbook-import-architecture.md)、[原生工具提交说明](ai-pipelines/tool-calling-vs-json-prompting.md)及[Gateway 协议](protocol.md)。

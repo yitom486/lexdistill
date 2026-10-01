@@ -172,11 +172,14 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
   it('派生表故障使 AST、正文和 ready 整体回滚', async () => {
     const env = environment();
     env.repo.getRawDb().run("CREATE TRIGGER block_vocab BEFORE INSERT ON textbook_vocab BEGIN SELECT RAISE(ABORT, 'test-write-fault'); END");
-    const result = await env.repo.executeTextbookPipeline({ ...env.input, storageRetries: 0 });
+    const result = await env.repo.executeTextbookPipeline({ ...env.input, storageRetries: 0, traceId: 'rollback-trace' });
     expect(result.ok && result.value.successfulLessons).toBe(0);
     expect(env.db.select().from(schema.textbookLines).all()).toHaveLength(0);
     const ast = TextbookASTSchema.parse(JSON.parse(env.db.select().from(schema.documents).where(eq(schema.documents.id, 'book')).get()!.astJson!));
     expect(ast.lessons.every(lesson => !lesson.content && lesson.status === 'pending')).toBe(true);
+    const events = await env.repo.listImportEvents({ userId: 'owner', traceId: 'rollback-trace' });
+    expect(events.ok && events.value.some(event => event.name === 'transaction_rolled_back')).toBe(true);
+    expect(events.ok && events.value.some(event => event.name === 'committed')).toBe(false);
   });
   it('模型初始化期间队列满后停止预扫，OCR 与模型并发均受用户配置限制', async () => {
     const releaseInit = deferred(), thirdText = deferred();

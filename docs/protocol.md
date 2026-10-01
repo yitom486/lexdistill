@@ -14,9 +14,11 @@
 - `GET /api/documents/:userId/textbook-imports/:traceId?after=<sequence>`：分页元数据（最多 200 项）、cursor 和可选缺失警告。
 - `GET .../:traceId/details/:sequence`：读取单项实际 payload。
 - `GET .../:traceId/events`：`monitor.event` SSE（id=sequence）；初连 after、重连 Last-Event-ID，客户端按 sequence 去重；`monitor.warning` 报告记录不完整。
-- `GET /api/documents/:userId/textbook-saved/:documentId/:nodeId`：当前 AST 保存内容及 readAt，区别于历史候选和回执。
+- `GET /api/documents/:userId/textbook-saved/:documentId/:nodeId`：`SavedTextbookContentSchema`，当前 AST 内容、节点标题/状态、祖先与子目录、派生行 counts 及 readAt；区别于历史候选和回执。
 
 查询按用户与 trace 过滤；正文内容还核对文档归属。进度快照及取消同样核对 job.userId。详情采用 `packages/document-model` 的 ImportEvent 契约，不在每次进度快照复制长文本。
+
+章节阶段使用 `TextbookLessonStageSchema`：`ocr/queued/extracting/validating/correcting/model_retrying/saving/storage_retrying/saved/failed`。首响应/无活动期限属于 `TextbookPipelineSettingsSchema`，模型超时中断当前尝试并拒绝迟到工具；临时数据库失败只重试已校验候选。工具执行上下文保留实际 `turnId/callId`，提交校验不替换错误身份。
 
 ## 一、协议信封规范 (Message Envelope)
 

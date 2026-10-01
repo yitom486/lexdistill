@@ -77,6 +77,24 @@ describe('提交修正集成：准确身份反馈、字段保留、阶段与有�
     expect(env.stages).toContain('storage_retrying'); expect(env.stages).not.toContain('model_retrying');
     expect(env.model.inputs).toHaveLength(1);
   });
+  it('普通文本即使包含合法 JSON 或代码围栏也不落库，监视保留真实文本与缺少工具的原因', async () => {
+    const env = setup(), create = env.model.adapter.createSession;
+    env.model.adapter.createSession = async options => {
+      const created = await create(options); if (!created.ok) return created;
+      created.value.send = async function* (input) {
+        const json = JSON.stringify(submissionFromPrompt(input.message));
+        yield { type: 'TEXT_DELTA', delta: `${json}\n\u0060\u0060\u0060json\n${json}\n\u0060\u0060\u0060` };
+        yield { type: 'COMPLETED' };
+      };
+      return created;
+    };
+    const result = await env.repo.executeTextbookPipeline(env.input);
+    expect(result.ok && result.value.failedLessons).toBe(1); expect(result.ok && result.value.successfulLessons).toBe(0);
+    expect(result.ok && result.value.errors[0]?.error).toContain('未通过工具提交有效内容');
+    expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(0);
+    const messages = await eventDetails(env.repo, 'message');
+    expect(messages[0]?.detail).toEqual(expect.objectContaining({ text: expect.stringContaining('\u0060\u0060\u0060json') }));
+  });
   for (const first of [true, false]) it(`${first ? '首响应' : '无活动'}超时会中断、结算失败并拒绝迟到工具`, async () => {
     const gate = deferred(), lateDone = deferred(); let accepted: boolean | undefined;
     const env = setup(async ({ input, submit }) => { await gate.promise; accepted = (await submit(submissionFromPrompt(input.message))).ok; lateDone.resolve(); });
@@ -97,5 +115,22 @@ describe('提交修正集成：准确身份反馈、字段保留、阶段与有�
       expect(failed.some(event => typeof event?.detail === 'object' && event.detail !== null && 'code' in event.detail && event.detail.code === (first ? 'E_AGENT_FIRST_RESPONSE_TIMEOUT' : 'E_AGENT_STALL_TIMEOUT'))).toBe(true);
     } finally { gate.resolve(); if (env.model.inputs.length) await lateDone.promise; }
     expect(accepted).toBe(false); expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(0);
+  });
+  it('超时会话先关闭再重试，旧工具零写入，新会话持续复用到下一部分', async () => {
+    const gate = deferred(), lateDone = deferred(); let calls = 0, oldAccepted: boolean | undefined;
+    const env = setup(async ({ input, submit }) => {
+      if (!calls++) { await gate.promise; oldAccepted = (await submit(submissionFromPrompt(input.message))).ok; lateDone.resolve(); return; }
+      expect(env.model.closed).toHaveLength(1);
+      expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true);
+    });
+    try {
+      const result = await env.repo.executeTextbookPipeline({ ...env.input, modelRetries: 1, firstResponseTimeoutMs: 30,
+        tocEntries: [...env.input.tocEntries, { id: 'b', title: '后一部分', level: 'lesson', startPage: 4 }], lessonJobs: [...env.input.lessonJobs, { lessonId: 'b', ocrText: '后一部分正文' }],
+      });
+      expect(result.ok && result.value.allLessonsReady).toBe(true); expect(env.model.created).toHaveLength(2);
+      expect(env.model.inputs.map(turn => turn.sessionId)).toEqual([env.model.created[0]!.sessionId, env.model.created[1]!.sessionId, env.model.created[1]!.sessionId]);
+      expect(env.model.closed).toHaveLength(2);
+    } finally { gate.resolve(); await lateDone.promise; }
+    expect(oldAccepted).toBe(false); expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(2);
   });
 });

@@ -111,10 +111,13 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
       };
       const consume = async () => {
         await activePool.initialize();
-        await activePool.consume(queue, async (session, job) => {
-          monitor.record('queue', 'dequeued', undefined, { nodeId: job.lessonId, sessionId: session.sessionId });
+        await activePool.consume(queue, async (worker, job) => {
+          monitor.record('queue', 'dequeued', undefined, { nodeId: job.lessonId, sessionId: worker.session.sessionId });
           let lastError: BusinessError | undefined;
           for (let attempt = 0; attempt <= config.modelRetries && !controller.signal.aborted; attempt++) {
+            try { worker.session = await activePool.recover(worker.session); }
+            catch (cause) { lastError = translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本章会话恢复失败，其他章节继续处理' }); break; }
+            const session = worker.session;
             const assignmentId = generateId('chapter_attempt');
             const turnController = new AbortController();
             const cancelTurn = () => turnController.abort();

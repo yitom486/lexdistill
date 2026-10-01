@@ -20,19 +20,19 @@ export const ProposedTocEntrySchema = z.object({
     '条目对应的教材印刷起始页码（正整数）。若课内次级条目与所属成课同页，填入同页页码。'
   ),
   endPage: z.number().int().positive().optional().describe('印刷结束页码（看不清或未标明时省略）'),
-});
+}).strict();
 
 export const ProposedTocSchema = z.object({
   title: z.string().trim().min(1).optional().describe('教材标题；目录页未写明时省略'),
   entries: z.array(ProposedTocEntrySchema).min(1).describe('按目录页阅读顺序列出的完整条目'),
-});
+}).strict();
 
 export type ProposedToc = z.infer<typeof ProposedTocSchema>;
 
 interface ActiveProposal {
   userId: string;
   value: ProposedToc | null;
-  onValidation?: (result: { accepted: boolean; code?: string; entryCount?: number }) => void;
+  onValidation?: (result: { accepted: boolean; code?: string; entryCount?: number; callId?: string; message?: string }) => void;
 }
 
 /** 目录识别专用草稿工具：模型可提交、检查并修正草稿；绝不写入学习资产。 */
@@ -86,7 +86,10 @@ export class LibraryProposeTocTool implements ToolDefinition<ProposedToc, Propos
       let parent = value.entries[index]!.parentIndex;
       const visited = new Set([index]);
       while (parent !== undefined) {
-        if (!value.entries[parent] || visited.has(parent)) return err(new BusinessError('E_TOC_HIERARCHY_INVALID', '目录父节点不存在或形成循环，请核对层级', 'VALIDATION', true));
+        if (!value.entries[parent] || visited.has(parent)) {
+          active.onValidation?.({ accepted: false, code: 'E_TOC_HIERARCHY_INVALID', message: `目录第 ${index + 1} 项的父节点不存在或形成循环`, ...(context.callId ? { callId: context.callId } : {}) });
+          return err(new BusinessError('E_TOC_HIERARCHY_INVALID', '目录父节点不存在或形成循环，请核对层级', 'VALIDATION', true));
+        }
         visited.add(parent); parent = value.entries[parent]!.parentIndex;
       }
     }
@@ -95,6 +98,7 @@ export class LibraryProposeTocTool implements ToolDefinition<ProposedToc, Propos
       level: entry.level,
       title: entry.title,
       startPage: entry.startPage,
+      ...(entry.parentIndex !== undefined ? { parentId: `toc-${entry.parentIndex + 1}` } : {}),
       ...(entry.endPage !== undefined ? { endPage: entry.endPage } : {}),
     }));
     // 这里校验的是印刷页码；物理页映射必须由后续确认流程单独完成。
