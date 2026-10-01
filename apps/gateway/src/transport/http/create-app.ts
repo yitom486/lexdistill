@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { createTTSApp } from 'gemini-tts-studio/server';
+import { createTtsRoutes } from './tts-routes.js';
 import { cors } from 'hono/cors';
 import { BusinessError } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../errors/http-error-handler.js';
@@ -78,7 +78,7 @@ export function createApp(deps: GatewayDeps) {
     .route('/', createTextbookQuizRoutes(deps))
     .route('/', createPdfImportRoutes(deps))
     .route('/', createCurriculumRoutes(deps))
-    .route('/', createTTSApp({ prefix: '/api/tts-studio', corsOrigins: false, enableLogger: false }))
+    .route('/', createTtsRoutes())
     .route('/', createLearningCompatRoutes(deps));
 }
 

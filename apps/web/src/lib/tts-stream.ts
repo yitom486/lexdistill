@@ -157,17 +157,19 @@ export async function fetchTtsStream(
   if (!res.ok || !res.body) {
     let message = `流式生成失败 (${res.status})`;
     let code = 'E_TTS_UPSTREAM';
+    let retryable = res.status >= 500 || res.status === 429;
     try {
       const data: unknown = await res.json();
       if (data && typeof data === 'object') {
-        const record = data as { error?: unknown; code?: unknown };
+        const record = data as { error?: unknown; code?: unknown; retryable?: unknown };
         if (typeof record.error === 'string' && record.error) message = record.error;
         if (typeof record.code === 'string' && record.code) code = record.code;
+        if (typeof record.retryable === 'boolean') retryable = record.retryable;
       }
     } catch {
       // 保持默认 message
     }
-    throw new TtsStreamError(message, code, res.status >= 500 || res.status === 429);
+    throw new TtsStreamError(message, code, retryable);
   }
 
   const reader = res.body.getReader();

@@ -569,10 +569,14 @@ class SpeechStudioEngine {
     } catch (error) {
       if (sequence !== this.sequence || controller.signal.aborted) return;
       const userError = error instanceof TtsStreamError
-        ? new BusinessError('E_TTS_SYNTHESIS', error.message, 'TOOL_EXECUTION', error.retryable)
+        ? new BusinessError(error.code, error.message, 'TOOL_EXECUTION', error.retryable)
         : translateToBusinessError(error, 'TTS_STREAM_CLIENT');
       this.finishPlayback();
-      toast.error(userError.userMessage);
+      if (['E_TTS_QUOTA', 'E_TTS_RATE_LIMIT', 'E_TTS_USAGE_LIMIT'].includes(userError.code)) {
+        toast.warning(userError.userMessage);
+      } else {
+        toast.error(userError.userMessage);
+      }
       options?.onError?.(userError);
     }
   }
