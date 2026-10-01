@@ -16,7 +16,7 @@ async function request(url: string): Promise<unknown> {
 }
 export function useTextbookParserConfig(userId = DEFAULT_USER_ID) {
   return useQuery({ queryKey: ['textbook-parser-config', userId], queryFn: async () => {
-    const result = TextbookParserConfigSchema.safeParse(await request(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/textbook-parser-config`));
+    const result = TextbookParserConfigSchema.safeParse(await request(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/textbook-parsers/config`));
     if (!result.success) throw new GatewayRequestError('无法确认本机解析配置');
     return result.data;
   }, staleTime: 0 });

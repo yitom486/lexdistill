@@ -1,9 +1,12 @@
 import { expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Hono } from 'hono';
 import { DEFAULT_TEXTBOOK_PIPELINE_SETTINGS, TextbookASTSchema } from '@study-studio/document-model';
 import { DrizzleLearnerRepository } from '../../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
 import { createPdfImportRoutes } from '../../../../../gateway/src/modules/library/http/pdf-import-routes.js';
+import { createLibraryRoutes } from '../../../../../gateway/src/modules/library/http/library-routes.js';
+import type { GatewayDeps } from '../../../../../gateway/src/composition/gateway-deps.js';
 import { LibraryLessonCommitTool } from '../../../../../gateway/src/modules/library/tools/library-lesson-commit-tool.js';
 import { TextbookPipelineJobRegistry } from '../../../../../gateway/src/modules/library/application/pipeline-job-runner.js';
 import { fixturePdf, fixturePng, pipelineModel } from '../../../../../gateway/src/modules/library/__tests__/textbook-pipeline-fixtures.js';
@@ -35,10 +38,17 @@ it('桌面解析选择与资源配置 → Gateway → MinerU V1 HTTP → 工具 
   } });
   const priorLocalToken = process.env.MINERU_LOCAL_TOKEN; delete process.env.MINERU_LOCAL_TOKEN;
   const tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool);
-  const app = createPdfImportRoutes({ repo, server: { pipelineJobs: registry } as never, port: 0 }, { adapter: model.adapter, submissionTool: tool, loadInspector: async () => ({
+  // 只运行文库与导入路由；模型/工具/PDF 由正式注入点提供，其他 GatewayServer 能力不访问。
+  const deps = { repo, server: { pipelineJobs: registry } as GatewayDeps['server'], port: 0 };
+  const pdfRoutes = createPdfImportRoutes(deps, { adapter: model.adapter, submissionTool: tool, loadInspector: async () => ({
     processPdf: () => ({ markdown: '', pagesNeedingOcr: [2] }), processPdfWithOcr: async () => { throw new Error('旧 OCR 不得调用'); },
     renderPdfPages: async (_pdf, pages) => pages.map(pageNumber => ({ pageNumber, png: fixturePng, width: 1, height: 1 })),
   }) });
+  // 与生产相同：文档按 ID 的通配路由先注册，配置接口仍必须可达。
+  const app = new Hono().route('/', createLibraryRoutes(deps)).route('/', pdfRoutes);
+  const configResponse = await app.request('/api/documents/desktop-owner/textbook-parsers/config');
+  expect(configResponse.status).toBe(200);
+  expect(await configResponse.json()).toEqual({ cloudTokenConfigured: !!(process.env.MINERU_TOKEN ?? '').trim().replace(/^Bearer\s+/i, '') });
   const reads: string[] = [], submitted: unknown[] = [];
   globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
@@ -67,7 +77,7 @@ it('桌面解析选择与资源配置 → Gateway → MinerU V1 HTTP → 工具 
     }
     async function until(check: () => boolean) { for (let attempt = 0; attempt < 160; attempt++) { if (check()) return; await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); }); } throw new Error('桌面贯通状态没有更新'); }
     await act(async () => { dom.root.render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>); });
-    await until(() => reads.some(path => path.endsWith('/textbook-parser-config')));
+    await until(() => reads.some(path => path.endsWith('/textbook-parsers/config')));
     const doc = dom.dom.window.document;
     await act(async () => doc.querySelector<HTMLButtonElement>('[aria-label="扫描正文解析方式"]')!.click());
     await until(() => !![...doc.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent?.includes('本地部署')));
