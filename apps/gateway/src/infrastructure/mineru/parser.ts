@@ -11,7 +11,7 @@ export interface ChapterParser {
 }
 const id = z.string().min(1);
 interface ParseCheckpoint { taskId?: string; uploadId?: string; uploadUrl?: string; uploadHeaders?: Record<string, string>; uploaded?: boolean; fileId?: string; resultUrl?: string }
-const cloudEnvelope = z.object({ code: z.number(), data: z.unknown().optional() });
+const cloudEnvelope = z.object({ code: z.union([z.number(), z.string()]), data: z.unknown().optional() });
 function checked<T>(schema: z.ZodType<T>, raw: unknown): T {
   const result = schema.safeParse(raw);
   if (!result.success) throw new BusinessError('E_MINERU_RESPONSE_INVALID', 'MinerU 返回的解析回执结构不完整', 'VALIDATION', true, result.error.issues);
@@ -19,7 +19,7 @@ function checked<T>(schema: z.ZodType<T>, raw: unknown): T {
 }
 async function cloudJson(client: MineruHttpClient, path: string, body?: unknown): Promise<unknown> {
   const envelope = checked(cloudEnvelope, await client.json(path, body));
-  if (envelope.code !== 0) throw new BusinessError('E_MINERU_API_REJECTED', 'MinerU 未接受解析请求，请检查凭据、额度或服务状态', 'TOOL_EXECUTION', false, { providerCode: envelope.code });
+  if (envelope.code !== 0) throw new BusinessError('E_MINERU_API_REJECTED', ['A0202', 'A0211'].includes(String(envelope.code)) ? 'MinerU Token 无效或已过期，请更新本机凭据' : [-50001, -60018].includes(Number(envelope.code)) ? 'MinerU 解析额度已用完，请检查额度后再试' : 'MinerU 未接受解析请求，请检查文件、配置或服务状态', 'TOOL_EXECUTION', [-10001, -60001, -60007, -60009].includes(Number(envelope.code)), { providerCode: envelope.code });
   return envelope.data;
 }
 
@@ -31,7 +31,7 @@ export function createMineruParser(settings: TextbookPipelineSettings, options: 
     try { url = new URL(base); } catch { throw new BusinessError('E_MINERU_CONFIG', '请填写本地 MinerU 服务地址', 'VALIDATION'); }
     if (!['http:', 'https:'].includes(url.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) || url.username || url.password) throw new BusinessError('E_MINERU_CONFIG', '本地 MinerU 地址必须是本机 HTTP 服务地址', 'VALIDATION');
   }
-  const token = (local ? options.localToken ?? process.env.MINERU_LOCAL_TOKEN ?? '' : options.cloudToken ?? process.env.MINERU_TOKEN ?? process.env.MINERU_API_TOKEN ?? process.env.MINERU_API_KEY ?? '').trim().replace(/^Bearer\s+/i, '');
+  const token = (local ? options.localToken ?? process.env.MINERU_LOCAL_TOKEN ?? '' : options.cloudToken ?? process.env.MINERU_TOKEN ?? '').trim().replace(/^Bearer\s+/i, '');
   if (!local && !token) throw new BusinessError('E_MINERU_CREDENTIAL_MISSING', '尚未配置 MinerU 云端 Token，请在本机配置 MINERU_TOKEN，或明确选择已部署的本地服务', 'VALIDATION');
   const checkpoints = new Map<string, ParseCheckpoint>();
   return { async parse(pdf, pages, signal, diagnostic) {
@@ -62,12 +62,12 @@ async function parseCloud(client: MineruHttpClient, pdf: Uint8Array, pages: read
   } else note('parse_resumed', { parser: 'mineru-cloud', remoteTaskId: checkpoint.taskId, pages });
   // OSS 签名上传不用 Token 和自动 Content-Type；字节体避免 Blob 的隐式头。
   if (!checkpoint.uploaded) {
-    await client.response(checkpoint.uploadUrl!, { method: 'PUT', body: new Uint8Array(pdf).buffer });
+    await (await client.response(checkpoint.uploadUrl!, { method: 'PUT', body: new Uint8Array(pdf).buffer })).body?.cancel();
     checkpoint.uploaded = true;
     note('parse_uploaded', { remoteTaskId: checkpoint.taskId, bytes: pdf.byteLength });
   }
   while (!checkpoint.resultUrl) {
-    const batch = checked(z.object({ extract_result: z.array(z.object({ state: z.enum(['pending', 'running', 'converting', 'done', 'failed']), full_zip_url: id.optional(), extract_progress: z.object({ extracted_pages: z.number().optional(), total_pages: z.number().optional() }).optional() })).length(1) }), await cloudJson(client, `/api/v4/extract-results/batch/${encodeURIComponent(checkpoint.taskId!)}`));
+    const batch = checked(z.object({ extract_result: z.array(z.object({ state: z.enum(['waiting-file', 'pending', 'running', 'converting', 'done', 'failed']), full_zip_url: id.optional(), extract_progress: z.object({ extracted_pages: z.number().optional(), total_pages: z.number().optional() }).optional() })).length(1) }), await cloudJson(client, `/api/v4/extract-results/batch/${encodeURIComponent(checkpoint.taskId!)}`));
     const item = batch.extract_result[0]!;
     note('parse_progress', { remoteTaskId: checkpoint.taskId, state: item.state, ...(item.extract_progress ? { progress: item.extract_progress } : {}) });
     if (item.state === 'failed') throw new BusinessError('E_MINERU_PARSE_FAILED', 'MinerU 未能解析本章，请核对文件和服务状态', 'TOOL_EXECUTION', true);
@@ -101,7 +101,7 @@ async function parseLocal(client: MineruHttpClient, pdf: Uint8Array, pages: read
     if (!checkpoint.uploadUrl) throw new BusinessError('E_MINERU_RESPONSE_INVALID', '本地服务未提供上传地址', 'VALIDATION', true);
     const url = client.allowed(checkpoint.uploadUrl);
     if (!checkpoint.uploaded) {
-      await client.response(url, { method: 'PUT', headers: { ...checkpoint.uploadHeaders, ...client.auth(url) }, body: new Uint8Array(pdf).buffer });
+      await (await client.response(url, { method: 'PUT', headers: { ...checkpoint.uploadHeaders, ...client.auth(url) }, body: new Uint8Array(pdf).buffer })).body?.cancel();
       checkpoint.uploaded = true;
     }
     const completed = checked(z.object({ status: z.literal('completed'), file: z.object({ id }) }), await client.json(`/v1/uploads/${encodeURIComponent(checkpoint.uploadId)}/complete`, {}));

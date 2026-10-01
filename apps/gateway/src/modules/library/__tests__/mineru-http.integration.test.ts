@@ -26,7 +26,7 @@ it('云端真实 HTTP 上传章节 PDF、轮询和下载重试，既有任务复
     }
     if (path.includes('/extract-results/')) {
       polls++;
-      return Response.json({ code: 0, data: { extract_result: [{ state: polls === 1 ? 'running' : 'done', ...(polls > 1 ? { full_zip_url: new URL('/result', request.url).href } : {}) }] } });
+      return Response.json({ code: 0, data: { extract_result: [{ state: polls === 1 ? 'waiting-file' : 'done', ...(polls > 1 ? { full_zip_url: new URL('/result', request.url).href } : {}) }] } });
     }
     if (path === '/result') {
       if (++downloads === 1) return new Response('temporary', { status: 503 });
@@ -49,6 +49,37 @@ it('云端真实 HTTP 上传章节 PDF、轮询和下载重试，既有任务复
     expect(notes).toContain('parse_resumed');
     expect(model.inputs[0]?.input.message).toContain('p2b0');
     expect((await repo.getTextbookAssetStats('http-book')).ok).toBe(true);
+  } finally { repo.getRawDb().close(); await server.stop(true); }
+});
+
+it('云端限流、无效 Token、损坏解析包与页数漂移不进入模型、不污染章节内容', async () => {
+  let mode: 'rate' | 'token' | 'zip' | 'pages' = 'rate';
+  const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch(request) {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v4/file-urls/batch') {
+      if (mode === 'rate') return new Response(null, { status: 429 });
+      if (mode === 'token') return Response.json({ code: 'A0202' });
+      return Response.json({ code: 0, data: { batch_id: mode, file_urls: [new URL('/upload', request.url).href] } });
+    }
+    if (path === '/upload') return new Response();
+    if (path === '/result') return mode === 'zip' ? new Response('broken zip') : new Response(new Uint8Array(modelZip([])).buffer);
+    return Response.json({ code: 0, data: { extract_result: [{ state: 'done', full_zip_url: new URL('/result', request.url).href }] } });
+  } });
+  const repo = new DrizzleLearnerRepository(':memory:');
+  try {
+    const pdf = await fixturePdf(1), settings = TextbookPipelineSettingsSchema.parse({ parseRetries: 0, poolSize: 1 });
+    for (const fault of ['rate', 'token', 'zip', 'pages'] as const) {
+      mode = fault;
+      const parser = createMineruParser(settings, { cloudBaseUrl: server.url.href, cloudToken: 'test-key' });
+      const tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool);
+      const result = await repo.executeTextbookPipeline({ ...settings, userId: 'fault-owner', documentId: 'fault-' + fault, title: '解析故障验证', pdf,
+        tocEntries: [{ id: 'part', title: '章节', level: 'lesson', startPage: 1, endPage: 1 }], chapterParser: parser,
+        inspector: { processPdf: () => ({ markdown: '', pagesNeedingOcr: [1] }), processPdfWithOcr: async () => { throw new Error('不得降级为旧 OCR'); } },
+        adapter: model.adapter, submissionTool: tool });
+      expect(result.ok && result.value.failedLessons).toBe(1); expect(model.inputs).toHaveLength(0);
+      const stats = await repo.getTextbookAssetStats('fault-' + fault);
+      expect(stats.ok && stats.value.readyLessons).toBe(0); expect(stats.ok && stats.value.lines).toBe(0);
+    }
   } finally { repo.getRawDb().close(); await server.stop(true); }
 });
 

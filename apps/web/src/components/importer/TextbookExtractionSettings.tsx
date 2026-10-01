@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Switch } from '../ui/switch.js';
 import { Button } from '../ui/button.js';
 import { TextbookPipelineSettingsSchema, type TextbookPipelineSettings } from '@study-studio/document-model';
+import { TextbookParserSettings } from './TextbookParserSettings.js';
 
 interface Props {
   forceOverwrite: boolean;
@@ -28,12 +29,14 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
   type NumericSetting = { [K in keyof TextbookPipelineSettings]: TextbookPipelineSettings[K] extends number ? K : never }[keyof TextbookPipelineSettings];
   const budgetFields: Array<{ key: Exclude<NumericSetting, 'poolSize'>; label: string }> = [
     { key: 'parseConcurrency', label: '同时提取的章节数' }, { key: 'queueCapacity', label: '待提交队列容量' },
-    { key: 'parseRetries', label: '文字提取重试次数' }, { key: 'modelRetries', label: '模型修正重试次数' }, { key: 'storageRetries', label: '保存重试次数' },
+    { key: 'parsePageLimit', label: '每个解析任务最多页数' }, { key: 'parseTimeoutMs', label: '解析等待超时（毫秒）' },
+    { key: 'parseRetries', label: '解析重试次数' }, { key: 'modelRetries', label: '模型修正重试次数' }, { key: 'storageRetries', label: '保存重试次数' },
     { key: 'firstResponseTimeoutMs', label: '模型首响应超时（毫秒）' }, { key: 'stallTimeoutMs', label: '模型无活动超时（毫秒）' },
   ];
   return (
     <section className="space-y-3 rounded-2xl border border-line bg-surface p-4 text-xs">
       <h3 className="font-semibold text-ink">内容提取配置</h3>
+      <TextbookParserSettings settings={settings} onChange={setSettings} pending={pending} />
       <label className="block space-y-1 text-ink">教材语种
         <Select value={language} onValueChange={(value) => { if (value === 'ja' || value === 'en' || value === 'ko') setLanguage(value); }} disabled={pending}>
           <SelectTrigger aria-label="教材语种"><SelectValue /></SelectTrigger>
@@ -83,7 +86,7 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
       <label className="flex items-center justify-between gap-3 text-ink">重新提取并覆盖已保存内容
         <Switch checked={forceOverwrite} onCheckedChange={onForceOverwrite} disabled={pending} />
       </label>
-      <Button disabled={pending} onClick={onStart}>{pending ? '正在启动…' : '开始提取并保存教材'}</Button>
+      <Button disabled={pending || (settings.parserBackend === 'mineru-local' && !settings.mineruLocalUrl)} onClick={onStart}>{pending ? '正在启动…' : '开始提取并保存教材'}</Button>
     </section>
   );
 }

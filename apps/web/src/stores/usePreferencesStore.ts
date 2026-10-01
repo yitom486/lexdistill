@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DEFAULT_TEXTBOOK_PIPELINE_SETTINGS, type TextbookPipelineSettings } from '@study-studio/document-model';
+import { DEFAULT_TEXTBOOK_PIPELINE_SETTINGS, TextbookPipelineSettingsSchema, type TextbookPipelineSettings } from '@study-studio/document-model';
 
 export interface PreferencesState {
   theme: 'light' | 'dark';
@@ -210,6 +210,11 @@ export const usePreferencesStore = create<PreferencesState>()(
     }),
     {
       name: 'study_studio_user_preferences',
+      merge: (persisted, current) => {
+        const stored = typeof persisted === 'object' && persisted !== null ? persisted : {};
+        const parsed = TextbookPipelineSettingsSchema.safeParse('pipelineSettings' in stored ? stored.pipelineSettings : {});
+        return { ...current, ...stored, pipelineSettings: parsed.success ? parsed.data : DEFAULT_TEXTBOOK_PIPELINE_SETTINGS };
+      },
       onRehydrateStorage: () => (state) => {
         if (state?.theme) {
           applyThemeToDom(state.theme);

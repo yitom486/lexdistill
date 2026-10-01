@@ -139,3 +139,10 @@ export interface GeneratedQuestionPayload {
 2. **断线恢复**：
    - 客户端重连成功后，发送带有原 `sessionId` 的 `client.session.init`。
    - 网关维护近期未完结 Turn 的事件缓冲区（Event Buffer），按需执行事件补发。
+
+## 教材解析配置与章节来源（2026-10-01）
+
+- `GET /api/documents/:userId/textbook-parser-config` 只返回 `{ cloudTokenConfigured: boolean }`；不返回 Token、不验证额度，不向客户端透露云端上传签名。
+- 正文任务仍使用既有 `/textbook-pipeline-jobs` 接口。`parserBackend` 为 `mineru-cloud` / `mineru-local`，显式本地配置 `mineruLocalUrl` 与 `mineruLocalTier`（basic/standard/advanced）。资源配置为 `parseConcurrency`、`parsePageLimit`、`parsePollIntervalMs`、`parseTimeoutMs`、`parseRetries`，其边界由 `TextbookPipelineSettingsSchema` 定义。旧正文 OCR 字段已删除，不提供别名。
+- 阶段 `parsing` 表示章节解析；`parse_submitted/uploaded/progress/downloading/completed/resumed/failed/retry` 在既有监视 `text` 类别中记录本次实际远端任务身份、页段和进度，不新增模型能力或伪造逐页流。
+- 解析块格式由 `ChapterSourceSchema` 定义，统一保留原 PDF 1 起物理页和块 ID。模型工具的 `sourceRefs` 为 `{ blockId, page, row? }`，`row` 从 0 开始。`E_SOURCE_REFERENCE_INVALID` 拒绝未知块、错误页和越界表格行，返回具体可修正反馈；正式保存仍经既有 AST/派生事务。

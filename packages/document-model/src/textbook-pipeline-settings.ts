@@ -19,6 +19,8 @@ export const TextbookPipelineSettingsSchema = z.object({
   stallTimeoutMs: z.number().int().positive().max(600_000).default(120_000),
 });
 export type TextbookPipelineSettings = z.infer<typeof TextbookPipelineSettingsSchema>;
+/** 只返回凭据是否存在；客户端永远不接收凭据值。 */
+export const TextbookParserConfigSchema = z.object({ cloudTokenConfigured: z.boolean() }).strict();
 export const DEFAULT_TEXTBOOK_PIPELINE_SETTINGS = TextbookPipelineSettingsSchema.parse({});
 export const TextbookLessonStageSchema = z.enum(['parsing', 'queued', 'extracting', 'validating', 'correcting', 'model_retrying', 'saving', 'storage_retrying', 'saved', 'failed']);
 export type TextbookLessonStage = z.infer<typeof TextbookLessonStageSchema>;

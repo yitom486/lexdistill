@@ -66,6 +66,7 @@ export function createPdfImportRoutes(
   };
   return new Hono()
     .route('', createImportMonitorRoutes(deps.repo))
+    .get('/api/documents/:userId/textbook-parser-config', (c) => c.json({ cloudTokenConfigured: !!(process.env.MINERU_TOKEN ?? '').trim().replace(/^Bearer\s+/i, '') }))
     .use('/api/documents/:userId/*', async (c, next) => {
       const traceId = c.req.header('X-Textbook-Trace');
       const monitored = ['map-pdf', 'extract-toc-llm', 'textbook-outline'].includes(c.req.path.split('/').at(-1) ?? '');

@@ -9,6 +9,7 @@ import { ImportEventDetail } from './ImportEventDetail.js';
 import { ImportWorkerList } from './ImportWorkerList.js';
 import { useImportDirectory } from './useImportDirectory.js';
 import { SavedContentResult } from './SavedContentResult.js';
+import { ImportParseTimeline } from './ImportParseTimeline.js';
 
 interface Props { open: boolean; onOpenChange: (open: boolean) => void; userId: string; traceId: string; job?: TextbookPipelineJobSnapshot; nodeId?: string }
 export function TextbookImportMonitor({ open, onOpenChange, userId, traceId, job, nodeId }: Props) {
@@ -32,7 +33,7 @@ export function TextbookImportMonitor({ open, onOpenChange, userId, traceId, job
       <div className="space-y-3 overflow-auto text-xs">
         <p className="break-all text-ink-muted">本次记录：{traceId}</p>
         {job && <p>进度 {job.doneLessons}/{job.totalLessons} · 成功 {job.successfulLessons} · 失败 {job.failedLessons.length} · Agent 并发 {job.concurrency ?? '见启动配置'} · 模型 {job.model ?? '运行时默认，见会话记录'}</p>}
-        {snapshot && <p>目录 {directory.length} 项 · OCR 章节并发 {snapshot.settings.parseConcurrency} · Agent 并发 {snapshot.settings.poolSize} · 等待队列容量 {snapshot.settings.queueCapacity}</p>}
+        {snapshot && <p>目录 {directory.length} 项 · 解析方式 {snapshot.settings.parserBackend} · 解析章节并发 {snapshot.settings.parseConcurrency} · Agent 并发 {snapshot.settings.poolSize} · 等待队列容量 {snapshot.settings.queueCapacity}</p>}
         <Button variant="outline" size="sm" onClick={() => { void query.refetch(); }}>刷新记录</Button>
         {query.isPending && <p>正在读取本次记录…</p>}
         {query.isError && <p role="alert">{query.error.message}</p>}
@@ -42,7 +43,8 @@ export function TextbookImportMonitor({ open, onOpenChange, userId, traceId, job
         <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => { setSelected(undefined); setReadSaved(false); }}>本次全部部分</Button>
           {nodes.map(id => <Button key={id} size="sm" variant={selected === id ? 'default' : 'outline'} onClick={() => { setSelected(id); setReadSaved(false); }}>{titles.get(id) ?? (job?.currentLessonId === id ? job.currentLessonTitle ?? id : id)}</Button>)}
         </div>
-        {shown.filter(event => !event.attemptId).map(event => <ImportEventDetail key={event.sequence} event={event} />)}
+        <ImportParseTimeline events={shown} directory={directory} />
+        {shown.filter(event => !event.attemptId && event.category !== 'text').map(event => <ImportEventDetail key={event.sequence} event={event} />)}
         {[...groups.entries()].reverse().map(([id, items]) => { const node = items.find(event => event.nodeId)?.nodeId; return <ImportInteraction key={id} events={items} directory={directory} title={node ? titles.get(node) ?? node : '目录识别'} current={!items.some(event => event.name === 'turn_ended')} />; })}
         {selected && documentId && <section className="space-y-2 rounded-xl border border-line p-3">
           <Button size="sm" variant="outline" onClick={() => { setReadSaved(true); if (readSaved) void saved.refetch(); }}>查询数据库当前保存内容</Button>

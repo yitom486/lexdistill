@@ -67,3 +67,31 @@ bun run typecheck
 - 会话复用仍保留模型历史及其 token 成本。原生 OCR 正在执行的批次不能立即中断；在途文字和队列没有跨进程持久化。
 
 实现链路见[教材导入架构](textbook-import-architecture.md)、[原生工具提交说明](ai-pipelines/tool-calling-vs-json-prompting.md)及[Gateway 协议](protocol.md)。
+
+## MinerU 升级：M1 → M4（2026-10-01）
+
+原 Plan 33 验收记录是当时实现的历史证据；其正文 OCR 生产者在本轮被替换，当前正文路径见[架构说明](textbook-import-architecture.md)。目录原生识别能力保留。
+
+| 阶段 | 交付与关键核对 | 正式门禁 | 提交 |
+| --- | --- | --- | --- |
+| M1 | 真实云端完整 12 页章节解析；逐页输入契约；两页表格保持边界并进入实际工具/SQLite 链路 | 1675 通过、0 失败；类型检查通过 | `ac1b519` |
+| M2 | 精准云端/显式本地 V1；物理页裁切、并发与背压；下载失败继续同一任务，超时/取消/异常回执处理 | 1678 通过、0 失败；类型检查通过 | `35b4410` |
+| M3 | 实际目录子树、表格与原页 PNG 进入 Turn；错误来源行拒绝零写入；修正引用随规范 AST 保存 | 1679 通过、0 失败；类型检查通过 | `4c26db5` |
+| M4 | 桌面配置/偏好持久化；解析时间线与来源可视化；UI → Gateway → V1 HTTP → 原生工具 → SQLite → 监视读回；已保存章不再次解析 | 1681 通过、0 失败；类型检查通过 | 本记录随 M4 提交 |
+
+各阶段均有 3 项既有 RSS 网络测试跳过，原生 PDF 测试没有跳过。最终 255 文件、1684 项，59.73 秒。日志保存在忽略目录 `.studio-internal/mineru-m1/m2/m3/m4-test-all.log` 对应的分阶段文件（实际文件名 `mineru-m1-test-all.log` 等），类型检查日志同理。
+
+### 可检查的集成证据
+
+- [MinerU HTTP 集成](../apps/gateway/src/modules/library/__tests__/mineru-http.integration.test.ts)：真实 HTTP 上传收到可读取的两页裁切 PDF；云端认证头只出现在服务请求，签名上传不携带 Token；上传/轮询/下载计数证明下载失败不重建任务；本地 V1 上传确认、Standard 任务和 302 文件下载贯通。限流、无效 Token、损坏 ZIP、结果页数不符均不进入模型、不写入章节内容；轮询有明确期限，取消停止等待。
+- [来源集成](../apps/gateway/src/modules/library/__tests__/mineru-source.integration.test.ts)：实际 `session.send` 同时带目录子树、表格行、原页 PNG；提示词没有 Schema 文本；无效行引用被真实工具拒绝，SQLite 内容行仍为零，合法修正后引用保存在规范 AST。
+- [桌面贯通](../apps/web/src/components/importer/__tests__/mineru-desktop.dom.test.tsx)：使用实际 Base UI 选择本地模式、填写地址并记住配置；真实 Query/HTTP 路由启动受控 V1 服务，真实生产解析器/裁切/工具/SQLite 保存；弹窗读回解析表格及来源定位。重复启动没有新增解析调用或模型 Turn。
+- [并发流水线](../apps/gateway/src/modules/library/__tests__/textbook-import-pipeline.e2e.test.ts)：解析与池初始化并行，首章保存时后章未完成，有界队列背压、会话复用、乱序保存、成功页段缓存、取消和事务回滚持续验证。
+
+外部 MinerU 及 LLM 输出受控替代的 HTTP/DOM 集成，不能等同真实解析或模型语义质量验收。原生测试中正文边界注入受控解析器，仍运行真实原生 OCR 验证目录探测能力。
+
+### 真实云端质量与限制
+
+另外完成同一本书 6 页与完整第 1 课 12 页的独立精准云端实测，上传、查询、下载和实际逐页结果转换均成功。完整章节的原始表格保留 28 + 25 行，采用逐页模型输出可避免观察到的后处理错合并。实测仍发现音调编号错误；目录页码/标题不能仅依靠解析后的文字恢复。因此目录继续发送原页，正文工具要求核对必要原页，无法确认的音调省略。
+
+实测材料保存在忽略目录 `.studio-internal/mineru-cloud-probe/` 与 `.studio-internal/mineru-chapter-probe/`，Token 不进入 Git 或客户端。没有调用真实正文 LLM，也没有安装本地 MinerU 模型；本地接口测试不能代表本机性能。没有重新导入、清空或修复用户已有教材。已接受的远端任务在用户取消后可能继续，远端检查点只在本次进程执行内有效。保存源文件已提前声明，正式测试进程均已退出。

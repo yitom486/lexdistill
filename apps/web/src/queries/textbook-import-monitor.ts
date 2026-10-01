@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ImportEventSchema, ImportEventPageSchema, SavedTextbookContentSchema, type ImportEvent } from '@study-studio/document-model';
+import { ImportEventSchema, ImportEventPageSchema, SavedTextbookContentSchema, TextbookParserConfigSchema, type ImportEvent } from '@study-studio/document-model';
+import { DEFAULT_USER_ID } from './query-keys.js';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { GatewayRequestError, readGatewayUserMessage } from '../lib/gateway-error.js';
 
@@ -12,6 +13,13 @@ async function request(url: string): Promise<unknown> {
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) throw new GatewayRequestError(readGatewayUserMessage(payload, '无法读取导入监视记录，请重试'));
   return payload;
+}
+export function useTextbookParserConfig(userId = DEFAULT_USER_ID) {
+  return useQuery({ queryKey: ['textbook-parser-config', userId], queryFn: async () => {
+    const result = TextbookParserConfigSchema.safeParse(await request(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/textbook-parser-config`));
+    if (!result.success) throw new GatewayRequestError('无法确认本机解析配置');
+    return result.data;
+  }, staleTime: 0 });
 }
 export async function requestImportMonitor(userId: string, traceId: string): Promise<ImportMonitorData> {
   const events: ImportEvent[] = [];
