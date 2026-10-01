@@ -4,7 +4,7 @@ import { canonicalizeTocEntries, planTextbookTasks, TextbookPipelineSettingsSche
 import { BusinessError, ok, err, generateId, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ImportTask } from '@study-studio/storage-sqlite';
 import type { ContentRepository } from '../ports.js';
-import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
+import type { PdfInspectorLike, RenderedPagePng } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import { ChapterSessionPool, LessonInputQueue, type BatchExtractionProgress, type LessonStage } from './lesson-batch-extractor.js';
 import { producePdfLessons } from './pdf-import/lesson-content-slicer.js';
@@ -93,10 +93,15 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
         if (visualPages.length && input.pdf && input.inspector) {
           try {
             if (!input.inspector.renderPdfPages || input.adapter?.supportsImageInput?.() !== true) throw new BusinessError('E_AGENT_CAPABILITY', '当前章节含表格或图片，需要 PDF 页渲染与支持图片的模型通道', 'AGENT_RUNTIME');
-            const rendered = await input.inspector.renderPdfPages(input.pdf, visualPages);
+            // Pinned pdf-inspector permits at most 8 pages per native call; keep every requested page.
+            const rendered: RenderedPagePng[] = [];
+            for (let offset = 0; offset < visualPages.length; offset += 8) {
+              if (controller.signal.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消', 'TOOL_EXECUTION');
+              rendered.push(...await input.inspector.renderPdfPages(input.pdf, visualPages.slice(offset, offset + 8)));
+            }
             if (rendered.length !== visualPages.length || visualPages.some(page => !rendered.some(image => image.pageNumber === page && image.png.length))) throw new BusinessError('E_PARSE_IMAGE_INVALID', '章节原页图片不完整，请检查 PDF 渲染运行时', 'VALIDATION', true);
             attachments = rendered.map(image => ({ label: `原书 PDF 第 ${image.pageNumber} 页`, png: image.png, width: image.width, height: image.height }));
-          } catch (cause) { fail(lesson.id, translateToBusinessError(cause, { category: 'TOOL_EXECUTION', fallbackMessage: '章节原页渲染失败' })); return; }
+          } catch (cause) { fail(lesson.id, cause instanceof BusinessError ? cause : new BusinessError('E_PDF_RENDER_FAILED', '章节原页图片准备失败，请检查 PDF 渲染运行时后重试本章', 'TOOL_EXECUTION', true)); return; }
         }
         monitor.record('text', 'ready', { text, source: source ?? null, startPage: lesson.startPage, endPage: lesson.endPage ?? null }, { nodeId: lesson.id });
         emit(lesson.id, 'queued');
@@ -148,7 +153,8 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
             });
             try {
               emit(job.lessonId, 'extracting');
-              const sent = await activePool.send(session, job, assignmentId, turnController, lastError?.userMessage);
+              const correction = lastError ? `${lastError.userMessage}${lastError.category === 'VALIDATION' && lastError.internalDetails ? `\n具体校验问题：${JSON.stringify(lastError.internalDetails)}` : ''}` : undefined;
+              const sent = await activePool.send(session, job, assignmentId, turnController, correction);
               if (submission.receipt) return;
               if (submission.candidate) {
                 for (let retry = 0; retry < config.storageRetries && !controller.signal.aborted && submission.error?.retryable; retry++) {

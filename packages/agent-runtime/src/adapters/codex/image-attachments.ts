@@ -6,8 +6,8 @@ import type { AgentImageAttachment } from '../../contracts/index.js';
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import type { CodexTurnInputItem } from './app-server-protocol.js';
 
-/** 单轮图片附件上限（与目录 review 窗上限同量级；超限明确拒绝，不截断）。 */
-export const MAX_PNG_ATTACHMENTS_PER_TURN = 8;
+/** 本应用的单轮图片字节预算；与原生渲染单次 8 页限制无关，不截断章节。 */
+export const MAX_PNG_BYTES_PER_TURN = 32 * 1024 * 1024;
 
 /** 单张 PNG 体积上限（fork 渲染总预算 32MB；单张超限即拒绝，不写盘）。 */
 const MAX_PNG_BYTES_PER_ATTACHMENT = 32 * 1024 * 1024;
@@ -28,15 +28,19 @@ export interface MaterializedPngAttachments {
 export async function materializePngAttachments(
   attachments: AgentImageAttachment[]
 ): Promise<Result<MaterializedPngAttachments, BusinessError>> {
-  if (attachments.length === 0 || attachments.length > MAX_PNG_ATTACHMENTS_PER_TURN) {
+  if (attachments.length === 0) {
     return err(
       new BusinessError(
         'E_INVALID_INPUT',
-        `图片附件须为 1..${MAX_PNG_ATTACHMENTS_PER_TURN} 张`,
+        '请提供至少一张图片附件',
         'VALIDATION'
       )
     );
   }
+  if (attachments.some(image => !(image.png instanceof Uint8Array) || !image.png.length))
+    return err(new BusinessError('E_INVALID_INPUT', '图片附件为空或格式不正确', 'VALIDATION'));
+  if (attachments.reduce((bytes, image) => bytes + image.png.length, 0) > MAX_PNG_BYTES_PER_TURN)
+    return err(new BusinessError('E_INVALID_INPUT', '本章图片附件超过单轮字节预算，请减少图片分辨率或章节范围', 'VALIDATION'));
   const paths: string[] = [];
   const cleanup = async (): Promise<void> => {
     await Promise.allSettled(paths.map((p) => unlink(p)));

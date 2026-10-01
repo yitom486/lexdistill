@@ -113,7 +113,7 @@ async function toolCall(
   if (!fake.capturedHandler) throw new Error('router handler not installed');
   const res = (await fake.capturedHandler({
     ...params,
-    itemId: `item-${params.turnId}`,
+    callId: `item-${params.turnId}`,
     arguments: {},
     namespace: null,
   })) as { success: boolean; contentItems: Array<{ text: string }> };

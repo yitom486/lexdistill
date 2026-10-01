@@ -70,6 +70,8 @@ bun run typecheck
 
 ## MinerU 升级：M1 → M4（2026-10-01）
 
+后续 S0 修复集成：真实共享 Codex Adapter/Connection + 受控 JSON-RPC 交错通知，验证 B 完成不结束 A、旧轮通知拒收、原生 callId 和合法枚举到达执行与模型回执。11 个真实 PDF 页通过生产流水线分为 8+3 页渲染，完整 PNG 和目录随模型输入发送，实际 SQLite 事务后教材就绪。附件物化验证 11 张完整传递与总字节超限拒绝；不调用付费模型。
+
 原 Plan 33 验收记录是当时实现的历史证据；其正文 OCR 生产者在本轮被替换，当前正文路径见[架构说明](textbook-import-architecture.md)。目录原生识别能力保留。
 
 | 阶段 | 交付与关键核对 | 正式门禁 | 提交 |

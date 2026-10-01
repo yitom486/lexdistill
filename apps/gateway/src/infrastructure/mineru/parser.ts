@@ -67,10 +67,13 @@ async function parseCloud(client: MineruHttpClient, pdf: Uint8Array, pages: read
     note('parse_uploaded', { remoteTaskId: checkpoint.taskId, bytes: pdf.byteLength });
   }
   while (!checkpoint.resultUrl) {
-    const batch = checked(z.object({ extract_result: z.array(z.object({ state: z.enum(['waiting-file', 'pending', 'running', 'converting', 'done', 'failed']), full_zip_url: id.optional(), extract_progress: z.object({ extracted_pages: z.number().optional(), total_pages: z.number().optional() }).optional() })).length(1) }), await cloudJson(client, `/api/v4/extract-results/batch/${encodeURIComponent(checkpoint.taskId!)}`));
+    const batch = checked(z.object({ extract_result: z.array(z.object({ state: z.enum(['waiting-file', 'pending', 'running', 'converting', 'done', 'failed']), err_msg: z.string().optional(), full_zip_url: id.optional(), extract_progress: z.object({ extracted_pages: z.number().optional(), total_pages: z.number().optional() }).optional() })).length(1) }), await cloudJson(client, `/api/v4/extract-results/batch/${encodeURIComponent(checkpoint.taskId!)}`));
     const item = batch.extract_result[0]!;
     note('parse_progress', { remoteTaskId: checkpoint.taskId, state: item.state, ...(item.extract_progress ? { progress: item.extract_progress } : {}) });
-    if (item.state === 'failed') throw new BusinessError('E_MINERU_PARSE_FAILED', 'MinerU 未能解析本章，请核对文件和服务状态', 'TOOL_EXECUTION', true);
+    if (item.state === 'failed') {
+      note('parse_failed_result', { remoteTaskId: checkpoint.taskId, state: item.state, reason: item.err_msg ?? null });
+      throw new BusinessError('E_MINERU_PARSE_FAILED', 'MinerU 服务端解析本章失败，可稍后重试；已保存章节保留', 'TOOL_EXECUTION', true, { remoteTaskId: checkpoint.taskId, reason: item.err_msg ?? null });
+    }
     if (item.state === 'done') { if (!item.full_zip_url) throw new BusinessError('E_MINERU_RESPONSE_INVALID', '章节解析完成但缺少结果文件', 'VALIDATION', true); checkpoint.resultUrl = item.full_zip_url; break; }
     await client.pause(settings.parsePollIntervalMs);
   }

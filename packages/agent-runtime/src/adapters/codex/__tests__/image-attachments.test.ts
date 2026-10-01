@@ -6,7 +6,7 @@ import type { CodexAppServerConnection } from '../app-server-client.js';
 import type { CodexTurnInputItem } from '../app-server-protocol.js';
 import { CodexAdapter, CodexSession } from '../codex-adapter.js';
 import {
-  MAX_PNG_ATTACHMENTS_PER_TURN,
+  MAX_PNG_BYTES_PER_TURN,
   buildTurnInputItems,
   materializePngAttachments,
 } from '../image-attachments.js';
@@ -85,8 +85,17 @@ describe('P4B 图片附件（adapters/codex）', () => {
     expect(new CodexAdapter().supportsImageInput()).toBe(true);
   });
 
-  it('单轮附件上限锁死 8', () => {
-    expect(MAX_PNG_ATTACHMENTS_PER_TURN).toBe(8);
+  it('超过 8 张附件完整传递；总字节预算超限时不启动模型', async () => {
+    const turns: FakeTurn[] = [];
+    const session = new CodexSession('s-budget', 'thread-budget', 'u', makeFakeConnection({ onTurn: turn => turns.push(turn) }));
+    try {
+      await drain(session, { message: '完整章节', attachments: Array.from({ length: 11 }, () => ({ png: PNG })) });
+      expect(turns[0]?.imagePaths).toHaveLength(11);
+      expect(turns[0]?.seenExisting).toEqual(Array(11).fill(true));
+      const seen = await drain(session, { message: '超限', attachments: [{ png: new Uint8Array(MAX_PNG_BYTES_PER_TURN + 1) }] });
+      expect(turns).toHaveLength(1);
+      expect(seen[0]?.type).toBe('ERROR');
+    } finally { await session.close(); }
   });
 
   it('无附件：纯文本 turn 形状不变，不碰文件系统', async () => {

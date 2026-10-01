@@ -92,7 +92,7 @@ export class CodexAppServerConnection {
    * adapter 路由层判定（P3.4B-FIX2），连接只做 fail-closed 转发。
    */
   /** 正在流式中的 turn id（供 steer / interrupt） */
-  private activeTurnId: string | null = null;
+  private readonly activeTurns = new Map<string, string>();
   /** 连接级通知（含 idle 时 queue/changed 等） */
   private idleNotifyUnsub: (() => void) | null = null;
   private readonly idleNotifyHandlers = new Set<
@@ -451,9 +451,17 @@ export class CodexAppServerConnection {
       wake?.();
     };
 
-    this.activeTurnId = turnId;
+    if (turnId) this.activeTurns.set(params.threadId, turnId);
 
     const unsub = this.rpc.onNotification((note) => {
+      if (!note.params || typeof note.params !== 'object') return;
+      const payload = note.params as Record<string, unknown>;
+      if (payload.threadId !== params.threadId) return;
+      const turn = payload.turn;
+      const notificationTurnId = typeof payload.turnId === 'string' ? payload.turnId
+        : turn && typeof turn === 'object' && 'id' in turn && typeof turn.id === 'string' ? turn.id : null;
+      // Turn events must carry the current native identity; stale turns cannot finish a reused thread.
+      if (!notificationTurnId || (turnId && notificationTurnId !== turnId)) return;
       const mapped = mapAppServerNotificationToEvents(note.method, note.params);
       for (const ev of mapped) {
         if (ev.type === 'COMPLETED' && note.method === 'turn/completed') {
@@ -461,7 +469,7 @@ export class CodexAppServerConnection {
         }
         if (note.method === 'turn/started') {
           turnId = (note.params as { turn?: { id?: string } })?.turn?.id ?? turnId;
-          this.activeTurnId = turnId;
+          if (turnId) this.activeTurns.set(params.threadId, turnId);
         }
         push(ev);
       }
@@ -515,14 +523,15 @@ export class CodexAppServerConnection {
         error: translateToBusinessError(e, 'CODEX_TURN'),
       };
     } finally {
-      this.activeTurnId = null;
+      if (this.activeTurns.get(params.threadId) === turnId) this.activeTurns.delete(params.threadId);
       unsub();
       params.signal?.removeEventListener('abort', onAbort);
     }
   }
 
-  public getActiveTurnId(): string | null {
-    return this.activeTurnId;
+  public getActiveTurnId(threadId?: string): string | null {
+    if (threadId) return this.activeTurns.get(threadId) ?? null;
+    return this.activeTurns.size === 1 ? this.activeTurns.values().next().value ?? null : null;
   }
 
   public async steer(

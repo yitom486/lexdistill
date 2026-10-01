@@ -419,7 +419,7 @@ export class CodexSession implements AgentSession {
         new BusinessError('E_INVALID_INPUT', '引导消息不能为空。', 'VALIDATION')
       );
     }
-    const turnId = this.activeTurnId ?? this.connection.getActiveTurnId();
+    const turnId = this.activeTurnId ?? this.connection.getActiveTurnId(this.threadId);
     if (!turnId) {
       return err(
         new BusinessError(
@@ -564,13 +564,21 @@ export class CodexAdapter implements AgentAdapter {
             sessionId: route.sessionId,
             userId: route.userId,
             turnId: params.turnId,
-            callId: params.itemId,
+            callId: params.callId,
           });
           return {
             contentItems: [{ type: 'inputText', text: JSON.stringify(result ?? null) }],
             success: true,
           } satisfies DynamicToolCallResponse;
         } catch (e) {
+          if (e instanceof BusinessError) return {
+            success: false,
+            contentItems: [{ type: 'inputText', text: JSON.stringify({
+              code: e.code, message: e.userMessage, retryable: e.retryable,
+              // Only explicit validation feedback is safe to expose; runtime/DB internal details are private.
+              ...(e.category === 'VALIDATION' && ['E_LLM_', 'E_TOC_', 'E_SOURCE_', 'E_SUBMISSION_'].some(prefix => e.code.startsWith(prefix)) ? { issues: e.internalDetails } : {}),
+            }) }],
+          };
           lastErr = e instanceof Error ? e.message : String(e);
         }
       }

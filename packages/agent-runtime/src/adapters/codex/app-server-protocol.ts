@@ -208,7 +208,7 @@ export interface CodexRealtimeCapabilityDto {
 export interface DynamicToolCallParams {
   threadId: string;
   turnId: string;
-  itemId: string;
+  callId: string;
   tool: string;
   arguments: unknown;
   namespace?: string | null;
