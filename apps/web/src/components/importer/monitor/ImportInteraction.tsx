@@ -1,23 +1,29 @@
+import { useEffect, useRef, useState } from 'react';
 import type { ImportEvent, ContentDirectoryNode } from '@study-studio/document-model';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs.js';
 import { ImportEventDetail } from './ImportEventDetail.js';
+import { ImportToolCall } from './ImportToolCall.js';
 
-const sections = [
-  { key: 'input', title: '输入', match: (e: ImportEvent) => e.category === 'text' || (e.category === 'model' && e.name === 'input') },
-  { key: 'model', title: '模型交互', match: (e: ImportEvent) => e.category === 'model' && e.name !== 'input' },
-  { key: 'tool', title: '工具', match: (e: ImportEvent) => e.category === 'tool' || e.category === 'session' },
-  { key: 'validation', title: '校验与重试', match: (e: ImportEvent) => e.category === 'validation' || e.name === 'retry' },
-  { key: 'storage', title: '保存结果', match: (e: ImportEvent) => e.category === 'storage' },
-];
-export function ImportInteraction({ events, title, current, directory }: { events: ImportEvent[]; title: string; current: boolean; directory?: readonly ContentDirectoryNode[] }) {
-  return <details open={current || undefined} className="rounded-xl border border-line p-3 text-xs" data-testid={current ? 'current-interaction' : 'history-interaction'}>
-    <summary className="cursor-pointer font-medium text-ink">{current ? '当前交互' : '已结束交互'} · {title} · {events[0]?.sessionId ?? '未分配会话'} · {events[0]?.attemptId}</summary>
-    <Tabs defaultValue="input" className="mt-3">
-      <TabsList className="flex flex-wrap">{sections.map(section => <TabsTrigger key={section.key} value={section.key}>{section.title}</TabsTrigger>)}</TabsList>
-      {sections.map(section => <TabsContent key={section.key} value={section.key} className="space-y-2 pt-3">
-        {events.filter(section.match).map(event => <ImportEventDetail key={event.sequence} event={event} expanded={current && event.name === 'input'} {...(directory ? { directory } : {})} />)}
-        {!events.some(section.match) && <p className="text-ink-muted">本轮暂无该类记录</p>}
-      </TabsContent>)}
-    </Tabs>
+export function ImportInteraction({ events, title, current, directory = [] }: { events: ImportEvent[]; title: string; current: boolean; directory?: readonly ContentDirectoryNode[] }) {
+  const [open, setOpen] = useState(current);
+  const manuallyChanged = useRef(false);
+  useEffect(() => { if (!manuallyChanged.current) setOpen(current); }, [current]);
+  const input = events.find(event => event.category === 'model' && event.name === 'input');
+  const calls = new Map<string, ImportEvent[]>();
+  for (const event of events) if (event.callId) calls.set(event.callId, [...calls.get(event.callId) ?? [], event]);
+  const ended = events.some(event => event.name === 'turn_ended');
+  const meta = events.find(event => event.sessionId);
+  return <details open={open} onToggle={event => setOpen(event.currentTarget.open)} className="rounded-xl border border-line p-3 text-xs" data-testid={current ? 'current-interaction' : 'history-interaction'}>
+    <summary onClick={() => { manuallyChanged.current = true; }} className="cursor-pointer font-medium text-ink">{current ? '最近一轮交互' : '历史交互'} · {title} · {ended ? '已结束' : '进行中'}</summary>
+    {open && <div className="mt-3 space-y-3">
+      <p className="break-all">Agent {meta?.sessionId ?? '未记录'} · 线程 {events.find(event => event.threadId)?.threadId ?? '引擎未提供'}</p>
+      <details><summary className="cursor-pointer text-ink-muted">系统绑定与本轮身份</summary>
+        <p className="break-all">节点 {meta?.nodeId} · 系统尝试 {meta?.attemptId}</p>
+        {events.filter(event => event.name === 'turn_started').map(event => <ImportEventDetail key={event.sequence} event={event} expanded />)}
+      </details>
+      {input && <ImportEventDetail event={input} expanded />}
+      {events.filter(event => event.category === 'model' && ['message', 'error', 'failed', 'approval_requested'].includes(event.name)).map(event => <ImportEventDetail key={event.sequence} event={event} expanded={event.name !== 'message'} />)}
+      {[...calls.entries()].map(([callId, records]) => <ImportToolCall key={callId} events={records} directory={directory} />)}
+      {events.filter(event => !event.callId && (event.category === 'validation' || event.category === 'storage' || event.name === 'retry')).map(event => <ImportEventDetail key={event.sequence} event={event} directory={directory} expanded={event.name === 'rejected' || event.name === 'commit_failed'} />)}
+    </div>}
   </details>;
 }

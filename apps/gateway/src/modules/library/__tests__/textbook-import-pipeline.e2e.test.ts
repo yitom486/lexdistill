@@ -260,6 +260,22 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     expect(calls.filter(batch => batch[0] === 1)).toHaveLength(1);
     expect(env.model.inputs).toHaveLength(1); expect(env.model.inputs[0]?.input.message).toContain('前半章'); expect(env.model.inputs[0]?.input.message).toContain('后半章');
   });
+  it('解析失败保留最终原因供结果页读取，另一章仍调用模型并保存', async () => {
+    const env = environment();
+    const result = await env.repo.executeTextbookPipeline({ ...env.input, traceId: 'parser-result', lessonJobs: undefined, pdf: await fixturePdf(2), parseRetries: 0,
+      inspector: { processPdf: () => ({ pageCount: 2, pagesNeedingOcr: [1, 2] }), processPdfWithOcr: async () => { throw new Error('不得调用旧正文 OCR'); } },
+      chapterParser: { parse: async (_bytes, pages) => {
+        if (pages[0] === 1) throw new BusinessError('E_MINERU_PARSE_FAILED', '解析服务未能完成本章', 'TOOL_EXECUTION', true, { reason: 'parsing failed, please try again later' });
+        return parsedText('实际解析结果替身', pages);
+      } },
+    });
+    expect(result.ok && result.value.failedLessons).toBe(1); expect(result.ok && result.value.successfulLessons).toBe(1);
+    expect(env.model.inputs).toHaveLength(1);
+    const events = await env.repo.listImportEvents({ userId: 'owner', traceId: 'parser-result' }); if (!events.ok) throw events.error;
+    const failed = events.value.find(event => event.category === 'text' && event.name === 'failed')!;
+    const detail = await env.repo.getImportEvent('owner', 'parser-result', failed.sequence);
+    expect(detail.ok && detail.value?.detail).toEqual(expect.objectContaining({ code: 'E_MINERU_PARSE_FAILED', message: '解析服务未能完成本章', details: { reason: 'parsing failed, please try again later' } }));
+  });
   it('网关关闭取消后台任务，收尾在途解析并释放会话，迟到内容不入库', async () => {
     const env = environment(), registry = new TextbookPipelineJobRegistry(), nativeStarted = deferred(), releaseNative = deferred();
     let nativeCalls = 0, settled = false;

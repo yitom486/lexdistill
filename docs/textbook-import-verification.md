@@ -87,6 +87,10 @@ bun run typecheck
 
 ### 可检查的集成证据
 
+本轮分步门禁：故障修复 `b311ec4` 与系统 ID/原生轮次绑定 `7dad1e6` 各为 1683 通过、0 失败；监视精简最终为 1684 通过、0 失败（1687 项、257 文件，62.72 秒），`bun run typecheck` 零报错。三个阶段均有 3 项既有 RSS 联网测试跳过，原生 PDF/OCR 集成没有跳过。最终日志：`.studio-internal/monitor-test-all.log`、`monitor-typecheck.log`。
+
+监视精简阶段：`import-monitor.dom.test.tsx` 验证默认展示当前章节提示词与已发送目录、历史未展开不请求详情、实际 callId 的校验拒绝/合法枚举和成功事务分组、系统生成内容可展开核对、刷新保留章节/折叠状态、关闭重开及数据库正文/生词/原书与 AI 讲解。`mineru-desktop.dom.test.tsx` 验证解析结果页可查看实际表格，三个页签均不列解析事件，已保存章节不重解析。额外流水线场景验证服务失败原因保存为最终结果，另一章正常入库。以上为真实组件/Query/Gateway/SQLite 与受控外部输出；尚未替代 Tauri 窗口人工验收或真实全书模型质量评估。
+
 - [MinerU HTTP 集成](../apps/gateway/src/modules/library/__tests__/mineru-http.integration.test.ts)：真实 HTTP 上传收到可读取的两页裁切 PDF；云端认证头只出现在服务请求，签名上传不携带 Token；上传/轮询/下载计数证明下载失败不重建任务；本地 V1 上传确认、Standard 任务和 302 文件下载贯通。限流、无效 Token、损坏 ZIP、结果页数不符均不进入模型、不写入章节内容；轮询有明确期限，取消停止等待。
 - [来源集成](../apps/gateway/src/modules/library/__tests__/mineru-source.integration.test.ts)：实际 `session.send` 同时带目录子树、表格行、原页 PNG；提示词没有 Schema 文本；无效行引用被真实工具拒绝，SQLite 内容行仍为零，合法修正后引用保存在规范 AST。
 - [桌面贯通](../apps/web/src/components/importer/__tests__/mineru-desktop.dom.test.tsx)：使用实际 Base UI 选择本地模式、填写地址并记住配置；真实 Query/HTTP 路由启动受控 V1 服务，真实生产解析器/裁切/工具/SQLite 保存；弹窗读回解析表格及来源定位。重复启动没有新增解析调用或模型 Turn。

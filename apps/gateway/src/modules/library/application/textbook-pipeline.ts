@@ -122,7 +122,10 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
           await producePdfLessons({ pdf: input.pdf, inspector: input.inspector, lessons: pending, concurrency: config.parseConcurrency, retries: config.parseRetries, signal: controller.signal,
             settings: config, ...(input.chapterParser ? { parser: input.chapterParser } : {}),
             onDiagnostic: (lesson, name, detail) => monitor.record('text', name, detail, { nodeId: lesson.id }),
-            onStart: lesson => emit(lesson.id, 'parsing'), onText, onFailure: (lesson, error) => fail(lesson.id, error),
+            onStart: lesson => emit(lesson.id, 'parsing'), onText, onFailure: (lesson, error) => {
+              monitor.record('text', 'failed', { code: error.code, message: error.userMessage, retryable: error.retryable, details: error.internalDetails }, { nodeId: lesson.id });
+              fail(lesson.id, error);
+            },
           });
         } else throw new BusinessError('E_INVALID_INPUT', '请选择教材 PDF 或提供章节文字', 'VALIDATION');
         queue.end();

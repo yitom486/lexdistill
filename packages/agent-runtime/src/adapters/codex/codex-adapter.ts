@@ -81,6 +81,7 @@ interface SessionToolRoute {
   toolNameMap?: Map<string, string> | undefined;
   executeTool?: ExternalToolExecutor | undefined;
   noteTurn?: ((turnId: string) => void) | undefined;
+  runningTurnOf?: (() => string | null) | undefined;
   /** 创建时声明的审批策略（CreateSessionOptions.approvalPolicy；缺席走连接默认）。 */
   createApprovalPolicy?: string | undefined;
   /** 当前 turn 覆盖策略读取口（send variables 写入；缺席回退创建策略）。 */
@@ -153,6 +154,7 @@ export class CodexSession implements AgentSession {
   public noteActiveTurn(turnId: string): void {
     this.activeTurnId = turnId;
   }
+  public currentRunningTurnId(): string | null { return this.abort ? this.activeTurnId : null; }
 
   /** @internal 本轮审批策略覆盖（send 进入时写入；缺席即清除回退创建策略）。 */
   public setTurnPolicy(policy: string | undefined): void {
@@ -217,6 +219,7 @@ export class CodexSession implements AgentSession {
   }
 
   public async *send(input: AgentInput): AsyncIterable<AgentEvent> {
+    this.activeTurnId = null;
     this.abort = new AbortController();
     // 本轮审批策略覆盖（缺席即清除，回退创建策略；只影响本会话各轮，不跨会话）。
     this.setTurnPolicy(input.turnOptions?.approvalPolicy);
@@ -524,6 +527,8 @@ export class CodexAdapter implements AgentAdapter {
     if (!route || route.closed) {
       return failTool(ORPHAN_TOOL_CALL_MESSAGE);
     }
+    const runningTurn = route.runningTurnOf?.();
+    if (runningTurn && params.turnId !== runningTurn) return failTool('工具调用不属于当前运行轮次，已拒绝迟到调用');
     // 学到 turn 映射：同 thread 后续只带 turnId 也能找回（仍受 closed 门控）。
     if (typeof params.turnId === 'string' && params.turnId) {
       this.toolRouteByTurn.set(params.turnId, route);
@@ -742,6 +747,7 @@ export class CodexAdapter implements AgentAdapter {
         bridge.specs.map(spec => ({ name: spec.name, businessName: bridge.nameMap.get(spec.name) ?? spec.name, description: spec.description, inputSchema: spec.inputSchema }))
       );
       route.noteTurn = (turnId: string) => sess.noteActiveTurn(turnId);
+      route.runningTurnOf = () => sess.currentRunningTurnId();
       route.turnPolicyOf = () => sess.currentTurnPolicy();
       route.handleApproval = (req) => sess.handleRoutedApproval(req);
       route.cancelPending = () => sess.cancelPendingApprovals('interrupt');
@@ -789,6 +795,7 @@ export class CodexAdapter implements AgentAdapter {
         () => this.unregisterToolRoute(route)
       );
       route.noteTurn = (turnId: string) => sess.noteActiveTurn(turnId);
+      route.runningTurnOf = () => sess.currentRunningTurnId();
       route.turnPolicyOf = () => sess.currentTurnPolicy();
       route.handleApproval = (req) => sess.handleRoutedApproval(req);
       route.cancelPending = () => sess.cancelPendingApprovals('interrupt');

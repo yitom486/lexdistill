@@ -2,6 +2,7 @@ import { ChapterSourceSchema } from '@study-studio/document-model';
 
 export function ChapterSourceView({ detail }: { detail: unknown }) {
   if (!detail || typeof detail !== 'object' || !('source' in detail)) return null;
+  if (detail.source === null && 'text' in detail && typeof detail.text === 'string') return <section data-testid="chapter-source"><h4 className="font-semibold">章节文字材料</h4><pre className="max-h-80 overflow-auto whitespace-pre-wrap">{detail.text}</pre></section>;
   const result = ChapterSourceSchema.safeParse(detail.source);
   if (!result.success) return null;
   const source = result.data, pages = [...new Set(source.blocks.map(block => block.page))];

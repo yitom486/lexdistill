@@ -14,11 +14,13 @@ class InterleavedRpc extends JsonRpcStdioClient {
   private listeners = new Set<(note: JsonRpcNotification) => void>();
   private serverHandler: ((req: JsonRpcRequest) => unknown | Promise<unknown>) | undefined;
   readonly started = new Map<string, string>();
+  readonly requests: Array<{ method: string; params: unknown }> = [];
   override get isConnected() { return this.connected; }
   override async start() { this.connected = true; return ok(undefined); }
   override notify() { return ok(undefined); }
   override async close() { this.connected = false; return ok(undefined); }
   override async request<T = unknown>(method: string, params?: unknown): Promise<Result<T, BusinessError>> {
+    this.requests.push({ method, params });
     let result: unknown = {};
     if (method === 'thread/start') result = { thread: { id: `thread-${++this.threadNumber}` } };
     if (method === 'turn/start') {
@@ -71,6 +73,11 @@ describe('共享 Codex 连接的并行模型交互', () => {
       rpc.emit('turn/completed', { threadId: a.threadId, turn: { id: 'stale-A', status: 'completed' } });
       rpc.emit('turn/completed', { threadId: b.threadId, turn: { id: turnB, status: 'completed' } });
       await drainB; expect(endedA).toBe(false);
+      const stale = await rpc.call({ threadId: a.threadId, turnId: 'stale-A', callId: 'old-call', tool: 'test_commit', arguments: { status: 'EXTRACTED' } });
+      expect(z.object({ success: z.boolean() }).parse(stale).success).toBe(false);
+      expect(calls).toHaveLength(0);
+      expect((await a.steer('继续当前章')).ok).toBe(true);
+      expect(rpc.requests.findLast(request => request.method === 'turn/steer')?.params).toEqual(expect.objectContaining({ expectedTurnId: turnA }));
       const reply = await rpc.call({ threadId: a.threadId, turnId: turnA, callId: 'native-call-A', tool: 'test_commit', arguments: { status: 'OK' } });
       const parsed = z.object({ success: z.boolean(), contentItems: z.array(z.object({ text: z.string() })) }).parse(reply);
       expect(parsed.success).toBe(false);
