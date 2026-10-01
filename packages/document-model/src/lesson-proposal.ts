@@ -1,16 +1,22 @@
 import { z } from 'zod';
 import { LessonContentSchema } from './lesson-content.js';
+import { ContentSourceReferenceSchema } from './chapter-source.js';
 
 const fields = LessonContentSchema.shape;
-const example = fields.knowledgePoints.element.shape.examples.element.omit({ id: true });
+const provenance = {
+  tocId: z.string().trim().min(1).max(128).describe('原样选择当前输入目录 ID；每条内容和例句必填'),
+  sourceRefs: z.array(ContentSourceReferenceSchema.omit({ page: true })).optional().describe('原书内容引用当前材料 blockId，可选表格 row；物理页由系统按块映射，不提交 page'),
+};
+const example = fields.knowledgePoints.element.shape.examples.element.omit({ id: true }).extend(provenance);
 const option = z.object({ text: z.string().trim().min(1) }).strict();
 const index = z.number().int().nonnegative();
 /** 模型只声明内容与数组内引用；持久化身份由 Gateway 分配。 */
 export const LessonProposalContentSchema = LessonContentSchema.extend({
-  blocks: z.array(fields.blocks.element.omit({ id: true })),
-  vocabularies: z.array(fields.vocabularies.element.omit({ id: true }).extend({ examples: z.array(example) })),
-  knowledgePoints: z.array(fields.knowledgePoints.element.omit({ id: true }).extend({ examples: z.array(example) })),
+  blocks: z.array(fields.blocks.element.omit({ id: true }).extend(provenance)),
+  vocabularies: z.array(fields.vocabularies.element.omit({ id: true }).extend({ ...provenance, examples: z.array(example) })),
+  knowledgePoints: z.array(fields.knowledgePoints.element.omit({ id: true }).extend({ ...provenance, examples: z.array(example) })),
   exercises: z.array(fields.exercises.element.omit({ id: true, knowledgePointIds: true, options: true, left: true, right: true, answer: true }).extend({
+    ...provenance,
     knowledgePointIndexes: z.array(index).describe('本次 knowledgePoints 数组中从 0 起的下标，由系统转换为持久化关联'),
     options: z.array(option).optional(), left: z.array(option).optional(), right: z.array(option).optional(),
     answer: z.object({

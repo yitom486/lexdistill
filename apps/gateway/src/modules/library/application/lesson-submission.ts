@@ -1,8 +1,9 @@
-import { LessonSubmissionSchema, lessonContentIssues, type LessonSubmission as SubmissionInput, type TocEntry, type ChapterSourceBlock } from '@study-studio/document-model';
+import { LessonSubmissionSchema, type LessonSubmission as SubmissionInput, type TocEntry, type ChapterSourceBlock } from '@study-studio/document-model';
 import { BusinessError, err, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ContentRepository, CommitLessonKnowledgeOutput } from '../ports.js';
 import type { ImportMonitor } from './import-monitor.js';
 import { normalizeLessonProposal } from './normalize-lesson-proposal.js';
+import { validateLessonContent, type LessonValidationIssue } from './validate-lesson-content.js';
 
 export interface LessonAssignment {
   userId: string;
@@ -32,10 +33,10 @@ export class LessonSubmission {
     this.note('tool', 'proposal', raw, callId);
     const normalized = normalizeLessonProposal(raw, this.assignment);
     if (!normalized.ok) return this.reject(normalized.error.code, normalized.error.userMessage, true, normalized.error.internalDetails, callId);
-    return this.accept(normalized.value, callId);
+    return this.accept(normalized.value.submission, callId, normalized.value.issues);
   }
 
-  accept(raw: unknown, callId?: string): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
+  accept(raw: unknown, callId?: string, sourceIssues: LessonValidationIssue[] = []): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
     const startedAt = Date.now();
     const reject = (code: string, message: string, details: unknown, retryable = true) => this.reject(code, message, retryable, { details, elapsedMs: Date.now() - startedAt }, callId);
     const passed = (check: string, details?: unknown) => this.note('validation', 'check_passed', { check, details, elapsedMs: Date.now() - startedAt }, callId);
@@ -53,38 +54,11 @@ export class LessonSubmission {
     if (this.receipt) return Promise.resolve({ ok: true, value: this.receipt });
     if (this.inFlight) return this.inFlight;
     if (this.candidate && this.error) return Promise.resolve(err(this.error));
-    const ids = new Set(task.tocEntries.map(entry => entry.id));
     const content = value.content;
-    const items = [...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises, ...content.vocabularies.flatMap(item => item.examples), ...content.knowledgePoints.flatMap(item => item.examples)];
-    const outsideIds = [...new Set([...content.coverage, ...items].flatMap(item => item.tocId && !ids.has(item.tocId) ? [item.tocId] : []))];
-    if (outsideIds.length) return reject('E_TOC_SLOT_NOT_FOUND', `内容关联了当前目录之外的 ID：${outsideIds.join('、')}`, { expected: [...ids], received: outsideIds });
-    const missingLinks = items.filter(item => !item.tocId).map(item => item.id);
-    if (missingLinks.length) return reject('E_LLM_SCHEMA_INVALID', '全部内容及例句必须关联当前目录 ID', { itemIds: missingLinks, expected: [...ids] });
-    passed('directory_membership');
-    if (task.sourceBlocks) {
-      const blocks = new Map(task.sourceBlocks.map(block => [block.id, block]));
-      const invalid: Array<{ itemId: string; reason: string }> = [];
-      for (const item of items) {
-        if (item.source === 'TEXTBOOK' && !item.sourceRefs?.length) invalid.push({ itemId: item.id, reason: '原书内容缺少 sourceRefs' });
-        for (const ref of item.sourceRefs ?? []) {
-          const block = blocks.get(ref.blockId);
-          if (!block || block.page !== ref.page || (ref.row !== undefined && (block.kind !== 'TABLE' || !block.rows || ref.row >= block.rows.length))) invalid.push({ itemId: item.id, reason: `无效引用 ${ref.blockId} / 第 ${ref.page} 页${ref.row !== undefined ? ' / 行 ' + ref.row : ''}` });
-        }
-      }
-      if (invalid.length) return reject('E_SOURCE_REFERENCE_INVALID', `来源引用不属于当前章节材料：${invalid.slice(0, 3).map(issue => issue.itemId + '：' + issue.reason).join('；')}`, { invalid, availableBlocks: task.sourceBlocks.map(block => ({ id: block.id, page: block.page, rows: block.rows?.length ?? null })) });
-      passed('source_references', { blockCount: blocks.size, semanticAccuracyVerified: false });
-    }
-    const reported = new Map(content.coverage.map(item => [item.tocId, item.status]));
-    const missingCoverage = task.tocEntries.filter(entry => reported.get(entry.id) !== 'EXTRACTED');
-    if (missingCoverage.length) return reject('E_TOC_COVERAGE_INCOMPLETE', '当前部分或子目录未逐项提取；无法辨认的内容不能标记已完成', missingCoverage.map(entry => ({ id: entry.id, title: entry.title, received: reported.get(entry.id) ?? null })));
-    if (!items.some(item => item.source === 'TEXTBOOK')) return reject('E_TOC_COVERAGE_INCOMPLETE', '章节只有 AI 新增内容，不能据此声明原书已提取', { expected: 'TEXTBOOK' });
-    const emptySlots = task.tocEntries.filter(entry => (entry.level === 'lesson' || entry.level === 'section') && !items.some(item => item.source === 'TEXTBOOK' && item.tocId === entry.id));
-    if (emptySlots.length) return reject('E_TOC_COVERAGE_INCOMPLETE', '内容目录虽报告已提取，但没有关联的原书内容', emptySlots.map(entry => ({ id: entry.id, title: entry.title })));
-    passed('directory_coverage');
-    if (!task.allowAiExercises && content.exercises.some(item => item.source === 'AI')) return reject('E_LLM_SCHEMA_INVALID', '当前配置不允许新增 AI 习题', { expected: 'TEXTBOOK' });
-    const issues = lessonContentIssues(content);
-    if (issues.length) return reject('E_LLM_SCHEMA_INVALID', issues.join('; '), issues);
-    passed('content_format');
+    const issues = validateLessonContent(content, task, sourceIssues);
+    if (issues.length) return reject(issues[0]!.code, `章节校验未通过（${issues.length} 项）：${issues.slice(0, 3).map(issue => `${issue.path}：${issue.message}`).join('；')}`, { issues });
+    passed('directory_membership'); passed('directory_coverage'); passed('content_format');
+    if (task.sourceBlocks) passed('source_references', { blockCount: task.sourceBlocks.length, semanticAccuracyVerified: false });
     this.candidate ??= value;
     this.candidateCallId = callId;
     this.note('validation', 'accepted', { coverage: content.coverage, elapsedMs: Date.now() - startedAt }, callId);

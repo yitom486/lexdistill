@@ -1,4 +1,4 @@
-import { LessonProposalSchema, type LessonProposal as SubmissionInput } from '@study-studio/document-model';
+import { LessonProposalSchema, LessonContentSchema, ContentSourceSchema, ExerciseTypeSchema, FieldSourcesSchema, type LessonProposal as SubmissionInput } from '@study-studio/document-model';
 import { ToolLocations, ToolPermissions, type ToolDefinition, type ToolExecutionContext } from '@study-studio/tool-core';
 import { BusinessError, err, type Result } from '@study-studio/shared';
 import type { ContentRepository, CommitLessonKnowledgeOutput } from '../ports.js';
@@ -11,7 +11,7 @@ export type LibraryLessonCommitOutput = CommitLessonKnowledgeOutput;
 /** 执行端第二道门：只有已绑定的专职会话可以写入当前章。 */
 export class LibraryLessonCommitTool implements ToolDefinition<SubmissionInput, CommitLessonKnowledgeOutput> {
   readonly name = 'library.commit_lesson_knowledge';
-  readonly description = '提交当前任务的结构化教材内容。只提交 content；任务身份和全部新内容 ID 由系统按当前原生会话轮次生成，不提交 id、documentId、lessonId、assignmentId。coverage 逐项报告本任务目录；纯容器汇总子节点，lesson/section 必须有对应原书内容。blocks.text 仅课文或对话，translation 独立存译文；讲解和例句不能混进正文。当前输入有解析块时，原书内容及原书例句必须填 sourceRefs，引用实际 blockId、物理 page，表格可注明从 0 起的 row；引用合法仅证明定位。按页读取生词表，不跨页串行合并词条；核对原页上的读音和音调，无法确认的音调省略，不能把编号猜成声调类型。vocabularies.gloss 存词义，aiExplanation 单独存 AI 生词讲解，examples 存例句。knowledgePoints.textbookExplanation 只存原书讲解，aiExplanation 存 AI 补充，examples 单独存例句。全部内容含例句必须有当前目录内的 tocId；AI 新增内容至少关联任务根节点。原书内容 source=TEXTBOOK，新增内容 source=AI；翻译、注音、词义、接续、答案和解析的来源写 fieldSources。习题用已声明题型，答案对应 text、optionIndexes 或 pairs（leftIndex/rightIndex）；knowledgePointIndexes 引用本次知识点数组，所有下标从 0 起，由系统转为持久化 ID，可新增 AI 练习且无须原目录存在练习项。UNREADABLE 和缺项不能算完成。校验拒绝后按具体字段修正，再调用本工具；回执确认事务提交才算保存成功。暂时性数据库失败由调度器仅重试保存。';
+  readonly description = `提交当前章，只提交 content，不提交任务或内容 id。全部内容和例句必填当前目录 tocId。coverage.status=${LessonContentSchema.shape.coverage.element.shape.status.options.join('|')}，逐项覆盖当前目录；无法辨认不能算完成。blocks.kind=${LessonContentSchema.shape.blocks.element.shape.kind.options.join('|')}；DIALOGUE 必填 speaker，text 仅正文/对话，讲解和例句独立存放。source=${ContentSourceSchema.options.join('|')}，原书 TEXTBOOK、新增 AI。当前有解析材料时，每条原书内容和原书例句必填 sourceRefs，只选实际 blockId、可选表格 row（从 0 起），不要 page，系统映射物理页；不得引用别章。vocabularies 用 surface、reading、pos、gloss、aiExplanation、examples；knowledgePoints 用 title、connection、textbookExplanation、aiExplanation、examples。原书讲解与 AI 补充分别存放；无法确认的音调省略，不把编号当音调，生词表不跨页串行合并。fieldSources 仅允许 ${Object.keys(FieldSourcesSchema.shape).join('|')}，有对应译文/读音/释义/接续/答案/解析必须标注来源，不填写空字符串或 null；可选字段无内容则省略。exercises.type=${ExerciseTypeSchema.options.join('|')}；options/left/right 每项只含 text；knowledgePointIndexes 引用本次知识点数组。CHOICE 单答案、MULTI_CHOICE 多答案、ORDERING 全部有序答案，用 answer.optionIndexes；MATCHING 用 answer.pairs 的 leftIndex/rightIndex；其他用 answer.text，均从 0 起。AI 练习无须原目录存在习题项。拒绝后按回执中全部字段路径修正，再提交；只有事务提交回执才算已保存，数据库暂错由系统仅重试保存。`;
   readonly location = ToolLocations.SERVER;
   readonly permission = ToolPermissions.WRITE;
   readonly schema = LessonProposalSchema;

@@ -1,5 +1,13 @@
 # 教材目录与运行监视：集成验收记录
 
+## 失败记录修正：字段与来源（2026-10-01）
+
+`submission-correction.integration.test.ts` 通过实际流水线、原生提交工具与 SQLite，验证同次回执同时包含目录越界、未知来源块、缺少对话角色及注音/释义来源，反馈定位原始数组路径且没有生成的内容 ID；拒绝时零写入，修正后内容与真实物理页保存。模型输入明确包含当前目录与解析材料。
+
+`mineru-source.integration.test.ts` 保持真实页边界与表格行核对；模型仅引用块/行，系统映射页。越界行拒绝，修正后规范 AST 保存对应 page/row。所有外部模型输出受控，不代表真实模型语义质量，未重跑现有全书任务。
+
+阶段门禁：`bun run test:all` 1685 通过、3 项既有 RSS 跳过、0 失败；原生测试未跳过。`bun run typecheck` 通过。日志为 `.studio-internal/failure-s1-test-all.log`、`failure-s1-typecheck.log`。
+
 日期：2026-10-01。按用户批准的 Plan 33，以 P1 → P5 顺序实施、验证并分别提交。产品为 Tauri 桌面，`apps/web` 是其 WebView 源码目录。
 
 ## 交付与核对

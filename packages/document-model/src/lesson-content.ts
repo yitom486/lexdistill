@@ -67,47 +67,63 @@ export const LessonSubmissionSchema = z.object({
 }).strict();
 export type LessonSubmission = z.infer<typeof LessonSubmissionSchema>;
 
-export function lessonContentIssues(content: LessonContent): string[] {
-  const issues: string[] = [];
-  const unique = (values: string[], name: string) => {
-    if (new Set(values).size !== values.length) issues.push(`${name} ID 重复`);
+export interface ContentFieldIssue { path: string; message: string }
+/** 路径对应提交数组；反馈不使用系统随后分配的内容 ID。 */
+export function lessonContentFieldIssues(content: LessonContent): ContentFieldIssue[] {
+  const issues: ContentFieldIssue[] = [];
+  const add = (path: string, message: string) => issues.push({ path, message });
+  const unique = (values: string[], path: string) => {
+    if (new Set(values).size !== values.length) add(path, 'ID 重复');
   };
-  unique(content.coverage.map(item => item.tocId), '目录');
-  unique([...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises].map(item => item.id), '内容');
-  if (!content.blocks.length && !content.vocabularies.length && !content.knowledgePoints.length && !content.exercises.length) issues.push('没有实际章节内容');
-  for (const block of content.blocks) {
-    if (block.kind === 'DIALOGUE' && !block.speaker) issues.push(`${block.id} 对话缺少 speaker`);
-    if (block.translation && !block.fieldSources?.translation) issues.push(`${block.id} 翻译缺少来源`);
+  unique(content.coverage.map(item => item.tocId), 'content.coverage');
+  unique([...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises].map(item => item.id), 'content');
+  if (!content.blocks.length && !content.vocabularies.length && !content.knowledgePoints.length && !content.exercises.length) add('content', '没有实际章节内容');
+  for (const [index, block] of content.blocks.entries()) {
+    const path = `content.blocks.${index}`;
+    if (block.kind === 'DIALOGUE' && !block.speaker) add(`${path}.speaker`, 'DIALOGUE 对话必须提供 speaker');
+    if (block.translation && !block.fieldSources?.translation) add(`${path}.fieldSources.translation`, '翻译缺少来源');
   }
-  for (const word of content.vocabularies) {
-    if ((word.reading && !word.fieldSources?.reading) || (word.gloss && !word.fieldSources?.gloss)) issues.push(`${word.id} 注音/释义缺少来源`);
+  for (const [index, word] of content.vocabularies.entries()) {
+    if (word.reading && !word.fieldSources?.reading) add(`content.vocabularies.${index}.fieldSources.reading`, '注音缺少来源');
+    if (word.gloss && !word.fieldSources?.gloss) add(`content.vocabularies.${index}.fieldSources.gloss`, '释义缺少来源');
   }
-  for (const point of content.knowledgePoints) {
-    if (point.source === 'AI' && point.textbookExplanation) issues.push(`${point.id} AI 知识点不能填写原书讲解`);
-    if (point.connection && !point.fieldSources?.connection) issues.push(`${point.id} 接续说明缺少来源`);
+  for (const [index, point] of content.knowledgePoints.entries()) {
+    if (point.source === 'AI' && point.textbookExplanation) add(`content.knowledgePoints.${index}.textbookExplanation`, 'AI 知识点不能填写原书讲解');
+    if (point.connection && !point.fieldSources?.connection) add(`content.knowledgePoints.${index}.fieldSources.connection`, '接续说明缺少来源');
   }
-  for (const item of [...content.vocabularies, ...content.knowledgePoints]) {
-    unique(item.examples.map(example => example.id), `${item.id} 例句`);
-    if (item.examples.some(example => example.translation && !example.fieldSources?.translation)) issues.push(`${item.id} 例句译文缺少来源`);
+  for (const collection of ['vocabularies', 'knowledgePoints'] as const) {
+    for (const [index, item] of content[collection].entries()) {
+      const path = `content.${collection}.${index}.examples`;
+      unique(item.examples.map(example => example.id), path);
+      item.examples.forEach((example, position) => {
+        if (example.translation && !example.fieldSources?.translation) add(`${path}.${position}.fieldSources.translation`, '例句译文缺少来源');
+      });
+    }
   }
   const knowledgeIds = new Set(content.knowledgePoints.map(item => item.id));
-  for (const exercise of content.exercises) {
+  for (const [index, exercise] of content.exercises.entries()) {
+    const path = `content.exercises.${index}`;
     const { type, answer } = exercise;
     const options = exercise.options ?? [];
-    unique(options.map(item => item.id), `${exercise.id} 选项`);
-    if (exercise.knowledgePointIds.some(key => !knowledgeIds.has(key))) issues.push(`${exercise.id} 关联了未知知识点`);
-    if (!exercise.fieldSources?.answer || (exercise.explanation && !exercise.fieldSources.explanation)) issues.push(`${exercise.id} 答案/解析缺少来源`);
+    unique(options.map(item => item.id), `${path}.options`);
+    if (exercise.knowledgePointIds.some(key => !knowledgeIds.has(key))) add(`${path}.knowledgePointIds`, '关联了未知知识点');
+    if (!exercise.fieldSources?.answer) add(`${path}.fieldSources.answer`, '答案缺少来源');
+    if (exercise.explanation && !exercise.fieldSources?.explanation) add(`${path}.fieldSources.explanation`, '解析缺少来源');
     if (['CHOICE', 'MULTI_CHOICE', 'ORDERING'].includes(type)) {
       const selected = answer.optionIds ?? [];
       const ids = new Set(options.map(item => item.id));
-      if (options.length < 2 || !selected.length || new Set(selected).size !== selected.length || selected.some(key => !ids.has(key)) || answer.text || answer.pairs) issues.push(`${exercise.id} 选项答案格式不正确`);
-      if (type === 'CHOICE' && selected.length !== 1) issues.push(`${exercise.id} 单选只能有一个答案`);
-      if (type === 'ORDERING' && selected.length !== options.length) issues.push(`${exercise.id} 排序答案必须覆盖全部选项`);
+      if (options.length < 2 || !selected.length || new Set(selected).size !== selected.length || selected.some(key => !ids.has(key)) || answer.text || answer.pairs) add(`${path}.answer`, '选项答案格式不正确：至少两个 options，answer 只含不重复的 optionIndexes');
+      if (type === 'CHOICE' && selected.length !== 1) add(`${path}.answer.optionIndexes`, '单选只能有一个答案');
+      if (type === 'ORDERING' && selected.length !== options.length) add(`${path}.answer.optionIndexes`, '排序答案必须覆盖全部选项');
     } else if (type === 'MATCHING') {
       const left = exercise.left ?? [], right = exercise.right ?? [], pairs = answer.pairs ?? [];
-      unique(left.map(item => item.id), `${exercise.id} 左侧`); unique(right.map(item => item.id), `${exercise.id} 右侧`);
-      if (!left.length || !right.length || pairs.length !== left.length || new Set(pairs.map(item => item.leftId)).size !== left.length || pairs.some(pair => !left.some(item => item.id === pair.leftId) || !right.some(item => item.id === pair.rightId)) || answer.text || answer.optionIds) issues.push(`${exercise.id} 匹配答案格式不正确`);
-    } else if (!answer.text || answer.optionIds || answer.pairs) issues.push(`${exercise.id} 需要文本参考答案`);
+      unique(left.map(item => item.id), `${path}.left`); unique(right.map(item => item.id), `${path}.right`);
+      if (!left.length || !right.length || pairs.length !== left.length || new Set(pairs.map(item => item.leftId)).size !== left.length || pairs.some(pair => !left.some(item => item.id === pair.leftId) || !right.some(item => item.id === pair.rightId)) || answer.text || answer.optionIds) add(`${path}.answer`, '匹配答案只含 pairs，需覆盖全部左项并引用有效左右下标');
+    } else if (!answer.text || answer.optionIds || answer.pairs) add(`${path}.answer`, '需要文本参考答案，只填写 answer.text');
   }
   return issues;
+}
+
+export function lessonContentIssues(content: LessonContent): string[] {
+  return lessonContentFieldIssues(content).map(issue => `${issue.path}：${issue.message}`);
 }

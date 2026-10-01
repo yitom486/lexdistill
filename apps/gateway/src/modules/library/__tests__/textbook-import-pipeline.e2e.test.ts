@@ -228,11 +228,10 @@ describe('教材按章流水线：会话原生工具 → 独立校验 → SQLite
     const env = environment(async ({ input, submit }) => {
       const value = submissionFromPrompt(input.message);
       value.content.exercises = [
-        ...(['CHOICE', 'MULTI_CHOICE', 'ORDERING'] as const).map(type => ({ type, prompt: '新增练习', source: 'AI' as const, knowledgePointIndexes: [0], options: [{ text: '甲' }, { text: '乙' }], answer: { optionIndexes: type === 'CHOICE' ? [0] : [1, 0] }, fieldSources: { answer: 'AI' as const } })),
-        ...(['FILL_BLANK', 'TRANSLATION', 'SHORT_ANSWER'] as const).map(type => ({ type, prompt: '新增练习', source: 'AI' as const, knowledgePointIndexes: [0], answer: { text: '答案' }, fieldSources: { answer: 'AI' as const } })),
-        { type: 'MATCHING', prompt: '匹配', source: 'AI', knowledgePointIndexes: [0], left: [{ text: '甲' }], right: [{ text: '乙' }], answer: { pairs: [{ leftIndex: 0, rightIndex: 0 }] }, fieldSources: { answer: 'AI' } },
+        ...(['CHOICE', 'MULTI_CHOICE', 'ORDERING'] as const).map(type => ({ tocId: value.content.coverage[0]!.tocId, type, prompt: '新增练习', source: 'AI' as const, knowledgePointIndexes: [0], options: [{ text: '甲' }, { text: '乙' }], answer: { optionIndexes: type === 'CHOICE' ? [0] : [1, 0] }, fieldSources: { answer: 'AI' as const } })),
+        ...(['FILL_BLANK', 'TRANSLATION', 'SHORT_ANSWER'] as const).map(type => ({ tocId: value.content.coverage[0]!.tocId, type, prompt: '新增练习', source: 'AI' as const, knowledgePointIndexes: [0], answer: { text: '答案' }, fieldSources: { answer: 'AI' as const } })),
+        { tocId: value.content.coverage[0]!.tocId, type: 'MATCHING', prompt: '匹配', source: 'AI', knowledgePointIndexes: [0], left: [{ text: '甲' }], right: [{ text: '乙' }], answer: { pairs: [{ leftIndex: 0, rightIndex: 0 }] }, fieldSources: { answer: 'AI' } },
       ];
-      value.content.exercises = value.content.exercises.map(item => ({ ...item, tocId: value.content.coverage[0]!.tocId }));
       const badAnswer = await submit({ ...value, content: { ...value.content, exercises: [{ ...value.content.exercises[0], answer: { optionIndexes: [99] } }] } });
       expect(badAnswer.ok).toBe(false); if (!badAnswer.ok) expect(badAnswer.error.code).toBe('E_LLM_SCHEMA_INVALID');
       expect((await submit(value)).ok).toBe(true);

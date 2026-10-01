@@ -1,5 +1,5 @@
 import type { AgentAdapter, AgentEvent, AgentInput, CreateSessionOptions, AgentSession } from '@study-studio/agent-runtime';
-import { LessonProposalSchema, type LessonContent, type LessonProposal } from '@study-studio/document-model';
+import { LessonProposalSchema, type LessonContent, type LessonProposal, type ContentSourceReference } from '@study-studio/document-model';
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
@@ -42,10 +42,14 @@ export function submissionFromPrompt(message: string): LessonProposal {
     for (const item of [...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises]) if (item.source === 'TEXTBOOK') item.sourceRefs = [{ blockId: source.blocks[0]!.id, page: source.blocks[0]!.page }];
   }
   const withoutId = <T extends { id: string }>({ id: _id, ...item }: T) => item;
-  return LessonProposalSchema.parse({ content: { ...content, blocks: content.blocks.map(withoutId),
-    vocabularies: content.vocabularies.map(item => ({ ...withoutId(item), examples: item.examples.map(withoutId) })),
-    knowledgePoints: content.knowledgePoints.map(item => ({ ...withoutId(item), examples: item.examples.map(withoutId) })),
-    exercises: content.exercises.map(({ id: _id, knowledgePointIds, options, left, right, answer, ...item }) => ({ ...item,
+  const proposalItem = <T extends { id: string; sourceRefs?: ContentSourceReference[] | undefined }>(item: T) => {
+    const { sourceRefs, ...rest } = withoutId(item);
+    return { ...rest, ...(sourceRefs ? { sourceRefs: sourceRefs.map(({ page: _page, ...ref }) => ref) } : {}) };
+  };
+  return LessonProposalSchema.parse({ content: { ...content, blocks: content.blocks.map(proposalItem),
+    vocabularies: content.vocabularies.map(item => ({ ...proposalItem(item), examples: item.examples.map(proposalItem) })),
+    knowledgePoints: content.knowledgePoints.map(item => ({ ...proposalItem(item), examples: item.examples.map(proposalItem) })),
+    exercises: content.exercises.map(({ knowledgePointIds, options, left, right, answer, ...item }) => ({ ...proposalItem(item),
       knowledgePointIndexes: knowledgePointIds.map(id => content.knowledgePoints.findIndex(point => point.id === id)),
       ...(options ? { options: options.map(withoutId) } : {}), ...(left ? { left: left.map(withoutId) } : {}), ...(right ? { right: right.map(withoutId) } : {}),
       answer: { ...(answer.text ? { text: answer.text } : {}),

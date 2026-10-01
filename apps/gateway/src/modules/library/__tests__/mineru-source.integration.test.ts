@@ -43,11 +43,11 @@ it('实际 Turn 包含目录子树、表格与原页附件；越界行引用拒�
     expect(input.attachments).toHaveLength(1); expect(input.attachments?.[0]?.label).toBe('原书 PDF 第 2 页');
     expect(input.attachments?.[0]?.png).toEqual(fixturePng);
     const candidate = submissionFromPrompt(input.message);
-    candidate.content.vocabularies[0]!.sourceRefs = [{ blockId: 'p2b0', page: 2, row: 9 }];
+    candidate.content.vocabularies[0]!.sourceRefs = [{ blockId: 'p2b0', row: 9 }];
     const rejected = await submit(candidate);
     expect(rejected.ok).toBe(false); if (!rejected.ok) expect(rejected.error.code).toBe('E_SOURCE_REFERENCE_INVALID');
     expect(db.select().from(tables.textbookVocab).all()).toHaveLength(0);
-    candidate.content.vocabularies[0]!.sourceRefs = [{ blockId: 'p2b0', page: 2, row: 0 }];
+    candidate.content.vocabularies[0]!.sourceRefs = [{ blockId: 'p2b0', row: 0 }];
     expect((await submit(candidate)).ok).toBe(true);
   });
   const result = await repo.executeTextbookPipeline({ userId: 'source-owner', documentId: 'source-book', title: '来源定位验证', traceId: 'source-trace',

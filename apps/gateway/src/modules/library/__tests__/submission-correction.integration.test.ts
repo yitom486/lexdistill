@@ -6,7 +6,7 @@ import { TextbookASTSchema, type TextbookLessonStage } from '@study-studio/docum
 import { BusinessError, err } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
-import { deferred, pipelineModel, submissionFromPrompt, type ModelTurn } from './textbook-pipeline-fixtures.js';
+import { deferred, parsedText, pipelineModel, submissionFromPrompt, type ModelTurn } from './textbook-pipeline-fixtures.js';
 
 const repositories: DrizzleLearnerRepository[] = [];
 afterEach(() => { for (const repo of repositories.splice(0)) repo.getRawDb().close(); });
@@ -67,14 +67,40 @@ describe('提交修正集成：准确身份反馈、字段保留、阶段与有�
     let attempts = 0;
     const env = setup(async ({ input, submit }) => {
       const value = submissionFromPrompt(input.message);
-      if (!attempts++) delete value.content.knowledgePoints[0]!.examples[0]!.tocId;
+      if (!attempts++) Reflect.deleteProperty(value.content.knowledgePoints[0]!.examples[0]!, 'tocId');
       const result = await submit(value);
       expect(result.ok).toBe(attempts > 1);
     });
     const result = await env.repo.executeTextbookPipeline({ ...env.input, modelRetries: 1 });
     expect(result.ok && result.value.allLessonsReady).toBe(true);
     expect(env.stages).toContain('model_retrying'); expect(env.model.created).toHaveLength(1);
-    expect(env.model.inputs[1]!.input.message).toContain('全部内容及例句必须关联当前目录 ID');
+    expect(env.model.inputs[1]!.input.message).toContain('content.knowledgePoints.0.examples.0.tocId');
+  });
+  it('同一次回执汇总原始路径的目录、来源及内容错误；模型只选块，系统保存真实物理页', async () => {
+    const source = parsedText('当前正文', [3]);
+    const env = setup(async ({ input, submit }) => {
+      expect(input.message).toContain('"id":"a"'); expect(input.message).toContain('章节解析材料:');
+      expect(env.tool.description.length).toBeLessThanOrEqual(1024);
+      const value = submissionFromPrompt(input.message), bad = structuredClone(value);
+      expect(value.content.blocks[0]!.sourceRefs).toEqual([{ blockId: 'p3b0' }]);
+      bad.content.blocks[0]!.kind = 'DIALOGUE';
+      bad.content.blocks[0]!.sourceRefs = [{ blockId: 'another-chapter' }];
+      bad.content.vocabularies[0]!.fieldSources = {};
+      bad.content.knowledgePoints[0]!.examples[0]!.tocId = 'outside';
+      bad.content.coverage[0]!.status = 'UNREADABLE';
+      const rejected = await submit(bad); expect(rejected.ok).toBe(false);
+      if (!rejected.ok) {
+        const feedback = JSON.stringify(rejected.error.internalDetails);
+        for (const path of ['content.blocks.0.sourceRefs.0', 'content.blocks.0.speaker', 'content.vocabularies.0.fieldSources.reading', 'content.vocabularies.0.fieldSources.gloss', 'content.knowledgePoints.0.examples.0.tocId', 'content.coverage']) expect(feedback).toContain(path);
+        expect(feedback).not.toContain('content_');
+      }
+      expect(env.db.select().from(tables.textbookLines).all()).toHaveLength(0);
+      expect((await submit(value)).ok).toBe(true);
+    });
+    const result = await env.repo.executeTextbookPipeline({ ...env.input, lessonJobs: [{ lessonId: 'a', text: '正文', source }] });
+    expect(result.ok && result.value.allLessonsReady).toBe(true);
+    const ast = TextbookASTSchema.parse(JSON.parse(env.db.select().from(tables.documents).where(eq(tables.documents.id, 'book')).get()!.astJson!));
+    expect(ast.lessons[0]!.content!.blocks[0]!.sourceRefs).toEqual([{ blockId: 'p3b0', page: 3 }]);
   });
   it('有效候选遇暂时数据库失败仅重试保存，阶段及回执均对应同一次模型输入', async () => {
     const env = setup(), commit = env.repo.commitLessonKnowledge.bind(env.repo); let count = 0;
