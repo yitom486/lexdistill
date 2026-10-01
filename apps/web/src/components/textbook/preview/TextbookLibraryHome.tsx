@@ -1,14 +1,14 @@
-import { BookOpen, ArrowRight, Plus, RefreshCw } from 'lucide-react';
+import { BookOpen, ArrowRight, Plus, RefreshCw, ListChecks } from 'lucide-react';
 import { Button } from '../../ui/button.js';
 import { Badge } from '../../ui/badge.js';
 import type { LearningLibraryBook } from './library-view.js';
 
-export function TextbookLibraryHome({ books, rememberedChapters, onOpen, onImport, onRefresh, loading }: {
+export function TextbookLibraryHome({ books, rememberedChapters, onOpen, onImport, onRefresh, onOpenExerciseExamples, loading }: {
   books: LearningLibraryBook[]; rememberedChapters: Record<string, string>; onOpen: (book: LearningLibraryBook) => void;
-  onImport: () => void; onRefresh: () => void; loading: boolean;
+  onImport: () => void; onRefresh: () => void; onOpenExerciseExamples: () => void; loading: boolean;
 }) {
   return <div className="space-y-6" data-testid="textbook-library-home">
-    <header className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="flex items-center gap-3 font-serif text-3xl font-bold"><BookOpen className="h-7 w-7 text-accent-ink" />我的教材</h2><p className="mt-3 text-sm text-ink-muted">选择一本教材，继续学习或查看章节内容。</p></div><div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}><RefreshCw className="h-4 w-4" />刷新教材</Button><Button onClick={onImport}><Plus className="h-4 w-4" />导入教材</Button></div></header>
+    <header className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="flex items-center gap-3 font-serif text-3xl font-bold"><BookOpen className="h-7 w-7 text-accent-ink" />我的教材</h2><p className="mt-3 text-sm text-ink-muted">选择一本教材，继续学习或查看章节内容。</p></div><div className="flex flex-wrap items-center gap-2"><Button variant="amber" onClick={onOpenExerciseExamples}><ListChecks className="h-4 w-4" />查看题型案例</Button><Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}><RefreshCw className="h-4 w-4" />刷新教材</Button><Button onClick={onImport}><Plus className="h-4 w-4" />导入教材</Button></div></header>
     <div className="flex items-center justify-between text-xs text-ink-muted"><span>{books.length} 本教材</span>{loading && <span>正在读取已保存教材…</span>}</div>
     <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">{books.map(book => {
       const remembered = book.chapters.find(chapter => chapter.id === rememberedChapters[book.id]);

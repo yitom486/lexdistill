@@ -2,6 +2,7 @@ import { afterEach, expect, it } from 'bun:test';
 import * as React from 'react';
 import { TextbookLearningContentSchema, TextbookASTSchema } from '@study-studio/document-model';
 import { previewLesson, previewBooks } from '../../../fixtures/textbook-learning-preview.js';
+import { exercisePreviewBook } from '../../../fixtures/textbook-exercise-preview.js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, setupDom, type DomHandle } from '../../toc/__tests__/dom-setup.js';
 
@@ -51,8 +52,26 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   for (let attempt = 0; !doc.body.textContent?.includes('已保存的教材') && attempt < 80; attempt++) await settle();
   expect(doc.querySelector('[data-testid="textbook-library-home"]')).not.toBeNull();
   expect(doc.querySelector('[role="dialog"]')).toBeNull();
-  expect(doc.querySelectorAll('article')).toHaveLength(previewBooks.length + 1);
+  expect(doc.querySelectorAll('article')).toHaveLength(previewBooks.length + 2);
   expect(doc.body.textContent).toContain('已保存的教材');
+  expect(TextbookLearningContentSchema.safeParse(exercisePreviewBook.chapters[0]!.content).success).toBe(true);
+  await click(button(doc, '查看题型案例'));
+  expect(doc.querySelector('[data-testid="learning-preview-page"]')?.textContent).toContain('七类题型 · 交互案例');
+  expect(doc.querySelectorAll('[role="tab"]')).toHaveLength(1);
+  expect(tab('练习')?.getAttribute('aria-selected')).toBe('true');
+  const examples = activePanel();
+  expect(examples.querySelectorAll('article')).toHaveLength(9);
+  for (const type of ['单选', '多选', '填空', '翻译', '排序', '配对', '简答']) {
+    expect(examples.querySelector(`article[aria-label$="：${type}"]`)).not.toBeNull();
+  }
+  expect(examples.querySelector('article[aria-label="练习 8：填空"]')?.querySelectorAll('textarea')).toHaveLength(2);
+  expect(examples.querySelector('article[aria-label="练习 9：排序"] [aria-label="待选词块"]')?.querySelectorAll('button')).toHaveLength(4);
+  const exampleChoice = examples.querySelector<HTMLElement>('article[aria-label="练习 1：单选"]')!;
+  await click(button(exampleChoice, 'これは本です。'));
+  await click(button(exampleChoice, '检查答案'));
+  expect(exampleChoice.textContent).toContain('回答正确');
+  expect(examples.textContent).toContain('尚未接入 AI 评分');
+  await click(button(doc, '返回教材首页'));
   await click(button(doc.querySelector(`article[aria-label="教材：${previewBooks[0]!.title}"]`)!, '打开教材'));
   expect(doc.querySelector('[data-testid="learning-preview-page"]')).not.toBeNull();
   await click(doc.querySelector<HTMLElement>('[aria-label="选择章节"]'));
