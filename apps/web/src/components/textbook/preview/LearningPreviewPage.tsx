@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { TextbookLearningContent } from '@study-studio/document-model';
 import { BookOpen, BookText, Languages, ListChecks, MessageSquareText, ChevronRight, ArrowRight, Route, CheckCheck } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs.js';
@@ -17,7 +16,6 @@ export function LearningPreviewPage({ content, bookTitle, chapterTitle, chapterI
   content: TextbookLearningContent; bookTitle: string; chapterTitle: string; chapterId: string; subtitle: string; language: string; temporary?: boolean;
   study?: ChapterStudy | undefined; onAskAiTutor?: ((text: string, context: string) => void) | undefined;
 }) {
-  const [detail, setDetail] = useState<StudyDetail | null>(null);
   const categories = ([
     { key: 'overview', title: '本课导学', count: study?.goals.length ?? 0, unit: '个目标', icon: Route, note: '先看目标和学习主线，再开始本课。' },
     { key: 'articles', title: '文章与会话', count: content.articles.length, unit: '篇', icon: BookOpen, note: '先读完整内容，理解这一章的语境。' },
@@ -33,7 +31,8 @@ export function LearningPreviewPage({ content, bookTitle, chapterTitle, chapterI
   const showTranslation = navigation.showTranslation;
   const selected = categories.find(category => category.key === active);
   const next = categories[categories.findIndex(category => category.key === active) + 1];
-  const props = { content, showTranslation, language, explain: setDetail };
+  const explain = (detail: StudyDetail, label: string, disabled = false) => <StudyExplanation key={`${detail.title}-${detail.text}`} detail={detail} label={label} disabled={disabled} content={content} language={language} onAsk={onAskAiTutor ? (text, context) => onAskAiTutor(text, `教材：${bookTitle}\n章节：${chapterTitle}\n语种：${language}\n${context}\n请解释当前选中表达，结合本课语境说明用法与注意点。`) : undefined} />;
+  const props = { content, showTranslation, language, explain };
   return <div className="flex min-h-0 flex-1 flex-col bg-surface-warm text-ink" data-testid="learning-preview-page">
     <header className="border-b border-line-soft bg-paper-soft px-7 py-6 sm:px-9">
       <div className="mb-3 flex items-center gap-2 text-xs text-ink-muted"><BookOpen className="h-4 w-4 text-accent-ink" /><span>{bookTitle}</span><ChevronRight className="h-3 w-3" /><span>本课学习</span></div>
@@ -47,7 +46,7 @@ export function LearningPreviewPage({ content, bookTitle, chapterTitle, chapterI
           {categories.map(category => <TabsTrigger key={category.key} value={category.key} className="w-full justify-start rounded-xl px-3 py-3.5 text-sm text-ink-muted data-[selected]:bg-wash-amber-500o15 data-[selected]:text-accent-ink"><category.icon className="h-4 w-4 shrink-0" />{category.title}<span className="ml-auto text-xs tabular-nums opacity-70">{category.count}</span></TabsTrigger>)}
         </TabsList>
         {content.material && <div className="mt-4 px-3"><PreviewMaterial text={content.material} /></div>}
-        {!!content.grammar.length && <div className="mt-5 space-y-1 border-t border-line-soft pt-4"><p className="px-3 text-xs font-semibold text-ink-muted">本课重点</p>{content.grammar.map(point => <Button key={point.id} variant="ghost" size="sm" className="h-auto w-full justify-start whitespace-normal text-left text-xs leading-6" onClick={() => setDetail({ title: point.title, text: point.title, knowledgeTitles: [point.title] })}>{point.title}</Button>)}</div>}
+        {!!content.grammar.length && <div className="mt-5 space-y-1 border-t border-line-soft pt-4"><p className="px-3 text-xs font-semibold text-ink-muted">本课重点</p>{content.grammar.map(point => <Button key={point.id} variant="ghost" size="sm" className="h-auto w-full justify-start whitespace-normal text-left text-xs leading-6" onClick={() => setActive('grammar')}>{point.title}</Button>)}</div>}
         <p className="mt-auto px-3 pt-6 text-xs leading-6 text-ink-muted">先理解，再记忆，再练习。<br />可以随时切换本课内容。</p>
       </aside>
       <div className="min-h-0 overflow-y-auto overscroll-contain px-6 py-7 sm:px-9">
@@ -65,6 +64,5 @@ export function LearningPreviewPage({ content, bookTitle, chapterTitle, chapterI
       </div>
     </Tabs> : <p className="p-9 text-sm text-ink-muted">本章尚无学习内容。</p>}
     <footer className="border-t border-line-soft bg-paper-soft px-7 py-3 text-xs text-ink-muted">{temporary ? '临时演示内容' : '教材学习预览'} · 作答与复习选择仅在预览中生效。</footer>
-    <StudyExplanation detail={detail} content={content} language={language} onClose={() => setDetail(null)} onAsk={onAskAiTutor ? (text, context) => onAskAiTutor(text, `教材：${bookTitle}\n章节：${chapterTitle}\n语种：${language}\n${context}\n请解释当前选中表达，结合本课语境说明用法与注意点。`) : undefined} />
   </div>;
 }

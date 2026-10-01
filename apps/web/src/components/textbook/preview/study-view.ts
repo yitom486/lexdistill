@@ -1,4 +1,5 @@
 import type { TextbookLearningContent } from '@study-studio/document-model';
+import type { ReactNode } from 'react';
 import type { LearningSection } from '../../../stores/useTextbookNavigationStore.js';
 
 /** Temporary presentation contract. Proposed persisted fields are documented separately. */
@@ -16,6 +17,6 @@ export interface StudyDetail {
 }
 export interface StudyActions {
   language: string;
-  explain: (detail: StudyDetail) => void;
+  explain: (detail: StudyDetail, label: string, disabled?: boolean) => ReactNode;
 }
 export type StudyContentProps = StudyActions & { content: TextbookLearningContent; showTranslation: boolean };
