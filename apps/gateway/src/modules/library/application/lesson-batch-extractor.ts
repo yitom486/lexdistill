@@ -1,4 +1,4 @@
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
+import type { AgentAdapter, AgentSession, AgentImageAttachment } from '@study-studio/agent-runtime';
 import type { ChapterSource, TocEntry, TextbookLessonStage } from '@study-studio/document-model';
 import { BusinessError, generateId, translateToBusinessError, logger, type Result } from '@study-studio/shared';
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
@@ -17,6 +17,7 @@ export interface LessonExtractionJob {
   tocPath: readonly TocEntry[];
   text: string;
   source?: ChapterSource;
+  attachments?: AgentImageAttachment[];
 }
 export type LessonStage = TextbookLessonStage;
 export interface BatchExtractionProgress {
@@ -26,7 +27,7 @@ export interface BatchExtractionProgress {
   stats: CommitLessonKnowledgeOutput['stats'];
 }
 
-/** 教材专用有界交接队列；满时阻塞 OCR 生产者，结束/取消唤醒双方。 */
+/** 教材专用有界交接队列；满时阻塞解析生产者，结束/取消唤醒双方。 */
 export class LessonInputQueue {
   private readonly buffer: LessonExtractionJob[] = [];
   private waiters: Array<() => void> = [];
@@ -117,10 +118,12 @@ export class ChapterSessionPool {
   async send(session: AgentSession, job: LessonExtractionJob, assignmentId: string, controller: AbortController, correction?: string): Promise<Result<void, BusinessError>> {
     const turn = this.options.monitor?.turn(session, { nodeId: job.lessonId, attemptId: assignmentId });
     const message = buildLessonExtractionPrompt(job, assignmentId, this.options.tool.name.replaceAll('.', '_'), correction);
-    this.options.monitor?.record('model', 'input', { message, model: this.options.model ?? null, effort: this.options.effort ?? null, correction: correction ?? null }, turn?.binding);
+    this.options.monitor?.record('model', 'input', { message, model: this.options.model ?? null, effort: this.options.effort ?? null, correction: correction ?? null,
+      attachments: job.attachments?.map(image => ({ label: image.label, pngBase64: Buffer.from(image.png).toString('base64') })) ?? [],
+    }, turn?.binding);
     const interrupt = () => { void session.interrupt().catch(cause => logger.warn('教材会话中断失败', { cause: String(cause) })); };
     controller.signal.addEventListener('abort', interrupt, { once: true });
-    const iterator = session.send({ message, ...(this.options.effort ? { turnOptions: { effort: this.options.effort } } : {}) })[Symbol.asyncIterator]();
+    const iterator = session.send({ message, ...(job.attachments?.length ? { attachments: job.attachments } : {}), ...(this.options.effort ? { turnOptions: { effort: this.options.effort } } : {}) })[Symbol.asyncIterator]();
     try {
       if (controller.signal.aborted) return { ok: false, error: new BusinessError('E_CANCELLED', '教材提取已取消', 'AGENT_RUNTIME') };
       let first = true;

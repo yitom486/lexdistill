@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ContentSourceReferenceSchema } from './chapter-source.js';
 
 export const ContentSourceSchema = z.enum(['TEXTBOOK', 'AI']).describe('TEXTBOOK 为原书整理，AI 为新增内容；不得把新增内容标为原书');
 export const ExerciseTypeSchema = z.enum(['CHOICE', 'MULTI_CHOICE', 'FILL_BLANK', 'TRANSLATION', 'ORDERING', 'MATCHING', 'SHORT_ANSWER']);
@@ -7,6 +8,7 @@ const text = z.string().trim().min(1);
 const provenance = {
   source: ContentSourceSchema,
   tocId: id.optional().describe('所有内容必须关联本任务目录 ID；AI 新增内容至少关联当前任务根节点'),
+  sourceRefs: z.array(ContentSourceReferenceSchema).optional().describe('当前输入有解析块时，原书内容必须引用实际 blockId 与物理 page；表格可加从 0 开始的 row。不得引用别章、上一轮或虚构材料'),
 };
 export const FieldSourcesSchema = z.object({
   translation: ContentSourceSchema.optional(),
@@ -28,7 +30,7 @@ export const LessonContentSchema = z.object({
     translation: text.optional().describe('正文译文独立存放，并注明 fieldSources.translation'), ...provenance, fieldSources: FieldSourcesSchema.optional(),
   }).strict()),
   vocabularies: z.array(z.object({
-    id, surface: text, reading: text.optional(), pos: text.optional(), gloss: text.optional(), pitch: text.optional(),
+    id, surface: text, reading: text.optional(), pos: text.optional(), gloss: text.optional(), pitch: text.optional().describe('只填写原书或原页能确认的音调；无法确认则省略，编号不能猜成声调'),
     aiExplanation: text.optional().describe('生词独立的 AI 补充讲解；不混进词义 gloss 或原书正文'),
     examples: z.array(example), ...provenance, fieldSources: FieldSourcesSchema.optional(),
   }).strict()),

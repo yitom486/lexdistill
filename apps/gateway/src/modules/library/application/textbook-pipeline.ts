@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import type { AgentAdapter, AgentImageAttachment } from '@study-studio/agent-runtime';
 import { canonicalizeTocEntries, planTextbookTasks, TextbookPipelineSettingsSchema, type ChapterSource, type TextbookPipelineSettings, type TocEntry } from '@study-studio/document-model';
 import { BusinessError, ok, err, generateId, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ImportTask } from '@study-studio/storage-sqlite';
@@ -88,9 +88,19 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
       const activePool = pool;
       const onText = async (lesson: TocEntry, text: string, source?: ChapterSource) => {
         const task = tasks.find(task => task.root.id === lesson.id)!;
+        let attachments: AgentImageAttachment[] = [];
+        const visualPages = [...new Set(source?.blocks.filter(block => block.kind === 'TABLE' || block.kind === 'IMAGE').map(block => block.page) ?? [])];
+        if (visualPages.length && input.pdf && input.inspector) {
+          try {
+            if (!input.inspector.renderPdfPages || input.adapter?.supportsImageInput?.() !== true) throw new BusinessError('E_AGENT_CAPABILITY', '当前章节含表格或图片，需要 PDF 页渲染与支持图片的模型通道', 'AGENT_RUNTIME');
+            const rendered = await input.inspector.renderPdfPages(input.pdf, visualPages);
+            if (rendered.length !== visualPages.length || visualPages.some(page => !rendered.some(image => image.pageNumber === page && image.png.length))) throw new BusinessError('E_PARSE_IMAGE_INVALID', '章节原页图片不完整，请检查 PDF 渲染运行时', 'VALIDATION', true);
+            attachments = rendered.map(image => ({ label: `原书 PDF 第 ${image.pageNumber} 页`, png: image.png, width: image.width, height: image.height }));
+          } catch (cause) { fail(lesson.id, translateToBusinessError(cause, { category: 'TOOL_EXECUTION', fallbackMessage: '章节原页渲染失败' })); return; }
+        }
         monitor.record('text', 'ready', { text, source: source ?? null, startPage: lesson.startPage, endPage: lesson.endPage ?? null }, { nodeId: lesson.id });
         emit(lesson.id, 'queued');
-        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: task.ancestors, text, ...(source ? { source } : {}) });
+        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: task.ancestors, text, ...(source ? { source } : {}), ...(attachments.length ? { attachments } : {}) });
         monitor.record('queue', 'enqueued', { size: queue.size }, { nodeId: lesson.id });
       };
       const produce = async () => {
@@ -100,7 +110,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
           for (const lesson of pending) {
             if (controller.signal.aborted) return;
             const text = supplied.get(lesson.id)?.text.trim();
-            if (!text) { fail(lesson.id, new BusinessError('E_OCR_TEXT_EMPTY', '该章没有可用文字', 'VALIDATION')); continue; }
+            if (!text) { fail(lesson.id, new BusinessError('E_CHAPTER_TEXT_EMPTY', '该章没有可用文字', 'VALIDATION')); continue; }
             await onText(lesson, text, supplied.get(lesson.id)?.source);
           }
         } else if (input.pdf && input.inspector) {
@@ -129,6 +139,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
             monitor.record('session', 'bound', { attempt: attempt + 1 }, binding);
             if (attempt) { emit(job.lessonId, 'model_retrying'); monitor.record('model', 'retry', { previousError: lastError?.userMessage, attempt: attempt + 1 }, binding); }
             const submission = tool.bind(session.sessionId, { userId: input.userId, documentId, lessonId: job.lessonId, assignmentId, tocEntries: job.tocEntries, signal: controller.signal, allowAiExercises: config.allowAiExercises,
+              ...(job.source ? { sourceBlocks: job.source.blocks } : {}),
               monitor, sessionId: session.sessionId, turnSignal: turnController.signal,
               onStage: stage => {
                 if (stage === 'saved' && submission.receipt) { successful++; completed++; emit(job.lessonId, stage, submission.receipt.stats, undefined, submission.receipt.allLessonsReady); }

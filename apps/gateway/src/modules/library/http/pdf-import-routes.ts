@@ -8,7 +8,7 @@ import { beginTocVisionTrace, listTocVisionTraces } from '../application/toc-vis
 import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
 import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
 import { ensurePdfRuntime, type PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
-import { TocEntrySchema, TextbookPipelineSettingsSchema, SaveTextbookOutlineRequestSchema } from '@study-studio/document-model';
+import { TocEntrySchema, TextbookPipelineSettingsSchema, SaveTextbookOutlineRequestSchema, ChapterSourceSchema } from '@study-studio/document-model';
 import { z } from 'zod';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import type { TextbookPipelineInput } from '../application/textbook-pipeline.js';
@@ -33,7 +33,8 @@ const PipelineRequestSchema = TextbookPipelineSettingsSchema.extend({
   lessonJobs: z.array(z.object({
     lessonId: z.string(),
     text: z.string(),
-  })).optional(),
+    source: ChapterSourceSchema.optional(),
+  }).transform(({ lessonId, text, source }) => ({ lessonId, text, ...(source ? { source } : {}) }))).optional(),
 });
 
 /**

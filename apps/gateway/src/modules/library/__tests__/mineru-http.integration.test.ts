@@ -5,7 +5,7 @@ import { MineruHttpClient } from '../../../infrastructure/mineru/http-client.js'
 import { TextbookPipelineSettingsSchema } from '@study-studio/document-model';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { LibraryLessonCommitTool } from '../tools/library-lesson-commit-tool.js';
-import { fixturePdf, pipelineModel } from './textbook-pipeline-fixtures.js';
+import { fixturePdf, fixturePng, pipelineModel } from './textbook-pipeline-fixtures.js';
 import { modelZip } from './mineru-http-fixtures.js';
 
 it('云端真实 HTTP 上传章节 PDF、轮询和下载重试，既有任务复用后工具提交到真实 SQLite', async () => {
@@ -41,7 +41,7 @@ it('云端真实 HTTP 上传章节 PDF、轮询和下载重试，既有任务复
     const tool = new LibraryLessonCommitTool(repo), model = pipelineModel(tool);
     const result = await repo.executeTextbookPipeline({ ...settings, userId: 'http-owner', documentId: 'http-book', title: 'HTTP 集成验证',
       tocEntries: [{ id: 'part', title: '章节', level: 'lesson', startPage: 2, endPage: 3 }], pdf: await fixturePdf(4),
-      inspector: { processPdf: () => ({ markdown: '', pagesNeedingOcr: [2, 3] }), processPdfWithOcr: async () => { throw new Error('旧 OCR 不得被调用'); } },
+      inspector: { processPdf: () => ({ markdown: '', pagesNeedingOcr: [2, 3] }), processPdfWithOcr: async () => { throw new Error('旧 OCR 不得被调用'); }, renderPdfPages: async (_pdf, pages) => pages.map(pageNumber => ({ pageNumber, png: fixturePng, width: 1, height: 1 })) },
       chapterParser: { parse: (pdf, pages, signal, note) => parser.parse(pdf, pages, signal, (name, detail) => { notes.push(name); note(name, detail); }) },
       adapter: model.adapter, submissionTool: tool });
     expect(result.ok && result.value.allLessonsReady).toBe(true);

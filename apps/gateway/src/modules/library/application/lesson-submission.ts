@@ -1,4 +1,4 @@
-import { LessonSubmissionSchema, lessonContentIssues, type LessonSubmission as SubmissionInput, type TocEntry } from '@study-studio/document-model';
+import { LessonSubmissionSchema, lessonContentIssues, type LessonSubmission as SubmissionInput, type TocEntry, type ChapterSourceBlock } from '@study-studio/document-model';
 import { BusinessError, err, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ContentRepository, CommitLessonKnowledgeOutput } from '../ports.js';
 import type { ImportMonitor } from './import-monitor.js';
@@ -9,6 +9,7 @@ export interface LessonAssignment {
   lessonId: string;
   assignmentId: string;
   tocEntries: readonly TocEntry[];
+  sourceBlocks?: readonly ChapterSourceBlock[];
   signal: AbortSignal;
   turnSignal?: AbortSignal;
   allowAiExercises: boolean;
@@ -50,6 +51,19 @@ export class LessonSubmission {
     const missingLinks = items.filter(item => !item.tocId).map(item => item.id);
     if (missingLinks.length) return reject('E_LLM_SCHEMA_INVALID', '全部内容及例句必须关联当前目录 ID', { itemIds: missingLinks, expected: [...ids] });
     passed('directory_membership');
+    if (task.sourceBlocks) {
+      const blocks = new Map(task.sourceBlocks.map(block => [block.id, block]));
+      const invalid: Array<{ itemId: string; reason: string }> = [];
+      for (const item of items) {
+        if (item.source === 'TEXTBOOK' && !item.sourceRefs?.length) invalid.push({ itemId: item.id, reason: '原书内容缺少 sourceRefs' });
+        for (const ref of item.sourceRefs ?? []) {
+          const block = blocks.get(ref.blockId);
+          if (!block || block.page !== ref.page || (ref.row !== undefined && (block.kind !== 'TABLE' || !block.rows || ref.row >= block.rows.length))) invalid.push({ itemId: item.id, reason: `无效引用 ${ref.blockId} / 第 ${ref.page} 页${ref.row !== undefined ? ' / 行 ' + ref.row : ''}` });
+        }
+      }
+      if (invalid.length) return reject('E_SOURCE_REFERENCE_INVALID', `来源引用不属于当前章节材料：${invalid.slice(0, 3).map(issue => issue.itemId + '：' + issue.reason).join('；')}`, { invalid, availableBlocks: task.sourceBlocks.map(block => ({ id: block.id, page: block.page, rows: block.rows?.length ?? null })) });
+      passed('source_references', { blockCount: blocks.size, semanticAccuracyVerified: false });
+    }
     const reported = new Map(content.coverage.map(item => [item.tocId, item.status]));
     const missingCoverage = task.tocEntries.filter(entry => reported.get(entry.id) !== 'EXTRACTED');
     if (missingCoverage.length) return reject('E_TOC_COVERAGE_INCOMPLETE', '当前部分或子目录未逐项提取；无法辨认的内容不能标记已完成', missingCoverage.map(entry => ({ id: entry.id, title: entry.title, received: reported.get(entry.id) ?? null })));

@@ -5,6 +5,10 @@ import type { LibraryLessonCommitTool } from '../tools/library-lesson-commit-too
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
 import { PDFDocument } from 'pdf-lib';
 import type { ChapterSource } from '@study-studio/document-model';
+import { z } from 'zod';
+
+/** 受控模型的图片输入夹具，不代表真实书页。 */
+export const fixturePng = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR3cAAAAASUVORK5CYII=', 'base64'));
 
 export async function fixturePdf(pageCount: number): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
@@ -31,7 +35,13 @@ export function submissionFromPrompt(message: string): LessonSubmission {
   const tocLine = message.split('本章目录:\n')[1]?.split('\n')[0] ?? '[]';
   const raw: unknown = JSON.parse(tocLine);
   const ids = Array.isArray(raw) ? raw.map(item => typeof item === 'object' && item && 'id' in item && typeof item.id === 'string' ? item.id : '') : [];
-  return LessonSubmissionSchema.parse({ documentId: value('documentId'), lessonId: value('lessonId'), assignmentId: value('assignmentId'), content: contentFor(ids) });
+  const content = contentFor(ids);
+  const material = message.split('章节解析材料:\n')[1]?.split('\n')[0];
+  if (material) {
+    const source = z.object({ blocks: z.array(z.object({ id: z.string(), page: z.number() })).min(1) }).parse(JSON.parse(material));
+    for (const item of [...content.blocks, ...content.vocabularies, ...content.knowledgePoints, ...content.exercises]) if (item.source === 'TEXTBOOK') item.sourceRefs = [{ blockId: source.blocks[0]!.id, page: source.blocks[0]!.page }];
+  }
+  return LessonSubmissionSchema.parse({ documentId: value('documentId'), lessonId: value('lessonId'), assignmentId: value('assignmentId'), content });
 }
 export interface ModelTurn {
   sessionId: string; input: AgentInput;
@@ -40,7 +50,7 @@ export interface ModelTurn {
 export function pipelineModel(tool: LibraryLessonCommitTool, handle?: (turn: ModelTurn) => Promise<void>) {
   const created: CreateSessionOptions[] = [], inputs: Array<{ sessionId: string; input: AgentInput }> = [], closed: string[] = [], interrupted: string[] = [];
   const adapter: AgentAdapter = {
-    id: 'controlled-tool-model', name: 'Integration model output',
+    id: 'controlled-tool-model', name: 'Integration model output', supportsImageInput: () => true,
     createSession: async options => {
       created.push(options);
       const session: AgentSession = {
