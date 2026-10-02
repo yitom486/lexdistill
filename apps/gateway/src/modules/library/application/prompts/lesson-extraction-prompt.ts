@@ -6,6 +6,9 @@ export function buildLessonExtractionPrompt(job: LessonExtractionJob, toolNames:
     `可用工具：${toolNames.join('、')}。可多次新增、查询、修改和删除；只填写内容，修改或删除使用工具回执的本任务短引用，不填写数据库 ID 或页码。`,
     job.allowAiExercises ? '可按本章知识点补充练习，如实标注 AI 来源。' : '本次不新增 AI 练习，保留原书习题。',
     `语种: ${job.language}\n章节: ${job.title}`,
+    ...(job.tocPath.length
+      ? [`本节位置（仅定位参考，不需逐项对应）：${job.tocPath.map(entry => entry.title).join(' > ')}`]
+      : []),
     ...(correction ? [`上次未完成的原因：${correction}`] : []),
     job.source ? `章节材料:\n${JSON.stringify(job.source.blocks.map(block => ({ kind: block.kind, ...(block.text && !block.rows?.length ? { text: block.text } : {}), ...(block.rows?.length ? { rows: block.rows } : {}) })))}` : `本章内容:\n${job.text}`,
   ].join('\n\n');
