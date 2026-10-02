@@ -21,4 +21,5 @@
 教材练习新增入口：`POST /api/textbook-practice/:userId/submit`、`GET /api/textbook-practice/:userId/history`。
 `application/textbook-grading.ts` 组装冻结上下文，只注入 `learning.submit_grade`；模型填写批改内容，系统绑定身份。
 SQLite 通过 `learner-core/TextbookPracticeRepository` 命令保存每次正式作答、实际模型审计和幂等统计；失败无分数，临时案例不写正式学情。
+`GET /api/textbook-practice/:userId/growth?documentId=…&chapterId=…` 从同一份正式历史计算成长摘要，不建立重复统计表。按章节、题型、难度、独立/修改作答、实际模型及评分版本分别计算样本数、均分、满分率和已记录的交互耗时；未知难度保持未知，未评分和临时作答不参与均分。相邻修改仅在题目快照和模型/评分版本一致时标为可直接比较。
 `quiz.gradeSubjective` 的旧规则路径不参与这条教材 AI 批改链路。

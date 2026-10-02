@@ -156,7 +156,7 @@ document_id + chapter_id 为联合主键；再次写入替换该章材料。它�
 | library.write_vocabulary | items：词形、读音、释义、N5–N1 等级、可选词性/音调/讲解/例句 |
 | library.write_articles | items：正文、可选标题/译文；组级 source |
 | library.write_sentences | items：句子、可选译文/讲解/说话人；组级 source |
-| library.write_exercises | items：题型、题干、答案、必要选项、可选解析/评分要点；组级 source |
+| library.write_exercises | items：题型、题干、难度 1–5 及估计依据、客观题答案与必要选项；开放题评分要点及可选参考答案/解析；组级 source |
 | library.write_material | text |
 | library.read_material | 无参数，查询当前章节已保存材料 |
 

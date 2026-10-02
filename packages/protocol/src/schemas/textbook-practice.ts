@@ -33,8 +33,22 @@ export const TextbookExerciseAttemptSchema = z.object({
   submittedAt: z.string(), gradedAt: z.string().nullable(), timeSpentMs: z.number().nullable(), temporary: z.boolean(),
 });
 export const TextbookExerciseHistorySchema = z.array(TextbookExerciseAttemptSchema);
+export const TextbookGrowthGroupSchema = z.object({
+  chapterId: z.string(), chapterTitle: z.string(), type: ExerciseSnapshotSchema.shape.exercise.shape.type,
+  difficultyTier: z.number().int().min(1).max(5).nullable(), submissionKind: z.enum(['INDEPENDENT','REVISION']),
+  model: z.string().nullable(), adapter: z.string().nullable(), rubricVersion: z.string(),
+  samples: z.number().int().positive(), averageScore: z.number().min(0).max(100), fullMarkRate: z.number().min(0).max(1),
+  averageTimeSpentMs: z.number().nonnegative().nullable(),
+  timeline: z.array(z.object({ date: z.string(), samples: z.number().int().positive(), averageScore: z.number().min(0).max(100) })),
+});
+export const TextbookGrowthSchema = z.object({
+  independentAttempts: z.number().int().nonnegative(), revisionAttempts: z.number().int().nonnegative(), ungradedAttempts: z.number().int().nonnegative(),
+  groups: z.array(TextbookGrowthGroupSchema),
+});
+export const TextbookGrowthResponseSchema = z.object({ history: TextbookExerciseHistorySchema, summary: TextbookGrowthSchema });
 export type ExerciseGrade = z.infer<typeof ExerciseGradeSchema>;
 export type ExerciseAnswer = z.infer<typeof ExerciseAnswerSchema>;
 export type ExerciseSnapshot = z.infer<typeof ExerciseSnapshotSchema>;
 export type SubmitTextbookExercise = z.infer<typeof SubmitTextbookExerciseSchema>;
 export type TextbookExerciseAttempt = z.infer<typeof TextbookExerciseAttemptSchema>;
+export type TextbookGrowth = z.infer<typeof TextbookGrowthSchema>;

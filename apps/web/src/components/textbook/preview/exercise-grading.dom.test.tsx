@@ -43,9 +43,11 @@ it('desktop writing → actual Query/HTTP/native grade/SQLite → failure retry 
     return ok(session);
   };
   const server = new GatewayServer(repo, adapter), app = createTextbookPracticeRoutes({ repo, server, port: 0 });
+  let disconnected = true;
   globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
     if (url.pathname === '/api/agent/models') return Response.json({ models: [{ id: 'chosen-model', model: 'chosen-model', displayName: 'Chosen model', supportedReasoningEfforts: ['low'] }] });
+    if (disconnected && init?.method === 'POST') { disconnected = false; throw new Error('fetch failed'); }
     return app.request(url.pathname + url.search, init);
   }, { preconnect: originalFetch.preconnect });
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
@@ -60,11 +62,25 @@ it('desktop writing → actual Query/HTTP/native grade/SQLite → failure retry 
     input.dispatchEvent(new dom!.dom.window.Event('input', { bubbles: true }));
   }); };
   await act(async () => { dom!.root.render(<QueryClientProvider client={client!}><PreviewExercises exercises={[exercise]} temporary={false} scope={{ documentId: 'book', chapterId: 'c', chapterTitle: 'Introduce yourself', language: 'ja', knowledge: [], rubricVersion: 'textbook-grade-v1' }} /></QueryClientProvider>); });
-  await enter('わたしは李です。'); await click('请求 AI 批改'); await until('未评分 · 答案已保留');
+  await enter('わたしは李です。'); await click('请求 AI 批改'); await until('无法连接到学习助手服务');
+  expect(document.body.textContent).not.toContain('fetch failed');
+  expect(button('请求 AI 批改').disabled).toBe(true);
+  expect(repo.getRawDb().query('SELECT count(*) AS n FROM practice_item_attempts').get()).toEqual({ n: 0 });
+  await click('重试请求'); await until('未评分 · 答案已保留');
+  expect(button('请求 AI 批改').disabled).toBe(true); // Failure retries stay on the frozen attempt.
   expect(repo.getRawDb().query('SELECT count(*) AS n FROM quiz_attempts').get()).toEqual({ n: 0 });
   await click('重试批改'); await until('60 / 100');
+  expect(document.body.textContent).not.toContain('参考对照 · 尚未评分');
   expect(repo.getRawDb().query('SELECT count(*) AS n FROM practice_item_attempts').get()).toEqual({ n: 1 });
   await click('修改后再答'); await enter('わたしは李です。お名前は何ですか。'); await click('请求 AI 批改'); await until('85 / 100');
   expect(repo.getRawDb().query('SELECT attempt_no,submission_kind FROM practice_item_attempts ORDER BY attempt_no').all()).toEqual([{ attempt_no: 1, submission_kind: 'INDEPENDENT' }, { attempt_no: 2, submission_kind: 'REVISION' }]);
   expect(repo.getRawDb().query('SELECT score,max_score FROM quiz_attempts ORDER BY created_at').all()).toEqual([{ score: 60, max_score: 100 }, { score: 85, max_score: 100 }]);
+  await click('作答历史与成长'); await until('独立练习 1 次');
+  expect(document.body.textContent).toContain('修改后作答 1 次');
+  const histories = [...document.querySelectorAll<HTMLDetailsElement>('details')].filter(detail => detail.querySelector('summary')?.textContent?.includes('第 '));
+  expect(histories).toHaveLength(2);
+  expect(histories.find(detail => detail.querySelector('summary')?.textContent?.includes('第 2 次'))?.textContent).toContain('60 → 85 分');
+  await click('作答历史与成长');
+  await click('作答历史与成长'); await until('修改后作答 1 次');
+  expect(calls).toBe(3); // Reading/reopening history cannot call the model again.
 });

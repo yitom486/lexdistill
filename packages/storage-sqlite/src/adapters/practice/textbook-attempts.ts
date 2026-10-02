@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, max } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import { ChapterManifestSchema, TextbookLearningContentSchema } from '@study-studio/document-model';
 import { ExerciseSnapshotSchema, ExerciseGradeSchema, TextbookExerciseAttemptSchema, type ExerciseSnapshot, type ExerciseGrade, type SubmitTextbookExercise, type TextbookExerciseAttempt } from '@study-studio/protocol';
@@ -65,9 +65,10 @@ export function prepareTextbookAttempt(db: DrizzleDb, userId: string, input: Sub
       if (previous.status !== 'GRADED' && previous.status !== 'GRADING_FAILED') throw new BusinessError('E_ATTEMPT_BUSY', '请等待本次批改结束再修改作答', 'VALIDATION', true);
     }
     const now = nowIso(), runId = previous?.runId ?? generateId('prun');
+    const latestNo = tx.select({ n: max(practiceItemAttempts.attemptNo) }).from(practiceItemAttempts).where(and(eq(practiceItemAttempts.runId, runId), eq(practiceItemAttempts.itemId, input.exerciseId))).get()?.n ?? 0;
     if (!previous) tx.insert(practicePlanRuns).values({ id: runId, userId, language: snapshot.language, blocksJson: '[]', status: 'IN_PROGRESS', startedAt: now, createdAt: now }).run();
     tx.insert(practiceItemAttempts).values({ id, runId, blockId: input.chapterId, itemId: input.exerciseId, status: 'SUBMITTED', userAnswer: JSON.stringify(input.answer),
-      questionSnapshotJson: JSON.stringify(snapshot), attemptNo: previous ? previous.attemptNo + 1 : 1, previousAttemptId: previous?.id ?? null,
+      questionSnapshotJson: JSON.stringify(snapshot), attemptNo: latestNo + 1, previousAttemptId: previous?.id ?? null,
       submissionKind: previous ? 'REVISION' : 'INDEPENDENT', timeSpentMs: input.timeSpentMs ?? null, submittedAt: now }).run();
     return map(tx, owned(tx, userId, id));
   });
@@ -85,8 +86,8 @@ export interface GradeAudit { id: string; adapter: string; model: string; inputS
 export function settleTextbookGrade(db: DrizzleDb, userId: string, id: string, audit: GradeAudit | undefined, grading: ExerciseGrade | undefined, errorCode?: string) {
   return db.transaction(tx => {
     const row = owned(tx, userId, id);
-    if (row.status === 'GRADED') return map(tx, row);
     if (audit && row.gradingRunId !== audit.id) throw new BusinessError('E_GRADING_STALE', '旧批改结果已被拒绝，本次作答正在重新批改', 'VALIDATION');
+    if (row.status === 'GRADED') return map(tx, row);
     const snapshot = ExerciseSnapshotSchema.parse(JSON.parse(row.questionSnapshotJson!));
     const now = nowIso();
     if (audit) tx.insert(aiArtifactRuns).values({ id: audit.id, userId, action: 'textbook.grade', adapter: audit.adapter, model: audit.model,

@@ -1,7 +1,8 @@
 import { afterEach, expect, it } from 'bun:test';
 import { CodexAdapter, type AgentEvent, type CreateSessionOptions, type AgentSession, type AgentInput } from '@study-studio/agent-runtime';
 import { BusinessError, ok } from '@study-studio/shared';
-import { TextbookExerciseAttemptSchema, TextbookExerciseHistorySchema } from '@study-studio/protocol';
+import { TextbookExerciseAttemptSchema, TextbookExerciseHistorySchema, TextbookGrowthResponseSchema } from '@study-studio/protocol';
+import { haveSameGradingBasis, summarizeTextbookGrowth } from '@study-studio/learner-core';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../../../runtime/gateway-runtime.js';
 import { createTextbookPracticeRoutes } from '../http/textbook-practice-routes.js';
@@ -60,10 +61,45 @@ it('HTTP → frozen context → allowlisted native tool → committed SQLite →
   expect(TextbookExerciseAttemptSchema.parse(await (await env.post({ ...env.input, requestId: crypto.randomUUID() })).json()).submissionKind).toBe('INDEPENDENT');
   const history = TextbookExerciseHistorySchema.parse(await (await env.app.request('/api/textbook-practice/owner/history?documentId=book&chapterId=chapter')).json());
   expect(history).toHaveLength(3); expect(history.find(row => row.id === first.id)?.grading?.score).toBe(60);
+  const growth = TextbookGrowthResponseSchema.parse(await (await env.app.request('/api/textbook-practice/owner/growth?documentId=book&chapterId=chapter')).json());
+  expect(growth.summary).toMatchObject({ independentAttempts: 2, revisionAttempts: 1, ungradedAttempts: 0 });
+  expect(growth.summary.groups.find(group => group.submissionKind === 'INDEPENDENT')).toMatchObject({ samples: 2, averageScore: 67.5, difficultyTier: 3 });
+  expect(growth.summary.groups.find(group => group.submissionKind === 'REVISION')).toMatchObject({ samples: 1, averageScore: 85 });
+  expect(haveSameGradingBasis(first, revision)).toBe(true);
+  expect(summarizeTextbookGrowth([...history, first])).toEqual(growth.summary);
   expect(env.repo.getRawDb().query('SELECT count(*) AS n, count(DISTINCT source_attempt_id) AS unique_n FROM quiz_attempts').get()).toEqual({ n: 3, unique_n: 3 });
   expect(env.repo.getRawDb().query('SELECT model,prompt_version FROM ai_artifact_runs').all()).toHaveLength(3);
   expect((await env.post({ ...env.input, requestId: crypto.randomUUID(), retryAttemptId: first.id }, 'other')).status).not.toBe(200);
   expect((await env.post({ ...env.input, requestId: crypto.randomUUID(), score: 100 })).status).not.toBe(200);
+});
+
+it('growth separates models, prompt versions, unknown difficulty and failures; database commit failure cannot leave a successful grade', async () => {
+  const env = await setup(async function* (options, input) {
+    input.onTurnStarted?.('t');
+    await options.tools![0]!.execute({ score: options.model === 'model-a' ? 40 : 95, feedback: 'Controlled feedback', suggestions: [] }, { userId: options.userId, sessionId: options.sessionId, turnId: 't' });
+    yield { type: 'COMPLETED' };
+  });
+  const first = TextbookExerciseAttemptSchema.parse(await (await env.post({ ...env.input, model: 'model-a', timeSpentMs: 1000 })).json());
+  const second = TextbookExerciseAttemptSchema.parse(await (await env.post({ ...env.input, requestId: crypto.randomUUID(), model: 'model-b', timeSpentMs: 2000 })).json());
+  expect(haveSameGradingBasis(first, second)).toBe(false);
+  // Static fixture mutation simulates an existing unknown difficulty, not an estimated default.
+  env.repo.getRawDb().query('UPDATE textbook_exercise_items SET difficulty_tier=NULL,difficulty_reason=NULL WHERE id=?').run(env.input.exerciseId);
+  const third = TextbookExerciseAttemptSchema.parse(await (await env.post({ ...env.input, requestId: crypto.randomUUID(), model: 'model-a' })).json());
+  expect(third.snapshot.exercise.difficultyTier).toBeNull();
+  // Test-only DDL fault: both detailed grade and effective statistics must roll back together.
+  env.repo.getRawDb().run("CREATE TRIGGER fail_quiz_insert BEFORE INSERT ON quiz_attempts BEGIN SELECT RAISE(ABORT,'controlled commit failure'); END");
+  const failed = TextbookExerciseAttemptSchema.parse(await (await env.post({ ...env.input, requestId: crypto.randomUUID(), model: 'model-a' })).json());
+  expect(failed.status).toBe('GRADING_FAILED'); expect(failed.grading).toBeNull();
+  const growth = TextbookGrowthResponseSchema.parse(await (await env.app.request('/api/textbook-practice/owner/growth?documentId=book&chapterId=chapter')).json());
+  expect(growth.summary).toMatchObject({ independentAttempts: 3, ungradedAttempts: 1 });
+  expect(growth.summary.groups).toHaveLength(3);
+  expect(growth.summary.groups.find(group => group.model === 'model-a' && group.difficultyTier === 3)).toMatchObject({ averageScore: 40, averageTimeSpentMs: 1000 });
+  expect(growth.summary.groups.find(group => group.model === 'model-b')).toMatchObject({ averageScore: 95, averageTimeSpentMs: 2000 });
+  expect(growth.summary.groups.find(group => group.difficultyTier === null)).toMatchObject({ averageScore: 40, samples: 1 });
+  const versioned = summarizeTextbookGrowth([first, { ...second, model: first.model, rubricVersion: 'different-rubric' }]);
+  expect(versioned.groups).toHaveLength(2);
+  expect(env.repo.getRawDb().query('SELECT count(*) AS n FROM quiz_attempts').get()).toEqual({ n: 3 });
+  expect((await env.app.request('/api/textbook-practice/other/growth?documentId=book&chapterId=chapter')).status).not.toBe(200);
 });
 
 it('AI failure keeps frozen answer unscored; retry reuses attempt; temporary case and objective grading cannot pollute model/growth counts', async () => {

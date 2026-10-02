@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { TextbookExerciseAttemptSchema, TextbookExerciseHistorySchema, type SubmitTextbookExercise } from '@study-studio/protocol';
-import { BusinessError } from '@study-studio/shared';
+import { TextbookExerciseAttemptSchema, TextbookExerciseHistorySchema, TextbookGrowthResponseSchema, type SubmitTextbookExercise } from '@study-studio/protocol';
+import { BusinessError, translateToBusinessError } from '@study-studio/shared';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { DEFAULT_USER_ID } from './query-keys.js';
@@ -20,8 +20,10 @@ export function useTextbookExerciseMutation(documentId: string, chapterId: strin
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (input: SubmitTextbookExercise) => {
-      const response = await fetch(`${GATEWAY_BASE_URL}/api/textbook-practice/${encodeURIComponent(userId)}/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
-      return TextbookExerciseAttemptSchema.parse(await readResponse(response));
+      try {
+        const response = await fetch(`${GATEWAY_BASE_URL}/api/textbook-practice/${encodeURIComponent(userId)}/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+        return TextbookExerciseAttemptSchema.parse(await readResponse(response));
+      } catch (cause) { throw translateToBusinessError(cause, 'submitTextbookExercise'); }
     },
     retry: false,
     onSuccess: result => { if (!result.temporary) void client.invalidateQueries({ queryKey: textbookHistoryKey(userId, documentId, chapterId) }); },
@@ -33,5 +35,13 @@ export function useTextbookExerciseHistory(documentId: string, chapterId: string
     queryFn: async () => {
       const response = await fetch(`${GATEWAY_BASE_URL}/api/textbook-practice/${encodeURIComponent(userId)}/history?${new URLSearchParams({ documentId, chapterId })}`);
       return TextbookExerciseHistorySchema.parse(await readResponse(response));
+    } });
+}
+export function useTextbookGrowth(documentId: string, chapterId: string, enabled: boolean) {
+  const userId = useUserProfileStore(state => state.profile.userId) || DEFAULT_USER_ID;
+  return useQuery({ queryKey: [...textbookHistoryKey(userId, documentId, chapterId), 'growth'], enabled,
+    queryFn: async () => {
+      const response = await fetch(`${GATEWAY_BASE_URL}/api/textbook-practice/${encodeURIComponent(userId)}/growth?${new URLSearchParams({ documentId, chapterId })}`);
+      return TextbookGrowthResponseSchema.parse(await readResponse(response));
     } });
 }

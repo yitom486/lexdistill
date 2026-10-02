@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { ExerciseSnapshot, ExerciseAnswer, SubmitTextbookExercise, TextbookExerciseAttempt } from '@study-studio/protocol';
 import type { TextbookLearningContent } from '@study-studio/document-model';
+import { translateToBusinessError } from '@study-studio/shared';
 import { Check, RotateCcw } from 'lucide-react';
 import { Button } from '../../ui/button.js';
 import { Badge } from '../../ui/badge.js';
@@ -24,6 +25,7 @@ export function PreviewExercise({ exercise, index, scope, temporary = true }: { 
   const [submitted, setSubmitted] = useState(false);
   const [previous, setPrevious] = useState<TextbookExerciseAttempt>();
   const lastRequest = useRef<SubmitTextbookExercise | undefined>(undefined);
+  const startedAt = useRef<number | undefined>(undefined);
   const mutation = useTextbookExerciseMutation(scope?.documentId ?? '', scope?.chapterId ?? '');
   const preferences = usePreferencesStore();
   const subjective = ['TRANSLATION', 'SHORT_ANSWER', 'WRITING'].includes(exercise.type);
@@ -45,7 +47,7 @@ export function PreviewExercise({ exercise, index, scope, temporary = true }: { 
     : exercise.type === 'ORDERING' ? selected.length === exercise.options?.length
     : exercise.type === 'CHOICE' || exercise.type === 'MULTI_CHOICE' ? !!selected.length
     : Array.from({ length: inputCount }, (_, i) => answers[i]?.trim()).every(Boolean);
-  const reset = () => { setAnswers([]); setSelected([]); setPairs({}); setSubmitted(false); mutation.reset(); };
+  const reset = () => { setAnswers([]); setSelected([]); setPairs({}); setSubmitted(false); mutation.reset(); startedAt.current = undefined; };
   const submit = (retry = false) => {
     if (!scope) return;
     const answer: ExerciseAnswer = exercise.type === 'MATCHING' ? (exercise.left ?? []).map((left, i) => ({ left, right: pairs[i] ?? '' }))
@@ -56,6 +58,7 @@ export function PreviewExercise({ exercise, index, scope, temporary = true }: { 
       ...(temporary ? { preview: { ...scope, exercise } } : { documentId: scope.documentId, chapterId: scope.chapterId, exerciseId: exercise.id,
         ...(retry && previous ? { retryAttemptId: previous.id } : previous ? { previousAttemptId: previous.id } : {}) }),
       ...(preferences.coachModelId ? { model: preferences.coachModelId } : {}), ...(preferences.coachEffort ? { effort: preferences.coachEffort } : {}),
+      ...(startedAt.current !== undefined ? { timeSpentMs: Date.now() - startedAt.current } : {}),
     };
     lastRequest.current = input;
     setSubmitted(true);
@@ -68,7 +71,7 @@ export function PreviewExercise({ exercise, index, scope, temporary = true }: { 
     : subjective ? '写出你的表达，不要求与参考答案逐字一致。可主动请求 AI 批改，或只对照参考。'
     : '选择一个答案。';
 
-  return <article className="rounded-2xl border border-line-soft bg-paper-soft p-6" aria-label={`练习 ${index + 1}：${exerciseNames[exercise.type]}`}>
+  return <article className="rounded-2xl border border-line-soft bg-paper-soft p-6" aria-label={`练习 ${index + 1}：${exerciseNames[exercise.type]}`} onFocusCapture={() => { if (startedAt.current === undefined && !submitted) startedAt.current = Date.now(); }}>
     <div className="mb-4 flex items-center gap-2">
       <span className="text-sm font-semibold text-accent-ink">{String(index + 1).padStart(2, '0')}</span>
       <Badge variant="outline">{exerciseNames[exercise.type]}</Badge>
@@ -117,15 +120,15 @@ export function PreviewExercise({ exercise, index, scope, temporary = true }: { 
     </div>}
     <div className="mt-5 flex items-center gap-3">
       <Button disabled={!hasInput || submitted || mutation.isPending} onClick={() => { if (!subjective && !temporary) submit(); else setSubmitted(true); }}><Check className="h-4 w-4" />{subjective ? '对照参考答案' : '检查答案'}</Button>
-      {subjective && scope && <Button variant="amber" disabled={!hasInput || mutation.isPending || !preferences.coachModelId || !!mutation.data?.grading} onClick={() => submit()}>{mutation.isPending ? 'AI 批改中…' : '请求 AI 批改'}</Button>}
+      {subjective && scope && <Button variant="amber" disabled={!hasInput || mutation.isPending || !preferences.coachModelId || !!mutation.data || mutation.isError} onClick={() => submit()}>{mutation.isPending ? 'AI 批改中…' : '请求 AI 批改'}</Button>}
       {submitted && <Button variant="ghost" disabled={mutation.isPending} onClick={reset}><RotateCcw className="h-4 w-4" />{previous && !temporary ? '修改后再答' : '重新作答'}</Button>}
       {previous && !temporary && <Button variant="ghost" disabled={mutation.isPending} onClick={() => { reset(); setPrevious(undefined); }}>开始新一轮练习</Button>}
     </div>
     {mutation.isPending && <p role="status" className="mt-3 text-sm text-ink-muted">正在批改这次提交；答案已冻结，批改完成后可以修改。</p>}
     {!mutation.isPending && mutation.data && <ExerciseGradingFeedback result={mutation.data} onRetry={() => submit(true)} />}
-    {mutation.isError && <div role="alert" className="mt-3 space-y-2 text-sm text-ink-muted"><p>{mutation.error.message}</p><Button variant="outline" onClick={() => { if (lastRequest.current) mutation.mutate(lastRequest.current, { onSuccess: result => setPrevious(result) }); }}>重试请求</Button></div>}
+    {mutation.isError && <div role="alert" className="mt-3 space-y-2 text-sm text-ink-muted"><p>{translateToBusinessError(mutation.error, 'submitTextbookExercise').userMessage}</p><Button variant="outline" onClick={() => { if (lastRequest.current) mutation.mutate(lastRequest.current, { onSuccess: result => setPrevious(result) }); }}>重试请求</Button></div>}
     {submitted && <div role="status" className="mt-5 rounded-xl border border-line-soft bg-surface-warm p-4">
-      <p className="font-medium">{subjective ? '参考对照 · 尚未评分' : correct ? '回答正确' : '再核对一下'}</p>
+      <p className="font-medium">{subjective ? mutation.data?.grading ? '参考对照' : '参考对照 · 尚未评分' : correct ? '回答正确' : '再核对一下'}</p>
       {reference && <p className="mt-2 text-sm leading-7">参考答案：{reference}</p>}
       {exercise.explanation && <p className="mt-2 text-sm leading-7 text-ink-muted">{exercise.explanation}</p>}
       {subjective && exercise.gradingNotes && <p className="mt-2 text-sm leading-7 text-ink-muted">评分要点：{exercise.gradingNotes}</p>}

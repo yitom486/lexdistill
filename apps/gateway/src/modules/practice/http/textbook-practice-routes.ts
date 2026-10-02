@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { SubmitTextbookExerciseSchema } from '@study-studio/protocol';
+import { summarizeTextbookGrowth } from '@study-studio/learner-core';
 import { BusinessError } from '@study-studio/shared';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
@@ -29,5 +30,13 @@ export function createTextbookPracticeRoutes(deps: GatewayDeps) {
         const result = await deps.repo.textbookExerciseHistory(c.req.param('userId'), documentId, chapterId);
         return result.ok ? c.json(result.value) : formatBusinessErrorResponse(c, result.error);
       } catch (cause) { return formatBusinessErrorResponse(c, cause, 'textbookExerciseHistory'); }
+    })
+    .get('/api/textbook-practice/:userId/growth', async c => {
+      try {
+        const documentId = c.req.query('documentId'), chapterId = c.req.query('chapterId');
+        if (!documentId || !chapterId) return formatBusinessErrorResponse(c, new BusinessError('E_INVALID_INPUT', '请指定教材和章节', 'VALIDATION'));
+        const result = await deps.repo.textbookExerciseHistory(c.req.param('userId'), documentId, chapterId);
+        return result.ok ? c.json({ history: result.value, summary: summarizeTextbookGrowth(result.value) }) : formatBusinessErrorResponse(c, result.error);
+      } catch (cause) { return formatBusinessErrorResponse(c, cause, 'textbookExerciseGrowth'); }
     });
 }
