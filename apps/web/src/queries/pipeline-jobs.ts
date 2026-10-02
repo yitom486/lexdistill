@@ -6,9 +6,8 @@ import type { TextbookPipelineSettings, TocEntry } from '@study-studio/document-
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,
-  GATEWAY_NO_RESPONSE_MESSAGE,
-  GATEWAY_UNREACHABLE_CODE,
   isGatewayNoResponseError,
+  mapGatewayTransportFailure,
   readGatewayErrorCode,
   readGatewayErrorDetails,
   readGatewayUserMessage,
@@ -42,7 +41,7 @@ async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Respo
     return await fetch(input, init);
   } catch (e) {
     if (isGatewayNoResponseError(e)) {
-      throw new GatewayRequestError(GATEWAY_NO_RESPONSE_MESSAGE, { code: GATEWAY_UNREACHABLE_CODE });
+      throw await mapGatewayTransportFailure(GATEWAY_BASE_URL, e);
     }
     throw e instanceof Error ? e : new Error('网络请求失败，请稍后重试');
   }

@@ -46,7 +46,7 @@ export function createApp(deps: GatewayDeps) {
       cors({
         origin: '*',
         allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowHeaders: ['Content-Type', 'Authorization'],
+        allowHeaders: ['Content-Type', 'Authorization', 'X-Textbook-Trace'],
       }),
     )
     .onError((err, c) => {

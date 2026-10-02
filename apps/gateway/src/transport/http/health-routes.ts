@@ -4,8 +4,8 @@ import type { GatewayDeps } from '../../composition/gateway-deps.js';
 
 /**
  * 进程身份（AGENTS §7.3 服务端身份握手）：模块级常量，随进程启动一次生成。
- * 重启即换 bootId；前端长请求失败后凭此判定"网关是否在请求中途重启"，
- * 不再把中断误诊为普通网络失败（见 web `mapTransportInterruption`）。
+ * 重启即换 bootId；前端必须比较前后身份才能判断重启。
+ * 单次健康检查仅说明当前是否能连接（见 WebView `mapGatewayTransportFailure`）。
  */
 const BOOT_ID = randomUUID();
 const STARTED_AT = new Date().toISOString();

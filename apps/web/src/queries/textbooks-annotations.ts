@@ -5,9 +5,8 @@ import { parseTextbookAST, TocEntrySchema, SaveTextbookOutlineResultSchema, type
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,
-  GATEWAY_NO_RESPONSE_MESSAGE,
-  GATEWAY_UNREACHABLE_CODE,
   isGatewayNoResponseError,
+  mapGatewayTransportFailure,
   readGatewayErrorCode,
   readGatewayErrorDetails,
   readGatewayUserMessage,
@@ -15,7 +14,7 @@ import {
 
 /**
  * CMD-10：PDF 三专线（import/map/append）的 fetch 统一包一层——连接级失败
- *（网关被大书整本解析打断 / 未启动）抛中文 GatewayRequestError，
+ * 先检查网关健康状态，再抛安全中文错误；不推测失败原因。
  *禁止把 Failed to fetch 顶到 toast。HTTP 信封错误仍走各调用方的 readGatewayUserMessage。
  */
 async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Response> {
@@ -23,7 +22,7 @@ async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Respo
     return await fetch(input, init);
   } catch (e) {
     if (isGatewayNoResponseError(e)) {
-      throw new GatewayRequestError(GATEWAY_NO_RESPONSE_MESSAGE, { code: GATEWAY_UNREACHABLE_CODE });
+      throw await mapGatewayTransportFailure(GATEWAY_BASE_URL, e);
     }
     throw e instanceof Error ? e : new Error('网络请求失败，请稍后重试');
   }

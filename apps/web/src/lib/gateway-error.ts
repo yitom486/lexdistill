@@ -9,12 +9,11 @@
 /** 网关不可达错误码（fetch 层无响应时用；见 fetchPdfGateway）。 */
 export const GATEWAY_UNREACHABLE_CODE = 'E_GATEWAY_UNREACHABLE';
 
-/** 长请求被网关重启中断的错误码（探测到网关存活但本次请求已死时用）。 */
-export const GATEWAY_INTERRUPTED_CODE = 'E_GATEWAY_RESTARTED';
+/** 教材请求失败但健康检查正常；不能由此断定网关重启或 PDF 解析故障。 */
+export const GATEWAY_REQUEST_FAILED_CODE = 'E_GATEWAY_REQUEST_FAILED';
 
-/** 中断固定中文：明确"没有完成 + 请重新发起"，禁止无止境转圈误诊。 */
-export const GATEWAY_INTERRUPTED_MESSAGE =
-  '网关连接中断（可能刚刚重启），本次请求没有完成，请重新发起。';
+export const GATEWAY_REQUEST_FAILED_MESSAGE =
+  '教材请求未能完成，请检查网关连接后重试。';
 
 /** 携带网关错误码与 details 的请求失败（message 即 userMessage，可直接展示）。 */
 export class GatewayRequestError extends Error {
@@ -65,10 +64,10 @@ export function readGatewayErrorDetails(payload: unknown): unknown {
 
 /**
  * 网关无响应固定中文（fetch 根本没拿到 HTTP 体时用，禁止把 Failed to fetch 顶到 toast）。
- * 大扫描书整本解析可能打断网关进程，文案直接指路重启 + 指定页码/全部页（只扫前 30 页）。
+ * 仅在健康检查也失败时提示无法连接，不推测文件大小、解析崩溃或进程退出。
  */
 export const GATEWAY_NO_RESPONSE_MESSAGE =
-  '网关没有响应。请确认网关已启动；若刚导入很大的扫描 PDF，进程可能被整本解析打断，重启网关后再用「指定页码」或全部页（应只扫前 30 页）。';
+  '无法连接本机网关，请检查桌面后台服务后重试。';
 
 function readErrorText(error: unknown): string {
   if (error instanceof Error) return `${error.name} ${error.message}`;
@@ -106,20 +105,18 @@ export async function probeGatewayBootId(baseUrl: string, timeoutMs = 4000): Pro
 }
 
 /**
- * 传输层失败映射（长请求重启误诊修复）：仅当失败本身是"无响应"类
- * （含已映射的 E_GATEWAY_UNREACHABLE）时才探测；网关存活 → 本次请求死于
- * 中途（极大概率网关在请求中途重启），换中断错误；网关仍死 → 原样返回。
+ * 仅在没有 HTTP 响应时进行一次健康检查，记录实际检查结果。
+ * 网关存活不证明请求失败原因；健康检查失败也不证明进程已退出。
  * 读到真实 HTTP 信封错误的调用方不得经过这里（那是业务失败，不是中断）。
  */
-export async function mapTransportInterruption(baseUrl: string, error: unknown): Promise<unknown> {
+export async function mapGatewayTransportFailure(baseUrl: string, error: unknown): Promise<unknown> {
   const unreachable =
     isGatewayNoResponseError(error) ||
     (error instanceof GatewayRequestError && error.code === GATEWAY_UNREACHABLE_CODE);
   if (!unreachable) return error;
   const bootId = await probeGatewayBootId(baseUrl);
-  if (bootId === null) return error;
-  return new GatewayRequestError(GATEWAY_INTERRUPTED_MESSAGE, {
-    code: GATEWAY_INTERRUPTED_CODE,
-    details: { bootId },
+  return new GatewayRequestError(bootId === null ? GATEWAY_NO_RESPONSE_MESSAGE : GATEWAY_REQUEST_FAILED_MESSAGE, {
+    code: bootId === null ? GATEWAY_UNREACHABLE_CODE : GATEWAY_REQUEST_FAILED_CODE,
+    details: { health: bootId === null ? { reachable: false } : { reachable: true, bootId } },
   });
 }

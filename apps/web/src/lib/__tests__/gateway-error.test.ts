@@ -1,12 +1,12 @@
 import { describe, expect, test, afterEach } from 'bun:test';
 import {
-  GATEWAY_INTERRUPTED_CODE,
-  GATEWAY_INTERRUPTED_MESSAGE,
+  GATEWAY_REQUEST_FAILED_CODE,
+  GATEWAY_REQUEST_FAILED_MESSAGE,
   GATEWAY_NO_RESPONSE_MESSAGE,
   GATEWAY_UNREACHABLE_CODE,
   GatewayRequestError,
   isGatewayNoResponseError,
-  mapTransportInterruption,
+  mapGatewayTransportFailure,
   probeGatewayBootId,
   readGatewayErrorCode,
   readGatewayErrorDetails,
@@ -74,15 +74,14 @@ describe('isGatewayNoResponseError（无响应转中文，不再 Failed to fetch
     expect(isGatewayNoResponseError({ success: false, error: { userMessage: '超限' } })).toBe(false);
   });
 
-  test('固定中文案含重启与页码指引', () => {
-    expect(GATEWAY_NO_RESPONSE_MESSAGE).toContain('网关没有响应');
-    expect(GATEWAY_NO_RESPONSE_MESSAGE).toContain('重启网关');
-    expect(GATEWAY_NO_RESPONSE_MESSAGE).toContain('指定页码');
+  test('连接失败提示不推测解析或进程故障', () => {
+    expect(GATEWAY_NO_RESPONSE_MESSAGE).toContain('无法连接本机网关');
+    expect(GATEWAY_NO_RESPONSE_MESSAGE).not.toContain('整本解析');
     expect(GATEWAY_NO_RESPONSE_MESSAGE).not.toContain('Failed to fetch');
   });
 });
 
-describe('probeGatewayBootId / mapTransportInterruption（重启中断显式化）', () => {
+describe('probeGatewayBootId / mapGatewayTransportFailure（根据健康检查提示）', () => {
   const originalFetch = globalThis.fetch;
   afterEach(() => {
     globalThis.fetch = originalFetch;
@@ -124,25 +123,29 @@ describe('probeGatewayBootId / mapTransportInterruption（重启中断显式化�
     await expect(probeGatewayBootId('http://localhost:8080')).resolves.toBeNull();
   });
 
-  test('无响应失败 + 网关存活 → 中断错误；网关仍死 → 原样；业务错误透传', async () => {
+  test('无响应失败根据健康检查分类；业务错误透传', async () => {
     stubHealth({ status: 'ok', bootId: 'boot-2' });
-    const interrupted = await mapTransportInterruption(
+    const interrupted = await mapGatewayTransportFailure(
       'http://localhost:8080',
       new GatewayRequestError(GATEWAY_NO_RESPONSE_MESSAGE, { code: GATEWAY_UNREACHABLE_CODE })
     );
     expect(interrupted).toBeInstanceOf(GatewayRequestError);
     const err = interrupted as GatewayRequestError;
-    expect(err.code).toBe(GATEWAY_INTERRUPTED_CODE);
-    expect(err.message).toBe(GATEWAY_INTERRUPTED_MESSAGE);
+    expect(err.code).toBe(GATEWAY_REQUEST_FAILED_CODE);
+    expect(err.message).toBe(GATEWAY_REQUEST_FAILED_MESSAGE);
+    expect(err.details).toEqual({ health: { reachable: true, bootId: 'boot-2' } });
 
     stubDead();
     const original = new GatewayRequestError(GATEWAY_NO_RESPONSE_MESSAGE, {
       code: GATEWAY_UNREACHABLE_CODE,
     });
-    await expect(mapTransportInterruption('http://localhost:8080', original)).resolves.toBe(original);
+    const unavailable = await mapGatewayTransportFailure('http://localhost:8080', original);
+    expect(unavailable).toBeInstanceOf(GatewayRequestError);
+    expect((unavailable as GatewayRequestError).code).toBe(GATEWAY_UNREACHABLE_CODE);
+    expect((unavailable as GatewayRequestError).details).toEqual({ health: { reachable: false } });
 
     stubHealth({ status: 'ok', bootId: 'boot-3' });
     const business = new GatewayRequestError('范围非法', { code: 'E_INVALID_INPUT' });
-    await expect(mapTransportInterruption('http://localhost:8080', business)).resolves.toBe(business);
+    await expect(mapGatewayTransportFailure('http://localhost:8080', business)).resolves.toBe(business);
   });
 });

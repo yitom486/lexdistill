@@ -138,3 +138,20 @@ bun run typecheck
 
 收尾实机只读检查发现，原配置接口路径会被先注册的文档 ID 通配路由截获。已替换为 `/api/documents/:userId/textbook-parsers/config`，桌面贯通测试同步按生产顺序组合真实文库/导入路由并断言配置响应。现有桌面 Gateway 新接口实际返回配置布尔值，未暴露凭据。此修正单独提交，不保留旧路径兼容。
 
+## 桌面跨端口教材请求（2026-10-02）
+
+Tauri WebView 与本机 Gateway 端口不同，教材监视头 `X-Textbook-Trace` 必须通过 CORS 预检许可。此次故障为该请求头未列入允许列表；“大 PDF 导致进程中断”不能由 `Failed to fetch` 推断。
+
+新增 [教材网关集成测试](../apps/web/src/lib/__tests__/textbook-gateway.integration.test.ts) 使用完整 `createApp` 及真实临时 HTTP 服务：
+
+- 先核对目录探测、目录提炼、目录保存的 OPTIONS 许可，再发送 POST；无效输入能读取安全的 HTTP 400 回执。
+- 合法目录实际保存到隔离的 SQLite，并核对对应 trace 的开始/结果记录。
+- TTS 专属凭证头预检保留，普通目录 API 不放开任意请求头。
+- 客户端失败诊断读取真实网关健康结果；服务关闭后健康检查失败，分别生成教材请求失败和连接失败文案，details 保留实际检查结果。
+
+修复前测试确实因缺少 `x-textbook-trace` 失败；修复后通过。Bun fetch 不执行 WebView 的 CORS 限制，所以测试显式检查许可；WebView 无响应错误形状受控替代。没有调用真实目录模型，不能替代桌面人工操作及模型质量验收。
+
+本次生产源码集中保存于北京时间 20:26:46–20:26:52，watch 自动重载；20:30 左右删除首次类型检查意外生成的未跟踪 JS/声明文件。未手动停止或重启用户服务。桌面动态端口上的只读复核返回 HTTP 204，允许头实际包含 `Content-Type,Authorization,X-Textbook-Trace`，健康检查正常。
+
+正式门禁：`bun run typecheck` 通过；`bun run test:all` 为 1637 通过、3 项既有 RSS 联网跳过、0 失败，共 263 文件，69.63 秒。首次沙箱内执行遇到原生依赖及文件权限限制，不计为验收通过；获准在沙箱外重跑后通过。最终日志位于忽略目录 `.studio-internal/textbook-cors-typecheck.log`、`textbook-cors-test-all.log`。
+
