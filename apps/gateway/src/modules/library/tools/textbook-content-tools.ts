@@ -1,4 +1,4 @@
-import { TextbookContentOperationSchemas, RequiredLessonContent, JlptLevelSchema, type TextbookContentKind } from '@study-studio/document-model';
+import { TextbookContentOperationSchemas, JlptLevelSchema, type TextbookContentKind } from '@study-studio/document-model';
 import { BusinessError, err, ok, translateToBusinessError, type Result } from '@study-studio/shared';
 import { ToolLocations, ToolPermissions, type ToolDefinition, type ToolExecutionContext } from '@study-studio/tool-core';
 import type { ContentRepository, CommitLessonKnowledgeOutput } from '../ports.js';
@@ -14,9 +14,9 @@ export interface ChapterContentAssignment {
   onStage?: (stage: 'validating' | 'correcting' | 'saving' | 'saved' | 'extracting') => void;
 }
 const descriptions: Record<TextbookContentKind, string> = {
-  grammar: '管理本课知识点、用法或发音知识。填写标题、说明和例句；AI 补充讲解放 aiExplanation。本课必需提交知识点。',
-  vocabulary: '管理本课词汇。填写词面、读音、释义及估计等级 ' + JlptLevelSchema.options.join('|') + '，可提供词性、讲解和例句。本课必需提交词汇；最终事务新增全局缺失词，已有词复用、不覆盖。等级不是掌握度。',
-  exercises: '管理本课练习。本课必需提交练习；填写题型、题干、difficultyTier（复杂度 1–5）及 difficultyReason。选择题答案用选项文字；排序用有序文字列表，可重复；配对用左右文字配对，可复用右项；多空答案按空位顺序。翻译、简答和写作提供 gradingNotes，参考表达可省略。新增练习标注 source=AI。',
+  grammar: '管理本课知识点、用法或发音知识。填写标题、说明和例句；AI 补充讲解放 aiExplanation。',
+  vocabulary: '管理本课词汇。填写词面、读音、释义及估计等级 ' + JlptLevelSchema.options.join('|') + '，可提供词性、讲解和例句。最终事务新增全局缺失词，已有词复用、不覆盖。等级不是掌握度。',
+  exercises: '管理本课练习。填写题型、题干、difficultyTier（复杂度 1–5）及 difficultyReason。选择题答案用选项文字；排序用有序文字列表，可重复；配对用左右文字配对，可复用右项；多空答案按空位顺序。翻译、简答和写作提供 gradingNotes，参考表达可省略。新增练习标注 source=AI。',
   articles: '管理本课完整文章或会话。填写正文，可提供标题和译文；保留完整语境，不逐行拆成文章。没有文章无需调用。',
   sentences: '管理本课可独立学习的句子。填写句子，可提供译文、讲解或说话人。没有句子无需调用。',
   material: '管理本课的一份整理材料，items 中填写 text，保留有意义的标题、列表和表格。没有材料无需调用。',
@@ -89,9 +89,8 @@ export class ChapterContentSubmission {
     this.sealed = true; await this.queue;
     if (this.receipt) return ok(this.receipt);
     const guard = this.guard(); if (guard) return err(guard);
-    const missing = this.buffer?.missing();
-    if (!this.buffer || missing?.length) {
-      this.error = new BusinessError('E_LESSON_CONTENT_MISSING', '本课知识点、词汇、练习必须分别提交有效内容', 'VALIDATION', true, { missing: missing ?? RequiredLessonContent });
+    if (!this.buffer?.hasSubmittedContent()) {
+      this.error = new BusinessError('E_LESSON_CONTENT_MISSING', '本章尚未提交有效学习内容，请按实际内容调用对应工具', 'VALIDATION', true);
       this.assignment.monitor?.record('validation', 'rejected', { code: this.error.code, message: this.error.userMessage, details: this.error.internalDetails },
         { nodeId: this.assignment.lessonId, attemptId: this.assignment.assignmentId, ...(this.assignment.sessionId ? { sessionId: this.assignment.sessionId } : {}) });
       return err(this.error);

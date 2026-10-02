@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ArticleItemSchema, GrammarItemSchema, LearningExerciseItemSchema, SentenceItemSchema, VocabularyItemSchema } from './textbook-learning-content.js';
 import { validateExercise } from './exercise-validation.js';
 
-export const RequiredLessonContent = ['grammar', 'vocabulary', 'exercises'] as const;
 const ref = z.string().trim().min(1).describe('仅使用当前任务工具回执中的短引用，不是数据库 ID');
 const action = z.enum(['add', 'read', 'update', 'delete']).default('add');
 function operation<T extends z.ZodType>(item: T, sourced: boolean) {

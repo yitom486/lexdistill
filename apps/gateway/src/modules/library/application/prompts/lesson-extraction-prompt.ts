@@ -2,7 +2,7 @@ import type { LessonExtractionJob } from '../lesson-batch-extractor.js';
 
 export function buildLessonExtractionPrompt(job: LessonExtractionJob, toolNames: readonly string[], correction?: string): string {
   return [
-    '以本课为单位整理可直接学习的内容。必须分别提交知识点、词汇、练习；文章、句子和整理材料有则提交，没有则省略。课内小标题仅作内容参考，不需逐项对应。知识点说明与例句分开，文章和会话保留完整语境，AI 补充讲解单独填写。',
+    '根据本章实际内容整理可直接学习的材料，视情况选择知识点、词汇、练习、文章、句子或整理材料；有则提交，无则省略，不为凑齐类别生成内容。课内小标题仅作参考。讲解与例句按各自字段填写，文章和会话保留完整语境。',
     `可用工具：${toolNames.join('、')}。可多次新增、查询、修改和删除；只填写内容，修改或删除使用工具回执的本任务短引用，不填写数据库 ID 或页码。`,
     job.allowAiExercises ? '可按本章知识点补充练习，如实标注 AI 来源。' : '本次不新增 AI 练习，保留原书习题。',
     `语种: ${job.language}\n章节: ${job.title}`,

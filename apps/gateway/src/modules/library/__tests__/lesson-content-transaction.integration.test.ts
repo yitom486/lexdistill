@@ -166,22 +166,22 @@ describe('原生课程 CRUD 暂存与整课事务', () => {
     expect(db.query('SELECT count(*) AS n FROM textbook_fts').get()).toEqual({ n: 1 });
   });
 
-  it('缺必需内容时不写库、不当数据库失败重试；模型新轮次获得缺项反馈且不继承失败缓冲', async () => {
+  it('删空暂存内容时不写库、不当数据库失败重试；模型新轮次获得反馈且不继承失败缓冲', async () => {
     const env = setup(); let commits = 0, attempts = 0, firstRef = '';
     const commit = env.repo.commitTextbookLesson.bind(env.repo);
     env.repo.commitTextbookLesson = (...args) => { commits++; return commit(...args); };
     const model = pipelineModel(env.tool, async ({ submit, input: turn }) => {
       if (++attempts === 1) {
         firstRef = items(await submit({ items: [{ text: '失败轮次正文' }] }))[0]!.ref;
-        expect((await submit(requiredContent.grammar, 'grammar')).ok).toBe(true);
+        expect((await submit({ action: 'delete', refs: [firstRef] })).ok).toBe(true);
       } else {
-        expect(turn.message).toContain('vocabulary'); expect(turn.message).toContain('exercises');
+        expect(turn.message).toContain('本章尚未提交有效学习内容');
         expect(items(await submit({ action: 'read' }))).toEqual([]);
         const foreign = await submit({ action: 'delete', refs: [firstRef] });
         expect(foreign.ok ? '' : foreign.error.code).toBe('E_CONTENT_REF_INVALID');
         const own = items(await submit({ items: [{ text: '本轮删除以修正反馈' }] }))[0]!;
         expect((await submit({ action: 'delete', refs: [own.ref] })).ok).toBe(true);
-        await submitRequired(submit);
+        expect((await submit(requiredContent.grammar, 'grammar')).ok).toBe(true);
       }
     });
     const result = await env.repo.executeTextbookPipeline({ ...input(env), adapter: model.adapter, modelRetries: 1, storageRetries: 3 });
@@ -239,19 +239,24 @@ describe('原生课程 CRUD 暂存与整课事务', () => {
     const env = setup(), original = pipelineModel(env.tool);
     expect((await env.repo.executeTextbookPipeline({ ...input(env), adapter: original.adapter })).ok).toBe(true);
     const db = env.repo.getRawDb(), snapshot = db.query('SELECT * FROM textbook_articles').all();
-    const failed = pipelineModel(env.tool, async ({ submit }) => { await submit({ items: [{ text: '未完成的替换' }] }); });
+    const failed = pipelineModel(env.tool, async ({ submit }) => {
+      const row = items(await submit({ items: [{ text: '未完成的替换' }] }))[0]!;
+      expect((await submit({ action: 'delete', refs: [row.ref] })).ok).toBe(true);
+    });
     const result = await env.repo.executeTextbookPipeline({ ...input(env), adapter: failed.adapter, forceOverwrite: true });
     expect(result.ok && result.value.allLessonsReady).toBe(false);
     expect(db.query('SELECT * FROM textbook_articles').all()).toEqual(snapshot);
     const stats = await env.repo.getTextbookAssetStats('book'); expect(stats.ok && stats.value.readyLessons).toBe(1);
     const success = pipelineModel(env.tool, async ({ submit }) => {
       expect(items(await submit({ action: 'read' }))).toEqual([]);
-      await submit({ items: [{ text: '新版本正文' }] }); await submitRequired(submit);
+      expect((await submit({ items: [{ text: '新版本正文' }] })).ok).toBe(true);
       expect(db.query('SELECT * FROM textbook_articles').all()).toEqual(snapshot);
     });
     const replaced = await env.repo.executeTextbookPipeline({ ...input(env), adapter: success.adapter, forceOverwrite: true });
     expect(replaced.ok && replaced.value.allLessonsReady).toBe(true);
     expect(db.query('SELECT text FROM textbook_articles').all()).toEqual([{ text: '新版本正文' }]);
+    for (const table of ['textbook_knowledge', 'textbook_vocabulary', 'textbook_exercise_items'])
+      expect(db.query(`SELECT count(*) AS n FROM ${table}`).get()).toEqual({ n: 0 });
     expect(db.query('SELECT count(*) AS n FROM global_vocabulary').get()).toEqual({ n: 1 });
   });
 

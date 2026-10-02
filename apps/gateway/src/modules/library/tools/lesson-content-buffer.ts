@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { RequiredLessonContent, TextbookContentOperationSchemas, type TextbookContentChange, type TextbookContentKind, type TextbookLearningContent } from '@study-studio/document-model';
+import { TextbookContentOperationSchemas, type TextbookContentChange, type TextbookContentKind, type TextbookLearningContent } from '@study-studio/document-model';
 import { BusinessError, generateId } from '@study-studio/shared';
 
 interface DraftRow { ref: string; id: string; content: Record<string, unknown>; source?: 'TEXTBOOK' | 'AI' }
@@ -31,7 +31,7 @@ export class LessonContentBuffer {
   private row(id: string, content: Record<string, unknown>, source?: 'TEXTBOOK' | 'AI'): DraftRow {
     return { ref: `${this.namespace}-${++this.counter}`, id, content, ...(source ? { source } : {}) };
   }
-  missing(): TextbookContentKind[] { return RequiredLessonContent.filter(kind => !this.touched.has(kind) || !this.rows.get(kind)?.length); }
+  hasSubmittedContent(): boolean { return [...this.touched].some(kind => !!this.rows.get(kind)?.length); }
   apply(kind: TextbookContentKind, raw: unknown, allowAiExercises: boolean): BufferedContentReceipt {
     const parsed = TextbookContentOperationSchemas[kind].safeParse(raw);
     if (!parsed.success) throw new BusinessError('E_CONTENT_FORMAT_INVALID', '内容字段不符合工具要求，请按具体字段修正', 'VALIDATION', true,

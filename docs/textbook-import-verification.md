@@ -1,5 +1,14 @@
 # 教材目录与运行监视：集成验收记录
 
+## 按章节实际内容提交（2026-10-03）
+
+用户批准取消知识点、词汇、练习三类必交。章节提示词、六工具说明、暂存完成条件及 SQLite 事务同步改为按实际内容选择；有则提交，无则省略，不为凑齐类别生成内容。至少一类有效学习内容即可完成，AI 练习开关与内容字段校验继续生效。此前阶段记录中的三类必交规则已由本节替代。
+
+- [按章内容集成](../apps/gateway/src/modules/library/__tests__/adaptive-chapter-content.integration.test.ts)：六类各自单独提交，通过真实 Gateway HTTP、ToolRegistry、暂存和 SQLite 保存；实际模型输入包含当前章标题、子目录和材料，调用期间数据库零写入。存储层删空唯一内容会回滚。
+- [课程事务集成](../apps/gateway/src/modules/library/__tests__/lesson-content-transaction.integration.test.ts)：删空与只查询不能算提交，重试获得实际反馈且不继承旧缓冲；失败重新提取保留旧内容，成功可替换为只有文章的版本；未修正格式错误、跨任务引用、未正常结束和禁用 AI 练习继续拒绝保存。
+
+正式门禁：`bun run typecheck` 通过；`bun run test:all` **1653 通过、3 项既有 RSS 跳过、0 失败**，1656 项 / 267 文件，原生 PDF/OCR 不跳过。聚焦集成 16 项通过。日志：`.studio-internal/adaptive-content-typecheck.log`、`.studio-internal/adaptive-content-test-all.log`、`.studio-internal/adaptive-content-focused.log`。测试进程已退出。模型输出受控，尚未用真实模型重新导入教材；未修改用户数据库。
+
 ## 本地 OCR 默认与云端选择（2026-10-03）
 
 扫描正文默认现有本机 OCR，桌面保留 MinerU 云端与已部署本机 V1 服务的显式选择，后续手动选择持久化。解析失败不会自动切换或上传云端。既有 Agent 池、一级标题任务与六工具课程事务继续使用。
