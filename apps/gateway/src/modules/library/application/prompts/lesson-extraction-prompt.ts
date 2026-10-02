@@ -6,6 +6,18 @@ export function buildLessonExtractionPrompt(job: LessonExtractionJob, toolNames:
     `可用工具：${toolNames.join('、')}。可多次新增、查询、修改和删除；只填写内容，修改或删除使用工具回执的本任务短引用，不填写数据库 ID 或页码。`,
     job.allowAiExercises ? '可按本章知识点补充练习，如实标注 AI 来源。' : '本次不新增 AI 练习，保留原书习题。',
     `语种: ${job.language}\n章节: ${job.title}`,
+    `本课标题结构（仅供内容参考，不需逐项对应）：\n${job.tocEntries.map(entry => {
+      let depth = 0;
+      let parentId = entry.parentId;
+      const visited = new Set<string>();
+      while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+        const parent = job.tocEntries.find(node => node.id === parentId);
+        if (!parent) break;
+        depth++; parentId = parent.parentId;
+      }
+      return `${'  '.repeat(depth)}- ${entry.title}`;
+    }).join('\n')}`,
     ...(job.tocPath.length
       ? [`本节位置（仅定位参考，不需逐项对应）：${job.tocPath.map(entry => entry.title).join(' > ')}`]
       : []),

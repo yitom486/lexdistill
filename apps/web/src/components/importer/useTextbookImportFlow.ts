@@ -111,7 +111,7 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
       ...(entry.endPage ? { endPage: entry.endPage } : {}),
       ...(entry.parentId ? { parentId: entry.parentId } : {}),
     })));
-    setStep(3); toast.success(`目录已保存，共 ${saved.lessonCount} 课`);
+    setStep(3); toast.success(`目录已保存，共 ${saved.totalEntries} 个一级提取章节`);
   };
 
   const beginRescan = () => { setRescanOutline(true); setEntries(null); setStep(2); };

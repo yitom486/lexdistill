@@ -29,7 +29,7 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
       </p>
       <Progress value={job.doneLessons} max={job.totalLessons} aria-label="教材处理进度" />
       <p className="text-ink">已处理 {job.doneLessons}/{job.totalLessons} 个部分 · 成功 {job.successfulLessons} · 失败 {job.failedLessons.length}</p>
-      {slots.data && <p className="text-ink-muted">目录 {slots.data.length} 项 · 课次 {slots.data.filter(slot => slot.kind === 'lesson').length} 课</p>}
+      {slots.data && <p className="text-ink-muted">一级提取章节 {slots.data.length} 个 · 目录参考 {slots.data.reduce((count, slot) => count + (slot.tocEntries?.length ?? 1), 0)} 项</p>}
       {planned && !planned.ok && <p role="alert" className="text-ink-rose-700-rose-400">{planned.error.userMessage}</p>}
       {job.error && <p role="alert" className="text-ink-rose-700-rose-400">{job.error}</p>}
       {slots.isError && <p role="alert" className="text-ink-rose-700-rose-400">{slots.error.message}</p>}

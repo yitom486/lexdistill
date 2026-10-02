@@ -1,19 +1,19 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { SaveTextbookOutlineRequest, TocEntry } from '@study-studio/document-model';
+import { planTextbookTasks, type SaveTextbookOutlineRequest, type TocEntry } from '@study-studio/document-model';
 import type { TextbookInspectionResult, TextbookInspectionDocSummary } from '@study-studio/protocol';
 import { useTextbookImportFlow } from '../useTextbookImportFlow.js';
 import { TextbookImportInspection } from '../TextbookImportInspection.js';
 import { TextbookPageMapping } from '../TextbookPageMapping.js';
-import { TocRecognitionPanel } from '../../toc/TocRecognitionPanel.js';
-import { TextbookPipelineImporterTab } from '../TextbookPipelineImporterTab.js';
 import { usePipelineJobStore } from '../../../stores/usePipelineJobStore.js';
 import { usePreferencesStore } from '../../../stores/usePreferencesStore.js';
 import { __resetPlatformForTest } from '../../../platform/capabilities.js';
 import { act, setupDom, type DomHandle } from '../../toc/__tests__/dom-setup.js';
 
 let dom: DomHandle | null = null;
+let TocRecognitionPanel: typeof import('../../toc/TocRecognitionPanel.js').TocRecognitionPanel;
+let TextbookPipelineImporterTab: typeof import('../TextbookPipelineImporterTab.js').TextbookPipelineImporterTab;
 let client: QueryClient | null = null;
 const originalFetch = globalThis.fetch;
 const previousPreferences = usePreferencesStore.getState();
@@ -82,8 +82,11 @@ async function click(text: string) {
   if (!button) throw new Error(`缺少按钮：${text}`);
   await act(async () => { button.dispatchEvent(new MouseEvent('click', { bubbles: true })); await Promise.resolve(); });
 }
-async function prepare(tocEndPage?: number) {
-  dom = await setupDom();
+async function prepare(tocEndPage?: number, recognizedEntries?: TocEntry[]) {
+  dom = await setupDom(true);
+  // Base UI 的 DOM 能力检测必须发生在 jsdom 环境就绪之后。
+  ({ TocRecognitionPanel } = await import('../../toc/TocRecognitionPanel.js'));
+  ({ TextbookPipelineImporterTab } = await import('../TextbookPipelineImporterTab.js'));
   ready = false; failSlots = false; picked = 0; opened = ''; submitted = undefined;
   savedOutline = undefined; failSave = false; mapCalls = 0; llmCalls = 0;
   __resetPlatformForTest();
@@ -102,7 +105,7 @@ async function prepare(tocEndPage?: number) {
       llmCalls++;
       const body = JSON.parse(String(init?.body)) as { endPage: number };
       expect(body.endPage).toBe(tocEndPage);
-      return Response.json({ entries: [
+      return Response.json({ entries: recognizedEntries ?? [
         { id: 'recognized-1', title: '第1课', level: 'lesson', startPage: 2 },
         { id: 'recognized-2', title: '第2课', level: 'lesson', startPage: 9 },
       ] });
@@ -125,11 +128,13 @@ async function prepare(tocEndPage?: number) {
     }
     if (url.includes('/textbook-lessons/')) {
       if (failSlots) return Response.json({ error: { userMessage: '目录暂时无法读取' } }, { status: 503 });
-      if (savedOutline) return Response.json({ slots: savedOutline.tocEntries.map((entry, index) => ({
-        documentId: 'stored-book', lessonId: entry.id, lessonNumber: index + 1, title: entry.title, sortOrder: index + 1,
-        kind: entry.level, parentId: entry.parentId ?? null, startPage: entry.startPage, endPage: entry.endPage ?? null,
+      if (savedOutline) {
+        const tasks = planTextbookTasks(savedOutline.tocEntries); if (!tasks.ok) throw tasks.error;
+        return Response.json({ slots: tasks.value.map(({ root: entry, entries }, index) => ({
+        documentId: 'stored-book', lessonId: entry.id, lessonNumber: index + 1, title: entry.title, sortOrder: index + 1, tocEntries: entries,
+        kind: entry.level === 'lesson' ? 'lesson' : 'section', parentId: null, startPage: entry.startPage, endPage: entry.endPage ?? null,
         status: 'pending', hasPassage: false, hasPreview: false, hasSummary: false,
-      })) });
+      })) }); }
       return Response.json({ slots: storedDocument().lessonDetails.map((lesson, index) => ({
         documentId: 'stored-book', lessonId: lesson.lessonId, lessonNumber: index + 1, title: lesson.title, sortOrder: index + 1,
         kind: 'lesson', parentId: null, startPage: index === 0 ? 8 : 10, endPage: null, status: lesson.status,
@@ -164,6 +169,54 @@ afterEach(() => {
 });
 
 describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码组件', () => {
+  it('目录缩进取父子关系，层级编辑同步保存父节点；重新读取仍保留全部子标题', async () => {
+    if (process.env['LINGUA_HEADING_DOM_CHILD'] !== '1') {
+      // 与现有监视 DOM 测试相同：防止其他测试在无 DOM 时缓存 Base UI。
+      const child = Bun.spawn([process.execPath, 'test', '--path-ignore-patterns', '**/dist/**', import.meta.path, '--test-name-pattern', '目录缩进'], {
+        env: { ...process.env, LINGUA_HEADING_DOM_CHILD: '1' }, stdout: 'ignore', stderr: 'pipe',
+      });
+      const [exit, output] = await Promise.all([child.exited, new Response(child.stderr).text()]);
+      expect({ exit, output: exit ? output : '' }).toEqual({ exit: 0, output: '' });
+      return;
+    }
+    await prepare(12, [
+      { id: 'intro', title: '准备部分', level: 'unit', startPage: 1 },
+      { id: 'nested-lesson', title: '嵌套课次', level: 'lesson', parentId: 'intro', startPage: 1 },
+      { id: 'deep', title: '发音细节', level: 'section', parentId: 'nested-lesson', startPage: 2 },
+      { id: 'main', title: '正式第一课', level: 'lesson', startPage: 4 },
+    ]);
+    await click('选择本地文件');
+    await tickUntil(() => (document.querySelector('input[aria-label="目录结束页"]') as HTMLInputElement | null)?.value === '12');
+    await click('大模型智能提炼目录');
+    await tickUntil(() => Boolean(document.querySelector('[aria-label="目录层级 4"]')));
+    expect(document.querySelector('[aria-label="目录类型 1"]')?.textContent).toContain('单元');
+    expect(document.querySelector('[aria-label="目录层级 1"]')?.textContent).toContain('一级');
+    expect(document.querySelector('[aria-label="目录层级 2"]')?.textContent).toContain('子标题');
+    // 将原三级标题改为一级，实际 parentId 必须一并移除。
+    await act(async () => {
+      const trigger = document.querySelector('[aria-label="目录层级 3"]') as HTMLButtonElement;
+      trigger.focus(); trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    });
+    await tickUntil(() => Boolean([...document.querySelectorAll('[role="option"]')].find(option => option.textContent?.includes('一级'))));
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent?.includes('一级'))!;
+    await act(async () => option.focus());
+    await act(async () => option.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    await tickUntil(() => document.querySelector('[aria-label="目录层级 3"]')?.textContent?.includes('一级') === true);
+    await click('确认目录草稿');
+    await tickUntil(() => currentFlow?.step === 3);
+    expect(savedOutline?.tocEntries.map(entry => [entry.id, entry.parentId])).toEqual([
+      ['intro', undefined], ['nested-lesson', 'intro'], ['deep', undefined], ['main', undefined],
+    ]);
+    await tickUntil(() => currentFlow?.slots.data?.length === 3);
+    await click('复用目录');
+    expect(currentFlow?.entries?.map(entry => [entry.key, entry.level, entry.parentId])).toEqual([
+      ['intro', 1, undefined], ['nested-lesson', 2, 'intro'], ['deep', 1, undefined], ['main', 1, undefined],
+    ]);
+    await click('启动提取');
+    await tickUntil(() => Boolean(submitted));
+    expect(submitted?.tocEntries).toMatchObject(savedOutline!.tocEntries);
+    expect([mapCalls, llmCalls]).toEqual([1, 1]);
+  });
   for (const tocEndPage of [21, 12]) {
     it(`目录结束于 PDF 第 ${tocEndPage} 页：确认目录即默认换算并启动，允许修改默认页码`, async () => {
       await prepare(tocEndPage);

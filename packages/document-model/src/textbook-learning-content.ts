@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { validateExercise } from './exercise-validation.js';
+import { TocEntrySchema } from './toc.js';
 
 export const JlptLevelSchema = z.enum(['N5', 'N4', 'N3', 'N2', 'N1']);
 const text = z.string().trim().min(1);
@@ -54,5 +55,6 @@ export const ChapterManifestSchema = z.array(z.object({
   kind: z.enum(['lesson','section']).default('lesson'),
   startPage: z.number().int().positive().nullable(), endPage: z.number().int().positive().nullable(),
   status: z.enum(['pending','ready','failed']),
+  tocEntries: z.array(TocEntrySchema).min(1).optional(),
 }).strict());
 export type ChapterManifest = z.infer<typeof ChapterManifestSchema>;

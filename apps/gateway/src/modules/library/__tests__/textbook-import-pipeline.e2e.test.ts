@@ -54,7 +54,7 @@ describe('教材简单内容工具 → 实际 SQLite → 查询回执', () => {
   const result=await env.repo.executeTextbookPipeline({userId:'owner',documentId:'book',title:'发音',tocEntries:[{id:'intro',title:'发音',level:'section',startPage:1},{id:'child',parentId:'intro',title:'小目录',level:'section',startPage:1}],lessonJobs:[{lessonId:'intro',text:'长音'}],adapter:model.adapter,submissionTool:env.tool,poolSize:1,modelRetries:0});
   expect(result.ok && result.value.allLessonsReady).toBe(true);
   const slots=await env.repo.listTextbookLessonSlots('book'); expect(slots.ok && slots.value.map(item=>item.lessonId)).toEqual(['intro']);
-  expect(model.inputs[0]!.input.message).not.toContain('小目录');
+  expect(model.inputs[0]!.input.message).toContain('  - 小目录');
  });
  it('解析与模型流水线并行，第一章保存时第二章尚在解析，同一会话复用',async()=>{
   const env=setup(), second=deferred(), release=deferred(), saved=deferred(); let secondDone=false;

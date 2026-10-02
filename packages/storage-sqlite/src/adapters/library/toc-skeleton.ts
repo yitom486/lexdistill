@@ -14,6 +14,7 @@ export interface SavedTocSkeleton { documentId: string; title: string; lessonCou
 export interface TextbookLessonSlotItem {
   documentId: string; lessonId: string; lessonNumber: number; title: string; sortOrder: number; kind: string; parentId: string | null;
   startPage: number | null; endPage: number | null; status: string; hasPassage: boolean; hasPreview: boolean; hasSummary: boolean;
+  tocEntries?: TocEntry[];
 }
 export interface TextbookAssetStats {
   documentId: string; lessons: number; readyLessons: number; lines: number; vocab: number; grammar: number; exercises: number; passageLessons: number;
@@ -21,7 +22,7 @@ export interface TextbookAssetStats {
     vocabCount: number; grammarCount: number; exerciseCount: number; hasPreview: boolean; hasSummary: boolean }>;
 }
 
-/** Directory is reduced to extraction chapters; learning content lives only in its own tables. */
+/** 一级章节保存为任务，子标题只保存为本章的目录参考；学习内容仍在自己的表中。 */
 export async function seedTextbookTocSkeleton(deps: { db: DrizzleDb }, input: SeedTocSkeletonInput): Promise<Result<SavedTocSkeleton, BusinessError>> {
   if (!input.documentId.trim() || !input.title.trim()) return err(new BusinessError('E_INVALID_INPUT', '教材身份和标题不能为空', 'VALIDATION'));
   const ordered = validateTocPageOrder(input.entries); if (!ordered.ok) return ordered;
@@ -35,7 +36,8 @@ export async function seedTextbookTocSkeleton(deps: { db: DrizzleDb }, input: Se
       if (existing?.sourceFingerprint && input.sourceFingerprint && existing.sourceFingerprint !== input.sourceFingerprint) throw new BusinessError('E_SOURCE_FILE_CONFLICT', '所选文件与已保存教材不同', 'VALIDATION');
       const previous: ChapterManifest = existing?.chaptersJson ? ChapterManifestSchema.parse(JSON.parse(existing.chaptersJson)) : [];
       const manifest: ChapterManifest = planned.value.map((task, index) => ({ id: task.root.id, title: task.root.title, order: index + 1,
-        kind: task.root.level === 'section' ? 'section' : 'lesson', startPage: task.root.startPage ?? null, endPage: task.root.endPage ?? null,
+        kind: task.root.level === 'lesson' ? 'lesson' : 'section', startPage: task.root.startPage ?? null, endPage: task.root.endPage ?? null,
+        tocEntries: task.entries.map(({ sortOrder: _order, ...entry }) => entry),
         status: !input.forceOverwrite ? previous.find(chapter => chapter.id === task.root.id)?.status ?? 'pending' : 'pending' }));
       if (!input.forceOverwrite && previous.some(chapter => chapter.status === 'ready' && !manifest.some(next => next.id === chapter.id))) throw new BusinessError('E_TOC_SLOT_CONFLICT', '新章节清单缺少已经保存的章节', 'VALIDATION');
       if (input.forceOverwrite) for (const table of [textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials]) tx.delete(table).where(eq(table.documentId, input.documentId)).run();
@@ -59,6 +61,7 @@ export async function listTextbookLessonSlots(deps: { db: DrizzleDb }, documentI
       const stats = textbookStatsInTx(tx, documentId);
       return manifest.map(chapter => ({ documentId, lessonId: chapter.id, lessonNumber: chapter.order, title: chapter.title, sortOrder: chapter.order,
         kind: chapter.kind, parentId: null, startPage: chapter.startPage, endPage: chapter.endPage, status: chapter.status,
+        ...(chapter.tocEntries ? { tocEntries: chapter.tocEntries } : {}),
         hasPassage: stats.lessonDetails.find(item => item.lessonId === chapter.id)?.hasPassage ?? false, hasPreview: false, hasSummary: false }));
     }));
   } catch (cause) { return err(translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage: '章节清单读取失败' })); }

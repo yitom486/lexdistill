@@ -46,9 +46,8 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       return created;
     };
     const running = repo.executeTextbookPipeline({ userId: 'owner', traceId: 'desktop-trace', documentId: 'desktop-book', title: '监视教材', poolSize: 1,
-      tocEntries: [{ id: 'u', level: 'unit', title: '真实单元', startPage: 5, endPage: 11 },
-        { id: 'a', level: 'section', parentId: 'u', title: '已保存部分', startPage: 5, endPage: 7 }, { id: 'ac', level: 'section', parentId: 'a', title: '会话小节', startPage: 6, endPage: 7 },
-        { id: 'b', level: 'lesson', parentId: 'u', title: '当前部分', startPage: 8, endPage: 11 }],
+      tocEntries: [{ id: 'a', level: 'section', title: '已保存部分', startPage: 5, endPage: 7 }, { id: 'ac', level: 'section', parentId: 'a', title: '会话小节', startPage: 6, endPage: 7 },
+        { id: 'b', level: 'lesson', title: '当前部分', startPage: 8, endPage: 11 }],
       lessonJobs: [{ lessonId: 'a', text: '历史正文' }, { lessonId: 'b', text: '当前正文' }], adapter: model.adapter, submissionTool: tool,
     });
     try {

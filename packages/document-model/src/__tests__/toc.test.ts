@@ -54,16 +54,13 @@ describe('validateTocPageOrder', () => {
     }
   });
 
-  it('缺少 lesson 课次条目：拦截并抛出 E_TOC_NO_LESSONS', () => {
+  it('一级单元标题本身就是提取任务，不要求特定语义类型', () => {
     const entries: TocEntry[] = [
       { id: 'u1', level: 'unit', title: '只有单元', startPage: 1 },
     ];
 
     const res = validateTocPageOrder(entries);
-    expect(isOk(res)).toBe(false);
-    if (!isOk(res)) {
-      expect(res.error.code).toBe('E_TOC_NO_LESSONS');
-    }
+    expect(isOk(res)).toBe(true);
   });
 
   it('重复 ID：拦截并抛出 E_TOC_DUPLICATE_ID', () => {

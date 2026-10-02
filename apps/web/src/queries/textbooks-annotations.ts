@@ -29,7 +29,7 @@ async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Respo
 }
 import type { TextbookBook } from '../models/textbook.js';
 import { convertAstToTextbookBook } from '../components/importer/textbook-converter.js';
-import type { TocRecognitionCandidate } from '../lib/toc-recognition.js';
+import { tocCandidatesFromEntries, type TocRecognitionCandidate } from '../lib/toc-recognition.js';
 import { TextbookInspectionResultSchema, type TextbookInspectionResult, type TextbookInspectionDocSummary } from '@study-studio/protocol';
 export type { TextbookInspectionResult, TextbookInspectionDocSummary };
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
@@ -1140,6 +1140,7 @@ export interface TextbookLessonSlotItem {
   hasPassage: boolean;
   hasPreview: boolean;
   hasSummary: boolean;
+  tocEntries?: import('@study-studio/document-model').TocEntry[];
 }
 
 /** 查询全部原始文档（包含未完成 AST 结构化仅有骨架大纲的文档） */
@@ -1170,6 +1171,7 @@ const LessonSlotsResponseSchema = z.object({ slots: z.array(z.object({
   sortOrder: z.number(), kind: z.string(), parentId: z.string().nullable(),
   startPage: z.number().int().positive().nullable(), endPage: z.number().int().positive().nullable(),
   status: z.string(), hasPassage: z.boolean(), hasPreview: z.boolean(), hasSummary: z.boolean(),
+  tocEntries: z.array(TocEntrySchema).min(1).optional(),
 })) });
 
 export function useTextbookLessonSlotsQuery(documentId: string | undefined, userId = DEFAULT_USER_ID) {
@@ -1186,7 +1188,7 @@ export function useTextbookLessonSlotsQuery(documentId: string | undefined, user
       if (!res.ok) throw new GatewayRequestError(readGatewayUserMessage(payload, '教材目录读取失败，请重试'));
       const parsed = LessonSlotsResponseSchema.safeParse(payload);
       if (!parsed.success) throw new GatewayRequestError('教材目录数据不完整，请重新检测');
-      return parsed.data.slots;
+      return parsed.data.slots.map(({ tocEntries, ...slot }) => ({ ...slot, ...(tocEntries ? { tocEntries } : {}) }));
     },
     staleTime: 1000 * 60 * 2,
   });
@@ -1194,11 +1196,13 @@ export function useTextbookLessonSlotsQuery(documentId: string | undefined, user
 
 /** 将已入库教材槽位转换为目录候选（可直接复用，免去大模型重复抽取） */
 export function lessonSlotsToTocCandidates(slots: TextbookLessonSlotItem[]): TocRecognitionCandidate[] {
-  return slots.map((s, idx) => ({
+  return slots.flatMap((s, idx): TocRecognitionCandidate[] => s.tocEntries
+    ? tocCandidatesFromEntries(s.tocEntries, 'physical')
+    : [{
     key: s.lessonId || `slot-${idx + 1}`,
     title: s.title,
     printedPage: '',
-    level: (s.kind === 'chapter' || s.kind === 'section' ? 2 : 1) as 1 | 2,
+    level: s.parentId ? 2 : 1,
     kind: (s.kind === 'chapter' || s.kind === 'section' ? 'section' : 'lesson') as 'section' | 'lesson',
     ...(s.kind === 'unit' || s.kind === 'chapter' || s.kind === 'lesson' || s.kind === 'section' ? { directoryLevel: s.kind } : {}),
     confidence: 'high' as const,
@@ -1207,7 +1211,7 @@ export function lessonSlotsToTocCandidates(slots: TextbookLessonSlotItem[]): Toc
       : {}),
     ...(s.endPage !== null ? { endPage: s.endPage } : {}),
     ...(s.parentId ? { parentId: s.parentId } : {}),
-  }));
+  }]);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { AgentAdapter } from '@study-studio/agent-runtime';
-import { canonicalizeTocEntries, planTextbookTasks, TextbookPipelineSettingsSchema, type ChapterSource, type TextbookPipelineSettings, type TocEntry, type TextbookModelActivity } from '@study-studio/document-model';
+import { canonicalizeTocEntries, planTextbookTasks, validateTocPageOrder, TextbookPipelineSettingsSchema, type ChapterSource, type TextbookPipelineSettings, type TocEntry, type TextbookModelActivity } from '@study-studio/document-model';
 import { BusinessError, ok, err, generateId, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ImportTask } from '@study-studio/storage-sqlite';
 import type { ContentRepository } from '../ports.js';
@@ -35,6 +35,8 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
   const settings = TextbookPipelineSettingsSchema.safeParse(input);
   if (!settings.success || !input.adapter || !input.submissionTool) return err(new BusinessError('E_INVALID_INPUT', '教材提取配置或章节会话通道未就绪', 'VALIDATION'));
   const config = settings.data;
+  const validatedToc = validateTocPageOrder(input.tocEntries);
+  if (!validatedToc.ok) return validatedToc;
   const documentId = input.documentId ?? generateId('doc_tb');
   const monitor = new ImportMonitor(repo, input.userId, input.traceId ?? generateId('import'), { documentId, ...(input.jobId ? { jobId: input.jobId } : {}) });
   const toc = Object.freeze(canonicalizeTocEntries(input.tocEntries).map(entry => Object.freeze({ ...entry })));
@@ -91,7 +93,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
         const task = tasks.find(task => task.root.id === lesson.id)!;
         monitor.record('text', 'ready', { text, source: source ?? null, startPage: lesson.startPage, endPage: lesson.endPage ?? null }, { nodeId: lesson.id });
         emit(lesson.id, 'queued');
-        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: [task.root], tocPath: [], text, ...(source ? { source } : {}) });
+        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: [], text, ...(source ? { source } : {}) });
         monitor.record('queue', 'enqueued', { size: queue.size }, { nodeId: lesson.id });
       };
       const produce = async () => {

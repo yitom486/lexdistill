@@ -49,7 +49,7 @@ describe('目录候选与人工确认边界', () => {
     expect(validateTocCandidates(rows)).toBeNull();
   });
 
-  it('空页码、倒退页码和无成课条目都不能确认', () => {
+  it('空页码、倒退页码不能确认；一级章节无需标为成课', () => {
     const rows = tocCandidatesFromMap({
       ...BASE,
       tocEntries: [
@@ -58,7 +58,7 @@ describe('目录候选与人工确认边界', () => {
       ],
     });
     expect(validateTocCandidates([{ ...rows[0]!, printedPage: '' }])).toContain('印刷页');
-    expect(validateTocCandidates(rows.map((row) => ({ ...row, kind: 'section' })))).toContain('成课');
+    expect(validateTocCandidates(rows.map((row) => ({ ...row, kind: 'section' })))).toBeNull();
     expect(validateTocCandidates([rows[1]!, rows[0]!])).toContain('倒退');
   });
 });

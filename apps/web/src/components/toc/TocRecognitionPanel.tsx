@@ -11,6 +11,8 @@ import type { PdfAzureCredential } from '../../queries/textbooks-annotations.js'
 import { nextManualKey } from '../../lib/toc-confirm-flow.js';
 import {
   validateTocCandidates,
+  tocCandidatesFromEntries,
+  changeTocCandidateLevel,
   type TocRecognitionCandidate,
 } from '../../lib/toc-recognition.js';
 import { sound } from '../../utils/audio.js';
@@ -216,16 +218,7 @@ export function TocRecognitionPanel({
           return;
         }
 
-        const candidates: TocRecognitionCandidate[] = data.entries.map((item) => ({
-          key: item.id,
-          title: item.title,
-          printedPage: String(item.startPage),
-          level: item.level === 'section' ? 2 : 1,
-          kind: item.level === 'lesson' ? 'lesson' : 'section',
-          directoryLevel: item.level,
-          confidence: null,
-          ...(item.parentId ? { parentId: item.parentId } : {}),
-        }));
+        const candidates = tocCandidatesFromEntries(data.entries, 'printed');
 
         setEntries(candidates);
         setScanned(true);
@@ -470,15 +463,17 @@ export function TocRecognitionPanel({
                     className="h-8 w-full rounded-lg border border-line bg-surface px-2 text-ink text-xs font-mono text-center outline-none focus:border-line-accent"
                   />
                   <Select
-                    value={entry.kind}
+                    value={entry.directoryLevel ?? entry.kind}
                     onValueChange={(val) => {
-                      if (val === 'lesson' || val === 'section') updateEntry(entry.key, { kind: val, directoryLevel: val });
+                      if (val === 'unit' || val === 'chapter' || val === 'lesson' || val === 'section') updateEntry(entry.key, { kind: val === 'lesson' ? 'lesson' : 'section', directoryLevel: val });
                     }}
                   >
                     <SelectTrigger aria-label={`目录类型 ${index + 1}`} className="h-8 text-xs">
-                      <SelectValue />
+                      <SelectValue>{entry.directoryLevel === 'unit' ? '单元' : entry.directoryLevel === 'chapter' ? '章' : entry.kind === 'lesson' ? '成课' : '章节/复习'}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="unit">单元</SelectItem>
+                      <SelectItem value="chapter">章</SelectItem>
                       <SelectItem value="lesson">成课</SelectItem>
                       <SelectItem value="section">章节/复习</SelectItem>
                     </SelectContent>
@@ -486,15 +481,18 @@ export function TocRecognitionPanel({
                   <Select
                     value={String(entry.level)}
                     onValueChange={(val) => {
-                      if (val === '1' || val === '2') updateEntry(entry.key, { level: val === '1' ? 1 : 2 });
+                      if (val === '1' || val === '2') {
+                        setEntries(previous => changeTocCandidateLevel(previous, entry.key, val === '1' ? 1 : 2));
+                        invalidate();
+                      }
                     }}
                   >
                     <SelectTrigger aria-label={`目录层级 ${index + 1}`} className="h-8 text-xs">
-                      <SelectValue />
+                      <SelectValue>{entry.level === 1 ? '一级' : '子标题'}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="1">一级</SelectItem>
-                      <SelectItem value="2">二级 (子目)</SelectItem>
+                      <SelectItem value="2" disabled={!entries.slice(0, index).some(item => !item.parentId && item.level === 1)}>子标题</SelectItem>
                     </SelectContent>
                   </Select>
                   <Button

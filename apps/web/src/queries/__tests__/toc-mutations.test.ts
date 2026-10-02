@@ -268,6 +268,6 @@ describe('教材匹配与槽位复用纯函数测试', () => {
 
     expect(candidates[1]!.key).toBe('u1');
     expect(candidates[1]!.kind).toBe('section');
-    expect(candidates[1]!.level).toBe(2);
+    expect(candidates[1]!.level).toBe(1);
   });
 });

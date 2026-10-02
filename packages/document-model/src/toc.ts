@@ -56,7 +56,7 @@ export interface TocValidationResult {
 
 /**
  * 目录页码单调递增自动校验器：
- * 1. 提取所有核心教学实体（level === 'lesson'）；
+ * 1. 按父子关系提取一级标题（不按语义类型筛选）；
  * 2. 强制校验 startPage 严格单调递增：Page_{i+1} >= Page_i；
  * 3. 校验 endPage 是否大于等于自身的 startPage；
  * 4. 若出现页码回退或倒错，返回友好的业务诊断错误 E_TOC_PAGE_ORDER_INVALID。
@@ -96,17 +96,6 @@ export function validateTocPageOrder(entries: readonly TocEntry[]): Result<TocVa
 
   // 2. 独立部分也属于内容任务；课内小节不作为另一份独立任务检查。
   const lessons = entries.filter((e) => e.level === 'lesson');
-  if (!entries.some(entry => entry.level === 'lesson' || entry.level === 'section')) {
-    return err(
-      new BusinessError(
-        'E_TOC_NO_LESSONS',
-        '目录只有层级容器，请至少保留具体课次或独立部分',
-        'VALIDATION',
-        false
-      )
-    );
-  }
-
   const planned = planTextbookTasks(entries);
   if (!planned.ok) return planned;
   const roots = planned.value.map(task => task.root);
@@ -139,20 +128,22 @@ export function validateTocPageOrder(entries: readonly TocEntry[]): Result<TocVa
 }
 
 /**
- * 规范化目录条目：自动推断并补齐每课未填写的 endPage，并自动分配连续的 sortOrder 序号
+ * 一级标题切到下一个一级标题之前；子标题仅在本章内推断范围，最后一章保留用户结束页。
  */
 export function canonicalizeTocEntries(entries: readonly TocEntry[]): Array<TocEntry & { sortOrder: number }> {
+  const planned = planTextbookTasks(entries);
+  const tasks = planned.ok ? planned.value : [];
   return entries.map((entry, index) => {
     let inferredEndPage = entry.endPage;
-    if (inferredEndPage === undefined) {
-      // 尝试根据下一个同级或高级节点的 startPage 推断
-      const rank = TocLevelSchema.options.indexOf(entry.level);
-      const nextEntry = entries.slice(index + 1).find((e) =>
-        TocLevelSchema.options.indexOf(e.level) <= rank && e.startPage > entry.startPage
-      );
-      if (nextEntry && nextEntry.startPage > entry.startPage) {
-        inferredEndPage = nextEntry.startPage - 1;
-      }
+    const taskIndex = tasks.findIndex(task => task.entries.some(child => child.id === entry.id));
+    const task = tasks[taskIndex];
+    const nextRoot = tasks[taskIndex + 1]?.root;
+    if (task?.root.id === entry.id && nextRoot) {
+      inferredEndPage = Math.max(entry.startPage, nextRoot.startPage - 1);
+    } else if (task && inferredEndPage === undefined) {
+      const nextSibling = entries.slice(index + 1).find(child => child.parentId === entry.parentId);
+      const boundary = nextSibling?.startPage ?? nextRoot?.startPage;
+      inferredEndPage = boundary === undefined ? task.root.endPage : Math.max(entry.startPage, boundary - 1);
     }
 
     return {

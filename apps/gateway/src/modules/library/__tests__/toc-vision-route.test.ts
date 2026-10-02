@@ -111,17 +111,18 @@ describe('目录视觉识别 HTTP 闭环', () => {
       });
       expect(savedResponse.status).toBe(200);
       const saved = SaveTextbookOutlineResultSchema.parse(await savedResponse.json());
-      expect(saved.lessonCount).toBe(1); expect(saved.totalEntries).toBe(2);
+      expect(saved.lessonCount).toBe(0); expect(saved.totalEntries).toBe(1);
       const before = await repo.getTextbookAssetStats(saved.documentId); expect(before.ok && before.value.lines).toBe(0);
       const tool = new TextbookContentTools(repo), model = pipelineModel(tool);
       const completed = await repo.executeTextbookPipeline({ userId: 'u1', documentId: saved.documentId, traceId: 'directory-to-content', title: saved.title, tocEntries: saved.entries,
-        lessonJobs: [{ lessonId: 'toc-2', text: '独立部分的文字' }, { lessonId: 'toc-3', text: '当前课与小节的文字' }], adapter: model.adapter, submissionTool: tool, poolSize: 1, modelRetries: 0,
+        lessonJobs: [{ lessonId: 'toc-1', text: '独立部分的文字\n当前课与小节的文字' }], adapter: model.adapter, submissionTool: tool, poolSize: 1, modelRetries: 0,
       });
       expect(completed.ok && completed.value.allLessonsReady).toBe(true);
-      expect(model.inputs).toHaveLength(2);
+      expect(model.inputs).toHaveLength(1);
       expect(model.inputs.every(turn=>!turn.input.message.includes('toc-'))).toBe(true);
       expect(model.inputs[0]?.input.message).toContain('独立部分的文字');
-      expect(model.inputs[1]?.input.message).toContain('当前课与小节的文字');
+      expect(model.inputs[0]?.input.message).toContain('当前课与小节的文字');
+      expect(model.inputs[0]?.input.message).toContain('    - 课内会话');
       const monitor = ImportEventPageSchema.parse(await (await flow.app.request('/api/documents/u1/textbook-imports/directory-to-content')).json());
       expect(monitor.events.map(event => event.name)).toEqual(expect.arrayContaining(['extract-toc-llm_result', 'confirmed_saved', 'content_staged', 'committed']));
     } finally { repo.getRawDb().close(); }

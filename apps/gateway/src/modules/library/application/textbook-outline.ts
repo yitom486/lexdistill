@@ -21,9 +21,10 @@ export async function saveTextbookOutline(
     const slots = await repo.listTextbookLessonSlots(documentId);
     if (!slots.ok) return slots;
     // 再识别会生成新草稿 ID；同一本书、同标题和物理页的条目仍使用已保存身份。
-    const ids = new Map(input.tocEntries.map(entry => [entry.id, slots.value.find(slot =>
-      slot.title === entry.title.trim() && slot.startPage === entry.startPage,
-    )?.lessonId ?? entry.id]));
+    const savedEntries = slots.value.flatMap(slot => slot.tocEntries ?? [{ id: slot.lessonId, title: slot.title, startPage: slot.startPage }]);
+    const ids = new Map(input.tocEntries.map(entry => [entry.id, savedEntries.find(saved =>
+      saved.title === entry.title.trim() && saved.startPage === entry.startPage,
+    )?.id ?? entry.id]));
     const entries = input.tocEntries.map(entry => ({
       ...entry, id: ids.get(entry.id)!,
       ...(entry.parentId ? { parentId: ids.get(entry.parentId) ?? entry.parentId } : {}),
