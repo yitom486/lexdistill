@@ -34,7 +34,18 @@ export function submissionFromPrompt(message: string) {
 }
 export interface ModelTurn {
   sessionId: string; turnId: string; input: AgentInput;
-  submit: (raw: unknown, kind?: import('@study-studio/document-model').TextbookContentKind | 'read_material') => Promise<Result<unknown, BusinessError>>;
+  submit: (raw: unknown, kind?: import('@study-studio/document-model').TextbookContentKind) => Promise<Result<unknown, BusinessError>>;
+}
+export const requiredContent = {
+  grammar: { items: [{ title: '方向表达', explanation: 'へ表示方向。', examples: [{ text: '学校へ行く。' }] }] },
+  vocabulary: { items: [{ word: '学校', reading: 'がっこう', meaning: '学校', level: 'N5' }] },
+  exercises: { items: [{ type: 'CHOICE', prompt: '方向助词？', options: ['へ', 'を'], answer: 'へ', difficultyTier: 1, difficultyReason: '单一助词识别' }] },
+};
+export async function submitRequired(submit: ModelTurn['submit'], already: readonly import('@study-studio/document-model').TextbookContentKind[] = []) {
+  for (const kind of Object.keys(requiredContent) as Array<keyof typeof requiredContent>) {
+    if (already.includes(kind)) continue;
+    const result = await submit(requiredContent[kind], kind); if (!result.ok) throw result.error;
+  }
 }
 export function pipelineModel(tool: TextbookContentTools, handle?: (turn: ModelTurn) => Promise<void>) {
   const created: CreateSessionOptions[] = [], inputs: Array<{ sessionId: string; input: AgentInput }> = [], closed: string[] = [], interrupted: string[] = [];
@@ -50,13 +61,14 @@ export function pipelineModel(tool: TextbookContentTools, handle?: (turn: ModelT
           const turnId = `turn:${inputs.length}`;
           input.onTurnStarted?.(turnId);
           let toolCalls = 0;
-          const submit = (raw: unknown, kind: import('@study-studio/document-model').TextbookContentKind | 'read_material' = 'articles') => tool.tools.find(item => item.kind === kind)!.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId: ++toolCalls === 1 ? callId : `${callId}:${toolCalls}`, turnId });
+          const submit = (raw: unknown, kind: import('@study-studio/document-model').TextbookContentKind = 'articles') => tool.tools.find(item => item.kind === kind)!.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId: ++toolCalls === 1 ? callId : `${callId}:${toolCalls}`, turnId });
           if (handle) await handle({ sessionId: options.sessionId, turnId, input, submit });
           else {
             const candidate = submissionFromPrompt(input.message);
-            yield { type: 'TOOL_CALL_REQUESTED', callId, toolName: 'library_write_articles', input: candidate };
+            yield { type: 'TOOL_CALL_REQUESTED', callId, toolName: 'library_articles', input: candidate };
             const result = await submit(candidate);
             yield { type: 'TOOL_CALL_COMPLETED', callId, result };
+            await submitRequired(submit);
           }
           yield { type: 'COMPLETED' };
         },

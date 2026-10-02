@@ -6,7 +6,7 @@ import { convertAstToTextbookBook } from '../../textbook-converter.js';
 import { DrizzleLearnerRepository } from '../../../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
 import { TextbookContentTools } from '../../../../../../gateway/src/modules/library/tools/textbook-content-tools.js';
 import { createImportMonitorRoutes } from '../../../../../../gateway/src/modules/library/http/import-monitor-routes.js';
-import { pipelineModel, submissionFromPrompt, deferred } from '../../../../../../gateway/src/modules/library/__tests__/textbook-pipeline-fixtures.js';
+import { submitRequired, pipelineModel, submissionFromPrompt, deferred } from '../../../../../../gateway/src/modules/library/__tests__/textbook-pipeline-fixtures.js';
 import { act, setupDom, type DomHandle } from '../../../toc/__tests__/dom-setup.js';
 
 let dom: DomHandle | undefined, repo: DrizzleLearnerRepository | undefined, client: QueryClient | undefined;
@@ -27,12 +27,13 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
     const model = pipelineModel(tool, async ({ input, submit, sessionId, turnId }) => {
       const value = submissionFromPrompt(input.message);
 
-      if (input.message.includes('章节: 当前部分')) { reached.resolve(); await waiting.promise; }
-      else {
+      const current = input.message.includes('章节: 当前部分');
+      if (!current) {
         const bad = await submit({items:[{text:''}]});
         expect(bad.ok).toBe(false);
       }
-      expect((await submit(value)).ok).toBe(true);
+      expect((await submit(value)).ok).toBe(true); await submitRequired(submit);
+      if (current) { reached.resolve(); await waiting.promise; }
     });
     const create = model.adapter.createSession;
     model.adapter.createSession = async options => {
@@ -86,6 +87,8 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       expect(doc.body.textContent).toContain('不刷新模型输出等待期限');
       expect(doc.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')?.open).toBe(false);
       expect(doc.body.textContent).toContain('当前正文');
+      expect(doc.body.textContent).toContain('已暂存，等待整课提交');
+      expect(currentRepo.getRawDb().query('SELECT count(*) AS n FROM textbook_articles WHERE chapter_id=?').get('b')).toEqual({ n: 0 });
       expect(reads.some(path => path.endsWith('/details/' + historyInput.sequence))).toBe(false);
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '已保存部分')!.click());
       await settle();
@@ -120,6 +123,10 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       await settle();
       expect(doc.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')?.open).toBe(false);
       expect(doc.body.textContent).toContain('当前正文');
+      waiting.resolve(); await running;
+      await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '刷新记录')!.click()); await settle(); await settle();
+      expect(doc.body.textContent).toContain('暂存内容已随整课保存');
+      expect(doc.body.textContent).not.toContain('已暂存，等待整课提交');
     } finally { waiting.resolve(); await running; }
   });
 });

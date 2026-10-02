@@ -59,7 +59,7 @@ export function createPdfImportRoutes(
   }
 ) {
   const pipelineChannels = () => {
-    const registered = pdfOverrides?.submissionTool ? undefined : deps.server.toolRegistry.get('library.write_vocabulary');
+    const registered = pdfOverrides?.submissionTool ? undefined : deps.server.toolRegistry.get('library.vocabulary');
     const tool = pdfOverrides?.submissionTool ?? (registered instanceof TextbookContentTool ? registered.owner : undefined);
     const adapter = pdfOverrides?.adapter ?? deps.server.agentAdapter;
     if (!(tool instanceof TextbookContentTools) || !adapter) throw new BusinessError('E_AGENT_UNAVAILABLE', '章节工具或模型通道尚未就绪，请检查桌面运行时', 'AGENT_RUNTIME');

@@ -2,7 +2,7 @@
 import { cloudChapterSource } from '../../../infrastructure/mineru/chapter-source.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { TextbookContentTools } from '../tools/textbook-content-tools.js';
-import { pipelineModel, submissionFromPrompt } from './textbook-pipeline-fixtures.js';
+import { submitRequired, pipelineModel, submissionFromPrompt } from './textbook-pipeline-fixtures.js';
 import { fixturePdf, fixturePng } from './textbook-pipeline-fixtures.js';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { eq } from 'drizzle-orm';
@@ -23,7 +23,7 @@ it('逐页表格保持跨页边界，原书表格正文进入会话并通过工�
     expect(input.message).toContain('"rows":[["人物甲","人物"]]');
     expect(input.message).not.toContain('<table>');
     expect(source.blocks.filter(block => block.kind === 'TABLE').map(block => [block.page, block.rows])).toEqual([[7, [['人物甲', '人物']]], [8, [['职业乙', '职业']]]]);
-    expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true);
+    expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true); await submitRequired(submit);
   });
   const result = await repo.executeTextbookPipeline({ userId: 'source-owner', documentId: 'source-book', title: '解析材料集成验证',
     tocEntries: [{ id: 'chapter', title: '当前章节', level: 'lesson', startPage: 7, endPage: 8 }],

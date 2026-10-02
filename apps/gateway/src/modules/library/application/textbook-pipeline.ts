@@ -69,7 +69,8 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
     const created = await repo.createImportTask({ userId: input.userId, sourceKind: 'pdf', filename: input.filename ?? `${input.title}.pdf` });
     if (!created.ok) return created;
     task = created.value;
-    const seeded = await repo.seedTextbookTocSkeleton({ documentId, userId: input.userId, title: input.title, language: input.language ?? 'ja', entries: toc, forceOverwrite: input.forceOverwrite,
+    // Re-extraction replaces content only in the final lesson transaction.
+    const seeded = await repo.seedTextbookTocSkeleton({ documentId, userId: input.userId, title: input.title, language: input.language ?? 'ja', entries: toc,
       ...(input.pdf ? { sourceFingerprint: createHash('sha256').update(input.pdf).digest('hex') } : {}),
     });
     if (!seeded.ok) throw seeded.error;
@@ -135,6 +136,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
             monitor.record('session', 'bound', { attempt: attempt + 1 }, binding);
             if (attempt) { emit(job.lessonId, 'model_retrying'); monitor.record('model', 'retry', { previousError: lastError?.userMessage, attempt: attempt + 1 }, binding); }
             const submission = tool.bind(session.sessionId, { userId: input.userId, documentId, lessonId: job.lessonId, assignmentId, signal: controller.signal, allowAiExercises: config.allowAiExercises,
+              ...(input.forceOverwrite ? { replaceContent: true } : {}),
               monitor, sessionId: session.sessionId, turnSignal: turnController.signal,
               toolRepairRetries: config.toolRepairRetries, onRepairLimit: error => turnController.abort(error),
               onStage: stage => {
@@ -158,7 +160,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
               if (submission.receipt) return;
               if (sent.ok && submission.candidate) {
                 const finalized = await submission.persist(); if (finalized.ok) return;
-                for (let retry = 0; retry < config.storageRetries && !controller.signal.aborted && submission.error?.retryable; retry++) {
+                for (let retry = 0; retry < config.storageRetries && !controller.signal.aborted && submission.error?.category === 'DATABASE' && submission.error.retryable; retry++) {
                   emit(job.lessonId, 'storage_retrying');
                   monitor.record('storage', 'retry', { retry: retry + 1, error: submission.error.userMessage }, binding);
                   const saved = await submission.persist(); if (saved.ok) return;
@@ -185,7 +187,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
     if (controller.signal.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消，已保存章节保留', 'TOOL_EXECUTION');
     const stats = await repo.getTextbookAssetStats(documentId);
     if (!stats.ok) throw stats.error;
-    const allLessonsReady = stats.value.lessons > 0 && stats.value.readyLessons === stats.value.lessons;
+    const allLessonsReady = errors.length === 0 && stats.value.lessons > 0 && stats.value.readyLessons === stats.value.lessons;
     const updated = await repo.updateImportTask(task.id, { status: allLessonsReady ? 'done' : 'failed', documentId, lessons: successful, ...(errors.length ? { error: errors.map(item => `${item.lessonId}: ${item.error}`).join('; ') } : {}) });
     if (!updated.ok) throw updated.error;
     return ok({ task: updated.value, documentId, title: input.title, lessonCount: lessons.length, allLessonsReady, successfulLessons: successful, failedLessons: errors.length, errors });

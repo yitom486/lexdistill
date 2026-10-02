@@ -9,7 +9,7 @@ import { createLibraryRoutes } from '../../../../../gateway/src/modules/library/
 import type { GatewayDeps } from '../../../../../gateway/src/composition/gateway-deps.js';
 import { TextbookContentTools } from '../../../../../gateway/src/modules/library/tools/textbook-content-tools.js';
 import { TextbookPipelineJobRegistry } from '../../../../../gateway/src/modules/library/application/pipeline-job-runner.js';
-import { fixturePdf, fixturePng, deferred, submissionFromPrompt, pipelineModel } from '../../../../../gateway/src/modules/library/__tests__/textbook-pipeline-fixtures.js';
+import { fixturePdf, fixturePng, deferred, submissionFromPrompt, pipelineModel, submitRequired } from '../../../../../gateway/src/modules/library/__tests__/textbook-pipeline-fixtures.js';
 import { pinProcessToTestRuntime } from '../../../../../gateway/src/modules/library/__tests__/pdf-test-runtime.js';
 import { act, setupDom } from '../../toc/__tests__/dom-setup.js';
 
@@ -41,7 +41,7 @@ it('桌面解析选择与资源配置 → Gateway → MinerU V1 HTTP → 工具 
   const tool = new TextbookContentTools(repo), model = pipelineModel(tool, async ({ input, submit }) => {
     expect((await submit({ content: null })).ok).toBe(false);
     modelWaiting.resolve(); await releaseModel.promise;
-    expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true);
+    expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true); await submitRequired(submit);
   });
   // 只运行文库与导入路由；模型/工具/PDF 由正式注入点提供，其他 GatewayServer 能力不访问。
   const deps = { repo, server: { pipelineJobs: registry } as GatewayDeps['server'], port: 0 };

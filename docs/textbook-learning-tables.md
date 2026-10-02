@@ -1,10 +1,10 @@
 # 教材学习内容表与简单工具
 
-更新：2026-10-02。版本：数据库 v37。目标是保存可直接学习的内容。
+更新：2026-10-02。版本：数据库 v39（内容表始于 v37）。目标是保存可直接学习的内容。
 
 ## 模型和系统的分工
 
-模型只填写标题、正文、释义、讲解、例句、题干和参考答案。系统绑定用户、教材和章节，生成内容 ID、排序、时间，执行事务并返回真实保存数量。没有某类内容就不调用对应工具，不要求小目录覆盖。
+模型只填写标题、正文、释义、讲解、例句、题干和参考答案。系统绑定用户、教材和章节，生成内容 ID、排序和时间。调用校验后暂存，模型正常结束后统一事务保存；知识点、词汇、练习必须提交有效内容，文章、句子和材料有则提交。不要求小目录覆盖。
 
 五类学习内容加整理材料、全局词汇，共七张表。公共词典包与个人全局词汇不同：公共词典仍为查询来源，全局词汇用于同一学习者跨教材复用词汇身份。
 
@@ -144,7 +144,7 @@ document_id + chapter_id 为联合主键；再次写入替换该章材料。它�
 | chapters_json | 章节列表；每项有系统 id、title、order、kind、startPage、endPage、status |
 | source_fingerprint | 本地文件指纹，用于检测同文件重复导入 |
 
-页码只用于内部切分和核对，模型内容工具无需填写。状态 ready 在模型轮次正常结束且已有内容后保存；工具已保存某批内容不等于整章已完成。
+页码只用于内部切分和核对，模型内容工具无需填写。状态 ready 与内容在同一事务保存，前提是模型轮次正常结束、工具调用已处理完、三类必需内容齐备且没有未修正的操作错误。暂存回执不代表数据库已保存。
 
 教材不再重复存全书 ast_json 和拼接正文 content；非教材的新闻、阅读文档用途保留。读取层按现有接口生成视图，不保存第二份内容。
 
@@ -152,15 +152,18 @@ document_id + chapter_id 为联合主键；再次写入替换该章材料。它�
 
 | 工具 | 模型填写 |
 | --- | --- |
-| library.write_grammar | items：标题、说明、知识类型、可选接续/AI 讲解/例句；组级 source |
-| library.write_vocabulary | items：词形、读音、释义、N5–N1 等级、可选词性/音调/讲解/例句 |
-| library.write_articles | items：正文、可选标题/译文；组级 source |
-| library.write_sentences | items：句子、可选译文/讲解/说话人；组级 source |
-| library.write_exercises | items：题型、题干、难度 1–5 及估计依据、客观题答案与必要选项；开放题评分要点及可选参考答案/解析；组级 source |
-| library.write_material | text |
-| library.read_material | 无参数，查询当前章节已保存材料 |
+| library.knowledge | items：标题、说明、知识类型、可选接续/AI 讲解/例句；组级 source；本课必需 |
+| library.vocabulary | items：词形、读音、释义、N5–N1 等级、可选词性/音调/讲解/例句；本课必需 |
+| library.articles | items：正文、可选标题/译文；组级 source；可选 |
+| library.sentences | items：句子、可选译文/讲解/说话人；组级 source；可选 |
+| library.exercises | items：题型、题干、难度 1–5 及估计依据、客观题答案与必要选项；开放题评分要点及可选参考答案/解析；组级 source；本课必需 |
+| library.material | items 中填写 text；本课最多一份整理材料；可选 |
 
-运行时原生名称将点号转换为下划线，如 library_write_vocabulary。引擎收到实际工具说明和参数定义；提示词不重复粘贴 JSON Schema。旧 library_commit_lesson_knowledge 工具已删除。
+每个工具均支持 action=add/read/update/delete，默认 add。新增只填写内容；read 返回本课已有内容加暂存变更及短引用 ref，update 在 items 中填 ref 和完整内容，delete 填 refs。短引用只在当前课、当前尝试有效，不是数据库 ID；重复原生 callId 不重复操作。
+
+回执 status=staged 表示已校验并暂存，status=view 表示查询当前视图。模型正常结束后由调度器校验并统一提交内容、全局新词、FTS 和 ready 状态。取消、超时或异常结束丢弃本轮暂存；数据库暂时失败仅重试同一候选。重新提取的旧内容也在最终事务中替换，失败保留旧版本。删除章节词汇不删除全局词和其他学习资产。
+
+运行时原生名称将点号转换为下划线，如 library_vocabulary。引擎收到实际工具说明和参数定义；提示词不重复粘贴 JSON Schema。旧统一提交和分批立即写入工具入口均已删除，无兼容工具。
 
 ## 迁移与检验
 

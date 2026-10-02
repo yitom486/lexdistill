@@ -1,5 +1,18 @@
 # 教材目录与运行监视：集成验收记录
 
+## 课程 CRUD 暂存与原子保存（2026-10-02）
+
+当前六工具为 knowledge、vocabulary、exercises、articles、sentences、material，均支持增查改删。模型调用先校验并暂存，正常结束后以课程为单位一次事务提交；知识点、词汇、练习为必需内容。当前契约见[教材学习内容表](textbook-learning-tables.md)；下文其余阶段记录为历史取证，不代表现行旧工具或来源引用规则。
+
+- [课程事务集成](../apps/gateway/src/modules/library/__tests__/lesson-content-transaction.integration.test.ts)：实际 HTTP 默认入口、ToolRegistry、Codex 原生 schema 转换、内容工具与 SQLite；核对六工具 action/ref 和嵌套字段完整注入，无数据库身份参数。
+- 多次新增、查询、修改、删除仅改变当前尝试视图，模型运行期间学习表与全局词汇未变化；新增后又删除的词不进入全局表。已有条目修改保留内容身份，删除章节词汇不删除全局词或其他章节关联。
+- 在最终 ready 更新处注入真实 SQLite 故障，此前内容、全局词和 FTS 写入全部回滚；同候选重试成功，模型只调用一次。
+- 缺必需内容、关闭新增 AI 练习、跨课程/重试引用、非法批次或缺少正常 COMPLETED 均不能完成。下一轮收到真实缺项反馈，不继承失败缓存；正常字段修正复用会话。
+- 重新提取失败保留旧版本，成功后整课替换。原生 callId 幂等，冲突内容拒绝；仅查询不算本轮提交。
+- [监视 DOM](../apps/web/src/components/importer/monitor/__tests__/import-monitor.dom.test.tsx)：实际 Query→Gateway→SQLite，模型未结束时显示暂存且当前课数据库零写入，完成后改为整课保存；历史折叠、按需读取及关闭重开继续验证。
+
+测试使用受控模型输出，没有调用付费模型，不证明语义整理质量；实际 Tauri 视觉验收由用户执行。最终门禁：`bun run typecheck` 通过；`bun run test:all` 1634 通过、3 项既有 RSS 跳过、0 失败，原生 PDF/OCR 不跳过。日志为 `.studio-internal/lesson-atomic-typecheck.log`、`.studio-internal/lesson-atomic-test-all.log`。本轮测试进程已退出。
+
 ## 失败记录修正：字段与来源（2026-10-01）
 
 `submission-correction.integration.test.ts` 通过实际流水线、原生提交工具与 SQLite，验证同次回执同时包含目录越界、未知来源块、缺少对话角色及注音/释义来源，反馈定位原始数组路径且没有生成的内容 ID；拒绝时零写入，修正后内容与真实物理页保存。模型输入明确包含当前目录与解析材料。

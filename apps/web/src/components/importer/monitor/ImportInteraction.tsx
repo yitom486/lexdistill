@@ -25,7 +25,7 @@ export function ImportInteraction({ events, title, current, directory = [] }: { 
       {input && <ImportEventDetail event={input} expanded />}
       {saved && rejected > 0 && <p className="text-ink-muted">本轮曾拒绝 {rejected} 次提交，后续已修正并保存；此前失败调用默认折叠。</p>}
       {events.filter(event => event.category === 'model' && ['message', 'error', 'failed', 'approval_requested', 'runtime_retry'].includes(event.name)).map(event => <ImportEventDetail key={event.sequence} event={event} expanded={event.name !== 'message'} />)}
-      {[...calls.entries()].map(([callId, records]) => <ImportToolCall key={callId} events={records} directory={directory} resolved={saved && records.some(event => event.name === 'rejected') && !records.some(event => event.name === 'committed')} />)}
+      {[...calls.entries()].map(([callId, records]) => <ImportToolCall key={callId} events={records} directory={directory} lessonSaved={saved} resolved={saved && records.some(event => event.name === 'rejected') && !records.some(event => event.name === 'committed')} />)}
       {events.filter(event => !event.callId && (event.category === 'validation' || event.category === 'storage' || event.name === 'retry')).map(event => <ImportEventDetail key={event.sequence} event={event} directory={directory} expanded={event.name === 'rejected' || event.name === 'commit_failed'} />)}
     </div>}
   </details>;

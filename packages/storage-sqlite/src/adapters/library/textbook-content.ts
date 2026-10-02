@@ -22,15 +22,25 @@ const contentId = (scope: TextbookScope, kind: string, value: unknown) => `conte
 const formatError = (error: { issues: { path: (string | number)[]; message: string }[] }) => new BusinessError('E_CONTENT_FORMAT_INVALID', '内容格式不正确，请按工具字段说明修正', 'VALIDATION', true,
   { issues: error.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message })) });
 
-/** Each successful call saves immediately. The model supplies no storage identity. */
+/** Internal content command. Model tools buffer changes and use the lesson transaction. */
 export async function writeTextbookContent(deps: { db: DrizzleDb }, scope: TextbookScope, kind: TextbookContentKind, raw: unknown): Promise<Result<ContentWriteReceipt, BusinessError>> {
   try {
     const receipt = deps.db.transaction(tx => {
+      const receipt = writeTextbookContentInTx(tx, scope, kind, raw);
+      rebuildTextbookSearchInTx(tx, scope.documentId);
+      tx.update(documents).set({ updatedAt: nowIso() }).where(eq(documents.id, scope.documentId)).run();
+      return receipt;
+    });
+    return ok(receipt);
+  } catch (cause) { return err(cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage: '内容保存失败，本次写入已撤回' })); }
+}
+
+export function writeTextbookContentInTx(tx: Tx, scope: TextbookScope, kind: TextbookContentKind, raw: unknown, identity?: { id: string; ord: number }) {
       const { doc } = getBoundChapter(tx, scope);
       let saved = 0, vocabularyAdded = 0;
       const table = { vocabulary: textbookVocabulary, grammar: textbookKnowledge, articles: textbookArticles, sentences: textbookSentences, exercises: textbookExerciseItems }[kind === 'material' ? 'articles' : kind];
       const nextOrd = (tx.select({ n: max(table.ord) }).from(table).where(and(eq(table.documentId, scope.documentId), eq(table.chapterId, scope.chapterId))).get()?.n ?? -1) + 1;
-      const base = (value: unknown, ord: number, source?: string) => ({ id: contentId(scope, kind, [value, source ?? null]), documentId: scope.documentId, chapterId: scope.chapterId, ord: nextOrd + ord });
+      const base = (value: unknown, ord: number, source?: string) => ({ id: identity?.id ?? contentId(scope, kind, [value, source ?? null]), documentId: scope.documentId, chapterId: scope.chapterId, ord: identity?.ord ?? nextOrd + ord });
       switch (kind) {
         case 'vocabulary': {
           const parsed = TextbookWriteSchemas.vocabulary.safeParse(raw); if (!parsed.success) throw formatError(parsed.error);
@@ -74,12 +84,7 @@ export async function writeTextbookContent(deps: { db: DrizzleDb }, scope: Textb
           tx.insert(textbookMaterials).values({ documentId: scope.documentId, chapterId: scope.chapterId, text: parsed.data.text, updatedAt: nowIso() }).onConflictDoUpdate({ target: [textbookMaterials.documentId, textbookMaterials.chapterId], set: { text: parsed.data.text, updatedAt: nowIso() } }).run(); saved = 1; break;
         }
       }
-      rebuildTextbookSearchInTx(tx, scope.documentId);
-      tx.update(documents).set({ updatedAt: nowIso() }).where(eq(documents.id, scope.documentId)).run();
       return { kind, saved, vocabularyAdded };
-    });
-    return ok(receipt);
-  } catch (cause) { return err(cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage: '内容保存失败，本次写入已撤回' })); }
 }
 
 export async function readTextbookMaterial(deps: { db: DrizzleDb }, scope: TextbookScope): Promise<Result<{ text: string | null }, BusinessError>> {

@@ -227,3 +227,4 @@ export {
 } from './adapters/library/toc-skeleton.js';
 export { getVisibleDocument, type VisibleDocument } from './adapters/library/document-visibility.js';
 export * from './adapters/practice/textbook-attempts.js';
+export { readTextbookChapter, commitTextbookLesson } from './adapters/library/lesson-content-transaction.js';

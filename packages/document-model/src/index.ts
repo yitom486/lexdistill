@@ -14,3 +14,4 @@ export * from './textbook-pipeline-settings.js';
 export * from './toc.js';
 export * from './chapter-source.js';
 export * from './textbook-learning-content.js';
+export * from './textbook-content-operations.js';

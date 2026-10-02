@@ -4,7 +4,7 @@ import { TextbookInspectionResultSchema } from '@study-studio/protocol';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';
 import { TextbookContentTools } from '../tools/textbook-content-tools.js';
-import { pipelineModel, submissionFromPrompt } from './textbook-pipeline-fixtures.js';
+import { submitRequired, pipelineModel, submissionFromPrompt } from './textbook-pipeline-fixtures.js';
 
 const fixture = new URL('./fixtures/smoke-native-2lessons.pdf', import.meta.url);
 const repos: DrizzleLearnerRepository[] = [];
@@ -14,7 +14,7 @@ describe('教材检测：真实指纹、内容统计、补课与重复导入', (
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
     const tool = new TextbookContentTools(repo);
     let partial = true;
-    const model = pipelineModel(tool, async ({ input, submit }) => { const value = submissionFromPrompt(input.message); if (!partial || input.message.includes('章节: 第一章')) await submit(value); });
+    const model = pipelineModel(tool, async ({ input, submit }) => { const value = submissionFromPrompt(input.message); if (!partial || input.message.includes('章节: 第一章')) { await submit(value); await submitRequired(submit); } });
     const app = createPdfImportRoutes({ repo, server: {} as never, port: 0 });
     const input = { userId: 'owner', documentId: 'book', title: '教材', pdf: new Uint8Array(await Bun.file(fixture).arrayBuffer()), poolSize: 1, modelRetries: 0, adapter: model.adapter, submissionTool: tool,
       tocEntries: [{ id: 'l1', title: '第一章', level: 'lesson' as const, startPage: 1 }, { id: 'l2', title: '第二章', level: 'lesson' as const, startPage: 2 }],
@@ -26,7 +26,7 @@ describe('教材检测：真实指纹、内容统计、补课与重复导入', (
     };
     expect((await repo.executeTextbookPipeline(input)).ok).toBe(true);
     const first = await inspect(); expect(first.status).toBe('partial'); expect(first.summary).toContain('1/2'); expect(first.matchedDocument?.lineCount).toBe(1);
-    expect(first.matchedDocument?.lessonDetails[0]?.hasPassage).toBe(true); expect(first.matchedDocument?.exerciseCount).toBe(0);
+    expect(first.matchedDocument?.lessonDetails[0]?.hasPassage).toBe(true); expect(first.matchedDocument?.exerciseCount).toBe(1);
     partial = false;
     expect((await repo.executeTextbookPipeline(input)).ok).toBe(true);
     const ready = await inspect(); expect(ready.status).toBe('ready'); expect(ready.matchedDocument?.readyLessonCount).toBe(2); expect(ready.matchedDocument?.lineCount).toBe(2);

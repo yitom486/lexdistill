@@ -57,6 +57,7 @@ function convertZod(schema: z.ZodTypeAny): Record<string, unknown> {
     values?: unknown;
     value?: unknown;
     innerType?: z.ZodTypeAny;
+    schema?: z.ZodTypeAny;
     options?: z.ZodTypeAny[];
     checks?: unknown;
     minLength?: unknown;
@@ -129,6 +130,9 @@ function convertZod(schema: z.ZodTypeAny): Record<string, unknown> {
       return withDescription({ anyOf: (def.options as z.ZodTypeAny[] | undefined)?.map(convertZod) ?? [] });
     case 'ZodRecord':
       return withDescription({ type: 'object', additionalProperties: true });
+    case 'ZodEffects':
+      // Refinement checks run at the tool boundary; expose their underlying fields to the engine.
+      return withDescription(def.schema ? convertZod(def.schema) : {});
     default:
       return withDescription({});
   }

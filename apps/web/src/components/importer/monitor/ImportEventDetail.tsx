@@ -6,7 +6,7 @@ import { ChapterSourceView } from './ChapterSourceView.js';
 import { ModelInputView } from './ModelInputView.js';
 import { ImportRecordView } from './ImportRecordView.js';
 
-const labels: Record<string, string> = { input: '实际模型输入与材料', opened: '本会话模型与工具说明', candidate: '系统生成 ID 后的规范内容', requested: '模型工具调用', proposal: '模型提交参数', result: '工具回执', rejected: '校验拒绝与修正反馈', repair_limit: '本轮工具修正次数用尽', accepted: '校验通过', content_saved: '内容已经写入数据库', committed: '本章完成状态已保存', commit_failed: '保存失败', message: '模型回复', retry: '应用发起新轮重试', runtime_retry: '引擎内部重试（本轮尚未结束）', failed: '失败原因', error: '模型运行错误', check_passed: '逐项校验', turn_started: '原生轮次身份' };
+const labels: Record<string, string> = { input: '实际模型输入与材料', opened: '本会话模型与工具说明', candidate: '系统生成 ID 后的规范内容', requested: '模型工具调用', proposal: '模型提交参数', result: '工具回执', rejected: '校验拒绝与修正反馈', repair_limit: '本轮工具修正次数用尽', accepted: '校验通过', content_staged: '内容已校验并暂存（尚未落库）', content_view: '本课已有内容与暂存变更', committed: '本课内容与完成状态已事务保存', commit_failed: '保存失败', message: '模型回复', retry: '应用发起新轮重试', runtime_retry: '引擎内部重试（本轮尚未结束）', failed: '失败原因', error: '模型运行错误', check_passed: '逐项校验', turn_started: '原生轮次身份' };
 
 export function ImportEventDetail({ event, expanded = false, directory = [] }: { event: ImportEvent; expanded?: boolean; directory?: readonly ContentDirectoryNode[] }) {
   const [open, setOpen] = useState(expanded);

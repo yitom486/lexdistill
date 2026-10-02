@@ -9,7 +9,7 @@ import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtim
 import { producePdfLessons } from '../application/pdf-import/lesson-content-slicer.js';
 import { TextbookPipelineJobRegistry } from '../application/pipeline-job-runner.js';
 import { TextbookContentTools } from '../tools/textbook-content-tools.js';
-import { pipelineModel, submissionFromPrompt } from './textbook-pipeline-fixtures.js';
+import { submitRequired, pipelineModel, submissionFromPrompt } from './textbook-pipeline-fixtures.js';
 
 pinProcessToTestRuntime();
 const { inspector } = await ensurePdfTestRuntime();
@@ -79,7 +79,7 @@ describe('真实原生 OCR 与教材流水线', () => {
     const model = pipelineModel(tool, async ({ input, submit }) => {
       expect(input.message).toContain('第1課'); expect(input.message).toContain('会話');
       expect(input.message).not.toContain('properties'); expect(input.message).not.toContain('passageMd');
-      expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true);
+      expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true); await submitRequired(submit);
     });
     const result = await repo.executeTextbookPipeline({ userId: 'native', title: '扫描教材', pdf: bytes, inspector, chapterParser,
       tocEntries: [{ id: 'l1', title: '第一章', level: 'lesson', startPage: 1, endPage: 1 }], poolSize: 1, adapter: model.adapter, submissionTool: tool });

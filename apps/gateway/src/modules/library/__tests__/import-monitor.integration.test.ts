@@ -37,7 +37,7 @@ describe('导入监视：实际会话工具 → SQLite 事件 → Gateway 查询
       const input = interactions.find(event => event.name === 'input')!;
       const detail = ImportEventSchema.parse(await (await flow.app.request(`${base}/details/${input.sequence}`)).json());
       expect(detail.detail).toEqual(expect.objectContaining({ message: flow.model.inputs.find(turn => turn.sessionId === binding.sessionId)!.input.message }));
-      expect(interactions.map(event => event.name)).toEqual(expect.arrayContaining(['requested', 'content_saved', 'committed', 'result', 'turn_ended', 'unbound']));
+      expect(interactions.map(event => event.name)).toEqual(expect.arrayContaining(['requested', 'content_staged', 'committed', 'result', 'turn_ended', 'unbound']));
       const request = interactions.find(event => event.name === 'requested')!, response = interactions.find(event => event.name === 'result')!;
       expect(request.callId).toBe(response.callId);
       const saved = await flow.app.request(`/api/documents/owner/textbook-saved/monitored-book/${binding.nodeId}`);

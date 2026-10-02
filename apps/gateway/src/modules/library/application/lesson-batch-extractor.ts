@@ -126,7 +126,7 @@ export class ChapterSessionPool {
     const startedAt = Date.now();
     let nativeTurnId: string | undefined, lastActivityAt = startedAt, lastEvent: string | undefined;
     let engineRetryCount = 0, lastEngineError: { code: string; message: string } | undefined;
-    let first = true, deadline = startedAt + this.options.firstResponseTimeoutMs;
+    let first = true, completed = false, deadline = startedAt + this.options.firstResponseTimeoutMs;
     const activity = (event: string, message?: string) => onActivity?.({ event, lastActivityAt: new Date().toISOString(), engineRetryCount,
       ...(nativeTurnId ? { nativeTurnId } : {}), ...(message ? { message } : {}),
     });
@@ -151,6 +151,7 @@ export class ChapterSessionPool {
         }));
         if (next.done) break;
         const event = next.value;
+        if (event.type === 'COMPLETED') completed = true;
         turn?.event(event);
         if (event.type === 'RUNTIME_RETRY') {
           engineRetryCount++; lastEngineError = { code: event.code, message: event.message };
@@ -171,7 +172,7 @@ export class ChapterSessionPool {
           return { ok: false, error: event.error };
         }
       }
-      return { ok: true, value: undefined };
+      return completed ? { ok: true, value: undefined } : { ok: false, error: new BusinessError('E_MODEL_TURN_INCOMPLETE', '模型响应未正常结束，本课暂存内容未提交', 'AGENT_RUNTIME', true) };
     } catch (cause) {
       const error = cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本章模型处理失败，请重试本章' });
       this.options.monitor?.record('model', 'failed', { code: error.code, message: error.userMessage, retryable: error.retryable, details: error.internalDetails }, turn?.binding);

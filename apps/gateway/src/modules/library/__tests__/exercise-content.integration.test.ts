@@ -2,6 +2,7 @@ import { afterEach, expect, it } from 'bun:test';
 import { TextbookASTSchema } from '@study-studio/document-model';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { TextbookContentTools } from '../tools/textbook-content-tools.js';
+import { submitRequired } from './textbook-pipeline-fixtures.js';
 
 let repo: DrizzleLearnerRepository;
 afterEach(() => repo?.getRawDb().close());
@@ -9,7 +10,7 @@ it('native exercise tool persists all eight shapes, actual difficulty and option
   repo = new DrizzleLearnerRepository(':memory:');
   await repo.seedTextbookTocSkeleton({ userId: 'u', documentId: 'b', title: 'Book', language: 'ja', entries: [{ id: 'c', title: 'Chapter', level: 'lesson', startPage: 1 }] });
   const tools = new TextbookContentTools(repo);
-  tools.bind('s', { userId: 'u', documentId: 'b', lessonId: 'c', assignmentId: 'a', signal: new AbortController().signal, allowAiExercises: true });
+  const binding = tools.bind('s', { userId: 'u', documentId: 'b', lessonId: 'c', assignmentId: 'a', signal: new AbortController().signal, allowAiExercises: true });
   tools.startTurn('s', 'a', 't');
   const tool = tools.tools.find(tool => tool.kind === 'exercises')!;
   const context = { userId: 'u', sessionId: 's', turnId: 't' };
@@ -24,8 +25,21 @@ it('native exercise tool persists all eight shapes, actual difficulty and option
     { type: 'WRITING', prompt: 'Introduce yourself', gradingNotes: 'Identity, interests and coherence' },
   ].map((item, index) => ({ ...item, difficultyTier: index % 5 + 1, difficultyReason: `Controlled estimate for ${item.type}` }));
   const saved = await tool.execute({ items, source: 'AI' }, context);
-  expect(saved.ok && saved.value).toEqual({ kind: 'exercises', saved: 8, vocabularyAdded: 0 });
+  expect(saved.ok && saved.value).toMatchObject({ kind: 'exercises', status: 'staged' });
   expect((await tool.execute({ items, source: 'AI' }, context)).ok).toBe(true);
+  expect(repo.getRawDb().query('SELECT count(*) AS n FROM textbook_exercise_items').get()).toEqual({ n: 0 });
+  for (const invalid of [
+    { ...items[0], difficultyTier: 0 }, { ...items[0], difficultyTier: 2.5 },
+    { ...items[0], difficultyReason: '' }, { ...items[0], difficultyTier: undefined },
+    { ...items[3], answer: ['a', 'b', 'b'] }, { ...items[2], answer: undefined },
+    { ...items[7], gradingNotes: undefined }, { ...items[7], id: 'model-id' },
+  ]) {
+    expect((await tool.execute({ items: [{ ...items[0], prompt: 'Must roll back' }, invalid] }, context)).ok).toBe(false);
+    expect(repo.getRawDb().query('SELECT count(*) AS n FROM textbook_exercise_items').get()).toEqual({ n: 0 });
+  }
+  expect((await tool.execute({ items, source: 'AI' }, context)).ok).toBe(true);
+  await submitRequired((raw, kind = 'articles') => tools.tools.find(tool => tool.kind === kind)!.execute(raw, context), ['exercises']);
+  expect((await binding.persist()).ok).toBe(true);
   const rows = repo.getRawDb().query<{ type: string; answer_json: string | null; difficulty_tier: number }, []>('SELECT type,answer_json,difficulty_tier FROM textbook_exercise_items ORDER BY ord').all();
   expect(rows).toHaveLength(8);
   expect(rows[2]!.answer_json).toBe('["の","は"]');
@@ -35,15 +49,6 @@ it('native exercise tool persists all eight shapes, actual difficulty and option
   const read = TextbookASTSchema.parse(JSON.parse(doc.value!.astJson!)).lessons[0]!.learningContent!.exercises;
   expect(read[7]).toMatchObject({ type: 'WRITING', difficultyTier: 3, gradingNotes: 'Identity, interests and coherence' });
   expect(read[7]!.answer).toBeUndefined();
-  for (const invalid of [
-    { ...items[0], difficultyTier: 0 }, { ...items[0], difficultyTier: 2.5 },
-    { ...items[0], difficultyReason: '' }, { ...items[0], difficultyTier: undefined },
-    { ...items[3], answer: ['a', 'b', 'b'] }, { ...items[2], answer: undefined },
-    { ...items[7], gradingNotes: undefined }, { ...items[7], id: 'model-id' },
-  ]) {
-    expect((await tool.execute({ items: [{ ...items[0], prompt: 'Must roll back' }, invalid] }, context)).ok).toBe(false);
-    expect(repo.getRawDb().query('SELECT count(*) AS n FROM textbook_exercise_items').get()).toEqual({ n: 8 });
-  }
   expect((await tool.execute({ items }, { ...context, userId: 'other' })).ok).toBe(false);
   tools.end('s');
 });

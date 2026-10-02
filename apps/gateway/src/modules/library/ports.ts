@@ -10,8 +10,9 @@ import type {
   ReadingPassageSet,
   SubmitReadingPractice,
 } from '@study-studio/protocol';
-import type { TextbookAST, ImportEvent, ImportEventInput, ImportEventQuery, TextbookContentKind } from '@study-studio/document-model';
-import type { TextbookScope, ContentWriteReceipt } from '@study-studio/storage-sqlite';
+import type { TextbookAST, ImportEvent, ImportEventInput, ImportEventQuery } from '@study-studio/document-model';
+import type { TextbookScope } from '@study-studio/storage-sqlite';
+import type { TextbookLearningContent, TextbookContentChange } from '@study-studio/document-model';
 import type { ImportTask, ImportTaskStatus } from '@study-studio/storage-sqlite';
 import type {
   DocumentImportInput,
@@ -44,9 +45,8 @@ import type {
  *   所有权归属 M5 再定，本契约暂不收录。
  */
 export interface ContentRepository {
-  writeTextbookContent(scope: TextbookScope, kind: TextbookContentKind, input: unknown): Promise<Result<ContentWriteReceipt, BusinessError>>;
-  readTextbookMaterial(scope: TextbookScope): Promise<Result<{ text: string | null }, BusinessError>>;
-  completeTextbookChapter(scope: TextbookScope): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>>;
+  readTextbookChapter(scope: TextbookScope): Promise<Result<TextbookLearningContent, BusinessError>>;
+  commitTextbookLesson(scope: TextbookScope, changes: readonly TextbookContentChange[]): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>>;
   appendImportEvent(input: ImportEventInput): Promise<Result<ImportEvent, BusinessError>>;
   listImportEvents(query: ImportEventQuery): Promise<Result<ImportEvent[], BusinessError>>;
   getImportEvent(userId: string, traceId: string, sequence: number): Promise<Result<ImportEvent | null, BusinessError>>;

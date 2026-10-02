@@ -259,7 +259,7 @@ import {
 } from '@study-studio/storage-sqlite';
 import {
   seedTextbookTocSkeleton as seedTextbookTocSkeletonDomain,
-  writeTextbookContent, readTextbookMaterial, completeTextbookChapter, type TextbookScope,
+  writeTextbookContent, readTextbookMaterial, completeTextbookChapter, readTextbookChapter, commitTextbookLesson, type TextbookScope,
   appendImportEvent, listImportEvents, getImportEvent,
   listTextbookLessonSlots as listTextbookLessonSlotsDomain,
   getTextbookAssetStats as getTextbookAssetStatsDomain,
@@ -642,6 +642,8 @@ export class DrizzleLearnerRepository
   }
   public readTextbookMaterial(scope: TextbookScope) { return readTextbookMaterial(this.deps, scope); }
   public completeTextbookChapter(scope: TextbookScope) { return completeTextbookChapter(this.deps, scope); }
+  public readTextbookChapter(scope: TextbookScope) { return readTextbookChapter(this.deps, scope); }
+  public commitTextbookLesson(scope: TextbookScope, changes: readonly import('@study-studio/document-model').TextbookContentChange[]) { return commitTextbookLesson(this.deps, scope, changes); }
 
   public appendImportEvent(input: Parameters<typeof appendImportEvent>[1]) { return appendImportEvent(this.deps, input); }
   public listImportEvents(query: Parameters<typeof listImportEvents>[1]) { return listImportEvents(this.deps, query); }

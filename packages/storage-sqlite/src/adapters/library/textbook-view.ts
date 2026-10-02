@@ -80,6 +80,12 @@ export function textbookViewInTx(tx: Tx, documentId: string): TextbookAST | null
 export async function completeTextbookChapter(deps: { db: DrizzleDb }, scope: TextbookScope): Promise<Result<CommitLessonKnowledgeOutput, BusinessError>> {
   try {
     return ok(deps.db.transaction(tx => {
+      return completeTextbookChapterInTx(tx, scope);
+    }));
+  } catch (cause) { return err(cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage: '章节完成状态保存失败，可重试' })); }
+}
+
+export function completeTextbookChapterInTx(tx: Tx, scope: TextbookScope): CommitLessonKnowledgeOutput {
       const { manifest } = getBoundChapter(tx, scope);
       const stats = textbookStatsInTx(tx, scope.documentId);
       const chapter = stats.lessonDetails.find(item => item.lessonId === scope.chapterId)!;
@@ -88,6 +94,4 @@ export async function completeTextbookChapter(deps: { db: DrizzleDb }, scope: Te
       const next = manifest.map(item => item.id === scope.chapterId ? { ...item, status: 'ready' as const } : item);
       tx.update(documents).set({ chaptersJson: JSON.stringify(next), updatedAt: nowIso() }).where(eq(documents.id, scope.documentId)).run();
       return { documentId: scope.documentId, lessonId: scope.chapterId, stats: { vocabCount: chapter.vocabCount, grammarCount: chapter.grammarCount, exerciseCount: chapter.exerciseCount, hasPassage: chapter.hasPassage }, allLessonsReady: next.every(item => item.status === 'ready') };
-    }));
-  } catch (cause) { return err(cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage: '章节完成状态保存失败，可重试' })); }
 }

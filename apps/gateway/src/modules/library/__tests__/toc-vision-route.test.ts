@@ -123,7 +123,7 @@ describe('目录视觉识别 HTTP 闭环', () => {
       expect(model.inputs[0]?.input.message).toContain('独立部分的文字');
       expect(model.inputs[1]?.input.message).toContain('当前课与小节的文字');
       const monitor = ImportEventPageSchema.parse(await (await flow.app.request('/api/documents/u1/textbook-imports/directory-to-content')).json());
-      expect(monitor.events.map(event => event.name)).toEqual(expect.arrayContaining(['extract-toc-llm_result', 'confirmed_saved', 'content_saved', 'committed']));
+      expect(monitor.events.map(event => event.name)).toEqual(expect.arrayContaining(['extract-toc-llm_result', 'confirmed_saved', 'content_staged', 'committed']));
     } finally { repo.getRawDb().close(); }
   });
 
