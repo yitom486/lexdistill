@@ -1,5 +1,16 @@
 # 教材目录与运行监视：集成验收记录
 
+## 本地 OCR 默认与云端选择（2026-10-03）
+
+扫描正文默认现有本机 OCR，桌面保留 MinerU 云端与已部署本机 V1 服务的显式选择，后续手动选择持久化。解析失败不会自动切换或上传云端。既有 Agent 池、一级标题任务与六工具课程事务继续使用。
+
+- [本地 OCR 流水线](../apps/gateway/src/modules/library/__tests__/local-ocr-pipeline.integration.test.ts)：长章分批后只入队一次，保留真实物理页映射，优先识别行；文本 PDF 零 OCR；失败章节隔离、成功批次缓存、取消/超时与迟到结果丢弃。受控模型收到当前目录和 OCR 内容，无正文图片；知识点、词汇、练习通过真实工具保存至 SQLite。
+- [真实原生 OCR](../apps/gateway/src/modules/library/__tests__/pdf-ocr-native-integration.test.ts)：生产默认选择直接运行真实扫描夹具及 ONNX OCR，贯通 Gateway 后台任务、工具与 SQLite，不再通过解析器替身冒充默认通路。
+- [桌面选择](../apps/web/src/components/importer/__tests__/local-ocr-desktop.dom.test.tsx)：真实 Base UI、Zustand、Query、Gateway 和 SQLite；升级后本地默认、其他偏好保留；手选云端与再次重载保留选择；切回本地启动并完成整课保存，客户端只访问 Gateway。
+- 既有 MinerU HTTP 与桌面本机服务测试继续通过，云端请求仍需显式选择。测试中的外部模型、云端服务与桌面 OCR 边界受控；真实 OCR 另有上述原生测试，不能据此声称全书语义质量已验收。
+
+最终门禁：`bun run typecheck` 通过；`bun run test:all` **1646 通过、3 项既有 RSS 跳过、0 失败**，1649 项 / 266 文件，原生 PDF/OCR 没有跳过。日志：`.studio-internal/local-ocr-typecheck.log`、`.studio-internal/local-ocr-test-all.log`。本轮测试进程已退出，没有重启应用或重新导入现有教材；实际 Tauri 视觉验收由用户执行。
+
 ## 课程 CRUD 暂存与原子保存（2026-10-02）
 
 当前六工具为 knowledge、vocabulary、exercises、articles、sentences、material，均支持增查改删。模型调用先校验并暂存，正常结束后以课程为单位一次事务提交；知识点、词汇、练习为必需内容。当前契约见[教材学习内容表](textbook-learning-tables.md)；下文其余阶段记录为历史取证，不代表现行旧工具或来源引用规则。

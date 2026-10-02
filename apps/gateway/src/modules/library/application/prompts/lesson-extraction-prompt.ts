@@ -22,6 +22,7 @@ export function buildLessonExtractionPrompt(job: LessonExtractionJob, toolNames:
       ? [`本节位置（仅定位参考，不需逐项对应）：${job.tocPath.map(entry => entry.title).join(' > ')}`]
       : []),
     ...(correction ? [`上次未完成的原因：${correction}`] : []),
+    ...(job.source?.parser === 'local-ocr' ? ['以下材料来自逐页本地 OCR，可能有错字、注音混入或词表断行。结合本课语境整理，不把页码或编号猜成音调；无法确认的音调省略。'] : []),
     job.source ? `章节材料:\n${JSON.stringify(job.source.blocks.map(block => ({ kind: block.kind, ...(block.text && !block.rows?.length ? { text: block.text } : {}), ...(block.rows?.length ? { rows: block.rows } : {}) })))}` : `本章内容:\n${job.text}`,
   ].join('\n\n');
 }

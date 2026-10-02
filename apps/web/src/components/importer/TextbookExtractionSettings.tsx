@@ -80,7 +80,7 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
         ))}
       </div>
       <p className="text-ink-muted">每轮工具修正次数控制同一会话轮次内的重新提交；用尽后结束该轮，再按模型新轮重试次数处理。引擎内部重试单独显示，不延长所选等待期限。</p>
-      <p className="text-ink-muted">扫描正文使用 MinerU 解析，数字原生 PDF 直接读取文字。章节数控制在途解析任务；队列满后等待模型消费。停止提取会停止本地等待，已被解析服务接受的任务可能继续运行。</p>
+      <p className="text-ink-muted">扫描正文使用你选择的解析方式，数字原生 PDF 直接读取文字。章节数控制同时处理的章节；队列满后等待模型消费。停止后不再发送新章节，正在执行的 OCR 或已被云端接受的任务可能继续完成当前处理，其迟到结果不会落库。</p>
       <label className="flex items-center justify-between gap-3 text-ink">允许 AI 补充习题（单独标注来源）
         <Switch checked={settings.allowAiExercises} onCheckedChange={allowAiExercises => setSettings({ allowAiExercises })} disabled={pending} />
       </label>

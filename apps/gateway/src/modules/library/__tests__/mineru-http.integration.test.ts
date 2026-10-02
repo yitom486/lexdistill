@@ -36,7 +36,7 @@ it('云端真实 HTTP 上传章节 PDF、轮询和下载重试，既有任务复
   } });
   const repo = new DrizzleLearnerRepository(':memory:');
   try {
-    const settings = TextbookPipelineSettingsSchema.parse({ parsePollIntervalMs: 10, parseRetries: 1, poolSize: 1 });
+    const settings = TextbookPipelineSettingsSchema.parse({ parserBackend: 'mineru-cloud', parsePollIntervalMs: 10, parseRetries: 1, poolSize: 1 });
     const parser = createMineruParser(settings, { cloudBaseUrl: server.url.href, cloudToken: 'test-cloud-key' });
     const tool = new TextbookContentTools(repo), model = pipelineModel(tool);
     const result = await repo.executeTextbookPipeline({ ...settings, userId: 'http-owner', documentId: 'http-book', title: 'HTTP 集成验证',
@@ -67,7 +67,7 @@ it('云端限流、无效 Token、损坏解析包与页数漂移不进入模型�
   } });
   const repo = new DrizzleLearnerRepository(':memory:');
   try {
-    const pdf = await fixturePdf(1), settings = TextbookPipelineSettingsSchema.parse({ parseRetries: 0, poolSize: 1 });
+    const pdf = await fixturePdf(1), settings = TextbookPipelineSettingsSchema.parse({ parserBackend: 'mineru-cloud', parseRetries: 0, poolSize: 1 });
     for (const fault of ['rate', 'token', 'zip', 'pages'] as const) {
       mode = fault;
       const parser = createMineruParser(settings, { cloudBaseUrl: server.url.href, cloudToken: 'test-key' });
@@ -117,7 +117,7 @@ it('拒绝异常回执和权限失败，轮询有明确超时且继续同一任�
     return Response.json({ code: 0, data: { extract_result: [{ state: 'pending' }] } });
   } });
   try {
-    const parser = createMineruParser(TextbookPipelineSettingsSchema.parse({ parseTimeoutMs: 100, parsePollIntervalMs: 10 }), { cloudBaseUrl: server.url.href, cloudToken: 'test-key' });
+    const parser = createMineruParser(TextbookPipelineSettingsSchema.parse({ parserBackend: 'mineru-cloud', parseTimeoutMs: 100, parsePollIntervalMs: 10 }), { cloudBaseUrl: server.url.href, cloudToken: 'test-key' });
     const pdf = await fixturePdf(1), signal = new AbortController().signal, note = () => {};
     await expect(parser.parse(pdf, [5], signal, note)).rejects.toMatchObject({ code: 'E_MINERU_HTTP', retryable: false });
     mode = 'invalid'; await expect(parser.parse(pdf, [5], signal, note)).rejects.toMatchObject({ code: 'E_MINERU_RESPONSE_INVALID' });

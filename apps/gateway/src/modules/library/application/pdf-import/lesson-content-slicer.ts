@@ -3,6 +3,7 @@ import { BusinessError, translateToBusinessError } from '@study-studio/shared';
 import { type ChapterSource, type TocEntry, TextbookPipelineSettingsSchema } from '@study-studio/document-model';
 import type { PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { createMineruParser, type ChapterParser } from '../../../../infrastructure/mineru/parser.js';
+import { createLocalOcrParser, LOCAL_OCR_PAGE_LIMIT } from '../../../../infrastructure/pdf-runtime/local-ocr-parser.js';
 
 export interface ProducePdfLessonsOptions {
   pdf: Uint8Array; inspector: PdfInspectorLike; lessons: readonly TocEntry[];
@@ -20,6 +21,7 @@ export async function producePdfLessons(options: ProducePdfLessonsOptions): Prom
   const settings = options.settings ?? TextbookPipelineSettingsSchema.parse({});
   const document = await PDFDocument.load(pdf);
   const pageCount = document.getPageCount();
+  const batchLimit = settings.parserBackend === 'local-ocr' ? Math.min(settings.parsePageLimit, LOCAL_OCR_PAGE_LIMIT) : settings.parsePageLimit;
   let next = 0;
   let parser = options.parser;
   const extract = async (lesson: TocEntry, batches: Map<number, ChapterSource>, files: Map<number, Uint8Array>): Promise<ChapterSource> => {
@@ -27,11 +29,11 @@ export async function producePdfLessons(options: ProducePdfLessonsOptions): Prom
     if (lesson.startPage < 1 || end < lesson.startPage || end > pageCount) throw new BusinessError('E_PDF_PAGE_RANGE_INVALID', '章节物理页范围无效，请核对目录：' + lesson.title, 'VALIDATION');
     const pages = Array.from({ length: end - lesson.startPage + 1 }, (_, index) => lesson.startPage + index);
     const result: ChapterSource = { parser: 'native', blocks: [] };
-    for (let offset = 0; offset < pages.length; offset += settings.parsePageLimit) {
+    for (let offset = 0; offset < pages.length; offset += batchLimit) {
       if (signal.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消', 'TOOL_EXECUTION');
       let part = batches.get(offset);
       if (!part) {
-        const batchPages = pages.slice(offset, offset + settings.parsePageLimit);
+        const batchPages = pages.slice(offset, offset + batchLimit);
         const direct = inspector.processPdf(pdf, batchPages);
         if (direct.pagesNeedingOcr?.length || !direct.markdown?.trim()) {
           let file = files.get(offset);
@@ -40,7 +42,7 @@ export async function producePdfLessons(options: ProducePdfLessonsOptions): Prom
             for (const page of await slice.copyPages(document, batchPages.map(page => page - 1))) slice.addPage(page);
             file = await slice.save(); files.set(offset, file);
           }
-          parser ??= createMineruParser(settings);
+          parser ??= settings.parserBackend === 'local-ocr' ? createLocalOcrParser(inspector, settings) : createMineruParser(settings);
           part = await parser.parse(file, batchPages, signal, (name, detail) => options.onDiagnostic?.(lesson, name, detail));
         } else {
           part = { parser: 'native', blocks: batchPages.flatMap(page => {

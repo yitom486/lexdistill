@@ -312,12 +312,12 @@ export function createPdfImportRoutes(
             return formatBusinessErrorResponse(c, fileRes.error, 'readLocalPdfFile');
           }
           pdfBytes = fileRes.value.bytes;
-          const runtime = await ensurePdfRuntime({ needOcr: false, needPdfium: true, ...pdfOverrides });
+          const runtime = await ensurePdfRuntime({ needOcr: body.parserBackend === 'local-ocr', needPdfium: true, ...pdfOverrides });
           inspector = runtime.inspector;
         } else if (body.pdfBase64) {
           try {
             pdfBytes = new Uint8Array(Buffer.from(body.pdfBase64, 'base64'));
-            const runtime = await ensurePdfRuntime({ needOcr: false, needPdfium: true, ...pdfOverrides });
+            const runtime = await ensurePdfRuntime({ needOcr: body.parserBackend === 'local-ocr', needPdfium: true, ...pdfOverrides });
             inspector = runtime.inspector;
           } catch (e) {
             return formatBusinessErrorResponse(
@@ -391,12 +391,12 @@ export function createPdfImportRoutes(
             return formatBusinessErrorResponse(c, fileRes.error, 'readLocalPdfFile');
           }
           pdfBytes = fileRes.value.bytes;
-          const runtime = await ensurePdfRuntime({ needOcr: false, needPdfium: true, ...pdfOverrides });
+          const runtime = await ensurePdfRuntime({ needOcr: body.parserBackend === 'local-ocr', needPdfium: true, ...pdfOverrides });
           inspector = runtime.inspector;
         } else if (body.pdfBase64) {
           try {
             pdfBytes = new Uint8Array(Buffer.from(body.pdfBase64, 'base64'));
-            const runtime = await ensurePdfRuntime({ needOcr: false, needPdfium: true, ...pdfOverrides });
+            const runtime = await ensurePdfRuntime({ needOcr: body.parserBackend === 'local-ocr', needPdfium: true, ...pdfOverrides });
             inspector = runtime.inspector;
           } catch (e) {
             return formatBusinessErrorResponse(

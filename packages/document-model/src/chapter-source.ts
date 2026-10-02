@@ -11,7 +11,7 @@ export const ChapterSourceBlockSchema = z.object({
 }).strict();
 export type ChapterSourceBlock = z.infer<typeof ChapterSourceBlockSchema>;
 export const ChapterSourceSchema = z.object({
-  parser: z.enum(['native', 'mineru-cloud', 'mineru-local']),
+  parser: z.enum(['native', 'local-ocr', 'mineru-cloud', 'mineru-local']),
   blocks: z.array(ChapterSourceBlockSchema).min(1),
 }).strict();
 export type ChapterSource = z.infer<typeof ChapterSourceSchema>;

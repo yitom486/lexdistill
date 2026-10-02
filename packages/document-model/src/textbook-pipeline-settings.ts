@@ -2,7 +2,7 @@ import { z } from 'zod';
 /** 可由桌面偏好覆盖的资源与重试预算；非教材内容或完成判断。 */
 export const TextbookPipelineSettingsSchema = z.object({
   poolSize: z.number().int().min(1).max(16).default(3),
-  parserBackend: z.enum(['mineru-cloud', 'mineru-local']).default('mineru-cloud'),
+  parserBackend: z.enum(['local-ocr', 'mineru-cloud', 'mineru-local']).default('local-ocr'),
   mineruLocalUrl: z.string().default(''),
   mineruLocalTier: z.enum(['basic', 'standard', 'advanced']).default('standard'),
   parserLanguage: z.enum(['ch', 'en', 'japan', 'korean']).default('ch'),

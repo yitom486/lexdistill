@@ -210,6 +210,13 @@ export const usePreferencesStore = create<PreferencesState>()(
     }),
     {
       name: 'study_studio_user_preferences',
+      version: 1,
+      migrate: (persisted) => {
+        const stored = typeof persisted === 'object' && persisted !== null ? persisted : {};
+        const settings = TextbookPipelineSettingsSchema.safeParse('pipelineSettings' in stored ? stored.pipelineSettings : {});
+        // User-approved switch of the previous default; subsequent manual choices persist.
+        return { ...stored, pipelineSettings: { ...(settings.success ? settings.data : DEFAULT_TEXTBOOK_PIPELINE_SETTINGS), parserBackend: 'local-ocr' } };
+      },
       merge: (persisted, current) => {
         const stored = typeof persisted === 'object' && persisted !== null ? persisted : {};
         const parsed = TextbookPipelineSettingsSchema.safeParse('pipelineSettings' in stored ? stored.pipelineSettings : {});
