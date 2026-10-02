@@ -47,13 +47,13 @@ describe('简单工具纠错与运行故障隔离',()=>{
  });
  it('非法选项答案与重复匹配左项不入库；多选、排序和匹配正确答案可以保存',async()=>{
   const env=setup(),model=pipelineModel(env.tool,async({submit})=>{
-   expect((await submit({items:[{type:'CHOICE',prompt:'选择',options:['一','二'],answer:'三'}]},'exercises')).ok).toBe(false);
-   expect((await submit({items:[{type:'MATCHING',prompt:'配对',left:['一','二'],right:['甲','乙'],answer:[{left:'一',right:'甲'},{left:'一',right:'乙'}]}]},'exercises')).ok).toBe(false);
+   expect((await submit({items:[{type:'CHOICE',difficultyTier:1,difficultyReason:'单一选项',prompt:'选择',options:['一','二'],answer:'三'}]},'exercises')).ok).toBe(false);
+   expect((await submit({items:[{type:'MATCHING',difficultyTier:1,difficultyReason:'词义匹配',prompt:'配对',left:['一','二'],right:['甲','乙'],answer:[{left:'一',right:'甲'},{left:'一',right:'乙'}]}]},'exercises')).ok).toBe(false);
    for(const exercise of [
     {type:'MULTI_CHOICE',prompt:'多选',options:['一','二','三'],answer:['一','二']},
     {type:'ORDERING',prompt:'排序',options:['一','二'],answer:['二','一']},
-    {type:'MATCHING',prompt:'匹配',left:['一','二'],right:['甲','乙'],answer:[{left:'一',right:'甲'},{left:'二',right:'乙'}]},
-   ])expect((await submit({items:[exercise]},'exercises')).ok).toBe(true);
+    {type:'MATCHING',difficultyTier:1,difficultyReason:'词义匹配',prompt:'匹配',left:['一','二'],right:['甲','乙'],answer:[{left:'一',right:'甲'},{left:'二',right:'乙'}]},
+   ])expect((await submit({items:[{...exercise,difficultyTier:2,difficultyReason:'受控题型测试'}]},'exercises')).ok).toBe(true);
   });
   const result=await env.repo.executeTextbookPipeline({...input(env),adapter:model.adapter});expect(result.ok&&result.value.allLessonsReady).toBe(true);
   expect(env.repo.getRawDb().query('SELECT type FROM textbook_exercise_items ORDER BY ord').all()).toEqual([{type:'MULTI_CHOICE'},{type:'ORDERING'},{type:'MATCHING'}]);

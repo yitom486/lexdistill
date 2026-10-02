@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ContentSourceReferenceSchema } from './chapter-source.js';
 
 export const ContentSourceSchema = z.enum(['TEXTBOOK', 'AI']).describe('TEXTBOOK 为原书整理，AI 为新增内容；不得把新增内容标为原书');
-export const ExerciseTypeSchema = z.enum(['CHOICE', 'MULTI_CHOICE', 'FILL_BLANK', 'TRANSLATION', 'ORDERING', 'MATCHING', 'SHORT_ANSWER']);
+export const ExerciseTypeSchema = z.enum(['CHOICE', 'MULTI_CHOICE', 'FILL_BLANK', 'TRANSLATION', 'ORDERING', 'MATCHING', 'SHORT_ANSWER', 'WRITING']);
 const id = z.string().trim().min(1).max(128);
 const text = z.string().trim().min(1);
 const provenance = {

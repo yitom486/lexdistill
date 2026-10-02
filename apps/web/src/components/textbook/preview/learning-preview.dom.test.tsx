@@ -56,17 +56,17 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   expect(doc.body.textContent).toContain('已保存的教材');
   expect(TextbookLearningContentSchema.safeParse(exercisePreviewBook.chapters[0]!.content).success).toBe(true);
   await click(button(doc, '查看题型案例'));
-  expect(doc.querySelector('[data-testid="learning-preview-page"]')?.textContent).toContain('七类题型 · 交互案例');
+  expect(doc.querySelector('[data-testid="learning-preview-page"]')?.textContent).toContain('八类题型 · 交互案例');
   expect(doc.querySelectorAll('[role="tab"]')).toHaveLength(1);
   expect(tab('练习')?.getAttribute('aria-selected')).toBe('true');
   const examples = activePanel();
-  expect(examples.querySelectorAll('article')).toHaveLength(9);
-  for (const type of ['单选', '多选', '填空', '翻译', '排序', '配对', '简答']) {
+  expect(examples.querySelectorAll('article')).toHaveLength(10);
+  for (const type of ['单选', '多选', '填空', '翻译', '排序', '配对', '简答', '写作']) {
     expect(examples.querySelector(`article[aria-label$="：${type}"]`)).not.toBeNull();
   }
-  expect(examples.querySelector('article[aria-label="练习 8：填空"]')?.querySelectorAll('textarea')).toHaveLength(2);
-  expect(examples.querySelector('article[aria-label="练习 9：排序"] [aria-label="待选词块"]')?.querySelectorAll('button')).toHaveLength(4);
-  const exampleChoice = examples.querySelector<HTMLElement>('article[aria-label="练习 1：单选"]')!;
+  expect(examples.querySelector('article[aria-label="练习 9：填空"]')?.querySelectorAll('textarea')).toHaveLength(2);
+  expect(examples.querySelector('article[aria-label="练习 10：排序"] [aria-label="待选词块"]')?.querySelectorAll('button')).toHaveLength(4);
+  const exampleChoice = examples.querySelector<HTMLElement>('article[aria-label="练习 2：单选"]')!;
   await click(button(exampleChoice, 'これは本です。'));
   await click(button(exampleChoice, '检查答案'));
   expect(exampleChoice.textContent).toContain('回答正确');
@@ -246,8 +246,8 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   expect(activePanel().textContent).toContain('用これ，因为书靠近说话人。');
   // Same read contract, multiple blanks and repeated ordering words; no persistence calls.
   const special = { ...previewLesson.content, exercises: [
-    { id: 'test-multiple-blanks', type: 'FILL_BLANK' as const, prompt: 'わたし（ ）本（ ）これです。', answer: ['の', 'は'], source: 'AI' as const },
-    { id: 'test-repeated-words', type: 'ORDERING' as const, prompt: '按给出的顺序重组台词词块。', options: ['はい', 'そうです', 'はい'], answer: ['はい', 'はい', 'そうです'], source: 'AI' as const },
+    { id: 'test-multiple-blanks', difficultyTier: 2, difficultyReason: 'Boundary case fixture', type: 'FILL_BLANK' as const, prompt: 'わたし（ ）本（ ）これです。', answer: ['の', 'は'], source: 'AI' as const },
+    { id: 'test-repeated-words', difficultyTier: 2, difficultyReason: 'Boundary case fixture', type: 'ORDERING' as const, prompt: '按给出的顺序重组台词词块。', options: ['はい', 'そうです', 'はい'], answer: ['はい', 'はい', 'そうです'], source: 'AI' as const },
   ] };
   expect(TextbookLearningContentSchema.safeParse(special).success).toBe(true);
   await act(async () => { dom!.root.render(<LearningPreviewPage key="multiple-answer-types" {...previewLesson} content={special} />); });

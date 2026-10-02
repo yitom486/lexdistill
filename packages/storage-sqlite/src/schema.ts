@@ -27,7 +27,8 @@ export const textbookSentences = sqliteTable('textbook_sentences', {
 }, table => [index('idx_textbook_sentences_chapter').on(table.documentId, table.chapterId, table.ord)]);
 export const textbookExerciseItems = sqliteTable('textbook_exercise_items', {
   ...textbookContentColumns(), type: text('type').notNull(), prompt: text('prompt').notNull(), optionsJson: text('options_json'),
-  leftJson: text('left_json'), rightJson: text('right_json'), answerJson: text('answer_json').notNull(), explanation: text('explanation'),
+  leftJson: text('left_json'), rightJson: text('right_json'), answerJson: text('answer_json'), explanation: text('explanation'),
+  difficultyTier: integer('difficulty_tier'), difficultyReason: text('difficulty_reason'),
   gradingNotes: text('grading_notes'), source: text('source').notNull(),
 }, table => [index('idx_textbook_exercises_chapter').on(table.documentId, table.chapterId, table.ord)]);
 export const textbookMaterials = sqliteTable('textbook_materials', {

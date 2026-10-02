@@ -56,7 +56,7 @@ export function textbookViewInTx(tx: Tx, documentId: string): TextbookAST | null
         vocabulary: vocabulary.filter(({local}) => local.chapterId === chapter.id).map(({local,global}) => ({ id: local.id, vocabularyId: global.id, word: global.word, reading: global.reading || undefined, meaning: local.meaning, level: global.jlptLevel, partOfSpeech: local.partOfSpeech || undefined, pitch: local.pitch || undefined, explanation: local.explanation || undefined, examples: parseExamples(local.examplesJson) })),
         articles: articles.filter(row => row.chapterId === chapter.id).map(row => ({ id: row.id, title: row.title || undefined, text: row.text, translation: row.translation || undefined, source: row.source })),
         sentences: sentences.filter(row => row.chapterId === chapter.id).map(row => ({ id: row.id, text: row.text, translation: row.translation || undefined, explanation: row.explanation || undefined, speaker: row.speaker || undefined, source: row.source })),
-        exercises: exercises.filter(row => row.chapterId === chapter.id).map(row => ({ id: row.id, type: row.type, prompt: row.prompt, options: row.optionsJson ? JSON.parse(row.optionsJson) : undefined, left: row.leftJson ? JSON.parse(row.leftJson) : undefined, right: row.rightJson ? JSON.parse(row.rightJson) : undefined, answer: JSON.parse(row.answerJson), explanation: row.explanation || undefined, gradingNotes: row.gradingNotes ?? undefined, source: row.source })),
+        exercises: exercises.filter(row => row.chapterId === chapter.id).map(row => ({ id: row.id, type: row.type, prompt: row.prompt, options: row.optionsJson ? JSON.parse(row.optionsJson) : undefined, left: row.leftJson ? JSON.parse(row.leftJson) : undefined, right: row.rightJson ? JSON.parse(row.rightJson) : undefined, ...(row.answerJson ? { answer: JSON.parse(row.answerJson) } : {}), difficultyTier: row.difficultyTier, difficultyReason: row.difficultyReason, explanation: row.explanation || undefined, gradingNotes: row.gradingNotes ?? undefined, source: row.source })),
         material: tx.select().from(textbookMaterials).where(and(eq(textbookMaterials.documentId, documentId),eq(textbookMaterials.chapterId, chapter.id))).get()?.text ?? null,
       }),
       vocabularies: vocabulary.filter(word => word.local.chapterId === chapter.id).map(({ local, global }) => {
@@ -71,7 +71,7 @@ export function textbookViewInTx(tx: Tx, documentId: string): TextbookAST | null
       passageMd: articles.filter(article => article.chapterId === chapter.id).map(article => article.text).join('\n\n') || null,
       exercises: exercises.filter(exercise => exercise.chapterId === chapter.id).map(exercise => ({ id: exercise.id, type: ExerciseTypeSchema.parse(exercise.type), prompt: exercise.prompt,
         ...(exercise.optionsJson ? { options: StringListSchema.parse(JSON.parse(exercise.optionsJson)) } : {}),
-        answer: typeof JSON.parse(exercise.answerJson) === 'string' ? JSON.parse(exercise.answerJson) as string : exercise.answerJson,
+        answer: exercise.answerJson ? (typeof JSON.parse(exercise.answerJson) === 'string' ? JSON.parse(exercise.answerJson) as string : exercise.answerJson) : '',
         ...(exercise.explanation ? { explanation: exercise.explanation } : {}) })),
     })),
   };

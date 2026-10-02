@@ -3,7 +3,7 @@ import type { StructuredExercise, ContentDirectoryNode } from '@study-studio/doc
 import { DirectoryGroups } from './DirectoryGroups.js';
 import { Button } from '../ui/button.js';
 import { ContentSource } from './ContentSource.js';
-const typeLabels = { CHOICE: '单选', MULTI_CHOICE: '多选', FILL_BLANK: '填空', TRANSLATION: '翻译', ORDERING: '排序', MATCHING: '匹配', SHORT_ANSWER: '简答' };
+const typeLabels = { CHOICE: '单选', MULTI_CHOICE: '多选', FILL_BLANK: '填空', TRANSLATION: '翻译', ORDERING: '排序', MATCHING: '匹配', SHORT_ANSWER: '简答', WRITING: '写作' };
 function referenceAnswer(exercise: StructuredExercise): string {
   if (exercise.answer.text) return exercise.answer.text;
   if (exercise.answer.optionIds) return exercise.answer.optionIds.map(id => exercise.options?.find(option => option.id === id)?.text ?? '').join(exercise.type === 'ORDERING' ? ' → ' : '、');

@@ -652,8 +652,9 @@ CREATE TABLE IF NOT EXISTS textbook_sentences (
 );
 CREATE TABLE IF NOT EXISTS textbook_exercise_items (
   id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-  chapter_id TEXT NOT NULL, ord INTEGER NOT NULL, type TEXT NOT NULL CHECK(type IN ('CHOICE','MULTI_CHOICE','FILL_BLANK','TRANSLATION','ORDERING','MATCHING','SHORT_ANSWER')), prompt TEXT NOT NULL,
-  options_json TEXT, left_json TEXT, right_json TEXT, answer_json TEXT NOT NULL, explanation TEXT, grading_notes TEXT,
+  chapter_id TEXT NOT NULL, ord INTEGER NOT NULL, type TEXT NOT NULL CHECK(type IN ('CHOICE','MULTI_CHOICE','FILL_BLANK','TRANSLATION','ORDERING','MATCHING','SHORT_ANSWER','WRITING')), prompt TEXT NOT NULL,
+  options_json TEXT, left_json TEXT, right_json TEXT, answer_json TEXT, explanation TEXT, grading_notes TEXT,
+  difficulty_tier INTEGER CHECK(difficulty_tier IS NULL OR (typeof(difficulty_tier)='integer' AND difficulty_tier BETWEEN 1 AND 5)), difficulty_reason TEXT,
   source TEXT NOT NULL CHECK(source IN ('TEXTBOOK','AI'))
 );
 CREATE TABLE IF NOT EXISTS textbook_materials (

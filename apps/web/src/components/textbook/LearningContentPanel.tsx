@@ -22,7 +22,7 @@ export function LearningContentPanel({ content, section = 'ALL', showTranslation
     </li>)}</ul></section>}
     {section === 'ALL' && !!content.exercises.length && <section aria-label="练习"><h3 className="mb-3 font-semibold">练习</h3>{content.exercises.map(exercise => <article key={exercise.id} className="mb-3 rounded-xl border border-line p-4">
       <p>{exercise.prompt}</p>{exercise.options && <ol className="list-decimal pl-5">{exercise.options.map((option, i) => <li key={i}>{option}</li>)}</ol>}
-      <details className="mt-3"><summary className="cursor-pointer">查看参考答案与解析</summary><p>{typeof exercise.answer === 'string' ? exercise.answer : exercise.answer.map(item => typeof item === 'string' ? item : `${item.left} ↔ ${item.right}`).join(exercise.type === 'ORDERING' ? ' → ' : '；')}</p>{exercise.explanation && <p>{exercise.explanation}</p>}</details>
+      <details className="mt-3"><summary className="cursor-pointer">查看参考答案与解析</summary><p>{typeof exercise.answer === 'string' ? exercise.answer : exercise.answer?.map(item => typeof item === 'string' ? item : `${item.left} ↔ ${item.right}`).join(exercise.type === 'ORDERING' ? ' → ' : '；')}</p>{exercise.explanation && <p>{exercise.explanation}</p>}</details>
     </article>)}</section>}
   </div>;
 }

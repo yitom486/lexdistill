@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 type Exercise = TextbookLearningContent['exercises'][number];
 export const exerciseNames: Record<Exercise['type'], string> = {
   CHOICE: '单选', MULTI_CHOICE: '多选', FILL_BLANK: '填空', TRANSLATION: '翻译',
-  ORDERING: '排序', MATCHING: '配对', SHORT_ANSWER: '简答',
+  ORDERING: '排序', MATCHING: '配对', SHORT_ANSWER: '简答', WRITING: '写作',
 };
 
 /** Preview-only feedback. Subjective answers show a reference, never claim to have been AI graded. */
@@ -19,11 +19,11 @@ export function PreviewExercise({ exercise, index }: { exercise: Exercise; index
   const [selected, setSelected] = useState<number[]>([]);
   const [pairs, setPairs] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState(false);
-  const subjective = exercise.type === 'TRANSLATION' || exercise.type === 'SHORT_ANSWER';
+  const subjective = ['TRANSLATION', 'SHORT_ANSWER', 'WRITING'].includes(exercise.type);
   const strings = Array.isArray(exercise.answer)
-    ? exercise.answer.filter((answer): answer is string => typeof answer === 'string') : [exercise.answer];
+    ? exercise.answer.filter((answer): answer is string => typeof answer === 'string') : exercise.answer ? [exercise.answer] : [];
   const reference = typeof exercise.answer === 'string' ? exercise.answer
-    : exercise.answer.map(answer => typeof answer === 'string' ? answer : `${answer.left} → ${answer.right}`)
+    : exercise.answer?.map(answer => typeof answer === 'string' ? answer : `${answer.left} → ${answer.right}`)
       .join(exercise.type === 'ORDERING' ? ' ' : '；');
   const choices = selected.map(position => exercise.options?.[position] ?? '');
   const correct = exercise.type === 'MATCHING'
@@ -50,6 +50,7 @@ export function PreviewExercise({ exercise, index }: { exercise: Exercise; index
     <div className="mb-4 flex items-center gap-2">
       <span className="text-sm font-semibold text-accent-ink">{String(index + 1).padStart(2, '0')}</span>
       <Badge variant="outline">{exerciseNames[exercise.type]}</Badge>
+      <span className="text-xs text-ink-muted" title={exercise.difficultyReason ?? undefined}>{exercise.difficultyTier === null ? '难度未估计' : `难度 ${exercise.difficultyTier}/5`}</span>
       {exercise.source === 'AI' && <span className="ml-auto text-xs text-ink-muted">AI 补充练习</span>}
     </div>
     <h3 className="whitespace-pre-wrap text-base font-medium leading-7">{exercise.prompt}</h3>
@@ -98,7 +99,7 @@ export function PreviewExercise({ exercise, index }: { exercise: Exercise; index
     </div>
     {submitted && <div role="status" className="mt-5 rounded-xl border border-line-soft bg-surface-warm p-4">
       <p className="font-medium">{subjective ? '参考对照 · 尚未评分' : correct ? '回答正确' : '再核对一下'}</p>
-      <p className="mt-2 text-sm leading-7">参考答案：{reference}</p>
+      {reference && <p className="mt-2 text-sm leading-7">参考答案：{reference}</p>}
       {exercise.explanation && <p className="mt-2 text-sm leading-7 text-ink-muted">{exercise.explanation}</p>}
       {subjective && exercise.gradingNotes && <p className="mt-2 text-sm leading-7 text-ink-muted">评分要点：{exercise.gradingNotes}</p>}
     </div>}

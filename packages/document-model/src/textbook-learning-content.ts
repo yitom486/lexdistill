@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validateExercise } from './exercise-validation.js';
 
 export const JlptLevelSchema = z.enum(['N5', 'N4', 'N3', 'N2', 'N1']);
 const text = z.string().trim().min(1);
@@ -15,9 +16,11 @@ export const VocabularyItemSchema = z.object({
 export const ArticleItemSchema = z.object({ title: text.optional(), text, translation: text.optional() }).strict();
 export const SentenceItemSchema = z.object({ text, translation: text.optional(), explanation: text.optional(), speaker: text.optional() }).strict();
 export const LearningExerciseItemSchema = z.object({
-  type: z.enum(['CHOICE', 'MULTI_CHOICE', 'FILL_BLANK', 'TRANSLATION', 'ORDERING', 'MATCHING', 'SHORT_ANSWER']),
+  type: z.enum(['CHOICE', 'MULTI_CHOICE', 'FILL_BLANK', 'TRANSLATION', 'ORDERING', 'MATCHING', 'SHORT_ANSWER', 'WRITING']),
   prompt: text, options: z.array(text).optional(), left: z.array(text).optional(), right: z.array(text).optional(),
-  answer: z.union([text, z.array(text).min(1), z.array(z.object({ left: text, right: text }).strict()).min(1)]),
+  answer: z.union([text, z.array(text).min(1), z.array(z.object({ left: text, right: text }).strict()).min(1)]).optional(),
+  difficultyTier: z.number().int().min(1).max(5).describe('目标语种下的题目复杂度估计 1–5，不是 JLPT 或用户掌握度'),
+  difficultyReason: text.describe('简述词汇、语法、阅读或表达要求的难度依据'),
   explanation: text.optional(), gradingNotes: text.optional(),
 }).strict();
 export const TextbookWriteSchemas = {
@@ -25,7 +28,7 @@ export const TextbookWriteSchemas = {
   vocabulary: z.object({ items: z.array(VocabularyItemSchema).min(1) }).strict(),
   articles: z.object({ items: z.array(ArticleItemSchema).min(1), source: origin.default('TEXTBOOK') }).strict(),
   sentences: z.object({ items: z.array(SentenceItemSchema).min(1), source: origin.default('TEXTBOOK') }).strict(),
-  exercises: z.object({ items: z.array(LearningExerciseItemSchema).min(1), source: origin.default('TEXTBOOK') }).strict(),
+  exercises: z.object({ items: z.array(LearningExerciseItemSchema.superRefine(validateExercise)).min(1), source: origin.default('TEXTBOOK') }).strict(),
   material: z.object({ text }).strict(),
 } as const;
 export type TextbookContentKind = keyof typeof TextbookWriteSchemas;
@@ -41,7 +44,7 @@ export const TextbookLearningContentSchema = z.object({
   vocabulary: z.array(VocabularyItemSchema.omit({ level: true }).extend({ id: text, vocabularyId: text, meaning: z.string(), level: JlptLevelSchema.nullable() })),
   articles: z.array(ArticleItemSchema.extend({ id: text, source: origin })),
   sentences: z.array(SentenceItemSchema.extend({ id: text, source: origin })),
-  exercises: z.array(LearningExerciseItemSchema.extend({ id: text, source: origin })),
+  exercises: z.array(LearningExerciseItemSchema.extend({ id: text, source: origin, difficultyTier: LearningExerciseItemSchema.shape.difficultyTier.nullable(), difficultyReason: text.nullable() })),
   material: z.string().nullable(),
 });
 export type TextbookLearningContent = z.infer<typeof TextbookLearningContentSchema>;

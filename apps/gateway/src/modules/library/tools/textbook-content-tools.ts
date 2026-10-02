@@ -18,7 +18,7 @@ const descriptions: Record<TextbookContentKind, string> = {
   vocabulary: `保存本章词汇列表。填写词面、读音、释义及估计等级 ${JlptLevelSchema.options.join('|')}，可提供词性、讲解和例句。系统自动新增尚不存在的全局词汇，已有词复用、不覆盖。等级不是掌握度。`,
   articles: '保存本章完整文章或会话。填写正文，可提供标题和译文；保留完整语境，不逐行拆成文章。',
   sentences: '保存本章可独立学习的句子列表。填写句子，可提供译文、讲解或说话人。没有句子则无需调用。',
-  exercises: '保存本章练习列表。填写题型、题干、参考答案，可提供选项、解析和评分要点。选择题答案用实际选项文字，排序用有序文字列表，匹配用左右文字配对；其他用文字答案。新增练习标注 source=AI。',
+  exercises: '保存本章练习列表。填写题型、题干、difficultyTier（目标语种下复杂度 1–5）及一句 difficultyReason；难度不是 JLPT 或掌握度。选择题答案用选项文字；排序用有序文字列表，可重复词块；配对用左右文字配对，可复用右项；多空答案按空位顺序。翻译、简答和写作须提供 gradingNotes，参考表达可省略。新增练习标注 source=AI。',
   material: '保存整理后的本章教材材料 text；保留有意义的标题、列表和表格。不要提交扫描图片。',
 };
 const names: Record<TextbookContentKind, string> = { grammar: 'write_grammar', vocabulary: 'write_vocabulary', articles: 'write_articles', sentences: 'write_sentences', exercises: 'write_exercises', material: 'write_material' };

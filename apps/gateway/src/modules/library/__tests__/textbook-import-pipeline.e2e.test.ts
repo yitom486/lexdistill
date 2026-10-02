@@ -27,7 +27,7 @@ describe('教材简单内容工具 → 实际 SQLite → 查询回执', () => {
    expect((await submit({items:[{title:'助词へ',explanation:'表示方向',examples:[{text:'学校へ行く。'}],aiExplanation:'目的地也可以用に。'}]},'grammar')).ok).toBe(true);
    expect((await submit({items:[{title:'上学',text:'学校へ行きます。\n先生に会います。',translation:'去学校，见老师。'}]},'articles')).ok).toBe(true);
    expect((await submit({items:[{text:'学校はどこですか。',translation:'学校在哪里？'}]},'sentences')).ok).toBe(true);
-   expect((await submit({items:[{type:'CHOICE',prompt:'表示方向的助词？',options:['へ','を'],answer:'へ',explanation:'へ表示方向。'}]},'exercises')).ok).toBe(true);
+   expect((await submit({items:[{type:'CHOICE',difficultyTier:1,difficultyReason:'单一助词识别',prompt:'表示方向的助词？',options:['へ','を'],answer:'へ',explanation:'へ表示方向。'}]},'exercises')).ok).toBe(true);
    expect((await submit({text:'本课整理材料'},'material')).ok).toBe(true);
    const material=await submit({},'read_material'); expect(material.ok && material.value).toEqual({text:'本课整理材料'});
   });

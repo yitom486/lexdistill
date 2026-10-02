@@ -66,15 +66,7 @@ export async function writeTextbookContent(deps: { db: DrizzleDb }, scope: Textb
         case 'exercises': {
           const parsed = TextbookWriteSchemas.exercises.safeParse(raw); if (!parsed.success) throw formatError(parsed.error);
           for (const [ord, item] of parsed.data.items.entries()) {
-            const options = item.options ?? [];
-            if (['CHOICE','MULTI_CHOICE','ORDERING'].includes(item.type)) {
-              const answers = typeof item.answer === 'string' ? [item.answer] : item.answer.filter((answer): answer is string => typeof answer === 'string');
-              if (options.length < 2 || new Set(options).size !== options.length || answers.length !== (typeof item.answer === 'string' ? 1 : item.answer.length) || new Set(answers).size !== answers.length || !answers.length || answers.some(answer => typeof answer !== 'string' || !options.includes(answer)) ||
-                (item.type === 'CHOICE' && answers.length !== 1) || (item.type === 'ORDERING' && (answers.length !== options.length || new Set(answers).size !== answers.length))) throw new BusinessError('E_EXERCISE_ANSWER_INVALID', '选项和参考答案不对应，请使用实际选项文字填写答案', 'VALIDATION', true);
-            } else if (item.type === 'MATCHING') {
-              if (!Array.isArray(item.answer) || !item.left?.length || !item.right?.length || item.answer.length !== item.left.length || new Set(item.left).size !== item.left.length || new Set(item.right).size !== item.right.length || item.answer.some(pair => typeof pair !== 'object' || !item.left?.includes(pair.left) || !item.right?.includes(pair.right)) || new Set(item.answer.map(pair => typeof pair === 'object' ? pair.left : '')).size !== item.left.length) throw new BusinessError('E_EXERCISE_ANSWER_INVALID', '匹配答案必须对应实际左右项文字', 'VALIDATION', true);
-            } else if (typeof item.answer !== 'string') throw new BusinessError('E_EXERCISE_ANSWER_INVALID', '本题需要文字参考答案', 'VALIDATION', true);
-            saved += tx.insert(textbookExerciseItems).values({ ...base(item, ord, parsed.data.source), type: item.type, prompt: item.prompt, optionsJson: item.options ? JSON.stringify(item.options) : null, leftJson: item.left ? JSON.stringify(item.left) : null, rightJson: item.right ? JSON.stringify(item.right) : null, answerJson: JSON.stringify(item.answer), explanation: item.explanation ?? null, gradingNotes: item.gradingNotes ?? null, source: parsed.data.source }).onConflictDoNothing().returning({ id: table.id }).all().length;
+            saved += tx.insert(textbookExerciseItems).values({ ...base(item, ord, parsed.data.source), type: item.type, prompt: item.prompt, optionsJson: item.options ? JSON.stringify(item.options) : null, leftJson: item.left ? JSON.stringify(item.left) : null, rightJson: item.right ? JSON.stringify(item.right) : null, answerJson: item.answer === undefined ? null : JSON.stringify(item.answer), difficultyTier: item.difficultyTier, difficultyReason: item.difficultyReason, explanation: item.explanation ?? null, gradingNotes: item.gradingNotes ?? null, source: parsed.data.source }).onConflictDoNothing().returning({ id: table.id }).all().length;
           } break;
         }
         case 'material': {
