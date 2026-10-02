@@ -12,3 +12,4 @@ export * from './mistake.js';
 export * from './repository.js';
 
 export * from './learning-evidence.js';
+export * from './textbook-practice.js';

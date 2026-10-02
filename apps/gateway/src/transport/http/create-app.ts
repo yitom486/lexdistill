@@ -17,6 +17,7 @@ import {
 import { createLearningProgressRoutes } from '../../modules/learning-progress/http/public.js';
 import {
   createPracticeRoutes,
+  createTextbookPracticeRoutes,
   createPlacementRoutes,
 } from '../../modules/practice/http/public.js';
 import { createReviewRoutes } from '../../modules/review/http/public.js';
@@ -68,6 +69,7 @@ export function createApp(deps: GatewayDeps) {
     .route('/', createMediaRoutes(deps))
     .route('/', createLearningProgressRoutes(deps))
     .route('/', createPracticeRoutes(deps))
+    .route('/', createTextbookPracticeRoutes(deps))
     .route('/', createPlacementRoutes(deps))
     .route('/', createReviewRoutes(deps))
     .route('/', createLibraryRoutes(deps))

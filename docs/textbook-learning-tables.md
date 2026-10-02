@@ -103,18 +103,28 @@
 
 | 字段 | 含义 |
 | --- | --- |
-| type | CHOICE、MULTI_CHOICE、FILL_BLANK、TRANSLATION、ORDERING、MATCHING 或 SHORT_ANSWER |
+| type | CHOICE、MULTI_CHOICE、FILL_BLANK、TRANSLATION、ORDERING、MATCHING、SHORT_ANSWER 或 WRITING |
 | prompt | 题干 |
 | options_json | 选择或排序题的文字选项列表 |
 | left_json / right_json | 匹配题的左右文字列表 |
-| answer_json | 参考答案：文字、有序文字列表或 left/right 文字配对列表 |
+| answer_json | 客观题答案：文字、按空位/词序排列的文字列表或 left/right 配对；主观题可存参考表达，也可为 NULL |
 | explanation | 可选题目解析 |
-| grading_notes | 可选主观题评分要点 |
+| grading_notes | 主观题必填的评分要求；客观题可省略 |
+| difficulty_tier | 模型估计的题目复杂度整数 1–5；已有未知值为 NULL，新写入不能使用默认难度 |
+| difficulty_reason | 一句难度依据，不等同 JLPT 等级或个人掌握度 |
 | source | TEXTBOOK 或 AI |
 
 选择题答案填写实际选项文字，系统检查对应关系；模型不生成选项 ID 或数组关联下标。评分结果与个人作答不能写进教材题目表。
 
-既有 quiz_attempts 保存 id、user_id、language、question_id、user_answer、is_correct、score、time_spent_ms、tested_skill_id、created_at，分别为记录身份、用户、语种、题目、作答、正误、分数、用时、技能与时间。这次迁移没有新增教材练习作答界面，也没有把练习卡上的参考答案展示宣称为完整评分闭环。
+多空填空按空位保存答案数组；排序允许相同文字的不同词块，校验出现次数；配对允许复用右项。主观题按评分要求接受等价表达。
+
+### 作答、批改与统计（v39）
+
+- `practice_item_attempts` 保存每份正式答案：`attempt_no` 为版本序号、`previous_attempt_id` 指向修改前作答、`submission_kind` 区分独立练习和修改；`question_snapshot_json` 冻结题干、参考表达、评分要求、难度和本章知识。
+- `status` 区分 SUBMITTED、GRADING、GRADED、GRADING_FAILED。`grading_result_json` 只保存通过校验的 score/maxScore/feedback/suggestions/可选 revisedAnswer；失败保留答案且无分数。`grading_run_id` 关联实际模型审计，`grading_error_code` 保留失败类型。
+- `quiz_attempts` 以唯一 `source_attempt_id` 关联有效作答；`document_id`、`chapter_id`、`difficulty_tier`、`submission_kind` 保存当次统计维度，`max_score` 明确分值尺度。新链路为 0–100；已有未知尺度不猜测、不混算。
+- 模型仅通过 `learning.submit_grade` 提交批改内容。用户、题目、版本、运行身份和统计关联由系统绑定；事务提交成功才给工具成功回执。技术重试沿用同一作答，迟到调用拒绝；临时案例不写正式记录。
+- 客观题在 Gateway 自动判题；翻译、简答、写作使用用户选择的实际模型，没有启发式评分回退。没有可靠考点关联时不更新某个语法的掌握度；难度权重公式须另行批准。
 
 ## 7. textbook_materials：整理后的章节材料
 

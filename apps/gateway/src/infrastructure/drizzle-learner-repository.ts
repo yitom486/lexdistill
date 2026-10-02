@@ -1,4 +1,7 @@
 import { Database } from 'bun:sqlite';
+import { prepareTextbookAttempt, getTextbookAttempt, claimTextbookGrade, settleTextbookGrade, textbookExerciseHistory } from '@study-studio/storage-sqlite';
+import type { ExerciseGrade, SubmitTextbookExercise } from '@study-studio/protocol';
+import type { TextbookGradeAudit, TextbookPracticeRepository } from '@study-studio/learner-core';
 import { eq } from 'drizzle-orm';
 import { isOk, ok, err, type Result, BusinessError, translateToBusinessError } from '@study-studio/shared';
 import type {
@@ -340,7 +343,7 @@ export {
 };
 
 export class DrizzleLearnerRepository
-  implements LearnerRepository, ContentRepository, LexiconRepository, LearningRepository, FlashcardsRepository
+  implements LearnerRepository, ContentRepository, LexiconRepository, LearningRepository, FlashcardsRepository, TextbookPracticeRepository
 {
   // 本类是纯委托门面：每个方法一行，转调各域 persistence 实现；读法是“查目录→跳域文件”。
   // 分节速览（节内方法均以 `XXXDomain(this.deps, …)` 委托，冒号后为实现落点）：
@@ -372,6 +375,16 @@ export class DrizzleLearnerRepository
   public getRawDb(): Database {
     return this.sqlite;
   }
+
+  private textbookCommand<T>(command: () => T): Promise<Result<T, BusinessError>> {
+    try { return Promise.resolve(ok(command())); }
+    catch (cause) { return Promise.resolve(err(cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage: '作答记录保存或读取失败，请重试' }))); }
+  }
+  public prepareTextbookAttempt(userId: string, input: SubmitTextbookExercise) { return this.textbookCommand(() => prepareTextbookAttempt(this.db, userId, input)); }
+  public getTextbookAttempt(userId: string, id: string) { return this.textbookCommand(() => getTextbookAttempt(this.db, userId, id)); }
+  public claimTextbookGrade(userId: string, id: string, gradingRunId: string) { return this.textbookCommand(() => claimTextbookGrade(this.db, userId, id, gradingRunId)); }
+  public settleTextbookGrade(userId: string, id: string, audit: TextbookGradeAudit | undefined, grade: ExerciseGrade | undefined, errorCode?: string) { return this.textbookCommand(() => settleTextbookGrade(this.db, userId, id, audit, grade, errorCode)); }
+  public textbookExerciseHistory(userId: string, documentId: string, chapterId: string) { return this.textbookCommand(() => textbookExerciseHistory(this.db, userId, documentId, chapterId)); }
 
   // ==================== A 词典读/写（→ modules/dictionary/persistence/） ====================
 

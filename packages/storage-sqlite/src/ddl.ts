@@ -111,7 +111,8 @@ export function initSchema(sqlite: Database): void {
       score REAL NOT NULL,
       time_spent_ms INTEGER NOT NULL,
       tested_skill_id TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      source_attempt_id TEXT, document_id TEXT, chapter_id TEXT, difficulty_tier INTEGER, max_score REAL, submission_kind TEXT
     );
 
     CREATE TABLE IF NOT EXISTS mistakes (
@@ -394,7 +395,9 @@ export function initSchema(sqlite: Database): void {
       grading_result_json TEXT,
       time_spent_ms INTEGER,
       submitted_at TEXT,
-      graded_at TEXT
+      graded_at TEXT,
+      attempt_no INTEGER NOT NULL DEFAULT 1, previous_attempt_id TEXT, submission_kind TEXT,
+      question_snapshot_json TEXT, grading_run_id TEXT, grading_error_code TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_practice_attempts_run

@@ -46,7 +46,7 @@ local_dictionary_fts 由触发器增量同步（insert/delete，无 update 触�
 | textbook_knowledge | 语法/发音/用法的标题、说明、接续、AI 补充和例句 |
 | textbook_articles | 完整文章或会话及独立译文 |
 | textbook_sentences | 独立句子、译文、讲解和可选说话人 |
-| textbook_exercise_items | 题型、题干、文字选项、参考答案、解析和评分要点 |
+| textbook_exercise_items | 八类题型、题干、文字选项、可选主观题参考表达、解析、评分要求和模型估计难度；作答及批改记录另存 practice_item_attempts |
 | textbook_materials | 整理后的章节材料，支持查询和写入 |
 
 完整字段、去重规则及工具参数见 [教材学习内容表](textbook-learning-tables.md)。

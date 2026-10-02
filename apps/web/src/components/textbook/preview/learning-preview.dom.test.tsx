@@ -70,7 +70,7 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   await click(button(exampleChoice, 'これは本です。'));
   await click(button(exampleChoice, '检查答案'));
   expect(exampleChoice.textContent).toContain('回答正确');
-  expect(examples.textContent).toContain('尚未接入 AI 评分');
+  expect(examples.textContent).toContain('可主动请求 AI 批改');
   await click(button(doc, '返回教材首页'));
   await click(button(doc.querySelector(`article[aria-label="教材：${previewBooks[0]!.title}"]`)!, '打开教材'));
   expect(doc.querySelector('[data-testid="learning-preview-page"]')).not.toBeNull();
@@ -250,7 +250,7 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
     { id: 'test-repeated-words', difficultyTier: 2, difficultyReason: 'Boundary case fixture', type: 'ORDERING' as const, prompt: '按给出的顺序重组台词词块。', options: ['はい', 'そうです', 'はい'], answer: ['はい', 'はい', 'そうです'], source: 'AI' as const },
   ] };
   expect(TextbookLearningContentSchema.safeParse(special).success).toBe(true);
-  await act(async () => { dom!.root.render(<LearningPreviewPage key="multiple-answer-types" {...previewLesson} content={special} />); });
+  await act(async () => { dom!.root.render(<QueryClientProvider client={client!}><LearningPreviewPage key="multiple-answer-types" {...previewLesson} content={special} /></QueryClientProvider>); });
   await settle();
   await click(tab('练习'));
   const blanks = doc.querySelector<HTMLElement>('article[aria-label="练习 1：填空"]')!;
@@ -272,7 +272,7 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   await click(button(repeated, '重新作答'));
   expect(tokens[0]?.disabled).toBe(false);
   expect(repeated.textContent).not.toContain('回答正确');
-  await act(async () => { dom!.root.render(<LearningPreviewPage key="empty-categories" {...previewLesson} content={{ ...previewLesson.content, grammar: [], articles: [], sentences: [], exercises: [] }} />); });
+  await act(async () => { dom!.root.render(<QueryClientProvider client={client!}><LearningPreviewPage key="empty-categories" {...previewLesson} content={{ ...previewLesson.content, grammar: [], articles: [], sentences: [], exercises: [] }} /></QueryClientProvider>); });
   await settle();
   expect(doc.querySelectorAll('[role="tab"]')).toHaveLength(1);
   expect(tab('词汇')?.getAttribute('aria-selected')).toBe('true');

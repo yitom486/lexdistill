@@ -292,9 +292,10 @@ export async function savePracticeItemDraft(
       .select()
       .from(practiceItemAttempts)
       .where(and(eq(practiceItemAttempts.runId, runId), eq(practiceItemAttempts.itemId, itemId)))
+      .orderBy(desc(practiceItemAttempts.attemptNo))
       .limit(1);
     const now = nowIso();
-    if (existing.length > 0) {
+    if (existing[0]?.status === 'DRAFT') {
       const row = existing[0]!;
       await deps.db
         .update(practiceItemAttempts)
@@ -309,6 +310,9 @@ export async function savePracticeItemDraft(
       blockId: '',
       itemId,
       status: 'DRAFT',
+      attemptNo: (existing[0]?.attemptNo ?? 0) + 1,
+      previousAttemptId: existing[0]?.id ?? null,
+      submissionKind: existing.length ? 'REVISION' : 'INDEPENDENT',
       userAnswer,
       gradingResultJson: null,
       timeSpentMs: null,
@@ -350,19 +354,22 @@ export async function submitPracticeItem(
       .select()
       .from(practiceItemAttempts)
       .where(and(eq(practiceItemAttempts.runId, runId), eq(practiceItemAttempts.itemId, itemId)))
+      .orderBy(desc(practiceItemAttempts.attemptNo))
       .limit(1);
+    if (gradingResult && (typeof gradingResult.score !== 'number' || !Number.isFinite(gradingResult.score) || gradingResult.score < 0 || gradingResult.score > 100 || typeof gradingResult.isCorrect !== 'boolean')) return err(new BusinessError('E_GRADING_RESULT_INVALID', '评分结果不完整，本次作答未写入', 'VALIDATION'));
     const status: 'SUBMITTED' | 'GRADED' = gradingResult ? 'GRADED' : 'SUBMITTED';
-    if (existing.length > 0) {
+    if (existing[0]?.status === 'GRADED' && existing[0].userAnswer === userAnswer) return ok(mapAttemptRow(existing[0]));
+    if (existing[0]?.status === 'DRAFT' || (existing[0]?.status === 'SUBMITTED' && existing[0].userAnswer === userAnswer)) {
       const row = existing[0]!;
       await deps.db
         .update(practiceItemAttempts)
         .set({
           userAnswer,
           status,
-          gradingResultJson: gradingResult ? JSON.stringify(gradingResult) : row.gradingResultJson,
+          gradingResultJson: gradingResult ? JSON.stringify(gradingResult) : null,
           timeSpentMs: timeSpentMs ?? row.timeSpentMs,
           submittedAt: row.submittedAt ?? now,
-          gradedAt: status === 'GRADED' ? now : row.gradedAt,
+          gradedAt: status === 'GRADED' ? now : null,
         })
         .where(eq(practiceItemAttempts.id, row.id));
       return ok(
@@ -370,10 +377,10 @@ export async function submitPracticeItem(
           ...row,
           userAnswer,
           status,
-          gradingResultJson: gradingResult ? JSON.stringify(gradingResult) : row.gradingResultJson,
+          gradingResultJson: gradingResult ? JSON.stringify(gradingResult) : null,
           timeSpentMs: timeSpentMs ?? row.timeSpentMs,
           submittedAt: row.submittedAt ?? now,
-          gradedAt: status === 'GRADED' ? now : row.gradedAt,
+          gradedAt: status === 'GRADED' ? now : null,
         })
       );
     }
@@ -384,6 +391,9 @@ export async function submitPracticeItem(
       blockId: '',
       itemId,
       status,
+      attemptNo: (existing[0]?.attemptNo ?? 0) + 1,
+      previousAttemptId: existing[0]?.id ?? null,
+      submissionKind: existing.length ? 'REVISION' : 'INDEPENDENT',
       userAnswer,
       gradingResultJson: gradingResult ? JSON.stringify(gradingResult) : null,
       timeSpentMs: timeSpentMs ?? null,
@@ -415,8 +425,11 @@ export async function listPracticeItemAttempts(
     const rows = await deps.db
       .select()
       .from(practiceItemAttempts)
-      .where(eq(practiceItemAttempts.runId, runId));
-    return ok(rows.map((r) => mapAttemptRow(r)));
+      .where(eq(practiceItemAttempts.runId, runId)).orderBy(desc(practiceItemAttempts.attemptNo));
+    // Run progress counts one latest state per item; detailed versions stay in SQLite.
+    const latest = new Map<string, PracticeItemAttempt>();
+    for (const row of rows) if (!latest.has(row.itemId)) latest.set(row.itemId, mapAttemptRow(row));
+    return ok([...latest.values()]);
   } catch (error) {
     return err(translateToBusinessError(error, { category: 'DATABASE', action: 'listPracticeItemAttempts', entityId: runId }));
   }

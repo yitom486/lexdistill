@@ -17,3 +17,8 @@
 依赖说明：`application/practice-assembly.ts` 经结构化 `ContentToolLike`
 消费内容生成能力，只从 `modules/learning-content/public.ts` type-only 导入契约，
 不依赖 Tool 实现；练习 HTTP 与 Agent Tool 共用同一应用能力。
+
+教材练习新增入口：`POST /api/textbook-practice/:userId/submit`、`GET /api/textbook-practice/:userId/history`。
+`application/textbook-grading.ts` 组装冻结上下文，只注入 `learning.submit_grade`；模型填写批改内容，系统绑定身份。
+SQLite 通过 `learner-core/TextbookPracticeRepository` 命令保存每次正式作答、实际模型审计和幂等统计；失败无分数，临时案例不写正式学情。
+`quiz.gradeSubjective` 的旧规则路径不参与这条教材 AI 批改链路。

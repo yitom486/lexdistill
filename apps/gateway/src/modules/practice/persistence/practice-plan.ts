@@ -44,12 +44,12 @@ export async function finalizePracticePlanRun(
       if (!isOk(attemptsRes)) return err(attemptsRes.error);
       const graded = attemptsRes.value.filter((a) => a.status === 'GRADED' && a.gradingResult);
       // 原子写入既有 quiz_attempts/错题/打卡（SSOT）。
-      // 每个 GRADED 尝试按其 gradingResult 写一次 quiz_attempt；幂等：同 itemId 已写则跳过。
+      // 幂等以正式作答身份为准；同题的新练习和修改可有独立记录。
       for (const a of graded) {
         const already = await deps.db
           .select({ id: quizAttempts.id })
           .from(quizAttempts)
-          .where(and(eq(quizAttempts.userId, userId), eq(quizAttempts.questionId, a.itemId)))
+          .where(eq(quizAttempts.sourceAttemptId, a.id))
           .limit(1);
         if (already.length > 0) continue;
         const g = a.gradingResult as {
@@ -66,6 +66,7 @@ export async function finalizePracticePlanRun(
           userId,
           language: run.language,
           questionId: a.itemId,
+          sourceAttemptId: a.id,
           userAnswer: a.userAnswer ?? '',
           isCorrect,
           score,

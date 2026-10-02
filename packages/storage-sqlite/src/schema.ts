@@ -185,7 +185,9 @@ export const quizAttempts = sqliteTable('quiz_attempts', {
   timeSpentMs: integer('time_spent_ms').notNull(),
   testedSkillId: text('tested_skill_id').notNull(),
   createdAt: text('created_at').notNull(),
-});
+  sourceAttemptId: text('source_attempt_id'), documentId: text('document_id'), chapterId: text('chapter_id'),
+  difficultyTier: integer('difficulty_tier'), maxScore: real('max_score'), submissionKind: text('submission_kind'),
+}, table => [uniqueIndex('idx_quiz_source_attempt').on(table.sourceAttemptId)]);
 
 /**
  * 错题本记录表 (Mistakes)
@@ -536,7 +538,7 @@ export const practicePlanRuns = sqliteTable('practice_plan_runs', {
 
 /**
  * P5：单题尝试（草稿/已提交/已批改）。
- * 完成批改后由领域服务原子写入既有 quiz_attempts/错题/打卡；本表只存计划运行态。
+ * 正式提交及反馈是长期学习资产；草稿可改，正式作答冻结并保留版本。
  */
 export const practiceItemAttempts = sqliteTable('practice_item_attempts', {
   id: text('id').primaryKey(),
@@ -549,6 +551,8 @@ export const practiceItemAttempts = sqliteTable('practice_item_attempts', {
   timeSpentMs: integer('time_spent_ms'),
   submittedAt: text('submitted_at'),
   gradedAt: text('graded_at'),
+  attemptNo: integer('attempt_no').notNull().default(1), previousAttemptId: text('previous_attempt_id'), submissionKind: text('submission_kind'),
+  questionSnapshotJson: text('question_snapshot_json'), gradingRunId: text('grading_run_id'), gradingErrorCode: text('grading_error_code'),
 });
 
 /**

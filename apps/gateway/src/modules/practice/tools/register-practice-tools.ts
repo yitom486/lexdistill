@@ -5,6 +5,7 @@ import { GenerateAdaptiveQuizTool } from './generate-adaptive-quiz.js';
 import { GradeSubjectiveQuizTool } from './grade-subjective-quiz.js';
 import { LearningAssessTool } from './learning-assess-tool.js';
 import { LearningPracticeTool } from './learning-practice-tool.js';
+import { SubmitExerciseGradeTool } from './submit-exercise-grade.js';
 
 /**
  * E4b 练习域工具注册（纯组装）。
@@ -20,4 +21,5 @@ export function registerPracticeTools(
   registry.register(new GradeSubjectiveQuizTool(learnerRepo));
   registry.register(new LearningAssessTool(learnerRepo, adapter));
   registry.register(new LearningPracticeTool(learnerRepo));
+  registry.register(new SubmitExerciseGradeTool());
 }

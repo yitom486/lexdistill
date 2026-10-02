@@ -57,6 +57,8 @@ export const PracticeItemAttemptStatusSchema = z.enum([
   'DRAFT',
   'SUBMITTED',
   'GRADED',
+  'GRADING',
+  'GRADING_FAILED',
 ]);
 export type PracticeItemAttemptStatus = z.infer<typeof PracticeItemAttemptStatusSchema>;
 

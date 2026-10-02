@@ -4,3 +4,4 @@
  */
 export { createPracticeRoutes } from './practice-routes.js';
 export { createPlacementRoutes } from './placement-routes.js';
+export { createTextbookPracticeRoutes } from './textbook-practice-routes.js';

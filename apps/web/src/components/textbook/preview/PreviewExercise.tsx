@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { ExerciseSnapshot, ExerciseAnswer, SubmitTextbookExercise, TextbookExerciseAttempt } from '@study-studio/protocol';
 import type { TextbookLearningContent } from '@study-studio/document-model';
 import { Check, RotateCcw } from 'lucide-react';
 import { Button } from '../../ui/button.js';
@@ -6,6 +7,9 @@ import { Badge } from '../../ui/badge.js';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.js';
 import { Textarea } from '../../ui/textarea.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select.js';
+import { useTextbookExerciseMutation } from '../../../queries/textbook-practice.js';
+import { usePreferencesStore } from '../../../stores/usePreferencesStore.js';
+import { ExerciseGradingFeedback } from './ExerciseGradingFeedback.js';
 
 type Exercise = TextbookLearningContent['exercises'][number];
 export const exerciseNames: Record<Exercise['type'], string> = {
@@ -13,12 +17,15 @@ export const exerciseNames: Record<Exercise['type'], string> = {
   ORDERING: '排序', MATCHING: '配对', SHORT_ANSWER: '简答', WRITING: '写作',
 };
 
-/** Preview-only feedback. Subjective answers show a reference, never claim to have been AI graded. */
-export function PreviewExercise({ exercise, index }: { exercise: Exercise; index: number }) {
+export function PreviewExercise({ exercise, index, scope, temporary = true }: { exercise: Exercise; index: number; scope?: Omit<ExerciseSnapshot, 'exercise'> | undefined; temporary?: boolean }) {
   const [answers, setAnswers] = useState<string[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [pairs, setPairs] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [previous, setPrevious] = useState<TextbookExerciseAttempt>();
+  const lastRequest = useRef<SubmitTextbookExercise | undefined>(undefined);
+  const mutation = useTextbookExerciseMutation(scope?.documentId ?? '', scope?.chapterId ?? '');
+  const preferences = usePreferencesStore();
   const subjective = ['TRANSLATION', 'SHORT_ANSWER', 'WRITING'].includes(exercise.type);
   const strings = Array.isArray(exercise.answer)
     ? exercise.answer.filter((answer): answer is string => typeof answer === 'string') : exercise.answer ? [exercise.answer] : [];
@@ -38,12 +45,27 @@ export function PreviewExercise({ exercise, index }: { exercise: Exercise; index
     : exercise.type === 'ORDERING' ? selected.length === exercise.options?.length
     : exercise.type === 'CHOICE' || exercise.type === 'MULTI_CHOICE' ? !!selected.length
     : Array.from({ length: inputCount }, (_, i) => answers[i]?.trim()).every(Boolean);
-  const reset = () => { setAnswers([]); setSelected([]); setPairs({}); setSubmitted(false); };
+  const reset = () => { setAnswers([]); setSelected([]); setPairs({}); setSubmitted(false); mutation.reset(); };
+  const submit = (retry = false) => {
+    if (!scope) return;
+    const answer: ExerciseAnswer = exercise.type === 'MATCHING' ? (exercise.left ?? []).map((left, i) => ({ left, right: pairs[i] ?? '' }))
+      : exercise.type === 'CHOICE' || exercise.type === 'MULTI_CHOICE' || exercise.type === 'ORDERING' ? choices
+      : exercise.type === 'FILL_BLANK' ? answers : answers[0] ?? '';
+    const input: SubmitTextbookExercise = {
+      requestId: crypto.randomUUID(), answer,
+      ...(temporary ? { preview: { ...scope, exercise } } : { documentId: scope.documentId, chapterId: scope.chapterId, exerciseId: exercise.id,
+        ...(retry && previous ? { retryAttemptId: previous.id } : previous ? { previousAttemptId: previous.id } : {}) }),
+      ...(preferences.coachModelId ? { model: preferences.coachModelId } : {}), ...(preferences.coachEffort ? { effort: preferences.coachEffort } : {}),
+    };
+    lastRequest.current = input;
+    setSubmitted(true);
+    mutation.mutate(input, { onSuccess: result => setPrevious(result) });
+  };
   const help = exercise.type === 'MULTI_CHOICE' ? '可以选择多个选项，选完后检查答案。'
     : exercise.type === 'ORDERING' ? '依次选择词块；点击已排列的词块可以撤回。'
     : exercise.type === 'MATCHING' ? '为左侧各项选择对应项。'
     : exercise.type === 'FILL_BLANK' ? `按题干空格的顺序填写${inputCount > 1 ? ` ${inputCount} 个答案` : '答案'}。`
-    : subjective ? '写出你的表达，不要求与参考答案逐字一致。当前可对照参考，尚未接入 AI 评分。'
+    : subjective ? '写出你的表达，不要求与参考答案逐字一致。可主动请求 AI 批改，或只对照参考。'
     : '选择一个答案。';
 
   return <article className="rounded-2xl border border-line-soft bg-paper-soft p-6" aria-label={`练习 ${index + 1}：${exerciseNames[exercise.type]}`}>
@@ -94,9 +116,14 @@ export function PreviewExercise({ exercise, index }: { exercise: Exercise; index
       </label>)}
     </div>}
     <div className="mt-5 flex items-center gap-3">
-      <Button disabled={!hasInput || submitted} onClick={() => setSubmitted(true)}><Check className="h-4 w-4" />{subjective ? '对照参考答案' : '检查答案'}</Button>
-      {submitted && <Button variant="ghost" onClick={reset}><RotateCcw className="h-4 w-4" />重新作答</Button>}
+      <Button disabled={!hasInput || submitted || mutation.isPending} onClick={() => { if (!subjective && !temporary) submit(); else setSubmitted(true); }}><Check className="h-4 w-4" />{subjective ? '对照参考答案' : '检查答案'}</Button>
+      {subjective && scope && <Button variant="amber" disabled={!hasInput || mutation.isPending || !preferences.coachModelId || !!mutation.data?.grading} onClick={() => submit()}>{mutation.isPending ? 'AI 批改中…' : '请求 AI 批改'}</Button>}
+      {submitted && <Button variant="ghost" disabled={mutation.isPending} onClick={reset}><RotateCcw className="h-4 w-4" />{previous && !temporary ? '修改后再答' : '重新作答'}</Button>}
+      {previous && !temporary && <Button variant="ghost" disabled={mutation.isPending} onClick={() => { reset(); setPrevious(undefined); }}>开始新一轮练习</Button>}
     </div>
+    {mutation.isPending && <p role="status" className="mt-3 text-sm text-ink-muted">正在批改这次提交；答案已冻结，批改完成后可以修改。</p>}
+    {!mutation.isPending && mutation.data && <ExerciseGradingFeedback result={mutation.data} onRetry={() => submit(true)} />}
+    {mutation.isError && <div role="alert" className="mt-3 space-y-2 text-sm text-ink-muted"><p>{mutation.error.message}</p><Button variant="outline" onClick={() => { if (lastRequest.current) mutation.mutate(lastRequest.current, { onSuccess: result => setPrevious(result) }); }}>重试请求</Button></div>}
     {submitted && <div role="status" className="mt-5 rounded-xl border border-line-soft bg-surface-warm p-4">
       <p className="font-medium">{subjective ? '参考对照 · 尚未评分' : correct ? '回答正确' : '再核对一下'}</p>
       {reference && <p className="mt-2 text-sm leading-7">参考答案：{reference}</p>}

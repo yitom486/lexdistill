@@ -12,8 +12,9 @@ import { StudyExplanation } from './StudyExplanation.js';
 import { StudyGuide } from './StudyGuide.js';
 import type { ChapterStudy, StudyDetail } from './study-view.js';
 
-export function LearningPreviewPage({ content, bookTitle, chapterTitle, chapterId, subtitle, language, study, onAskAiTutor, temporary = true }: {
+export function LearningPreviewPage({ content, bookTitle, bookId = '', chapterTitle, chapterId, subtitle, language, study, onAskAiTutor, temporary = true }: {
   content: TextbookLearningContent; bookTitle: string; chapterTitle: string; chapterId: string; subtitle: string; language: string; temporary?: boolean;
+  bookId?: string;
   study?: ChapterStudy | undefined; onAskAiTutor?: ((text: string, context: string) => void) | undefined;
 }) {
   const categories = ([
@@ -57,12 +58,12 @@ export function LearningPreviewPage({ content, bookTitle, chapterTitle, chapterI
           <TabsContent value="vocabulary" keepMounted className="m-0"><PreviewVocabulary {...props} /></TabsContent>
           <TabsContent value="grammar" keepMounted className="m-0"><PreviewGrammar {...props} /></TabsContent>
           <TabsContent value="sentences" keepMounted className="m-0"><PreviewSentences {...props} /></TabsContent>
-          <TabsContent value="exercises" keepMounted className="m-0"><PreviewExercises exercises={content.exercises} /></TabsContent>
+          <TabsContent value="exercises" keepMounted className="m-0"><PreviewExercises exercises={content.exercises} temporary={temporary} scope={{ documentId: bookId, chapterId, chapterTitle, language: language.toLowerCase() === 'en' ? 'en' : language.toLowerCase() === 'ko' ? 'ko' : 'ja', knowledge: content.grammar.map(point => ({ title: point.title, explanation: point.explanation })), rubricVersion: 'textbook-grade-v1' }} /></TabsContent>
           {study && <TabsContent value="summary" keepMounted className="m-0"><StudyGuide study={study} summary onNavigate={setActive} /></TabsContent>}
           {next && <div className="mt-7 flex justify-end"><Button variant="outline" onClick={() => setActive(next.key)}>继续学习{next.title}<ArrowRight className="h-4 w-4" /></Button></div>}
         </div>
       </div>
     </Tabs> : <p className="p-9 text-sm text-ink-muted">本章尚无学习内容。</p>}
-    <footer className="border-t border-line-soft bg-paper-soft px-7 py-3 text-xs text-ink-muted">{temporary ? '临时演示内容' : '教材学习预览'} · 作答与复习选择仅在预览中生效。</footer>
+    <footer className="border-t border-line-soft bg-paper-soft px-7 py-3 text-xs text-ink-muted">{temporary ? '临时演示内容 · 不写入正式学情；AI 批改需主动点击。' : '正式提交保留作答历史；失败不计分，重试不新增作答次数。'}</footer>
   </div>;
 }
