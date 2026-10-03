@@ -24,7 +24,7 @@ async function cloudJson(client: MineruHttpClient, path: string, body?: unknown)
 }
 
 export function createMineruParser(settings: TextbookPipelineSettings, options: { cloudBaseUrl?: string; cloudToken?: string; localToken?: string } = {}): ChapterParser {
-  if (settings.parserBackend === 'local-ocr') throw new BusinessError('E_MINERU_CONFIG', '本地 OCR 应使用本机识别通道', 'VALIDATION');
+  if (settings.parserBackend !== 'mineru-cloud' && settings.parserBackend !== 'mineru-local') throw new BusinessError('E_MINERU_CONFIG', '当前正文方式不使用 MinerU，请使用所选的读图或本地 OCR 通道', 'VALIDATION');
   const local = settings.parserBackend === 'mineru-local';
   const base = local ? settings.mineruLocalUrl : options.cloudBaseUrl ?? MINERU_CLOUD_URL;
   if (local) {

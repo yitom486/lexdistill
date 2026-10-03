@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 import { fileURLToPath } from 'node:url';
 import { isOk } from '@study-studio/shared';
-import { canonicalizeTocEntries } from '@study-studio/document-model';
+import { canonicalizeTocEntries, TextbookPipelineSettingsSchema } from '@study-studio/document-model';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
@@ -15,7 +15,7 @@ pinProcessToTestRuntime();
 const { inspector } = await ensurePdfTestRuntime();
 const fixture = new URL('./fixtures/scanned-lesson-dialect.pdf', import.meta.url);
 const bytes = new Uint8Array(await Bun.file(fixture).arrayBuffer());
-// Default local OCR is exercised through production selection, without a parser override.
+// Manual local OCR and default vision both exercise the production runtime.
 const repos: DrizzleLearnerRepository[] = [];
 afterEach(() => { for (const repo of repos.splice(0)) repo.getRawDb().close(); });
 async function threadCpuSnapshot(): Promise<Map<number, number>> {
@@ -64,7 +64,7 @@ describe('真实原生 OCR 与教材流水线', () => {
       { id: 'bad', title: '越界', level: 'lesson', startPage: 4 },
     ]);
     const texts = new Map<string, string>(), failed: string[] = [];
-    await producePdfLessons({ pdf: bytes, inspector, lessons: entries.filter(entry => entry.level === 'lesson'), concurrency: 2, retries: 0, signal: new AbortController().signal,
+    await producePdfLessons({ pdf: bytes, inspector, settings: TextbookPipelineSettingsSchema.parse({ parserBackend: 'local-ocr' }), lessons: entries.filter(entry => entry.level === 'lesson'), concurrency: 2, retries: 0, signal: new AbortController().signal,
       onStart: () => {}, onText: async (lesson, text) => { texts.set(lesson.id, text); }, onFailure: (lesson, error) => { failed.push(error.code); expect(lesson.id).toBe('bad'); },
     });
     expect(texts.get('l1')).toContain('第2課'); expect(texts.get('l2')).toContain('ふくしゅう'); expect(failed).toEqual(['E_PDF_PAGE_RANGE_INVALID']);
@@ -77,14 +77,14 @@ describe('真实原生 OCR 与教材流水线', () => {
       expect(input.message).not.toContain('properties'); expect(input.message).not.toContain('passageMd');
       expect((await submit(submissionFromPrompt(input.message))).ok).toBe(true); await submitRequired(submit);
     });
-    const result = await repo.executeTextbookPipeline({ userId: 'native', title: '扫描教材', pdf: bytes, inspector,
+    const result = await repo.executeTextbookPipeline({ userId: 'native', title: '扫描教材', pdf: bytes, inspector, parserBackend: 'local-ocr',
       tocEntries: [{ id: 'l1', title: '第一章', level: 'lesson', startPage: 1, endPage: 1 }], poolSize: 1, adapter: model.adapter, submissionTool: tool });
     expect(isOk(result)).toBe(true); expect(result.ok && result.value.allLessonsReady).toBe(true);
     expect(model.closed).toHaveLength(1);
     const doc = await repo.getDocumentById(result.ok ? result.value.documentId : '');
     expect(doc.ok && doc.value?.astJson).toContain('整理后的正文 第一章');
   }, 120000);
-  it('HTTP 本地路径 → 后台注册 → 原生 OCR → 工具 → SQLite 完成，透传用户模型和思考等级', async () => {
+  it('HTTP 本地路径 → 后台注册 → 原生页面图片 → 工具 → SQLite 完成，透传用户模型和思考等级', async () => {
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
     const registry = new TextbookPipelineJobRegistry(), tool = new TextbookContentTools(repo), model = pipelineModel(tool);
     const app = createPdfImportRoutes({ repo, server: { pipelineJobs: registry } as never, port: 0 }, { adapter: model.adapter, submissionTool: tool });
@@ -99,5 +99,8 @@ describe('真实原生 OCR 与教材流水线', () => {
     const result = registry.get(initial.jobId);
     expect(result?.status).toBe('done'); expect(result?.successfulLessons).toBe(1); expect(result?.lessonStages?.l1).toBe('saved');
     expect(model.created[0]?.model).toBe('user-model'); expect(model.inputs[0]?.input.turnOptions?.effort).toBe('low'); expect(model.closed).toHaveLength(1);
+    const images = model.inputs[0]?.input.attachments;
+    expect(images).toHaveLength(1); expect(images?.[0]?.png.byteLength).toBeGreaterThan(100);
+    expect(model.inputs[0]?.input.message).toContain('本课共 1 张页面图片');
   }, 120000);
 });

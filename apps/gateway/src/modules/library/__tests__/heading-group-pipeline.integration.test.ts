@@ -60,7 +60,7 @@ it('一级标题保存重开、真实 PDF 切片、模型工具及事务使用�
     });
     const progress: Array<{ id: string; total: number }> = [];
     const result = await repo.executeTextbookPipeline({ userId: 'owner', documentId: saved.documentId, title: request.title,
-      tocEntries: restored, pdf, adapter: model.adapter, submissionTool: tool, poolSize: 2, parseConcurrency: 2, modelRetries: 0,
+      tocEntries: restored, pdf, parserBackend: 'mineru-cloud', adapter: model.adapter, submissionTool: tool, poolSize: 2, parseConcurrency: 2, modelRetries: 0,
       inspector: { processPdf: () => ({ pageCount: 8, markdown: '', pagesNeedingOcr: [1] }), processPdfWithOcr: async () => { throw new Error('不应调用旧 OCR'); } },
       chapterParser: { parse: async (slice, pages) => {
         expect((await PDFDocument.load(slice)).getPageCount()).toBe(pages.length);
@@ -72,7 +72,7 @@ it('一级标题保存重开、真实 PDF 切片、模型工具及事务使用�
     expect(pagesRead.sort((a, b) => a[0]! - b[0]!)).toEqual([[1, 2], [3, 4], [5, 6], [7, 8]]);
     expect([...new Set(progress.map(event => event.id))].sort()).toEqual(['root-a', 'root-b', 'root-c', 'root-d']);
     expect(progress.every(event => event.total === 4)).toBe(true);
-    expect(model.inputs).toHaveLength(4); expect(model.created).toHaveLength(2);
+    expect(model.inputs).toHaveLength(4); expect(model.created).toHaveLength(4);
     const stats = await repo.getTextbookAssetStats(saved.documentId);
     expect(stats.ok && stats.value).toMatchObject({ lessons: 4, readyLessons: 4, vocab: 4, grammar: 4, exercises: 4, lines: 4 });
   } finally {

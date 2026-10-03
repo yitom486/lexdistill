@@ -28,6 +28,7 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       const value = submissionFromPrompt(input.message);
 
       const current = input.message.includes('章节: 当前部分');
+      if (current && !input.message.includes('上次未完成的原因')) return;
       if (!current) {
         const bad = await submit({items:[{text:''}]});
         expect(bad.ok).toBe(false);
@@ -56,9 +57,15 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       const book = convertAstToTextbookBook(TextbookASTSchema.parse(JSON.parse(document.value!.astJson!)));
       expect(book.lessons.map(lesson => lesson.id)).toEqual(['a', 'b']); expect(book.totalLessons).toBe(1);
       expect(book.lessons[0]?.kind).toBe('section'); expect(book.lessons[0]?.learningContent?.articles).toHaveLength(1);
-      const recorded = await currentRepo.listImportEvents({ userId: 'owner', traceId: 'desktop-trace' });
+      let recorded = await currentRepo.listImportEvents({ userId: 'owner', traceId: 'desktop-trace' });
+      for (let attempt = 0; attempt < 30 && recorded.ok && recorded.value.filter(event => event.nodeId === 'b' && event.category === 'model' && event.name === 'input').length < 2; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        recorded = await currentRepo.listImportEvents({ userId: 'owner', traceId: 'desktop-trace' });
+      }
       if (!recorded.ok) throw recorded.error;
-      const historyInput = recorded.value.find(event => event.nodeId === 'a' && event.category === 'model' && event.name === 'input')!;
+      const historyInput = recorded.value.find(event => event.nodeId === 'b' && event.category === 'model' && event.name === 'input')!;
+      const otherInput = recorded.value.find(event => event.nodeId === 'a' && event.category === 'model' && event.name === 'input')!;
+      expect(historyInput.sessionId).not.toBe(otherInput.sessionId);
       const app = createImportMonitorRoutes(currentRepo), reads: string[] = [];
       globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
         const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
@@ -78,7 +85,7 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       expect(doc.querySelector('[data-testid="parse-timeline"]')).toBeNull();
       expect(doc.body.textContent).not.toContain('parse_submitted');
       expect(doc.body.textContent).not.toContain('目录已随本轮输入发送');
-      expect(doc.body.textContent).toContain('本 Worker 会复用线程');
+      expect(doc.body.textContent).toContain('每课使用独立线程');
       expect(doc.querySelector<HTMLDetailsElement>('[data-testid="current-interaction"]')?.open).toBe(true);
       expect(doc.body.textContent).toContain('引擎内部重试（本轮尚未结束）');
       for (let attempt = 0; attempt < 20 && !doc.body.textContent?.includes('受控引擎繁忙'); attempt++) await settle();
@@ -106,12 +113,12 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       await act(async () => { recent.open = true; recent.dispatchEvent(new dom!.dom.window.Event('toggle')); }); await settle();
       expect(recent.textContent).toContain('工具');
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '当前部分')!.click()); await settle();
-      const outer = doc.querySelector<HTMLDetailsElement>('[data-testid="worker-context-history"]')!;
-      expect(outer.open).toBe(false);
-      const history = outer.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')!;
+      expect(doc.querySelector('[data-testid="worker-context-history"]')).toBeNull();
+      const history = doc.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')!;
       expect(history.open).toBe(false);
-      await act(async () => { outer.open = true; outer.dispatchEvent(new dom!.dom.window.Event('toggle')); history.open = true; history.dispatchEvent(new dom!.dom.window.Event('toggle')); }); await settle(); await settle();
-      expect(history.textContent).toContain('历史正文');
+      await act(async () => { history.open = true; history.dispatchEvent(new dom!.dom.window.Event('toggle')); }); await settle(); await settle();
+      expect(history.textContent).toContain('当前正文');
+      expect(doc.body.textContent).not.toContain('历史正文');
       const detailReads = reads.filter(path => path.includes('/details/'));
       expect(detailReads.length).toBeGreaterThan(0);
       expect(detailReads.length).toBeLessThan(25);

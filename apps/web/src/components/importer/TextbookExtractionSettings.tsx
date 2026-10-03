@@ -26,11 +26,12 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
   const setSettings = usePreferencesStore((s) => s.setPipelineSettings);
   const language = usePreferencesStore((s) => s.pipelineLanguage);
   const setLanguage = usePreferencesStore((s) => s.setPipelineLanguage);
+  const directImages = settings.parserBackend === 'model-vision';
   type NumericSetting = { [K in keyof TextbookPipelineSettings]: TextbookPipelineSettings[K] extends number ? K : never }[keyof TextbookPipelineSettings];
   const budgetFields: Array<{ key: Exclude<NumericSetting, 'poolSize'>; label: string }> = [
     { key: 'parseConcurrency', label: '同时提取的章节数' }, { key: 'queueCapacity', label: '待提交队列容量' },
-    { key: 'parsePageLimit', label: '每个解析任务最多页数' }, { key: 'parseTimeoutMs', label: '解析等待超时（毫秒）' },
-    { key: 'parseRetries', label: '解析重试次数' }, { key: 'modelRetries', label: '模型新轮重试次数' }, { key: 'toolRepairRetries', label: '每轮工具修正次数' }, { key: 'storageRetries', label: '保存重试次数' },
+    ...(!directImages ? [{ key: 'parsePageLimit' as const, label: '每个解析任务最多页数' }] : []), { key: 'parseTimeoutMs', label: directImages ? '图片准备超时（毫秒）' : '解析等待超时（毫秒）' },
+    { key: 'parseRetries', label: directImages ? '图片准备重试次数' : '解析重试次数' }, { key: 'modelRetries', label: '模型新轮重试次数' }, { key: 'toolRepairRetries', label: '每轮工具修正次数' }, { key: 'storageRetries', label: '保存重试次数' },
     { key: 'firstResponseTimeoutMs', label: '模型首响应超时（毫秒）' }, { key: 'stallTimeoutMs', label: '模型无活动超时（毫秒）' },
   ];
   return (
@@ -80,7 +81,7 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
         ))}
       </div>
       <p className="text-ink-muted">每轮工具修正次数控制同一会话轮次内的重新提交；用尽后结束该轮，再按模型新轮重试次数处理。引擎内部重试单独显示，不延长所选等待期限。</p>
-      <p className="text-ink-muted">扫描正文使用你选择的解析方式，数字原生 PDF 直接读取文字。章节数控制同时处理的章节；队列满后等待模型消费。停止后不再发送新章节，正在执行的 OCR 或已被云端接受的任务可能继续完成当前处理，其迟到结果不会落库。</p>
+      <p className="text-ink-muted">扫描正文默认直接发送本课图片，数字原生 PDF 直接读取文字。默认 6 个模型会话并发，每课独立；队列满后等待模型消费。停止后不再发送新课，当前处理的迟到结果不会落库。</p>
       <label className="flex items-center justify-between gap-3 text-ink">允许 AI 补充习题（单独标注来源）
         <Switch checked={settings.allowAiExercises} onCheckedChange={allowAiExercises => setSettings({ allowAiExercises })} disabled={pending} />
       </label>

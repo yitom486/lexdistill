@@ -16,14 +16,14 @@ const recognized = (pageNumber: number) => ({ pageNumber, markdown: '错误表�
   { text: `识别行 ${pageNumber}`, x: 0, y: 0, width: 10, height: 10, confidence: 0.9 },
 ] });
 
-it('默认本地 OCR 按一级章切片，长章分批后只入队一次，采用逐页识别行', async () => {
+it('手动选择本地 OCR 按一级章切片，长章分批后只入队一次，采用逐页识别行', async () => {
   const batchSizes: number[] = [], delivered: ChapterSource[] = [];
   await producePdfLessons({ pdf: await fixturePdf(33), inspector: scan(async (slice, options) => {
     const count = (await PDFDocument.load(slice)).getPageCount(); batchSizes.push(count);
     expect(options?.pageNumbers).toEqual(Array.from({ length: count }, (_, index) => index + 1));
     return { pages: options!.pageNumbers!.map(recognized) };
   }), lessons: [{ id: 'root', title: '长章节', level: 'lesson', startPage: 2, endPage: 33 }],
-  concurrency: 2, retries: 0, signal: new AbortController().signal,
+  concurrency: 2, retries: 0, settings: TextbookPipelineSettingsSchema.parse({ parserBackend: 'local-ocr' }), signal: new AbortController().signal,
   onStart: () => {}, onFailure: error => { throw new Error(String(error)); }, onText: async (_, text, source) => {
     delivered.push(source); expect(text).not.toContain('错误表格拼装');
   } });
@@ -49,7 +49,7 @@ it('本地 OCR 一章失败不阻塞另一章入库，模型收到目录和识�
   try {
     const tool = new TextbookContentTools(repo), model = pipelineModel(tool);
     const result = await repo.executeTextbookPipeline({ userId: 'local-owner', documentId: 'local-book', title: '本地 OCR 教材',
-      pdf: await fixturePdf(2), poolSize: 1, parseConcurrency: 1, parseRetries: 0,
+      pdf: await fixturePdf(2), parserBackend: 'local-ocr', poolSize: 1, parseConcurrency: 1, parseRetries: 0,
       tocEntries: [{ id: 'a', title: '失败章', level: 'lesson', startPage: 1 },
         { id: 'b', title: '成功章', level: 'lesson', startPage: 2 }],
       inspector: scan(async () => ++calls === 1 ? { pages: [] } : { pages: [recognized(1)] }),
@@ -69,7 +69,7 @@ it('本地 OCR 一章失败不阻塞另一章入库，模型收到目录和识�
 it('OCR 重试不重新识别已成功的批次，不切换云端', async () => {
   const batches: number[] = [], sources: ChapterSource[] = [];
   let failed = false;
-  await producePdfLessons({ pdf: await fixturePdf(3), settings: TextbookPipelineSettingsSchema.parse({ parsePageLimit: 2 }),
+  await producePdfLessons({ pdf: await fixturePdf(3), settings: TextbookPipelineSettingsSchema.parse({ parserBackend: 'local-ocr', parsePageLimit: 2 }),
     inspector: scan(async (bytes, options) => {
       const count = (await PDFDocument.load(bytes)).getPageCount(); batches.push(count);
       if (count === 1 && !failed) { failed = true; throw new BusinessError('E_OCR_BUSY', '本地暂忙', 'TOOL_EXECUTION', true); }

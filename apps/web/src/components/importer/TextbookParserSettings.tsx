@@ -8,10 +8,10 @@ export function TextbookParserSettings({ settings, onChange, pending }: { settin
     <label className="block space-y-1 text-ink">扫描正文解析方式
       <Select value={settings.parserBackend} disabled={pending} onValueChange={value => { const parsed = TextbookPipelineSettingsSchema.shape.parserBackend.safeParse(value); if (parsed.success) onChange({ parserBackend: parsed.data }); }}>
         <SelectTrigger aria-label="扫描正文解析方式"><SelectValue /></SelectTrigger>
-        <SelectContent><SelectItem value="local-ocr">本地 OCR</SelectItem><SelectItem value="mineru-cloud">MinerU 云端精准解析</SelectItem><SelectItem value="mineru-local">MinerU 本地部署</SelectItem></SelectContent>
+        <SelectContent><SelectItem value="model-vision">大模型直接读图（推荐）</SelectItem><SelectItem value="local-ocr">本地 OCR</SelectItem><SelectItem value="mineru-cloud">MinerU 云端精准解析</SelectItem><SelectItem value="mineru-local">MinerU 本地部署</SelectItem></SelectContent>
       </Select>
     </label>
-    {settings.parserBackend === 'local-ocr' ? <p className="text-ink-muted">使用本机 OCR 识别扫描正文，再交给所选大模型整理学习内容。无需 MinerU Token 或本地 MinerU 服务；首次使用会下载 OCR 运行时及模型，教材文件不上传解析服务。</p> : settings.parserBackend === 'mineru-cloud' ? <>
+    {settings.parserBackend === 'model-vision' ? <p className="text-ink-muted">将本课页面图片直接发送给所选大模型，整理成学习内容，无需 OCR 或 MinerU。每课使用独立会话，内容暂存后一次保存。请选择支持图片的模型。</p> : settings.parserBackend === 'local-ocr' ? <p className="text-ink-muted">使用本机 OCR 识别扫描正文，再交给所选大模型整理学习内容。无需 MinerU Token 或本地 MinerU 服务；首次使用会下载 OCR 运行时及模型，教材文件不上传解析服务。</p> : settings.parserBackend === 'mineru-cloud' ? <>
       <p className="text-ink-muted">扫描章节上传到 MinerU 云端解析，Token 由本机 Gateway 读取。数字原生 PDF 直接提取文字。</p>
       {config.isPending ? <p>正在检测本机云端凭据…</p> : config.isError ? <p role="alert">{config.error.message}</p> : <p role={config.data?.cloudTokenConfigured ? undefined : 'alert'}>{config.data?.cloudTokenConfigured ? '本机已配置云端 Token（未验证有效性或额度）' : '本机未配置云端 Token。请配置 MINERU_TOKEN，或选择本地 OCR。'}</p>}
     </> : <>

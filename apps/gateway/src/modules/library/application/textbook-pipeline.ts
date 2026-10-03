@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import type { AgentAdapter, AgentImageAttachment } from '@study-studio/agent-runtime';
 import { canonicalizeTocEntries, planTextbookTasks, validateTocPageOrder, TextbookPipelineSettingsSchema, type ChapterSource, type TextbookPipelineSettings, type TocEntry, type TextbookModelActivity } from '@study-studio/document-model';
 import { BusinessError, ok, err, generateId, translateToBusinessError, type Result } from '@study-studio/shared';
 import type { ImportTask } from '@study-studio/storage-sqlite';
@@ -89,11 +89,11 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
       const tool = input.submissionTool;
       pool = new ChapterSessionPool({ userId: input.userId, adapter: input.adapter, tool, poolSize: config.poolSize, model: input.model, effort: input.effort, signal: controller.signal, monitor, firstResponseTimeoutMs: config.firstResponseTimeoutMs, stallTimeoutMs: config.stallTimeoutMs });
       const activePool = pool;
-      const onText = async (lesson: TocEntry, text: string, source?: ChapterSource) => {
+      const onText = async (lesson: TocEntry, text: string, source?: ChapterSource, attachments?: AgentImageAttachment[]) => {
         const task = tasks.find(task => task.root.id === lesson.id)!;
-        monitor.record('text', 'ready', { text, source: source ?? null, startPage: lesson.startPage, endPage: lesson.endPage ?? null }, { nodeId: lesson.id });
+        monitor.record('text', 'ready', { text, source: source ?? null, imageCount: attachments?.length ?? 0, startPage: lesson.startPage, endPage: lesson.endPage ?? null }, { nodeId: lesson.id });
         emit(lesson.id, 'queued');
-        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: [], text, ...(source ? { source } : {}) });
+        await queue.put({ documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: [], text, ...(source ? { source } : {}), ...(attachments ? { attachments } : {}) });
         monitor.record('queue', 'enqueued', { size: queue.size }, { nodeId: lesson.id });
       };
       const produce = async () => {
@@ -109,6 +109,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
         } else if (input.pdf && input.inspector) {
           await producePdfLessons({ pdf: input.pdf, inspector: input.inspector, lessons: pending, concurrency: config.parseConcurrency, retries: config.parseRetries, signal: controller.signal,
             settings: config, ...(input.chapterParser ? { parser: input.chapterParser } : {}),
+            onImages: (lesson, images) => onText(lesson, '', undefined, images),
             onDiagnostic: (lesson, name, detail) => monitor.record('text', name, detail, { nodeId: lesson.id }),
             onStart: lesson => emit(lesson.id, 'parsing'), onText, onFailure: (lesson, error) => {
               monitor.record('text', 'failed', { code: error.code, message: error.userMessage, retryable: error.retryable, details: error.internalDetails }, { nodeId: lesson.id });

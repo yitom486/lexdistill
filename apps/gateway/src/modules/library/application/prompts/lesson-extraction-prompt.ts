@@ -23,6 +23,8 @@ export function buildLessonExtractionPrompt(job: LessonExtractionJob, toolNames:
       : []),
     ...(correction ? [`上次未完成的原因：${correction}`] : []),
     ...(job.source?.parser === 'local-ocr' ? ['以下材料来自逐页本地 OCR，可能有错字、注音混入或词表断行。结合本课语境整理，不把页码或编号猜成音调；无法确认的音调省略。'] : []),
-    job.source ? `章节材料:\n${JSON.stringify(job.source.blocks.map(block => ({ kind: block.kind, ...(block.text && !block.rows?.length ? { text: block.text } : {}), ...(block.rows?.length ? { rows: block.rows } : {}) })))}` : `本章内容:\n${job.text}`,
+    job.attachments?.length
+      ? `本课共 ${job.attachments.length} 张页面图片，按附件顺序阅读。直接整理可学习的内容，无需先逐页转录原文。只依据本课材料，不猜无法辨认的词或音调；图片不清楚时说明问题。`
+      : job.source ? `章节材料:\n${JSON.stringify(job.source.blocks.map(block => ({ kind: block.kind, ...(block.text && !block.rows?.length ? { text: block.text } : {}), ...(block.rows?.length ? { rows: block.rows } : {}) })))}` : `本章内容:\n${job.text}`,
   ].join('\n\n');
 }

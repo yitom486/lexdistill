@@ -34,7 +34,7 @@ describe('教材简单内容工具 → 实际 SQLite → 查询回执', () => {
   });
   const result=await env.repo.executeTextbookPipeline({userId:'owner',documentId:'book',title:'教材',language:'ja',tocEntries:toc,lessonJobs:[{lessonId:'a',text:'一'},{lessonId:'b',text:'二'}],adapter:model.adapter,submissionTool:env.tool,poolSize:1,modelRetries:0});
   expect(result.ok && result.value.allLessonsReady).toBe(true);
-  expect(model.created).toHaveLength(1); expect(model.created[0]!.tools?.map(tool=>tool.name).sort()).toEqual(env.tool.tools.map(tool=>tool.name).sort());
+  expect(model.created).toHaveLength(2); expect(model.created[0]!.tools?.map(tool=>tool.name).sort()).toEqual(env.tool.tools.map(tool=>tool.name).sort());
   const globals=env.db.select().from(schema.globalVocabulary).all(); expect(globals).toHaveLength(1); expect(globals[0]).toMatchObject({jlptLevel:'N5',meaning:'学校',levelSource:'MODEL_ESTIMATE'});
   const words=env.db.select().from(schema.textbookVocabulary).all(); expect(words).toHaveLength(2); expect(words[0]!.vocabularyId).toBe(words[1]!.vocabularyId);
   expect(env.db.select().from(schema.textbookKnowledge).all()).toHaveLength(2);
@@ -56,15 +56,15 @@ describe('教材简单内容工具 → 实际 SQLite → 查询回执', () => {
   const slots=await env.repo.listTextbookLessonSlots('book'); expect(slots.ok && slots.value.map(item=>item.lessonId)).toEqual(['intro']);
   expect(model.inputs[0]!.input.message).toContain('  - 小目录');
  });
- it('解析与模型流水线并行，第一章保存时第二章尚在解析，同一会话复用',async()=>{
+ it('解析与模型流水线并行，第一章保存时第二章尚在解析，每章独立会话',async()=>{
   const env=setup(), second=deferred(), release=deferred(), saved=deferred(); let secondDone=false;
   const model=pipelineModel(env.tool,async({submit})=>{await second.promise; expect((await submit({items:[{text:'完整正文'}]})).ok).toBe(true); await submitRequired(submit);});
-  const running=env.repo.executeTextbookPipeline({userId:'owner',documentId:'book',title:'并行教材',tocEntries:toc,pdf:await fixturePdf(2),parseConcurrency:2,poolSize:1,adapter:model.adapter,submissionTool:env.tool,modelRetries:0,
+  const running=env.repo.executeTextbookPipeline({userId:'owner',documentId:'book',title:'并行教材',parserBackend:'mineru-cloud',tocEntries:toc,pdf:await fixturePdf(2),parseConcurrency:2,poolSize:1,adapter:model.adapter,submissionTool:env.tool,modelRetries:0,
    inspector:{processPdf:()=>({pageCount:2,markdown:'',pagesNeedingOcr:[1,2]}),processPdfWithOcr:async()=>{throw new Error('不应走旧正文 OCR');}},
    chapterParser:{parse:async(_pdf,pages)=>{if(pages[0]===2){second.resolve();await release.promise;secondDone=true;}return parsedText('教材材料',pages);}},
    onProgress:progress=>{if(progress.lessonId==='a'&&progress.stage==='saved'){expect(secondDone).toBe(false);saved.resolve();}}
   });
-  try{await saved.promise;release.resolve();const result=await running;expect(result.ok&&result.value.successfulLessons).toBe(2);expect(model.created).toHaveLength(1);}
+  try{await saved.promise;release.resolve();const result=await running;expect(result.ok&&result.value.successfulLessons).toBe(2);expect(model.created).toHaveLength(2);}
   finally{release.resolve();await running;}
  });
  it('多个内容批次追加顺序、完全相同的重试不重复写，跨用户和章节写入被拒绝',async()=>{

@@ -1,9 +1,11 @@
 import { PDFDocument } from 'pdf-lib';
+import type { AgentImageAttachment } from '@study-studio/agent-runtime';
 import { BusinessError, translateToBusinessError } from '@study-studio/shared';
 import { type ChapterSource, type TocEntry, TextbookPipelineSettingsSchema } from '@study-studio/document-model';
-import type { PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
+import type { PdfInspectorLike, RenderedPagePng } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { createMineruParser, type ChapterParser } from '../../../../infrastructure/mineru/parser.js';
 import { createLocalOcrParser, LOCAL_OCR_PAGE_LIMIT } from '../../../../infrastructure/pdf-runtime/local-ocr-parser.js';
+import { renderLessonImages, LESSON_RENDER_BATCH_PAGES } from './lesson-page-images.js';
 
 export interface ProducePdfLessonsOptions {
   pdf: Uint8Array; inspector: PdfInspectorLike; lessons: readonly TocEntry[];
@@ -11,6 +13,7 @@ export interface ProducePdfLessonsOptions {
   parser?: ChapterParser; settings?: Parameters<typeof createMineruParser>[0];
   onStart: (lesson: TocEntry) => void;
   onText: (lesson: TocEntry, text: string, source: ChapterSource) => Promise<void>;
+  onImages?: (lesson: TocEntry, images: AgentImageAttachment[]) => Promise<void>;
   onFailure: (lesson: TocEntry, error: BusinessError) => void;
   onDiagnostic?: (lesson: TocEntry, name: string, detail: unknown) => void;
 }
@@ -24,10 +27,20 @@ export async function producePdfLessons(options: ProducePdfLessonsOptions): Prom
   const batchLimit = settings.parserBackend === 'local-ocr' ? Math.min(settings.parsePageLimit, LOCAL_OCR_PAGE_LIMIT) : settings.parsePageLimit;
   let next = 0;
   let parser = options.parser;
-  const extract = async (lesson: TocEntry, batches: Map<number, ChapterSource>, files: Map<number, Uint8Array>): Promise<ChapterSource> => {
+  const extract = async (lesson: TocEntry, batches: Map<number, ChapterSource>, files: Map<number, Uint8Array>, imageCache: Map<number, RenderedPagePng[]>): Promise<ChapterSource | AgentImageAttachment[]> => {
     const end = lesson.endPage ?? pageCount;
     if (lesson.startPage < 1 || end < lesson.startPage || end > pageCount) throw new BusinessError('E_PDF_PAGE_RANGE_INVALID', '章节物理页范围无效，请核对目录：' + lesson.title, 'VALIDATION');
     const pages = Array.from({ length: end - lesson.startPage + 1 }, (_, index) => lesson.startPage + index);
+    if (settings.parserBackend === 'model-vision') {
+      for (let offset = 0; offset < pages.length; offset += LESSON_RENDER_BATCH_PAGES) {
+        if (signal.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消', 'TOOL_EXECUTION');
+        const direct = inspector.processPdf(pdf, pages.slice(offset, offset + LESSON_RENDER_BATCH_PAGES));
+        if (direct.pagesNeedingOcr?.length || !direct.markdown?.trim()) {
+          if (!options.onImages) throw new BusinessError('E_INVALID_INPUT', '正文图片接收通道未就绪', 'VALIDATION');
+          return renderLessonImages(pdf, pages, inspector, signal, settings.parseTimeoutMs, imageCache);
+        }
+      }
+    }
     const result: ChapterSource = { parser: 'native', blocks: [] };
     for (let offset = 0; offset < pages.length; offset += batchLimit) {
       if (signal.aborted) throw new BusinessError('E_CANCELLED', '教材提取已取消', 'TOOL_EXECUTION');
@@ -64,9 +77,10 @@ export async function producePdfLessons(options: ProducePdfLessonsOptions): Prom
       options.onStart(lesson);
       const batches = new Map<number, ChapterSource>();
       const files = new Map<number, Uint8Array>();
-      let source: ChapterSource | undefined;
+      const imageCache = new Map<number, RenderedPagePng[]>();
+      let source: ChapterSource | AgentImageAttachment[] | undefined;
       for (let attempt = 0; attempt <= options.retries && !signal.aborted; attempt++) {
-        try { source = await extract(lesson, batches, files); break; }
+        try { source = await extract(lesson, batches, files, imageCache); break; }
         catch (cause) {
           const error = cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'TOOL_EXECUTION', fallbackMessage: '章节解析失败：' + lesson.title });
           options.onDiagnostic?.(lesson, 'parse_failed', { attempt: attempt + 1, code: error.code, message: error.userMessage });
@@ -75,7 +89,10 @@ export async function producePdfLessons(options: ProducePdfLessonsOptions): Prom
           break;
         }
       }
-      if (source && !signal.aborted) await options.onText(lesson, JSON.stringify(source), source);
+      if (source && !signal.aborted) {
+        if (Array.isArray(source)) await options.onImages!(lesson, source);
+        else await options.onText(lesson, JSON.stringify(source), source);
+      }
     }
   }));
 }

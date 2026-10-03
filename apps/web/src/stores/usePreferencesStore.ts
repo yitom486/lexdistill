@@ -210,12 +210,17 @@ export const usePreferencesStore = create<PreferencesState>()(
     }),
     {
       name: 'study_studio_user_preferences',
-      version: 1,
+      version: 2,
       migrate: (persisted) => {
         const stored = typeof persisted === 'object' && persisted !== null ? persisted : {};
         const settings = TextbookPipelineSettingsSchema.safeParse('pipelineSettings' in stored ? stored.pipelineSettings : {});
         // User-approved switch of the previous default; subsequent manual choices persist.
-        return { ...stored, pipelineSettings: { ...(settings.success ? settings.data : DEFAULT_TEXTBOOK_PIPELINE_SETTINGS), parserBackend: 'local-ocr' } };
+        const previous = settings.success ? settings.data : DEFAULT_TEXTBOOK_PIPELINE_SETTINGS;
+        const previousPool = 'pipelinePoolSize' in stored ? String(stored.pipelinePoolSize) : '';
+        return { ...stored,
+          pipelinePoolSize: !previousPool || previousPool === '3' || previousPool === '4' ? '6' : previousPool,
+          pipelineSettings: { ...previous, poolSize: previous.poolSize === 3 || previous.poolSize === 4 ? 6 : previous.poolSize, parserBackend: 'model-vision' },
+        };
       },
       merge: (persisted, current) => {
         const stored = typeof persisted === 'object' && persisted !== null ? persisted : {};

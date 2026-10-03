@@ -1,4 +1,4 @@
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
+import type { AgentAdapter, AgentSession, AgentImageAttachment } from '@study-studio/agent-runtime';
 import type { ChapterSource, TocEntry, TextbookLessonStage, TextbookModelActivity } from '@study-studio/document-model';
 import { BusinessError, generateId, translateToBusinessError, logger, type Result } from '@study-studio/shared';
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
@@ -17,6 +17,7 @@ export interface LessonExtractionJob {
   tocPath: readonly TocEntry[];
   text: string;
   source?: ChapterSource;
+  attachments?: AgentImageAttachment[];
 }
 export type LessonStage = TextbookLessonStage;
 export interface BatchExtractionProgress {
@@ -78,15 +79,16 @@ export class ChapterSessionPool {
     return created.value;
   }
   async initialize(): Promise<void> {
-    const results = await Promise.allSettled(Array.from({ length: this.options.poolSize }, async () => {
-      await this.createSession();
-    }));
-    const failed = results.find(result => result.status === 'rejected');
-    if (failed?.status === 'rejected') {
-      await this.close();
-      throw translateToBusinessError(failed.reason, { category: 'AGENT_RUNTIME', fallbackMessage: '章节会话池初始化失败，未降低所选并发度，请检查模型配置' });
-    }
     if (this.options.signal.aborted) { await this.close(); throw new BusinessError('E_CANCELLED', '教材提取已取消', 'AGENT_RUNTIME'); }
+  }
+  private async release(session: AgentSession): Promise<void> {
+    this.sessions = this.sessions.filter(item => item !== session);
+    this.faults.delete(session.sessionId);
+    const results = await Promise.allSettled([session.close()]);
+    const result = results[0]!;
+    if (result.status === 'rejected') logger.warn('教材会话关闭失败', { cause: String(result.reason) });
+    else if (!result.value.ok) logger.warn('教材会话关闭失败', { code: result.value.error.code });
+    this.options.monitor?.record('session', 'closed', undefined, { sessionId: session.sessionId });
   }
   async recover(session: AgentSession): Promise<AgentSession> {
     const fault = this.faults.get(session.sessionId);
@@ -103,24 +105,29 @@ export class ChapterSessionPool {
     return replacement;
   }
   async consume(queue: LessonInputQueue, run: (worker: ChapterWorker, job: LessonExtractionJob) => Promise<void>, onSessionFailure: (job: LessonExtractionJob, error: BusinessError) => void): Promise<void> {
-    await Promise.all([...this.sessions].map(async initial => {
-      const worker = { session: initial };
+    await Promise.all(Array.from({ length: this.options.poolSize }, async () => {
       while (!this.options.signal.aborted) {
         const job = await queue.take(); if (!job) return;
-        try { worker.session = await this.recover(worker.session); }
-        catch (cause) {
-          onSessionFailure(job, translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本章会话恢复失败，其他章节继续处理' }));
-          continue;
+        let worker: ChapterWorker | undefined;
+        try {
+          // 每课独立线程；只在同一课的修正轮次中保留上下文。
+          worker = { session: await this.createSession() };
+          if (!this.options.signal.aborted) await run(worker, job);
         }
-        await run(worker, job);
+        catch (cause) {
+          if (!this.options.signal.aborted) onSessionFailure(job, translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: '本课会话处理失败，其他课程继续处理' }));
+        } finally { if (worker) await this.release(worker.session); }
       }
     }));
   }
   async send(session: AgentSession, job: LessonExtractionJob, assignmentId: string, controller: AbortController, correction?: string, onActivity?: (activity: ModelTurnActivity) => void): Promise<Result<void, BusinessError>> {
+    if (job.attachments?.length && !this.options.adapter.supportsImageInput?.()) return { ok: false,
+      error: new BusinessError('E_AGENT_IMAGES_UNSUPPORTED', '当前模型通道不支持图片，请选择支持图片的模型通道或手动选择文字解析方式', 'AGENT_RUNTIME') };
     const turn = this.options.monitor?.turn(session, { nodeId: job.lessonId, attemptId: assignmentId });
     const message = buildLessonExtractionPrompt(job, this.options.tool.tools.map(tool => tool.name.replaceAll('.', '_')), correction);
     this.options.monitor?.record('model', 'input', { message, model: this.options.model ?? null, effort: this.options.effort ?? null, correction: correction ?? null,
-      chapterTitle: job.title, contextMode: 'worker-thread-reuse',
+      chapterTitle: job.title, contextMode: 'chapter-session',
+      attachments: job.attachments?.map(image => ({ label: image.label ?? null, bytes: image.png.byteLength })) ?? [],
     }, turn?.binding);
     const interrupt = () => { void session.interrupt().catch(cause => logger.warn('教材会话中断失败', { cause: String(cause) })); };
     const startedAt = Date.now();
@@ -132,7 +139,7 @@ export class ChapterSessionPool {
     });
     activity('input');
     controller.signal.addEventListener('abort', interrupt, { once: true });
-    const iterator = session.send({ message, onTurnStarted: id => {
+    const iterator = session.send({ message, ...(job.attachments?.length ? { attachments: job.attachments } : {}), onTurnStarted: id => {
       if (controller.signal.aborted) return;
       nativeTurnId = id;
       this.options.tool.startTurn(session.sessionId, assignmentId, id);
