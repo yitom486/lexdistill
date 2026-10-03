@@ -7,6 +7,7 @@ import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';
 import { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { pipelineModel, requiredContent } from './textbook-pipeline-fixtures.js';
+import { toolsToDynamicSpecs } from '../../../../../../packages/agent-runtime/src/adapters/codex/tools-bridge.js';
 
 const repos: DrizzleLearnerRepository[] = [];
 afterEach(() => { for (const repo of repos.splice(0)) repo.getRawDb().close(); });
@@ -22,6 +23,51 @@ const cases: Array<{ kind: TextbookContentKind; title: string; content: unknown;
 ];
 
 describe('按章节实际内容提交', () => {
+  it('原生工具说明提示排序选项、可选字段省略和重试引用；实际错误修正后统一保存', async () => {
+    const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
+    const tools = new TextbookContentTools(repo);
+    const exercise = { type: 'ORDERING', prompt: '排列词块组成句子。',
+      answer: ['私', 'の', '日本語', 'の', '本', 'です'], difficultyTier: 1, difficultyReason: '基础名词短语词序' };
+    const model = pipelineModel(tools, async ({ submit }) => {
+      const emptyField = await submit({ items: [{ word: '本', meaning: '书', level: 'N5', partOfSpeech: '' }] }, 'vocabulary');
+      expect(emptyField.ok ? '' : emptyField.error.code).toBe('E_CONTENT_FORMAT_INVALID');
+      const noOptions = await submit({ items: [exercise] }, 'exercises');
+      expect(noOptions.ok ? '' : noOptions.error.code).toBe('E_CONTENT_FORMAT_INVALID');
+      expect((await submit({ items: [{ word: '本', meaning: '书', level: 'N5' }] }, 'vocabulary')).ok).toBe(true);
+      expect((await submit({ items: [{ ...exercise, options: ['本', 'の', '私', 'です', '日本語', 'の'] }] }, 'exercises')).ok).toBe(true);
+      const view = await submit({ action: 'read' }, 'exercises');
+      if (!view.ok) throw view.error;
+      const { items } = z.object({ items: z.array(z.object({ ref: z.string() }).passthrough()) }).parse(view.value);
+      expect((await submit({ action: 'update', items: [{ ...exercise, options: ['本', 'の', '私', 'です', '日本語', 'の'],
+        ref: items[0]!.ref, explanation: '名词之间用「の」连接。' }] }, 'exercises')).ok).toBe(true);
+      expect(repo.getRawDb().query('SELECT count(*) AS n FROM textbook_exercise_items').get()).toEqual({ n: 0 });
+    });
+    const create = model.adapter.createSession;
+    model.adapter.createSession = async options => {
+      const { specs } = toolsToDynamicSpecs(options.tools ?? []);
+      expect(specs).toHaveLength(6);
+      const exerciseSpec = specs.find(spec => spec.name === 'library_exercises')!;
+      expect(exerciseSpec.description).toContain('选择题和排序题均需 options');
+      expect(exerciseSpec.description).toContain('重复词块的次数与 options 一致');
+      for (const spec of specs) {
+        expect(spec.description).toContain('可选字段没有值就省略');
+        expect(spec.description).toContain('已有相同内容先 read 后 update');
+        expect(spec.description).toContain('重试后先 read 获取新 ref');
+      }
+      return create(options);
+    };
+    const result = await repo.executeTextbookPipeline({ userId: 'owner', documentId: 'book', title: '工具说明修正',
+      tocEntries: [{ id: 'a', title: '当前课程', level: 'lesson', startPage: 1 }],
+      lessonJobs: [{ lessonId: 'a', text: '私の日本語の本です。' }], adapter: model.adapter, submissionTool: tools,
+      poolSize: 1, modelRetries: 0 });
+    expect(result.ok && result.value.allLessonsReady).toBe(true);
+    const content = await repo.readTextbookChapter({ userId: 'owner', documentId: 'book', chapterId: 'a' });
+    expect(content.ok && content.value.exercises).toHaveLength(1);
+    expect(content.ok && content.value.exercises[0]?.answer).toEqual(exercise.answer);
+    expect(content.ok && content.value.vocabulary[0]?.partOfSpeech).toBeUndefined();
+    expect(model.inputs).toHaveLength(1);
+  });
+
   for (const example of cases) it(`${example.title}章只提交 ${example.kind}，HTTP 完成后整章保存`, async () => {
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
     const tools = new TextbookContentTools(repo), registry = new ToolRegistry();

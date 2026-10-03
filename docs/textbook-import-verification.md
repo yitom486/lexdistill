@@ -1,5 +1,15 @@
 # 教材目录与运行监视：集成验收记录
 
+## 工具说明与 MinerU 只读查询（2026-10-03）
+
+按真实失败日志补充工具说明：选择/排序题均须提供 options，排序覆盖全部词块及重复次数；可选字段没有值省略；重复内容先读取后修改；重试读取当前尝试新 ref。未改变现有内容契约、类别选择或最终事务机制。
+
+[按章内容集成](../apps/gateway/src/modules/library/__tests__/adaptive-chapter-content.integration.test.ts) 核对 Codex 原生声明实际包含这些说明，复现空词性、漏排序 options 的非法调用，修正后读取短引用再修改，模型结束前零写入、结束后整章保存。既有跨尝试引用拒绝与失败保留原版本测试继续通过。
+
+正式门禁：`bun run typecheck` 通过；`bun run test:all` **1654 通过、3 项既有 RSS 跳过、0 失败**，1657 项 / 267 文件。聚焦17项通过，测试进程已退出。日志：`.studio-internal/tool-guidance-typecheck.log`、`.studio-internal/tool-guidance-test-all.log`、`.studio-internal/tool-guidance-focused.log`。没有用真实模型重新提取教材，尚不能据此声称真实模型不会再填写错误。
+
+12:24（北京时间）用现有 Token 只读查询：MinerU `/api/v4/quota` HTTP200/code0，返回两项企业剩余额度为0；已有云端样例任务查询 HTTP200/code0、state=done。官方[企业接口说明](https://mineru.net/doc/docs/index_pro/) 明确该 quota 接口不适用于个人专属 Token，不能把本次返回0解释为个人额度耗尽。没有创建任务或上传文件。当前[个人解析文档](https://mineru.net/apiManage/docs) 说明每天1000页最高优先级，超过后降低优先级；个人准确剩余额度仍需已登录的 API 管理页核对。
+
 ## 按章节实际内容提交（2026-10-03）
 
 用户批准取消知识点、词汇、练习三类必交。章节提示词、六工具说明、暂存完成条件及 SQLite 事务同步改为按实际内容选择；有则提交，无则省略，不为凑齐类别生成内容。至少一类有效学习内容即可完成，AI 练习开关与内容字段校验继续生效。此前阶段记录中的三类必交规则已由本节替代。
