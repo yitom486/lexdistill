@@ -72,8 +72,16 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   expect(exampleChoice.textContent).toContain('回答正确');
   expect(examples.textContent).toContain('可主动请求 AI 批改');
   await click(button(doc, '返回教材首页'));
-  await click(button(doc.querySelector(`article[aria-label="教材：${previewBooks[0]!.title}"]`)!, '打开教材'));
+  const bookEntry = doc.querySelector<HTMLButtonElement>(`[aria-label="查看章节：${previewBooks[0]!.title}"]`);
+  expect(bookEntry?.tagName).toBe('BUTTON');
+  expect(bookEntry?.disabled).toBe(false);
+  await click(bookEntry);
+  expect(doc.querySelector('[data-testid="learning-preview-page"]')).toBeNull();
+  expect(doc.querySelector('[data-testid="textbook-chapter-list"]')?.textContent).toContain(previewLesson.chapterTitle);
+  expect(navigation.getState().view).toBe('CHAPTERS');
+  await click(doc.querySelector<HTMLButtonElement>(`[aria-label="学习章节：${previewLesson.chapterTitle}"]`));
   expect(doc.querySelector('[data-testid="learning-preview-page"]')).not.toBeNull();
+  // The study page also retains its chapter selector.
   await click(doc.querySelector<HTMLElement>('[aria-label="选择章节"]'));
   const chapterOption = [...doc.querySelectorAll<HTMLElement>('[role="option"]')].find(option => option.textContent === previewLesson.chapterTitle);
   expect(chapterOption).toBeTruthy();
@@ -217,14 +225,24 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   await click(button(doc, '返回教材首页'));
   expect(doc.querySelector('[data-testid="textbook-library-home"]')).not.toBeNull();
   expect(doc.querySelector('[data-testid="learning-preview-page"]')).toBeNull();
-  await click(button(doc.querySelector(`article[aria-label="教材：${previewBooks[1]!.title}"]`)!, '打开教材'));
+  await click(doc.querySelector<HTMLButtonElement>(`[aria-label="查看章节：${previewBooks[1]!.title}"]`));
+  await click(doc.querySelector<HTMLButtonElement>(`[aria-label="学习章节：${previewBooks[1]!.chapters[0]!.title}"]`));
   expect(doc.querySelectorAll('[role="tab"]')).toHaveLength(6);
   expect(tab('句子')).toBeUndefined();
   await click(button(doc, '返回教材首页'));
   await click(button(doc.querySelector(`article[aria-label="教材：${previewBooks[0]!.title}"]`)!, '继续学习'));
+  expect(navigation.getState().view).toBe('STUDY');
   expect(doc.querySelector('[aria-label="选择章节"]')?.textContent).toContain(previewLesson.chapterTitle);
   expect(tab('练习')?.getAttribute('aria-selected')).toBe('true');
   expect(doc.querySelector('article[aria-label="练习 1：单选"]')?.textContent).not.toContain('回答正确');
+
+  await click(button(doc, '返回章节列表'));
+  expect(doc.querySelector('[data-testid="textbook-chapter-list"]')).not.toBeNull();
+  expect(doc.querySelector('[data-testid="learning-preview-page"]')).toBeNull();
+  expect(navigation.getState().chaptersByBook[previewBooks[0]!.id]).toBe(previewLesson.chapterId);
+  expect(navigation.getState().sectionsByChapter[previewLesson.chapterId]).toBe('exercises');
+  await click(doc.querySelector<HTMLButtonElement>(`[aria-label="学习章节：${previewLesson.chapterTitle}"]`));
+  expect(tab('练习')?.getAttribute('aria-selected')).toBe('true');
 
   // Reload navigation from persisted preferences; preserve location, not learner records.
   const preferences = dom.dom.window.localStorage.getItem('lingua-textbook-navigation');
