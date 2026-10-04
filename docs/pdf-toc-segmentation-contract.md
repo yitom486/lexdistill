@@ -1,4 +1,6 @@
-# PDF 目录分段契约（TOC → 物理页 → lesson segment）
+# PDF 目录分段契约（历史设计参考）
+
+> 2026-10-04：当前导入已改为[本机 PDF 文件流程](textbook-pdf-file-flow.md)，不再执行本文 OCR、30 页 OCR 分段或锚点探测策略。本文仅保留旧设计记录，不作为当前行为说明。
 
 > 长期维护文档。实现：`apps/gateway/src/modules/library/application/pdf-import/toc-segment-preview.ts`
 > （纯函数 `previewTocSegments`），单测：`apps/gateway/src/modules/library/__tests__/toc-segment-preview.test.ts`。
@@ -284,4 +286,4 @@ P5-C 的 anchor 一律 `evidence: 'human-confirmed'`（P5-A 白名单既有成�
 默认 6 个课程 Worker，每课创建独立原生线程；同课修正保留本课历史，运行时
 故障可重建该课线程。工具继续只收学习内容，先暂存，模型正常结束并通过
 校验后整课一次事务保存。图片字节仅存在内存和适配器临时文件中，业务数据库
-和运行日志只记录图片数量、标签与字节数。旧 OCR/MinerU 方式保留为手动选择。
+和运行日志只记录图片数量、标签与字节数。旧 OCR/MinerU 后端已移除，不再保留手动选择（见 textbook-pdf-file-flow.md）。

@@ -280,11 +280,8 @@ export interface ImportPdfResult {
   classification: {
     pdfType: string;
     pageCount: number;
-    pagesNeedingOcr: number[];
-    ocrUsed: boolean;
+
     selectedPages: number[];
-    /** 云回填命中的页（无云调用时缺席） */
-    azurePages?: number[];
     /** CMD-08 全部页夹持：超限未失败而是对首窗转换（无夹持时缺席） */
     clampedFromAll?: boolean;
   };
@@ -298,14 +295,14 @@ export interface ImportPdfResult {
  * PDF 上传导入：multipart 发网关 /api/documents/:userId/import-pdf，
  * 网关做分类/提取/结构化后返回 TextbookAST（协议层已验），前端复用既有
  * 确认导入链路（parseTextbookAST → onImportBook → useImportTextbookMutation）入库。
- * 注意：扫描版首次 OCR 会触发网关按需下载运行时（约 80MB，一次性），属正常等待。
+ * 注意：扫描版无文字层时请改用章节模型读取 PDF；此接口不执行 OCR。
  */
 export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
     mutationFn: async (
       vars:
-        | { file: File; startPage?: number; endPage?: number; azure?: PdfAzureCredential; classes?: StructureClassItem[] }
-        | { filePath: string; startPage?: number; endPage?: number; azure?: PdfAzureCredential; classes?: StructureClassItem[] }
+        | { file: File; startPage?: number; endPage?: number; classes?: StructureClassItem[] }
+        | { filePath: string; startPage?: number; endPage?: number; classes?: StructureClassItem[] }
     ): Promise<ImportPdfResult> => {
       const hasPath = 'filePath' in vars;
       const classes = vars.classes && vars.classes.length > 0 ? vars.classes : undefined;
@@ -317,7 +314,6 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
               filePath: vars.filePath,
               ...(vars.startPage !== undefined ? { startPage: vars.startPage } : {}),
               ...(vars.endPage !== undefined ? { endPage: vars.endPage } : {}),
-              ...azureBodyFields(vars.azure),
               ...(classes ? { classes } : {}),
             }),
           })
@@ -326,7 +322,6 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
             form.append('file', vars.file, vars.file.name);
             if (vars.startPage !== undefined) form.append('startPage', String(vars.startPage));
             if (vars.endPage !== undefined) form.append('endPage', String(vars.endPage));
-            azureFormFields(form, vars.azure);
             if (classes) form.append('classes', JSON.stringify(classes));
             return fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/import-pdf`, {
               method: 'POST',
@@ -358,8 +353,7 @@ export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
         classification: rest.classification ?? {
           pdfType: 'Unknown',
           pageCount: 0,
-          pagesNeedingOcr: [],
-          ocrUsed: false,
+
           selectedPages: [],
         },
         stats: rest.stats ?? { lessons: 0, dialogues: 0 },
@@ -536,15 +530,14 @@ export function useAppendPdfMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
     mutationFn: async (
       vars: { documentId: string } & (
-        | { file: File; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
-        | { filePath: string; startPage?: number; endPage?: number; azure?: PdfAzureCredential }
+        | { file: File; startPage?: number; endPage?: number }
+        | { filePath: string; startPage?: number; endPage?: number }
       )
     ): Promise<AppendPdfResult> => {
       const hasPath = 'filePath' in vars;
       const { documentId, ...src } = vars;
       const startPage = (src as { startPage?: number }).startPage;
       const endPage = (src as { endPage?: number }).endPage;
-      const azure = (src as { azure?: PdfAzureCredential }).azure;
       const res = hasPath
         ? await fetchPdfGateway(
             `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${encodeURIComponent(documentId)}/append-pdf`,
@@ -555,7 +548,6 @@ export function useAppendPdfMutation(userId = DEFAULT_USER_ID) {
                 filePath: (src as { filePath: string }).filePath,
                 ...(startPage !== undefined ? { startPage } : {}),
                 ...(endPage !== undefined ? { endPage } : {}),
-                ...azureBodyFields(azure),
               }),
             }
           )
@@ -565,7 +557,6 @@ export function useAppendPdfMutation(userId = DEFAULT_USER_ID) {
             form.append('file', f, f.name);
             if (startPage !== undefined) form.append('startPage', String(startPage));
             if (endPage !== undefined) form.append('endPage', String(endPage));
-            azureFormFields(form, azure);
             return fetchPdfGateway(
               `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${encodeURIComponent(documentId)}/append-pdf`,
               { method: 'POST', body: form }
@@ -618,11 +609,8 @@ export interface MapPdfResult {
   classification: {
     pdfType: string;
     pageCount: number;
-    pagesNeedingOcr: number[];
-    ocrUsed: boolean;
+
     selectedPages: number[];
-    /** 云回填命中的页（无云调用时缺席） */
-    azurePages?: number[];
   };
   window: number[];
   headings: PdfPageHeading[];
@@ -631,7 +619,7 @@ export interface MapPdfResult {
   outlineSource?: 'embedded' | 'none';
   /** 校验后的原生目录条目（physicalPage 必合法；none 时缺席或空）。 */
   embeddedOutline?: Array<{ title: string; level: number; physicalPage: number }>;
-  /** 阶段一 OCR 探测出的目次区间候选（未检测到时为 null 或缺席） */
+  /** 旧结构预览接口的目录区间字段（未检测到时为 null 或缺席） */
   detectedTocRange?: {
     startPage: number;
     endPage: number;
@@ -641,33 +629,13 @@ export interface MapPdfResult {
   } | null;
 }
 
-/** 云 OCR 凭据（随请求发网关，内存态用完即弃；不填走纯本地链路）。 */
-export interface PdfAzureCredential {
-  endpoint: string;
-  key: string;
-}
 
-function azureBodyFields(azure: PdfAzureCredential | undefined): Record<string, string> {
-  if (!azure || !azure.endpoint.trim() || !azure.key.trim()) return {};
-  return { azureEndpoint: azure.endpoint.trim(), azureKey: azure.key.trim() };
-}
-
-function azureFormFields(form: FormData, azure: PdfAzureCredential | undefined): void {
-  const fields = azureBodyFields(azure);
-  if (fields.azureEndpoint) form.append('azureEndpoint', fields.azureEndpoint);
-  if (fields.azureKey) form.append('azureKey', fields.azureKey);
-}
-
-/**
- * PDF 结构预览：扫一个窗口页，返回每页标题 + 目录条目（目录感知导入第一步）。
- * 调用方按标题页选范围，再调 useImportPdfMutation 精确导入。
- */
 export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
     mutationFn: async (
       vars:
-        | { file: File; startPage?: number; endPage?: number; azure?: PdfAzureCredential; traceId?: string }
-        | { filePath: string; startPage?: number; endPage?: number; azure?: PdfAzureCredential; traceId?: string }
+        | { file: File; startPage?: number; endPage?: number; traceId?: string }
+        | { filePath: string; startPage?: number; endPage?: number; traceId?: string }
     ): Promise<MapPdfResult> => {
       const hasPath = 'filePath' in vars;
       const res = hasPath
@@ -678,7 +646,6 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
               filePath: vars.filePath,
               ...(vars.startPage !== undefined ? { startPage: vars.startPage } : {}),
               ...(vars.endPage !== undefined ? { endPage: vars.endPage } : {}),
-              ...azureBodyFields(vars.azure),
             }),
           })
         : await (async () => {
@@ -686,7 +653,6 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
             form.append('file', vars.file, vars.file.name);
             if (vars.startPage !== undefined) form.append('startPage', String(vars.startPage));
             if (vars.endPage !== undefined) form.append('endPage', String(vars.endPage));
-            azureFormFields(form, vars.azure);
             return fetchPdfGateway(`${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/map-pdf`, {
               method: 'POST',
               ...(vars.traceId ? { headers: { 'X-Textbook-Trace': vars.traceId } } : {}),
@@ -706,8 +672,7 @@ export function useMapPdfMutation(userId = DEFAULT_USER_ID) {
         classification: p.classification ?? {
           pdfType: 'Unknown',
           pageCount: 0,
-          pagesNeedingOcr: [],
-          ocrUsed: false,
+
           selectedPages: [],
         },
         window: Array.isArray(p.window) ? p.window : [],
@@ -794,12 +759,6 @@ export interface StructureClassItem {
   lessonNo: string | null;
   skillId: string | null;
 }
-export interface ClassifyStructureResult {
-  classes: StructureClassItem[];
-  dropped: number;
-  model: string;
-  allowedSkillIds: string[];
-}
 export interface SavedStructure {
   documentId: string;
   headings: StructureHeading[];
@@ -808,56 +767,6 @@ export interface SavedStructure {
   effort: string;
   dropped: number;
   createdAt: string;
-}
-
-/**
- * 标题结构分类（mini 分流观测）：输入 map 阶段标题候选，瞬时返回判选（不落库）。
- * 模型与 effort 由导入页独立选择后显式传入；网关只透传。
- */
-export function useClassifyStructureMutation() {
-  return useMutation({
-    mutationFn: async (vars: {
-      headings: StructureHeading[];
-      lang?: string;
-      model?: string;
-      effort?: string;
-    }): Promise<ClassifyStructureResult> => {
-      const res = await fetch(`${GATEWAY_BASE_URL}/api/structure/classify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(vars),
-      });
-      const payload: unknown = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new GatewayRequestError(readGatewayUserMessage(payload, `结构分类失败（HTTP ${res.status}）`), {
-          code: readGatewayErrorCode(payload),
-          details: readGatewayErrorDetails(payload),
-        });
-      }
-      const p = (payload ?? {}) as Record<string, unknown>;
-      const kinds = new Set(['lesson', 'section', 'toc', 'noise']);
-      return {
-        classes: (Array.isArray(p.classes) ? p.classes : [])
-          .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
-          .filter((c) => typeof c.text === 'string' && kinds.has(c.kind as string))
-          .map((c) => ({
-            text: c.text as string,
-            page: typeof c.page === 'number' ? c.page : 0,
-            kind: c.kind as StructureClassKind,
-            lessonNo: typeof c.lessonNo === 'string' ? c.lessonNo : null,
-            skillId: typeof c.skillId === 'string' ? c.skillId : null,
-          })),
-        dropped: typeof p.dropped === 'number' ? p.dropped : 0,
-        model: typeof p.model === 'string' ? p.model : '',
-        allowedSkillIds: Array.isArray(p.allowedSkillIds)
-          ? (p.allowedSkillIds as unknown[]).filter((s): s is string => typeof s === 'string')
-          : [],
-      };
-    },
-    onError: (e) => {
-      logger.debug('[useClassifyStructureMutation] classify failed', e);
-    },
-  });
 }
 
 /** 保存已验分类（一文档一行；导入确认后调用）。 */
@@ -1047,14 +956,15 @@ export interface ExtractTocWithLlmVars {
   traceId?: string;
   filePath?: string;
   file?: File;
-  startPage: number;
-  endPage: number;
+  startPage?: number;
+  endPage?: number;
   title?: string;
   language?: string;
   model?: string;
+  effort?: string;
 }
 
-const ExtractTocWithLlmResultSchema = z.object({ title: z.string().optional(), entries: z.array(TocEntrySchema) });
+const ExtractTocWithLlmResultSchema = z.object({ title: z.string().optional(), entries: z.array(TocEntrySchema), tocEndPage: z.number().int().positive(), pageOffset: z.number().int().optional() });
 export type ExtractTocWithLlmResult = z.infer<typeof ExtractTocWithLlmResultSchema>;
 
 export async function requestExtractTocWithLlm(
@@ -1066,11 +976,12 @@ export async function requestExtractTocWithLlm(
   if (vars.file) {
     const fd = new FormData();
     fd.append('file', vars.file);
-    fd.append('startPage', String(vars.startPage));
-    fd.append('endPage', String(vars.endPage));
+    if (vars.startPage !== undefined) fd.append('startPage', String(vars.startPage));
+    if (vars.endPage !== undefined) fd.append('endPage', String(vars.endPage));
     if (vars.title) fd.append('title', vars.title);
     if (vars.language) fd.append('language', vars.language);
     if (vars.model) fd.append('model', vars.model);
+    if (vars.effort) fd.append('effort', vars.effort);
     res = await fetchPdfGateway(url, { method: 'POST', body: fd, ...(vars.traceId ? { headers: { 'X-Textbook-Trace': vars.traceId } } : {}) });
   } else {
     res = await fetchPdfGateway(url, {
@@ -1083,6 +994,7 @@ export async function requestExtractTocWithLlm(
         ...(vars.title ? { title: vars.title } : {}),
         ...(vars.language ? { language: vars.language } : {}),
         ...(vars.model ? { model: vars.model } : {}),
+        ...(vars.effort ? { effort: vars.effort } : {}),
       }),
       ...(vars.traceId ? { headers: { 'Content-Type': 'application/json', 'X-Textbook-Trace': vars.traceId } } : {}),
     });

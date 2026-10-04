@@ -34,7 +34,7 @@ export interface EnrichLessonInput {
    */
   signal?: AbortSignal;
   /**
-   * 模型分流（与 structure-classify 同口径）：抽取是结构化体力活，
+   * 模型分流：抽取是结构化体力活，
    * 允许指定便宜模型 + 低 effort；不填则走网关缺省（强模型）。
    * effort 必须取目标模型的支持列表（硬塞未知档会被拒收），调用方负责选对。
    */
