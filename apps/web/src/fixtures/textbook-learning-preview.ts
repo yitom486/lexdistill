@@ -55,6 +55,20 @@ export const previewBooks: LearningLibraryBook[] = [
       exercises: [{ id: 'preview-greeting-e1', difficultyTier: 1, difficultyReason: '识别基础自我介绍。', type: 'CHOICE', prompt: '请选择礼貌的自我介绍。', options: ['わたしは李です。', 'これは李です。'], answer: 'わたしは李です。', explanation: '介绍自己用「わたしは」。', source: 'AI' }], material: null,
     } },
     { id: previewLesson.chapterId, title: previewLesson.chapterTitle, subtitle: previewLesson.subtitle, content: previewLesson.content },
+    { id: 'preview-pronunciation', title: '发音练习 · 长音与促音', subtitle: '先理解拍长，再听读对比。', content: {
+      vocabulary: [], articles: [], sentences: [], exercises: [], material: null,
+      grammar: [
+        { id: 'preview-long-vowels', kind: 'PRONUNCIATION', title: '长音（ちょうおん）', source: 'AI',
+          explanation: '### 核心规则\n\n长音把前面的元音**延长一拍**。短音和长音可能区分词义，练习时要听清拍数。\n\n### 常见写法\n\n- 平假名中用元音假名表示延长。\n- 片假名中常用长音符号「ー」。\n\n不要只提高音量；保持元音，把时间延长。',
+          aiExplanation: '### 练习方法\n\n先慢读两个词，边读边打拍子，再恢复自然语速。\n\n**自检**：是否只是读得更响，而没有延长元音？',
+          examples: [{ text: 'おばさん。おばあさん。', translation: '阿姨；奶奶。对比「ば」后一拍的延长。' }, { text: 'ゆき。ゆうき。', translation: '雪；勇气。对比「ゆ」后一拍的延长。' }, { text: 'カード。', translation: '卡片。注意「カー」的两拍。' }],
+        },
+        { id: 'preview-gemination', kind: 'PRONUNCIATION', title: '促音（そくおん）', source: 'AI',
+          explanation: '### 核心规则\n\n小「っ／ッ」表示**停顿一拍**，随后发出下一个辅音。\n\n- 不把小「っ」读成「つ」。\n- 停顿时间计入拍数。',
+          examples: [{ text: 'きて。きって。', translation: '来；邮票。注意第二个词中间的停顿。' }],
+        },
+      ],
+    } },
   ] },
   { id: 'preview-travel-japanese', title: '旅行日语：在城市里问路', language: 'JA', level: 'N5', temporary: true, chapters: [
     { id: 'preview-directions', title: '第 1 课 · 駅はどこですか', subtitle: '礼貌问路，听懂简单的方向指引。', content: {

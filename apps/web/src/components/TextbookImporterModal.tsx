@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from './ui/dialog.js';
 import { Button } from './ui/button.js';
-import { Badge } from './ui/badge.js';
+import { Switch } from './ui/switch.js';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs.js';
 import { TextbookJsonImporterTab } from './importer/TextbookJsonImporterTab.js';
 import { TextbookPipelineImporterTab } from './importer/TextbookPipelineImporterTab.js';
@@ -114,20 +114,20 @@ export function TextbookImporterModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
+        className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 bg-surface-warm text-ink"
         showCloseButton
       >
-        <DialogHeader className="px-6 py-4 border-b border-line text-left">
+        <DialogHeader className="px-6 py-5 border-b border-line-soft bg-paper-soft text-left">
           <div className="flex items-center gap-2.5 pr-8">
             <div className="p-2 rounded-xl bg-surface border border-line text-ink">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
-              <DialogTitle className="text-base text-ink">
-                教材导入与解析
+              <DialogTitle className="font-serif text-xl text-ink">
+                导入教材
               </DialogTitle>
               <DialogDescription className="text-xs text-ink-muted">
-                导入 PDF 或电子书，识别目次大纲并构建课程体系
+                选择教材，核对目录，再整理成可学习的内容。
               </DialogDescription>
             </div>
           </div>
@@ -135,18 +135,18 @@ export function TextbookImporterModal({
 
         <Tabs
           value={activeTab}
-          onValueChange={(v) => setActiveTab(v as 'pipeline' | 'json')}
+          onValueChange={(value) => { if (value === 'pipeline' || value === 'json') setActiveTab(value); }}
           className="w-full flex-1 flex flex-col min-h-0"
         >
           <div className="px-6 pt-2 pb-0 border-b border-line flex items-center justify-between">
             <TabsList className="h-9">
               <TabsTrigger value="pipeline" className="text-xs gap-1.5">
                 <FileUp className="w-3.5 h-3.5" />
-                智能教材导入 (PDF / 电子书)
+                教材文件
               </TabsTrigger>
               <TabsTrigger value="json" className="text-xs gap-1.5">
                 <Code2 className="w-3.5 h-3.5" />
-                结构化 AST JSON 导入
+                JSON 内容
               </TabsTrigger>
             </TabsList>
           </div>
@@ -196,7 +196,7 @@ export function TextbookImporterModal({
               </div>
             )}
 
-            {parsedAST && (
+            {activeTab === 'json' && parsedAST && (
               <div className="p-4 rounded-2xl bg-wash-amber-500o10 border border-line-amber-900o10-amber-500o20 flex items-center justify-between">
                 <div className="space-y-0.5">
                   <div className="text-xs font-bold text-ink flex items-center gap-1.5">
@@ -209,18 +209,13 @@ export function TextbookImporterModal({
                     个生词直接注入今日复习池
                   </p>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={autoGenerateCards}
-                  onChange={(e) => setAutoGenerateCards(e.target.checked)}
-                  className="w-4 h-4 rounded text-tone-amber-600 focus:ring-tone-amber-500 border-tone-stone-300"
-                />
+                <Switch aria-label="自动生成记忆卡片" checked={autoGenerateCards} onCheckedChange={setAutoGenerateCards} />
               </div>
             )}
           </div>
         </Tabs>
 
-        <div className="flex items-center justify-between px-6 py-4 border-t border-line-accent bg-wash-amber-500o5">
+        {activeTab === 'json' && <div className="flex items-center justify-between px-6 py-4 border-t border-line-soft bg-paper-soft">
           <Button variant="ghost" onClick={onClose}>
             取消
           </Button>
@@ -228,7 +223,7 @@ export function TextbookImporterModal({
             确认导入并激活
             <ArrowRight className="w-3.5 h-3.5" />
           </Button>
-        </div>
+        </div>}
       </DialogContent>
     </Dialog>
   );

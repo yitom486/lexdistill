@@ -13,7 +13,7 @@ interface Props {
   onClose: () => void;
   onReset: () => void;
 }
-const stageLabels = { parsing: '解析章节内容', queued: '等待会话', extracting: '模型整理', validating: '校验目录与格式', correcting: '等待模型修正', model_retrying: '模型重试', saving: '保存中', storage_retrying: '保存重试', saved: '已保存', failed: '未完成' };
+const stageLabels = { parsing: '准备章节材料', queued: '等待会话', extracting: '模型整理', validating: '检查内容', correcting: '等待模型修正', model_retrying: '模型重试', saving: '保存中', storage_retrying: '保存重试', saved: '已保存', failed: '未完成' };
 
 export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: Props) {
   const [monitorOpen, setMonitorOpen] = useState(false);
@@ -22,8 +22,8 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
   const cancel = useCancelPipelineJobMutation();
   const planned = slots.data?.length ? planTextbookTasks(slots.data.map(slot => ({ ...slot, id: slot.lessonId, level: slot.kind }))) : undefined;
   return (
-    <section className="space-y-4 rounded-2xl border border-line bg-surface p-4 text-xs">
-      <h3 className="font-semibold text-ink">《{job.title}》教材提取</h3>
+    <section className="space-y-4 rounded-2xl border border-line-soft bg-paper-soft p-5 text-sm text-ink">
+      <h3 className="font-serif text-lg font-semibold">《{job.title}》内容整理</h3>
       <p className="text-ink-muted">
         {job.status === 'running' ? '正在处理' : job.status === 'done' ? '已确认目录内的内容已完成' : job.status === 'cancelled' ? '已中止，已保存内容保留' : '部分内容未完成，请检查后重试'}
       </p>
@@ -41,8 +41,7 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
             <button type="button" key={slot.lessonId} onClick={() => { setMonitorNode(slot.lessonId); setMonitorOpen(true); }} className="flex w-full justify-between gap-2 border-b border-line-soft py-2 text-left text-ink">
               <span>{slot.title}</span>
               <span className="text-right text-ink-muted">{slot.status === 'ready' ? '已保存' : failure ? failure.error : job.status === 'running' && job.lessonStages?.[slot.lessonId] ? stageLabels[job.lessonStages[slot.lessonId]!] : job.status === 'running' ? '等待处理' : '未完成'}
-                {activity && slot.status !== 'ready' && <span className="mt-1 block">第 {activity.attempt} 次尝试 · 提交拒绝 {activity.correctionCount} 次 · 引擎重试 {activity.engineRetryCount} 次<br />
-                  最近活动 {new Date(activity.lastActivityAt).toLocaleTimeString()} · {activity.event === 'runtime_retry' ? activity.message ?? '引擎重试中' : activity.nativeTurnId ? '原生轮次已启动' : '等待原生轮次启动'}
+                {activity && slot.status !== 'ready' && <span className="mt-1 block text-xs">第 {activity.attempt} 次尝试 · 最近活动 {new Date(activity.lastActivityAt).toLocaleTimeString()}
                 </span>}
               </span>
             </button>

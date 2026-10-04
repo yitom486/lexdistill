@@ -78,6 +78,7 @@ async function tickUntil(predicate: () => boolean) {
   throw new Error(`界面未在预期时间更新：${JSON.stringify({ path: currentFlow?.path, inspection: currentFlow?.inspection.status, slots: currentFlow?.slots.status, fetching: currentFlow?.slots.isFetching, error: currentFlow?.slots.error?.message })}`);
 }
 async function click(text: string) {
+  await tickUntil(() => [...document.querySelectorAll('button')].some(button => button.textContent?.includes(text)));
   const button = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes(text));
   if (!button) throw new Error(`缺少按钮：${text}`);
   await act(async () => { button.dispatchEvent(new MouseEvent('click', { bubbles: true })); await Promise.resolve(); });
@@ -169,6 +170,24 @@ afterEach(() => {
 });
 
 describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码组件', () => {
+  it('文件导入只显示步骤操作；JSON 确认只属于 JSON 入口', async () => {
+    await prepare();
+    const { TextbookImporterModal } = await import('../../TextbookImporterModal.js');
+    let closed = 0;
+    act(() => dom!.root.render(<QueryClientProvider client={client!}><TextbookImporterModal isOpen onClose={() => { closed++; }} onImportBook={() => {}} onAddCardsBatch={() => {}} /></QueryClientProvider>));
+    await tickUntil(() => Boolean(document.querySelector('[role="dialog"]')));
+    expect(document.querySelector('input[aria-label="本地 PDF 路径"]')).toBeNull();
+    expect([...document.querySelectorAll('button')].find(button => button.textContent?.includes('确认导入并激活'))).toBeUndefined();
+    await click('使用文件路径或网址');
+    expect(document.querySelector('input[aria-label="本地 PDF 路径"]')).not.toBeNull();
+    await click('JSON 内容');
+    const confirm = [...document.querySelectorAll('button')].find(button => button.textContent?.includes('确认导入并激活'));
+    expect(confirm?.disabled).toBe(true);
+    await click('教材文件');
+    expect([...document.querySelectorAll('button')].find(button => button.textContent?.includes('确认导入并激活'))).toBeUndefined();
+    await click('Close');
+    expect(closed).toBe(1);
+  });
   it('目录缩进取父子关系，层级编辑同步保存父节点；重新读取仍保留全部子标题', async () => {
     if (process.env['LINGUA_HEADING_DOM_CHILD'] !== '1') {
       // 与现有监视 DOM 测试相同：防止其他测试在无 DOM 时缓存 Base UI。
@@ -186,8 +205,12 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
       { id: 'main', title: '正式第一课', level: 'lesson', startPage: 4 },
     ]);
     await click('选择本地文件');
+    await click('目录识别设置');
     await tickUntil(() => (document.querySelector('input[aria-label="目录结束页"]') as HTMLInputElement | null)?.value === '12');
-    await click('大模型智能提炼目录');
+    await click('识别目录');
+    await tickUntil(() => Boolean(document.querySelector('[aria-label="目录层级列表"]')));
+    expect(document.querySelector('[aria-label="目录标题 1"]')).toBeNull();
+    await click('编辑目录');
     await tickUntil(() => Boolean(document.querySelector('[aria-label="目录层级 4"]')));
     expect(document.querySelector('[aria-label="目录类型 1"]')?.textContent).toContain('单元');
     expect(document.querySelector('[aria-label="目录层级 1"]')?.textContent).toContain('一级');
@@ -221,8 +244,9 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
     it(`目录结束于 PDF 第 ${tocEndPage} 页：确认目录即默认换算并启动，允许修改默认页码`, async () => {
       await prepare(tocEndPage);
       await click('选择本地文件');
+      await click('目录识别设置');
       await tickUntil(() => (document.querySelector('input[aria-label="目录结束页"]') as HTMLInputElement | null)?.value === String(tocEndPage));
-      await click('大模型智能提炼目录');
+      await click('识别目录');
       await tickUntil(() => [...document.querySelectorAll('button')].some(button => button.textContent?.includes('确认目录草稿') && !button.disabled));
       await click('确认目录草稿');
       await tickUntil(() => currentFlow?.step === 3);
@@ -248,8 +272,9 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
   it('保存失败保留草稿可重试；保存成功重进后自动读回目录，不重新探测或调用模型', async () => {
     await prepare(12);
     await click('选择本地文件');
+    await click('目录识别设置');
     await tickUntil(() => (document.querySelector('input[aria-label="目录结束页"]') as HTMLInputElement | null)?.value === '12');
-    await click('大模型智能提炼目录');
+    await click('识别目录');
     await tickUntil(() => [...document.querySelectorAll('button')].some(button => button.textContent?.includes('确认目录草稿') && !button.disabled));
     failSave = true; await click('确认目录草稿');
     await tickUntil(() => document.body.textContent?.includes('目录保存失败') === true);
@@ -266,8 +291,30 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
     expect(document.querySelector('input[aria-label="目录结束页"]')).toBeNull();
     expect([mapCalls, llmCalls]).toEqual(calls);
     expect(submitted).toBeUndefined();
-    await click('目录已保存，继续提取');
+    await click('继续整理内容');
+    expect(document.querySelector('input[aria-label="第1课 PDF 起始页"]')).toBeNull();
+    expect(document.querySelector('input[aria-label="教材提取并发数量"]')).toBeNull();
+    expect(document.body.textContent).toContain('user-selected-model · low · 2 个 Worker');
+    expect(document.querySelector('input[aria-label="首响应超时（毫秒）"]')).toBeNull();
+    await click('调整正文页码');
     expect((document.querySelector('input[aria-label="第1课 PDF 起始页"]') as HTMLInputElement | null)?.value).toBe('14');
+    await click('调整正文页码');
+    await click('模型与并发');
+    const concurrency = document.querySelector<HTMLInputElement>('input[aria-label="教材提取并发数量"]')!;
+    expect(concurrency.value).toBe('2');
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(concurrency, '5');
+      concurrency.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await click('模型与并发');
+    expect(document.body.textContent).toContain('5 个 Worker');
+    const budgets = usePreferencesStore.getState().pipelineSettings;
+    await click('开始整理教材');
+    await tickUntil(() => Boolean(submitted));
+    expect(submitted?.model).toBe('user-selected-model');
+    expect(submitted?.effort).toBe('low');
+    expect(submitted?.poolSize).toBe(5);
+    expect(submitted).toMatchObject({ firstResponseTimeoutMs: budgets.firstResponseTimeoutMs, stallTimeoutMs: budgets.stallTimeoutMs });
   });
   it('原生路径选择后展示实际逐课内容，打开已有教材，重新检测更新完成状态', async () => {
     await prepare();
@@ -276,6 +323,8 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
     expect(picked).toBe(1);
     expect(currentFlow?.path).toBe(selectedPath);
     expect(document.body.textContent).toContain('1/2 个部分就绪');
+    expect(document.querySelector('tbody')).toBeNull();
+    await click('按目录核对已保存内容');
     const rows = [...document.querySelectorAll('tbody tr')];
     expect(rows).toHaveLength(2);
     expect(rows[0]?.textContent).toContain('第1课已就绪已保存723');

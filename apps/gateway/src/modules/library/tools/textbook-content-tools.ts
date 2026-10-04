@@ -14,12 +14,12 @@ export interface ChapterContentAssignment {
   onStage?: (stage: 'validating' | 'correcting' | 'saving' | 'saved' | 'extracting') => void;
 }
 const descriptions: Record<TextbookContentKind, string> = {
-  grammar: '管理本课知识点、用法或发音知识。填写标题、说明和例句；AI 补充讲解放 aiExplanation。',
-  vocabulary: '管理本课词汇。填写词面、读音、释义及估计等级 ' + JlptLevelSchema.options.join('|') + '，可提供词性、讲解和例句。最终事务新增全局缺失词，已有词复用、不覆盖。等级不是掌握度。',
+  grammar: '管理本课知识点、用法或发音知识。explanation 为规则说明，aiExplanation 为独立的 AI 补充，UI 按 Markdown 渲染这两个字段，可用段落、列表、加粗和表格；卡片已展示 title，说明不必重复大标题。title、connection 和 examples 的 text/translation 按普通文本展示，例句单独填写，不混进说明。',
+  vocabulary: '管理本课词汇。填写词面、读音、释义及估计等级 ' + JlptLevelSchema.options.join('|') + '，可提供词性、讲解和例句。explanation 按 Markdown 渲染；word、reading、meaning、partOfSpeech、pitch 和例句 text/translation 按普通文本展示，讲解不要混入释义。最终事务新增全局缺失词，已有词复用、不覆盖。等级不是掌握度。',
   exercises: '管理本课练习。填写题型、题干、difficultyTier（复杂度 1–5）及 difficultyReason。选择题和排序题均需 options（至少两项），待排序词块不能只写在题干里。单选 answer 用一个选项文字，多选用选项文字数组；排序 answer 用全部词块的有序数组，重复词块的次数与 options 一致。配对用左右文字配对，可复用右项；多空答案按空位顺序。翻译、简答和写作提供 gradingNotes，参考表达可省略。新增练习标注 source=AI。',
-  articles: '管理本课完整文章或会话。填写正文，可提供标题和译文；保留完整语境，不逐行拆成文章。没有文章无需调用。',
-  sentences: '管理本课可独立学习的句子。填写句子，可提供译文、讲解或说话人。没有句子无需调用。',
-  material: '管理本课的一份整理材料，items 中填写 text，保留有意义的标题、列表和表格。没有材料无需调用。',
+  articles: '管理本课完整文章或会话。title、text、translation 按普通文本展示，不添加 Markdown 标记；正文和译文分开填写，换行分段。保留完整语境，不逐行拆成文章。没有文章无需调用。',
+  sentences: '管理本课可独立学习的句子。explanation 按 Markdown 渲染，可用段落、列表和加粗；text、translation、speaker 按普通文本展示，句子和译文分开填写。没有句子无需调用。',
+  material: '管理本课的一份整理材料，items 中填写 text。UI 按保留换行的普通文本展示，不解析 Markdown；保留有意义的结构，使用文本标题和分行。没有材料无需调用。',
 };
 const names: Record<TextbookContentKind, string> = { grammar: 'knowledge', vocabulary: 'vocabulary', exercises: 'exercises', articles: 'articles', sentences: 'sentences', material: 'material' };
 
@@ -117,7 +117,7 @@ export class TextbookContentTool implements ToolDefinition<unknown, unknown> {
   readonly permission = ToolPermissions.WRITE;
   constructor(readonly owner: TextbookContentTools, readonly kind: TextbookContentKind) {
     this.name = 'library.' + names[kind];
-    this.description = descriptions[kind] + ' 可选字段没有值就省略，不填空字符串。action 默认 add；read 查询当前课视图；update 在 items 中填回执 ref 和完整内容；delete 填 refs。新增不填 ref；已有相同内容先 read 后 update，不重复新增。ref 仅当前章当前尝试有效，重试后先 read 获取新 ref，不沿用上一轮引用。调用只暂存，模型正常结束后系统统一事务保存；不填写数据库身份或页码。';
+    this.description = descriptions[kind] + (kind === 'exercises' ? ' 本工具的题干、选项、答案、explanation 和 gradingNotes 使用普通文本，不加 Markdown 标记；题型由交互组件渲染。' : '') + ' Markdown 仅写在声明支持的字段中，不输出 HTML，不把整个字段包在 Markdown 代码围栏中。可选字段没有值就省略，不填空字符串。action 默认 add；read 查询当前课视图；update 在 items 中填回执 ref 和完整内容；delete 填 refs。新增不填 ref；已有相同内容先 read 后 update，不重复新增。ref 仅当前章当前尝试有效，重试后先 read 获取新 ref，不沿用上一轮引用。调用只暂存，模型正常结束后系统统一事务保存；不填写数据库身份或页码。';
     this.schema = TextbookContentOperationSchemas[kind];
   }
   async execute(input: unknown, context: ToolExecutionContext): Promise<Result<unknown, BusinessError>> {

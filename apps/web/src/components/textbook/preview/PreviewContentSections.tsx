@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from 'react';
-import { BookmarkCheck, BookmarkPlus, ChevronDown, Lightbulb } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus, ChevronDown } from 'lucide-react';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible.js';
 import { UnifiedTtsPlayer } from '../../UnifiedTtsPlayer.js';
 import { trackToSpeechLang } from '../../../config/speech-language.js';
 import type { StudyContentProps } from './study-view.js';
+import { KnowledgeCard } from './KnowledgeCard.js';
+import { MarkdownText } from '../../common/MarkdownText.js';
 
 type Props = StudyContentProps;
 const panel = 'rounded-2xl border border-line-soft bg-paper-soft p-6';
@@ -38,21 +40,13 @@ export function PreviewVocabulary({ content, showTranslation, language, explain 
       <div className="mt-3 flex flex-wrap gap-2"><UnifiedTtsPlayer text={word.word} lang={trackToSpeechLang(language)} label="听读词汇" />{explain({ title: '词汇讲解', text: word.word, translation: word.meaning, ...(word.explanation ? { explanation: word.explanation } : {}) }, '用法与 AI 讲解')}</div>
       {showTranslation ? <p className="mt-3 font-medium">{word.meaning}</p> : <Disclosure label="查看词义"><p>{word.meaning}</p></Disclosure>}
       {!!word.examples.length && <div className="mt-4 border-t border-line-soft pt-4 space-y-3">{word.examples.map((example, index) => <div key={index}><p className="leading-7">{example.text}</p>{showTranslation && example.translation && <p className="mt-1 text-sm text-ink-muted">{example.translation}</p>}</div>)}</div>}
-      {word.explanation && <p className="mt-3 text-sm leading-6 text-ink-muted">{word.explanation}</p>}
+      {word.explanation && <div className="mt-3 text-sm leading-6 text-ink-muted"><MarkdownText text={word.explanation} /></div>}
     </article>;
   })}</div>;
 }
 
-export function PreviewGrammar({ content, showTranslation, language, explain }: Props) {
-  return <div className="space-y-5">{content.grammar.map((point, index) => <article key={point.id} className={panel}>
-    <div className="mb-4 flex items-center gap-2"><Badge variant="amber">{point.kind === 'PRONUNCIATION' ? '发音' : point.kind === 'USAGE' ? '用法' : '语法'}</Badge><span className="ml-auto text-xs tabular-nums text-ink-muted">{String(index + 1).padStart(2, '0')}</span></div>
-    <h3 className="text-xl font-semibold">{point.title}</h3>
-    <div className="mt-3">{explain({ title: point.title, text: point.title, knowledgeTitles: [point.title] }, '讲解与追问')}</div>
-    {point.connection && <p className="mt-4 rounded-xl bg-wash-amber-500o10 px-4 py-3 font-medium text-accent-ink">{point.connection}</p>}
-    <p className="mt-4 whitespace-pre-wrap text-sm leading-7">{point.explanation}</p>
-    {!!point.examples.length && <div className="mt-5 space-y-3 border-l-2 border-line-accent pl-4">{point.examples.map((example, i) => <div key={i}><div className="flex items-center gap-2"><p className="leading-7">{example.text}</p><UnifiedTtsPlayer text={example.text} lang={trackToSpeechLang(language)} variant="inline" /></div>{showTranslation && example.translation && <p className="text-sm text-ink-muted">{example.translation}</p>}</div>)}</div>}
-    {point.aiExplanation && <Disclosure label={<><Lightbulb className="h-4 w-4" />换个角度理解<Badge variant="outline">AI 补充</Badge></>}><p>{point.aiExplanation}</p></Disclosure>}
-  </article>)}</div>;
+export function PreviewGrammar({ content, showTranslation, language, ask }: Props) {
+  return <div className="space-y-5">{content.grammar.map((point, index) => <KnowledgeCard key={point.id} point={point} index={index} language={language} showTranslation={showTranslation} onAsk={ask} />)}</div>;
 }
 
 export function PreviewSentences({ content, showTranslation, language, explain }: Props) {
@@ -60,6 +54,6 @@ export function PreviewSentences({ content, showTranslation, language, explain }
     <div className="flex items-center gap-3"><span className="text-sm tabular-nums text-accent-ink">{String(index + 1).padStart(2, '0')}</span><p className="text-xl leading-9">{sentence.speaker && `${sentence.speaker}：`}{sentence.text}</p></div>
     <div className="mt-3 flex flex-wrap gap-2"><UnifiedTtsPlayer text={sentence.text} lang={trackToSpeechLang(language)} label="听读 / 跟读" />{explain({ title: '句子讲解', text: sentence.text, ...(sentence.translation ? { translation: sentence.translation } : {}), ...(sentence.explanation ? { explanation: sentence.explanation } : {}) }, '讲解')}</div>
     {showTranslation && sentence.translation && <p className="mt-2 pl-7 text-sm text-ink-muted">{sentence.translation}</p>}
-    {(sentence.explanation || (!showTranslation && sentence.translation)) && <Disclosure label="查看译文与用法">{!showTranslation && sentence.translation && <p>{sentence.translation}</p>}{sentence.explanation && <p className="mt-2">{sentence.explanation}</p>}</Disclosure>}
+    {(sentence.explanation || (!showTranslation && sentence.translation)) && <Disclosure label="查看译文与用法">{!showTranslation && sentence.translation && <p>{sentence.translation}</p>}{sentence.explanation && <div className="mt-2"><MarkdownText text={sentence.explanation} /></div>}</Disclosure>}
   </article>)}</div>;
 }

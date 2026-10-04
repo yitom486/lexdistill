@@ -85,8 +85,10 @@ it('桌面解析选择与资源配置 → Gateway → MinerU V1 HTTP → 工具 
     }
     async function until(check: () => boolean) { for (let attempt = 0; attempt < 160; attempt++) { if (check()) return; await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); }); } throw new Error('桌面贯通状态没有更新'); }
     await act(async () => { dom.root.render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>); });
-    await until(() => reads.some(path => path.endsWith('/textbook-parsers/config')));
     const doc = dom.dom.window.document;
+    expect(doc.querySelector('[aria-label="扫描正文解析方式"]')).toBeNull();
+    await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.startsWith('更多设置'))!.click());
+    await until(() => reads.some(path => path.endsWith('/textbook-parsers/config')));
     await act(async () => doc.querySelector<HTMLButtonElement>('[aria-label="扫描正文解析方式"]')!.click());
     await until(() => !![...doc.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent?.includes('本地部署')));
     const localOption = [...doc.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent?.includes('本地部署'))!;
@@ -96,20 +98,23 @@ it('桌面解析选择与资源配置 → Gateway → MinerU V1 HTTP → 工具 
     const address = doc.querySelector<HTMLInputElement>('[aria-label="本地 MinerU 服务地址"]')!;
     await act(async () => { Object.getOwnPropertyDescriptor(dom.dom.window.HTMLInputElement.prototype, 'value')!.set!.call(address, service.url.href); address.dispatchEvent(new dom.dom.window.Event('input', { bubbles: true })); });
     expect(usePreferencesStore.getState().pipelineSettings.mineruLocalUrl).toBe(service.url.href);
-    const repairs = doc.querySelector<HTMLInputElement>('[aria-label="每轮工具修正次数"]')!;
+    await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.startsWith('等待与重试'))!.click());
+    const repairs = doc.querySelector<HTMLInputElement>('[aria-label="工具修正次数"]')!;
     await act(async () => { Object.getOwnPropertyDescriptor(dom.dom.window.HTMLInputElement.prototype, 'value')!.set!.call(repairs, '2'); repairs.dispatchEvent(new dom.dom.window.Event('input', { bubbles: true })); });
     expect(usePreferencesStore.getState().pipelineSettings.toolRepairRetries).toBe(2);
     await act(async () => { usePreferencesStore.getState().setPipelineSettings({ parseConcurrency: 1, parseTimeoutMs: 3000, parseRetries: 0 }); await usePreferencesStore.persist.rehydrate(); });
     expect(usePreferencesStore.getState().pipelineSettings.parserBackend).toBe('mineru-local');
-    async function start() { await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '开始提取并保存教材')!.click()); }
+    async function start() { await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '开始整理教材')!.click()); }
     await start();
     await modelWaiting.promise;
     const runningJobId = registry.getActive('desktop-owner')!.jobId;
     const runningSnapshot = await requestPipelineJob('desktop-owner', runningJobId);
     await act(async () => usePipelineJobStore.getState().setActiveJob(runningSnapshot));
-    await until(() => !!doc.body.textContent?.includes('提交拒绝 1 次'));
+    await until(() => !!doc.body.textContent?.includes('第 1 次尝试'));
+    expect(runningSnapshot?.lessonActivities?.['part']?.correctionCount).toBe(1);
+    expect(doc.body.textContent).not.toContain('提交拒绝 1 次');
     expect(doc.body.textContent).toContain('第 1 次尝试'); expect(doc.body.textContent).toContain('最近活动');
-    expect(doc.body.textContent).toContain('原生轮次已启动'); expect(doc.body.textContent).toContain('已处理 0/1');
+    expect(runningSnapshot?.lessonActivities?.['part']?.nativeTurnId).toBeTruthy(); expect(doc.body.textContent).toContain('已处理 0/1');
     releaseModel.resolve();
     await until(() => model.inputs.length === 1 && registry.getActive('desktop-owner') === null);
     await act(async () => usePipelineJobStore.getState().setActiveJob(await requestPipelineJob('desktop-owner', runningJobId)));

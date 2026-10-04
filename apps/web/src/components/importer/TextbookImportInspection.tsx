@@ -1,6 +1,7 @@
 import type { TextbookInspectionDocSummary, TextbookInspectionResult } from '@study-studio/protocol';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
+import { ImportOptions } from './ImportOptions.js';
 
 interface Props {
   result: TextbookInspectionResult | undefined;
@@ -15,7 +16,7 @@ interface Props {
 /** 所有数量和逐课状态均来自 Gateway 的实际数据库查询。 */
 export function TextbookImportInspection({ result, document: doc, pending, error, onRecheck, onContinue, onUse }: Props) {
   return (
-    <section className="space-y-3 rounded-2xl border border-line bg-surface p-4 text-xs" aria-label="教材导入检测">
+    <section className="space-y-3 rounded-2xl border border-line-soft bg-paper-soft p-5 text-sm text-ink" aria-label="教材导入检测">
       <div className="flex items-center justify-between gap-3">
         <span className="font-semibold text-ink">已导入内容检测</span>
         <Button size="sm" variant="outline" disabled={pending} onClick={onRecheck}>
@@ -39,8 +40,7 @@ export function TextbookImportInspection({ result, document: doc, pending, error
             已通过文件指纹确认是同一份 PDF。
             {doc.outlineConfirmed ? '完成情况以已确认目录为准，请对照原书核对内容。' : '目录尚未确认。'}
           </p>
-          <details className="rounded-xl border border-line p-3" open>
-            <summary className="cursor-pointer font-semibold text-ink">按目录核对已保存内容</summary>
+          <ImportOptions title="按目录核对已保存内容">
             <div className="mt-2 max-h-64 overflow-auto">
               <table className="w-full text-left">
                 <thead><tr className="text-ink-muted">
@@ -59,7 +59,7 @@ export function TextbookImportInspection({ result, document: doc, pending, error
                 ))}</tbody>
               </table>
             </div>
-          </details>
+          </ImportOptions>
           <p className="text-ink-muted">数量为 0 表示当前未保存该类内容；是否原书没有该项，请按课核对。</p>
           <div className="flex flex-wrap justify-end gap-2">
             <Button size="sm" variant="outline" onClick={onContinue}>继续检查目录</Button>

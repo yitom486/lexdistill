@@ -20,8 +20,9 @@ function linkClick(e: React.MouseEvent<HTMLAnchorElement>) {
  * - 'adaptive'（默认）：跟随应用明暗主题（导师抽屉等浅色底面板）。
  * - 'dark'：强制深色底浅色字（Agent 对话面板恒为深色，不依赖 html.dark）。
  */
-export function MarkdownText({ text, surface = 'adaptive' }: { text: string; surface?: 'adaptive' | 'dark' }) {
+export function MarkdownText({ text, surface = 'adaptive', variant = 'default' }: { text: string; surface?: 'adaptive' | 'dark'; variant?: 'default' | 'lesson' }) {
   const dark = surface === 'dark';
+  const lesson = variant === 'lesson';
   const components: Components = {
     a: ({ href, children }) => (
       <a
@@ -32,7 +33,7 @@ export function MarkdownText({ text, surface = 'adaptive' }: { text: string; sur
         {children}
       </a>
     ),
-    p: ({ children }) => <p className="my-1.5 first:mt-0 last:mb-0 leading-relaxed">{children}</p>,
+    p: ({ children }) => <p className={lesson ? 'my-3 first:mt-0 last:mb-0 leading-7' : 'my-1.5 first:mt-0 last:mb-0 leading-relaxed'}>{children}</p>,
     ul: ({ children }) => <ul className="my-1.5 list-disc space-y-1 pl-5">{children}</ul>,
     ol: ({ children }) => <ol className="my-1.5 list-decimal space-y-1 pl-5">{children}</ol>,
     li: ({ children }) => <li className="leading-relaxed">{children}</li>,
@@ -78,9 +79,17 @@ export function MarkdownText({ text, surface = 'adaptive' }: { text: string; sur
         {children}
       </div>
     ),
+    ...(lesson ? {
+      h1: ({ children }) => <h4 className="mb-2 mt-5 text-base font-semibold first:mt-0">{children}</h4>,
+      h2: ({ children }) => <h4 className="mb-2 mt-5 text-base font-semibold first:mt-0">{children}</h4>,
+      h3: ({ children }) => <h5 className="mb-2 mt-4 font-semibold first:mt-0">{children}</h5>,
+      table: ({ children }) => <div className="my-4 overflow-x-auto"><table className="w-full border-collapse text-left text-sm">{children}</table></div>,
+      th: ({ children }) => <th className="border-b border-line px-3 py-2 font-semibold">{children}</th>,
+      td: ({ children }) => <td className="border-b border-line-soft px-3 py-2">{children}</td>,
+    } satisfies Components : {}),
   };
   return (
-    <div className="markdown-body text-xs sm:text-sm leading-relaxed">
+    <div className={lesson ? 'markdown-body min-w-0 break-words text-sm leading-7 text-ink' : 'markdown-body text-xs sm:text-sm leading-relaxed'}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {text}
       </ReactMarkdown>

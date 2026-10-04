@@ -33,7 +33,7 @@ export function LearningPreviewPage({ content, bookTitle, bookId = '', chapterTi
   const selected = categories.find(category => category.key === active);
   const next = categories[categories.findIndex(category => category.key === active) + 1];
   const explain = (detail: StudyDetail, label: string, disabled = false) => <StudyExplanation key={`${detail.title}-${detail.text}`} detail={detail} label={label} disabled={disabled} content={content} language={language} onAsk={onAskAiTutor ? (text, context) => onAskAiTutor(text, `教材：${bookTitle}\n章节：${chapterTitle}\n语种：${language}\n${context}\n请解释当前选中表达，结合本课语境说明用法与注意点。`) : undefined} />;
-  const props = { content, showTranslation, language, explain };
+  const props = { content, showTranslation, language, explain, ask: onAskAiTutor ? (text: string, context: string) => onAskAiTutor(text, `教材：${bookTitle}\n章节：${chapterTitle}\n语种：${language}\n${context}\n请围绕当前知识点回答，结合例句说明。`) : undefined };
   return <div className="flex min-h-0 flex-1 flex-col bg-surface-warm text-ink" data-testid="learning-preview-page">
     <header className="border-b border-line-soft bg-paper-soft px-7 py-6 sm:px-9">
       <div className="mb-3 flex items-center gap-2 text-xs text-ink-muted"><BookOpen className="h-4 w-4 text-accent-ink" /><span>{bookTitle}</span><ChevronRight className="h-3 w-3" /><span>本课学习</span></div>

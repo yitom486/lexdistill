@@ -145,8 +145,13 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   await click(tab('知识点'));
   expect(activePanel().textContent).toContain('用法');
   expect(activePanel().textContent).not.toContain('先判断物品靠近谁');
-  await click(button(activePanel(), '换个角度理解'));
+  await click(button(activePanel(), '补充说明'));
   expect(activePanel().textContent).toContain('先判断物品靠近谁');
+  await click(button(activePanel(), '向 AI 追问'));
+  expect(tutorRequests.at(-1)?.context).toContain(previewLesson.content.grammar[0]!.explanation);
+  expect(tutorRequests.at(-1)?.context).toContain(previewLesson.content.grammar[0]!.examples[0]!.text);
+  expect(tutorRequests.at(-1)?.context).toContain(previewLesson.chapterTitle);
+  expect(activePanel().querySelector('[data-testid="inline-explanation"]')).toBeNull();
 
   await click(tab('练习'));
   const single = doc.querySelector<HTMLElement>('article[aria-label="练习 1：单选"]')!;
@@ -294,4 +299,41 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   await settle();
   expect(doc.querySelectorAll('[role="tab"]')).toHaveLength(1);
   expect(tab('词汇')?.getAttribute('aria-selected')).toBe('true');
+  const pronunciation = previewBooks[0]!.chapters.find(chapter => chapter.id === 'preview-pronunciation')!;
+  navigation.setState({ showTranslation: false });
+  await act(async () => { dom!.root.render(<QueryClientProvider client={client!}><LearningPreviewPage key="pronunciation" content={pronunciation.content} bookTitle={previewBooks[0]!.title} chapterTitle={pronunciation.title} chapterId={pronunciation.id} subtitle={pronunciation.subtitle} language="JA" onAskAiTutor={(text, context) => tutorRequests.push({ text, context })} /></QueryClientProvider>); });
+  await settle();
+  const card = activePanel().querySelector('article')!;
+  expect(card.querySelectorAll('section[aria-label="规则与说明"] li')).toHaveLength(2);
+  expect(card.querySelector('section[aria-label="规则与说明"] strong')?.textContent).toBe('延长一拍');
+  expect(card.querySelector('section[aria-label="听读对比"]')?.textContent).not.toContain('阿姨');
+  const soundButton = card.querySelector<HTMLButtonElement>('section[aria-label="听读对比"] button')!;
+  await click(soundButton);
+  expect(spoken.at(-1)?.text).toBe(pronunciation.content.grammar[0]!.examples[0]!.text);
+  expect(spoken.at(-1)?.text).not.toContain('###');
+  await click(doc.querySelector<HTMLElement>('[role="switch"]'));
+  expect(card.querySelector('section[aria-label="听读对比"]')?.textContent).toContain('阿姨');
+  await click(button(card, '补充说明'));
+  expect(card.textContent).toContain('先慢读两个词');
+  await click(button(card, '补充说明'));
+  expect(card.textContent).not.toContain('先慢读两个词');
+  await click(button(card, '向 AI 追问'));
+  expect(tutorRequests.at(-1)?.context).toContain('长音（ちょうおん）');
+  expect(tutorRequests.at(-1)?.context).toContain('カード。');
+  expect(tutorRequests.at(-1)?.context).toContain('核心规则');
+  expect(doc.querySelector('[role="dialog"]')).toBeNull();
+  const markdownContent = { ...previewLesson.content, grammar: [], articles: [], exercises: [],
+    vocabulary: [{ ...previewLesson.content.vocabulary[0]!, meaning: '**词义按普通文本展示**', explanation: '- **名词用法**：表示书。\n- 讲解与词义分开。' }],
+    sentences: [{ ...previewLesson.content.sentences[0]!, explanation: '**句子用法**\n\n- 先判断物品的位置。' }],
+  };
+  await act(async () => { dom!.root.render(<QueryClientProvider client={client!}><LearningPreviewPage key="markdown-fields" {...previewLesson} content={markdownContent} /></QueryClientProvider>); });
+  await settle();
+  await click(tab('词汇'));
+  expect(activePanel().querySelector('strong')?.textContent).toBe('名词用法');
+  expect(activePanel().querySelectorAll('li')).toHaveLength(2);
+  expect(activePanel().textContent).toContain('**词义按普通文本展示**');
+  await click(tab('句子'));
+  await click(button(activePanel(), '查看译文与用法'));
+  expect(activePanel().querySelector('strong')?.textContent).toBe('句子用法');
+  expect(activePanel().querySelector('li')?.textContent).toBe('先判断物品的位置。');
 });

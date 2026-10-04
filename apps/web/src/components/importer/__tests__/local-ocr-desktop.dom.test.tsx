@@ -80,8 +80,10 @@ it('桌面默认直接读图、保留云端与本地手动选择，Query → Gat
       await act(async () => option.focus()); await act(async () => option.click());
     }
     expect(doc.querySelector('[aria-label="本地 MinerU 服务地址"]')).toBeNull();
+    expect(doc.querySelector('[aria-label="扫描正文解析方式"]')).toBeNull();
+    await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.startsWith('更多设置'))!.click());
     expect(doc.body.textContent).toContain('无需 OCR 或 MinerU');
-    await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '开始提取并保存教材')!.click());
+    await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '开始整理教材')!.click());
     await until(() => submitted.length === 1 && registry.getActive('ocr-desktop') === null && model.inputs.length === 1);
     expect(submitted[0]).toMatchObject({ parserBackend: 'model-vision' });
     expect(renders).toBe(1); expect(calls).toBe(0); expect(model.inputs[0]?.input.attachments).toHaveLength(1);
@@ -92,7 +94,7 @@ it('桌面默认直接读图、保留云端与本地手动选择，Query → Gat
     await choose('本地 OCR');
     await act(async () => usePreferencesStore.persist.rehydrate());
     expect(usePreferencesStore.getState().pipelineSettings.parserBackend).toBe('local-ocr');
-    await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '开始提取并保存教材')!.click());
+    await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '开始整理教材')!.click());
     await until(() => submitted.length === 2 && registry.getActive('ocr-desktop') === null && model.inputs.length === 2);
     expect(submitted[1]).toMatchObject({ parserBackend: 'local-ocr' });
     expect(calls).toBe(1); expect(model.inputs[1]?.input.message).toContain('本地识别教材内容');

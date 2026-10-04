@@ -17,6 +17,7 @@ export interface StudyDetail {
 }
 export interface StudyActions {
   language: string;
+  ask?: ((text: string, context: string) => void) | undefined;
   explain: (detail: StudyDetail, label: string, disabled?: boolean) => ReactNode;
 }
 export type StudyContentProps = StudyActions & { content: TextbookLearningContent; showTranslation: boolean };
