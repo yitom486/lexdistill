@@ -6,6 +6,8 @@ import {
   Code2,
   FileUp,
   AlertCircle,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TextbookAST } from '@study-studio/document-model';
@@ -46,6 +48,7 @@ export function TextbookImporterModal({
   onSelectBook,
 }: TextbookImporterModalProps) {
   const [activeTab, setActiveTab] = useState<'pipeline' | 'json'>('pipeline');
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [inputText, setInputText] = useState<string>('');
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsedAST, setParsedAST] = useState<TextbookAST | null>(null);
@@ -114,22 +117,49 @@ export function TextbookImporterModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 bg-surface-warm text-ink"
+        className={`overflow-hidden flex flex-col p-0 gap-0 bg-surface-warm text-ink transition-all duration-300
+          ${isExpanded 
+            ? 'w-[96vw] max-w-[96vw] h-[94vh] max-h-[94vh] rounded-2xl' 
+            : 'w-[92vw] max-w-5xl lg:max-w-6xl h-[88vh] max-h-[88vh] rounded-2xl'
+          }`}
         showCloseButton
       >
-        <DialogHeader className="px-6 py-5 border-b border-line-soft bg-paper-soft text-left">
-          <div className="flex items-center gap-2.5 pr-8">
-            <div className="p-2 rounded-xl bg-surface border border-line text-ink">
-              <BookOpen className="w-5 h-5" />
+        <DialogHeader className="px-6 py-4.5 border-b border-line-soft bg-paper-soft text-left shrink-0">
+          <div className="flex items-center justify-between pr-10">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-surface border border-line text-ink">
+                <BookOpen className="w-5 h-5 text-accent-ink" />
+              </div>
+              <div>
+                <DialogTitle className="font-serif text-lg font-bold text-ink">
+                  教材导入与智能提炼中枢
+                </DialogTitle>
+                <DialogDescription className="text-xs text-ink-muted">
+                  选取教材、对齐目录物理页码，调动 Agent 并发池进行多会话结构化提炼入库。
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className="font-serif text-xl text-ink">
-                导入教材
-              </DialogTitle>
-              <DialogDescription className="text-xs text-ink-muted">
-                选择教材，核对目录，再整理成可学习的内容。
-              </DialogDescription>
-            </div>
+
+            {/* 宽屏全屏视界切换按钮 */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-xs text-ink-muted hover:text-ink hidden md:flex items-center gap-1.5 h-8 px-2.5"
+              title={isExpanded ? '缩小窗口' : '沉浸全屏'}
+            >
+              {isExpanded ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  <span>还原</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>宽屏大视界</span>
+                </>
+              )}
+            </Button>
           </div>
         </DialogHeader>
 
@@ -138,7 +168,7 @@ export function TextbookImporterModal({
           onValueChange={(value) => { if (value === 'pipeline' || value === 'json') setActiveTab(value); }}
           className="w-full flex-1 flex flex-col min-h-0"
         >
-          <div className="px-6 pt-2 pb-0 border-b border-line flex items-center justify-between">
+          <div className="px-6 pt-2 pb-0 border-b border-line flex items-center justify-between bg-surface shrink-0">
             <TabsList className="h-9">
               <TabsTrigger value="pipeline" className="text-xs gap-1.5">
                 <FileUp className="w-3.5 h-3.5" />
@@ -190,20 +220,20 @@ export function TextbookImporterModal({
             </TabsContent>
 
             {parseError && (
-              <div className="p-3 rounded-xl bg-wash-rose-500o10 border border-line-rose-500o20 flex items-start gap-2 text-ink-rose-700-rose-400 text-xs">
+              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-2.5 text-rose-600 dark:text-rose-400 text-xs">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                 <span className="leading-relaxed">{parseError}</span>
               </div>
             )}
 
             {activeTab === 'json' && parsedAST && (
-              <div className="p-4 rounded-2xl bg-wash-amber-500o10 border border-line-amber-900o10-amber-500o20 flex items-center justify-between">
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
                 <div className="space-y-0.5">
                   <div className="text-xs font-bold text-ink flex items-center gap-1.5">
                     <Layers className="w-4 h-4 text-accent-ink" />
                     自动为全课生词生成 FSRS 记忆卡片
                   </div>
-                  <p className="text-[11px] text-ink-ghost">
+                  <p className="text-[11px] text-ink-muted">
                     将提取{' '}
                     {parsedAST.lessons.reduce((acc, l) => acc + l.vocabularies.length, 0)}{' '}
                     个生词直接注入今日复习池
@@ -215,15 +245,17 @@ export function TextbookImporterModal({
           </div>
         </Tabs>
 
-        {activeTab === 'json' && <div className="flex items-center justify-between px-6 py-4 border-t border-line-soft bg-paper-soft">
-          <Button variant="ghost" onClick={onClose}>
-            取消
-          </Button>
-          <Button disabled={!parsedAST} onClick={handleConfirmImport}>
-            确认导入并激活
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Button>
-        </div>}
+        {activeTab === 'json' && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-line-soft bg-paper-soft shrink-0">
+            <Button variant="ghost" onClick={onClose} className="text-xs">
+              取消
+            </Button>
+            <Button disabled={!parsedAST} onClick={handleConfirmImport} className="text-xs">
+              确认导入并激活
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
