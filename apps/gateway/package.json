@@ -4,6 +4,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@mozilla/readability": "^0.6.0",
     "@study-studio/agent-runtime": "workspace:*",
     "@study-studio/ai-content": "workspace:*",
@@ -20,10 +21,10 @@
     "@study-studio/speech": "workspace:*",
     "@study-studio/storage-sqlite": "workspace:*",
     "@study-studio/tool-core": "workspace:*",
-    "agentpools": "^0.1.0",
+    "agentpools": "^0.1.4",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.13.5",
     "gemini-tts-studio": "0.3.1",
+    "hono": "^4.13.5",
     "jsdom": "^30.0.1",
     "pdf-lib": "1.17.1"
   },
