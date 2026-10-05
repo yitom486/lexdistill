@@ -1,7 +1,7 @@
 /**
  * PDF 导入运行时构件清单（按需下载，不进安装包）。
  *
- * 约束（用户决策 2026-09-06）：pdf-inspector 绑定、PDFium、ONNX Runtime、OCR 模型
+ * 约束（用户决策 2026-09-06）：pdf-inspector 绑定与 PDFium
  * 一律不打包进 Tauri 安装包 / 网关 sidecar，首次使用时由网关下载到用户数据目录
  * （STUDY_STUDIO_RUNTIME_DIR，默认用户主目录下 .study-studio/runtime），并校验完整性。
  *
@@ -11,8 +11,6 @@
  *  （2026-09-10 下载 5 个包逐个 certutil 测得；repo yitom486/pdf-inspector，
  *   tag inkdown-napi-v1.18.2-inkdown.1，资产 7 tgz + 2 源码包）；
  * - PDFium：上游 release SHA256SUMS（native-v7988，2026-09-06 实测下载比对一致）；
- * - ONNX Runtime：上游未给单文件摘要，仅做版本 + 域名白名单 + 体积 sanity 校验；
- * - OCR 模型：由 pdf-inspector 首次路由时自行下载并 SHA-256 校验（见其 ocr-runtime 文档）。
  */
 
 export const PDF_INSPECTOR_VERSION = '1.18.2-inkdown.1';
@@ -40,14 +38,10 @@ export interface PlatformArtifactPins {
   /** PDFium 压缩包直链 + 官方 sha256（hex） */
   pdfiumUrl: string;
   pdfiumSha256: string;
-  /** ONNX Runtime 压缩包直链（上游无单文件摘要，仅白名单 + 体积校验） */
-  ortUrl: string;
   pdfiumLibName: string;
-  ortLibName: string;
 }
 
 const PDFIUM_TAG = 'native-v7988';
-const ORT_VERSION = '1.27.0';
 
 export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins> = {
   'win32-x64': {
@@ -58,9 +52,7 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-win-x64.tgz`,
     pdfiumSha256: '6f398552d8021a89078f64466557251a204999177287b876be49877eb8750d50',
-    ortUrl: `https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-win-x64-${ORT_VERSION}.zip`,
     pdfiumLibName: 'pdfium.dll',
-    ortLibName: 'onnxruntime.dll',
   },
   'linux-x64': {
     napiPkg: '@firecrawl/pdf-inspector-linux-x64-gnu',
@@ -70,9 +62,7 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-linux-x64.tgz`,
     pdfiumSha256: '6248189e07bbc33cdeb31976c539a88614307c8a19f3276dbd018efbe5b4a2a2',
-    ortUrl: `https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz`,
     pdfiumLibName: 'libpdfium.so',
-    ortLibName: 'libonnxruntime.so',
   },
   'darwin-arm64': {
     napiPkg: '@firecrawl/pdf-inspector-darwin-arm64',
@@ -82,9 +72,7 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-mac-arm64.tgz`,
     pdfiumSha256: '4168356c2e62ad5e79553e2e9162f5c99949759d90cb83876a50311f0c32b9b3',
-    ortUrl: `https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-osx-arm64-${ORT_VERSION}.tgz`,
     pdfiumLibName: 'libpdfium.dylib',
-    ortLibName: 'libonnxruntime.dylib',
   },
   'linux-arm64': {
     napiPkg: '@firecrawl/pdf-inspector-linux-arm64-gnu',
@@ -95,9 +83,7 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
     },
     pdfiumUrl: `https://github.com/firecrawl/pdfium-rs/releases/download/${PDFIUM_TAG}/firecrawl-pdfium-linux-arm64.tgz`,
     pdfiumSha256: '',
-    ortUrl: `https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-aarch64-${ORT_VERSION}.tgz`,
     pdfiumLibName: 'libpdfium.so',
-    ortLibName: 'libonnxruntime.so.1.27.0',
   },
 };
 
@@ -105,7 +91,6 @@ export const PLATFORM_ARTIFACTS: Record<PdfRuntimePlatform, PlatformArtifactPins
 export const ARTIFACT_HOST_ALLOWLIST = [
   'https://registry.npmjs.org/',
   'https://github.com/firecrawl/pdfium-rs/releases/download/',
-  'https://github.com/microsoft/onnxruntime/releases/download/',
   'https://github.com/yitom486/pdf-inspector/releases/download/',
 ] as const;
 

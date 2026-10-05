@@ -12,19 +12,18 @@ import {
   currentRuntimePlatform,
   type PdfRuntimePlatform,
 } from './pdf-artifacts.js';
-import { extractTarGz, extractZip, type ArchiveEntry } from '@study-studio/archive';
+import { extractTarGz, type ArchiveEntry } from '@study-studio/archive';
 
 /**
  * PDF 运行时管理器（按需下载，不进安装包）。
  *
  * - 首次导入 PDF 时下载 pdf-inspector（主包 + 对应平台 napi 包，~10MB）到用户数据目录；
- * - 遇到扫描页需要 OCR 时再下载 PDFium + ONNX Runtime + 由 pdf-inspector 自行校验的 OCR 模型；
+ * - Agent 按需查看扫描页时准备 PDFium；不下载 OCR 模型或 ONNX Runtime；
  * - 全部构件经域名白名单 + integrity/sha256 校验；缺 pin 的平台直接拒绝（不猜）。
  */
 
 export interface PdfInspectorLike {
   processPdf(pdf: Uint8Array, pages?: number[]): PdfClassifyResult;
-  processPdfWithOcr(pdf: Uint8Array, options?: { pageNumbers?: number[] }): Promise<PdfOcrResult>;
   /**
    * 可选：逐条文本+版式（pdf-inspector `extractTextWithPositions`）。
    * 老版本/阉割实现没有此方法时调用方降级为纯正则候选，不得抛。
@@ -112,41 +111,14 @@ export interface PdfClassifyResult {
   pdfType?: string;
   pageCount?: number;
   markdown?: string | null;
-  pagesNeedingOcr?: number[];
+
   confidence?: number;
-}
-
-export interface PdfOcrResult {
-  markdown?: string | null;
-  pages?: Array<{ pageNumber: number; markdown: string; spans?: OcrTextSpanLike[] }>;
-  pagesRoutedToOcr?: number[];
-  pagesRecommendingHosted?: number[];
-  pageCount?: number;
-  ocrTimeMs?: number;
-}
-
-/**
- * 行级 OCR 识别结果（fork 原生 `OcrTextSpan` 透传形状，与 TextItem 同坐标系）。
- * P3 只用它验证“同一行标题—右侧页码”几何关系；缺席即降级为纯文本证据。
- */
-export interface OcrTextSpanLike {
-  /** 识别行文本（已 trim）。 */
-  text: string;
-  /** 行包围盒（PDF 点，同 TextItem 系）。 */
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  /** 识别置信度 0–1。 */
-  confidence: number;
 }
 
 export interface PdfRuntimePaths {
   runtimeDir: string;
   inspectorDir: string;
-  modelCacheDir: string;
   pdfiumLib: string | null;
-  ortLib: string | null;
 }
 
 export interface EnsureRuntimeOptions {
@@ -154,11 +126,7 @@ export interface EnsureRuntimeOptions {
   loadInspector?: () => Promise<PdfInspectorLike>;
   runtimeDir?: string;
   fetchImpl?: typeof fetch;
-  needOcr?: boolean;
-  /**
-   * CMD-LINGUA-P4A-2：页面渲染只要 PDFium（不要 ORT/模型）。
-   * 与 needOcr 正交：只准备 pdfium 库 + PDFIUM_LIB_PATH，不碰 ORT 与模型缓存下载。
-   */
+  /** Agent 按需查看扫描页时准备 PDFium。 */
   needPdfium?: boolean;
   platform?: PdfRuntimePlatform;
   /**
@@ -182,9 +150,7 @@ export interface PdfRuntimeStageEvent {
   stage:
     | 'inspector_cached'
     | 'inspector_downloaded'
-    | 'ocr_cached'
-    | 'ocr_downloading'
-    | 'ocr_ready';
+    | 'pdfium_ready';
 }
 
 /** napi 包名（带 scope）→ node_modules/@firecrawl 下的目录名（去 scope）。 */
@@ -240,13 +206,10 @@ async function downloadArtifact(
   fetchImpl: typeof fetch,
   integrity?: string,
   sha256?: string,
-  // 仅用于上游不提供单文件摘要的构件（当前仅 ONNX Runtime）：
-  // 仍受域名白名单 + TLS + 体积上限保护，缺 pin 的事实在调用处注释说明。
-  allowUnpinned = false,
   signal?: AbortSignal
 ): Promise<Uint8Array> {
   assertArtifactUrlAllowed(url);
-  if (!integrity && !sha256 && !allowUnpinned) {
+  if (!integrity && !sha256) {
     throw new BusinessError(
       'E_RUNTIME_PIN_MISSING',
       '构件缺少完整性 pin，拒绝下载（请先登记官方摘要）',
@@ -271,10 +234,6 @@ async function downloadArtifact(
   const buf = new Uint8Array(await res.arrayBuffer());
   if (buf.length === 0 || buf.length > MAX_DOWNLOAD_BYTES) {
     throw new BusinessError('E_RUNTIME_DOWNLOAD', '构件体积异常，拒绝写入', 'TOOL_EXECUTION');
-  }
-  // ORT 上游无单文件摘要：至少校验体积量级（win x64 包约 70MB+），拦截下载截断
-  if (allowUnpinned && buf.length < 10 * 1024 * 1024) {
-    throw new BusinessError('E_RUNTIME_DOWNLOAD', '构件下载不完整（体积过小），请重试', 'NETWORK');
   }
   if (integrity) {
     const [algo, expected] = integrity.split('-', 2);
@@ -343,7 +302,6 @@ interface ManifestShape {
   version: 1;
   pdfInspector: string;
   platform: PdfRuntimePlatform;
-  withOcrLibs: boolean;
 }
 
 async function readManifest(runtimeDir: string): Promise<ManifestShape | null> {
@@ -362,9 +320,8 @@ function loadInspectorFromDir(inspectorDir: string): PdfInspectorLike {
     const req = createRequire(path.join(inspectorDir, 'index.js'));
     const mod = req(inspectorDir) as {
       processPdf?: unknown;
-      processPdfWithOcr?: unknown;
     };
-    if (typeof mod.processPdf !== 'function' || typeof mod.processPdfWithOcr !== 'function') {
+    if (typeof mod.processPdf !== 'function') {
       throw new Error('bad exports');
     }
     return mod as unknown as PdfInspectorLike;
@@ -381,7 +338,7 @@ export function ensurePdfRuntime(
   options: EnsureRuntimeOptions = {}
 ): Promise<{ inspector: PdfInspectorLike; paths: PdfRuntimePaths }> {
   const runtimeDir = options.runtimeDir ?? defaultRuntimeDir();
-  const key = `${runtimeDir}|ocr=${options.needOcr ? 1 : 0}|pdfium=${options.needPdfium ? 1 : 0}`;
+  const key = `${runtimeDir}|pdfium=${options.needPdfium ? 1 : 0}`;
   const existing = inFlight.get(key);
   if (existing) return existing;
   const task = ensurePdfRuntimeInner({ ...options, runtimeDir }).finally(() => {
@@ -405,9 +362,7 @@ async function ensurePdfRuntimeInner(
       paths: {
         runtimeDir,
         inspectorDir: runtimeDir,
-        modelCacheDir: path.join(runtimeDir, 'models'),
         pdfiumLib: null,
-        ortLib: null,
       },
     };
   }
@@ -428,8 +383,8 @@ async function ensurePdfRuntimeInner(
   if (!extractorReady) {
     logger.info('[pdf-runtime] 首次使用：按需下载 PDF 解析运行时（约 10MB，一次性）');
     const [mainPkg, napiPkg] = await Promise.all([
-      downloadArtifact(PDF_INSPECTOR_MAIN.url, fetchImpl, PDF_INSPECTOR_MAIN.integrity, PDF_INSPECTOR_MAIN.sha256, false, options.signal),
-      downloadArtifact(pins.napi.url, fetchImpl, pins.napi.integrity, pins.napi.sha256, false, options.signal),
+      downloadArtifact(PDF_INSPECTOR_MAIN.url, fetchImpl, PDF_INSPECTOR_MAIN.integrity, PDF_INSPECTOR_MAIN.sha256, options.signal),
+      downloadArtifact(pins.napi.url, fetchImpl, pins.napi.integrity, pins.napi.sha256, options.signal),
     ]);
     const napiShortName = napiDirName(pins.napiPkg);
     await writeEntries(nodeModulesDir, [
@@ -449,42 +404,8 @@ async function ensurePdfRuntimeInner(
   }
 
   let pdfiumLib: string | null = null;
-  let ortLib: string | null = null;
   const pdfiumDir = path.join(runtimeDir, 'pdfium');
-  if (options.needOcr) {
-    const freshManifest = await readManifest(runtimeDir);
-    const ocrReady =
-      freshManifest?.pdfInspector === PDF_INSPECTOR_VERSION &&
-      freshManifest.withOcrLibs === true &&
-      freshManifest.platform === platform;
-    const ortDir = path.join(runtimeDir, 'onnxruntime');
-    if (!ocrReady) {
-      logger.info('[pdf-runtime] 检测到扫描页：按需下载 OCR 运行时（PDFium + ONNX Runtime，约 80MB，一次性）');
-      notify?.({ stage: 'ocr_downloading' });
-      const [pdfiumPkg, ortPkg] = await Promise.all([
-        downloadArtifact(pins.pdfiumUrl, fetchImpl, undefined, pins.pdfiumSha256, false, options.signal),
-        // ONNX Runtime 上游未发布单文件摘要：白名单 + TLS + 体积上限，无哈希 pin（见 pdf-artifacts.ts）。
-        downloadArtifact(pins.ortUrl, fetchImpl, undefined, undefined, true, options.signal),
-      ]);
-      await writeEntries(pdfiumDir, extractTarGz(pdfiumPkg));
-      await writeEntries(
-        ortDir,
-        // ORT 上游包内含 403MB 的 *.pdb 调试符号（MAX_ENTRY_BYTES=150MB 会整体拒绝；
-        // pdb 永不被加载，跳过。见 archive.ExtractOptions）。
-        (pins.ortUrl.endsWith('.zip') ? extractZip(ortPkg, { skipEntry: (p) => /\.pdb$/i.test(p) }) : extractTarGz(ortPkg))
-      );
-    } else {
-      notify?.({ stage: 'ocr_cached' });
-    }
-    pdfiumLib = await findFileByName(pdfiumDir, pins.pdfiumLibName);
-    ortLib = await findFileByName(ortDir, pins.ortLibName);
-    if (!pdfiumLib || !ortLib) {
-      throw new BusinessError('E_RUNTIME_LOAD', 'OCR 运行时解包不完整（缺少本地库），请重试下载', 'TOOL_EXECUTION');
-    }
-    if (!process.env.PDFIUM_LIB_PATH) process.env.PDFIUM_LIB_PATH = pdfiumLib;
-    if (!process.env.ORT_DYLIB_PATH) process.env.ORT_DYLIB_PATH = ortLib;
-    notify?.({ stage: 'ocr_ready' });
-  } else if (options.needPdfium) {
+  if (options.needPdfium) {
     // CMD-LINGUA-P4A-2：页面渲染只要 PDFium——版本对上 + 文件在即用，
     // 不下载 ORT/模型；版本对不上或文件缺失才下载 pdfium 包（SHA 照常校验）。
     const pdfiumManifest = await readManifest(runtimeDir);
@@ -494,26 +415,17 @@ async function ensurePdfRuntimeInner(
       (await findFileByName(pdfiumDir, pins.pdfiumLibName)) !== null;
     if (!pdfiumReady) {
       logger.info('[pdf-runtime] 目录页渲染：按需准备 PDFium（仅渲染库，不含 OCR 模型）');
-      const pdfiumPkg = await downloadArtifact(pins.pdfiumUrl, fetchImpl, undefined, pins.pdfiumSha256, false, options.signal);
+      const pdfiumPkg = await downloadArtifact(pins.pdfiumUrl, fetchImpl, undefined, pins.pdfiumSha256, options.signal);
       await writeEntries(pdfiumDir, extractTarGz(pdfiumPkg));
     }
     pdfiumLib = await findFileByName(pdfiumDir, pins.pdfiumLibName);
     if (!pdfiumLib) {
       throw new BusinessError('E_RUNTIME_LOAD', 'PDFium 解包不完整（缺少本地库），请重试下载', 'TOOL_EXECUTION');
     }
+    notify?.({ stage: 'pdfium_ready' });
     if (!process.env.PDFIUM_LIB_PATH) process.env.PDFIUM_LIB_PATH = pdfiumLib;
   }
 
-  const modelCacheDir = path.join(runtimeDir, 'models');
-  await fsp.mkdir(modelCacheDir, { recursive: true });
-  if (!process.env.PDF_INSPECTOR_MODEL_CACHE) {
-    process.env.PDF_INSPECTOR_MODEL_CACHE = modelCacheDir;
-  }
-
-  // 非 OCR 调用不得降级 withOcrLibs（否则一次文字版导入会清掉已就绪的 OCR 标记，
-  // 下次扫描导入被迫重下 80MB —— 真机抓到的 bug）。
-  // 同理：只有本轮实际安装了 inspector 才登记新 pin，否则沿用旧登记——
-  // 否则一次 needPdfium 调用会把 manifest 写成新版本，而 inspector 目录仍是旧版。
   const prevManifest = await readManifest(runtimeDir);
   await fsp.writeFile(
     path.join(runtimeDir, 'manifest.json'),
@@ -521,28 +433,26 @@ async function ensurePdfRuntimeInner(
       version: 1,
       pdfInspector: inspectorInstalled ? PDF_INSPECTOR_VERSION : (prevManifest?.pdfInspector ?? PDF_INSPECTOR_VERSION),
       platform,
-      withOcrLibs: options.needOcr ? Boolean(pdfiumLib && ortLib) : Boolean(prevManifest?.withOcrLibs),
     } satisfies ManifestShape)
   );
 
   return {
     inspector: loadInspectorFromDir(inspectorDir),
-    paths: { runtimeDir, inspectorDir, modelCacheDir, pdfiumLib, ortLib },
+    paths: { runtimeDir, inspectorDir, pdfiumLib },
   };
 }
 
 /** 纯下载+校验（单测/脚本用，不解包）。 */
 export async function fetchRuntimeArtifact(
   url: string,
-  options: { fetchImpl?: typeof fetch; integrity?: string; sha256?: string; allowUnpinned?: boolean } = {}
+  options: { fetchImpl?: typeof fetch; integrity?: string; sha256?: string } = {}
 ): Promise<Result<Uint8Array, BusinessError>> {
   try {
     const data = await downloadArtifact(
       url,
       options.fetchImpl ?? fetch,
       options.integrity,
-      options.sha256,
-      options.allowUnpinned
+      options.sha256
     );
     return ok(data);
   } catch (e) {
