@@ -43,8 +43,18 @@ export function AgentSessionDrawer({
   userId,
   documentId,
 }: AgentSessionDrawerProps) {
-  const [activeTab, setActiveTab] = useState<'extracted' | 'activity' | 'diagnostics'>('extracted');
+  // 智能默认 Tab：已入库的直接看成果，正在提炼的优先看实时会话思考流！
+  const defaultTab = worker?.stage === 'saved' ? 'extracted' : 'activity';
+  const [activeTab, setActiveTab] = useState<'extracted' | 'activity' | 'diagnostics'>(defaultTab);
   const [queryDatabase, setQueryDatabase] = useState(false);
+
+  // 当切换 Worker 时自动调整最适合的展示 Tab
+  React.useEffect(() => {
+    if (worker) {
+      setActiveTab(worker.stage === 'saved' ? 'extracted' : 'activity');
+      setQueryDatabase(false);
+    }
+  }, [worker?.sessionId, worker?.nodeId, worker?.stage]);
 
   // 查询已保存结果（无条件调用 Hook，通过 enabled 参数安全控制）
   const savedQuery = useSavedTextbookContent(
@@ -64,6 +74,7 @@ export function AgentSessionDrawer({
 
   const errors = sessionEvents.filter(e => e.name === 'error' || e.name === 'failed' || e.name === 'rejected');
   const content = savedQuery.data?.content;
+  const isFetchingDb = savedQuery.isFetching;
 
   return (
     <Sheet open={open} onOpenChange={isOpen => { if (!isOpen) onClose(); }}>
@@ -99,6 +110,14 @@ export function AgentSessionDrawer({
           <div className="px-6 border-b border-line bg-surface shrink-0">
             <TabsList className="h-10 bg-transparent p-0 gap-6">
               <TabsTrigger 
+                value="activity" 
+                className="data-[state=active]:border-b-2 data-[state=active]:border-accent-ink data-[state=active]:text-accent-ink rounded-none px-1 text-xs gap-1.5 h-full"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                会话与思考流
+                <span className="text-[10px] text-ink-muted ml-0.5">({sessionEvents.length})</span>
+              </TabsTrigger>
+              <TabsTrigger 
                 value="extracted" 
                 className="data-[state=active]:border-b-2 data-[state=active]:border-accent-ink data-[state=active]:text-accent-ink rounded-none px-1 text-xs gap-1.5 h-full"
               >
@@ -109,14 +128,6 @@ export function AgentSessionDrawer({
                     就绪
                   </Badge>
                 )}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="activity" 
-                className="data-[state=active]:border-b-2 data-[state=active]:border-accent-ink data-[state=active]:text-accent-ink rounded-none px-1 text-xs gap-1.5 h-full"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                会话与思考流
-                <span className="text-[10px] text-ink-muted ml-0.5">({sessionEvents.length})</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="diagnostics" 
@@ -135,7 +146,7 @@ export function AgentSessionDrawer({
 
           {/* Tab 1: 提炼成果预览 */}
           <TabsContent value="extracted" className="flex-1 overflow-auto p-6 space-y-6 m-0">
-            {savedQuery.isPending ? (
+            {isFetchingDb ? (
               <div className="flex flex-col items-center justify-center py-12 text-ink-muted">
                 <Clock className="w-6 h-6 animate-spin text-accent-ink mb-2" />
                 <p className="text-xs">正在读取数据库成果…</p>
@@ -216,18 +227,28 @@ export function AgentSessionDrawer({
                 <BookOpen className="w-10 h-10 stroke-1 text-ink-stone-400 mb-3" />
                 <h4 className="font-serif text-sm font-semibold text-ink">本课成果正在提炼中</h4>
                 <p className="text-xs text-ink-muted mt-1 max-w-sm">
-                  Agent 正在逐页阅读扫描图或课文切片，调用结构化工具校验通过后，提炼的内容将在此实时呈现。
+                  该章节目前正在由 Agent 进行深度阅读与结构化提炼，尚未写入 SQLite 数据库。
                 </p>
-                {!queryDatabase && (
+                <div className="flex items-center gap-2 mt-4">
                   <Button 
-                    variant="outline" 
                     size="sm" 
-                    className="mt-4 text-xs" 
-                    onClick={() => setQueryDatabase(true)}
+                    className="text-xs gap-1.5" 
+                    onClick={() => setActiveTab('activity')}
                   >
-                    主动查询数据库入库状态
+                    <Sparkles className="w-3.5 h-3.5" />
+                    查看该会话实时思考与提炼日志
                   </Button>
-                )}
+                  {!queryDatabase && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs" 
+                      onClick={() => setQueryDatabase(true)}
+                    >
+                      检测数据库
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </TabsContent>
