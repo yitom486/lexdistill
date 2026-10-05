@@ -1,22 +1,26 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { BusinessError, isOk } from '@study-studio/shared';
+import { BusinessError, isOk, logger } from '@study-studio/shared';
+import { PDFDocument } from 'pdf-lib';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
+import { PdfTaskWorkspace } from '../application/pdf-import/pdf-task-workspace.js';
 import { extractTocWithLlm } from '../application/toc-extractor.js';
 import { beginTocVisionTrace, listTocVisionTraces } from '../application/toc-vision-diagnostics.js';
 import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
-import { TextbookContentTool, TextbookContentTools } from '../tools/textbook-content-tools.js';
-import { ensurePdfRuntime, type PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
-import { TocEntrySchema, TextbookPipelineSettingsSchema, SaveTextbookOutlineRequestSchema, ChapterSourceSchema } from '@study-studio/document-model';
+import { type PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
+import { TocEntrySchema, TextbookPipelineSettingsSchema, SaveTextbookOutlineRequestSchema } from '@study-studio/document-model';
 import { z } from 'zod';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import type { TextbookPipelineInput } from '../application/textbook-pipeline.js';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 import { inspectTextbookImport } from '../application/textbook-inspector.js';
 import { saveTextbookOutline } from '../application/textbook-outline.js';
 import { createImportMonitorRoutes } from './import-monitor-routes.js';
 import { ImportMonitor } from '../application/import-monitor.js';
+import { TextbookMcpRegistry } from '../mcp/textbook-mcp-server.js';
+import { createTextbookMcpRoutes } from '../mcp/textbook-mcp-routes.js';
 
 const PipelineRequestSchema = TextbookPipelineSettingsSchema.extend({
   traceId: z.string().min(1).optional(),
@@ -33,8 +37,7 @@ const PipelineRequestSchema = TextbookPipelineSettingsSchema.extend({
   lessonJobs: z.array(z.object({
     lessonId: z.string(),
     text: z.string(),
-    source: ChapterSourceSchema.optional(),
-  }).transform(({ lessonId, text, source }) => ({ lessonId, text, ...(source ? { source } : {}) }))).optional(),
+  })).optional(),
 });
 
 /**
@@ -53,21 +56,15 @@ export function createPdfImportRoutes(
   pdfOverrides?: {
     loadInspector?: () => Promise<PdfInspectorLike>;
     runtimeDir?: string;
-    adapter?: TextbookPipelineInput['adapter'];
-    submissionTool?: TextbookContentTools;
-    chapterParser?: TextbookPipelineInput['chapterParser'];
+    adapter?: AgentAdapter | undefined;
+    poolDriver?: TextbookPipelineInput['poolDriver'];
+    onChapterScope?: TextbookPipelineInput['onChapterScope'];
   }
 ) {
-  const pipelineChannels = () => {
-    const registered = pdfOverrides?.submissionTool ? undefined : deps.server.toolRegistry.get('library.vocabulary');
-    const tool = pdfOverrides?.submissionTool ?? (registered instanceof TextbookContentTool ? registered.owner : undefined);
-    const adapter = pdfOverrides?.adapter ?? deps.server.agentAdapter;
-    if (!(tool instanceof TextbookContentTools) || !adapter) throw new BusinessError('E_AGENT_UNAVAILABLE', '章节工具或模型通道尚未就绪，请检查桌面运行时', 'AGENT_RUNTIME');
-    return { adapter, submissionTool: tool, ...(pdfOverrides?.chapterParser ? { chapterParser: pdfOverrides.chapterParser } : {}) };
-  };
+  const mcpRegistry = new TextbookMcpRegistry({ repo: deps.repo });
   return new Hono()
     .route('', createImportMonitorRoutes(deps.repo))
-    .get('/api/documents/:userId/textbook-parsers/config', (c) => c.json({ cloudTokenConfigured: !!(process.env.MINERU_TOKEN ?? '').trim().replace(/^Bearer\s+/i, '') }))
+    .route('', createTextbookMcpRoutes(mcpRegistry))
     .use('/api/documents/:userId/*', async (c, next) => {
       const traceId = c.req.header('X-Textbook-Trace');
       const monitored = ['map-pdf', 'extract-toc-llm', 'textbook-outline'].includes(c.req.path.split('/').at(-1) ?? '');
@@ -97,7 +94,6 @@ export function createPdfImportRoutes(
             filename: input.value.filename,
             bytes: input.value.bytes,
             ...(input.value.pages ? { pages: input.value.pages } : {}),
-            ...(input.value.azure ? { azure: input.value.azure } : {}),
             ...(input.value.classes !== undefined ? { classes: input.value.classes } : {}),
           }
         );
@@ -169,7 +165,6 @@ export function createPdfImportRoutes(
             filename: input.value.filename,
             bytes: input.value.bytes,
             ...(input.value.pages ? { pages: input.value.pages } : {}),
-            ...(input.value.azure ? { azure: input.value.azure } : {}),
           }
         );
         if (!isOk(res)) return formatBusinessErrorResponse(c, res.error);
@@ -190,100 +185,39 @@ export function createPdfImportRoutes(
       c.json({ traces: listTocVisionTraces(c.req.param('userId')) })
     )
     .post('/api/documents/:userId/extract-toc-llm', async (c) => {
-      // 目录定位完成后，只将选中 PDF 页渲染为图片交给视觉会话；不生成或传入 OCR 文本。
       const userId = c.req.param('userId');
       const trace = beginTocVisionTrace(userId);
       c.header('X-Toc-Trace-Id', trace.id);
-      const input = await readPdfInput(c);
-      if (!input.ok) {
-        trace.finish('failed', { code: input.error.code });
-        return formatBusinessErrorResponse(c, input.error);
-      }
+      let workspace: PdfTaskWorkspace | undefined;
+      const reject = (error: BusinessError) => { trace.finish('failed', { code: error.code }); return formatBusinessErrorResponse(c, error); };
       try {
-        if (!userId) {
-          trace.finish('failed', { code: 'E_INVALID_INPUT' });
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '缺少用户标识', 'VALIDATION')
-          );
-        }
-        if (!input.value.pages || input.value.pages.length === 0) {
-          trace.finish('failed', { code: 'E_INVALID_INPUT' });
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '请指定教材目次所在的起始与结束页码', 'VALIDATION')
-          );
-        }
-        if (input.value.pages.length > 8) {
-          trace.finish('failed', { code: 'E_INVALID_INPUT' });
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_INVALID_INPUT', '一次最多识别 8 张目录页图片，请缩小范围', 'VALIDATION')
-          );
-        }
-        trace.record('request_accepted', {
-          pdfPages: input.value.pages,
-          model: input.value.model ?? 'default',
-          source: 'pdf-page-images',
-        });
+        const input = await readPdfInput(c);
+        if (!input.ok) return reject(input.error);
         const proposalTool = deps.server.toolRegistry.get('library.propose_toc');
-        if (!(proposalTool instanceof LibraryProposeTocTool)) {
-          trace.finish('failed', { code: 'E_TOOL_NOT_FOUND' });
-          return formatBusinessErrorResponse(c, new BusinessError(
-            'E_TOOL_NOT_FOUND', '目录草稿工具尚未就绪，请重启网关后重试', 'TOOL_EXECUTION'
-          ));
-        }
-        trace.record('runtime_starting');
-        const runtime = await ensurePdfRuntime({ needPdfium: true, ...pdfOverrides });
-        trace.record('runtime_ready');
-        if (!runtime.inspector.renderPdfPages) {
-          trace.finish('failed', { code: 'E_PDF_RENDER_UNAVAILABLE' });
-          return formatBusinessErrorResponse(c, new BusinessError(
-            'E_PDF_RENDER_UNAVAILABLE', 'PDF 页面渲染功能尚未就绪，请重启网关后重试', 'TOOL_EXECUTION'
-          ));
-        }
-        trace.record('render_starting');
-        const rendered = await runtime.inspector.renderPdfPages(input.value.bytes, input.value.pages);
-        if (rendered.length !== input.value.pages.length || rendered.some((page, index) =>
-          page.pageNumber !== input.value.pages![index] || page.png.length === 0
-        )) {
-          trace.finish('failed', { code: 'E_PDF_RENDER_INVALID' });
-          return formatBusinessErrorResponse(c, new BusinessError(
-            'E_PDF_RENDER_INVALID', '目录页图片生成不完整，请核对页码并重试', 'TOOL_EXECUTION'
-          ));
-        }
-        trace.record('render_completed', {
-          imageCount: rendered.length,
-          imageBytes: rendered.reduce((total, page) => total + page.png.length, 0),
-          imageWidths: rendered.map((page) => page.width),
-        });
-        const res = await extractTocWithLlm({
-          userId,
-          title: input.value.filename.replace(/\.[^/.]+$/, ''),
-          language: input.value.language || 'ja',
-          pageNumbers: input.value.pages,
-          pageImages: rendered.map((page) => ({ png: page.png, label: `PDF 第 ${page.pageNumber} 页` })),
-          adapter: deps.server.agentAdapter,
-          proposalTool,
-          traceId: trace.id,
-          onDiagnostic: trace.record,
+        if (!(proposalTool instanceof LibraryProposeTocTool)) throw new BusinessError('E_TOOL_NOT_FOUND', '目录工具尚未就绪，请重启网关', 'TOOL_EXECUTION');
+        const created = await PdfTaskWorkspace.create(input.value.bytes, c.req.raw.signal);
+        if (!created.ok) return reject(created.error);
+        workspace = created.value;
+        const pages = input.value.pages ?? Array.from({ length: Math.min(30, workspace.pageCount) }, (_, i) => i + 1);
+        const file = await workspace.slice('0.pdf', pages, c.req.raw.signal);
+        if (!file.ok) return reject(file.error);
+        // 扫描版在这里备图（目录范围小，毫秒到秒级），再开模型轮。
+        const materialized = await workspace.prepareImages(file.value, c.req.raw.signal);
+        if (!materialized.ok) return reject(materialized.error);
+        trace.record('request_accepted', { pdfPages: pages, source: 'local-pdf-file', model: input.value.model ?? 'default' });
+        const res = await extractTocWithLlm({ userId, title: input.value.filename.replace(/\.[^/.]+$/, ''), language: input.value.language ?? 'ja',
+          pdfFile: materialized.value, adapter: pdfOverrides?.adapter ?? deps.server.agentAdapter, proposalTool, traceId: trace.id, onDiagnostic: trace.record,
+          signal: c.req.raw.signal,
           ...(c.req.header('X-Textbook-Trace') ? { monitor: new ImportMonitor(deps.repo, userId, c.req.header('X-Textbook-Trace')!) } : {}),
-          ...(input.value.model ? { model: input.value.model } : {}),
+          ...(input.value.model ? { model: input.value.model } : {}), ...(input.value.effort ? { effort: input.value.effort } : {}),
         });
-
-        if (!isOk(res)) {
-          trace.finish('failed', { code: res.error.code });
-          return formatBusinessErrorResponse(c, res.error, 'extractTocWithLlm');
-        }
-        trace.finish('completed', {
-          entryCount: res.value.entries.length,
-          firstPrintedPage: res.value.entries[0]?.startPage ?? 0,
-        });
+        if (!res.ok) { trace.finish('failed', { code: res.error.code }); return formatBusinessErrorResponse(c, res.error); }
+        trace.finish('completed', { entryCount: res.value.entries.length });
         return c.json(res.value);
-      } catch (e) {
-        trace.finish('failed', { code: e instanceof BusinessError ? e.code : 'E_UNEXPECTED' });
-        return formatBusinessErrorResponse(c, e, 'extractTocWithLlm');
-      }
+      } catch (cause) {
+        trace.finish('failed', { code: cause instanceof BusinessError ? cause.code : 'E_UNEXPECTED' });
+        return formatBusinessErrorResponse(c, cause, '目录识别');
+      } finally { await workspace?.close().catch(cause => logger.warn('TOC PDF cleanup failed', { cause: String(cause) })); }
     })
     .post('/api/documents/:userId/execute-textbook-pipeline', async (c) => {
       // AI-Native 教材一条龙导入流水线：Phase 0 骨架建槽 + Phase 1&2 Worker并发提炼与白名单回填
@@ -305,20 +239,15 @@ export function createPdfImportRoutes(
         const body = parsed.data;
 
         let pdfBytes: Uint8Array | undefined = undefined;
-        let inspector: PdfInspectorLike | undefined = undefined;
         if (body.filePath) {
           const fileRes = await readLocalPdfFile(body.filePath);
           if (!fileRes.ok) {
             return formatBusinessErrorResponse(c, fileRes.error, 'readLocalPdfFile');
           }
           pdfBytes = fileRes.value.bytes;
-          const runtime = await ensurePdfRuntime({ needOcr: body.parserBackend === 'local-ocr', needPdfium: true, ...pdfOverrides });
-          inspector = runtime.inspector;
         } else if (body.pdfBase64) {
           try {
             pdfBytes = new Uint8Array(Buffer.from(body.pdfBase64, 'base64'));
-            const runtime = await ensurePdfRuntime({ needOcr: body.parserBackend === 'local-ocr', needPdfium: true, ...pdfOverrides });
-            inspector = runtime.inspector;
           } catch (e) {
             return formatBusinessErrorResponse(
               c,
@@ -348,13 +277,15 @@ export function createPdfImportRoutes(
           tocEntries: body.tocEntries,
           ...(body.lessonJobs ? { lessonJobs: body.lessonJobs } : {}),
           ...(pdfBytes ? { pdf: pdfBytes } : {}),
-          ...(inspector ? { inspector } : {}),
           ...(body.forceOverwrite !== undefined ? { forceOverwrite: Boolean(body.forceOverwrite) } : {}),
           ...(body.model ? { model: body.model } : {}),
           ...(body.poolSize ? { poolSize: body.poolSize } : {}),
           ...(body.effort ? { effort: body.effort } : {}),
           ...TextbookPipelineSettingsSchema.parse(body),
-          ...pipelineChannels(),
+          mcpRegistry,
+          gatewayBaseUrl: `http://127.0.0.1:${deps.port}`,
+          ...(pdfOverrides?.poolDriver ? { poolDriver: pdfOverrides.poolDriver } : {}),
+          ...(pdfOverrides?.onChapterScope ? { onChapterScope: pdfOverrides.onChapterScope } : {}),
         };
 
         const res = await deps.repo.executeTextbookPipeline(pipelineInput);
@@ -384,20 +315,15 @@ export function createPdfImportRoutes(
         const body = parsed.data;
 
         let pdfBytes: Uint8Array | undefined = undefined;
-        let inspector: PdfInspectorLike | undefined = undefined;
         if (body.filePath) {
           const fileRes = await readLocalPdfFile(body.filePath);
           if (!fileRes.ok) {
             return formatBusinessErrorResponse(c, fileRes.error, 'readLocalPdfFile');
           }
           pdfBytes = fileRes.value.bytes;
-          const runtime = await ensurePdfRuntime({ needOcr: body.parserBackend === 'local-ocr', needPdfium: true, ...pdfOverrides });
-          inspector = runtime.inspector;
         } else if (body.pdfBase64) {
           try {
             pdfBytes = new Uint8Array(Buffer.from(body.pdfBase64, 'base64'));
-            const runtime = await ensurePdfRuntime({ needOcr: body.parserBackend === 'local-ocr', needPdfium: true, ...pdfOverrides });
-            inspector = runtime.inspector;
           } catch (e) {
             return formatBusinessErrorResponse(
               c,
@@ -427,13 +353,15 @@ export function createPdfImportRoutes(
           tocEntries: body.tocEntries,
           ...(body.lessonJobs ? { lessonJobs: body.lessonJobs } : {}),
           ...(pdfBytes ? { pdf: pdfBytes } : {}),
-          ...(inspector ? { inspector } : {}),
           ...(body.forceOverwrite !== undefined ? { forceOverwrite: Boolean(body.forceOverwrite) } : {}),
           ...(body.model ? { model: body.model } : {}),
           ...(body.poolSize ? { poolSize: body.poolSize } : {}),
           ...(body.effort ? { effort: body.effort } : {}),
           ...TextbookPipelineSettingsSchema.parse(body),
-          ...pipelineChannels(),
+          mcpRegistry,
+          gatewayBaseUrl: `http://127.0.0.1:${deps.port}`,
+          ...(pdfOverrides?.poolDriver ? { poolDriver: pdfOverrides.poolDriver } : {}),
+          ...(pdfOverrides?.onChapterScope ? { onChapterScope: pdfOverrides.onChapterScope } : {}),
         };
 
         const res = deps.server.pipelineJobs.start(deps.repo, pipelineInput);
@@ -558,7 +486,6 @@ export function createPdfImportRoutes(
             filename: input.value.filename,
             bytes: input.value.bytes,
             ...(input.value.pages ? { pages: input.value.pages } : {}),
-            ...(input.value.azure ? { azure: input.value.azure } : {}),
           }
         );
         if (!isOk(res)) return formatBusinessErrorResponse(c, res.error, 'appendPdfDocument');
@@ -589,10 +516,9 @@ interface PdfRouteInput {
   docTitle?: string;
   /** CMD-01：已确认结构分类（原样透传，convert 侧 zod 校验后驱动切课） */
   classes?: unknown;
-  /** Azure 云 OCR 凭据（内存态透传，网关不落盘） */
-  azure?: { endpoint: string; apiKey: string };
   /** 专精大模型标识（空=服务端默认/轻量推荐） */
   model?: string;
+  effort?: string;
   /** 目标语种（空=服务端默认） */
   language?: string;
 }
@@ -638,19 +564,6 @@ export function extractRequestClasses(source: Record<string, unknown>): unknown 
   return raw;
 }
 
-function azureField(source: Record<string, unknown>): { endpoint: string; apiKey: string } | undefined {
-  const endpoint = strField(source['azureEndpoint']);
-  const apiKey = strField(source['azureKey']);
-  if (endpoint && apiKey) return { endpoint, apiKey };
-  return undefined;
-}
-
-/**
- * P5-B：显式物理页号集解析（纯函数）。
- * - 缺席 → undefined（旧行为；folio 端点会报“请提供”）；
- * - 数组 → 逐项正整数校验，非法项整体 'invalid'（fail-closed，不猜）；
- * - 字符串 → 先试 JSON 数组，失败再按逗号切分（`3,5,7`）。
- */
 export function explicitPageNumbers(source: Record<string, unknown>): number[] | undefined | 'invalid' {
   const raw = source['pages'];
   if (raw === undefined) return undefined;
@@ -699,17 +612,17 @@ function parsePagesField(raw: string): unknown {
   });
 }
 
-function pageRange(startPage?: number, endPage?: number): number[] | undefined {
-  if (startPage !== undefined && endPage !== undefined && startPage >= 1 && endPage >= startPage) {
-    const pages: number[] = [];
-    for (let p = startPage; p <= endPage; p++) pages.push(p);
-    return pages;
-  }
-  return undefined;
-}
-
-function numField(value: unknown): number | undefined {
-  return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : undefined;
+async function pageRange(startRaw: unknown, endRaw: unknown, bytes: Uint8Array): Promise<number[] | undefined | 'invalid'> {
+  if (startRaw === undefined && endRaw === undefined) return undefined;
+  const parse = (raw: unknown) => typeof raw === 'number' ? raw : typeof raw === 'string' && /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : NaN;
+  const start = parse(startRaw), end = parse(endRaw);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start) return 'invalid';
+  // Check the actual file before allocating the range; malformed or huge page numbers never become an array.
+  try {
+    const pdf = await PDFDocument.load(bytes);
+    if (end > pdf.getPageCount()) return 'invalid';
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  } catch { return 'invalid'; }
 }
 
 type RouteContext = {
@@ -732,18 +645,14 @@ async function readPdfInput(
       filePath?: unknown;
       startPage?: unknown;
       endPage?: unknown;
-      azureEndpoint?: unknown;
-      azureKey?: unknown;
     } | null;
     if (typeof body?.filePath !== 'string' || !body.filePath) {
       return fail('JSON 模式请提供 filePath（本机 PDF 绝对路径）');
     }
-    const startPage = typeof body.startPage === 'number' ? body.startPage : undefined;
-    const endPage = typeof body.endPage === 'number' ? body.endPage : undefined;
     const read = await readLocalPdfFile(body.filePath);
     if (!read.ok) return { ok: false, error: read.error };
-    const pages = pageRange(startPage, endPage);
-    const azure = azureField(body as Record<string, unknown>);
+    const pages = await pageRange(body.startPage, body.endPage, read.value.bytes);
+    if (pages === 'invalid') return fail('请填写完整、递增且不超出 PDF 的正整数页码范围；留空时使用前 30 页');
     const classes = extractRequestClasses(body as Record<string, unknown>);
     const pageNumbers = explicitPageNumbers(body as Record<string, unknown>);
     if (pageNumbers === 'invalid') {
@@ -758,6 +667,7 @@ async function readPdfInput(
     const fingerprint = strField((body as Record<string, unknown>)['fingerprint']);
     const docTitle = strField((body as Record<string, unknown>)['docTitle']);
     const model = strField((body as Record<string, unknown>)['model']);
+    const effort = strField((body as Record<string, unknown>)['effort']);
     const language = strField((body as Record<string, unknown>)['language']);
     return {
       ok: true,
@@ -771,17 +681,16 @@ async function readPdfInput(
         ...(lessonIndex !== undefined ? { lessonIndex } : {}),
         ...(fingerprint ? { fingerprint } : {}),
         ...(docTitle ? { docTitle } : {}),
-        ...(azure ? { azure } : {}),
         ...(classes !== undefined ? { classes } : {}),
         ...(model ? { model } : {}),
+        ...(effort ? { effort } : {}),
         ...(language ? { language } : {}),
       },
     };
   }
   let file: File | null = null;
-  let startPage: number | undefined;
-  let endPage: number | undefined;
-  let azure: { endpoint: string; apiKey: string } | undefined;
+  let startPage: unknown;
+  let endPage: unknown;
   let classesRaw: unknown;
   let pagesRaw: unknown;
   let entriesRaw: unknown;
@@ -790,14 +699,14 @@ async function readPdfInput(
   let fingerprintRaw: unknown;
   let docTitleRaw: unknown;
   let modelRaw: unknown;
+  let effortRaw: unknown;
   let languageRaw: unknown;
   try {
     const body = await c.req.parseBody();
     const candidate = body['file'];
     if (candidate instanceof File) file = candidate;
-    startPage = numField(body['startPage']);
-    endPage = numField(body['endPage']);
-    azure = azureField(body as Record<string, unknown>);
+    startPage = body['startPage'];
+    endPage = body['endPage'];
     classesRaw = body['classes'];
     pagesRaw = body['pages'];
     entriesRaw = body['entries'];
@@ -806,6 +715,7 @@ async function readPdfInput(
     fingerprintRaw = body['fingerprint'];
     docTitleRaw = body['docTitle'];
     modelRaw = body['model'];
+    effortRaw = body['effort'];
     languageRaw = body['language'];
   } catch {
     return fail('上传体不是合法 multipart，请用 file 字段上传 PDF');
@@ -815,7 +725,8 @@ async function readPdfInput(
     return fail('PDF 文件过大（上传上限 200MB；更大请用本地路径直读）');
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const pages = pageRange(startPage, endPage);
+  const pages = await pageRange(startPage, endPage, bytes);
+  if (pages === 'invalid') return fail('请填写完整、递增且不超出 PDF 的正整数页码范围；留空时使用前 30 页');
   const classes = extractRequestClasses({ classes: classesRaw });
   const pageNumbers = pagesRaw === undefined ? undefined : explicitPageNumbers({ pages: pagesRaw });
   if (pageNumbers === 'invalid') {
@@ -830,6 +741,7 @@ async function readPdfInput(
   const fingerprint = fingerprintRaw === undefined ? undefined : strField(fingerprintRaw);
   const docTitle = docTitleRaw === undefined ? undefined : strField(docTitleRaw);
   const model = strField(modelRaw);
+  const effort = strField(effortRaw);
   const language = strField(languageRaw);
   return {
     ok: true,
@@ -843,9 +755,9 @@ async function readPdfInput(
       ...(lessonIndex !== undefined ? { lessonIndex } : {}),
       ...(fingerprint ? { fingerprint } : {}),
       ...(docTitle ? { docTitle } : {}),
-      ...(azure ? { azure } : {}),
       ...(classes !== undefined ? { classes } : {}),
       ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
       ...(language ? { language } : {}),
     },
   };

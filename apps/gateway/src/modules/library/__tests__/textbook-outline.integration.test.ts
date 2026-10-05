@@ -7,8 +7,26 @@ import { TextbookASTSchema, SaveTextbookOutlineResultSchema } from '@study-studi
 import { TextbookInspectionResultSchema } from '@study-studio/protocol';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';
-import { TextbookContentTools } from '../tools/textbook-content-tools.js';
-import { pipelineModel } from './textbook-pipeline-fixtures.js';
+import { harnessInjection, type ChapterScript } from './agentpool-pipeline-harness.js';
+import { requiredContent } from './textbook-pipeline-fixtures.js';
+import type { McpChapterScope } from '../mcp/textbook-mcp-scope.js';
+import { pinProcessToTestRuntime } from './pdf-test-runtime.js';
+
+pinProcessToTestRuntime();
+
+let outlineRpcSeq = 0;
+async function submitScope(scope: McpChapterScope, kind: 'grammar' | 'vocabulary' | 'exercises' | 'articles', raw: unknown) {
+  const result = await scope.submission.execute(kind, raw, `outline-${++outlineRpcSeq}`);
+  if (!result.ok) throw result.error;
+}
+async function submitRequiredScope(scope: McpChapterScope) {
+  for (const kind of ['grammar', 'vocabulary', 'exercises'] as const) {
+    await submitScope(scope, kind, requiredContent[kind]);
+  }
+}
+async function scopeArticle(scope: McpChapterScope, lessonId: string) {
+  await submitScope(scope, 'articles', { items: [{ text: `${lessonId}正文` }] });
+}
 
 const fixture = new URL('./fixtures/smoke-native-2lessons.pdf', import.meta.url);
 const entries = [
@@ -85,11 +103,14 @@ describe('独立目录保存：HTTP → SQLite → 文件指纹检测 → 正文
     try {
       const app = routes(repo);
       const saved = SaveTextbookOutlineResultSchema.parse(await (await save(app)).json());
-      const tool = new TextbookContentTools(repo); const model = pipelineModel(tool);
+      const harness = harnessInjection(repo, new Map<string, ChapterScript>([
+        ['l1', async (scope) => { await scopeArticle(scope, 'l1'); await submitRequiredScope(scope); }],
+        ['l2', async (scope) => { await scopeArticle(scope, 'l2'); await submitRequiredScope(scope); }],
+      ]));
       const result = await repo.executeTextbookPipeline({
         documentId: saved.documentId, userId: 'owner', title: input.title, tocEntries: saved.entries,
         pdf: new Uint8Array(await Bun.file(fixture).arrayBuffer()),
-        adapter: model.adapter, submissionTool: tool, poolSize: 1,
+        poolSize: 1, ...harness.extra,
         lessonJobs: entries.map(entry => ({ lessonId: entry.id, text: entry.title })),
       });
       expect(result.ok).toBe(true);

@@ -5,21 +5,36 @@ import { join } from 'node:path';
 import { ImportEventPageSchema, ImportEventSchema } from '@study-studio/document-model';
 import { BusinessError, err } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { createImportMonitorRoutes } from '../http/import-monitor-routes.js';
-import { pipelineModel } from './textbook-pipeline-fixtures.js';
 import { ImportMonitor } from '../application/import-monitor.js';
+import { harnessInjection, type ChapterScript } from './agentpool-pipeline-harness.js';
+import { requiredContent } from './textbook-pipeline-fixtures.js';
+import type { McpChapterScope } from '../mcp/textbook-mcp-scope.js';
+
+let monitorRpcSeq = 0;
+async function submitScope(scope: McpChapterScope, kind: 'grammar' | 'vocabulary' | 'exercises' | 'articles', raw: unknown) {
+  const result = await scope.submission.execute(kind, raw, `monitor-${++monitorRpcSeq}`);
+  if (!result.ok) throw result.error;
+}
+async function submitRequiredScope(scope: McpChapterScope) {
+  for (const kind of ['grammar', 'vocabulary', 'exercises'] as const) {
+    await submitScope(scope, kind, requiredContent[kind]);
+  }
+  await submitScope(scope, 'articles', { items: [{ text: '本课正文' }] });
+}
 
 const repos: DrizzleLearnerRepository[] = [], dirs: string[] = [];
 afterEach(async () => { for (const repo of repos.splice(0)) repo.getRawDb().close(); Bun.gc(true); for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
 async function run(repo: DrizzleLearnerRepository, traceId = 'this-import') {
-  const tool = new TextbookContentTools(repo), model = pipelineModel(tool);
+  const harness = harnessInjection(repo, new Map<string, ChapterScript>([
+    ['a', async (scope) => { await submitRequiredScope(scope); }],
+    ['b', async (scope) => { await submitRequiredScope(scope); }],
+  ]));
   const result = await repo.executeTextbookPipeline({ userId: 'owner', traceId, documentId: 'monitored-book', title: '监视集成教材',
     tocEntries: [{ id: 'a', title: '第一部分', level: 'lesson', startPage: 7, endPage: 9 }, { id: 'b', title: '第二部分', level: 'lesson', startPage: 10, endPage: 15 }],
     lessonJobs: [{ lessonId: 'a', text: '第一部分真实输入' }, { lessonId: 'b', text: '第二部分真实输入' }],
-    adapter: model.adapter, submissionTool: tool, poolSize: 2, modelRetries: 0,
-  });
-  return { result, model, app: createImportMonitorRoutes(repo) };
+    poolSize: 2, modelRetries: 0, ...harness.extra });
+  return { result, harness, app: createImportMonitorRoutes(repo) };
 }
 const base = '/api/documents/owner/textbook-imports/this-import';
 describe('导入监视：实际会话工具 → SQLite 事件 → Gateway 查询与 SSE', () => {
@@ -36,7 +51,9 @@ describe('导入监视：实际会话工具 → SQLite 事件 → Gateway 查询
       const interactions = page.events.filter(event => event.attemptId === binding.attemptId);
       const input = interactions.find(event => event.name === 'input')!;
       const detail = ImportEventSchema.parse(await (await flow.app.request(`${base}/details/${input.sequence}`)).json());
-      expect(detail.detail).toEqual(expect.objectContaining({ message: flow.model.inputs.find(turn => turn.sessionId === binding.sessionId)!.input.message }));
+      const recorded = (detail.detail as { message: string }).message;
+      expect(recorded).toContain('章节:');
+      expect(flow.harness.driver.asks).toContain(recorded);
       expect(interactions.map(event => event.name)).toEqual(expect.arrayContaining(['requested', 'content_staged', 'committed', 'result', 'turn_ended', 'unbound']));
       const request = interactions.find(event => event.name === 'requested')!, response = interactions.find(event => event.name === 'result')!;
       expect(request.callId).toBe(response.callId);
@@ -76,6 +93,18 @@ describe('导入监视：实际会话工具 → SQLite 事件 → Gateway 查询
     expect(page.warning).toContain('记录不完整');
     const stats = await repo.getTextbookAssetStats('monitored-book');
     expect(stats.ok && stats.value.readyLessons).toBe(2);
+  });
+  it('失败类事件在列表中自带详情，成功路径保持轻量', async () => {
+    const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
+    const monitor = new ImportMonitor(repo, 'owner', 'detail-trace');
+    monitor.record('task', 'started', { title: '教材' }, { nodeId: 'l1' });
+    monitor.record('task', 'failed', { stats: {}, error: '模型未通过工具提交有效内容' }, { nodeId: 'l1' });
+    await monitor.flush();
+    const result = await repo.listImportEvents({ userId: 'owner', traceId: 'detail-trace' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.find(event => event.name === 'failed')!.detail).toEqual(expect.objectContaining({ error: '模型未通过工具提交有效内容' }));
+    expect('detail' in result.value.find(event => event.name === 'started')!).toBe(false);
   });
   it('目录创建之前允许没有教材和 job 身份，详情不会串到其他操作', async () => {
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
