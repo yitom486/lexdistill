@@ -8,6 +8,7 @@ import {
 } from '@study-studio/shared';
 import type { AgentEvent } from '../../contracts/index.js';
 import { JsonRpcStdioClient } from './jsonrpc-stdio.js';
+import { backgroundCodexArgs } from './windows-launch-policy.js';
 import {
   type CodexAppServerConfig,
   type DynamicToolCallParams,
@@ -166,7 +167,7 @@ export class CodexAppServerConnection {
       env?: NodeJS.ProcessEnv;
     } = {
       command: this.config.command || 'codex',
-      args: this.config.args ?? ['app-server', '--listen', 'stdio://'],
+      args: backgroundCodexArgs(this.config.args ?? ['app-server', '--listen', 'stdio://']),
       env: buildCodexProcessEnv(this.config),
     };
     if (this.config.cwd) startOpts.cwd = this.config.cwd;

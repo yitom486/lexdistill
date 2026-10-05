@@ -469,6 +469,8 @@ export class CodexAdapter implements AgentAdapter {
   public readonly name = 'Codex App Server Adapter';
 
   /** 本 Adapter 支持 AgentInput.attachments 内存图片输入（转 localImage）。 */
+  public supportsLocalFileInput(): boolean { return true; }
+
   public supportsImageInput(): boolean {
     return true;
   }
@@ -702,10 +704,14 @@ export class CodexAdapter implements AgentAdapter {
           approvalPolicy?: string;
           ephemeral?: boolean;
           developerInstructions?: string;
+          cwd?: string;
+          sandbox?: 'read-only' | 'workspace-write';
         } = {
           dynamicTools: bridge.specs,
         };
         if (options.model) threadParams.model = options.model;
+        if (options.workingDirectory) threadParams.cwd = options.workingDirectory;
+        if (options.sandboxMode) threadParams.sandbox = options.sandboxMode;
         if (options.approvalPolicy) threadParams.approvalPolicy = options.approvalPolicy;
         // P3.4B-FIX4：systemPrompt 经官方 developerInstructions 进线程。
         // 此前该字段被静默丢弃（adapter 内零引用），模型只能从用户消息尾部

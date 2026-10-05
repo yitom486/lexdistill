@@ -18,3 +18,4 @@ export type {
 } from './codex-adapter.js';
 export { mapAppServerNotificationToEvents } from './event-mapper.js';
 export { resolveCodexBinary } from './app-server-protocol.js';
+export { backgroundCodexArgs } from './windows-launch-policy.js';

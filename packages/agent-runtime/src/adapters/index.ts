@@ -6,6 +6,8 @@ export {
   CodexSession,
   buildLearnerContextEntry,
   mapAppServerNotificationToEvents,
+  resolveCodexBinary,
+  backgroundCodexArgs,
 } from './codex/index.js';
 export type {
   CodexAdapterOptions,

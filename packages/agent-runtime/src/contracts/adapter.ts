@@ -15,6 +15,9 @@ export interface CreateSessionOptions {
   resumeThreadId?: string;
   /** false=落盘持久化；默认 true（临时） */
   ephemeral?: boolean;
+  /** Local task workspace; materials live below it and are owned by Gateway. */
+  workingDirectory?: string;
+  sandboxMode?: 'read-only' | 'workspace-write';
 }
 
 export interface AgentAdapter {
@@ -27,6 +30,8 @@ export interface AgentAdapter {
    * （E_AGENT_CAPABILITY），禁止静默丢图或退化成纯文本。
    */
   supportsImageInput?(): boolean;
+  /** Native file/command reading, without binary PDF message attachments. */
+  supportsLocalFileInput?(): boolean;
 
   createSession(
     options: CreateSessionOptions

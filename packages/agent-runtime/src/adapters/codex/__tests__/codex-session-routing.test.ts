@@ -47,6 +47,7 @@ interface FakeConn {
   nativeContexts: Array<{ turnId?: string; callId?: string }>;
   approvalPolicyDefault: string;
   turnGates: Map<string, () => void>;
+  threadRequests: unknown[];
 }
 
 function makeFakeConnection(approvalPolicyDefault = 'never'): FakeConn {
@@ -59,6 +60,7 @@ function makeFakeConnection(approvalPolicyDefault = 'never'): FakeConn {
     nativeContexts: [],
     approvalPolicyDefault,
     turnGates: new Map(),
+    threadRequests: [],
     connection: undefined as never,
   };
   const conn = {
@@ -72,7 +74,8 @@ function makeFakeConnection(approvalPolicyDefault = 'never'): FakeConn {
     getConfiguredApprovalPolicy(): string {
       return fake.approvalPolicyDefault;
     },
-    startThread: async (): Promise<unknown> => {
+    startThread: async (params: unknown): Promise<unknown> => {
+      fake.threadRequests.push(params);
       fake.threadSeq++;
       return ok({ threadId: `thread-${fake.threadSeq}` });
     },
@@ -121,6 +124,16 @@ async function toolCall(
 }
 
 describe('P3.4B-FIX 单连接并发工具路由', () => {
+  it('本机 PDF 会话传递固定 cwd 与 workspace-write；普通会话仍使用默认值', async () => {
+    const fake = makeFakeConnection(), adapter = makeAdapter(fake);
+    expect(adapter.supportsLocalFileInput()).toBe(true);
+    const first = await adapter.createSession({sessionId:'pdf',userId:'owner',ephemeral:true,workingDirectory:'D:\\runtime\\agent-workspace',sandboxMode:'workspace-write'});
+    const second = await adapter.createSession({sessionId:'ordinary',userId:'owner',ephemeral:true});
+    expect(first.ok && second.ok).toBe(true);
+    expect(fake.threadRequests[0]).toMatchObject({cwd:'D:\\runtime\\agent-workspace',sandbox:'workspace-write'});
+    expect(fake.threadRequests[1]).not.toHaveProperty('cwd'); expect(fake.threadRequests[1]).not.toHaveProperty('sandbox');
+    if(first.ok) await first.value.close(); if(second.ok) await second.value.close();
+  });
   it('handler 只安装一次；交错调用各回各的 session 身份', async () => {
     const fake = makeFakeConnection();
     const adapter = makeAdapter(fake);

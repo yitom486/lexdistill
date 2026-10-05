@@ -23,3 +23,10 @@ export type {
   AgentSession,
   ApprovalDecision,
 } from './session.js';
+export type {
+  AgentPoolActivityEvent,
+  AgentPoolAskResult,
+  AgentPoolDriver,
+  AgentPoolDriverOptions,
+  AgentPoolLease,
+} from './pool-driver.js';

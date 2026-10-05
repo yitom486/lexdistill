@@ -41,9 +41,9 @@ describe('M2-1 agent-runtime facade', () => {
     }
   });
 
-  it('根入口运行时表面锁定（7 项；新增适配器符号必须同步更新本集合）', () => {
+  it('根入口运行时表面锁定（9 项；新增适配器符号必须同步更新本集合）', () => {
     const keys = new Set(Object.keys(runtime));
-    expect(keys.size).toBe(7);
+    expect(keys.size).toBe(9);
     for (const name of [
       'CodexAdapter',
       'CodexSession',
@@ -52,6 +52,8 @@ describe('M2-1 agent-runtime facade', () => {
       'buildLearnerContextEntry',
       'buildLightweightReply',
       'mapAppServerNotificationToEvents',
+      'resolveCodexBinary',
+      'backgroundCodexArgs',
     ] as const) {
       expect(keys.has(name)).toBe(true);
     }
