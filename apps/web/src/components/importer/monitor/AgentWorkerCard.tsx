@@ -49,28 +49,28 @@ export function AgentWorkerCard({ worker, onClickDetails }: AgentWorkerCardProps
   const isRetrying = worker.stage === 'retrying';
 
   const badgeColor = {
-    idle: 'bg-stone-500/10 text-stone-500 border-stone-500/20',
-    preparing: 'bg-sky-500/15 text-sky-600 border-sky-500/30 dark:text-sky-400',
-    thinking: 'bg-indigo-500/15 text-indigo-600 border-indigo-500/30 dark:text-indigo-400',
-    extracting: 'bg-amber-500/15 text-amber-600 border-amber-500/30 dark:text-amber-400',
-    validating: 'bg-purple-500/15 text-purple-600 border-purple-500/30 dark:text-purple-400',
-    saving: 'bg-teal-500/15 text-teal-600 border-teal-500/30 dark:text-teal-400',
-    saved: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30 dark:text-emerald-400',
-    retrying: 'bg-rose-500/15 text-rose-600 border-rose-500/30 dark:text-rose-400',
-    failed: 'bg-red-500/15 text-red-600 border-red-500/30 dark:text-red-400',
+    idle: 'bg-worker-idle-wash text-worker-idle-fg border-worker-idle-line',
+    preparing: 'bg-status-info-wash text-status-info-fg border-status-info-line',
+    thinking: 'bg-worker-thinking-wash text-worker-thinking-fg border-worker-thinking-line',
+    extracting: 'bg-status-warn-wash-strong text-status-warn-fg border-status-warn-line',
+    validating: 'bg-worker-validating-wash text-worker-validating-fg border-worker-validating-line',
+    saving: 'bg-worker-saving-wash text-worker-saving-fg border-worker-saving-line',
+    saved: 'bg-status-success-wash-strong text-status-success-fg border-status-success-line',
+    retrying: 'bg-status-rose-wash-strong text-status-rose-fg border-status-rose-line',
+    failed: 'bg-status-danger-wash-strong text-status-danger-fg border-status-danger-line',
   }[worker.stage];
 
   const statusIndicator = isRunning ? (
     <span className="relative flex h-2.5 w-2.5">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-warn-pulse opacity-75"></span>
+      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-status-warn-dot"></span>
     </span>
   ) : isSuccess ? (
-    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+    <CheckCircle2 className="w-3.5 h-3.5 text-status-success-dot" />
   ) : isError ? (
-    <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+    <AlertCircle className="w-3.5 h-3.5 text-status-danger-dot" />
   ) : (
-    <span className="h-2 w-2 rounded-full bg-stone-400/60" />
+    <span className="h-2 w-2 rounded-full bg-worker-idle-dot" />
   );
 
   return (
@@ -78,11 +78,11 @@ export function AgentWorkerCard({ worker, onClickDetails }: AgentWorkerCardProps
       onClick={onClickDetails}
       className={`group relative flex flex-col justify-between rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer overflow-hidden
         ${isRunning 
-          ? 'bg-gradient-to-br from-surface to-paper-soft border-amber-500/40 shadow-sm hover:border-amber-500/70 hover:shadow-md' 
+          ? 'bg-gradient-to-br from-surface to-paper-soft border-status-warn-line-strong shadow-sm hover:border-status-warn-line-bold hover:shadow-md' 
           : isSuccess 
-          ? 'bg-paper-soft/80 border-emerald-500/30 hover:border-emerald-500/60'
+          ? 'bg-paper-soft/80 border-status-success-line hover:border-status-success-line-strong'
           : isError
-          ? 'bg-red-500/5 border-red-500/30 hover:border-red-500/60'
+          ? 'bg-status-danger-wash-faint border-status-danger-line hover:border-status-danger-line-strong'
           : 'bg-paper-soft border-line-soft hover:border-line'
         }`}
     >
@@ -120,7 +120,7 @@ export function AgentWorkerCard({ worker, onClickDetails }: AgentWorkerCardProps
         {/* 实时动态活动信息 */}
         <div className="min-h-[2.5rem] mb-3">
           <div className="text-xs text-ink-muted flex items-start gap-1.5 line-clamp-2">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+            <Sparkles className="w-3.5 h-3.5 text-status-warn-dot shrink-0 mt-0.5" />
             <span className="break-all">
               {worker.recentMessage || (isRunning ? '模型正在分析章节上下文并生成结构化内容…' : isSuccess ? '本课全部内容已完成格式校验并存入 SQLite' : '等待任务队列调度')}
             </span>
@@ -147,7 +147,7 @@ export function AgentWorkerCard({ worker, onClickDetails }: AgentWorkerCardProps
         <div className="flex items-center justify-between pt-2 border-t border-line-soft text-[11px] text-ink-muted">
           <div className="flex items-center gap-2">
             {worker.attemptCount > 1 && (
-              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-mono">
+              <span className="flex items-center gap-1 text-status-warn-fg font-mono">
                 <RotateCcw className="w-3 h-3" />
                 第 {worker.attemptCount} 次尝试
               </span>
