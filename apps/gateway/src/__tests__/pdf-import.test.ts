@@ -176,22 +176,16 @@ function stubInspector(result: {
   pdfType: string;
   pageCount: number;
   markdown?: string | null;
-  pagesNeedingOcr?: number[];
-  ocrMarkdown?: string | null;
+
 }) {
   return async () => ({
     processPdf: () => ({
       pdfType: result.pdfType,
       pageCount: result.pageCount,
       markdown: result.markdown ?? null,
-      pagesNeedingOcr: result.pagesNeedingOcr ?? [],
       confidence: 0.9,
     }),
-    processPdfWithOcr: async () => ({
-      markdown: result.ocrMarkdown ?? null,
-      pagesRoutedToOcr: result.pagesNeedingOcr ?? [],
-      pagesRecommendingHosted: [],
-    }),
+
   });
 }
 
@@ -206,45 +200,14 @@ describe('convertPdfToAst', () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.value.classification.pdfType).toBe('TextBased');
-    expect(res.value.classification.ocrUsed).toBe(false);
     expect(res.value.stats.lessons).toBe(2);
     expect(res.value.book.title).toBe('标日');
   });
 
-  test('扫描版走 OCR：ocrUsed=true', async () => {
-    const res = await convertPdfToAst(
-      {
-        loadInspector: stubInspector({
-          pdfType: 'Scanned',
-          pageCount: 1,
-          markdown: null,
-          pagesNeedingOcr: [1],
-          ocrMarkdown: JA_MD,
-        }),
-      },
-      { userId: 'u1', filename: 'scan.pdf', bytes: PDF_HEAD }
-    );
-    expect(res.ok).toBe(true);
-    if (!res.ok) return;
-    expect(res.value.classification.ocrUsed).toBe(true);
-  });
-
-  test('OCR 无输出 → E_OCR_LANG_UNSUPPORTED（零产出不断言语种）', async () => {
-    const res = await convertPdfToAst(
-      {
-        loadInspector: stubInspector({
-          pdfType: 'Scanned',
-          pageCount: 1,
-          markdown: null,
-          pagesNeedingOcr: [1],
-          ocrMarkdown: '',
-        }),
-      },
-      { userId: 'u1', filename: 'ko-scan.pdf', bytes: PDF_HEAD }
-    );
-    expect(res.ok).toBe(false);
-    if (res.ok) return;
-    expect(res.error.code).toBe('E_OCR_LANG_UNSUPPORTED');
+  test('无文字层不运行 OCR，提示改用模型读取 PDF', async () => {
+    const result = await convertPdfToAst({loadInspector:stubInspector({pdfType:'Scanned',pageCount:1})},{userId:'owner',filename:'scan.pdf',bytes:PDF_HEAD});
+    expect(result.ok).toBe(false);
+    if(!result.ok) expect(result.error.code).toBe('E_PDF_TEXT_EMPTY');
   });
 
   test('非 PDF 魔数 / 超页 / 非 pdf 后缀拒绝', async () => {
@@ -265,46 +228,15 @@ describe('convertPdfToAst', () => {
     expect(many.ok).toBe(false);
   });
 
-  test('选页：越界拒绝；文字选页直提；OCR 超 30 页拒绝', async () => {
-    const base = { userId: 'u1', filename: 'big.pdf', bytes: PDF_HEAD };
-    const calls: Array<{ pages?: number[]; ocrPages?: number[] }> = [];
-    const loadInspector = async () => ({
-      processPdf: (pdf: Uint8Array, pages?: number[]) => {
-        if (pages !== undefined) calls.push({ pages });
-        else calls.push({});
-        void pdf;
-        return {
-          pdfType: 'Mixed',
-          pageCount: 371,
-          markdown: null,
-          pagesNeedingOcr: Array.from({ length: 371 }, (_, i) => i + 1),
-          confidence: 0.9,
-        };
-      },
-      processPdfWithOcr: async (pdf: Uint8Array, options?: { pageNumbers?: number[] }) => {
-        if (options?.pageNumbers !== undefined) calls.push({ ocrPages: options.pageNumbers });
-        else calls.push({});
-        void pdf;
-        return { markdown: JA_MD, pagesRoutedToOcr: options?.pageNumbers ?? [], pagesRecommendingHosted: [] };
-      },
-    });
-    // 越界
-    const oob = await convertPdfToAst({ loadInspector }, { ...base, pages: [999] });
-    expect(oob.ok).toBe(false);
-    // OCR 31 页拒绝（先经过校验，不调 OCR）
-    const tooMany = await convertPdfToAst(
-      { loadInspector },
-      { ...base, pages: Array.from({ length: 31 }, (_, i) => i + 1) }
-    );
-    expect(tooMany.ok).toBe(false);
-    if (!tooMany.ok) expect(tooMany.error.code).toBe('E_INVALID_INPUT');
-    // 正常选页：只 OCR 所选
-    const okRes = await convertPdfToAst({ loadInspector }, { ...base, pages: [1, 2, 3] });
-    expect(okRes.ok).toBe(true);
-    if (!okRes.ok) return;
-    expect(okRes.value.classification.ocrUsed).toBe(true);
-    expect(okRes.value.classification.selectedPages).toEqual([1, 2, 3]);
-    expect(okRes.value.stats.lessons).toBe(2);
+  test('选页只读取所选文字页，不存在 OCR 的 30 页限制；越界仍拒绝', async () => {
+    const calls: (number[] | undefined)[]=[];
+    const loadInspector=async()=>({processPdf:(_pdf:Uint8Array,pages?:number[])=>{calls.push(pages);return {pdfType:'TextBased',pageCount:371,markdown:JA_MD};}});
+    const base={userId:'owner',filename:'big.pdf',bytes:PDF_HEAD};
+    expect((await convertPdfToAst({loadInspector},{...base,pages:[999]})).ok).toBe(false);
+    const pages=Array.from({length:31},(_,i)=>i+1), result=await convertPdfToAst({loadInspector},{...base,pages});
+    expect(result.ok).toBe(true);
+    if(result.ok) expect(result.value.classification.selectedPages).toEqual(pages);
+    expect(calls.at(-1)).toEqual(pages);
   });
 });
 
@@ -344,25 +276,13 @@ describe('mapPdfPages（目录感知第一步）', () => {
   });
 
   test('map 服务：窗口扫描 + 越界拒绝', async () => {
-    const perPage = [
-      { pageNumber: 16, markdown: '# 目录\n第 1 課 … 18' },
-      { pageNumber: 17, markdown: '# 第 1 課\n李さん：はじめまして。' },
-    ];
-    const loadInspector = async () => ({
-      processPdf: () => ({ pdfType: 'Mixed', pageCount: 371, markdown: null, pagesNeedingOcr: [16, 17], confidence: 0.9 }),
-      processPdfWithOcr: async () => ({
-        markdown: perPage.map((p) => p.markdown).join('\n'),
-        pages: perPage,
-        pagesRoutedToOcr: [16, 17],
-        pagesRecommendingHosted: [],
-      }),
-    });
+    const loadInspector = async () => ({processPdf:() => ({pdfType:'TextBased',pageCount:371,markdown:TOC_MD})});
     const res = await mapPdfPages({ loadInspector }, { userId: 'u1', filename: 'm.pdf', bytes: PDF_HEAD });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.value.window).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
-    expect(res.value.headings).toEqual([{ page: 17, level: 1, text: '第 1 課' }]);
-    expect(res.value.tocEntries).toEqual([{ label: '第 1 課 … 18', lessonNo: '1', printedPage: 18 }]);
+    expect(res.value.headings).toEqual([{ page: 1, level: 1, text: '第 1 課' }]);
+    expect(res.value.tocEntries).toEqual([{ label: '第 1 課 あいさつ ………… 18', lessonNo: '1', printedPage: 18 }, { label: '第 2 課 買い物 ………… 30', lessonNo: '2', printedPage: 30 }]);
     const oob = await mapPdfPages({ loadInspector }, { userId: 'u1', filename: 'm.pdf', bytes: PDF_HEAD, pages: [999] });
     expect(oob.ok).toBe(false);
   });

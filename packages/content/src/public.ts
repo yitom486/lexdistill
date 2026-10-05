@@ -35,16 +35,6 @@ export {
 } from './pdf/markdown-to-ast.js';
 
 export {
-  buildOcrOverflowError,
-  buildPdfConvertReport,
-  buildPdfMapReport,
-} from './pdf/pdf-import-report.js';
-export type {
-  PdfConvertReport,
-  PdfOcrOverflowDetails,
-} from './pdf/pdf-import-report.js';
-
-export {
   MIN_SEMANTIC_RATIO,
   MIN_SEMANTIC_TITLES,
   classifyEmbeddedOutline,

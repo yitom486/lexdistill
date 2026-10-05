@@ -416,10 +416,10 @@ describe('P1-C0.8a 负向：append / enrich 不输出 shadow', () => {
         pdfType: 'TextBased',
         pageCount: 1,
         markdown: ['# 第3課', 'C：ありがとう。'].join('\n'),
-        pagesNeedingOcr: [] as number[],
+
         confidence: 0.9,
       }),
-      processPdfWithOcr: async () => ({ markdown: null, pagesRoutedToOcr: [] as number[], pagesRecommendingHosted: [] as number[] }),
+
     });
     const { result, events } = await captureShadow(async () => {
       const appended = await appendPdfToDocument(

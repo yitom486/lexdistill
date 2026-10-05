@@ -262,5 +262,5 @@ describe('Kanjium 真包（live，网络可达时）', () => {
     // 抽查：時（とき）应有声调
     const toki = parsed.pitchRows.filter((r) => r.term === '時');
     expect(toki.length).toBeGreaterThan(0);
-  }, 120000);
+  }, 60000);
 });

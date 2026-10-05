@@ -35,7 +35,7 @@ export interface LiveMapResult {
 export function formatMapSummary(result: PdfMapOutput, target: string): string {
   const lines: string[] = [];
   lines.push(`库：${target}`);
-  lines.push(`pageCount=${result.classification.pageCount} ocrPages=${result.classification.pagesNeedingOcr.length} window=[${result.window.join(',')}]`);
+  lines.push(`pageCount=${result.classification.pageCount} window=[${result.window.join(',')}]`);
   const heads = result.headings.slice(0, 30);
   lines.push(`headings(${result.headings.length}):`);
   for (const h of heads) lines.push(`  p${h.page} ${h.text}`);

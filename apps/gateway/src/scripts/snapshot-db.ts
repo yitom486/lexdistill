@@ -1,16 +1,18 @@
 import { Database } from 'bun:sqlite';
 import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 
 /**
  * R1 snapshot：VACUUM INTO 一致性快照（禁 Copy-Item 主库，尤其 WAL 未 checkpoint 时）。
  * VACUUM 在单语句内读出一致视图并写出全新整理库，等价在线备份。
  * 用法：bun src/scripts/snapshot-db.ts [dbPath] [outDir]
  * 输出 snapshot 路径 + 大小 + SHA-256 + 双方 integrity_check。
+ * 默认值均为相对/系统路径，不含机器专属绝对路径。
  */
-const src = process.argv[2] ?? 'D:/project/rust/tauri/study-studio/study-studio.db';
-const outDir = process.argv[3] ?? 'C:/Users/zheye/AppData/Local/Temp/opencode/snapshots';
+const src = process.argv[2] ?? resolve(process.cwd(), 'study-studio.db');
+const outDir = process.argv[3] ?? join(tmpdir(), 'study-studio-snapshots');
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const dest = `${outDir}/study-studio-r1-${stamp}.db`;
 mkdirSync(dirname(dest), { recursive: true });

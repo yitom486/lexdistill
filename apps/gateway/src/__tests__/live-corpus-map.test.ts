@@ -40,7 +40,7 @@ describe('live-corpus-map 探针安全行为', () => {
 
   it('formatMapSummary：摘要含计数与条目，长列表截断且不 dump 全文', () => {
     const result: PdfMapOutput = {
-      classification: { pdfType: 'TextBased', pageCount: 371, pagesNeedingOcr: [7, 8], ocrUsed: false, selectedPages: [1] },
+      classification: { pdfType: 'TextBased', pageCount: 371, selectedPages: [1] },
       window: [1],
       headings: Array.from({ length: 35 }, (_, i) => ({ page: 1, level: 1, text: `第${i + 1}課` })),
       tocEntries: [{ label: '第1課', lessonNo: '1', printedPage: 2 }],
@@ -49,7 +49,7 @@ describe('live-corpus-map 探针安全行为', () => {
     };
     const out = formatMapSummary(result, 'some.pdf');
     expect(out).toContain('pageCount=371');
-    expect(out).toContain('ocrPages=2');
+    expect(out).not.toContain('ocrPages');
     expect(out).toContain('p1 第1課');
     expect(out).toContain('1 -> p2');
     expect(out).toContain('…等 5 条');
