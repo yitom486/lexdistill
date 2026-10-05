@@ -185,7 +185,7 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
                 size="sm" 
                 disabled={cancel.isPending} 
                 onClick={() => cancel.mutate(job.jobId)}
-                className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                className="text-xs text-status-rose-fg hover:text-status-rose-fg-strong hover:bg-status-rose-wash-hover"
               >
                 中止提炼
               </Button>
@@ -243,13 +243,13 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
           <div className="mt-2 flex items-baseline gap-3">
             <div>
               <span className="text-[11px] text-ink-muted block">成功入库</span>
-              <span className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400">
+              <span className="text-lg font-bold font-mono text-status-success-fg">
                 {job.successfulLessons}
               </span>
             </div>
             <div>
               <span className="text-[11px] text-ink-muted block">异常重试</span>
-              <span className="text-lg font-bold font-mono text-rose-600 dark:text-rose-400">
+              <span className="text-lg font-bold font-mono text-status-rose-fg">
                 {job.failedLessons.length}
               </span>
             </div>
@@ -346,15 +346,15 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
                         </td>
                         <td className="p-3">
                           {isReady ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                            <span className="inline-flex items-center gap-1 text-status-success-fg font-medium">
                               <CheckCircle2 className="w-3.5 h-3.5" /> 已入库
                             </span>
                           ) : failure ? (
-                            <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium" title={failure.error}>
+                            <span className="inline-flex items-center gap-1 text-status-rose-fg font-medium" title={failure.error}>
                               <AlertCircle className="w-3.5 h-3.5" /> 异常 ({failure.error.slice(0, 12)}…)
                             </span>
                           ) : stageKey ? (
-                            <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                            <span className="inline-flex items-center gap-1 text-status-warn-fg font-medium">
                               <Sparkles className="w-3.5 h-3.5 animate-pulse" />
                               {stageLabels[stageKey] ?? stageKey}
                             </span>
@@ -399,15 +399,17 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
       )}
 
       {/* 会话沉浸式详情抽屉 */}
-      <AgentSessionDrawer
-        open={Boolean(selectedWorker)}
-        onClose={() => setSelectedWorker(null)}
-        worker={selectedWorker}
-        events={allEvents}
-        directory={directory}
-        userId={job.userId}
-        documentId={job.documentId}
-      />
+      {selectedWorker && (
+        <AgentSessionDrawer
+          open={Boolean(selectedWorker)}
+          onClose={() => setSelectedWorker(null)}
+          worker={selectedWorker}
+          events={allEvents}
+          directory={directory}
+          userId={job.userId}
+          documentId={job.documentId}
+        />
+      )}
     </section>
   );
 }

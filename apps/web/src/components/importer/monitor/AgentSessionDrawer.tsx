@@ -46,6 +46,14 @@ export function AgentSessionDrawer({
   const [activeTab, setActiveTab] = useState<'extracted' | 'activity' | 'diagnostics'>('extracted');
   const [queryDatabase, setQueryDatabase] = useState(false);
 
+  // 查询已保存结果（无条件调用 Hook，通过 enabled 参数安全控制）
+  const savedQuery = useSavedTextbookContent(
+    userId,
+    documentId ?? '',
+    worker?.nodeId ?? '',
+    open && Boolean(worker) && Boolean(documentId) && Boolean(worker?.nodeId) && (worker?.stage === 'saved' || queryDatabase)
+  );
+
   if (!worker) return null;
 
   // 过滤本 session 的相关事件
@@ -55,15 +63,6 @@ export function AgentSessionDrawer({
   );
 
   const errors = sessionEvents.filter(e => e.name === 'error' || e.name === 'failed' || e.name === 'rejected');
-
-  // 查询已保存结果（当该章节已入库时）
-  const savedQuery = useSavedTextbookContent(
-    userId,
-    documentId ?? '',
-    worker.nodeId ?? '',
-    open && Boolean(documentId) && Boolean(worker.nodeId) && (worker.stage === 'saved' || queryDatabase)
-  );
-
   const content = savedQuery.data?.content;
 
   return (
@@ -80,9 +79,9 @@ export function AgentSessionDrawer({
                 <SheetTitle className="font-serif text-base text-ink flex items-center gap-2">
                   <span>{worker.lessonTitle || '未分配具体章节'}</span>
                   <span className={`text-[11px] px-2 py-0.5 rounded-full font-sans font-medium border
-                    ${worker.stage === 'saved' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
-                      worker.stage === 'failed' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
-                      'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                    ${worker.stage === 'saved' ? 'bg-status-success-wash text-status-success-fg border-status-success-line-soft' :
+                      worker.stage === 'failed' ? 'bg-status-danger-wash text-status-danger-fg border-status-danger-line-soft' :
+                      'bg-status-warn-wash text-status-warn-fg border-status-warn-line-soft'}`}>
                     {worker.stageText}
                   </span>
                 </SheetTitle>
@@ -214,7 +213,7 @@ export function AgentSessionDrawer({
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center text-ink-muted">
-                <BookOpen className="w-10 h-10 stroke-1 text-stone-400 mb-3" />
+                <BookOpen className="w-10 h-10 stroke-1 text-ink-stone-400 mb-3" />
                 <h4 className="font-serif text-sm font-semibold text-ink">本课成果正在提炼中</h4>
                 <p className="text-xs text-ink-muted mt-1 max-w-sm">
                   Agent 正在逐页阅读扫描图或课文切片，调用结构化工具校验通过后，提炼的内容将在此实时呈现。
@@ -272,15 +271,15 @@ export function AgentSessionDrawer({
           <TabsContent value="diagnostics" className="flex-1 overflow-auto p-6 space-y-4 m-0">
             {errors.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center text-ink-muted">
-                <CheckCircle2 className="w-8 h-8 text-emerald-500 mb-2" />
+                <CheckCircle2 className="w-8 h-8 text-status-success-dot mb-2" />
                 <p className="text-xs font-medium text-ink">运行平稳，无异常阻断</p>
                 <p className="text-[11px] text-ink-muted mt-0.5">本会话当前未检测到格式冲突或模型拒收记录</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {errors.map((err, i) => (
-                  <div key={i} className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 text-xs space-y-1.5">
-                    <div className="flex items-center gap-1.5 font-semibold text-rose-600 dark:text-rose-400">
+                  <div key={i} className="rounded-xl border border-status-rose-line bg-status-rose-wash-faint p-4 text-xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-semibold text-status-rose-fg">
                       <AlertTriangle className="w-4 h-4" />
                       <span>{err.name} 异常记录</span>
                     </div>
