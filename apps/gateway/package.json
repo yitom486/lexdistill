@@ -21,7 +21,7 @@
     "@study-studio/speech": "workspace:*",
     "@study-studio/storage-sqlite": "workspace:*",
     "@study-studio/tool-core": "workspace:*",
-    "agentpools": "^0.1.4",
+    "agentpools": "^0.1.9",
     "drizzle-orm": "^0.45.2",
     "gemini-tts-studio": "0.3.1",
     "hono": "^4.13.5",
