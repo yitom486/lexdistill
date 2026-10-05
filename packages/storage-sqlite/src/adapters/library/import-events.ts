@@ -20,8 +20,12 @@ export async function listImportEvents(deps: { db: DrizzleDb }, query: ImportEve
       documentId: textbookImportEvents.documentId, jobId: textbookImportEvents.jobId, nodeId: textbookImportEvents.nodeId,
       sessionId: textbookImportEvents.sessionId, threadId: textbookImportEvents.threadId, attemptId: textbookImportEvents.attemptId, callId: textbookImportEvents.callId,
       category: textbookImportEvents.category, name: textbookImportEvents.name, occurredAt: textbookImportEvents.occurredAt,
+      detailJson: textbookImportEvents.detailJson,
     }).from(textbookImportEvents).where(and(eq(textbookImportEvents.userId, query.userId), eq(textbookImportEvents.traceId, query.traceId), gt(textbookImportEvents.sequence, query.after ?? 0))).orderBy(asc(textbookImportEvents.sequence)).limit(query.limit ?? 200).all();
-    return ok(rows.map(row => ImportEventSchema.parse(row)));
+    // 列表保持轻量：只带失败类事件的详情（成功路径的完整输入按需另查）。
+    // 无详情时不放键：调用方以 `'detail' in event` 区分。
+    const withDetail = new Set(['failed', 'error', 'rejected']);
+    return ok(rows.map(row => ImportEventSchema.parse(withDetail.has(row.name) ? { ...row, detail: JSON.parse(row.detailJson) } : row)));
   } catch (cause) { return err(translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage: '无法读取本次导入记录' })); }
 }
 export async function getImportEvent(deps: { db: DrizzleDb }, userId: string, traceId: string, sequence: number): Promise<Result<ImportEvent | null, BusinessError>> {
