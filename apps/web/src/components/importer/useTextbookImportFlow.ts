@@ -128,7 +128,7 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
     const tocEntries = tocFromCandidates(entries).map((entry, index) => ({ ...entry, sortOrder: index + 1 }));
     source.setParseError(null);
     startMutation.mutate({
-      traceId,
+      traceId: crypto.randomUUID(),
       ...(targetDocument ? { documentId: targetDocument.documentId } : outlineMutation.variables?.filePath === path && outlineMutation.data ? { documentId: outlineMutation.data.documentId } : {}),
       title: targetDocument?.title ?? filename.replace(/\.[^/.]+$/, ''),
       filePath: path, tocEntries, forceOverwrite, language: pipelineLanguage, ...config.data, ...(pipelineModel ? { model: pipelineModel } : {}),

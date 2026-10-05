@@ -220,14 +220,14 @@ export function TextbookImporterModal({
             </TabsContent>
 
             {parseError && (
-              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-2.5 text-rose-600 dark:text-rose-400 text-xs">
+              <div className="p-3.5 rounded-xl bg-status-rose-wash border border-status-rose-line-soft flex items-start gap-2.5 text-status-rose-fg text-xs">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                 <span className="leading-relaxed">{parseError}</span>
               </div>
             )}
 
             {activeTab === 'json' && parsedAST && (
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+              <div className="p-4 rounded-2xl bg-status-warn-wash border border-status-warn-line-soft flex items-center justify-between">
                 <div className="space-y-0.5">
                   <div className="text-xs font-bold text-ink flex items-center gap-1.5">
                     <Layers className="w-4 h-4 text-accent-ink" />

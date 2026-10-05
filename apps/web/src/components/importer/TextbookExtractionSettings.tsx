@@ -3,7 +3,6 @@ import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
 import { Switch } from '../ui/switch.js';
 import { Button } from '../ui/button.js';
-import { TextbookParserSettings } from './TextbookParserSettings.js';
 import { ImportOptions } from './ImportOptions.js';
 import { TextbookModelSettings } from './TextbookModelSettings.js';
 import { TextbookRunSettings } from './TextbookRunSettings.js';
@@ -26,10 +25,9 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
   const setSettings = usePreferencesStore(s => s.setPipelineSettings);
   const language = usePreferencesStore(s => s.pipelineLanguage);
   const setLanguage = usePreferencesStore(s => s.setPipelineLanguage);
-  const invalidLocalService = settings.parserBackend === 'mineru-local' && !settings.mineruLocalUrl;
   return <section aria-label="内容整理设置" className="space-y-5 text-sm text-ink">
     <div><h3 className="font-serif text-xl font-semibold">准备开始学习</h3>
-      <p className="mt-2 leading-6 text-ink-muted">按章节整理词汇、知识点和练习，有文章或句子时一起整理。{forceOverwrite ? '本次将重新整理已保存内容。' : '已整理好的章节会保留并跳过。'}</p>
+      <p className="mt-2 leading-6 text-ink-muted">按一级章节裁剪 PDF，由连续 Worker 读取文件，按实际内容整理词汇、知识点、练习、文章和句子。{forceOverwrite ? '本次将重新整理已保存内容。' : '已整理好的章节会保留并跳过。'}</p>
     </div>
     <label className="block max-w-xs space-y-2">教材语种
       <Select value={language} onValueChange={value => { if (value === 'ja' || value === 'en' || value === 'ko') setLanguage(value); }} disabled={pending}>
@@ -44,8 +42,7 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
       </label>
       <p className="text-xs text-ink-muted">并发越高，资源与模型额度消耗越大。</p>
     </ImportOptions>
-    <ImportOptions title="更多设置" summary="解析方式、补充习题与重新整理" defaultOpen={invalidLocalService || forceOverwrite}>
-      <TextbookParserSettings settings={settings} onChange={setSettings} pending={pending} />
+    <ImportOptions title="更多设置" summary="补充习题与重新整理" defaultOpen={forceOverwrite}>
       <label className="flex items-center justify-between gap-3">允许 AI 补充习题
         <Switch aria-label="允许 AI 补充习题" checked={settings.allowAiExercises} onCheckedChange={allowAiExercises => setSettings({ allowAiExercises })} disabled={pending} />
       </label>
@@ -57,7 +54,7 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
     </ImportOptions>
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
       <p className="text-xs text-ink-muted">设置会记住，下次无需重新填写。</p>
-      <Button disabled={pending || invalidLocalService} onClick={onStart}>{pending ? '正在启动…' : '开始整理教材'}<ArrowRight className="h-4 w-4" /></Button>
+      <Button disabled={pending} onClick={onStart}>{pending ? '正在启动…' : '开始整理教材'}<ArrowRight className="h-4 w-4" /></Button>
     </div>
   </section>;
 }

@@ -210,7 +210,7 @@ export const usePreferencesStore = create<PreferencesState>()(
     }),
     {
       name: 'study_studio_user_preferences',
-      version: 2,
+      version: 3,
       migrate: (persisted) => {
         const stored = typeof persisted === 'object' && persisted !== null ? persisted : {};
         const settings = TextbookPipelineSettingsSchema.safeParse('pipelineSettings' in stored ? stored.pipelineSettings : {});
@@ -219,7 +219,7 @@ export const usePreferencesStore = create<PreferencesState>()(
         const previousPool = 'pipelinePoolSize' in stored ? String(stored.pipelinePoolSize) : '';
         return { ...stored,
           pipelinePoolSize: !previousPool || previousPool === '3' || previousPool === '4' ? '6' : previousPool,
-          pipelineSettings: { ...previous, poolSize: previous.poolSize === 3 || previous.poolSize === 4 ? 6 : previous.poolSize, parserBackend: 'model-vision' },
+          pipelineSettings: { ...previous, poolSize: previous.poolSize === 3 || previous.poolSize === 4 ? 6 : previous.poolSize },
         };
       },
       merge: (persisted, current) => {

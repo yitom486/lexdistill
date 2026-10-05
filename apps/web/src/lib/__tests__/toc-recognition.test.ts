@@ -3,7 +3,7 @@ import type { MapPdfResult } from '../../queries/useLearnerQueries.js';
 import { parseTocScanRange, tocCandidatesFromMap, validateTocCandidates } from '../toc-recognition.js';
 
 const BASE: MapPdfResult = {
-  classification: { pdfType: 'Scanned', pageCount: 80, pagesNeedingOcr: [], ocrUsed: true, selectedPages: [3, 4] },
+  classification: { pdfType: 'Scanned', pageCount: 80, selectedPages: [3, 4] },
   window: [3, 4],
   headings: [],
   tocEntries: [],
