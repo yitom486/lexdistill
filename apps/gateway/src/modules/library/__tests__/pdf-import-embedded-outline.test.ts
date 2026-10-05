@@ -14,12 +14,9 @@ function outlineMock(outline: unknown, calls: { classify: Array<readonly number[
     processPdf: (_pdf, pages) => {
       calls.classify.push(pages);
       const w = Array.isArray(pages) ? [...pages] : [];
-      return { pdfType: 'Scanned', pageCount: 35, markdown: '', pagesNeedingOcr: w };
+      return { pdfType: 'Scanned', pageCount: 35, markdown: '' };
     },
-    processPdfWithOcr: async (_pdf, options) => {
-      calls.ocr.push(options?.pageNumbers);
-      return { markdown: '# 第1課\nアキ：はじめまして。\n' };
-    },
+
     // 故意喂畸形 native 负载时才需要断言（有注释）；正常用例均为合法形状。
     extractEmbeddedOutline: () => {
       if (outline instanceof Error) throw outline;
@@ -76,15 +73,14 @@ describe('P1A map embedded outline 优先', () => {
       { title: '第5課', level: 1, physicalPage: 5 },
     ]);
     expect(calls.ocr).toEqual([]);
-    expect(res.value.window).toEqual([]);
+    expect(res.value.window).toHaveLength(30);
     expect(res.value.headings).toEqual([]);
     expect(res.value.tocEntries).toEqual([]);
     expect(res.value.classification.pageCount).toBe(35);
-    expect(res.value.classification.ocrUsed).toBe(false);
     expectClassifyWindowed(calls.classify);
   });
 
-  it('空目录：走既有 none 路径（正常 OCR 窗）', async () => {
+  it('空目录：走既有 none 路径（原生信息窗，无文字时留给模型读取）', async () => {
     const calls = newCalls();
     const res = await mapPdfPages(
       { loadInspector: async () => outlineMock({ items: [], unresolvedCount: 0, truncated: false }, calls) },
@@ -94,7 +90,7 @@ describe('P1A map embedded outline 优先', () => {
     if (!isOk(res)) return;
     expect(res.value.outlineSource).toBe('none');
     expect(res.value.embeddedOutline).toEqual([]);
-    expect(calls.ocr.length).toBeGreaterThan(0);
+    expect(calls.ocr).toEqual([]);
     expect(res.value.window.length).toBeGreaterThan(0);
   });
 
@@ -114,7 +110,7 @@ describe('P1A map embedded outline 优先', () => {
     if (!isOk(res)) return;
     expect(res.value.outlineSource).toBe('none');
     expect(res.value.embeddedOutline).toEqual([]);
-    expect(calls.ocr.length).toBeGreaterThan(0);
+    expect(calls.ocr).toEqual([]);
   });
 
   it('native 抛错：安全降级走 none 路径', async () => {
@@ -126,7 +122,7 @@ describe('P1A map embedded outline 优先', () => {
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.outlineSource).toBe('none');
-    expect(calls.ocr.length).toBeGreaterThan(0);
+    expect(calls.ocr).toEqual([]);
   });
 
   it('畸形返回（items 非数组）：不抛，走 none 路径', async () => {

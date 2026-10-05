@@ -82,15 +82,13 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     expect(byNo.get('付録')).toBe(5);
     expect(byNo.get('3')).toBe(30);
     expect(byNo.get('4')).toBe(31);
-  }, 120000);
+  }, 60000);
 
   it('convert：3 课 + legacy positional lesson_number + 前言付録并入 + 零 OCR', async () => {
     const bytes = await bytesOf(RICH_URL);
     const res = await convertPdfToAst({}, { userId: 'u1', filename: 'rich.pdf', bytes });
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
-    expect(res.value.classification.ocrUsed).toBe(false);
-    expect(res.value.classification.azurePages).toBeUndefined();
     const lessons = res.value.book.lessons;
     expect(lessons).toHaveLength(3);
     // legacy characterization（P1-B replacement target）：lesson_number 是位置计数器，
@@ -107,11 +105,11 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
       expect(l.grammarPoints).toEqual([]);
       expect(l.exercises ?? []).toEqual([]);
     }
-  }, 120000);
+  }, 60000);
 
-  it('append：接力追加课数增长（smoke 2 课 + rich 3 课）', async () => {
+  it('append：接力追加课数增长（rich 3 课 + rich 3 课）', async () => {
     const smokeBytes = new Uint8Array(
-      await Bun.file(new URL('./fixtures/smoke-native-2lessons.pdf', import.meta.url)).arrayBuffer()
+      await Bun.file(new URL('./fixtures/rich-textbook-toc-review.pdf', import.meta.url)).arrayBuffer()
     );
     const richBytes = await bytesOf(RICH_URL);
     const repo = new DrizzleLearnerRepository(':memory:');
@@ -137,15 +135,15 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
     );
     expect(isOk(appended)).toBe(true);
     if (!isOk(appended)) return;
-    // smoke 出 2 课（OCR 回填后）+ rich 3 课 = 5 课，且续排不断号
+    // rich 3 课 + rich 3 课 = 6 课，且续排不断号
     expect(appended.value.addedLessons).toBe(3);
-    expect(appended.value.totalLessons).toBe(5);
+    expect(appended.value.totalLessons).toBe(6);
     // P1-B：append 后最终 AST 数组顺序即 canonical 顺序；shred 落 sort_order 连续，
     // legacy lessonNumber（maxNo+1 续排）原样保留，两者不必相等
     const finalAst = tryParseTextbookAst(appended.value.document.astJson);
     expect(finalAst).not.toBeNull();
     if (!finalAst) return;
-    expect(finalAst.lessons).toHaveLength(5);
+    expect(finalAst.lessons).toHaveLength(6);
     const shredRes = await repo.shredDocument(first.value.document.id, finalAst);
     expect(isOk(shredRes)).toBe(true);
     const dbRows = repo
@@ -155,18 +153,18 @@ describe('pdf-import rich 真 E2E（本机运行时）', () => {
       )
       .all(first.value.document.id) as Array<{ n: number; s: number }>;
 
-    expect(dbRows.map((r) => r.s)).toEqual([1, 2, 3, 4, 5]);
-  }, 180000);
+    expect(dbRows.map((r) => r.s)).toEqual([1, 2, 3, 4, 5, 6]);
+  }, 60000);
 });
 
-describe('pdf-import 扫描页（本机 OCR 运行时）', () => {  it('无字形状页：走 OCR → 零产出友好失败，不崩不打云', async () => {
+describe('pdf-import 原生文字读取', () => {  it('无字形状页：提示改用模型文件流程，不运行 OCR', async () => {
     const bytes = await bytesOf(SCAN_URL);
     const res = await convertPdfToAst({}, { userId: 'u1', filename: 'scan.pdf', bytes });
     expect(isOk(res)).toBe(false);
     if (isOk(res)) return;
-    expect(res.error.code).toBe('E_OCR_LANG_UNSUPPORTED');
+    expect(res.error.code).toBe('E_PDF_TEXT_EMPTY');
     // 文案不得断言具体语种（空白页/纯图页同样零产出）
     expect(res.error.userMessage).not.toContain('韩语');
     expect(res.error.retryable).toBe(false);
-  }, 180000);
+  }, 60000);
 });

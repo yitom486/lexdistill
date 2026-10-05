@@ -17,8 +17,8 @@ export function ImportInteraction({ events, title, current, directory = [] }: { 
   return <details open={open} onToggle={event => setOpen(event.currentTarget.open)} className="rounded-xl border border-line p-3 text-xs" data-testid={current ? 'current-interaction' : 'history-interaction'}>
     <summary onClick={() => { manuallyChanged.current = true; }} className="cursor-pointer font-medium text-ink">{current ? '最近一轮交互' : '历史交互'} · {title} · {ended ? '已结束' : '进行中'}</summary>
     {open && <div className="mt-3 space-y-3">
-      <p className="break-all">Agent {meta?.sessionId ?? '未记录'} · 线程 {events.find(event => event.threadId)?.threadId ?? '引擎未提供'}</p>
       <details><summary className="cursor-pointer text-ink-muted">系统绑定与本轮身份</summary>
+        <p className="break-all">Agent {meta?.sessionId ?? '未记录'} · 线程 {events.find(event => event.threadId)?.threadId ?? '引擎未提供'}</p>
         <p className="break-all">节点 {meta?.nodeId} · 系统尝试 {meta?.attemptId}</p>
         {events.filter(event => event.name === 'turn_started').map(event => <ImportEventDetail key={event.sequence} event={event} expanded />)}
       </details>

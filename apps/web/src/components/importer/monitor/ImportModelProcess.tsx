@@ -9,9 +9,9 @@ export function ImportModelProcess({ events, allEvents, directory, title }: { ev
   const sessionId = groups.at(-1)?.find(event => event.sessionId)?.sessionId;
   const opened = allEvents.find(event => event.sessionId === sessionId && event.name === 'opened');
   return <div className="space-y-3" data-testid="model-process">
-    <p className="text-ink-muted">每课使用独立线程；同一课的修正重试保留本课上下文，不包含其他课程。教材归属由系统绑定当前原生轮次。</p>
+    <p className="text-ink-muted">不同 Worker 使用独立线程，同一 Worker 连续处理章节并保留历史。当前章节 PDF 和工具写入归属由系统逐轮绑定，模型只整理本轮文件。</p>
     {opened && <ImportEventDetail event={opened} />}
-    {!groups.length && <p>本部分尚未开始模型交互；解析完成后才发送。</p>}
+    {!groups.length && <p>本部分尚未开始模型交互；PDF 裁剪准备完成后才发送。</p>}
     {[...groups].reverse().map((items, index) => <ImportInteraction key={items[0]!.attemptId} events={items} directory={directory} title={title} current={index === 0} />)}
   </div>;
 }

@@ -126,9 +126,9 @@ describe('vocab/grammar id 生成事实', () => {
         loadInspector: async () => ({
           processPdf: () => ({
             pdfType: 'TextBased', pageCount: 1,
-            markdown: '# 第2課\nB：さようなら。', pagesNeedingOcr: [], confidence: 0.9,
+            markdown: '# 第2課\nB：さようなら。', confidence: 0.9,
           }),
-          processPdfWithOcr: async () => ({ markdown: null, pagesRoutedToOcr: [], pagesRecommendingHosted: [] }),
+
         }),
       },
       { userId: 'u1', filename: 'p2.pdf', bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]), documentId: 'doc1' }

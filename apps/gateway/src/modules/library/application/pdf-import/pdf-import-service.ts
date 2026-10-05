@@ -3,102 +3,32 @@ import { StructureClassSchema, type DocumentItem, type StructureClass } from '@s
 import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
 import { ensurePdfRuntime, type PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { classifyEmbeddedOutline, type EmbeddedOutlineEntry } from '@study-studio/content';
-import { detectDocScript, markdownToAst, promoteLessonHeadings } from '@study-studio/content';
+import { markdownToAst, promoteLessonHeadings } from '@study-studio/content';
 import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from '@study-studio/content';
 import { collectLayoutCandidates } from './layout-headings.js';
 import { fireLinesProjection, type LinesProjectionHook } from '../lines-projection-hook.js';
-import { layoutItemsToCandidates, mergeHeadingCandidates, type LayoutTextItem } from '@study-studio/content';
-import { buildPdfConvertReport, buildPdfMapReport, buildOcrOverflowError } from '@study-studio/content';
-import {
-  analyzePagesWithAzure,
-  AZURE_FALLBACK_MIN_CHARS,
-  type AzureOcrPage,
-} from '../ocr/azure-document.js';
-import { detectTocPageRange, type DetectedTocRangeResult } from './toc-range-detector.js';
-
-/**
- * PDF 导入编排：校验 → 按需运行时 → 分类（文字直提 / 扫描 OCR）→ AST → 入库。
- * 语言与 OCR 覆盖（2026-09-06 spike 实测）：
- * - 文字版：JA/KO/EN 均可直接提取；
- * - 扫描版：JA/EN 走自带 PP-OCRv6；KO 交白卷 → 返回 E_OCR_LANG_UNSUPPORTED，
- *   不臆造、不静默降级。
- */
-
+import { mergeHeadingCandidates } from '@study-studio/content';
 export const MAX_PDF_BYTES = 200 * 1024 * 1024;
 export const MAX_PDF_PAGES = 400;
-/** 单次导入最多 OCR 页数（约 0.7s/页；大书请按课分段选页导入） */
-export const MAX_OCR_PAGES_PER_IMPORT = 30;
-/** 结构预览默认/上限扫描窗口（页） */
 export const MAX_MAP_PAGES = 30;
-/** 单次云回填上限（页；Azure 按页计费，30 页约几分钱，轮询 120s 内可完成） */
-export const MAX_AZURE_PAGES_PER_CALL = 30;
-
-/**
- * 失败页挑选（纯函数，可单测）：本地结果过薄（去空 < 阈值）的页才值得打云。
- * 稀疏但合法的页（练习留白）可能被多打一页，接受（用户显式给了 Key 才触发）。
- */
-export function selectFailedPages(pageMarkdown: Map<number, string>): number[] {
-  const out: number[] = [];
-  for (const [page, md] of pageMarkdown) {
-    if ((md ?? '').trim().length < AZURE_FALLBACK_MIN_CHARS) out.push(page);
-  }
-  return out.sort((a, b) => a - b);
-}
-
-/** Azure 行 → 版式条目（云页复活 relSize/居中/独立行；粗体 v1 缺席，见 azure-document）。 */
-export function azureLinesToLayoutItems(azure: AzureOcrPage): LayoutTextItem[] {
-  return azure.lines
-    .filter((l) => l.text.trim().length > 0)
-    .map((l) => ({
-      text: l.text,
-      page: azure.pageNumber,
-      x: l.x,
-      y: l.y,
-      width: l.width,
-      height: l.height > 0 ? l.height : 12,
-      fontSize: l.height > 0 ? l.height : 12,
-      isBold: false,
-    }));
-}
-
-function detectAzureLocale(sample: string): string {
-  const script = detectDocScript(sample);
-  if (script === 'KO') return 'ko';
-  if (script === 'EN') return 'en';
-  return 'ja';
-}
-
 export interface PdfImportInput {
   userId: string;
   filename: string;
   bytes: Uint8Array;
-  /** 1-based ????????= ?????????????????*/
+  /** 1-based PDF 物理页；未指定时读取原生文字。 */
   pages?: number[];
   /**
    * CMD-01：用户已确认、已接地的结构分类（原样透传，convert 侧 zod 校验后驱动切课）。
    * 缺席/空数组 = 旧正则切课行为。不提供则旧行为。
    */
   classes?: unknown;
-  /**
-   * Azure 云 OCR 凭据（失败页回填用；随请求内存态传递，网关不落盘、不打日志）。
-   * 不提供 = 纯本地链路（行为不变）。
-   */
-  azure?: { endpoint: string; apiKey: string };
 }
 
 export interface PdfImportClassification {
   pdfType: string;
   pageCount: number;
-  pagesNeedingOcr: number[];
-  ocrUsed: boolean;
+
   selectedPages: number[];
-  /** 云回填命中的页（来源可追溯；无云调用时缺席） */
-  azurePages?: number[];
-  /**
-   * CMD-08 全部页夹持标志：扫描书超单次 OCR 上限时，网关不直接失败，
-   * 而对首个 30 页窗真正转换一次并置 true（弹窗据此提示接力）。
-   */
-  clampedFromAll?: boolean;
 }
 
 export interface PdfImportStats {
@@ -138,20 +68,6 @@ export interface PdfImportServiceDeps {
   runtimeDir?: string;
 }
 
-function errorMessage(e: unknown): string {
-  if (e instanceof BusinessError) return e.userMessage;
-  return 'PDF 解析运行时异常，请稍后重试';
-}
-
-/**
- * 运行时加载失败的运维日志（用户面仍走 BusinessError 信封）。
- * 只记 code + 文件名，不记用户路径与字节内容。
- */
-function warnRuntimeLoad(scope: string, filename: string, e: unknown): void {
-  const code = e instanceof BusinessError ? e.code : 'E_RUNTIME_LOAD';
-  logger.warn(`${scope} runtime load failed`, { code, filename });
-}
-
 /** 1-based 连续页窗 [start, end]（首尾收敛，end < start 即空窗；P2 发现模块复用）。 */
 export function rangePages(start: number, end: number): number[] {
   const pages: number[] = [];
@@ -173,57 +89,12 @@ export function probePdfPageCount(inspector: PdfInspectorLike, bytes: Uint8Array
   }
 }
 
-interface WindowClassification {
-  pdfType?: string;
-  pageCount?: number;
-  markdown?: string | null;
-  pagesNeedingOcr?: number[];
-  confidence?: number;
-}
-
-/**
- * CMD-P0.1 分块窗口分类：pages 按 chunkSize 切块逐窗调用并合并。
- * pageCount 取首个有效值（window 调用仍返回全书页数）；needing 取并集
- *（调用方再与选页求交即得精确值，不受原生窗内外口径影响）；markdown 拼接
- *（选页路径不用它，仅保形）。禁止无参全书调用。
- */
-function classifySelectedWindow(
-  inspector: PdfInspectorLike,
-  bytes: Uint8Array,
-  pages: number[],
-  chunkSize: number
-): WindowClassification {
-  const size = Math.max(1, Math.floor(chunkSize));
-  let head: WindowClassification | null = null;
-  const needing = new Set<number>();
-  const markdownParts: string[] = [];
-  for (let i = 0; i < pages.length; i += size) {
-    const part = inspector.processPdf(bytes, pages.slice(i, i + size));
-    if (!head) {
-      head = {};
-      if (part.pdfType !== undefined) head.pdfType = part.pdfType;
-      if (part.pageCount !== undefined) head.pageCount = part.pageCount;
-      if (part.confidence !== undefined) head.confidence = part.confidence;
-    }
-    if (typeof part.markdown === 'string' && part.markdown) markdownParts.push(part.markdown);
-    const list = Array.isArray(part.pagesNeedingOcr) ? part.pagesNeedingOcr : [];
-    for (const n of list) {
-      if (typeof n === 'number') needing.add(n);
-    }
-  }
-  return {
-    ...(head ?? {}),
-    markdown: markdownParts.length > 0 ? markdownParts.join('\n') : null,
-    pagesNeedingOcr: [...needing].sort((a, b) => a - b),
-  };
-}
-
 export interface PdfMapOutput {
   classification: PdfImportClassification;
   window: number[];
   headings: PageHeading[];
   tocEntries: TocEntry[];
-  /** CMD-LINGUA-P1A：目录来源（embedded = 原生目录命中且可用，none = 走既有窗口/OCR 路径）。 */
+  /** CMD-LINGUA-P1A：目录来源（embedded = 原生目录命中且可用，none = 走既有原生信息窗口）。 */
   outlineSource: 'embedded' | 'none';
   /**
    * 校验后的原生目录条目（仅可用项：title 非空、level ≥1 整数、
@@ -231,7 +102,7 @@ export interface PdfMapOutput {
    * none 时为空数组；绝不混入 TocEntry.printedPage 语义。
    */
   embeddedOutline: EmbeddedOutlineEntry[];
-  detectedTocRange?: DetectedTocRangeResult | null;
+  detectedTocRange?: null;
 }
 
 /** 校验后的单条原生目录（M8-5 起由 canonical 出口定义，此处仅兼容重导出）。 */
@@ -249,244 +120,23 @@ export type { EmbeddedOutlineEntry } from '@study-studio/content';
  * 返回每页标题 + 目录条目。调用方按标题页选范围，再调 convertPdfToAst 精确导入。
  * 有目录 → 目录条目即 ground truth；无目录 → 分段扫全书标题建地图。
  */
-export async function mapPdfPages(
-  deps: Pick<PdfImportServiceDeps, 'loadInspector' | 'runtimeDir'>,
-  input: PdfImportInput
-): Promise<Result<PdfMapOutput, BusinessError>> {
-  const check = validatePdfInput(input);
-  if (!check.ok) return err(check.error);
-  let inspector: PdfInspectorLike;
+export async function mapPdfPages(deps: Pick<PdfImportServiceDeps, 'loadInspector' | 'runtimeDir'>, input: PdfImportInput): Promise<Result<PdfMapOutput, BusinessError>> {
+  const valid = validatePdfInput(input); if (!valid.ok) return valid;
   try {
-    const runtime = await ensurePdfRuntime({
-      ...(deps.loadInspector ? { loadInspector: deps.loadInspector } : {}),
-      ...(deps.runtimeDir ? { runtimeDir: deps.runtimeDir } : {}),
-      needOcr: false,
-    });
-    inspector = runtime.inspector;
-  } catch (e) {
-    warnRuntimeLoad('[pdf-map]', input.filename, e);
-    return err(
-      e instanceof BusinessError
-        ? e
-        : new BusinessError('E_RUNTIME_LOAD', 'PDF 解析运行时准备失败，请检查网络后重试', 'NETWORK')
-    );
-  }
-  let classification: {
-    pdfType?: string;
-    pageCount?: number;
-    pagesNeedingOcr?: number[];
-    confidence?: number;
-  };
-  // CMD-P0.1：探页数前置定窗——选页先按诚实总数清洗出处理窗，分类只扫该窗；
-  // 任何路径禁止单参 processPdf(bytes)。
-  // CMD-P0.1a：探页成功但选页全越界→直接拒绝，此路径只允许 probe 的 [1] 调用，
-  // 全越界选页不得再交给 inspector。
-  const window: number[] = [];
-  if (input.pages !== undefined) {
-    const total = probePdfPageCount(inspector, input.bytes);
-    if (total > 0) {
-      const cleaned = [...new Set(input.pages)].filter(
-        (n) => Number.isInteger(n) && n >= 1 && n <= total
-      );
-      if (cleaned.length === 0) {
-        return err(
-          new BusinessError('E_INVALID_INPUT', `选页超出范围（本书共 ${total} 页）`, 'VALIDATION')
-        );
-      }
-      cleaned.sort((a, b) => a - b);
-      window.push(...cleaned.slice(0, MAX_MAP_PAGES));
-    }
-  }
-  try {
-    // CMD-10：未选页不用无窗口 processPdf 扫全书——先 [1] 拿全书页数，再开窗分类
-    //（window 调用仍返回全书 pageCount，探针实测；超界窗不抛）。
-    if (input.pages === undefined) {
-      const total = probePdfPageCount(inspector, input.bytes);
-      const end = total > 0 ? Math.min(total, MAX_MAP_PAGES) : MAX_MAP_PAGES;
-      classification = inspector.processPdf(input.bytes, rangePages(1, end));
-    } else if (window.length > 0) {
-      classification = inspector.processPdf(input.bytes, window);
-    } else {
-      // 探页失败回退：一次小窗分类拿诚实页数（PDF parse error 语义不变），不扫全书。
-      // 探页成功时的全越界已在上一步直接拒绝，走不到这里。
-      const raw = [...new Set(input.pages ?? [])].filter((n) => Number.isInteger(n) && n >= 1);
-      classification = inspector.processPdf(input.bytes, raw.length > 0 ? raw.slice(0, MAX_MAP_PAGES) : [1]);
-    }
-  } catch (e) {
-    logger.warn('[pdf-map] processPdf failed', { message: errorMessage(e) });
-    return err(new BusinessError('E_PDF_PARSE', 'PDF 解析失败（文件可能加密或已损坏）', 'TOOL_EXECUTION'));
-  }
-  const pdfType = String(classification.pdfType ?? 'Unknown');
-  const pageCount = Number(classification.pageCount ?? 0);
-  if (!Number.isFinite(pageCount) || pageCount < 1) {
-    return err(new BusinessError('E_PDF_PARSE', 'PDF 页数识别失败，文件可能已损坏', 'TOOL_EXECUTION'));
-  }
-  // 窗已在分类前预填（选页）；此处只处理探页失败/越界回退与未选页默认窗。
-  if (input.pages !== undefined && window.length === 0) {
-    const cleaned = [...new Set(input.pages)].filter(
-      (n) => Number.isInteger(n) && n >= 1 && n <= pageCount
-    );
-    if (cleaned.length === 0) {
-      return err(new BusinessError('E_INVALID_INPUT', `选页超出范围（本书共 ${pageCount} 页）`, 'VALIDATION'));
-    }
-    cleaned.sort((a, b) => a - b);
-    window.push(...cleaned.slice(0, MAX_MAP_PAGES));
-  } else if (input.pages === undefined) {
-    for (let p = 1; p <= Math.min(pageCount, MAX_MAP_PAGES); p++) window.push(p);
-  }
-  const needing = Array.isArray(classification.pagesNeedingOcr)
-    ? classification.pagesNeedingOcr.filter((n): n is number => typeof n === 'number')
-    : [];
-  // CMD-LINGUA-P1A/P2.2：内置目录走唯一质量门——usable 才标 embedded
-  // 并透传有效条目；none/unusable 落到既有 none 路径（照常 OCR）。
-  // 校验用上面的诚实 pageCount；日志只记状态/reason/计数，不记标题。
-  const outlineQuality = classifyEmbeddedOutline(inspector, input.bytes, pageCount);
-  if (outlineQuality.quality === 'usable') {
-    const embedded = outlineQuality.entries;
-    // 只记条数，不记 title 原文。
-    logger.warn('[pdf-map] embedded outline 命中', {
-      pageCount,
-      entries: embedded.length,
-      reason: outlineQuality.reason,
-    });
-    return ok({
-      classification: {
-        pdfType,
-        pageCount,
-        pagesNeedingOcr: needing,
-        ocrUsed: false,
-        selectedPages: [...window],
-      },
-      window: [],
-      headings: [],
-      tocEntries: [],
-      outlineSource: 'embedded',
-      embeddedOutline: embedded,
-      detectedTocRange: detectTocPageRange([], embedded),
-    });
-  }
-  try {
-    const runtime = await ensurePdfRuntime({
-      ...(deps.loadInspector ? { loadInspector: deps.loadInspector } : {}),
-      ...(deps.runtimeDir ? { runtimeDir: deps.runtimeDir } : {}),
-      needOcr: window.some((p) => needing.includes(p)),
-    });
-    inspector = runtime.inspector;
-    const ocr = await inspector.processPdfWithOcr(input.bytes, { pageNumbers: window });
-    const perPage = Array.isArray(ocr.pages) ? ocr.pages : [];
-    // Azure 失败页回填（显式给了 Key 才触发；失败只 warn，本地结果不受影响）
-    let azurePages: AzureOcrPage[] = [];
-    if (input.azure?.apiKey) {
-      const perPageMd = new Map<number, string>();
-      if (perPage.length > 0) {
-        for (const pg of perPage) {
-          perPageMd.set(pg.pageNumber, typeof pg.markdown === 'string' ? pg.markdown : '');
-        }
-      } else {
-        perPageMd.set(window[0] ?? 1, typeof ocr.markdown === 'string' ? ocr.markdown : '');
-      }
-      const failed = selectFailedPages(perPageMd).slice(0, MAX_AZURE_PAGES_PER_CALL);
-      if (failed.length > 0) {
-        const az = await analyzePagesWithAzure({
-          pdfBytes: input.bytes,
-          pages: failed,
-          credentials: input.azure,
-          locale: detectAzureLocale([...perPageMd.values()].join('\n')),
-        });
-        if (isOk(az)) {
-          azurePages = az.value.pages;
-          const byPage = new Map(azurePages.map((p) => [p.pageNumber, p]));
-          for (const pg of perPage) {
-            const hit = byPage.get(pg.pageNumber);
-            if (hit && hit.markdown.trim()) pg.markdown = hit.markdown;
-          }
-          const single = byPage.get(window[0] ?? 1);
-          if (perPage.length === 0 && single && single.markdown.trim()) {
-            ocr.markdown = single.markdown;
-          }
-        } else {
-          logger.warn('[pdf-map] azure fallback failed', {
-            code: az.error.code,
-            pages: failed.length,
-          });
-        }
-      }
-    }
-    let headings: PageHeading[] = [];
-    let combined = '';
-    if (perPage.length > 0) {
-      for (const pg of perPage) {
-        const md = typeof pg.markdown === 'string' ? pg.markdown : '';
-        headings.push(...extractHeadingsFromMarkdown(md, pg.pageNumber));
-      }
-      combined = perPage.map((pg) => (typeof pg.markdown === 'string' ? pg.markdown : '')).join('\n');
-    } else {
-      combined = typeof ocr.markdown === 'string' ? ocr.markdown : '';
-      headings.push(...extractHeadingsFromMarkdown(combined, window[0] ?? 1));
-    }
-    // 版式候选（原生接口 + Azure 云行框，两路都失败就纯正则，不影响主流程）
-    const azureItems: LayoutTextItem[] = [];
-    for (const ap of azurePages) azureItems.push(...azureLinesToLayoutItems(ap));
-    headings = mergeHeadingCandidates(
-      headings,
-      [
-        ...collectLayoutCandidates(inspector, input.bytes, window),
-        ...layoutItemsToCandidates(azureItems, []),
-      ]
-    );
-    const azureHitPages = azurePages.filter((p) => p.markdown.trim()).map((p) => p.pageNumber);
-    const ocrUsed = window.some((p) => needing.includes(p));
-    const tocEntries = extractTocEntries(combined);
-    logger.warn(
-      '[pdf-map] 结构预览完成',
-      buildPdfMapReport({
-        pageCount,
-        window,
-        ocrUsed,
-        ocrPages: needing.filter((p) => window.includes(p)),
-        headings,
-        tocCount: tocEntries.length,
-      })
-    );
-    return ok({
-      classification: {
-        pdfType,
-        pageCount,
-        pagesNeedingOcr: needing,
-        ocrUsed,
-        selectedPages: window,
-        ...(azureHitPages.length > 0 ? { azurePages: azureHitPages } : {}),
-      },
-      window,
-      headings,
-      tocEntries,
-      outlineSource: 'none',
-      embeddedOutline: [],
-      detectedTocRange: detectTocPageRange(
-        perPage.length > 0
-          ? perPage.map((pg) => ({
-              page: pg.pageNumber,
-              text: typeof pg.markdown === 'string' ? pg.markdown : '',
-            }))
-          : [{ page: window[0] ?? 1, text: combined }],
-        outlineQuality.entries
-      ),
-    });
-  } catch (e) {
-    logger.warn('[pdf-map] map window failed', { message: errorMessage(e) });
-    return err(
-      e instanceof BusinessError
-        ? e
-        : new BusinessError('E_PDF_PARSE', '结构预览失败，请稍后重试', 'TOOL_EXECUTION')
-    );
-  }
+    const { inspector } = await ensurePdfRuntime(deps);
+    const pageCount = probePdfPageCount(inspector, input.bytes);
+    if (!pageCount) return err(new BusinessError('E_PDF_PARSE', 'PDF 页数识别失败，请检查文件', 'TOOL_EXECUTION'));
+    const window = input.pages ?? rangePages(1, Math.min(MAX_MAP_PAGES, pageCount));
+    if (!window.length || window.some(page => !Number.isSafeInteger(page) || page < 1 || page > pageCount)) return err(new BusinessError('E_INVALID_INPUT', '目录页范围超出教材页数', 'VALIDATION'));
+    const classified = inspector.processPdf(input.bytes, window);
+    const markdown = classified.markdown ?? '';
+    const outline = classifyEmbeddedOutline(inspector, input.bytes, pageCount);
+    return ok({ classification: { pdfType: classified.pdfType ?? 'Unknown', pageCount, selectedPages: window }, window,
+      headings: mergeHeadingCandidates(extractHeadingsFromMarkdown(markdown, window[0] ?? 1), collectLayoutCandidates(inspector, input.bytes, window)),
+      tocEntries: extractTocEntries(markdown), outlineSource: outline.quality === 'usable' ? 'embedded' : 'none', embeddedOutline: outline.quality === 'usable' ? outline.entries : [], detectedTocRange: null });
+  } catch (cause) { return err(cause instanceof BusinessError ? cause : new BusinessError('E_PDF_PARSE', 'PDF 信息读取失败，请检查文件后重试', 'TOOL_EXECUTION')); }
 }
 
-/**
- * CMD-01：已确认结构分类的信任边界收窄（zod 全量校验）。
- * - 缺席/空数组 = 未提供，走旧正则切课；
- * - 非数组或任一条目非法 = 友好 BusinessError（调用方零写，绝不抛底层栈）。
- */
 function parseStructureClasses(raw: unknown): Result<StructureClass[] | undefined, BusinessError> {
   if (raw === undefined) return ok(undefined);
   if (!Array.isArray(raw)) {
@@ -520,330 +170,27 @@ export function validatePdfInput(input: PdfImportInput): Result<void, BusinessEr
   return ok(undefined);
 }
 
-export async function convertPdfToAst(
-  deps: Pick<PdfImportServiceDeps, 'loadInspector' | 'runtimeDir'>,
-  input: PdfImportInput
-): Promise<Result<PdfAstOutput, BusinessError>> {
-  const valid = validatePdfInput(input);
-  if (!valid.ok) return err(valid.error);
-  // CMD-01：classes 非法直接友好失败（运行时准备之前，零副作用）。
-  const classesRes = parseStructureClasses(input.classes);
-  if (!classesRes.ok) return err(classesRes.error);
-
-  let inspector: PdfInspectorLike;
+/** Native text conversion for existing text-document commands. Scans use the chapter Agent flow. */
+export async function convertPdfToAst(deps: Pick<PdfImportServiceDeps, 'loadInspector' | 'runtimeDir'>, input: PdfImportInput): Promise<Result<PdfAstOutput, BusinessError>> {
+  const valid = validatePdfInput(input); if (!valid.ok) return valid;
+  const classes = parseStructureClasses(input.classes); if (!classes.ok) return classes;
   try {
-    const runtime = await ensurePdfRuntime({
-      ...(deps.loadInspector ? { loadInspector: deps.loadInspector } : {}),
-      ...(deps.runtimeDir ? { runtimeDir: deps.runtimeDir } : {}),
-      needOcr: false,
-    });
-    inspector = runtime.inspector;
-  } catch (e) {
-    warnRuntimeLoad('[pdf-import]', input.filename, e);
-    return err(
-      e instanceof BusinessError
-        ? e
-        : new BusinessError('E_RUNTIME_LOAD', 'PDF 解析运行时准备失败，请检查网络后重试', 'NETWORK')
-    );
-  }
-
-  let classification: {
-    pdfType?: string;
-    pageCount?: number;
-    markdown?: string | null;
-    pagesNeedingOcr?: number[];
-    confidence?: number;
-  };
-  // 选页状态（夹持在分类时即定，未选页解析不得覆盖它）
-  let selectedPages: number[] | null = null;
-  // CMD-08 夹持标志（分类时即定）
-  let clampedFromAll = false;
-  try {
-    if (input.pages === undefined) {
-      // CMD-10：未选页不用无窗口 processPdf 扫全书——先 [1] 拿全书页数，再开窗分类。
-      const total = probePdfPageCount(inspector, input.bytes);
-      if (total > MAX_OCR_PAGES_PER_IMPORT) {
-        const head = inspector.processPdf(input.bytes, rangePages(1, MAX_OCR_PAGES_PER_IMPORT));
-        const headMarkdown = typeof head.markdown === 'string' ? head.markdown : '';
-        const headNeeding = Array.isArray(head.pagesNeedingOcr)
-          ? head.pagesNeedingOcr.filter((n): n is number => typeof n === 'number')
-          : [];
-        if (!headMarkdown.trim() && headNeeding.length > 0) {
-          // 扫描头：夹持首窗，后续走选页 OCR 路径（≤30 页），永不扫全书。
-          clampedFromAll = true;
-          selectedPages = rangePages(1, MAX_OCR_PAGES_PER_IMPORT);
-          classification = head;
-        } else {
-          // 文字头大书：显式全范围取全文（带窗口参数，不走无参调用）。
-          classification = inspector.processPdf(input.bytes, rangePages(1, total));
-        }
-      } else {
-        // 30 页内：单窗即全书，与此前行为一致。
-        const end = total > 0 ? total : MAX_OCR_PAGES_PER_IMPORT;
-        classification = inspector.processPdf(input.bytes, rangePages(1, end));
-      }
-    } else {
-      // CMD-P0.1：已选页用用户页窗分类（分块 ≤30 并合并），禁止无参全书调用。
-      // 先 [1] 拿诚实页数做清洗上界；needing 并集再与选页求交即精确值。
-      const total = probePdfPageCount(inspector, input.bytes);
-      const raw = [...new Set(input.pages)].filter((n) => Number.isInteger(n) && n >= 1);
-      const cleanedHint = total > 0 ? raw.filter((n) => n <= total) : raw.slice(0, MAX_OCR_PAGES_PER_IMPORT);
-      if (cleanedHint.length === 0 && total > 0) {
-        // 选页越界：占位分类，下方校验块报与此前一致的错误，不扫全书。
-        classification = { pdfType: 'Unknown', pageCount: total, markdown: '', pagesNeedingOcr: [] };
-      } else if (cleanedHint.length === 0) {
-        classification = inspector.processPdf(input.bytes, [1]);
-      } else {
-        classification = classifySelectedWindow(inspector, input.bytes, cleanedHint, MAX_OCR_PAGES_PER_IMPORT);
-      }
-    }
-  } catch (e) {
-    logger.warn('[pdf-import] processPdf failed', { message: errorMessage(e) });
-    return err(new BusinessError('E_PDF_PARSE', 'PDF 解析失败（文件可能加密或已损坏）', 'TOOL_EXECUTION'));
-  }
-
-  const pdfType = String(classification.pdfType ?? 'Unknown');
-  const pageCount = Number(classification.pageCount ?? 0);
-  const pagesNeedingOcr = Array.isArray(classification.pagesNeedingOcr)
-    ? classification.pagesNeedingOcr.filter((n): n is number => typeof n === 'number')
-    : [];
-  if (!Number.isFinite(pageCount) || pageCount < 1) {
-    return err(new BusinessError('E_PDF_PARSE', 'PDF 页数识别失败，文件可能已损坏', 'TOOL_EXECUTION'));
-  }
-  if (pageCount > MAX_PDF_PAGES) {
-    return err(
-      new BusinessError(
-        'E_INVALID_INPUT',
-        `PDF 共 ${pageCount} 页（上限 ${MAX_PDF_PAGES} 页），请按课分段选页导入`,
-        'VALIDATION'
-      )
-    );
-  }
-
-  // 选页校验（1-based；不传 = 全书；夹持已在分类时定好，这里不得覆盖）
-  if (input.pages !== undefined) {
-    const cleaned = [...new Set(input.pages)].filter(
-      (n) => Number.isInteger(n) && n >= 1 && n <= pageCount
-    );
-    if (cleaned.length === 0) {
-      return err(
-        new BusinessError('E_INVALID_INPUT', `选页超出范围（本书共 ${pageCount} 页）`, 'VALIDATION')
-      );
-    }
-    if (cleaned.length > MAX_PDF_PAGES) {
-      return err(
-        new BusinessError('E_INVALID_INPUT', `一次最多导入 ${MAX_PDF_PAGES} 页，请缩小范围`, 'VALIDATION')
-      );
-    }
-    cleaned.sort((a, b) => a - b);
-    selectedPages = cleaned;
-  }
-  const inScope = (n: number) => !selectedPages || selectedPages.includes(n);
-
-  let markdown = '';
-  let ocrUsed = false;
-  // CMD-08：兜底（分类时已夹持的走不到这里；仅防御窗外仍超限的极端混合书）。
-  if (
-    !selectedPages &&
-    typeof classification.markdown === 'string' &&
-    !classification.markdown.trim() &&
-    pagesNeedingOcr.length > MAX_OCR_PAGES_PER_IMPORT
-  ) {
-    clampedFromAll = true;
-    selectedPages = Array.from(
-      { length: Math.min(MAX_OCR_PAGES_PER_IMPORT, pageCount) },
-      (_, i) => i + 1
-    );
-  }
-  if (selectedPages) {
-    // 选页导入：文字页直提 + 扫描页 OCR（Auto 只路由需 OCR 页）
-    try {
-      const selectedNeeding = pagesNeedingOcr.filter(inScope);
-      if (selectedNeeding.length > MAX_OCR_PAGES_PER_IMPORT) {
-        return err(
-          buildOcrOverflowError({
-            scope: 'range',
-            pageCount,
-            ocrPages: selectedNeeding,
-            limit: MAX_OCR_PAGES_PER_IMPORT,
-          })
-        );
-      }
-      const runtime = await ensurePdfRuntime({
-        ...(deps.loadInspector ? { loadInspector: deps.loadInspector } : {}),
-        ...(deps.runtimeDir ? { runtimeDir: deps.runtimeDir } : {}),
-        needOcr: selectedNeeding.length > 0,
-      });
-      inspector = runtime.inspector;
-      if (selectedNeeding.length > 0) {
-        const ocr = await inspector.processPdfWithOcr(input.bytes, { pageNumbers: selectedPages });
-        markdown = typeof ocr.markdown === 'string' ? ocr.markdown : '';
-        ocrUsed = true;
-      } else {
-        const part = await inspector.processPdf(input.bytes, selectedPages);
-        markdown = typeof part.markdown === 'string' ? part.markdown : '';
-      }
-    } catch (e) {
-      logger.warn('[pdf-import] selected pages failed', { message: errorMessage(e) });
-      return err(
-        e instanceof BusinessError
-          ? e
-          : new BusinessError('E_PDF_PARSE', '选页提取失败，请稍后重试', 'TOOL_EXECUTION')
-      );
-    }
-  } else {
-    markdown = typeof classification.markdown === 'string' ? classification.markdown : '';
-    if (!markdown.trim() && pagesNeedingOcr.length > 0) {
-      if (pagesNeedingOcr.length > MAX_OCR_PAGES_PER_IMPORT) {
-        return err(
-          buildOcrOverflowError({
-            scope: 'all',
-            pageCount,
-            ocrPages: pagesNeedingOcr,
-            limit: MAX_OCR_PAGES_PER_IMPORT,
-          })
-        );
-      }
-      // 扫描页：按需准备 OCR 运行时（PDFium + ORT + 模型，不进安装包）
-      try {
-        const runtime = await ensurePdfRuntime({
-          ...(deps.loadInspector ? { loadInspector: deps.loadInspector } : {}),
-          ...(deps.runtimeDir ? { runtimeDir: deps.runtimeDir } : {}),
-          needOcr: true,
-        });
-        inspector = runtime.inspector;
-        const ocr = await inspector.processPdfWithOcr(input.bytes);
-        markdown = typeof ocr.markdown === 'string' ? ocr.markdown : '';
-        ocrUsed = true;
-        const hosted = Array.isArray(ocr.pagesRecommendingHosted) ? ocr.pagesRecommendingHosted.length : 0;
-        if (hosted > 0) {
-          logger.info('[pdf-import] 部分页面 OCR 置信度低，建议改用文字版 PDF', { hosted });
-        }
-      } catch (e) {
-        return err(
-          e instanceof BusinessError
-            ? e
-            : new BusinessError('E_OCR_FAILED', 'OCR 运行时准备失败，请检查网络后重试', 'NETWORK')
-        );
-      }
-    }
-  }
-
-  // 本地零产出且无云钥：直接报错（有钥则落到下面的云回填，不在此提前 return）。
-  // 注意：零产出≠韩语——空白页/纯图页同样零产出，文案不得断言具体语种（实测：无字形状页也走这里）。
-  if (!markdown.trim() && !input.azure?.apiKey) {
-    return err(
-      new BusinessError(
-        'E_OCR_LANG_UNSUPPORTED',
-        '未能从 PDF 中识别出文字：可能是纯图片页/空白页，或扫描语种暂无本地模型覆盖。请改用文字版 PDF，或在设置页填入 Azure Key 走云端识别',
-        'TOOL_EXECUTION'
-      )
-    );
-  }
-
-  // Azure 失败页回填（convert 侧：整窗过薄才整窗打云；给了 Key 才触发）
-  let azureHitPages: number[] = [];
-  let azureItems: LayoutTextItem[] = [];
-  if (input.azure?.apiKey) {
-    const windowPages =
-      selectedPages ??
-      Array.from({ length: Math.min(pageCount, MAX_AZURE_PAGES_PER_CALL) }, (_, i) => i + 1);
-    const thin =
-      markdown.trim().length < AZURE_FALLBACK_MIN_CHARS * windowPages.length;
-    if (thin && !selectedPages && pageCount > MAX_AZURE_PAGES_PER_CALL) {
-      logger.warn('[pdf-import] azure skipped (whole-book convert too wide)', { pageCount });
-    } else if (thin) {
-      const az = await analyzePagesWithAzure({
-        pdfBytes: input.bytes,
-        pages: windowPages,
-        credentials: input.azure,
-        locale: detectAzureLocale(markdown),
-      });
-      if (isOk(az)) {
-        const got = [...az.value.pages]
-          .sort((a, b) => a.pageNumber - b.pageNumber)
-          .filter((p) => p.markdown.trim());
-        if (got.length > 0) {
-          markdown = got.map((p) => p.markdown).join('\n');
-          azureHitPages = got.map((p) => p.pageNumber);
-          for (const p of got) azureItems.push(...azureLinesToLayoutItems(p));
-          ocrUsed = true;
-        }
-      } else {
-        logger.warn('[pdf-import] azure fallback failed', { code: az.error.code });
-      }
-    }
-  }
-
-  const title = input.filename.replace(/\.pdf$/i, '');
-  if (!markdown.trim()) {
-    return err(
-      new BusinessError(
-        'E_OCR_FAILED',
-        '本地与云端均未识别出文字（云端可能配额不足或页窗过大），请缩小选页范围后重试',
-        'TOOL_EXECUTION'
-      )
-    );
-  }
-  // CMD-02：与 mapPdfPages 同源的标题候选（markdown 抽取 + layout 版式；Azure 行框有则一并）。
-  // 无模型：只把“像课标题的行”提升为 `#` 切课点，再交现有 markdownToAst（可带 classes）。
-  // layout 接口缺席/异常时 collect 内部降级为空，纯 markdown 规则照常工作。
-  const layoutWindow = selectedPages ?? Array.from({ length: pageCount }, (_, i) => i + 1);
-  const promoted = promoteLessonHeadings(markdown, {
-    headings: mergeHeadingCandidates(
-      extractHeadingsFromMarkdown(markdown, layoutWindow[0] ?? 1),
-      [
-        ...collectLayoutCandidates(inspector, input.bytes, layoutWindow),
-        ...layoutItemsToCandidates(azureItems, []),
-      ]
-    ),
-    tocEntries: extractTocEntries(markdown),
-  });
-  const astRes = markdownToAst(
-    promoted,
-    { title, ...(classesRes.value ? { classes: classesRes.value } : {}) }
-  );
-  if (!astRes.ok) return err(astRes.error);
-  // 协议层再验一次：服务绝不向外吐出非法 AST
-  const checked = parseTextbookAST(astRes.value);
-  if (!checked.ok) return err(checked.error);
-  const book = checked.value;
-
-  const stats: PdfImportStats = {
-    lessons: book.lessons.length,
-    dialogues: book.lessons.reduce((acc, l) => acc + l.dialogues.length, 0),
-  };
-  const outClassification = {
-    pdfType,
-    pageCount,
-    pagesNeedingOcr: pagesNeedingOcr.filter(inScope),
-    ocrUsed,
-    selectedPages: selectedPages ?? [],
-    ...(azureHitPages.length > 0 ? { azurePages: azureHitPages } : {}),
-    ...(clampedFromAll ? { clampedFromAll: true } : {}),
-  };
-  logger.warn(
-    '[pdf-import] 转换完成',
-    buildPdfConvertReport({
-      title: book.title,
-      pdfType: outClassification.pdfType,
-      pageCount: outClassification.pageCount,
-      selectedPages: outClassification.selectedPages,
-      ocrUsed: outClassification.ocrUsed,
-      ocrPages: outClassification.pagesNeedingOcr,
-      ...(outClassification.azurePages ? { azurePages: outClassification.azurePages } : {}),
-      lessons: stats.lessons,
-      dialogues: stats.dialogues,
-      lessonTitles: book.lessons.map((l) => l.title),
-      ...(clampedFromAll ? { clampedFromAll: true } : {}),
-    })
-  );
-  return ok({
-    book,
-    markdown,
-    classification: outClassification,
-    stats,
-  });
+    const { inspector } = await ensurePdfRuntime(deps);
+    const pageCount = probePdfPageCount(inspector, input.bytes);
+    if (!pageCount) return err(new BusinessError('E_PDF_PARSE', 'PDF 页数识别失败，请检查文件', 'TOOL_EXECUTION'));
+    const pages = input.pages ?? rangePages(1, pageCount);
+    if (pageCount > MAX_PDF_PAGES) return err(new BusinessError('E_INVALID_INPUT', '此文字直提入口仅支持 400 页内文件；大教材请使用按章整理', 'VALIDATION'));
+    if (!pages.length || pages.some(page => !Number.isSafeInteger(page) || page < 1 || page > pageCount)) return err(new BusinessError('E_INVALID_INPUT', '选页超出教材范围', 'VALIDATION'));
+    const classified = inspector.processPdf(input.bytes, pages);
+    const markdown = classified.markdown ?? '';
+    if (!markdown.trim()) return err(new BusinessError('E_PDF_TEXT_EMPTY', '这些页面没有文字层，请通过教材按章整理让模型读取 PDF', 'TOOL_EXECUTION'));
+    const promoted = promoteLessonHeadings(markdown, { headings: mergeHeadingCandidates(extractHeadingsFromMarkdown(markdown, pages[0] ?? 1), collectLayoutCandidates(inspector, input.bytes, pages)), tocEntries: extractTocEntries(markdown) });
+    const ast = markdownToAst(promoted, { title: input.filename.replace(/\.pdf$/i, ''), ...(classes.value ? { classes: classes.value } : {}) });
+    if (!ast.ok) return ast;
+    const checked = parseTextbookAST(ast.value); if (!checked.ok) return checked;
+    const book = checked.value;
+    return ok({ book, markdown, classification: { pdfType: classified.pdfType ?? 'Unknown', pageCount, selectedPages: pages }, stats: { lessons: book.lessons.length, dialogues: book.lessons.reduce((sum, lesson) => sum + lesson.dialogues.length, 0) } });
+  } catch (cause) { return err(cause instanceof BusinessError ? cause : new BusinessError('E_PDF_PARSE', 'PDF 文字读取失败，请检查文件后重试', 'TOOL_EXECUTION')); }
 }
 
 export async function importPdfDocument(

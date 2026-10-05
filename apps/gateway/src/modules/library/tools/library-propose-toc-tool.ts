@@ -24,6 +24,8 @@ export const ProposedTocEntrySchema = z.object({
 
 export const ProposedTocSchema = z.object({
   title: z.string().trim().min(1).optional().describe('教材标题；目录页未写明时省略'),
+  tocEndPage: z.number().int().positive().describe('实际目录最后一页在原 PDF 中的物理页码；不是提供文件的结束页'),
+  pageOffset: z.number().int().optional().describe('已从页面实际确认的物理页减印刷页偏移；无法确认则省略'),
   entries: z.array(ProposedTocEntrySchema).min(1).describe('按目录页阅读顺序列出的完整条目'),
 }).strict();
 
@@ -32,6 +34,7 @@ export type ProposedToc = z.infer<typeof ProposedTocSchema>;
 interface ActiveProposal {
   userId: string;
   value: ProposedToc | null;
+  physicalPages?: readonly number[];
   onValidation?: (result: { accepted: boolean; code?: string; entryCount?: number; callId?: string; message?: string }) => void;
 }
 
@@ -39,7 +42,7 @@ interface ActiveProposal {
 export class LibraryProposeTocTool implements ToolDefinition<ProposedToc, ProposedToc> {
   readonly name = 'library.propose_toc';
   readonly description =
-    '提交从目录页图片看到的完整多级目录草稿并检查页码顺序。包含成课(lesson)及课下文型/会话/复习(section)；只使用印刷页码；提交草稿不会入库。';
+    '提交当前 PDF 中的树状目录草稿，父子关系用 parentIndex；条目使用印刷页码，tocEndPage 使用实际目录末页的原 PDF 物理页码。没有目录时说明问题，不编造。草稿不入库。';
   readonly location = ToolLocations.SERVER;
   readonly permission = ToolPermissions.READ;
   readonly schema = ProposedTocSchema;
@@ -49,11 +52,13 @@ export class LibraryProposeTocTool implements ToolDefinition<ProposedToc, Propos
   begin(
     sessionId: string,
     userId: string,
-    onValidation?: ActiveProposal['onValidation']
+    onValidation?: ActiveProposal['onValidation'],
+    physicalPages?: readonly number[]
   ): void {
     this.active.set(sessionId, {
       userId,
       value: null,
+      ...(physicalPages ? { physicalPages } : {}),
       ...(onValidation ? { onValidation } : {}),
     });
   }
@@ -79,9 +84,13 @@ export class LibraryProposeTocTool implements ToolDefinition<ProposedToc, Propos
     const parsed = this.schema.safeParse(input);
     if (!parsed.success) {
       active.onValidation?.({ accepted: false, code: 'E_LLM_SCHEMA_INVALID' });
-      return err(new BusinessError('E_LLM_SCHEMA_INVALID', '目录草稿结构不符合要求，请重新核对图片', 'VALIDATION'));
+      return err(new BusinessError('E_LLM_SCHEMA_INVALID', '目录草稿字段不完整，请按工具说明补齐条目和实际目录结束页', 'VALIDATION', true));
     }
     const value = parsed.data;
+    if (active.physicalPages && !active.physicalPages.includes(value.tocEndPage)) {
+      active.onValidation?.({ accepted: false, code: 'E_TOC_RANGE_INVALID', message: 'tocEndPage 必须是本次文件中实际目录末页的原 PDF 物理页码' });
+      return err(new BusinessError('E_TOC_RANGE_INVALID', 'tocEndPage 超出本次文件，请核对原 PDF 物理页码后修正', 'VALIDATION', true));
+    }
     for (let index = 0; index < value.entries.length; index++) {
       let parent = value.entries[index]!.parentIndex;
       const visited = new Set([index]);
@@ -112,7 +121,7 @@ export class LibraryProposeTocTool implements ToolDefinition<ProposedToc, Propos
         active.onValidation?.({ accepted: false, code: 'E_TOC_PAGE_ORDER_INVALID' });
         return err(new BusinessError(
           'E_TOC_PAGE_ORDER_INVALID',
-          `目录第 ${index + 1} 条的印刷页码倒退，请核对目录图片`,
+          `目录第 ${index + 1} 条的印刷页码倒退，请核对目录PDF`,
           'VALIDATION'
         ));
       }

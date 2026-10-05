@@ -1,119 +1,74 @@
-import type { AgentAdapter, AgentImageAttachment } from '@study-studio/agent-runtime';
-import { BusinessError, err, generateId, ok, translateToBusinessError, type Result } from '@study-studio/shared';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
+import { BusinessError, err, generateId, ok, logger, translateToBusinessError, type Result } from '@study-studio/shared';
+import { TextbookPipelineSettingsSchema, type TocEntry } from '@study-studio/document-model';
 import { buildTocExtractionPrompt } from './prompts/toc-extraction-prompt.js';
 import { LibraryProposeTocTool, type ProposedToc } from '../tools/library-propose-toc-tool.js';
 import type { ImportMonitor } from './import-monitor.js';
-import type { TocEntry } from '@study-studio/document-model';
+import type { PdfTaskFile } from './pdf-import/pdf-task-workspace.js';
+import { awaitModelActivity } from './model-activity-deadline.js';
 
 export interface ExtractTocWithLlmInput {
-  userId: string;
-  title?: string | undefined;
-  language?: string | undefined;
-  pageNumbers: number[];
-  pageImages: AgentImageAttachment[];
-  model?: string | undefined;
-  adapter: AgentAdapter;
-  proposalTool: LibraryProposeTocTool;
-  traceId?: string;
-  monitor?: ImportMonitor;
+  userId: string; title?: string | undefined; language?: string | undefined;
+  pdfFile: PdfTaskFile; model?: string | undefined; effort?: string | undefined;
+  adapter: AgentAdapter; proposalTool: LibraryProposeTocTool; traceId?: string;
+  monitor?: ImportMonitor; signal?: AbortSignal;
   onDiagnostic?: (stage: string, details?: Record<string, string | number | boolean | number[]>) => void;
 }
 
-/** 专用视觉会话只收目录图片，只开放只读草稿工具，结果须由工具成功校验。 */
-export async function extractTocWithLlm(
-  input: ExtractTocWithLlmInput
-): Promise<Result<Omit<ProposedToc, 'entries'> & { entries: TocEntry[] }, BusinessError>> {
-  if (input.pageImages.length === 0 || input.pageImages.length !== input.pageNumbers.length) {
-    return err(new BusinessError('E_INVALID_INPUT', '目录图片数量与所选 PDF 页不一致', 'VALIDATION'));
-  }
-  if (input.adapter.supportsImageInput?.() !== true) {
-    return err(new BusinessError('E_AGENT_CAPABILITY', '当前模型通道不支持图片输入，请切换视觉模型', 'AGENT_RUNTIME'));
-  }
-
-  const sessionId = input.traceId ?? generateId('toc_review');
-  const attemptId = generateId('toc_attempt');
+/** 目录会话读取裁剪 PDF；只有草稿工具，原生文件读取由适配器提供。 */
+export async function extractTocWithLlm(input: ExtractTocWithLlmInput): Promise<Result<Omit<ProposedToc, 'entries'> & { entries: TocEntry[] }, BusinessError>> {
+  if (!input.adapter.supportsLocalFileInput?.()) return err(new BusinessError('E_AGENT_CAPABILITY', '当前模型通道不支持本机 PDF 读取，请切换模型通道', 'AGENT_RUNTIME'));
+  const sessionId = input.traceId ?? generateId('toc_review'), attemptId = generateId('toc_attempt');
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  input.signal?.addEventListener('abort', cancel, { once: true });
+  if (input.signal?.aborted) cancel();
   const note = input.onDiagnostic ?? (() => {});
-  input.proposalTool.begin(sessionId, input.userId, (result) => {
-    input.monitor?.record('validation', result.accepted ? 'accepted' : 'rejected', result, { sessionId, attemptId });
-    note(result.accepted ? 'tool_validation_accepted' : 'tool_validation_rejected', {
-      ...(result.code ? { code: result.code } : {}),
-      ...(result.entryCount !== undefined ? { entryCount: result.entryCount } : {}),
-    });
-  });
+  input.proposalTool.begin(sessionId, input.userId, result => input.monitor?.record('validation', result.accepted ? 'accepted' : 'rejected', result, { sessionId, attemptId }), input.pdfFile.originalPages);
   try {
-    note('session_starting', { tool: input.proposalTool.name, imageCount: input.pageImages.length });
-    const created = await input.adapter.createSession({
-      sessionId,
-      userId: input.userId,
-      tools: [input.proposalTool],
-      systemPrompt: '你负责根据教材目录页图片整理目录草稿。只依据所见，不编造。必须通过本会话提供的目录草稿工具提交结果，不要仅在普通回复中输出目录。',
+    if (controller.signal.aborted) throw new BusinessError('E_CANCELLED', '目录识别已取消', 'AGENT_RUNTIME');
+    const systemPrompt = '读取当前教材 PDF，依据实际目录提交草稿，不编造目录。通过本会话目录工具提交结果。';
+    const created = await input.adapter.createSession({ sessionId, userId: input.userId, tools: [input.proposalTool], systemPrompt,
+      workingDirectory: input.pdfFile.workingDirectory, sandboxMode: 'workspace-write', approvalPolicy: 'on-request', ephemeral: true,
       ...(input.model ? { model: input.model } : {}),
-      approvalPolicy: 'on-request',
-      ephemeral: true,
     });
-    if (!created.ok) {
-      note('session_failed', { code: created.error.code });
-      return err(created.error);
-    }
+    if (!created.ok) return created;
     const session = created.value;
-    input.monitor?.record('session', 'opened', { model: input.model ?? null, tools: session.toolSpecs ?? null }, { sessionId, ...(session.threadId ? { threadId: session.threadId } : {}) });
     const turn = input.monitor?.turn(session, { attemptId });
-    note('session_started');
+    const interrupt = () => { input.proposalTool.end(sessionId); void session.interrupt().catch(cause => logger.warn('目录会话中断失败', { cause: String(cause) })); };
+    controller.signal.addEventListener('abort', interrupt, { once: true });
+    const message = buildTocExtractionPrompt(input);
+    input.monitor?.record('session', 'opened', { model: input.model ?? null, effort: input.effort ?? null, tools: session.toolSpecs ?? null }, { sessionId });
+    input.monitor?.record('model', 'input', { message, systemPrompt, model: input.model ?? null, effort: input.effort ?? null, pdfFile: input.pdfFile, contextMode: 'directory-session' }, turn?.binding);
+    const iterator = session.send({ message, ...(input.effort ? { turnOptions: { effort: input.effort } } : {}) })[Symbol.asyncIterator]();
+    const budgets = TextbookPipelineSettingsSchema.parse({});
+    let first = true, completed = false, deadline = Date.now() + budgets.firstResponseTimeoutMs;
     try {
-      let completed = false;
-      note('turn_starting');
-      input.monitor?.record('model', 'input', { message: buildTocExtractionPrompt(input),
-        systemPrompt: '你负责根据教材目录页图片整理目录草稿。只依据所见，不编造。必须通过本会话提供的目录草稿工具提交结果，不要仅在普通回复中输出目录。',
-        attachments: input.pageImages.map(image => ({ label: image.label, pngBase64: Buffer.from(image.png).toString('base64') })), pageNumbers: input.pageNumbers,
-      }, turn?.binding);
-      for await (const event of session.send({
-        message: buildTocExtractionPrompt(input),
-        attachments: input.pageImages,
-      })) {
+      while (true) {
+        const next = await awaitModelActivity(() => iterator.next(), controller, deadline - Date.now(), first);
+        if (next.done) break;
+        const event = next.value;
         turn?.event(event);
-        if (event.type === 'TOOL_CALL_REQUESTED') {
-          note('tool_call_requested', { tool: event.toolName });
-        } else if (event.type === 'TOOL_CALL_COMPLETED') {
-          note('tool_call_completed');
-        } else if (event.type === 'APPROVAL_REQUESTED') {
-          note('approval_declined', { action: event.action });
-          const declined = await session.submitApproval(event.approvalId, 'decline');
-          if (!declined.ok) return err(declined.error);
-        } else if (event.type === 'ERROR') {
-          note('turn_failed', { code: event.error.code });
-          return err(event.error);
-        } else if (event.type === 'COMPLETED') {
-          completed = true;
-          note('turn_completed');
-        }
+        if (event.type === 'RUNTIME_RETRY' || ((event.type === 'TEXT_DELTA' || event.type === 'REASONING_DELTA') && !event.delta)) continue;
+        first = false; deadline = Date.now() + budgets.stallTimeoutMs;
+        note(event.type.toLowerCase());
+        if (event.type === 'ERROR') return err(event.error);
+        if (event.type === 'APPROVAL_REQUESTED') { const result = await session.submitApproval(event.approvalId, 'decline'); if (!result.ok) return result; }
+        if (event.type === 'COMPLETED') completed = true;
       }
       const proposal = input.proposalTool.take(sessionId);
-      if (!completed || !proposal) {
-        note('proposal_missing', { turnCompleted: completed });
-        return err(new BusinessError(
-          'E_TOC_PROPOSAL_MISSING',
-          '视觉模型未提交通过校验的目录草稿，请核对目录页后重试',
-          'AGENT_RUNTIME',
-          true
-        ));
-      }
-      note('proposal_ready', { entryCount: proposal.entries.length });
-      const entries = proposal.entries.map((entry, index) => ({ ...entry, id: `toc-${index + 1}`,
-        ...(entry.parentIndex !== undefined ? { parentId: `toc-${entry.parentIndex + 1}` } : {}),
-      }));
-      return ok({ ...proposal, entries });
+      if (!completed || !proposal) return err(new BusinessError('E_TOC_PROPOSAL_MISSING', '模型未提交有效目录；可指定目录页范围后重新识别', 'AGENT_RUNTIME', true));
+      if (proposal.tocEndPage === undefined || !input.pdfFile.originalPages.includes(proposal.tocEndPage)) return err(new BusinessError('E_TOC_RANGE_INVALID', '模型未确认实际目录结束页，请指定目录范围后重新识别', 'VALIDATION', true));
+      return ok({ ...proposal, entries: proposal.entries.map(({parentIndex, ...entry}, index) => ({ ...entry, id: `toc-${index + 1}`,
+        ...(parentIndex !== undefined ? { parentId: `toc-${parentIndex + 1}` } : {}),
+      })) });
     } finally {
-      turn?.flush(); input.monitor?.record('model', 'turn_ended', undefined, turn?.binding);
-      note('session_closing');
-      await session.close();
-      note('session_closed');
+      input.proposalTool.end(sessionId);
+      controller.signal.removeEventListener('abort', interrupt);
+      void iterator.return?.().catch(cause => logger.warn('目录响应流收尾失败', { cause: String(cause) }));
+      turn?.flush(); await session.close();
+      input.monitor?.record('session', 'closed', undefined, { sessionId });
     }
-  } catch (cause) {
-    const error = translateToBusinessError(cause, 'extractTocWithLlm');
-    note('session_exception', { code: error.code });
-    return err(error);
-  } finally {
-    input.proposalTool.end(sessionId);
-    await input.monitor?.flush();
-  }
+  } catch (cause) { return err(cause instanceof BusinessError ? cause : translateToBusinessError(cause, '目录识别')); }
+  finally { input.signal?.removeEventListener('abort', cancel); input.proposalTool.end(sessionId); await input.monitor?.flush(); }
 }

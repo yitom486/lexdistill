@@ -105,8 +105,8 @@ async function prepare(tocEndPage?: number, recognizedEntries?: TocEntry[]) {
     if (url.endsWith('/extract-toc-llm') && tocEndPage !== undefined) {
       llmCalls++;
       const body = JSON.parse(String(init?.body)) as { endPage: number };
-      expect(body.endPage).toBe(tocEndPage);
-      return Response.json({ entries: recognizedEntries ?? [
+      expect(body.endPage).toBeUndefined(); expect('startPage' in body).toBe(false);
+      return Response.json({ tocEndPage, entries: recognizedEntries ?? [
         { id: 'recognized-1', title: '第1课', level: 'lesson', startPage: 2 },
         { id: 'recognized-2', title: '第2课', level: 'lesson', startPage: 9 },
       ] });
@@ -206,7 +206,7 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
     ]);
     await click('选择本地文件');
     await click('目录识别设置');
-    await tickUntil(() => (document.querySelector('input[aria-label="目录结束页"]') as HTMLInputElement | null)?.value === '12');
+    expect((document.querySelector('input[aria-label="目录结束页"]') as HTMLInputElement).value).toBe('');
     await click('识别目录');
     await tickUntil(() => Boolean(document.querySelector('[aria-label="目录层级列表"]')));
     expect(document.querySelector('[aria-label="目录标题 1"]')).toBeNull();
@@ -238,14 +238,14 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
     await click('启动提取');
     await tickUntil(() => Boolean(submitted));
     expect(submitted?.tocEntries).toMatchObject(savedOutline!.tocEntries);
-    expect([mapCalls, llmCalls]).toEqual([1, 1]);
+    expect([mapCalls, llmCalls]).toEqual([0, 1]);
   });
   for (const tocEndPage of [21, 12]) {
     it(`目录结束于 PDF 第 ${tocEndPage} 页：确认目录即默认换算并启动，允许修改默认页码`, async () => {
       await prepare(tocEndPage);
       await click('选择本地文件');
       await click('目录识别设置');
-      await tickUntil(() => (document.querySelector('input[aria-label="目录结束页"]') as HTMLInputElement | null)?.value === String(tocEndPage));
+      expect((document.querySelector('input[aria-label="目录结束页"]') as HTMLInputElement).value).toBe('');
       await click('识别目录');
       await tickUntil(() => [...document.querySelectorAll('button')].some(button => button.textContent?.includes('确认目录草稿') && !button.disabled));
       await click('确认目录草稿');
@@ -273,7 +273,7 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
     await prepare(12);
     await click('选择本地文件');
     await click('目录识别设置');
-    await tickUntil(() => (document.querySelector('input[aria-label="目录结束页"]') as HTMLInputElement | null)?.value === '12');
+    expect((document.querySelector('input[aria-label="目录结束页"]') as HTMLInputElement).value).toBe('');
     await click('识别目录');
     await tickUntil(() => [...document.querySelectorAll('button')].some(button => button.textContent?.includes('确认目录草稿') && !button.disabled));
     failSave = true; await click('确认目录草稿');

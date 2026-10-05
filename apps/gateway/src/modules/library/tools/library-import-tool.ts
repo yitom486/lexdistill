@@ -39,7 +39,7 @@ function safeHostname(url: string): string {
 
 /**
  * 文档统一导入 Server Tool（WRITE：落库）。
- * PDF/EPUB/文本同一命令；OCR 是能力层，不在本 Tool 内。
+ * PDF/EPUB/文本同一命令；PDF 仅读取原生文字；扫描教材使用章节 Agent 流程。
  */
 export class LibraryImportTool implements ToolDefinition<LibraryImportInput, LibraryImportOutput> {
   public readonly name = 'library.import_document';

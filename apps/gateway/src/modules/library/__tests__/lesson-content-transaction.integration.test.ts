@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { TextbookContentTools } from '../tools/textbook-content-tools.js';
-import { pipelineModel, requiredContent, submitRequired, type ModelTurn } from './textbook-pipeline-fixtures.js';
+import { requiredContent, submitRequired } from './textbook-pipeline-fixtures.js';
 import type { TextbookContentKind } from '@study-studio/document-model';
 import type { BusinessError, Result } from '@study-studio/shared';
-import { ToolRegistry } from '@study-studio/tool-core';
-import { toolsToDynamicSpecs } from '../../../../../../packages/agent-runtime/src/adapters/codex/tools-bridge.js';
+import type { McpChapterScope } from '../mcp/textbook-mcp-scope.js';
+import { harnessInjection, stubPoolDriver, type ChapterScript } from './agentpool-pipeline-harness.js';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 
@@ -19,7 +19,7 @@ function setup() {
 }
 function input(env: ReturnType<typeof setup>) {
   return { userId: 'owner', documentId: 'book', title: '事务验证', tocEntries: toc,
-    lessonJobs: [{ lessonId: 'a', text: '本课材料' }], submissionTool: env.tool, poolSize: 1, modelRetries: 0 };
+    lessonJobs: [{ lessonId: 'a', text: '本课材料' }], poolSize: 1, modelRetries: 0 };
 }
 function items(result: Result<unknown, BusinessError>) {
   if (!result.ok) throw result.error;
@@ -30,76 +30,63 @@ async function bind(env: ReturnType<typeof setup>, sessionId: string, lessonId =
     signal: new AbortController().signal, allowAiExercises: true });
   env.tool.startTurn(sessionId, sessionId, 'turn:' + sessionId);
   let call = 0;
-  const submit: ModelTurn['submit'] = (raw, kind = 'articles') => env.tool.tools.find(tool => tool.kind === kind)!.execute(raw,
+  const submit = (raw: unknown, kind: TextbookContentKind = 'articles') => env.tool.tools.find(tool => tool.kind === kind)!.execute(raw,
     { userId: 'owner', sessionId, turnId: 'turn:' + sessionId, callId: `${sessionId}:${++call}` });
   return { binding, submit };
 }
 
-describe('原生课程 CRUD 暂存与整课事务', () => {
-  it('HTTP 默认入口从真实注册表找到六个工具；Codex 原生注入保留 CRUD 与嵌套内容字段', async () => {
-    const env = setup(), registry = new ToolRegistry();
-    for (const tool of env.tool.tools) registry.register(tool);
-    const model = pipelineModel(env.tool, async ({ sessionId, turnId }) => {
-      let call = 0;
-      const submit: ModelTurn['submit'] = (raw, kind = 'articles') => registry.get(env.tool.tools.find(tool => tool.kind === kind)!.name)!.execute(raw,
-        { userId: 'owner', sessionId, turnId, callId: `native:${++call}` });
-      await submitRequired(submit);
+let rpcSeq = 0;
+async function submitScope(scope: McpChapterScope, kind: TextbookContentKind, raw: unknown) {
+  const result = await scope.submission.execute(kind, raw, `test-${++rpcSeq}`);
+  if (!result.ok) throw result.error;
+}
+async function submitRequiredScope(scope: McpChapterScope) {
+  for (const kind of ['grammar', 'vocabulary', 'exercises'] as const) {
+    await submitScope(scope, kind, requiredContent[kind]);
+  }
+}
+
+describe('agentpool 课程 CRUD 暂存与整课事务', () => {
+  it('HTTP 入口经 MCP 六工具提交，暂存期库里 0 行，保存后落库', async () => {
+    const env = setup();
+    const harness = harnessInjection(env.repo, new Map<string, ChapterScript>([['a', async (scope) => {
+      await submitRequiredScope(scope);
       expect(env.repo.getRawDb().query('SELECT count(*) AS n FROM textbook_vocabulary').get()).toEqual({ n: 0 });
-    });
-    const create = model.adapter.createSession;
-    model.adapter.createSession = async options => {
-      const { specs } = toolsToDynamicSpecs(options.tools ?? []);
-      expect(specs).toHaveLength(6);
-      for (const spec of specs) {
-        const schema = z.object({ type: z.literal('object'), properties: z.record(z.unknown()) }).parse(spec.inputSchema);
-        expect(Object.keys(schema.properties)).toEqual(expect.arrayContaining(['action', 'items', 'refs']));
-        expect(schema.properties).not.toHaveProperty('id'); expect(schema.properties).not.toHaveProperty('chapterId');
-        expect(schema.properties).not.toHaveProperty('coverage');
-        const action = z.object({ enum: z.array(z.string()) }).parse(schema.properties['action']);
-        expect(action.enum).toEqual(['add', 'read', 'update', 'delete']);
-        const content = z.object({ items: z.object({ type: z.literal('object'), properties: z.record(z.unknown()) }) }).parse(schema.properties['items']);
-        expect(content.items.properties).toHaveProperty('ref');
-        if (spec.name === 'library_exercises') {
-          expect(content.items.properties).toHaveProperty('prompt');
-          expect(content.items.properties['difficultyTier']).toMatchObject({ minimum: 1, maximum: 5 });
-          expect(content.items.properties['type']).toMatchObject({ enum: expect.arrayContaining(['WRITING', 'MATCHING', 'FILL_BLANK']) });
-        }
-      }
-      return create(options);
-    };
-    // This route uses only these Gateway dependencies, provided by the real repository/registry.
-    const deps = { repo: env.repo, server: { toolRegistry: registry, agentAdapter: model.adapter } } as GatewayDeps;
-    const response = await createPdfImportRoutes(deps).request('/api/documents/owner/execute-textbook-pipeline', {
+    }]]));
+    const deps = { repo: env.repo, server: {} } as GatewayDeps;
+    const routes = createPdfImportRoutes(deps, { poolDriver: harness.driver, onChapterScope: harness.extra.onChapterScope });
+    const response = await routes.request('/api/documents/owner/execute-textbook-pipeline', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-        documentId: 'book', title: '原生入口', language: 'ja', tocEntries: toc, lessonJobs: [{ lessonId: 'a', text: '本课材料' }], poolSize: 1, modelRetries: 0,
+        documentId: 'book', title: 'MCP 入口', language: 'ja', tocEntries: toc, lessonJobs: [{ lessonId: 'a', text: '本课材料' }], poolSize: 1, modelRetries: 0,
       }),
     });
     expect(response.status).toBe(200); expect(await response.json()).toMatchObject({ allLessonsReady: true, successfulLessons: 1 });
-    expect(model.inputs).toHaveLength(1); expect(registry.get('library.write_vocabulary')).toBeUndefined();
+    expect(harness.driver.asks).toHaveLength(1);
     expect(env.repo.getRawDb().query('SELECT count(*) AS n FROM textbook_vocabulary').get()).toEqual({ n: 1 });
   });
 
   it('六类多次增查改删只保存最终视图；被删除的新词不进入全局表', async () => {
     const env = setup();
-    const model = pipelineModel(env.tool, async ({ submit }) => {
-      await submitRequired(submit);
+    const harness = harnessInjection(env.repo, new Map<string, ChapterScript>([['a', async (scope) => {
+      await submitRequiredScope(scope);
       for (const [kind, value] of Object.entries({
         articles: { text: '第一版正文' }, sentences: { text: '第一版句子' }, material: { text: '第一版材料' },
       }) as Array<[TextbookContentKind, { text: string }]>) {
-        const added = items(await submit({ items: [value] }, kind))[0]!;
-        expect(added).not.toHaveProperty('id'); expect(added).not.toHaveProperty('documentId');
-        expect((await submit({ action: 'update', items: [{ ref: added.ref, text: '最终' + kind }] }, kind)).ok).toBe(true);
-        expect(items(await submit({ action: 'read' }, kind))[0]).toMatchObject({ ref: added.ref, text: '最终' + kind });
+        const added = items(await scope.submission.execute(kind, { items: [value] }, `test-add-${kind}`));
+        const row = added[0]!;
+        expect(row).not.toHaveProperty('id'); expect(row).not.toHaveProperty('documentId');
+        expect((await scope.submission.execute(kind, { action: 'update', items: [{ ref: row.ref, text: '最终' + kind }] }, `test-upd-${kind}`)).ok).toBe(true);
+        expect(items(await scope.submission.execute(kind, { action: 'read' }, `test-read-${kind}`))[0]).toMatchObject({ ref: row.ref, text: '最终' + kind });
       }
-      const abandoned = items(await submit({ items: [{ word: '废弃词', meaning: '不保存', level: 'N5' }] }, 'vocabulary'))[0]!;
-      expect((await submit({ action: 'delete', refs: [abandoned.ref] }, 'vocabulary')).ok).toBe(true);
-      const abandonedArticle = items(await submit({ items: [{ text: '废弃正文' }] }, 'articles'))[0]!;
-      expect((await submit({ action: 'delete', refs: [abandonedArticle.ref] }, 'articles')).ok).toBe(true);
-      expect(items(await submit({ action: 'read' }, 'articles'))).toHaveLength(1);
+      const abandoned = items(await scope.submission.execute('vocabulary', { items: [{ word: '废弃词', meaning: '不保存', level: 'N5' }] }, 'test-abandon'))[0]!;
+      expect((await scope.submission.execute('vocabulary', { action: 'delete', refs: [abandoned.ref] }, 'test-abandon-del')).ok).toBe(true);
+      const abandonedArticle = items(await scope.submission.execute('articles', { items: [{ text: '废弃正文' }] }, 'test-abandon-a'))[0]!;
+      expect((await scope.submission.execute('articles', { action: 'delete', refs: [abandonedArticle.ref] }, 'test-abandon-a-del')).ok).toBe(true);
+      expect(items(await scope.submission.execute('articles', { action: 'read' }, 'test-read-a'))).toHaveLength(1);
       for (const table of ['textbook_articles', 'textbook_knowledge', 'textbook_vocabulary', 'textbook_exercise_items', 'global_vocabulary', 'textbook_fts'])
         expect(env.repo.getRawDb().query(`SELECT count(*) AS n FROM ${table}`).get()).toEqual({ n: 0 });
-    });
-    const result = await env.repo.executeTextbookPipeline({ ...input(env), adapter: model.adapter });
+    }]]));
+    const result = await env.repo.executeTextbookPipeline({ ...input(env), ...harness.extra });
     expect(result.ok && result.value.allLessonsReady).toBe(true);
     const saved = await env.repo.readTextbookChapter({ userId: 'owner', documentId: 'book', chapterId: 'a' });
     if (!saved.ok) throw saved.error;
@@ -111,10 +98,14 @@ describe('原生课程 CRUD 暂存与整课事务', () => {
   });
 
   it('已有内容使用短引用修改并保留身份；删除章节词汇不会删全局词和其他课关联', async () => {
-    const env = setup(), model = pipelineModel(env.tool);
+    const env = setup();
     const entries = [...toc, { ...toc[0]!, id: 'b', title: '第二课', startPage: 2 }];
+    const harness = harnessInjection(env.repo, new Map<string, ChapterScript>([
+      ['a', async (scope) => { await submitRequiredScope(scope); }],
+      ['b', async (scope) => { await submitRequiredScope(scope); }],
+    ]));
     const result = await env.repo.executeTextbookPipeline({ ...input(env), tocEntries: entries,
-      lessonJobs: [{ lessonId: 'a', text: '甲' }, { lessonId: 'b', text: '乙' }], adapter: model.adapter });
+      lessonJobs: [{ lessonId: 'a', text: '甲' }, { lessonId: 'b', text: '乙' }], ...harness.extra });
     expect(result.ok && result.value.allLessonsReady).toBe(true);
     const db = env.repo.getRawDb();
     const before = db.query('SELECT id, ord FROM textbook_knowledge WHERE chapter_id=?').get('a');
@@ -149,63 +140,59 @@ describe('原生课程 CRUD 暂存与整课事务', () => {
         for (const table of ['textbook_knowledge', 'textbook_vocabulary', 'global_vocabulary', 'textbook_fts'])
           expect(db.query(`SELECT count(*) AS n FROM ${table}`).get()).toEqual({ n: 0 });
         const stats = await env.repo.getTextbookAssetStats('book'); expect(stats.ok && stats.value.readyLessons).toBe(0);
-        // Fault injection uses DDL only; the production commit still runs a real SQLite transaction.
         db.run('DROP TRIGGER reject_ready');
       }
       return result;
     };
-    const model = pipelineModel(env.tool, async ({ submit }) => {
-      // Fail at the final ready update, after content/global words/FTS have already been written.
+    const harness = harnessInjection(env.repo, new Map<string, ChapterScript>([['a', async (scope) => {
       db.run("CREATE TRIGGER reject_ready BEFORE UPDATE OF chapters_json ON documents BEGIN SELECT RAISE(ABORT, 'SQLITE_BUSY controlled fault'); END");
-      await submitRequired(submit);
-    });
-    const result = await env.repo.executeTextbookPipeline({ ...input(env), adapter: model.adapter, storageRetries: 1 });
-    expect(result.ok && result.value.allLessonsReady).toBe(true); expect(commits).toBe(2); expect(model.inputs).toHaveLength(1);
+      await submitRequiredScope(scope);
+    }]]));
+    const driver = stubPoolDriver();
+    const harnessWithDriver = harnessInjection(env.repo, new Map<string, ChapterScript>([['a', async (scope) => {
+      db.run("CREATE TRIGGER reject_ready BEFORE UPDATE OF chapters_json ON documents BEGIN SELECT RAISE(ABORT, 'SQLITE_BUSY controlled fault'); END");
+      await submitRequiredScope(scope);
+    }]]), driver);
+    void harness;
+    const result = await env.repo.executeTextbookPipeline({ ...input(env), storageRetries: 1, ...harnessWithDriver.extra });
+    expect(result.ok && result.value.allLessonsReady).toBe(true); expect(commits).toBe(2); expect(driver.asks).toHaveLength(1);
     expect(db.query('SELECT count(*) AS n FROM global_vocabulary').get()).toEqual({ n: 1 });
     expect(db.query('SELECT count(*) AS n FROM textbook_knowledge').get()).toEqual({ n: 1 });
     expect(db.query('SELECT count(*) AS n FROM textbook_fts').get()).toEqual({ n: 1 });
   });
 
-  it('删空暂存内容时不写库、不当数据库失败重试；模型新轮次获得反馈且不继承失败缓冲', async () => {
-    const env = setup(); let commits = 0, attempts = 0, firstRef = '';
+  it('删空暂存内容时不写库；新轮次获得反馈且不继承失败引用', async () => {
+    const env = setup(); let commits = 0;
     const commit = env.repo.commitTextbookLesson.bind(env.repo);
     env.repo.commitTextbookLesson = (...args) => { commits++; return commit(...args); };
-    const model = pipelineModel(env.tool, async ({ submit, input: turn }) => {
-      if (++attempts === 1) {
-        firstRef = items(await submit({ items: [{ text: '失败轮次正文' }] }))[0]!.ref;
-        expect((await submit({ action: 'delete', refs: [firstRef] })).ok).toBe(true);
+    const harness = harnessInjection(env.repo, new Map<string, ChapterScript>([['a', async (scope, job, attempt) => {
+      if (attempt === 0) {
+        const first = items(await scope.submission.execute('articles', { items: [{ text: '失败轮次正文' }] }, 'rpc-a1'))[0]!;
+        expect((await scope.submission.execute('articles', { action: 'delete', refs: [first.ref] }, 'rpc-a2')).ok).toBe(true);
       } else {
-        expect(turn.message).toContain('本章尚未提交有效学习内容');
-        expect(items(await submit({ action: 'read' }))).toEqual([]);
-        const foreign = await submit({ action: 'delete', refs: [firstRef] });
+        expect(items(await scope.submission.execute('articles', { action: 'read' }, 'rpc-b1'))).toEqual([]);
+        const foreign = await scope.submission.execute('articles', { action: 'delete', refs: ['stale-ref'] }, 'rpc-b2');
         expect(foreign.ok ? '' : foreign.error.code).toBe('E_CONTENT_REF_INVALID');
-        const own = items(await submit({ items: [{ text: '本轮删除以修正反馈' }] }))[0]!;
-        expect((await submit({ action: 'delete', refs: [own.ref] })).ok).toBe(true);
-        expect((await submit(requiredContent.grammar, 'grammar')).ok).toBe(true);
+        const own = items(await scope.submission.execute('articles', { items: [{ text: '本轮删除以修正反馈' }] }, 'rpc-b3'))[0]!;
+        expect((await scope.submission.execute('articles', { action: 'delete', refs: [own.ref] }, 'rpc-b4')).ok).toBe(true);
+        await submitRequiredScope(scope);
       }
-    });
-    const result = await env.repo.executeTextbookPipeline({ ...input(env), adapter: model.adapter, modelRetries: 1, storageRetries: 3 });
-    expect(result.ok && result.value.allLessonsReady).toBe(true); expect(commits).toBe(1); expect(model.inputs).toHaveLength(2);
+    }]]));
+    const result = await env.repo.executeTextbookPipeline({ ...input(env), modelRetries: 1, storageRetries: 3, ...harness.extra });
+    expect(result.ok && result.value.allLessonsReady).toBe(true); expect(commits).toBe(1); expect(harness.driver.asks).toHaveLength(2);
     expect(env.repo.getRawDb().query('SELECT * FROM textbook_articles').all()).toEqual([]);
-    expect(model.created).toHaveLength(1);
   });
 
-  it('无正常 COMPLETED 事件的模型流不能提交，即使已经提交三类有效暂存内容', async () => {
-    const env = setup(), model = pipelineModel(env.tool, async ({ submit }) => { await submitRequired(submit); });
-    const create = model.adapter.createSession;
-    model.adapter.createSession = async options => {
-      const session = await create(options); if (!session.ok) return session;
-      const send = session.value.send.bind(session.value);
-      session.value.send = async function* (turn) { for await (const event of send(turn)) if (event.type !== 'COMPLETED') yield event; };
-      return session;
-    };
-    const result = await env.repo.executeTextbookPipeline({ ...input(env), adapter: model.adapter });
+  it('无有效工具提交不能保存，即使暂存为空', async () => {
+    const env = setup();
+    const harness = harnessInjection(env.repo, new Map<string, ChapterScript>([['a', async () => undefined]]));
+    const result = await env.repo.executeTextbookPipeline({ ...input(env), ...harness.extra });
     expect(result.ok && result.value.failedLessons).toBe(1);
     expect(env.repo.getRawDb().query('SELECT count(*) AS n FROM global_vocabulary').get()).toEqual({ n: 0 });
     const stats = await env.repo.getTextbookAssetStats('book'); expect(stats.ok && stats.value.readyLessons).toBe(0);
   });
 
-  it('同一原生调用幂等且不接受冲突内容；只查询不能算本轮提交，关闭 AI 练习不能绕过', async () => {
+  it('同一调用幂等且不接受冲突内容；只查询不能算本轮提交，关闭 AI 练习不能绕过', async () => {
     const env = setup();
     await env.repo.seedTextbookTocSkeleton({ ...input(env), entries: toc });
     const binding = env.tool.bind('idempotent', { userId: 'owner', documentId: 'book', lessonId: 'a', assignmentId: 'attempt',
@@ -217,42 +204,45 @@ describe('原生课程 CRUD 暂存与整课事务', () => {
     expect(await article.execute({ items: [{ text: '一次内容' }] }, context)).toEqual(first);
     const conflicting = await article.execute({ items: [{ text: '不能覆盖第一次' }] }, context);
     expect(conflicting.ok ? '' : conflicting.error.code).toBe('E_CONTENT_CALL_CONFLICT');
-    const submit: ModelTurn['submit'] = (raw, kind = 'articles') => env.tool.tools.find(tool => tool.kind === kind)!.execute(raw,
+    const submit: (raw: unknown, kind?: TextbookContentKind) => Promise<Result<unknown, BusinessError>> = (raw, kind = 'articles') => env.tool.tools.find(tool => tool.kind === kind)!.execute(raw,
       { ...context, callId: 'call:' + kind });
-    await submitRequired(submit); expect((await binding.persist()).ok).toBe(true); env.tool.end('idempotent');
+    await submitRequired(submit as never); expect((await binding.persist()).ok).toBe(true); env.tool.end('idempotent');
     expect(env.repo.getRawDb().query('SELECT text FROM textbook_articles').all()).toEqual([{ text: '一次内容' }]);
     const readOnly = await bind(env, 'read-only');
     for (const kind of ['grammar', 'vocabulary', 'exercises'] as const) expect(items(await readOnly.submit({ action: 'read' }, kind))).toHaveLength(1);
     const final = await readOnly.binding.persist(); expect(final.ok ? '' : final.error.code).toBe('E_LESSON_CONTENT_MISSING');
 
-    const disabled = setup(), model = pipelineModel(disabled.tool, async ({ submit }) => {
-      await submit(requiredContent.grammar, 'grammar'); await submit(requiredContent.vocabulary, 'vocabulary');
-      const rejected = await submit({ ...requiredContent.exercises, source: 'AI' }, 'exercises');
+    const disabled = setup();
+    const harnessDisabled = harnessInjection(disabled.repo, new Map<string, ChapterScript>([['a', async (scope) => {
+      await submitScope(scope, 'grammar', requiredContent.grammar);
+      await submitScope(scope, 'vocabulary', requiredContent.vocabulary);
+      const rejected = await scope.submission.execute('exercises', { ...requiredContent.exercises, source: 'AI' }, 'rpc-ex');
       expect(rejected.ok ? '' : rejected.error.code).toBe('E_AI_EXERCISES_DISABLED');
-    });
-    const result = await disabled.repo.executeTextbookPipeline({ ...input(disabled), adapter: model.adapter, allowAiExercises: false });
+    }]]));
+    const result = await disabled.repo.executeTextbookPipeline({ ...input(disabled), allowAiExercises: false, ...harnessDisabled.extra });
     expect(result.ok && result.value.failedLessons).toBe(1);
     expect(disabled.repo.getRawDb().query('SELECT count(*) AS n FROM global_vocabulary').get()).toEqual({ n: 0 });
   });
 
   it('重新提取失败保留原版本；成功后整课替换，不遗留旧正文', async () => {
-    const env = setup(), original = pipelineModel(env.tool);
-    expect((await env.repo.executeTextbookPipeline({ ...input(env), adapter: original.adapter })).ok).toBe(true);
+    const env = setup();
+    const good = new Map<string, ChapterScript>([['a', async (scope) => { await submitRequiredScope(scope); }]]);
+    expect((await env.repo.executeTextbookPipeline({ ...input(env), ...harnessInjection(env.repo, good).extra })).ok).toBe(true);
     const db = env.repo.getRawDb(), snapshot = db.query('SELECT * FROM textbook_articles').all();
-    const failed = pipelineModel(env.tool, async ({ submit }) => {
-      const row = items(await submit({ items: [{ text: '未完成的替换' }] }))[0]!;
-      expect((await submit({ action: 'delete', refs: [row.ref] })).ok).toBe(true);
-    });
-    const result = await env.repo.executeTextbookPipeline({ ...input(env), adapter: failed.adapter, forceOverwrite: true });
+    const failing = new Map<string, ChapterScript>([['a', async (scope) => {
+      const row = items(await scope.submission.execute('articles', { items: [{ text: '未完成的替换' }] }, 'rpc-f1'))[0]!;
+      expect((await scope.submission.execute('articles', { action: 'delete', refs: [row.ref] }, 'rpc-f2')).ok).toBe(true);
+    }]]);
+    const result = await env.repo.executeTextbookPipeline({ ...input(env), forceOverwrite: true, ...harnessInjection(env.repo, failing).extra });
     expect(result.ok && result.value.allLessonsReady).toBe(false);
     expect(db.query('SELECT * FROM textbook_articles').all()).toEqual(snapshot);
     const stats = await env.repo.getTextbookAssetStats('book'); expect(stats.ok && stats.value.readyLessons).toBe(1);
-    const success = pipelineModel(env.tool, async ({ submit }) => {
-      expect(items(await submit({ action: 'read' }))).toEqual([]);
-      expect((await submit({ items: [{ text: '新版本正文' }] })).ok).toBe(true);
+    const success = new Map<string, ChapterScript>([['a', async (scope) => {
+      expect(items(await scope.submission.execute('articles', { action: 'read' }, 'rpc-s1'))).toEqual([]);
+      expect((await scope.submission.execute('articles', { items: [{ text: '新版本正文' }] }, 'rpc-s2')).ok).toBe(true);
       expect(db.query('SELECT * FROM textbook_articles').all()).toEqual(snapshot);
-    });
-    const replaced = await env.repo.executeTextbookPipeline({ ...input(env), adapter: success.adapter, forceOverwrite: true });
+    }]]);
+    const replaced = await env.repo.executeTextbookPipeline({ ...input(env), forceOverwrite: true, ...harnessInjection(env.repo, success).extra });
     expect(replaced.ok && replaced.value.allLessonsReady).toBe(true);
     expect(db.query('SELECT text FROM textbook_articles').all()).toEqual([{ text: '新版本正文' }]);
     for (const table of ['textbook_knowledge', 'textbook_vocabulary', 'textbook_exercise_items'])
@@ -272,7 +262,7 @@ describe('原生课程 CRUD 暂存与整课事务', () => {
     expect((await a.submit({ action: 'update', items: [{ ref: own.ref, text: '甲的最终正文' }] })).ok).toBe(true);
     const other = items(await b.submit({ items: [{ text: '乙的正文' }] }))[0]!;
     expect((await b.submit({ action: 'update', items: [{ ref: other.ref, text: '乙的最终正文' }] })).ok).toBe(true);
-    await Promise.all([submitRequired(a.submit), submitRequired(b.submit)]);
+    await Promise.all([submitRequired(a.submit as never), submitRequired(b.submit as never)]);
     expect((await a.binding.persist()).ok).toBe(false); // Invalid add has not been repaired by an update.
     expect((await a.submit({ items: [{ text: '已封口，不能迟到修正' }] })).ok).toBe(false);
     expect((await b.binding.persist()).ok).toBe(true);

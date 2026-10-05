@@ -6,14 +6,28 @@ import { convertAstToTextbookBook } from '../../textbook-converter.js';
 import { DrizzleLearnerRepository } from '../../../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
 import { TextbookContentTools } from '../../../../../../gateway/src/modules/library/tools/textbook-content-tools.js';
 import { createImportMonitorRoutes } from '../../../../../../gateway/src/modules/library/http/import-monitor-routes.js';
-import { submitRequired, pipelineModel, submissionFromPrompt, deferred } from '../../../../../../gateway/src/modules/library/__tests__/textbook-pipeline-fixtures.js';
+import { deferred } from '../../../../../../gateway/src/modules/library/__tests__/textbook-pipeline-fixtures.js';
+import { harnessInjection, type ChapterScript } from '../../../../../../gateway/src/modules/library/__tests__/agentpool-pipeline-harness.js';
+import { requiredContent } from '../../../../../../gateway/src/modules/library/__tests__/textbook-pipeline-fixtures.js';
+import type { McpChapterScope } from '../../../../../../gateway/src/modules/library/mcp/textbook-mcp-scope.js';
 import { act, setupDom, type DomHandle } from '../../../toc/__tests__/dom-setup.js';
+
+let scopeRpcSeq = 0;
+async function submitScope(scope: McpChapterScope, kind: 'grammar' | 'vocabulary' | 'exercises' | 'articles', raw: unknown) {
+  const result = await scope.submission.execute(kind, raw, `dom-${++scopeRpcSeq}`);
+  if (!result.ok) throw result.error;
+}
+async function submitRequiredScope(scope: McpChapterScope) {
+  for (const kind of ['grammar', 'vocabulary', 'exercises'] as const) {
+    await submitScope(scope, kind, requiredContent[kind]);
+  }
+}
 
 let dom: DomHandle | undefined, repo: DrizzleLearnerRepository | undefined, client: QueryClient | undefined;
 const originalFetch = globalThis.fetch;
 afterEach(() => { dom?.teardown(); dom = undefined; client?.clear(); repo?.getRawDb().close(); repo = undefined; globalThis.fetch = originalFetch; });
 async function settle() { await act(async () => { await new Promise(resolve => setTimeout(resolve, 15)); }); }
-describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
+describe('页面内运行详情：真实 Query → Gateway → SQLite', () => {
   it('当前交互展开、历史折叠；详情按需读；关闭重开保留本次记录和已保存内容', async () => {
     // Base UI 在导入时选择 DOM layout effect；隔离进程防止其他测试先在无 DOM 时缓存该模块。
     if (process.env['LINGUA_MONITOR_DOM_CHILD'] !== '1') {
@@ -23,34 +37,28 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       return;
     }
     repo = new DrizzleLearnerRepository(':memory:');
-    const currentRepo = repo, tool = new TextbookContentTools(repo), waiting = deferred(), reached = deferred();
-    const model = pipelineModel(tool, async ({ input, submit, sessionId, turnId }) => {
-      const value = submissionFromPrompt(input.message);
-
-      const current = input.message.includes('章节: 当前部分');
-      if (current && !input.message.includes('上次未完成的原因')) return;
-      if (!current) {
-        const bad = await submit({items:[{text:''}]});
-        expect(bad.ok).toBe(false);
-      }
-      expect((await submit(value)).ok).toBe(true); await submitRequired(submit);
-      if (current) { reached.resolve(); await waiting.promise; }
-    });
-    const create = model.adapter.createSession;
-    model.adapter.createSession = async options => {
-      const created = await create(options); if (!created.ok) return created;
-      const send = created.value.send.bind(created.value);
-      created.value.send = async function* (input) {
-        yield { type: 'RUNTIME_RETRY', code: 'E_ENGINE_BUSY', message: '受控引擎繁忙，当前轮次继续重试', category: 'AGENT_RUNTIME' };
-        yield* send(input);
-      };
-      return created;
-    };
+    const currentRepo = repo;
+    const waiting = deferred(), reached = deferred();
+    const wbadu: Array<{ lesson: string; attempt: number }> = [];
+    const harness = harnessInjection(repo, new Map<string, ChapterScript>([
+      ['a', async (scope) => {
+        expect((await scope.submission.execute('articles', { items: [{ text: '' }] }, 'rpc-a-bad')).ok).toBe(false);
+        expect((await scope.submission.execute('articles', { items: [{ text: '整理后的正文 已保存部分' }] }, 'rpc-a')).ok).toBe(true);
+        await submitRequiredScope(scope);
+      }],
+      ['b', async (scope, job, attempt) => {
+        wbadu.push({ lesson: job.lessonId, attempt });
+        if (attempt === 0) return;
+        expect((await scope.submission.execute('articles', { items: [{ text: '' }] }, 'rpc-b-bad')).ok).toBe(false);
+        expect((await scope.submission.execute('articles', { items: [{ text: '当前正文' }] }, 'rpc-b')).ok).toBe(true);
+        await submitRequiredScope(scope);
+        if (job.lessonId === 'b' && attempt === 1) { reached.resolve(); await waiting.promise; }
+      }],
+    ]));
     const running = repo.executeTextbookPipeline({ userId: 'owner', traceId: 'desktop-trace', documentId: 'desktop-book', title: '监视教材', poolSize: 1,
       tocEntries: [{ id: 'a', level: 'section', title: '已保存部分', startPage: 5, endPage: 7 }, { id: 'ac', level: 'section', parentId: 'a', title: '会话小节', startPage: 6, endPage: 7 },
         { id: 'b', level: 'lesson', title: '当前部分', startPage: 8, endPage: 11 }],
-      lessonJobs: [{ lessonId: 'a', text: '历史正文' }, { lessonId: 'b', text: '当前正文' }], adapter: model.adapter, submissionTool: tool,
-    });
+      lessonJobs: [{ lessonId: 'a', text: '历史正文' }, { lessonId: 'b', text: '当前正文' }], ...harness.extra });
     try {
       await reached.promise;
       const document = await currentRepo.getDocumentById('desktop-book'); if (!document.ok) throw document.error;
@@ -65,7 +73,7 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       if (!recorded.ok) throw recorded.error;
       const historyInput = recorded.value.find(event => event.nodeId === 'b' && event.category === 'model' && event.name === 'input')!;
       const otherInput = recorded.value.find(event => event.nodeId === 'a' && event.category === 'model' && event.name === 'input')!;
-      expect(historyInput.sessionId).not.toBe(otherInput.sessionId);
+      expect(historyInput.sessionId).toBe(otherInput.sessionId);
       const app = createImportMonitorRoutes(currentRepo), reads: string[] = [];
       globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
         const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
@@ -80,22 +88,26 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       await act(async () => { dom!.root.render(<QueryClientProvider client={client!}><Harness /></QueryClientProvider>); });
       await settle(); await settle();
       const doc = dom.dom.window.document;
+      expect(doc.querySelector('[role="dialog"]')).toBeNull();
       for (let attempt = 0; attempt < 30 && !doc.querySelector('[data-testid="current-interaction"]'); attempt++) await settle();
       expect(doc.body.textContent).toContain('最近一轮交互');
       expect(doc.querySelector('[data-testid="parse-timeline"]')).toBeNull();
       expect(doc.body.textContent).not.toContain('parse_submitted');
       expect(doc.body.textContent).not.toContain('目录已随本轮输入发送');
-      expect(doc.body.textContent).toContain('每课使用独立线程');
+      expect(doc.body.textContent).toContain('不同 Worker 使用独立线程');
       expect(doc.querySelector<HTMLDetailsElement>('[data-testid="current-interaction"]')?.open).toBe(true);
-      expect(doc.body.textContent).toContain('引擎内部重试（本轮尚未结束）');
-      for (let attempt = 0; attempt < 20 && !doc.body.textContent?.includes('受控引擎繁忙'); attempt++) await settle();
-      expect(doc.body.textContent).toContain('受控引擎繁忙');
-      expect(doc.body.textContent).toContain('不刷新模型输出等待期限');
-      expect(doc.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')?.open).toBe(false);
+      const historyForInput = doc.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')!;
+      expect(historyForInput.open).toBe(false);
+      await act(async () => { historyForInput.open = true; historyForInput.dispatchEvent(new dom!.dom.window.Event('toggle')); }); await settle();
+      for (let attempt = 0; attempt < 20 && !doc.querySelector('[data-testid="raw-model-input"]'); attempt++) await settle();
+      expect(doc.querySelector<HTMLDetailsElement>('[data-testid="raw-model-input"]')?.open).toBe(false);
+      for (let attempt = 0; attempt < 20 && !doc.body.textContent?.includes('应用发起新轮重试'); attempt++) await settle();
+      expect(doc.body.textContent).toContain('应用发起新轮重试');
+      expect(doc.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')?.open).toBe(true);
       expect(doc.body.textContent).toContain('当前正文');
       expect(doc.body.textContent).toContain('已暂存，等待整课提交');
       expect(currentRepo.getRawDb().query('SELECT count(*) AS n FROM textbook_articles WHERE chapter_id=?').get('b')).toEqual({ n: 0 });
-      expect(reads.some(path => path.endsWith('/details/' + historyInput.sequence))).toBe(false);
+      expect(reads.some(path => path.endsWith('/details/' + otherInput.sequence))).toBe(false);
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '已保存部分')!.click());
       await settle();
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(button => button.textContent === '保存结果')!.click());
@@ -122,13 +134,14 @@ describe('桌面监视弹窗：真实 Query → Gateway → SQLite', () => {
       const detailReads = reads.filter(path => path.includes('/details/'));
       expect(detailReads.length).toBeGreaterThan(0);
       expect(detailReads.length).toBeLessThan(25);
-      const close = [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Close')!;
+      const close = [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '收起详情')!;
       await act(async () => close.click()); await settle();
       expect(doc.querySelector('[role="dialog"]')).toBeNull();
+      expect(doc.querySelector('[aria-label="教材导入运行详情"]')).toBeNull();
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '重开监视')!.click());
       await settle();
       expect(doc.querySelector<HTMLDetailsElement>('[data-testid="history-interaction"]')?.open).toBe(false);
-      expect(doc.body.textContent).toContain('当前正文');
+      expect(doc.body.textContent).toContain('应用发起新轮重试');
       waiting.resolve(); await running;
       await act(async () => [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '刷新记录')!.click()); await settle(); await settle();
       expect(doc.body.textContent).toContain('暂存内容已随整课保存');

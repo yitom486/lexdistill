@@ -4,9 +4,9 @@ import { ImportEventDetail } from './ImportEventDetail.js';
 
 /** 一个原生 call 的参数、校验和事务回执放在一起。 */
 export function ImportToolCall({ events, directory, resolved = false, lessonSaved = false }: { events: ImportEvent[]; directory: readonly ContentDirectoryNode[]; resolved?: boolean; lessonSaved?: boolean }) {
-  const [open, setOpen] = useState(!resolved);
+  const [open, setOpen] = useState(false);
   const manuallyChanged = useRef(false);
-  useEffect(() => { if (!manuallyChanged.current) setOpen(!resolved); }, [resolved]);
+  useEffect(() => { if (!manuallyChanged.current && resolved) setOpen(false); }, [resolved]);
   const committed = events.some(event => event.name === 'committed');
   const staged = events.some(event => event.name === 'content_staged');
   const rejected = events.some(event => event.name === 'rejected');

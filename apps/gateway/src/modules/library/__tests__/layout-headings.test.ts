@@ -11,7 +11,7 @@ import { collectLayoutCandidates } from '../application/pdf-import/layout-headin
 function fakeInspector(methods: Record<string, unknown>): PdfInspectorLike {
   return {
     processPdf: () => ({}),
-    processPdfWithOcr: async () => ({}),
+
     ...methods,
   } as unknown as PdfInspectorLike;
 }

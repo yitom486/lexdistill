@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { LessonSubmissionSchema, type ImportEvent, type ContentDirectoryNode } from '@study-studio/document-model';
 import { useImportEventDetail } from '../../../queries/textbook-import-monitor.js';
 import { ContentResultView } from './ContentResultView.js';
-import { ChapterSourceView } from './ChapterSourceView.js';
+import { PdfMaterialView } from './PdfMaterialView.js';
 import { ModelInputView } from './ModelInputView.js';
 import { ImportRecordView } from './ImportRecordView.js';
 
@@ -17,7 +17,7 @@ export function ImportEventDetail({ event, expanded = false, directory = [] }: {
     {open && <div className="mt-2 space-y-2">
       {query.isPending ? <p>正在读取详情…</p> : query.isError ? <p role="alert">{query.error.message}</p> : <>
         {candidate?.success && <section className="space-y-2"><h4 className="font-semibold">系统生成 ID 后的候选 · 尚不能据此认定已保存</h4><ContentResultView content={candidate.data.content} directory={directory} /></section>}
-        {event.category === 'text' && event.name === 'ready' && <ChapterSourceView detail={query.data?.detail} />}
+        {event.category === 'text' && (event.name === 'chapter_pdf' || event.name === 'ready') && <PdfMaterialView detail={query.data?.detail} />}
         {event.category === 'model' && event.name === 'input' && <ModelInputView detail={query.data?.detail} />}
         {!candidate?.success && !(event.category === 'text' && event.name === 'ready') && !(event.category === 'model' && event.name === 'input') && <ImportRecordView event={event} detail={query.data?.detail} />}
       </>}

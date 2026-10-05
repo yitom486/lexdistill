@@ -1,18 +1,17 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 import type { TextbookContentKind } from '@study-studio/document-model';
-import { ToolRegistry } from '@study-studio/tool-core';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';
-import { TextbookContentTools } from '../tools/textbook-content-tools.js';
-import { pipelineModel, requiredContent } from './textbook-pipeline-fixtures.js';
-import { toolsToDynamicSpecs } from '../../../../../../packages/agent-runtime/src/adapters/codex/tools-bridge.js';
+import { requiredContent } from './textbook-pipeline-fixtures.js';
+import { harnessInjection, type ChapterScript } from './agentpool-pipeline-harness.js';
+import type { McpChapterScope } from '../mcp/textbook-mcp-scope.js';
 
 const repos: DrizzleLearnerRepository[] = [];
 afterEach(() => { for (const repo of repos.splice(0)) repo.getRawDb().close(); });
 
-// Controlled chapter content exercises the real HTTP/tool/SQLite path, not a textbook classification rule.
+// Controlled chapter content exercises the real HTTP/MCP-tool/SQLite path, not a textbook classification rule.
 const cases: Array<{ kind: TextbookContentKind; title: string; content: unknown; table: string }> = [
   { kind: 'exercises', title: '复习', content: requiredContent.exercises, table: 'textbook_exercise_items' },
   { kind: 'grammar', title: '总结', content: requiredContent.grammar, table: 'textbook_knowledge' },
@@ -22,74 +21,51 @@ const cases: Array<{ kind: TextbookContentKind; title: string; content: unknown;
   { kind: 'material', title: '整理', content: { items: [{ text: '挨拶\nこんにちは。' }] }, table: 'textbook_materials' },
 ];
 
+let rpcSeq = 0;
+async function submitScope(scope: McpChapterScope, kind: TextbookContentKind, raw: unknown) {
+  const result = await scope.submission.execute(kind, raw, `adaptive-${++rpcSeq}`);
+  if (!result.ok) throw result.error;
+}
+
 describe('按章节实际内容提交', () => {
-  it('原生工具说明提示排序选项、可选字段省略和重试引用；实际错误修正后统一保存', async () => {
+  it('字段修正后统一保存；暂存期库里 0 行', async () => {
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
-    const tools = new TextbookContentTools(repo);
     const exercise = { type: 'ORDERING', prompt: '排列词块组成句子。',
       answer: ['私', 'の', '日本語', 'の', '本', 'です'], difficultyTier: 1, difficultyReason: '基础名词短语词序' };
-    const model = pipelineModel(tools, async ({ submit }) => {
-      const emptyField = await submit({ items: [{ word: '本', meaning: '书', level: 'N5', partOfSpeech: '' }] }, 'vocabulary');
+    const harness = harnessInjection(repo, new Map<string, ChapterScript>([['a', async (scope) => {
+      const emptyField = await scope.submission.execute('vocabulary', { items: [{ word: '本', meaning: '书', level: 'N5', partOfSpeech: '' }] }, 'rpc-empty');
       expect(emptyField.ok ? '' : emptyField.error.code).toBe('E_CONTENT_FORMAT_INVALID');
-      const noOptions = await submit({ items: [exercise] }, 'exercises');
+      const noOptions = await scope.submission.execute('exercises', { items: [exercise] }, 'rpc-noopt');
       expect(noOptions.ok ? '' : noOptions.error.code).toBe('E_CONTENT_FORMAT_INVALID');
-      expect((await submit({ items: [{ word: '本', meaning: '书', level: 'N5' }] }, 'vocabulary')).ok).toBe(true);
-      expect((await submit({ items: [{ ...exercise, options: ['本', 'の', '私', 'です', '日本語', 'の'] }] }, 'exercises')).ok).toBe(true);
-      const view = await submit({ action: 'read' }, 'exercises');
+      expect((await scope.submission.execute('vocabulary', { items: [{ word: '本', meaning: '书', level: 'N5' }] }, 'rpc-v')).ok).toBe(true);
+      expect((await scope.submission.execute('exercises', { items: [{ ...exercise, options: ['本', 'の', '私', 'です', '日本語', 'の'] }] }, 'rpc-e')).ok).toBe(true);
+      const view = await scope.submission.execute('exercises', { action: 'read' }, 'rpc-read');
       if (!view.ok) throw view.error;
       const { items } = z.object({ items: z.array(z.object({ ref: z.string() }).passthrough()) }).parse(view.value);
-      expect((await submit({ action: 'update', items: [{ ...exercise, options: ['本', 'の', '私', 'です', '日本語', 'の'],
-        ref: items[0]!.ref, explanation: '名词之间用「の」连接。' }] }, 'exercises')).ok).toBe(true);
+      expect((await scope.submission.execute('exercises', { action: 'update', items: [{ ...exercise, options: ['本', 'の', '私', 'です', '日本語', 'の'],
+        ref: items[0]!.ref, explanation: '名词之间用「の」连接。' }] }, 'rpc-upd')).ok).toBe(true);
       expect(repo.getRawDb().query('SELECT count(*) AS n FROM textbook_exercise_items').get()).toEqual({ n: 0 });
-    });
-    const create = model.adapter.createSession;
-    model.adapter.createSession = async options => {
-      const { specs } = toolsToDynamicSpecs(options.tools ?? []);
-      expect(specs).toHaveLength(6);
-      const exerciseSpec = specs.find(spec => spec.name === 'library_exercises')!;
-      expect(exerciseSpec.description).toContain('选择题和排序题均需 options');
-      expect(exerciseSpec.description).toContain('重复词块的次数与 options 一致');
-      for (const spec of specs) {
-        expect(spec.description).toContain('可选字段没有值就省略');
-        expect(spec.description).toContain('已有相同内容先 read 后 update');
-        expect(spec.description).toContain('重试后先 read 获取新 ref');
-      }
-      return create(options);
-    };
+    }]]));
     const result = await repo.executeTextbookPipeline({ userId: 'owner', documentId: 'book', title: '工具说明修正',
       tocEntries: [{ id: 'a', title: '当前课程', level: 'lesson', startPage: 1 }],
-      lessonJobs: [{ lessonId: 'a', text: '私の日本語の本です。' }], adapter: model.adapter, submissionTool: tools,
-      poolSize: 1, modelRetries: 0 });
+      lessonJobs: [{ lessonId: 'a', text: '私の日本語の本です。' }], poolSize: 1, modelRetries: 0, ...harness.extra });
     expect(result.ok && result.value.allLessonsReady).toBe(true);
     const content = await repo.readTextbookChapter({ userId: 'owner', documentId: 'book', chapterId: 'a' });
     expect(content.ok && content.value.exercises).toHaveLength(1);
     expect(content.ok && content.value.exercises[0]?.answer).toEqual(exercise.answer);
     expect(content.ok && content.value.vocabulary[0]?.partOfSpeech).toBeUndefined();
-    expect(model.inputs).toHaveLength(1);
+    expect(harness.driver.asks).toHaveLength(1);
   });
 
   for (const example of cases) it(`${example.title}章只提交 ${example.kind}，HTTP 完成后整章保存`, async () => {
     const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
-    const tools = new TextbookContentTools(repo), registry = new ToolRegistry();
-    for (const tool of tools.tools) {
-      registry.register(tool);
-      expect(tool.description).not.toContain('本课必需');
-    }
-    const model = pipelineModel(tools, async ({ sessionId, turnId, input }) => {
-      expect(input.message).toContain('视情况选择');
-      expect(input.message).not.toContain('必须分别提交');
-      expect(input.message).toContain(`章节: ${example.title}`);
-      expect(input.message).toContain(`- ${example.title}\n  - 参考小标题`);
-      expect(input.message).toContain('本章内容:\n当前章实际材料');
-      const tool = tools.tools.find(item => item.kind === example.kind)!;
-      const result = await registry.get(tool.name)!.execute(example.content,
-        { userId: 'owner', sessionId, turnId, callId: 'only-content' });
+    const harness = harnessInjection(repo, new Map<string, ChapterScript>([['a', async (scope) => {
+      const result = await scope.submission.execute(example.kind, example.content, `rpc-${example.kind}`);
       expect(result.ok).toBe(true);
       expect(repo.getRawDb().query(`SELECT count(*) AS n FROM ${example.table}`).get()).toEqual({ n: 0 });
-    });
-    // The HTTP routes consume these dependencies; unused server capabilities are never invoked.
-    const deps = { repo, server: { toolRegistry: registry, agentAdapter: model.adapter } } as GatewayDeps;
-    const response = await createPdfImportRoutes(deps).request('/api/documents/owner/execute-textbook-pipeline', {
+    }]]));
+    const deps = { repo, server: {} } as GatewayDeps;
+    const response = await createPdfImportRoutes(deps, { poolDriver: harness.driver, onChapterScope: harness.extra.onChapterScope }).request('/api/documents/owner/execute-textbook-pipeline', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         documentId: 'book', title: '按实际内容测试', language: 'ja', poolSize: 1, modelRetries: 0,
         tocEntries: [
@@ -106,8 +82,8 @@ describe('按章节实际内容提交', () => {
     expect(repo.getRawDb().query('SELECT count(*) AS n FROM global_vocabulary').get()).toEqual({ n: example.kind === 'vocabulary' ? 1 : 0 });
     const stats = await repo.getTextbookAssetStats('book');
     expect(stats.ok && stats.value.readyLessons).toBe(1);
-    expect(model.inputs).toHaveLength(1);
-    expect(model.closed).toHaveLength(1);
+    expect(harness.driver.asks).toHaveLength(1);
+    expect(harness.driver.finishes).toHaveLength(1);
   });
 
   it('存储层删空唯一内容会回滚，不把空章节标为完成', async () => {

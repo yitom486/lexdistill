@@ -36,8 +36,8 @@ afterEach(() => {
 
 function stubInspector(markdown: string) {
   return async () => ({
-    processPdf: () => ({ pdfType: 'TextBased', pageCount: 1, markdown, pagesNeedingOcr: [], confidence: 0.9 }),
-    processPdfWithOcr: async () => ({ markdown: null, pagesRoutedToOcr: [], pagesRecommendingHosted: [] }),
+    processPdf: () => ({ pdfType: 'TextBased', pageCount: 1, markdown, confidence: 0.9 }),
+
   });
 }
 const PDF_HEAD = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);

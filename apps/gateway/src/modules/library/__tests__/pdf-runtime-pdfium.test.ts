@@ -45,12 +45,12 @@ async function freshTmp(): Promise<string> {
 
 function recordingFetch(
   calls: string[],
-  delegate: (url: string) => Promise<Response>
+  delegate: (url: string, init?: RequestInit) => Promise<Response>
 ): typeof fetch {
-  return (async (url: unknown) => {
+  return (async (url: unknown, init?: RequestInit) => {
     const href = String(url);
     calls.push(href);
-    return delegate(href);
+    return delegate(href, init);
   }) as unknown as typeof fetch;
 }
 
@@ -82,7 +82,7 @@ describe('P4A-2 needPdfium 下载集合（真实网络，与 native E2E 同策�
     await fsp.rm(dir, { recursive: true, force: true });
     await fsp.mkdir(dir, { recursive: true });
     const calls: string[] = [];
-    const fetchImpl = recordingFetch(calls, (url) => fetch(url));
+    const fetchImpl = recordingFetch(calls, (url, init) => fetch(url, init));
     const result = await ensurePdfRuntime({ runtimeDir: dir, needPdfium: true, fetchImpl, platform });
     // 精确断言下载集合：inspector 主包 + napi 包 + pdfium 包，无 ORT/模型。
     // （主包与 napi 包并发下载，比较集合；pdfium 在后。12MB 量级，与 native E2E 同策略。）
@@ -94,8 +94,8 @@ describe('P4A-2 needPdfium 下载集合（真实网络，与 native E2E 同策�
     expect(ortEnv).toBeUndefined();
     const pdfiumEnv: unknown = process.env.PDFIUM_LIB_PATH;
     expect(pdfiumEnv).toBe(result.paths.pdfiumLib);
-    expect(result.paths.ortLib).toBeNull();
-  }, 300000);
+    expect('ortLib' in result.paths).toBe(false);
+  }, 60000);
 });
 
 describe('P4A-2 needPdfium 稳态（预置目录，必抛 fetch）', () => {
@@ -114,11 +114,11 @@ describe('P4A-2 needPdfium 稳态（预置目录，必抛 fetch）', () => {
     );
     await fsp.writeFile(
       path.join(inspectorDir, 'index.js'),
-      'module.exports = { processPdf: () => ({}), processPdfWithOcr: async () => ({}) };'
+      'module.exports = { processPdf: () => ({}), renderPdfPages: async () => [] };'
     );
     await fsp.writeFile(
       path.join(dir, 'manifest.json'),
-      JSON.stringify({ version: 1, pdfInspector: PDF_INSPECTOR_VERSION, platform, withOcrLibs: false })
+      JSON.stringify({ version: 1, pdfInspector: PDF_INSPECTOR_VERSION, platform })
     );
     const realLib = await findPinnedPdfiumLib();
     const pdfiumDir = path.join(dir, 'pdfium');
@@ -136,6 +136,6 @@ describe('P4A-2 needPdfium 稳态（预置目录，必抛 fetch）', () => {
     expect(pdfiumEnv).toBe(libPath);
     const ortEnv: unknown = process.env.ORT_DYLIB_PATH;
     expect(ortEnv).toBeUndefined();
-    expect(result.paths.ortLib).toBeNull();
+    expect('ortLib' in result.paths).toBe(false);
   });
 });

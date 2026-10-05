@@ -3,7 +3,6 @@ import type { LessonContent } from '@study-studio/document-model';
 import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import type { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { PDFDocument } from 'pdf-lib';
-import type { ChapterSource } from '@study-studio/document-model';
 
 /** 受控模型的图片输入夹具，不代表真实书页。 */
 export const fixturePng = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR3cAAAAASUVORK5CYII=', 'base64'));
@@ -12,9 +11,6 @@ export async function fixturePdf(pageCount: number): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   for (let index = 0; index < pageCount; index++) pdf.addPage();
   return pdf.save();
-}
-export function parsedText(text: string, pages: readonly number[]): ChapterSource {
-  return { parser: 'mineru-cloud', blocks: pages.map(page => ({ id: `p${page}b0`, page, kind: 'TEXT', text })) };
 }
 
 export function contentFor(tocIds: string[]): LessonContent {
@@ -50,7 +46,7 @@ export async function submitRequired(submit: ModelTurn['submit'], already: reado
 export function pipelineModel(tool: TextbookContentTools, handle?: (turn: ModelTurn) => Promise<void>) {
   const created: CreateSessionOptions[] = [], inputs: Array<{ sessionId: string; input: AgentInput }> = [], closed: string[] = [], interrupted: string[] = [];
   const adapter: AgentAdapter = {
-    id: 'controlled-tool-model', name: 'Integration model output', supportsImageInput: () => true,
+    id: 'controlled-tool-model', name: 'Integration model output', supportsImageInput: () => true, supportsLocalFileInput: () => true,
     createSession: async options => {
       created.push(options);
       const session: AgentSession = {

@@ -40,7 +40,7 @@ import type { RepoDeps } from '../../../../infrastructure/persistence/repo-conte
  *
  * 流程（LinguaCafe 式任务化，本仓库保持同步执行、状态落库）：
  * 建任务（processing）→ 源提取 markdown → markdownToAst → 入库 → 任务 done/failed。
- * PDF 走既有 convertPdfToAst（含 OCR 运行时能力层）；EPUB/文本走自研提取。
+ * PDF 走既有 convertPdfToAst（仅原生文字）；EPUB/文本走自研提取。
  * 原文不进库（content 只存前 2000 字摘要，与既有 PDF 导入一致）；失败可重发同一输入。
  */
 

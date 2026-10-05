@@ -1,30 +1,15 @@
-/** 目录视觉审核给任务、原则和模型可见工具名；字段由工具声明。 */
+import { pdfReadingInstructions, type PdfTaskFile } from '../pdf-import/pdf-task-workspace.js';
 export interface TocExtractionPromptInput {
-  title?: string | undefined;
-  language?: string | undefined;
-  pageNumbers: number[];
+  title?: string | undefined; language?: string | undefined; pdfFile: PdfTaskFile;
 }
-
 export function buildTocExtractionPrompt(input: TocExtractionPromptInput): string {
-  const langDesc = input.language ? `目标语种：${input.language}` : '';
   return [
-    '请阅读随消息附上的教材目录页高清图片，按阅读顺序完整提取全书的树状目录草稿。',
-    `图片依次对应 PDF 物理页：${input.pageNumbers.join('、')}。`,
-    ...(input.title ? [`教材参考名称：${input.title}`] : []),
-    ...(langDesc ? [langDesc] : []),
-    '',
-    '【语言教材通用目次提取准则】：',
-    '1. 必须提取前置教学准备单元（Lesson 0 / Introductory）：',
-    '   - 严禁将开篇带有实质教学内容的入门准备部分（如字母/发音/音标、课堂用语、日常问候、数词等）误当成版权页或无用序言过滤；',
-    '   - 只要开篇部分印刷了具体教学条目并配有印刷页码，必须作为 section 提取并记录印刷起始页。',
-    '2. 必须提取深度多级子目（还原真实树状大纲，严禁偷懒只提取平铺课名）：',
-    '   - 核心教学实体（如课次、Lesson、Chapter、第X课/章）标记为 level: "lesson"；',
-    '   - 凡是在成课下方通过缩进、编号（如 1. 2. 3.）、小标题、点线对齐排版的具体次级条目（如核心句型/语法点、情景会话、课文主题、单元复习/Test 等），均为目录有效条目，必须全部作为 level: "section" 提取！',
-    '3. 印刷页码规则：',
-    '   - 只读取图片中通过虚线点线或对齐指向的教材印刷页码，不要填入 PDF 的物理页码；',
-    '   - 同一课内的次级条目若在同一起始页，页码相同即可，后续条目的页码不能倒退。',
-    '4. 工具调用约束：',
-    '   - 本会话提供 library_propose_toc 目录草稿工具。请直接调用它提交完整条目草稿；具体字段以工具说明为准。严禁以普通聊天文本回复。',
-  ].join('\n');
+    '读取当前 PDF，找到实际目录并按阅读顺序提交树状目录。文件可能还包含封面、前言和正文，不把这些都当目录。没有目录时明确说明，不猜目录。',
+    '保留真实父子层级：成课为 lesson，单元为 unit，其余条目为 section；小标题通过 parentIndex 归属父节点，独立章节不强行归入上一课。',
+    'entries 使用教材印刷页码；tocEndPage 填实际目录末页的原 PDF 物理页码，可确认物理页与印刷页的对应时填写 pageOffset。不要把本次提供的文件结束页当目录结束页。',
+    '使用 library_propose_toc 提交草稿；只依据当前文件，不新增工具未声明的字段。',
+    ...(input.title ? [`教材：${input.title}`] : []),
+    ...(input.language ? [`语种：${input.language}`] : []),
+    pdfReadingInstructions(input.pdfFile),
+  ].join('\n\n');
 }
-

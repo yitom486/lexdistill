@@ -13,7 +13,7 @@ import { ensurePdfRuntime, type PdfInspectorLike, type PdfRuntimePaths } from '.
  * - 目录：只认 `STUDY_STUDIO_TEST_RUNTIME_DIR`，否则用 `apps/gateway/src/.test-runtime/`（gitignored）；
  * - 通用生产变量 `STUDY_STUDIO_RUNTIME_DIR` 一律无视（见 pinProcessToTestRuntime），
  *   避免开发者 shell 里 export 的生产路径把测试写进真 runtime；
- * - 首次调用即 bootstrap pinned 构件（含 OCR，供扫描页用例），复用已下载；
+ * - 首次调用即 bootstrap pinned 构件（原生 PDF 读取与按需查看，供扫描页用例），复用已下载；
  * - 缺失/损坏/离线导致无法就绪时直接抛（测试文件加载失败→非零退出），绝不 `it.skip`。
  * 生产 `~/.study-studio` 绝不作为测试状态读写。产品 `defaultRuntimeDir` 行为一字未动。
  */
@@ -37,14 +37,14 @@ export function pinProcessToTestRuntime(): string {
 
 let ready: Promise<{ inspector: PdfInspectorLike; paths: PdfRuntimePaths }> | null = null;
 
-/** 确保测试运行时就绪（含 OCR）；失败即抛，不 skip。失败时清 memo，允许调用方重试。 */
+/** 确保测试运行时就绪（原生 PDF 读取与按需查看）；失败即抛，不 skip。失败时清 memo，允许调用方重试。 */
 export function ensurePdfTestRuntime(): Promise<{ inspector: PdfInspectorLike; paths: PdfRuntimePaths }> {
   if (!ready) {
     ready = (async () => {
       const dir = testRuntimeDir();
       mkdirSync(dir, { recursive: true });
       try {
-        return await ensurePdfRuntime({ runtimeDir: dir, needOcr: true });
+        return await ensurePdfRuntime({ runtimeDir: dir, needPdfium: true });
       } catch (e) {
         ready = null;
         const code = e instanceof BusinessError ? e.code : 'E_RUNTIME_UNKNOWN';
