@@ -12,6 +12,11 @@
  * - usable：有可用于教材的语义目录 → 保留 embedded 短路；
  * - unusable：有书签但不能作为教材目录 → 回退 OCR，并如实告诉用户。
  *
+ * 第四维（与三态正交）：directoryPage——命中「目录/目次」类定位书签的物理页。
+ * 即使整体 unusable（如全是 1/2/3 页码书签但夹带一条“目录”），定位页仍然
+ * 可用：调用方据此把识别窗口收敛到目录附近，不再盲扫前 30 页。
+ * 终点不由书签定：仍由模型在同一轮确认 tocEndPage，超窗即打回重识。
+ *
  * 语义标题规则（明确、可测试）：
  * - 非语义：纯 ASCII 数字、纯全角数字、数字+分隔符（1.2/1-3）、页码式
  *   （Page 5/5 页/5ページ）、仅符号、仅空白；
@@ -66,6 +71,11 @@ export interface EmbeddedOutlineQualityReport {
   semanticEntries: number;
   /** 有效条目（与旧 readEmbeddedOutlineEntries 同口径，供 map 透传）。 */
   entries: EmbeddedOutlineEntry[];
+  /**
+   * 目录定位页（物理页）：命中「目录/目次」类书签即填，无命中/越界/截断一律 null。
+   * 与 quality 正交——unusable 时仍可用于收敛识别窗口；终点永不由此推定。
+   */
+  directoryPage: number | null;
 }
 
 /**
@@ -110,6 +120,17 @@ const PAGE_LABEL_BEFORE = /^(p\.?|pp\.?|page|pages|页|ページ|頁)\s*[\d０-�
 const PAGE_LABEL_AFTER = /^[\d０-９]+\s*(页|ページ|頁)$/;
 /** 内容字符：数字/拉丁/假名/CJK/谚文——命中其一即含真实文字。 */
 const CONTENT_CHAR = /[0-9０-９A-Za-z\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]/;
+
+/** 目录定位书签：精确全称匹配，不做模糊包含（“目录学”等不得误命中）。 */
+const DIRECTORY_LOCATOR = /^(目[录錄]|もくじ|目录|contents?)$/i;
+
+/** 有效条目中找目录定位页：首个命中的物理页；无命中返回 null。 */
+function findDirectoryPage(entries: readonly EmbeddedOutlineEntry[]): number | null {
+  for (const entry of entries) {
+    if (DIRECTORY_LOCATOR.test(entry.title.trim())) return entry.physicalPage;
+  }
+  return null;
+}
 
 /**
  * 单标题语义判定（纯函数）：非语义仅限数字形/页码形/符号形/空白，
@@ -162,27 +183,27 @@ export function classifyEmbeddedOutline(
   pageCount: number
 ): EmbeddedOutlineQualityReport {
   if (typeof inspector.extractEmbeddedOutline !== 'function') {
-    return { quality: 'none', reason: 'no-method', totalItems: 0, validEntries: 0, semanticEntries: 0, entries: [] };
+    return { quality: 'none', reason: 'no-method', totalItems: 0, validEntries: 0, semanticEntries: 0, entries: [], directoryPage: null };
   }
   let result: EmbeddedOutlineSource;
   try {
     result = inspector.extractEmbeddedOutline(bytes);
   } catch {
-    return { quality: 'none', reason: 'threw', totalItems: 0, validEntries: 0, semanticEntries: 0, entries: [] };
+    return { quality: 'none', reason: 'threw', totalItems: 0, validEntries: 0, semanticEntries: 0, entries: [], directoryPage: null };
   }
   if (!isRecord(result) || !Array.isArray(result.items)) {
-    return { quality: 'none', reason: 'malformed', totalItems: 0, validEntries: 0, semanticEntries: 0, entries: [] };
+    return { quality: 'none', reason: 'malformed', totalItems: 0, validEntries: 0, semanticEntries: 0, entries: [], directoryPage: null };
   }
   const totalItems = result.items.length;
   if (totalItems === 0) {
-    return { quality: 'none', reason: 'empty', totalItems: 0, validEntries: 0, semanticEntries: 0, entries: [] };
+    return { quality: 'none', reason: 'empty', totalItems: 0, validEntries: 0, semanticEntries: 0, entries: [], directoryPage: null };
   }
   if (result.truncated === true) {
-    return { quality: 'unusable', reason: 'truncated', totalItems, validEntries: 0, semanticEntries: 0, entries: [] };
+    return { quality: 'unusable', reason: 'truncated', totalItems, validEntries: 0, semanticEntries: 0, entries: [], directoryPage: null };
   }
   const entries = extractValidEntries(result, pageCount);
   if (entries.length === 0) {
-    return { quality: 'unusable', reason: 'no-valid-entries', totalItems, validEntries: 0, semanticEntries: 0, entries: [] };
+    return { quality: 'unusable', reason: 'no-valid-entries', totalItems, validEntries: 0, semanticEntries: 0, entries: [], directoryPage: null };
   }
   const semanticEntries = entries.filter((e) => isSemanticOutlineTitle(e.title)).length;
   if (semanticEntries === 0) {
@@ -193,6 +214,7 @@ export function classifyEmbeddedOutline(
       validEntries: entries.length,
       semanticEntries: 0,
       entries,
+      directoryPage: findDirectoryPage(entries),
     };
   }
   if (semanticEntries < MIN_SEMANTIC_TITLES || semanticEntries / entries.length < MIN_SEMANTIC_RATIO) {
@@ -203,6 +225,7 @@ export function classifyEmbeddedOutline(
       validEntries: entries.length,
       semanticEntries,
       entries,
+      directoryPage: findDirectoryPage(entries),
     };
   }
   return {
@@ -212,5 +235,6 @@ export function classifyEmbeddedOutline(
     validEntries: entries.length,
     semanticEntries,
     entries,
+    directoryPage: findDirectoryPage(entries),
   };
 }

@@ -144,5 +144,39 @@ describe('classifyEmbeddedOutline 三态', () => {
       { title: 'Lesson 3', level: 2, physicalPage: 12 },
       { title: '40', level: 1, physicalPage: 15 },
     ]);
+    expect(report.directoryPage).toBeNull();
+  });
+
+  it('directoryPage：数字洪水中夹带“目录”仍可定位（真书二形态）', () => {
+    const items = [
+      { title: '封面', level: 1, physicalPage: 1 },
+      { title: '目录', level: 1, physicalPage: 17 },
+      ...Array.from({ length: 65 }, (_, i) => ({ title: String(i + 1), level: 1, physicalPage: 22 + i })),
+    ];
+    const report = classifyEmbeddedOutline(
+      inspectorWith({ items, unresolvedCount: 0, truncated: false }),
+      mockBytes(),
+      371
+    );
+    // 语义 2/67 不到 60%：整体仍 unusable，但定位页可用。
+    expect(report).toMatchObject({ quality: 'unusable', reason: 'below-threshold' });
+    expect(report.directoryPage).toBe(17);
+  });
+
+  it('directoryPage：无定位书签/越界/模糊包含一律 null', () => {
+    const noLocator = classifyEmbeddedOutline(inspectorWith(numericOutline(10)), mockBytes(), 371);
+    expect(noLocator.directoryPage).toBeNull();
+    const outOfRange = classifyEmbeddedOutline(
+      inspectorWith({ items: [{ title: '目录', level: 1, physicalPage: 9999 }], unresolvedCount: 0, truncated: false }),
+      mockBytes(),
+      371
+    );
+    expect(outOfRange.directoryPage).toBeNull();
+    const fuzzy = classifyEmbeddedOutline(
+      inspectorWith({ items: [{ title: '目录学', level: 1, physicalPage: 5 }, { title: '第1課', level: 1, physicalPage: 9 }, { title: '第2課', level: 1, physicalPage: 12 }], unresolvedCount: 0, truncated: false }),
+      mockBytes(),
+      371
+    );
+    expect(fuzzy.directoryPage).toBeNull();
   });
 });

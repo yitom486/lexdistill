@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { PDFDocument } from 'pdf-lib';
 import { BusinessError, err, logger, ok, translateToBusinessError, type Result } from '@study-studio/shared';
+import { classifyEmbeddedOutline } from '@study-studio/content';
 import { defaultRuntimeDir, ensurePdfRuntime, type PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
 
 /** Agent 工作区稳定父目录：池子 cwd 与任务临时目录都落在这下面，备料前可先建。 */
@@ -27,6 +28,13 @@ export interface PdfTaskFile {
 /** 扫描页转图片阈值：文字层空白才烘图，网关只备料、不教模型怎么读。 */
 const RENDER_DPI = 150;
 
+/** 内置书签定位目录页（物理页）：走内容层统一判定，无命中/截断/组件缺失时返回 null，不抛错。 */
+export function directoryWindow(pageCount: number, physicalPage: number): number[] {
+  const start = Math.max(1, physicalPage - 2);
+  const end = Math.min(pageCount, physicalPage + 4);
+  return Array.from({ length: Math.max(0, end - start + 1) }, (_, index) => start + index);
+}
+
 async function removeOwnedWorkspace(directory: string, parent: string): Promise<void> {
   const target = resolve(directory);
   if (dirname(target) !== resolve(parent) || !basename(target).startsWith('import-')) throw new BusinessError('E_PDF_CLEANUP_SCOPE', '教材临时目录归属异常，已停止清理', 'TOOL_EXECUTION');
@@ -36,7 +44,7 @@ async function removeOwnedWorkspace(directory: string, parent: string): Promise<
 /** One task owns all slices. Worker cwd is the stable parent, never the removable task dir. */
 export class PdfTaskWorkspace {
   private readonly materialized = new Map<string, PdfTaskFile>();
-  private constructor(readonly directory: string, readonly workingDirectory: string, private readonly source: PDFDocument, private readonly inspector: PdfInspectorLike) {}
+  private constructor(readonly directory: string, readonly workingDirectory: string, private readonly source: PDFDocument, private readonly inspector: PdfInspectorLike, private readonly bytes: Uint8Array) {}
   static async create(pdf: Uint8Array, signal?: AbortSignal): Promise<Result<PdfTaskWorkspace, BusinessError>> {
     let directory: string | undefined;
     const workingDirectory = agentWorkspaceParent();
@@ -48,13 +56,19 @@ export class PdfTaskWorkspace {
       if (signal?.aborted) return err(new BusinessError('E_CANCELLED', '教材处理已取消', 'TOOL_EXECUTION'));
       await mkdir(workingDirectory, { recursive: true });
       directory = await mkdtemp(join(workingDirectory, 'import-'));
-      return ok(new PdfTaskWorkspace(directory, workingDirectory, source, runtime.inspector));
+      return ok(new PdfTaskWorkspace(directory, workingDirectory, source, runtime.inspector, pdf));
     } catch (cause) {
       if (directory) await removeOwnedWorkspace(directory, workingDirectory).catch(cleanup => logger.warn('PDF preparation cleanup failed', { cause: String(cleanup) }));
       return err(translateToBusinessError(cause, { category: 'TOOL_EXECUTION', fallbackMessage: '教材 PDF 阅读环境准备失败，请重试' }));
     }
   }
   get pageCount(): number { return this.source.getPageCount(); }
+  /** 内置书签定位目录页（物理页）：无书签、无命中或组件缺失时返回 null，不抛错。 */
+  findDirectoryPage(): number | null {
+    try {
+      return classifyEmbeddedOutline(this.inspector, this.bytes, this.pageCount).directoryPage;
+    } catch { return null; }
+  }
   async slice(filename: string, pages: number[], signal?: AbortSignal): Promise<Result<PdfTaskFile, BusinessError>> {
     if (signal?.aborted) return err(new BusinessError('E_CANCELLED', '教材处理已取消', 'TOOL_EXECUTION'));
     if (!/^\d+\.pdf$/.test(filename) || !pages.length || pages.some(page => !Number.isSafeInteger(page) || page < 1 || page > this.pageCount) || new Set(pages).size !== pages.length)

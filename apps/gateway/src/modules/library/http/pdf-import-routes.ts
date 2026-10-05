@@ -4,7 +4,7 @@ import { BusinessError, isOk, logger } from '@study-studio/shared';
 import { PDFDocument } from 'pdf-lib';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
-import { PdfTaskWorkspace } from '../application/pdf-import/pdf-task-workspace.js';
+import { PdfTaskWorkspace, directoryWindow } from '../application/pdf-import/pdf-task-workspace.js';
 import { extractTocWithLlm } from '../application/toc-extractor.js';
 import { beginTocVisionTrace, listTocVisionTraces } from '../application/toc-vision-diagnostics.js';
 import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
@@ -198,7 +198,10 @@ export function createPdfImportRoutes(
         const created = await PdfTaskWorkspace.create(input.value.bytes, c.req.raw.signal);
         if (!created.ok) return reject(created.error);
         workspace = created.value;
-        const pages = input.value.pages ?? Array.from({ length: Math.min(30, workspace.pageCount) }, (_, i) => i + 1);
+        const bookmarkPage = workspace.findDirectoryPage();
+        const pages = input.value.pages ?? (bookmarkPage === null
+          ? Array.from({ length: Math.min(30, workspace.pageCount) }, (_, i) => i + 1)
+          : directoryWindow(workspace.pageCount, bookmarkPage));
         const file = await workspace.slice('0.pdf', pages, c.req.raw.signal);
         if (!file.ok) return reject(file.error);
         // 扫描版在这里备图（目录范围小，毫秒到秒级），再开模型轮。
