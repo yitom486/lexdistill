@@ -75,7 +75,7 @@ export function TextbookPipelineImporterTab(props: TextbookPipelineImporterTabPr
                     'text-ink-muted/50'}`}
               >
                 <div className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono text-xs font-semibold shrink-0 transition-colors
-                  ${isDone ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : 
+                  ${isDone ? 'bg-status-success-wash-strong text-status-success-fg border border-status-success-line' : 
                     isActive ? 'bg-accent-ink text-surface shadow-xs' : 
                     'bg-surface border border-line text-ink-muted'}`}
                 >
@@ -86,8 +86,8 @@ export function TextbookPipelineImporterTab(props: TextbookPipelineImporterTabPr
                     <span>{st.label}</span>
                     {isActive && st.id === 3 && flow.activeJob?.status === 'running' && (
                       <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-success-pulse opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-status-success-dot"></span>
                       </span>
                     )}
                   </div>
@@ -106,7 +106,7 @@ export function TextbookPipelineImporterTab(props: TextbookPipelineImporterTabPr
         })}
       </nav>
 
-      {monitorOpen && <TextbookImportMonitor open onOpenChange={setMonitorOpen} userId={DEFAULT_USER_ID} traceId={flow.traceId} />}
+      {monitorOpen && <TextbookImportMonitor open onOpenChange={setMonitorOpen} userId={DEFAULT_USER_ID} traceId={flow.traceId} directoryOnly />}
 
       {flow.step === 1 && <TextbookFileStep flow={flow} source={props} onClear={clear} />}
 

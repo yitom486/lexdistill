@@ -307,7 +307,7 @@ export function AgentSessionDrawer({
                     <p className="text-ink">
                       {typeof err.detail === 'object' && err.detail !== null && 'message' in err.detail
                         ? String((err.detail as Record<string, unknown>).message)
-                        : JSON.stringify(err.detail ?? '未提供详细错误原因')}
+                        : JSON.stringify(err.detail ?? { category: err.category, nodeId: err.nodeId, sessionId: err.sessionId, attemptId: err.attemptId, callId: err.callId })}
                     </p>
                     <span className="text-[10px] text-ink-muted font-mono block">
                       时间: {new Date(err.occurredAt).toLocaleString()}

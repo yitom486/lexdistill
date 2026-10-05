@@ -42,11 +42,11 @@ const stageLabels: Record<string, string> = {
   extracting: '模型深度提炼',
   validating: '结构格式校验',
   correcting: '模型自动修正',
-  model_retrying: '模型重试中',
+  model_retrying: '失败重试中',
   saving: '入库持久化',
   storage_retrying: '保存重试中',
   saved: '已完成入库',
-  failed: '提炼中断',
+  failed: '本轮失败',
 };
 
 export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: Props) {
@@ -153,7 +153,7 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
     return result;
   }, [allEvents, job, slotMap, directory]);
 
-  const activeWorkerCount = workers.filter(w => ['preparing', 'thinking', 'extracting', 'validating', 'saving'].includes(w.stage)).length;
+  const activeWorkerCount = workers.filter(w => ['preparing', 'thinking', 'extracting', 'validating', 'saving', 'retrying'].includes(w.stage)).length;
 
   return (
     <section className="space-y-5 rounded-2xl border border-line bg-surface p-6 text-ink shadow-sm">
@@ -247,8 +247,8 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
                 {job.successfulLessons}
               </span>
             </div>
-            <div>
-              <span className="text-[11px] text-ink-muted block">异常重试</span>
+            <div title="用完重试仍未成功；增量续跑会捡回这些章节">
+              <span className="text-[11px] text-ink-muted block">本轮失败</span>
               <span className="text-lg font-bold font-mono text-status-rose-fg">
                 {job.failedLessons.length}
               </span>

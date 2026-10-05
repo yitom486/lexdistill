@@ -42,8 +42,8 @@ interface AgentWorkerCardProps {
 }
 
 export function AgentWorkerCard({ worker, onClickDetails }: AgentWorkerCardProps) {
-  // 根据 stage 决定卡片视觉风格
-  const isRunning = ['preparing', 'thinking', 'extracting', 'validating', 'saving'].includes(worker.stage);
+  // 根据 stage 决定卡片视觉风格：重试是正在干活，不是等待。
+  const isRunning = ['preparing', 'thinking', 'extracting', 'validating', 'saving', 'retrying'].includes(worker.stage);
   const isSuccess = worker.stage === 'saved';
   const isError = worker.stage === 'failed';
   const isRetrying = worker.stage === 'retrying';
@@ -122,7 +122,7 @@ export function AgentWorkerCard({ worker, onClickDetails }: AgentWorkerCardProps
           <div className="text-xs text-ink-muted flex items-start gap-1.5 line-clamp-2">
             <Sparkles className="w-3.5 h-3.5 text-status-warn-dot shrink-0 mt-0.5" />
             <span className="break-all">
-              {worker.recentMessage || (isRunning ? '模型正在分析章节上下文并生成结构化内容…' : isSuccess ? '本课全部内容已完成格式校验并存入 SQLite' : '等待任务队列调度')}
+              {worker.recentMessage || (isRetrying ? '上一轮未成功，正在换新一轮重新提炼…' : isRunning ? '模型正在分析章节上下文并生成结构化内容…' : isSuccess ? '本课全部内容已完成格式校验并存入 SQLite' : '等待任务队列调度')}
             </span>
           </div>
         </div>

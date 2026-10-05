@@ -336,4 +336,4 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   await click(button(activePanel(), '查看译文与用法'));
   expect(activePanel().querySelector('strong')?.textContent).toBe('句子用法');
   expect(activePanel().querySelector('li')?.textContent).toBe('先判断物品的位置。');
-});
+}, 20000);

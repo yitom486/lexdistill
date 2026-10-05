@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react';
 import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
 import { useImportMonitorQuery, useSavedTextbookContent } from '../../../queries/textbook-import-monitor.js';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../ui/dialog.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs.js';
 import { Button } from '../../ui/button.js';
 import { ImportEventDetail } from './ImportEventDetail.js';
 import { ImportModelProcess } from './ImportModelProcess.js';
+import { WorkerLiveStrip } from './WorkerLiveStrip.js';
 import { useImportDirectory } from './useImportDirectory.js';
 import { SavedContentResult } from './SavedContentResult.js';
+import { selectImportRun } from './import-run-scope.js';
 
-interface Props { open: boolean; onOpenChange: (open: boolean) => void; userId: string; traceId: string; job?: TextbookPipelineJobSnapshot; nodeId?: string }
-function MonitorContent({ open, userId, traceId, job, nodeId }: Omit<Props, 'onOpenChange'>) {
+interface Props { open: boolean; onOpenChange: (open: boolean) => void; userId: string; traceId: string; job?: TextbookPipelineJobSnapshot; nodeId?: string; directoryOnly?: boolean }
+function MonitorContent({ open, userId, traceId, job, nodeId, directoryOnly }: Omit<Props, 'onOpenChange'>) {
   const query = useImportMonitorQuery(userId, traceId, open);
   const [selected, setSelected] = useState<string | null | undefined>(nodeId);
   const [readSaved, setReadSaved] = useState(false);
   const [tab, setTab] = useState('model');
-  const events = query.data?.events ?? [];
+  const runEvents = selectImportRun(query.data?.events ?? [], job?.jobId);
+  // 目录阶段没有 job：只看目录会话事件，不混入正文 Worker 会话。
+  const events = directoryOnly ? runEvents.filter(event => !event.nodeId) : runEvents;
   const snapshot = useImportDirectory(userId, traceId, events, open);
   const directory = snapshot?.directory ?? [];
   const titles = new Map(directory.map(node => [node.id, node.title]));
@@ -26,14 +29,14 @@ function MonitorContent({ open, userId, traceId, job, nodeId }: Omit<Props, 'onO
   // 只初始化 UI 选择；记录刷新不得抢走用户正在核对的章节。
   useEffect(() => { if (selected === undefined && initial) setSelected(initial); }, [selected, initial]);
   const shown = events.filter(event => selected ? event.nodeId === selected : !event.nodeId && !!event.attemptId);
-  const parseResult = shown.filter(event => event.category === 'text' && ['ready', 'failed'].includes(event.name)).at(-1);
+  const parseResult = shown.filter(event => event.category === 'text' && ['chapter_pdf', 'ready', 'failed'].includes(event.name)).at(-1);
   const documentId = job?.documentId ?? events.find(event => event.documentId)?.documentId ?? '';
   const saved = useSavedTextbookContent(userId, documentId, selected ?? '', open && readSaved && !!documentId && !!selected);
   const title = titles.get(selected ?? '') ?? selected ?? '目录识别';
   return <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden text-xs">
     {job && <p>进度 {job.doneLessons}/{job.totalLessons} · 成功 {job.successfulLessons} · 失败 {job.failedLessons.length} · Agent 并发 {job.concurrency ?? '见启动配置'} · 模型 {job.model ?? '见会话记录'}</p>}
-    {snapshot && <p className="text-ink-muted">目录 {directory.length} 项 · {snapshot.settings.parserBackend} · 解析并发 {snapshot.settings.parseConcurrency} · Agent 并发 {snapshot.settings.poolSize}</p>}
-    <div className="flex items-center justify-between gap-2"><span className="truncate text-ink-muted" title={traceId}>本次记录：{traceId}</span><Button variant="outline" size="sm" onClick={() => { void query.refetch(); }}>刷新记录</Button></div>
+    {snapshot && <p className="text-ink-muted">目录参考 {directory.length} 项{!job ? ` · Agent 并发 ${snapshot.settings.poolSize}` : ''}</p>}
+    <div className="flex items-center justify-between gap-2"><span className="text-ink-muted">只显示本轮任务记录</span><Button variant="outline" size="sm" onClick={() => { void query.refetch(); }}>刷新记录</Button></div>
     {query.isPending && <p>正在读取本次记录…</p>}
     {query.isError && <p role="alert">{query.error.message}</p>}
     {query.data?.warning && <p role="alert">{query.data.warning}</p>}
@@ -44,10 +47,13 @@ function MonitorContent({ open, userId, traceId, job, nodeId }: Omit<Props, 'onO
         {nodes.map(id => <Button key={id} size="sm" className="shrink-0 justify-start whitespace-normal text-left" variant={selected === id ? 'default' : 'outline'} aria-pressed={selected === id} onClick={() => { setSelected(id); setReadSaved(false); setTab('model'); }}>{titles.get(id) ?? id}</Button>)}
       </nav>}
       <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-col">
-        <TabsList className="shrink-0"><TabsTrigger value="model">模型过程</TabsTrigger><TabsTrigger value="parse">解析结果</TabsTrigger><TabsTrigger value="saved">保存结果</TabsTrigger></TabsList>
-        <TabsContent value="model" className="min-h-0 overflow-auto pt-3"><ImportModelProcess events={shown} allEvents={events} directory={directory} title={title} /></TabsContent>
+        <TabsList className="shrink-0"><TabsTrigger value="model">模型过程</TabsTrigger><TabsTrigger value="parse">材料准备</TabsTrigger><TabsTrigger value="saved">保存结果</TabsTrigger></TabsList>
+        <TabsContent value="model" className="min-h-0 overflow-auto pt-3">
+          <WorkerLiveStrip events={events} stallMs={snapshot?.settings.stallTimeoutMs ?? 120_000} />
+          <ImportModelProcess events={shown} allEvents={events} directory={directory} title={title} />
+        </TabsContent>
         <TabsContent value="parse" className="min-h-0 overflow-auto pt-3">
-          {parseResult ? <ImportEventDetail event={parseResult} expanded /> : <p>本部分暂无解析结果；解析过程事件不在这里展示。</p>}
+          {parseResult ? <ImportEventDetail event={parseResult} expanded /> : <p>本部分暂无材料记录；PDF 裁剪后可查看文件与页码信息。</p>}
         </TabsContent>
         <TabsContent value="saved" className="min-h-0 space-y-3 overflow-auto pt-3">
           {selected && documentId ? <>
@@ -61,10 +67,14 @@ function MonitorContent({ open, userId, traceId, job, nodeId }: Omit<Props, 'onO
   </div>;
 }
 export function TextbookImportMonitor(props: Props) {
-  return <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-    <DialogContent className="flex h-[85vh] max-h-[90vh] max-w-6xl flex-col overflow-hidden">
-      <DialogHeader><DialogTitle>教材导入运行详情</DialogTitle><DialogDescription>选择章节查看实际模型输入、工具调用、校验与重试。仅显示本次导入，历史交互按需展开。</DialogDescription></DialogHeader>
-      <MonitorContent key={props.traceId} {...props} />
-    </DialogContent>
-  </Dialog>;
+  if (!props.open) return null;
+  return <section aria-label="教材导入运行详情" className="space-y-4 rounded-xl border border-line-soft bg-paper-soft p-4 text-ink">
+    <div className="flex items-start justify-between gap-3">
+      <div><h3 className="font-semibold">教材导入运行详情</h3><p className="mt-1 text-sm text-ink-muted">查看本轮材料、模型调用和保存结果。完整参数按需展开。</p></div>
+      <Button variant="ghost" size="sm" onClick={() => props.onOpenChange(false)}>收起详情</Button>
+    </div>
+    <div className="flex max-h-[32rem] min-h-0 flex-col overflow-auto">
+      <MonitorContent key={`${props.traceId}:${props.job?.jobId ?? 'directory'}`} {...props} />
+    </div>
+  </section>;
 }
