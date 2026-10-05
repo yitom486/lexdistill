@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { PdfTaskWorkspace } from '../application/pdf-import/pdf-task-workspace.js';
+import { PdfTaskWorkspace, directoryWindow } from '../application/pdf-import/pdf-task-workspace.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { harnessInjection, stubPoolDriver, type ChapterScript } from './agentpool-pipeline-harness.js';
 import { requiredContent } from './textbook-pipeline-fixtures.js';
@@ -33,6 +33,15 @@ async function submitRequiredScope(scope: McpChapterScope) {
   }
 }
 describe('裁剪 PDF → 连续 Worker → 内容暂存 → 章节事务', () => {
+  it('目录定位窗：起点前留 2 页余量，首尾夹紧', async () => {
+    expect(directoryWindow(371, 17)).toEqual([15, 16, 17, 18, 19, 20, 21]);
+    expect(directoryWindow(371, 1)).toEqual([1, 2, 3, 4, 5]);
+    expect(directoryWindow(371, 371)).toEqual([369, 370, 371]);
+  }, 30000);
+  it('无内置书签的 PDF 定位返回 null，走既有默认', async () => {
+    const ws = await workspace(await textPdf(2));
+    expect(ws.findDirectoryPage()).toBeNull();
+  }, 30000);
   it('裁剪只保留指定页面并记录原页映射；有字版零图片，只放文件', async () => {
     const ws = await workspace(await textPdf(4));
     const sliced = await ws.slice('1.pdf', [2, 4]); if (!sliced.ok) throw sliced.error;
