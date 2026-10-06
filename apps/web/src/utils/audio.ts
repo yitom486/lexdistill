@@ -16,6 +16,7 @@ export interface SpeechStudioConfig {
   rate: number;
   preferredService: string;
   providerApiKeys: Record<string, string>;
+  backupApiKeys: Record<string, string>;
   azureRegion: string;
   localBaseUrl: string;
   voiceId: string;
@@ -178,9 +179,10 @@ class SpeechStudioEngine {
   private listeners = new Set<() => void>();
   private config: SpeechStudioConfig = {
     rate: 0.9, preferredService: '',
-    providerApiKeys: {}, azureRegion: '', localBaseUrl: '', voiceId: '', modelId: '',
+    providerApiKeys: {}, backupApiKeys: {}, azureRegion: '', localBaseUrl: '', voiceId: '', modelId: '',
     saveAudioCache: true,
   };
+  private cooldowns = new Map<string, number>();
   private isSpeaking = false;
   private isStreaming = false;
   private streamedSeconds = 0;
@@ -209,6 +211,19 @@ class SpeechStudioEngine {
   }
   public getConfig(): SpeechStudioConfig { return { ...this.config }; }
   public getIsSpeaking(): boolean { return this.isSpeaking; }
+
+  /** 查询服务商主用 Key 是否处于 1 分钟冷却期 */
+  public isProviderInCooldown(provider: string): boolean {
+    const until = this.cooldowns.get(provider.toLowerCase());
+    return until ? until > Date.now() : false;
+  }
+
+  /** 获取服务商冷却期剩余秒数 */
+  public getCooldownRemainingSeconds(provider: string): number {
+    const until = this.cooldowns.get(provider.toLowerCase());
+    if (!until) return 0;
+    return Math.max(0, Math.ceil((until - Date.now()) / 1000));
+  }
 
   /** stop() 专属代际：自然播完不加，外部停止才加，供连播区分“播完推进”与“被停住”。 */
   public getStopEpoch(): number { return this.stopEpoch; }
@@ -551,28 +566,82 @@ class SpeechStudioEngine {
         ...(provider === 'local' && config.localBaseUrl ? { endpoint: config.localBaseUrl } : {}),
         ...(Number.isFinite(rate) ? { speed: rate } : {}),
       });
+
+      const inCooldown = (this.cooldowns.get(provider) ?? 0) > Date.now();
+      const primaryKey = config.providerApiKeys[provider]?.trim() || '';
+      const backupKey = config.backupApiKeys?.[provider]?.trim() || '';
+      // 若当前在 1 分钟冷却期且存在备用 Key，直接启用备用 Key 兜底；否则优先主用 Key
+      const activeKey = inCooldown && backupKey ? backupKey : primaryKey;
+      const activeHeaders = { ...credentialHeaders };
+      if (activeKey) {
+        activeHeaders[`x-${provider}-api-key`] = activeKey;
+      }
+
+      const isRateLimitOrQuotaError = (err: unknown): boolean => {
+        if (!err) return false;
+        if (err instanceof TtsStreamError) {
+          if (['E_TTS_QUOTA', 'E_TTS_RATE_LIMIT', 'E_TTS_USAGE_LIMIT'].includes(err.code)) return true;
+        }
+        const code = typeof (err as { code?: unknown })?.code === 'string' ? (err as { code: string }).code : '';
+        if (['E_TTS_QUOTA', 'E_TTS_RATE_LIMIT', 'E_TTS_USAGE_LIMIT'].includes(code)) return true;
+        const msg = err instanceof Error ? err.message : String(err);
+        return msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('rate limit');
+      };
+
       let livePlayer: PcmStreamPlayer | null = null;
       let firstChunkAt = 0;
-      const { chunks, sampleRate, mimeType } = await fetchTtsStream(body, {
-        headers: credentialHeaders,
-        signal: controller.signal,
-        onChunk: async (chunk) => {
-          if (sequence !== this.sequence) return;
-          this.streamedChunks += 1;
-          // 非 PCM 单包（Azure/本地降级）不是可续播的帧，硬塞只会放出噪声，只计数。
-          if (!isRawPcmMime(chunk.mimeType)) return;
-          if (!livePlayer) {
-            livePlayer = new PcmStreamPlayer(chunk.sampleRate);
-            this.streamPlayer = livePlayer;
-            await livePlayer.resume();
-            firstChunkAt = Date.now();
+
+      const executeStream = async (headersToUse: Record<string, string>) => {
+        return await fetchTtsStream(body, {
+          headers: headersToUse,
+          signal: controller.signal,
+          onChunk: async (chunk) => {
+            if (sequence !== this.sequence) return;
+            this.streamedChunks += 1;
+            // 非 PCM 单包（Azure/本地降级）不是可续播的帧，硬塞只会放出噪声，只计数。
+            if (!isRawPcmMime(chunk.mimeType)) return;
+            if (!livePlayer) {
+              livePlayer = new PcmStreamPlayer(chunk.sampleRate);
+              this.streamPlayer = livePlayer;
+              await livePlayer.resume();
+              firstChunkAt = Date.now();
+            }
+            livePlayer.pushChunk(chunk.bytes);
+            this.streamedSeconds = livePlayer.playedSeconds;
+            this.notify();
+          },
+        });
+      };
+
+      let streamResult: Awaited<ReturnType<typeof fetchTtsStream>>;
+      try {
+        streamResult = await executeStream(activeHeaders);
+        // 主用 Key 成功时清除之前记录的冷却
+        if (!inCooldown && this.cooldowns.has(provider)) {
+          this.cooldowns.delete(provider);
+        }
+      } catch (firstErr) {
+        if (sequence !== this.sequence || controller.signal.aborted) return;
+        // 如果主用 Key 触发了 429 / 配额限制，且配了备用 Key，则触发 1 分钟冷却并自动兜底
+        if (!inCooldown && backupKey && isRateLimitOrQuotaError(firstErr)) {
+          this.cooldowns.set(provider, Date.now() + 60_000);
+          toast.info('免费 API 触发频率限制（15 RPM/429），已自动切换备用 Key（60 秒后恢复优先免费）');
+          if (this.streamPlayer) {
+            await this.streamPlayer.close().catch(() => {});
+            this.streamPlayer = null;
+            livePlayer = null;
+            this.streamedChunks = 0;
+            this.streamedSeconds = 0;
           }
-          livePlayer.pushChunk(chunk.bytes);
-          this.streamedSeconds = livePlayer.playedSeconds;
-          this.notify();
-        },
-      });
+          const backupHeaders = { ...activeHeaders, [`x-${provider}-api-key`]: backupKey };
+          streamResult = await executeStream(backupHeaders);
+        } else {
+          throw firstErr;
+        }
+      }
+
       if (sequence !== this.sequence) return;
+      const { chunks, sampleRate, mimeType } = streamResult;
       // 按 mime 拼装：PCM 包 WAV 头，完整文件直接拼接，绝不二次封装。
       const blob = audioChunksToBlob(chunks, mimeType, sampleRate);
       if (config.saveAudioCache) {

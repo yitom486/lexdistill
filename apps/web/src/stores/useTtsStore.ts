@@ -48,6 +48,7 @@ export interface TtsStoreState extends SpeechStudioConfig {
   setRate: (rate: number) => void;
   setPreferredService: (service: SpeechStudioConfig['preferredService']) => void;
   setProviderApiKey: (provider: string, key: string) => void;
+  setBackupApiKey: (provider: string, key: string) => void;
   setAzureRegion: (region: string) => void;
   setLocalBaseUrl: (url: string) => void;
   setVoiceId: (id: string) => void;
@@ -84,7 +85,13 @@ export function migrateTtsPreferences(persisted: unknown): Record<string, unknow
   const { gender: _legacyGender, ...preferences } = saved;
   const modelId = typeof preferences['modelId'] === 'string' ? (preferences['modelId'] as string) : '';
   const saveAudioCache = preferences['saveAudioCache'] !== false;
-  return { ...preferences, providerApiKeys, modelId, saveAudioCache };
+  const backupApiKeys: Record<string, string> = {};
+  if (saved.backupApiKeys && typeof saved.backupApiKeys === 'object') {
+    for (const [provider, key] of Object.entries(saved.backupApiKeys)) {
+      if (typeof key === 'string') backupApiKeys[provider] = key;
+    }
+  }
+  return { ...preferences, providerApiKeys, backupApiKeys, modelId, saveAudioCache };
 }
 
 export const useTtsStore = create<TtsStoreState>()(
@@ -130,8 +137,12 @@ export const useTtsStore = create<TtsStoreState>()(
         setProviderApiKey: (provider, key) => update({
           providerApiKeys: { ...get().providerApiKeys, [provider]: key.trim() },
         }),
+        setBackupApiKey: (provider, key) => update({
+          backupApiKeys: { ...get().backupApiKeys, [provider]: key.trim() },
+        }),
         setAzureRegion: (azureRegion) => update({ azureRegion: azureRegion.trim() }),
         setLocalBaseUrl: (localBaseUrl) => update({ localBaseUrl: localBaseUrl.trim() }),
+        voiceId: speechStudio.getConfig().voiceId,
         setVoiceId: (voiceId) => update({ voiceId: voiceId.trim() }),
         setModelId: (modelId) => update({ modelId: modelId.trim() }),
         setSaveAudioCache: (saveAudioCache) => update({ saveAudioCache }),
@@ -157,6 +168,7 @@ export const useTtsStore = create<TtsStoreState>()(
         rate: state.rate,
         preferredService: state.preferredService,
         providerApiKeys: state.providerApiKeys,
+        backupApiKeys: state.backupApiKeys,
         azureRegion: state.azureRegion,
         localBaseUrl: state.localBaseUrl,
         voiceId: state.voiceId,
@@ -168,6 +180,7 @@ export const useTtsStore = create<TtsStoreState>()(
           rate: state.rate,
           preferredService: state.preferredService,
           providerApiKeys: state.providerApiKeys,
+          backupApiKeys: state.backupApiKeys ?? {},
           azureRegion: state.azureRegion,
           localBaseUrl: state.localBaseUrl,
           voiceId: state.voiceId,

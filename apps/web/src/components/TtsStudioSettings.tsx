@@ -23,6 +23,7 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
 
   const preferredService = useTtsStore((state) => state.preferredService);
   const providerApiKeys = useTtsStore((state) => state.providerApiKeys);
+  const backupApiKeys = useTtsStore((state) => state.backupApiKeys);
   const azureRegion = useTtsStore((state) => state.azureRegion);
   const localBaseUrl = useTtsStore((state) => state.localBaseUrl);
   const voiceId = useTtsStore((state) => state.voiceId);
@@ -31,6 +32,7 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
 
   const setPreferredService = useTtsStore((state) => state.setPreferredService);
   const setProviderApiKey = useTtsStore((state) => state.setProviderApiKey);
+  const setBackupApiKey = useTtsStore((state) => state.setBackupApiKey);
   const setAzureRegion = useTtsStore((state) => state.setAzureRegion);
   const setLocalBaseUrl = useTtsStore((state) => state.setLocalBaseUrl);
   const setVoiceId = useTtsStore((state) => state.setVoiceId);
@@ -84,18 +86,29 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
           <div className="mt-4 rounded-2xl border border-line bg-surface-soft p-4">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block text-sm font-medium text-ink">
-                {providers.data?.find((provider) => provider.id === preferredService)?.displayName ?? preferredService} API Key
+                主用 API Key（优先免费配额）
                 <input
                   className={`${fieldClass} mt-1.5`}
                   type="password"
                   autoComplete="off"
                   value={providerApiKeys[preferredService] ?? ''}
                   onChange={(event) => setProviderApiKey(preferredService, event.target.value)}
-                  placeholder="输入 API Key 自动拉取模型，留空使用网关配置"
+                  placeholder="输入主用 API Key（优先使用，留空使用网关配置）"
+                />
+              </label>
+              <label className="block text-sm font-medium text-ink">
+                备用 API Key（可选，付费兜底）
+                <input
+                  className={`${fieldClass} mt-1.5`}
+                  type="password"
+                  autoComplete="off"
+                  value={backupApiKeys[preferredService] ?? ''}
+                  onChange={(event) => setBackupApiKey(preferredService, event.target.value)}
+                  placeholder="可选：主用触发 429 限额时自动接管"
                 />
               </label>
               {preferredService === 'azure' && (
-                <label className="block text-sm font-medium text-ink">
+                <label className="block text-sm font-medium text-ink md:col-span-2">
                   区域 (Region)
                   <input
                     className={`${fieldClass} mt-1.5`}
@@ -106,7 +119,7 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
                 </label>
               )}
               {preferredService === 'local' && (
-                <label className="block text-sm font-medium text-ink">
+                <label className="block text-sm font-medium text-ink md:col-span-2">
                   本地服务地址
                   <input
                     className={`${fieldClass} mt-1.5`}
@@ -117,8 +130,8 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
                 </label>
               )}
             </div>
-            <p className="mt-2 text-xs text-ink-mute">
-              Key 仅保存在本机；填入后将动态向服务商拉取该 Key 权限下的最新模型与音色。
+            <p className="mt-2.5 text-xs leading-relaxed text-ink-mute">
+              支持主备双 Key 智能容灾：主用 Key 触发 Google 1 分钟频率限制（429 / 15 RPM）时，系统自动无缝切换至备用 Key 接管；60 秒冷却后自动恢复优先使用免费 Key。
             </p>
           </div>
         )}

@@ -50,4 +50,14 @@ describe('TTS local preference migration', () => {
     const trueMigrated = migrateTtsPreferences({ saveAudioCache: true });
     expect(trueMigrated.saveAudioCache).toBe(true);
   });
+
+  it('preserves backupApiKeys across migration and defaults to empty object', () => {
+    const emptyMigrated = migrateTtsPreferences({});
+    expect(emptyMigrated.backupApiKeys).toEqual({});
+
+    const withBackup = migrateTtsPreferences({
+      backupApiKeys: { gemini: 'backup-gemini-key', azure: 456 },
+    });
+    expect(withBackup.backupApiKeys).toEqual({ gemini: 'backup-gemini-key' });
+  });
 });
