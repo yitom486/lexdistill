@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { VocabularyScopeSchema } from '@study-studio/protocol';
 import { isOk, BusinessError } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import {
@@ -14,6 +15,21 @@ const dictionaryInstallTasks = new Map<string, ReturnType<typeof installDictiona
 /** 词典域路由（G2：由 index.ts 链式注册迁移而来，行为不变）。 */
 export function createDictionaryRoutes(deps: GatewayDeps) {
   return new Hono()
+  .get('/api/vocabulary/:userId', async c => {
+    const language = c.req.query('lang') ?? 'ja';
+    const scope = VocabularyScopeSchema.safeParse({ ...c.req.query() });
+    if (!['ja', 'en', 'ko'].includes(language) || !scope.success) return formatBusinessErrorResponse(c, new BusinessError('E_INVALID_INPUT', '请选择有效的语种和教材章节', 'VALIDATION'));
+    const result = await deps.repo.listVocabulary(c.req.param('userId'), language, scope.data);
+    return result.ok ? c.json(result.value) : formatBusinessErrorResponse(c, result.error);
+  })
+  .post('/api/vocabulary/:userId/:vocabularyId/collect', async c => {
+    try {
+      const scope = VocabularyScopeSchema.safeParse(await c.req.json());
+      if (!scope.success) return formatBusinessErrorResponse(c, new BusinessError('E_INVALID_INPUT', '请选择有效的教材章节', 'VALIDATION'));
+      const result = await deps.repo.collectGlobalVocabulary(c.req.param('userId'), c.req.param('vocabularyId'), scope.data);
+      return result.ok ? c.json(result.value) : formatBusinessErrorResponse(c, result.error);
+    } catch (cause) { return formatBusinessErrorResponse(c, cause, 'collectVocabulary'); }
+  })
   // 词典包默认不预装；客户端可先查询状态，再由用户显式触发一次下载与 SQLite 导入。
   .get('/api/dictionary/packages', (c) =>
     c.json({ packages: listDictionaryPackages(deps.repo.getRawDb()) })

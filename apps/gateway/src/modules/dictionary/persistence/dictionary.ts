@@ -11,7 +11,7 @@ import {
   logger,
 } from '@study-studio/shared';
 import type { Flashcard } from '@study-studio/protocol';
-import { localDictionaryEntries, flashcards, dictionarySearchHistory, dictionarySources, dictionaryTermMeta } from '@study-studio/storage-sqlite';
+import { localDictionaryEntries, flashcards, dictionarySearchHistory, dictionarySources, dictionaryTermMeta, collectVocabularyCardInTx } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { TrackLanguage } from '@study-studio/shared';
 import { normalizeTrackLanguage } from '@study-studio/shared';
@@ -536,40 +536,9 @@ export async function collectDictionaryEntry(
       );
     }
 
-    const existingRows = await deps.db
-      .select()
-      .from(flashcards)
-      .where(
-        and(
-          eq(flashcards.userId, userId),
-          eq(flashcards.sourceEntryId, entry.id)
-        )
-      )
-      .limit(1);
-    const existing = existingRows[0];
-    let collection: DictionaryEntryCollection;
-    if (existing) {
-      collection = {
-        created: false,
-        card: {
-          id: existing.id,
-          userId: existing.userId,
-          type: existing.type as Flashcard['type'],
-          front: existing.front,
-          back: existing.back,
-          phonetic: existing.phonetic ?? undefined,
-          audioUrl: existing.audioUrl ?? undefined,
-          tags: JSON.parse(existing.tags) as string[],
-          fsrs: JSON.parse(existing.fsrs),
-          ...(existing.sourceEntryId ? { sourceEntryId: existing.sourceEntryId } : {}),
-        },
-      };
-    } else {
+    const collection = deps.db.transaction(tx => {
       const meanings = JSON.parse(entry.meaningsJson) as string[];
       const reading = entry.reading ?? entry.romanization ?? undefined;
-      // 建卡注入（卡片吃词典）：缓存命中的 AI 例句跟卡走（无缓存不硬凑，讲透卡按需生成）；
-      // tags 位序固定 [类别, 词性, 例句日, 例句中, 来源]，空位填 '' 占位——
-      // 旧收藏卡曾把 sourceLabel 落在 [2] 被前端误渲染为例句，本次一并纠正。
       let exampleJp = '';
       let exampleZh = '';
       try {
@@ -587,40 +556,13 @@ export async function collectDictionaryEntry(
       } catch {
         // 例句是 enrichment，失败不挡建卡。
       }
-      const now = nowIso();
-      const card: Flashcard = {
-        id: generateId('card_dict'),
-        userId,
-        type: 'VOCABULARY',
-        front: entry.headword,
-        back: meanings.join('；'),
-        phonetic: reading,
-        tags: ['词典生词', entry.partOfSpeech ?? '词汇', exampleJp, exampleZh, `词典：${entry.sourceLabel}`],
-        fsrs: {
-          stability: 1,
-          difficulty: 5,
-          reps: 0,
-          lapses: 0,
-          dueAt: now,
-          state: 'NEW',
-        },
-        sourceEntryId: entry.id,
-      };
-      await deps.db.insert(flashcards).values({
-        id: card.id,
-        userId,
-        language: normalizeTrackLanguage(entry.language),
-        type: card.type,
-        front: card.front,
-        back: card.back,
-        phonetic: card.phonetic ?? null,
-        audioUrl: null,
-        sourceEntryId: entry.id,
-        tags: JSON.stringify(card.tags),
-        fsrs: JSON.stringify(card.fsrs),
+      return collectVocabularyCardInTx(tx, {
+        userId, language: entry.language, word: entry.headword, reading, meaning: meanings.join('；'),
+        sourceEntryId: entry.id, partOfSpeech: entry.partOfSpeech ?? undefined,
+        examples: exampleJp ? [{ text: exampleJp, ...(exampleZh ? { translation: exampleZh } : {}) }] : [],
+        tags: ['词典生词', `词典：${entry.sourceLabel}`],
       });
-      collection = { card, created: true };
-    }
+    });
     // 相遇词强信号（收藏=见过+要背）：与 history 同级，失败只 warn，永不挡建卡主路径。
     const exposure = await recordTermExposure(deps, {
       userId,

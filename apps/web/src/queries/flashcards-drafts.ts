@@ -3,6 +3,7 @@ import { logger } from '@study-studio/shared';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { normalizeTrackLanguage } from '../learning/learning-shell.js';
+import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 
 /** 生词草稿箱组：提议由网关/AI 侧写入；前端只读列表、逐字段改、接受入库、驳回。 */
 
@@ -58,8 +59,10 @@ function toDraftItem(raw: unknown): CardDraftItem | null {
   };
 }
 
-export function useCardDraftsQuery(userId = DEFAULT_USER_ID, langOverride?: string) {
-  const language = normalizeTrackLanguage(langOverride);
+export function useCardDraftsQuery(userIdOverride?: string, langOverride?: string) {
+  const profile = useUserProfileStore(state => state.profile);
+  const userId = userIdOverride || profile.userId || DEFAULT_USER_ID;
+  const language = normalizeTrackLanguage(langOverride || profile.targetLanguage);
   return useQuery<CardDraftItem[]>({
     queryKey: [...QUERY_KEYS.DRAFTS, userId, language],
     queryFn: async () => {
@@ -89,16 +92,19 @@ export function useCardDraftsQuery(userId = DEFAULT_USER_ID, langOverride?: stri
   });
 }
 
-function useInvalidateDrafts(userId = DEFAULT_USER_ID) {
+function useInvalidateDrafts() {
   const queryClient = useQueryClient();
   return () => {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DRAFTS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CARDS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.VOCABULARY });
   };
 }
 
-export function useUpdateCardDraftMutation(userId = DEFAULT_USER_ID) {
-  const invalidate = useInvalidateDrafts(userId);
+export function useUpdateCardDraftMutation(userIdOverride?: string) {
+  const profileUserId = useUserProfileStore(state => state.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
+  const invalidate = useInvalidateDrafts();
   return useMutation({
     mutationFn: async (vars: {
       draftId: string;
@@ -132,8 +138,10 @@ export function useUpdateCardDraftMutation(userId = DEFAULT_USER_ID) {
   });
 }
 
-export function useAcceptCardDraftMutation(userId = DEFAULT_USER_ID) {
-  const invalidate = useInvalidateDrafts(userId);
+export function useAcceptCardDraftMutation(userIdOverride?: string) {
+  const profileUserId = useUserProfileStore(state => state.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
+  const invalidate = useInvalidateDrafts();
   return useMutation({
     mutationFn: async (vars: { draftId: string }): Promise<{ cardId: string }> => {
       const res = await fetch(
@@ -160,8 +168,10 @@ export function useAcceptCardDraftMutation(userId = DEFAULT_USER_ID) {
   });
 }
 
-export function useDismissCardDraftMutation(userId = DEFAULT_USER_ID) {
-  const invalidate = useInvalidateDrafts(userId);
+export function useDismissCardDraftMutation(userIdOverride?: string) {
+  const profileUserId = useUserProfileStore(state => state.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
+  const invalidate = useInvalidateDrafts();
   return useMutation({
     mutationFn: async (vars: { draftId: string }): Promise<void> => {
       const res = await fetch(
@@ -195,7 +205,9 @@ export interface ProposeDraftVars {
 }
 
 /** 提议草稿（课文收句子/助手整理用；幂等去重，重复返回空数组）。 */
-export function useProposeCardDraftMutation(userId = DEFAULT_USER_ID) {
+export function useProposeCardDraftMutation(userIdOverride?: string) {
+  const profileUserId = useUserProfileStore(state => state.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (vars: { drafts: ProposeDraftVars[] }): Promise<CardDraftItem[]> => {

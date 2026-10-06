@@ -5,7 +5,7 @@ import { buildTermKey } from '@study-studio/storage-sqlite';
 
 /**
  * 卡片吃词典（建卡注入）：收藏时把词典读音/释义/来源带进卡，
- * 缓存命中的例句跟卡走（tags 位序固定，无例句用 '' 占位，来源落 [4]）。
+ * 词性、例句独立保存；标签只保存来源标签，卡片关联全局词条。
  */
 describe('card eats dictionary（建卡注入）', () => {
   let repo: DrizzleLearnerRepository;
@@ -19,7 +19,7 @@ describe('card eats dictionary（建卡注入）', () => {
     repo.getRawDb().close();
   });
 
-  it('无例句缓存：读音/释义/来源进卡，例句位空占位（不把来源误渲染为例句）', async () => {
+  it('无例句缓存：读音/释义/来源进卡，例句保持空数组', async () => {
     const res = await repo.collectDictionaryEntry(userId, 'n5_ja_taberu');
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
@@ -30,14 +30,13 @@ describe('card eats dictionary（建卡注入）', () => {
     expect(card.back).toContain('吃');
     expect(card.sourceEntryId).toBe('n5_ja_taberu');
     expect(card.tags[0]).toBe('词典生词');
-    expect(card.tags[1]).toBe('动词');
-    // [2][3] 例句位空占位；[4] 来源（旧卡曾把来源落 [2] 被误渲染为例句）
-    expect(card.tags[2]).toBe('');
-    expect(card.tags[3]).toBe('');
-    expect(card.tags[4]).toBe('词典：N5 核心词');
+    expect(card.partOfSpeech).toBe('动词');
+    expect(card.examples).toEqual([]);
+    expect(card.tags).toEqual(['词典生词', '词典：N5 核心词']);
+    expect(card.vocabularyId).toBeTruthy();
   });
 
-  it('有例句缓存：例句跟卡走（位序 [2][3]，来源后移 [4]）', async () => {
+  it('有例句缓存：例句独立保存，标签只有来源', async () => {
     const termKey = buildTermKey('食べる', 'たべる');
     repo
       .getRawDb()
@@ -49,9 +48,8 @@ describe('card eats dictionary（建卡注入）', () => {
     const res = await repo.collectDictionaryEntry(userId, 'n5_ja_taberu');
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
-    expect(res.value.card.tags[2]).toBe('朝ごはんを食べる。');
-    expect(res.value.card.tags[3]).toBe('吃早饭。');
-    expect(res.value.card.tags[4]).toBe('词典：N5 核心词');
+    expect(res.value.card.examples).toEqual([{ text: '朝ごはんを食べる。', translation: '吃早饭。' }]);
+    expect(res.value.card.tags).toEqual(['词典生词', '词典：N5 核心词']);
   });
 
   it('sourceEntryId 跟卡到复习队列（卡面弹窗精确回查凭据）', async () => {

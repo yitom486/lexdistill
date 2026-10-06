@@ -45,7 +45,7 @@ const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'learning': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/document-model', '@study-studio/learner-core', '@study-studio/learning-algorithms'],
   'document-model': ['@study-studio/shared'],
   'content': ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol', '@study-studio/archive'],
-  'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model', '@study-studio/shared', '@study-studio/flashcards', '@study-studio/content', '@study-studio/learner-core', '@study-studio/learning'],
+  'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model', '@study-studio/shared', '@study-studio/flashcards', '@study-studio/content', '@study-studio/learner-core', '@study-studio/learning', '@study-studio/learning-algorithms'],
   'archive': ['@study-studio/shared'],
 };
 
@@ -467,6 +467,7 @@ describe('M1-1 package 依赖方向', () => {
         '@study-studio/content',
         '@study-studio/learner-core',
         '@study-studio/learning',
+        '@study-studio/learning-algorithms',
         'drizzle-orm',
         'bun:sqlite',
         'node:crypto',

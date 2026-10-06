@@ -140,8 +140,9 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   await click(tab('词汇'));
   expect(activePanel().querySelectorAll('article')).toHaveLength(previewLesson.content.vocabulary.length);
   expect(activePanel().textContent).toContain('词典');
-  await click(activePanel().querySelector<HTMLElement>('[aria-label="加入复习：本"]'));
-  expect(activePanel().querySelector('[aria-label="取消复习：本"]')?.getAttribute('aria-pressed')).toBe('true');
+  const previewCollect = activePanel().querySelector<HTMLButtonElement>('[aria-label="加入复习：本"]');
+  expect(previewCollect?.disabled).toBe(true);
+  expect(previewCollect?.textContent).toBe('演示内容');
   await click(tab('知识点'));
   expect(activePanel().textContent).toContain('用法');
   expect(activePanel().textContent).not.toContain('先判断物品靠近谁');
@@ -223,7 +224,7 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   expect(shortAnswer.textContent).toContain('尚未评分');
   expect(shortAnswer.textContent).toContain('评分要点');
   await click(tab('词汇'));
-  expect(activePanel().querySelector('[aria-label="取消复习：本"]')).not.toBeNull();
+  expect(activePanel().querySelector<HTMLButtonElement>('[aria-label="加入复习：本"]')?.disabled).toBe(true);
   await click(tab('练习'));
   expect(single.textContent).toContain('回答正确');
 

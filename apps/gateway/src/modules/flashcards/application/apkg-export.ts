@@ -8,7 +8,7 @@ import {
   translateToBusinessError,
 } from '@study-studio/shared';
 import { buildCardContext, renderCard } from '@study-studio/learner-core';
-import { flashcards } from '@study-studio/storage-sqlite';
+import { flashcards, readCardExamples } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { TrackLanguage } from '@study-studio/shared';
 import { getCardFormat } from '@study-studio/storage-sqlite';
@@ -133,6 +133,9 @@ export async function exportApkgFromCards(
         back: card.back,
         phonetic: card.phonetic,
         sourceEntryId: card.sourceEntryId,
+        vocabularyId: card.vocabularyId,
+        partOfSpeech: card.partOfSpeech,
+        examples: readCardExamples(card.examplesJson),
       });
       const ctx = buildCardContext(source);
       ctx.deckName = deckName;

@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, real, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
 
 /** Global means across this learner's textbooks; dictionary packages remain separate. */
 export const globalVocabulary = sqliteTable('global_vocabulary', {
@@ -160,6 +161,9 @@ export const flashcards = sqliteTable(
     audioUrl: text('audio_url'),
     /** 词典来源条目；用于用户生词本去重，不替代词典包本身。 */
     sourceEntryId: text('source_entry_id'),
+    vocabularyId: text('vocabulary_id').references(() => globalVocabulary.id),
+    partOfSpeech: text('part_of_speech'),
+    examplesJson: text('examples_json').notNull().default('[]'),
     tags: text('tags').notNull(),
     fsrs: text('fsrs').notNull(),
     /** v7：讲透时间（M2 学习门；NULL=没讲透，不进练习池 NEW 块）。 */
@@ -168,6 +172,8 @@ export const flashcards = sqliteTable(
   (table) => [
     index('idx_flashcards_user_lang').on(table.userId, table.language),
     index('idx_flashcards_user_source_entry').on(table.userId, table.sourceEntryId),
+    uniqueIndex('idx_flashcards_user_vocabulary').on(table.userId, table.vocabularyId)
+      .where(sql`${table.vocabularyId} IS NOT NULL AND ${table.type} = 'VOCABULARY'`),
   ]
 );
 

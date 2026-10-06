@@ -7,9 +7,11 @@ import {
   translateToBusinessError,
   nowIso,
 } from '@study-studio/shared';
-import { CardTypeSchema, type CardType, type Flashcard } from '@study-studio/protocol';
+import { type Flashcard } from '@study-studio/protocol';
 import {
   flashcards,
+  globalVocabulary,
+  flashcardFromRow,
   INITIAL_CARD_SEEDS,
   INITIAL_EN_CARD_SEEDS,
 } from '@study-studio/storage-sqlite';
@@ -25,16 +27,12 @@ import { resolveActiveLanguage } from '../../learning-progress/public.js';
  * 跨域调用一律走 `deps.repo`（接口方法）；同域互调直接调模块函数。
  */
 
-/** DB TEXT 列 → CardType；损坏值回退 VOCABULARY（读侧永不抛，种子/正常写入不受影响）。 */
-function coerceCardType(value: unknown): CardType {
-  const parsed = CardTypeSchema.safeParse(value);
-  return parsed.success ? parsed.data : 'VOCABULARY';
-}
-
-/** Flashcard 领域类型无 language 列；兼容历史写入中可能携带的 language 透传字段。 */
-function storedCardLanguage(card: Flashcard): string | undefined {
-  const language = (card as { language?: unknown }).language;
-  return typeof language === 'string' ? language : undefined;
+/** 单卡按用户与 ID 读取，复习不受列表数量上限或当前语种影响。 */
+export async function getFlashcard(deps: RepoDeps, userId: string, cardId: string): Promise<Result<Flashcard, BusinessError>> {
+  try {
+    const row = deps.db.select().from(flashcards).where(and(eq(flashcards.userId, userId), eq(flashcards.id, cardId))).get();
+    return row ? ok(flashcardFromRow(row)) : err(new BusinessError('E_NOT_FOUND', '未找到待复习卡片，请刷新后重试。', 'LEARNER_STATE'));
+  } catch (cause) { return err(translateToBusinessError(cause, { category: 'DATABASE', action: 'getFlashcard', entityId: cardId })); }
 }
 
 export async function getDueCards(
@@ -67,8 +65,6 @@ export async function getDueCards(
           state: c.reps > 0 ? 'REVIEW' : 'NEW',
         };
         const tags = [...c.tags];
-        if (c.exampleJp) tags.push(c.exampleJp);
-        if (c.exampleZh) tags.push(c.exampleZh);
 
         await deps.db.insert(flashcards).values({
           id: c.id,
@@ -80,6 +76,8 @@ export async function getDueCards(
           phonetic: c.phonetic ?? null,
           audioUrl: c.audioUrl ?? null,
           tags: JSON.stringify(tags),
+          partOfSpeech: c.tags[1] ?? null,
+          examplesJson: JSON.stringify(c.exampleJp ? [{ text: c.exampleJp, ...(c.exampleZh ? { translation: c.exampleZh } : {}) }] : []),
           fsrs: JSON.stringify(fsrsObj),
         });
       }
@@ -90,22 +88,7 @@ export async function getDueCards(
         .limit(limit);
     }
 
-    const cards: Flashcard[] = rows.map((r) => {
-      const card: Flashcard = {
-        id: r.id,
-        userId: r.userId,
-        type: coerceCardType(r.type),
-        front: r.front,
-        back: r.back,
-        phonetic: r.phonetic ?? undefined,
-        audioUrl: r.audioUrl ?? undefined,
-        tags: JSON.parse(r.tags),
-        fsrs: JSON.parse(r.fsrs),
-      };
-      if (r.studiedAt) card.studiedAt = r.studiedAt;
-      if (r.sourceEntryId) card.sourceEntryId = r.sourceEntryId;
-      return card;
-    });
+    const cards: Flashcard[] = rows.map(flashcardFromRow);
 
     // 如果显式要求仅待复习，则过滤到期卡片；否则返回全量卡片（优先展示待复习）
     if (options?.dueOnly) {
@@ -142,12 +125,20 @@ export async function saveCard(
       .where(eq(flashcards.id, card.id))
       .limit(1);
 
+    if (existing[0] && existing[0].userId !== card.userId) return err(new BusinessError('E_NOT_FOUND', '未找到当前用户的卡片', 'VALIDATION'));
+    const vocabularyId = card.vocabularyId ?? existing[0]?.vocabularyId;
+    if (vocabularyId) {
+      const word = deps.db.select().from(globalVocabulary).where(and(eq(globalVocabulary.id, vocabularyId), eq(globalVocabulary.userId, card.userId))).get();
+      if (!word || card.type !== 'VOCABULARY' || (card.language && card.language !== word.language))
+        return err(new BusinessError('E_VOCABULARY_SCOPE_INVALID', '卡片与词汇的归属不一致', 'VALIDATION'));
+    }
+
     if (existing.length > 0) {
       await deps.db
         .update(flashcards)
         .set({
           language: normalizeTrackLanguage(
-            storedCardLanguage(card) ?? (await resolveActiveLanguage(deps, card.userId))
+            card.language ?? existing[0]!.language
           ),
           type: card.type,
           front: card.front,
@@ -155,6 +146,10 @@ export async function saveCard(
           phonetic: card.phonetic ?? null,
           audioUrl: card.audioUrl ?? null,
           tags: JSON.stringify(card.tags),
+          ...(card.sourceEntryId ? { sourceEntryId: card.sourceEntryId } : {}),
+          ...(card.vocabularyId ? { vocabularyId: card.vocabularyId } : {}),
+          ...(card.partOfSpeech !== undefined ? { partOfSpeech: card.partOfSpeech } : {}),
+          ...(card.examples !== undefined ? { examplesJson: JSON.stringify(card.examples) } : {}),
           fsrs: JSON.stringify(card.fsrs),
           // 讲透只升不降：saveCard 透传已有值，不主动清零（清零无入口）。
           ...(card.studiedAt ? { studiedAt: card.studiedAt } : {}),
@@ -162,7 +157,7 @@ export async function saveCard(
         .where(eq(flashcards.id, card.id));
     } else {
       const language = normalizeTrackLanguage(
-        storedCardLanguage(card) ?? (await resolveActiveLanguage(deps, card.userId))
+        card.language ?? (await resolveActiveLanguage(deps, card.userId))
       );
       await deps.db.insert(flashcards).values({
         id: card.id,
@@ -173,6 +168,10 @@ export async function saveCard(
         back: card.back,
         phonetic: card.phonetic ?? null,
         audioUrl: card.audioUrl ?? null,
+        sourceEntryId: card.sourceEntryId ?? null,
+        vocabularyId: card.vocabularyId ?? null,
+        partOfSpeech: card.partOfSpeech ?? null,
+        examplesJson: JSON.stringify(card.examples ?? []),
         tags: JSON.stringify(card.tags),
         fsrs: JSON.stringify(card.fsrs),
         studiedAt: card.studiedAt ?? null,

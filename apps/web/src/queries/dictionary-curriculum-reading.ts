@@ -417,7 +417,9 @@ export function useUpdateDictionaryPackageMutation() {
     },
   });
 }
-export function useCollectDictionaryEntryMutation(userId = DEFAULT_USER_ID) {
+export function useCollectDictionaryEntryMutation(userIdOverride?: string) {
+  const profileUserId = useUserProfileStore(state => state.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (entryId: string) => {
@@ -435,6 +437,7 @@ export function useCollectDictionaryEntryMutation(userId = DEFAULT_USER_ID) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CARDS });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.VOCABULARY });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DAILY_PLAN });
       void queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.DICTIONARY, 'encountered'] });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.WORDLISTS });

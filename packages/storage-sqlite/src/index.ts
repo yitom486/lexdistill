@@ -6,6 +6,7 @@
  *   连接工厂与数据层实现（schema/DDL/迁移/种子/诊断/修复/排序）。
  */
 export * from './schema.js';
+export { collectVocabularyCardInTx, collectGlobalVocabulary, listVocabulary, flashcardFromRow, readCardExamples } from './adapters/flashcards/vocabulary-cards.js';
 export { writeTextbookContent, readTextbookMaterial, type TextbookScope, type ContentWriteReceipt } from './adapters/library/textbook-content.js';
 export { completeTextbookChapter, textbookViewInTx, type CommitLessonKnowledgeOutput } from './adapters/library/textbook-view.js';
 export { appendImportEvent, listImportEvents, getImportEvent } from './adapters/library/import-events.js';

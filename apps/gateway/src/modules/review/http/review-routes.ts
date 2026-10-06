@@ -33,7 +33,9 @@ export function createReviewRoutes(deps: GatewayDeps) {
               'saveCards'
             );
           }
-          await deps.repo.saveCard(parsed.data);
+          if (parsed.data.userId !== c.req.param('userId')) return formatBusinessErrorResponse(c, new BusinessError('E_INVALID_INPUT', '卡片不属于当前用户', 'VALIDATION'));
+          const saved = await deps.repo.saveCard(parsed.data);
+          if (!saved.ok) return formatBusinessErrorResponse(c, saved.error, 'saveCards');
         }
         return c.json({ success: true, count: cardsToSave.length });
       } catch (e) {
@@ -57,16 +59,9 @@ export function createReviewRoutes(deps: GatewayDeps) {
             'reviewCard'
           );
         }
-        const cardsRes = await deps.repo.getDueCards(userId, 200);
-        if (!isOk(cardsRes)) return formatBusinessErrorResponse(c, cardsRes.error, 'reviewCard');
-        const targetCard = cardsRes.value.find((card) => card.id === cardId);
-        if (!targetCard) {
-          return formatBusinessErrorResponse(
-            c,
-            new BusinessError('E_NOT_FOUND', '未找到待复习卡片，请刷新后重试。', 'LEARNER_STATE'),
-            'reviewCard'
-          );
-        }
+        const cardRes = await deps.repo.getFlashcard(userId, cardId);
+        if (!isOk(cardRes)) return formatBusinessErrorResponse(c, cardRes.error, 'reviewCard');
+        const targetCard = cardRes.value;
         const currentFsrs = {
           stability: targetCard.fsrs.stability,
           difficulty: targetCard.fsrs.difficulty,

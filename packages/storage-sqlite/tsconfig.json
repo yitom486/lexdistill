@@ -11,6 +11,7 @@
     { "path": "../flashcards" },
     { "path": "../learner-core" },
     { "path": "../learning" },
+    { "path": "../learning-algorithms" },
     { "path": "../protocol" },
     { "path": "../shared" }
   ],

@@ -97,6 +97,9 @@ export function initSchema(sqlite: Database): void {
       phonetic TEXT,
       audio_url TEXT,
       source_entry_id TEXT,
+      vocabulary_id TEXT REFERENCES global_vocabulary(id),
+      part_of_speech TEXT,
+      examples_json TEXT NOT NULL DEFAULT '[]',
       tags TEXT NOT NULL,
       fsrs TEXT NOT NULL
     );

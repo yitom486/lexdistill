@@ -16,7 +16,7 @@ import {
 } from '../../dictionary/public.js';
 import { CardTypeSchema, type CardType } from '@study-studio/protocol';
 import { initFsrsState } from '@study-studio/learning-algorithms';
-import { getVisibleDocument } from '@study-studio/storage-sqlite';
+import { getVisibleDocument, flashcards, collectVocabularyCardInTx } from '@study-studio/storage-sqlite';
 
 /**
  * 生词草稿（CardDraft）域：AI/导入提议 → 用户逐字段确认 → 入库成卡。
@@ -492,35 +492,21 @@ export async function acceptCardDraft(
     }
     const draft = toCardDraft(row);
     const now = nowIso();
-    const cardId = generateId('card_draft');
+    let cardId = generateId('card_draft');
     // M6：NEW 初始化走 canonical initFsrsState；dueAt 沿用本函数同一 now
     //（与 studied_at/updated_at 同一时钟，避免三处时间戳毫秒漂移）。
     const fsrs = JSON.stringify({ ...initFsrsState(), dueAt: now });
-    const tx = deps.sqlite.transaction(() => {
-      deps.sqlite
-        .query(
-          `INSERT INTO flashcards
-             (id, user_id, language, type, front, back, phonetic, audio_url,
-              source_entry_id, tags, fsrs, studied_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)`
-        )
-        .run(
-          cardId,
-          uid,
-          draft.language,
-          draft.cardType,
-          draft.headword,
-          draft.meanings.join('；'),
-          draft.reading ?? null,
-          JSON.stringify([
-            '草稿接受',
-            draft.source,
-            draft.partOfSpeech ?? (draft.kind === 'sentence' ? '句子' : '词汇'),
-          ]),
-          fsrs,
-          // 草稿接受=用户逐字段确认过，天然讲透
-          now
-        );
+    deps.db.transaction(tx => {
+      if (draft.kind === 'word' && draft.cardType === 'VOCABULARY') {
+        cardId = collectVocabularyCardInTx(tx, { userId: uid, language: draft.language,
+          word: draft.headword, reading: draft.reading, meaning: draft.meanings.join('；'),
+          partOfSpeech: draft.partOfSpeech, tags: ['草稿接受', draft.source], studiedAt: now }).card.id;
+      } else {
+        tx.insert(flashcards).values({ id: cardId, userId: uid, language: draft.language,
+          type: draft.cardType, front: draft.headword, back: draft.meanings.join('；'),
+          phonetic: draft.reading ?? null, partOfSpeech: draft.partOfSpeech ?? null,
+          tags: JSON.stringify(['草稿接受', draft.source]), fsrs, studiedAt: now }).run();
+      }
       deps.sqlite
         .query(
           `UPDATE card_drafts SET status = 'accepted', flashcard_id = ?, updated_at = ?
@@ -528,7 +514,6 @@ export async function acceptCardDraft(
         )
         .run(cardId, now, draftId.trim());
     });
-    tx();
     // 相遇词回填与 collect 漏斗同级：失败只 warn，不推翻已建的卡。
     // 句子草稿跳过（整句不是“词”，进相遇词是污染）。
     if (draft.kind !== 'sentence') {

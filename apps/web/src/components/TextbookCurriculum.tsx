@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useVocabularyQuery, useCollectVocabularyMutation } from '../queries/vocabulary.js';
 import { LearningContentPanel } from './textbook/LearningContentPanel.js';
 import { StructuredLessonPanel } from './textbook/StructuredLessonPanel.js';
 import { StructuredExerciseList } from './textbook/StructuredExerciseList.js';
@@ -92,7 +93,7 @@ function StoredTextbookCurriculum({
   const [selectedLessonId, setSelectedLessonId] = useState<string>('');
   const [lessonSubTab, setLessonSubTab] = useState<'READER' | 'VOCAB' | 'GRAMMAR' | 'EXERCISES'>('READER');
   const [activeWordCard, setActiveWordCard] = useState<FuriganaWord | null>(null);
-  const [addedCardsMap, setAddedCardsMap] = useState<Record<string, boolean>>({});
+  const collectVocabulary = useCollectVocabularyMutation();
   const isImporterOpen = usePipelineJobStore((s) => s.isImporterModalOpen);
   const setIsImporterOpen = usePipelineJobStore((s) => s.setIsImporterModalOpen);
   // B：默认跟轨道（ja→JA/en→EN/ko→KO，不要 ALL），ALL 仍在下拉里可手选。
@@ -120,6 +121,7 @@ function StoredTextbookCurriculum({
     pickDefaultTextbook(filteredBooks, languageFilter) ??
     pickDefaultTextbook(booksList, languageFilter);
   const currentLesson = currentBook?.lessons.find((l) => l.id === selectedLessonId) ?? currentBook?.lessons[0];
+  const vocabularyQuery = useVocabularyQuery(currentBook?.language?.toLowerCase() ?? targetLanguage);
 
   // P3-3 阅读焦点：打开某书某课即登记，离开教材页（卸载）即清空；
   // chat 仅凭此 store 决定是否附阅读 focus，其他页面保持 undefined。
@@ -307,22 +309,18 @@ function StoredTextbookCurriculum({
   };
 
   const handleAddCard = (word: FuriganaWord | TextbookVocabulary) => {
-    sound.playCorrect();
     const isVocab = 'kanji' in word;
-    const frontText = isVocab ? `${word.kanji} (${word.kana})` : `${word.surface} ${word.reading ? `(${word.reading})` : ''}`;
-    const backText = isVocab ? `${word.chinese} [${word.pos} · ${word.pitchAccent}]` : `${word.meaning ?? ''} [${word.pos ?? ''}]`;
-    const cardKey = isVocab ? word.id : word.surface;
-
-    onAddCardFromTextbook({
-      front: frontText,
-      back: backText,
-      category: 'VOCAB',
-      prompt: `来自《${currentBook.shortTitle}》${currentLesson.title}`,
+    const candidates = (vocabularyQuery.data ?? []).filter(entry => entry.word === (isVocab ? word.kanji : word.surface)
+      && entry.reading === (isVocab ? word.kana : word.reading ?? '')
+      && entry.sources.some(source => source.documentId === currentBook.documentId && source.chapterId === currentLesson.id));
+    if (candidates.length !== 1 || !currentBook.documentId) { toast.error('未找到对应的教材词条，请重新加载教材'); return; }
+    collectVocabulary.mutate({ vocabularyId: candidates[0]!.id, documentId: currentBook.documentId, chapterId: currentLesson.id }, {
+      onSuccess: result => toast.success(result.created ? '已加入复习' : '已在复习中，进度已保留'),
+      onError: error => toast.error(error.message),
     });
-
-    setAddedCardsMap((prev) => ({ ...prev, [cardKey]: true }));
-    toast.success(`已加入 FSRS 记忆闪卡：${frontText}`);
   };
+  const addedCardsMap: Record<string, boolean> = Object.fromEntries(currentLesson.vocabularies.map(word => [word.id,
+    (vocabularyQuery.data ?? []).some(entry => entry.word === word.kanji && entry.reading === word.kana && entry.collected)]));
 
   return (
     <div className="space-y-6">

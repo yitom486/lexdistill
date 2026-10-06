@@ -29,6 +29,7 @@ import { DictionaryLookupPanel } from './DictionaryLookupPanel.js';
 import { ApkgImportDialog } from './ApkgImportDialog.js';
 import { PlanIntentBanner } from './PlanIntentBanner.js';
 import type { StudyCardItem } from '../models/learning.js';
+import { VocabularyLibraryPanel } from './VocabularyLibraryPanel.js';
 
 export function FsrsCardWorkbench() {
   const { data: cards = [] } = useCardsQuery();
@@ -154,6 +155,7 @@ export function FsrsCardWorkbench() {
     <div className="flex max-w-2xl flex-col gap-5">
       <PlanIntentBanner />
       <PracticeQueueToCardsPanel />
+      <VocabularyLibraryPanel key={shell.track} language={shell.track} />
 
       <DictionaryLookupPanel
         language={shell.track}

@@ -1,0 +1,127 @@
+import { and, eq, or, sql } from 'drizzle-orm';
+import { initFsrsState } from '@study-studio/learning-algorithms';
+import { CardTypeSchema, FlashcardSchema, type Flashcard, type VocabularyCollection, type VocabularyEntry, type VocabularyScope } from '@study-studio/protocol';
+import { ChapterManifestSchema } from '@study-studio/document-model';
+import { BusinessError, generateId, nowIso, normalizeTrackLanguage } from '@study-studio/shared';
+import type { DrizzleDb } from '../../connection.js';
+import { documents, flashcards, globalVocabulary, textbookVocabulary } from '../../schema.js';
+
+type Tx = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];
+type CardRow = typeof flashcards.$inferSelect;
+const ExamplesSchema = FlashcardSchema.shape.examples.unwrap();
+type Examples = NonNullable<Flashcard['examples']>;
+export function readCardExamples(raw: string): Examples {
+  try { const parsed = ExamplesSchema.safeParse(JSON.parse(raw)); return parsed.success ? parsed.data : []; }
+  catch { return []; }
+}
+export function flashcardFromRow(row: CardRow): Flashcard {
+  const type = CardTypeSchema.safeParse(row.type);
+  return {
+    id: row.id, userId: row.userId, language: normalizeTrackLanguage(row.language),
+    type: type.success ? type.data : 'VOCABULARY', front: row.front, back: row.back,
+    ...(row.phonetic ? { phonetic: row.phonetic } : {}), ...(row.audioUrl ? { audioUrl: row.audioUrl } : {}),
+    ...(row.sourceEntryId ? { sourceEntryId: row.sourceEntryId } : {}),
+    ...(row.vocabularyId ? { vocabularyId: row.vocabularyId } : {}),
+    ...(row.partOfSpeech ? { partOfSpeech: row.partOfSpeech } : {}), examples: readCardExamples(row.examplesJson),
+    tags: FlashcardSchema.shape.tags.parse(JSON.parse(row.tags)), fsrs: FlashcardSchema.shape.fsrs.parse(JSON.parse(row.fsrs)),
+    ...(row.studiedAt ? { studiedAt: row.studiedAt } : {}),
+  };
+}
+
+export interface VocabularyCardInput {
+  userId: string; language: string; word: string; reading?: string | undefined; meaning: string;
+  vocabularyId?: string | undefined; sourceEntryId?: string | undefined;
+  partOfSpeech?: string | undefined; examples?: Examples | undefined; tags: string[]; studiedAt?: string | undefined;
+}
+
+/** Shared atomic collection command. Existing card content and FSRS are never reset. */
+export function collectVocabularyCardInTx(tx: Tx, input: VocabularyCardInput): VocabularyCollection {
+  const userId = input.userId.trim(), language = normalizeTrackLanguage(input.language);
+  const word = input.word.trim(), reading = (input.reading ?? '').trim();
+  if (!userId || !word) throw new BusinessError('E_INVALID_INPUT', '请选择有效的词汇', 'VALIDATION');
+  let vocabulary = tx.select().from(globalVocabulary).where(input.vocabularyId
+    ? and(eq(globalVocabulary.id, input.vocabularyId), eq(globalVocabulary.userId, userId), eq(globalVocabulary.language, language))
+    : and(eq(globalVocabulary.userId, userId), eq(globalVocabulary.language, language), eq(globalVocabulary.word, word), eq(globalVocabulary.reading, reading))).get();
+  if (input.vocabularyId && !vocabulary) throw new BusinessError('E_NOT_FOUND', '未找到当前用户的词汇', 'VALIDATION');
+  if (!vocabulary) {
+    tx.insert(globalVocabulary).values({ id: generateId('vocabulary'), userId, language, word, reading, meaning: input.meaning, createdAt: nowIso() }).onConflictDoNothing().run();
+    vocabulary = tx.select().from(globalVocabulary).where(and(eq(globalVocabulary.userId, userId), eq(globalVocabulary.language, language), eq(globalVocabulary.word, word), eq(globalVocabulary.reading, reading))).get();
+  }
+  if (!vocabulary) throw new BusinessError('E_VOCABULARY_SAVE_FAILED', '词汇保存失败，请重试', 'DATABASE');
+  let existing = tx.select().from(flashcards).where(and(eq(flashcards.userId, userId), eq(flashcards.type, 'VOCABULARY'), eq(flashcards.vocabularyId, vocabulary.id))).get();
+  if (!existing) {
+    // Only adopt one exact legacy match; never guess among duplicate or edited cards.
+    const candidates = tx.select().from(flashcards).where(and(eq(flashcards.userId, userId), eq(flashcards.language, language), eq(flashcards.type, 'VOCABULARY'),
+      input.sourceEntryId ? or(eq(flashcards.sourceEntryId, input.sourceEntryId), and(eq(flashcards.front, word), sql`coalesce(${flashcards.phonetic}, '') = ${reading}`))
+        : and(eq(flashcards.front, word), sql`coalesce(${flashcards.phonetic}, '') = ${reading}`))).all().filter(row => !row.vocabularyId);
+    if (candidates.length === 1) {
+      existing = candidates[0]!;
+      tx.update(flashcards).set({ vocabularyId: vocabulary.id }).where(eq(flashcards.id, existing.id)).run();
+    }
+  }
+  if (existing) {
+    // A dictionary reference may enrich a textbook card without replacing the card or its schedule.
+    const enrichment = {
+      ...(input.sourceEntryId && !existing.sourceEntryId ? { sourceEntryId: input.sourceEntryId } : {}),
+      ...(input.studiedAt && !existing.studiedAt ? { studiedAt: input.studiedAt } : {}),
+    };
+    if (Object.keys(enrichment).length) tx.update(flashcards).set(enrichment).where(eq(flashcards.id, existing.id)).run();
+    return { created: false, card: flashcardFromRow(tx.select().from(flashcards).where(eq(flashcards.id, existing.id)).get()!) };
+  }
+  const id = generateId('card_vocab');
+  tx.insert(flashcards).values({ id, userId, language, type: 'VOCABULARY', vocabularyId: vocabulary.id,
+    front: vocabulary.word, back: input.meaning, phonetic: vocabulary.reading || null,
+    sourceEntryId: input.sourceEntryId ?? null, partOfSpeech: input.partOfSpeech ?? null,
+    examplesJson: JSON.stringify(input.examples ?? []), tags: JSON.stringify(input.tags),
+    fsrs: JSON.stringify({ ...initFsrsState(), dueAt: input.studiedAt ?? nowIso() }), studiedAt: input.studiedAt ?? null,
+  }).run();
+  return { created: true, card: flashcardFromRow(tx.select().from(flashcards).where(eq(flashcards.id, id)).get()!) };
+}
+
+export function listVocabulary(db: DrizzleDb, userId: string, language: string, scope: VocabularyScope = {}): VocabularyEntry[] {
+  return db.transaction(tx => {
+    const words = tx.select().from(globalVocabulary).where(and(eq(globalVocabulary.userId, userId), eq(globalVocabulary.language, language))).all();
+    const contexts = tx.select({ local: textbookVocabulary, doc: documents }).from(textbookVocabulary)
+      .innerJoin(documents, eq(documents.id, textbookVocabulary.documentId)).where(and(eq(documents.userId, userId), eq(documents.language, language),
+        ...(scope.documentId ? [eq(documents.id, scope.documentId)] : []), ...(scope.chapterId ? [eq(textbookVocabulary.chapterId, scope.chapterId)] : []))).all();
+    const cards = tx.select({ id: flashcards.id, vocabularyId: flashcards.vocabularyId }).from(flashcards)
+      .where(and(eq(flashcards.userId, userId), eq(flashcards.language, language), eq(flashcards.type, 'VOCABULARY'))).all();
+    const cardByWord = new Map(cards.filter(card => card.vocabularyId).map(card => [card.vocabularyId!, card.id]));
+    const sourcesByWord = new Map<string, VocabularyEntry['sources']>();
+    const chapterTitles = new Map<string, Map<string, string>>();
+    for (const { local, doc } of contexts) {
+      let titles = chapterTitles.get(doc.id);
+      if (!titles) {
+        const chapters = ChapterManifestSchema.safeParse(JSON.parse(doc.chaptersJson ?? '[]'));
+        titles = new Map(chapters.success ? chapters.data.map(chapter => [chapter.id, chapter.title]) : []);
+        chapterTitles.set(doc.id, titles);
+      }
+      const sources = sourcesByWord.get(local.vocabularyId) ?? [];
+      sources.push({ documentId: doc.id, chapterId: local.chapterId, bookTitle: doc.title,
+        chapterTitle: titles.get(local.chapterId) ?? '章节', meaning: local.meaning,
+        ...(local.partOfSpeech ? { partOfSpeech: local.partOfSpeech } : {}), examples: readCardExamples(local.examplesJson) });
+      sourcesByWord.set(local.vocabularyId, sources);
+    }
+    return words.filter(word => !scope.documentId || sourcesByWord.has(word.id)).map(word => {
+      const cardId = cardByWord.get(word.id);
+      return { id: word.id, word: word.word, reading: word.reading, language: normalizeTrackLanguage(word.language), meaning: word.meaning,
+        level: word.jlptLevel, collected: !!cardId, ...(cardId ? { cardId } : {}),
+        sources: sourcesByWord.get(word.id) ?? [],
+      };
+    });
+  });
+}
+
+export function collectGlobalVocabulary(db: DrizzleDb, userId: string, vocabularyId: string, scope: VocabularyScope = {}): VocabularyCollection {
+  return db.transaction(tx => {
+    const word = tx.select().from(globalVocabulary).where(and(eq(globalVocabulary.id, vocabularyId), eq(globalVocabulary.userId, userId))).get();
+    if (!word) throw new BusinessError('E_NOT_FOUND', '未找到当前用户的词汇', 'VALIDATION');
+    const context = scope.documentId ? tx.select({ local: textbookVocabulary }).from(textbookVocabulary).innerJoin(documents, eq(documents.id, textbookVocabulary.documentId))
+      .where(and(eq(documents.userId, userId), eq(documents.id, scope.documentId), eq(textbookVocabulary.vocabularyId, vocabularyId),
+        ...(scope.chapterId ? [eq(textbookVocabulary.chapterId, scope.chapterId)] : []))).get()?.local : undefined;
+    if (scope.documentId && !context) throw new BusinessError('E_NOT_FOUND', '该词汇不属于指定教材或章节', 'VALIDATION');
+    return collectVocabularyCardInTx(tx, { userId, language: word.language, vocabularyId, word: word.word, reading: word.reading,
+      meaning: context?.meaning ?? word.meaning, partOfSpeech: context?.partOfSpeech ?? undefined,
+      examples: context ? readCardExamples(context.examplesJson) : [], tags: [context ? '教材生词' : '词汇收藏'] });
+  });
+}

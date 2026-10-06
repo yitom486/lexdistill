@@ -22,6 +22,9 @@ export interface ResolvableCard {
   back: string;
   phonetic?: string | null | undefined;
   sourceEntryId?: string | null | undefined;
+  vocabularyId?: string | null | undefined;
+  partOfSpeech?: string | null | undefined;
+  examples?: Array<{ text: string; translation?: string | undefined }> | undefined;
 }
 
 export interface ResolvedCardSource {
@@ -75,7 +78,11 @@ export async function resolveCardSource(
   ports: CardSourcePorts,
   card: ResolvableCard
 ): Promise<ResolvedCardSource> {
-  let source: CardSourceEntry = { headword: card.front, meanings: [card.back] };
+  let source: CardSourceEntry = { headword: card.front, meanings: [card.back],
+    ...(card.phonetic ? { reading: card.phonetic } : {}),
+    ...(card.partOfSpeech ? { partOfSpeech: card.partOfSpeech } : {}),
+    ...(card.examples?.[0]?.text ? { sentence: card.examples[0].text } : {}),
+  };
   let sourceLabel: string | undefined;
   if (!card.sourceEntryId) return { source };
   const entry = await ports.findEntryById(card.sourceEntryId);
@@ -89,13 +96,16 @@ export async function resolveCardSource(
   } catch {
     meanings = [];
   }
-  source = {
-    headword: entry.headword,
+  // Global vocabulary cards own their selected meaning, examples and user edits.
+  // Dictionary provenance can still supply pitch/frequency without replacing those fields.
+  if (!card.vocabularyId) source = {
+    ...source, headword: entry.headword,
     meanings: meanings.length > 0 ? meanings : [card.back],
   };
-  const reading = entry.reading ?? entry.romanization ?? card.phonetic ?? undefined;
+  const reading = card.vocabularyId ? card.phonetic ?? entry.reading ?? entry.romanization ?? undefined
+    : entry.reading ?? entry.romanization ?? card.phonetic ?? undefined;
   if (reading) source.reading = reading;
-  if (entry.partOfSpeech) source.partOfSpeech = entry.partOfSpeech;
+  if (entry.partOfSpeech && (!card.vocabularyId || !source.partOfSpeech)) source.partOfSpeech = entry.partOfSpeech;
   const pitch = pitchOfPronunciation(entry.pronunciationJson);
   if (pitch.label) source.pitchLabel = pitch.label;
   // 阶梯图需要读音 + 核位置同时在场；缺一即不生成（不臆造图形）。

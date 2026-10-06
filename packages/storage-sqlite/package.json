@@ -10,6 +10,7 @@
     "@study-studio/flashcards": "workspace:*",
     "@study-studio/learner-core": "workspace:*",
     "@study-studio/learning": "workspace:*",
+    "@study-studio/learning-algorithms": "workspace:*",
     "@study-studio/protocol": "workspace:*",
     "@study-studio/shared": "workspace:*",
     "drizzle-orm": "^0.45.2"

@@ -21,6 +21,7 @@ import {
   getAnkiVersion,
   type FetchImpl,
 } from './integrations/index.js';
+import type { ResolvableCard } from './card-source.js';
 
 /**
  * M7-7 自 Gateway `flashcards/application/anki-push.ts` 迁入（行为不变）。
@@ -76,7 +77,7 @@ export interface AnkiPushSettings {
 }
 
 /** port 视角的卡片行（Gateway 用 flashcards 表实现；仅读渲染所需列）。 */
-export interface AnkiPushCard {
+export interface AnkiPushCard extends ResolvableCard {
   id: string;
   front: string;
   back: string;

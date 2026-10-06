@@ -218,6 +218,7 @@ import {
 } from '../modules/learning-progress/persistence/activity-plan.js';
 import {
   getDueCards as getDueCardsDomain,
+  getFlashcard as getFlashcardDomain,
   saveCard as saveCardDomain,
   markCardStudied as markCardStudiedDomain,
 } from '../modules/review/persistence/cards.js';
@@ -326,6 +327,8 @@ import {
   defaultLanguageProfileSeed,
 } from '@study-studio/shared';
 import type { RepoDeps } from './persistence/repo-context.js';
+import { collectGlobalVocabulary, listVocabulary } from '@study-studio/storage-sqlite';
+import type { VocabularyScope } from '@study-studio/protocol';
 
 export type {
   TrackLanguage,
@@ -376,15 +379,18 @@ export class DrizzleLearnerRepository
     return this.sqlite;
   }
 
-  private textbookCommand<T>(command: () => T): Promise<Result<T, BusinessError>> {
+  private textbookCommand<T>(command: () => T, fallbackMessage = '作答记录保存或读取失败，请重试'): Promise<Result<T, BusinessError>> {
     try { return Promise.resolve(ok(command())); }
-    catch (cause) { return Promise.resolve(err(cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage: '作答记录保存或读取失败，请重试' }))); }
+    catch (cause) { return Promise.resolve(err(cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'DATABASE', fallbackMessage }))); }
   }
   public prepareTextbookAttempt(userId: string, input: SubmitTextbookExercise) { return this.textbookCommand(() => prepareTextbookAttempt(this.db, userId, input)); }
   public getTextbookAttempt(userId: string, id: string) { return this.textbookCommand(() => getTextbookAttempt(this.db, userId, id)); }
   public claimTextbookGrade(userId: string, id: string, gradingRunId: string) { return this.textbookCommand(() => claimTextbookGrade(this.db, userId, id, gradingRunId)); }
   public settleTextbookGrade(userId: string, id: string, audit: TextbookGradeAudit | undefined, grade: ExerciseGrade | undefined, errorCode?: string) { return this.textbookCommand(() => settleTextbookGrade(this.db, userId, id, audit, grade, errorCode)); }
   public textbookExerciseHistory(userId: string, documentId: string, chapterId: string) { return this.textbookCommand(() => textbookExerciseHistory(this.db, userId, documentId, chapterId)); }
+  public listVocabulary(userId: string, language: string, scope: VocabularyScope = {}) { return this.textbookCommand(() => listVocabulary(this.db, userId, language, scope), '词汇库读取失败，请重试'); }
+  public collectGlobalVocabulary(userId: string, vocabularyId: string, scope: VocabularyScope = {}) { return this.textbookCommand(() => collectGlobalVocabulary(this.db, userId, vocabularyId, scope), '词汇加入复习失败，请重试'); }
+  public getFlashcard(userId: string, cardId: string) { return getFlashcardDomain(this.deps, userId, cardId); }
 
   // ==================== A 词典读/写（→ modules/dictionary/persistence/） ====================
 

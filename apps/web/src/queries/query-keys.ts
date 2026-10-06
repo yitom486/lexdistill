@@ -20,6 +20,7 @@ export const QUERY_KEYS = {
   MISTAKES: ['learner', 'mistakes'] as const,
   QUESTIONS: ['learner', 'questions'] as const,
   CARDS: ['learner', 'cards'] as const,
+  VOCABULARY: ['learner', 'vocabulary'] as const,
   DRAFTS: ['learner', 'drafts'] as const,
   PRACTICE_COLLECTIONS: ['learner', 'practiceCollections'] as const,
   PRACTICE_ITEMS: ['learner', 'practiceItems'] as const,

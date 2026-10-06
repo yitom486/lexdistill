@@ -12,6 +12,7 @@ import type {
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { normalizeTrackLanguage } from '../learning/learning-shell.js';
+import { readVocabularyResponse } from './vocabulary.js';
 
 /** P1-2 拆分：卡片 / 错题 / 题库组（自 useLearnerQueries.ts 逐行平移，仅改 import）。 */
 
@@ -34,7 +35,9 @@ function nthStr(value: unknown, index: number, fallback = ''): string {
 /**
  * FSRS 卡片库查询 (依托 Gateway，带语种作用域隔离)
  */
-export function useCardsQuery(userId = DEFAULT_USER_ID, langOverride?: string) {
+export function useCardsQuery(userIdOverride?: string, langOverride?: string) {
+  const profileUserId = useUserProfileStore(state => state.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
   const profileLang = useUserProfileStore((s) => s.profile.targetLanguage);
   const targetLanguage = normalizeTrackLanguage(langOverride || profileLang);
 
@@ -54,7 +57,7 @@ export function useCardsQuery(userId = DEFAULT_USER_ID, langOverride?: string) {
                 id: rowStr(c, 'id'),
                 type: (c.type === 'GRAMMAR'
                   ? 'GRAMMAR'
-                  : c.type === 'CONFUSION'
+                  : c.type === 'CONFUSION_PAIR'
                     ? 'CONFUSION'
                     : c.type === 'SENTENCE'
                       ? 'SENTENCE'
@@ -62,11 +65,11 @@ export function useCardsQuery(userId = DEFAULT_USER_ID, langOverride?: string) {
                 frontWord: rowStr(c, 'front'),
                 reading: rowStr(c, 'phonetic'),
                 tag: nthStr(c.tags, 0, '核心词汇'),
-                pos: nthStr(c.tags, 1, '词汇'),
+                pos: rowStr(c, 'partOfSpeech', '词汇'),
                 backMeaning: rowStr(c, 'back'),
-                exampleJp: nthStr(c.tags, 2) || rowStr(c, 'exampleJp'),
+                exampleJp: Array.isArray(c.examples) && typeof c.examples[0]?.text === 'string' ? c.examples[0].text : '',
                 exampleHighlight: rowStr(c, 'exampleHighlight') || rowStr(c, 'front'),
-                exampleZh: nthStr(c.tags, 3) || rowStr(c, 'exampleZh'),
+                exampleZh: Array.isArray(c.examples) && typeof c.examples[0]?.translation === 'string' ? c.examples[0].translation : '',
                 stability: rowNum(fsrs, 'stability', 1.0),
                 reps: rowNum(fsrs, 'reps', 0),
                 difficulty: rowNum(fsrs, 'difficulty', 5.0),
@@ -83,6 +86,7 @@ export function useCardsQuery(userId = DEFAULT_USER_ID, langOverride?: string) {
                 ...(rowStr(fsrs, 'dueAt') ? { dueAt: rowStr(fsrs, 'dueAt') } : {}),
                 ...(rowStr(c, 'studiedAt') ? { studiedAt: rowStr(c, 'studiedAt') } : {}),
                 ...(rowStr(c, 'sourceEntryId') ? { sourceEntryId: rowStr(c, 'sourceEntryId') } : {}),
+                ...(rowStr(c, 'vocabularyId') ? { vocabularyId: rowStr(c, 'vocabularyId') } : {}),
               };
             });
           }
@@ -97,21 +101,27 @@ export function useCardsQuery(userId = DEFAULT_USER_ID, langOverride?: string) {
 }
 
 /** 追加 / 批量追加闪卡并经由 Hono RPC 持久化到 Gateway */
-export function useAddCardsMutation(userId = DEFAULT_USER_ID) {
+export function useAddCardsMutation(userIdOverride?: string) {
+  const profileUserId = useUserProfileStore(state => state.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
   const queryClient = useQueryClient();
+  const language = normalizeTrackLanguage(useUserProfileStore(state => state.profile.targetLanguage));
 
   return useMutation({
     mutationFn: async (cards: StudyCardItem[]) => {
-      try {
         const payload = cards.map((c) => ({
           id: c.id,
           userId,
-          type: c.type,
+          language,
+          type: c.type === 'VOCAB' ? 'VOCABULARY' as const : c.type === 'CONFUSION' ? 'CONFUSION_PAIR' as const : c.type,
           front: c.frontWord,
           back: c.backMeaning,
-          phonetic: c.reading || null,
-          audioUrl: null,
-          tags: [c.tag, c.pos].filter(Boolean),
+          ...(c.reading ? { phonetic: c.reading } : {}),
+          ...(c.sourceEntryId ? { sourceEntryId: c.sourceEntryId } : {}),
+          ...(c.vocabularyId ? { vocabularyId: c.vocabularyId } : {}),
+          partOfSpeech: c.pos,
+          examples: c.exampleJp ? [{ text: c.exampleJp, ...(c.exampleZh ? { translation: c.exampleZh } : {}) }] : [],
+          tags: [c.tag].filter(Boolean),
           fsrs: {
             stability: c.stability,
             difficulty: 5.0,
@@ -121,28 +131,25 @@ export function useAddCardsMutation(userId = DEFAULT_USER_ID) {
             state: 'NEW',
           },
         }));
-        await apiClient.api.cards[':userId'].$post({
+        const response = await apiClient.api.cards[':userId'].$post({
           param: { userId },
           json: payload,
         });
-      } catch (e) {
-        logger.debug('[useAddCardsMutation] Hono RPC failed to save cards', e);
-      }
+        await readVocabularyResponse(response);
       return cards;
     },
-    onSuccess: (cards) => {
-      queryClient.setQueryData<StudyCardItem[]>([...QUERY_KEYS.CARDS, userId], (prev = []) => [
-        ...cards,
-        ...prev,
-      ]);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CARDS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.VOCABULARY });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DAILY_PLAN });
     },
   });
 }
 
 /** 复习单张卡片：只提交 rating，FSRS 计算与持久化由 Gateway 完成 (SSOT) */
-export function useUpdateCardMutation(userId = DEFAULT_USER_ID) {
+export function useUpdateCardMutation(userIdOverride?: string) {
+  const profileUserId = useUserProfileStore(state => state.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
   const queryClient = useQueryClient();
   const profileLang = useUserProfileStore((s) => s.profile.targetLanguage);
   const targetLanguage = normalizeTrackLanguage(profileLang);

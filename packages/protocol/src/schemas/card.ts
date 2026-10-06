@@ -23,6 +23,10 @@ export const FlashcardSchema = z.object({
   audioUrl: z.string().optional(),
   /** 词典来源条目 id（词典收藏卡才有；卡面点词弹窗可凭此精确回查完整条目）。 */
   sourceEntryId: z.string().optional(),
+  vocabularyId: z.string().optional(),
+  language: z.enum(['ja', 'en', 'ko']).optional(),
+  partOfSpeech: z.string().optional(),
+  examples: z.array(z.object({ text: z.string(), translation: z.string().optional() })).optional(),
   tags: z.array(z.string()),
   /** 讲透时间（M2 学习门：NEW 卡须先讲透才进练习池；review 首刷不强制）。 */
   studiedAt: z.string().optional(),

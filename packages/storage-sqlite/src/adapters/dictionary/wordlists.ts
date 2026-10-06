@@ -73,11 +73,17 @@ export async function listWordlists(
 
     const cardRows = deps.sqlite
       .query(
-        `SELECT source_entry_id AS entryId, studied_at AS studiedAt FROM flashcards
-         WHERE user_id = ? AND source_entry_id IS NOT NULL`
+        `SELECT e.id AS entryId, MAX(CASE WHEN f.studied_at IS NOT NULL THEN 1 ELSE 0 END) AS studied
+         FROM flashcards f LEFT JOIN global_vocabulary g ON g.id=f.vocabulary_id
+           AND g.user_id=f.user_id AND g.language=f.language
+         JOIN local_dictionary_entries e ON e.language=f.language AND
+           (e.id=f.source_entry_id OR (g.word=e.headword AND g.reading=coalesce(e.reading,e.romanization,'')))
+         WHERE f.user_id=? AND f.language=? AND f.type='VOCABULARY'
+           AND (${prefixes.map(prefix => `e.id LIKE '${prefix}%'`).join(' OR ')})
+         GROUP BY e.id`
       )
-      .all(userId) as Array<{ entryId: string; studiedAt: string | null }>;
-    const states = new Map(cardRows.map((r) => [r.entryId, r.studiedAt !== null]));
+      .all(userId, track) as Array<{ entryId: string; studied: number }>;
+    const states = new Map(cardRows.map((r) => [r.entryId, r.studied === 1]));
 
     const toWord = (r: WordRow): WordlistWord => {
       let meanings: string[] = [];

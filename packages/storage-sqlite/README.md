@@ -98,18 +98,29 @@ createDrizzleDb(path | Database)
 - 基座：`shared`、`protocol`、`document-model`、`drizzle-orm`（外加 `bun:sqlite` / `node:` 运行时）。
 - 例外：允许依赖经白名单明确列出的**纯叶子领域包**（定义：仅依赖 shared、
   无存储/网络/Agent、无厂商 SDK，且禁反向依赖本包——由该包自身的相对内聚测试锁定）。
-  当前许可其二：`flashcards`（adapter 持久化的正是其语义：Anki 端点常量与校验、
+  当前许可：`flashcards`（adapter 持久化的正是其语义：Anki 端点常量与校验、
   内置模板种子与模板校验、模板类型；实测其依赖仅 shared，无循环可能）；
   `content`（**仅文档种类纯表面**：`DOCUMENT_SOURCE_KINDS` 值＋`DocumentSourceKind`
   类型，供 import-tasks 校验落库值；禁引 content 其他符号，由边界测试符号级锁定）；
   `learner-core`（course-route 的 `resolveCourseRoute` 值＋两类型；
   kana-practice-state 仅 `import type` 三类型；禁其他，符号级测试分别锁定）；
   `learning`（practice-plan 的 validate/freeze/parse 三纯函数；禁其他，
-  符号级测试锁定）。四者均无存储/网络/Agent、无反向依赖（各包内聚测试为证）。
+  符号级测试锁定）；`learning-algorithms`（词汇收藏建卡仅复用 canonical
+  `initFsrsState`，不在适配层重复定义 FSRS 初始值；无存储/网络/Agent，禁反向依赖）。
 - 禁止：Gateway、ports、编排、上层、Agent、Web。新增叶子依赖必须同步更新
   10 号卡＋本 README＋边界测试三处，缺一视为未完成。
 
 ---
+
+## 词汇与闪卡关联（v40）
+
+`global_vocabulary` 保存用户跨教材的词条，`textbook_vocabulary` 保存各章词义与例句。
+`flashcards.vocabulary_id` 关联词条，同一用户同一词条只有一张已关联的词汇卡；
+`source_entry_id` 继续独立记录词典出处。词性和例句保存到专用列，标签只放标签。
+
+教材、词典收藏和接受词汇草稿共用 `collectVocabularyCardInTx`。重复收藏返回原卡，
+保留卡片内容、ID、FSRS 和历史。教材词条导入后即可查询，加入复习由用户选择。
+v40 只关联能唯一匹配的旧卡，不合并或删除重复、已修改、归属不明的卡片。
 
 ## 附：`migrations/` 维护约（随包搬迁，原文合并）
 

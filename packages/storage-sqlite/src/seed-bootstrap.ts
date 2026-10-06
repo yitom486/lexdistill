@@ -211,8 +211,8 @@ export function seedInitialData(sqlite: Database): void {
     try {
       const now = new Date().toISOString();
       const insertCardStmt = sqlite.prepare(`
-        INSERT INTO flashcards (id, user_id, language, type, front, back, phonetic, audio_url, tags, fsrs)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO flashcards (id, user_id, language, type, front, back, phonetic, audio_url, tags, fsrs, part_of_speech, examples_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const jaCardCount = sqlite
@@ -229,8 +229,6 @@ export function seedInitialData(sqlite: Database): void {
             state: c.reps > 0 ? 'REVIEW' : 'NEW',
           };
           const tags = [...c.tags];
-          if (c.exampleJp) tags.push(c.exampleJp);
-          if (c.exampleZh) tags.push(c.exampleZh);
 
           insertCardStmt.run(
             c.id,
@@ -242,7 +240,8 @@ export function seedInitialData(sqlite: Database): void {
             c.phonetic ?? null,
             c.audioUrl ?? null,
             JSON.stringify(tags),
-            JSON.stringify(fsrsObj)
+            JSON.stringify(fsrsObj), c.tags[1] ?? null,
+            JSON.stringify(c.exampleJp ? [{ text: c.exampleJp, ...(c.exampleZh ? { translation: c.exampleZh } : {}) }] : [])
           );
         }
       }
@@ -261,8 +260,6 @@ export function seedInitialData(sqlite: Database): void {
             state: c.reps > 0 ? 'REVIEW' : 'NEW',
           };
           const tags = [...c.tags];
-          if (c.exampleJp) tags.push(c.exampleJp);
-          if (c.exampleZh) tags.push(c.exampleZh);
 
           insertCardStmt.run(
             c.id,
@@ -274,7 +271,8 @@ export function seedInitialData(sqlite: Database): void {
             c.phonetic ?? null,
             c.audioUrl ?? null,
             JSON.stringify(tags),
-            JSON.stringify(fsrsObj)
+            JSON.stringify(fsrsObj), c.tags[1] ?? null,
+            JSON.stringify(c.exampleJp ? [{ text: c.exampleJp, ...(c.exampleZh ? { translation: c.exampleZh } : {}) }] : [])
           );
         }
       }

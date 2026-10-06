@@ -30,6 +30,19 @@ function portsWith(entry: CardSourceEntryRow | undefined, freqs: number[] = []):
 const CARD: ResolvableCard = { front: '食べる', back: 'to eat', phonetic: 'たべる' };
 
 describe('resolveCardSource', () => {
+  it('全局词汇卡保留所选词义和例句，词典只补出处、音调等信息', async () => {
+    const result = await resolveCardSource(portsWith(row(), [100]), {
+      ...CARD, sourceEntryId: 'entry', vocabularyId: 'global-word', back: '我的教材词义',
+      partOfSpeech: '我的词性标注', examples: [{ text: '教材原例句', translation: '译文' }],
+    });
+    expect(result.source.meanings).toEqual(['我的教材词义']);
+    expect(result.source.sentence).toBe('教材原例句');
+    expect(result.source.partOfSpeech).toBe('我的词性标注');
+    expect(result.source.reading).toBe('たべる');
+    expect(result.source.pitchLabel).toBe('⓪');
+    expect(result.source.frequency).toBe(100);
+    expect(result.sourceLabel).toBe('seed');
+  });
   it('无来源词条 → 回退卡片自身前后端（无臆造、无 label）', async () => {
     const res = await resolveCardSource(portsWith(undefined), { front: 'F', back: 'B' });
     expect(res).toEqual({ source: { headword: 'F', meanings: ['B'] } });
@@ -37,7 +50,7 @@ describe('resolveCardSource', () => {
 
   it('词条不存在 → 同样回退', async () => {
     const res = await resolveCardSource(portsWith(undefined), { ...CARD, sourceEntryId: 'missing' });
-    expect(res.source).toEqual({ headword: '食べる', meanings: ['to eat'] });
+    expect(res.source).toEqual({ headword: '食べる', meanings: ['to eat'], reading: 'たべる' });
     expect(res.sourceLabel).toBeUndefined();
   });
 

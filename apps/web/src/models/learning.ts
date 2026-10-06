@@ -42,6 +42,7 @@ export interface StudyCardItem {
   studiedAt?: string;
   /** 词典来源条目 id（词典收藏卡才有；卡面点词弹窗凭此精确回查） */
   sourceEntryId?: string;
+  vocabularyId?: string;
 }
 
 export interface MistakeNotebookItem {
