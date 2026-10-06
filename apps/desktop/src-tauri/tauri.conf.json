@@ -4,9 +4,9 @@
   "version": "0.1.2",
   "identifier": "com.studystudio.desktop",
   "build": {
-    "beforeDevCommand": "bun run --filter @study-studio/web dev",
+    "beforeDevCommand": "bun run --filter @study-studio/gateway pdf:prepare && bun run --filter @study-studio/web dev",
     "devUrl": "http://localhost:3000",
-    "beforeBuildCommand": "bun run --filter @study-studio/web build",
+    "beforeBuildCommand": "bun run build:sidecar && bun run --filter @study-studio/web build",
     "frontendDist": "../../web/dist"
   },
   "app": {
@@ -38,7 +38,10 @@
     ],
     "externalBin": [
       "binaries/study-studio-gateway"
-    ]
+    ],
+    "resources": {
+      "resources/pdf-runtime/": "pdf-runtime/"
+    }
   },
   "plugins": {
     "updater": {

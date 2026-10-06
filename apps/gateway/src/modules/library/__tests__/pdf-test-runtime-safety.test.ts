@@ -2,6 +2,7 @@ import { describe, expect, it, afterEach } from 'bun:test';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { defaultRuntimeDir } from '../../../infrastructure/persistence/app-paths.js';
+import { defaultPdfRuntimeDir } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 import { pinProcessToTestRuntime, testRuntimeDir } from './pdf-test-runtime.js';
 
 /**
@@ -49,11 +50,13 @@ describe('pdf-test-runtime safety', () => {
     const prodPath = join(homedir(), '.study-studio', 'runtime');
     setEnv(PROD_VAR, prodPath);
     setEnv(TEST_VAR, undefined);
+    setEnv('STUDY_STUDIO_PDF_RUNTIME_DIR', prodPath);
     const pinned = pinProcessToTestRuntime();
     expect(pinned).toBe(DEFAULT_TEST_DIR);
     // 产品解析（空依赖调用走这里）已被钉到测试目录，不再是外部生产路径
     expect(process.env[PROD_VAR]).toBe(DEFAULT_TEST_DIR);
     expect(defaultRuntimeDir()).toBe(DEFAULT_TEST_DIR);
+    expect(defaultPdfRuntimeDir()).toBe(DEFAULT_TEST_DIR);
     expect(defaultRuntimeDir()).not.toBe(prodPath);
   });
 

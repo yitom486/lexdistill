@@ -6,6 +6,7 @@
  * 运行时由桌面壳经 STUDY_STUDIO_DB / GATEWAY_PORT 环境变量指定库路径与端口）。
  */
 import { dirname, join } from 'node:path';
+import { preparePdfRuntime } from '../src/infrastructure/pdf-runtime/pdf-runtime-provision.js';
 
 const TRIPLES: Record<string, string> = {
   'win32-x64': 'x86_64-pc-windows-msvc',
@@ -26,6 +27,12 @@ const ext = process.platform === 'win32' ? '.exe' : '';
 const outfile = Bun.fileURLToPath(
   new URL(`../../desktop/src-tauri/binaries/study-studio-gateway-${triple}${ext}`, import.meta.url)
 );
+
+
+
+await preparePdfRuntime({
+  runtimeDir: Bun.fileURLToPath(new URL('../../desktop/src-tauri/resources/pdf-runtime/', import.meta.url)),
+});
 
 function toJavaScriptLiteral(value: unknown): string {
   return JSON.stringify(value).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');

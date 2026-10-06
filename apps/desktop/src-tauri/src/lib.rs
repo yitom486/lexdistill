@@ -380,6 +380,16 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
         }
         None => (sidecar_path.clone(), Vec::new(), None),
     };
+    let pdf_runtime_dir = match &working_dir {
+        Some(root) => root.join("apps/desktop/src-tauri/resources/pdf-runtime"),
+        None => match app.path().resource_dir() {
+            Ok(dir) => dir.join("pdf-runtime"),
+            Err(error) => {
+                eprintln!("[sidecar] 无法定位随应用安装的 PDF 组件：{error}");
+                return;
+            }
+        },
+    };
     let mut command = Command::new(&program);
     if let Some(dir) = working_dir {
         command.current_dir(dir);
@@ -387,6 +397,7 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
     command
         .args(&extra_args)
         .env("STUDY_STUDIO_DB", &db_path)
+        .env("STUDY_STUDIO_PDF_RUNTIME_DIR", &pdf_runtime_dir)
         .env("GATEWAY_PORT", port.to_string())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

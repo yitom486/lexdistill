@@ -9,7 +9,7 @@ export function defaultAppDataDir(): string {
   return path.join(homedir(), '.study-studio');
 }
 
-/** 运行时构件目录（OCR/PDFium/ORT/媒体），默认 ~/.study-studio/runtime，不过包。 */
+/** 用户可写数据目录（媒体、Agent 临时任务），独立于安装包中的只读 PDF 组件。 */
 export function defaultRuntimeDir(): string {
   const override = process.env.STUDY_STUDIO_RUNTIME_DIR;
   if (override && override.trim()) return override.trim();

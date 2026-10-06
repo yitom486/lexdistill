@@ -15,7 +15,9 @@ import { readLocalPdfFile } from '../modules/library/application/pdf-import/loca
 import type { DocumentItem } from '@study-studio/protocol';
 import { extractTarGz, extractZip } from '@study-studio/archive';
 import { assertArtifactUrlAllowed, currentRuntimePlatform } from '../infrastructure/pdf-runtime/pdf-artifacts.js';
-import { fetchRuntimeArtifact, napiDirName } from '../infrastructure/pdf-runtime/pdf-runtime.js';import { isOk } from '@study-studio/shared';
+import { napiDirName } from '../infrastructure/pdf-runtime/pdf-runtime.js';
+import { fetchRuntimeArtifact } from '../infrastructure/pdf-runtime/pdf-runtime-provision.js';
+import { isOk } from '@study-studio/shared';
 
 const JA_MD = `# 第 1 课
 李さん：はじめまして。李です。

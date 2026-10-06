@@ -1,9 +1,8 @@
 /**
- * PDF 导入运行时构件清单（按需下载，不进安装包）。
+ * PDF 构建构件清单（构建时下载、校验，随 Tauri 安装包交付）。
  *
- * 约束（用户决策 2026-09-06）：pdf-inspector 绑定与 PDFium
- * 一律不打包进 Tauri 安装包 / 网关 sidecar，首次使用时由网关下载到用户数据目录
- * （STUDY_STUDIO_RUNTIME_DIR，默认用户主目录下 .study-studio/runtime），并校验完整性。
+ * pdf-inspector 与 PDFium 固定版本随安装包交付；应用运行时只读加载。
+ * 构建下载失败或摘要缺失时拒绝交付，用户首次使用不联网补装组件。
  *
  * Pin 来源：
  * - npm 包：registry 元数据 integrity（sha512，2026-09-06 实测抓取，1.18.0 于 2026-09-10 复核更新）；

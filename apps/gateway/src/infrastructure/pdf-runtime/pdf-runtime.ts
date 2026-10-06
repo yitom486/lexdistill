@@ -1,26 +1,17 @@
-import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
-import { BusinessError, logger, ok, err, type Result } from '@study-studio/shared';
+import { BusinessError } from '@study-studio/shared';
 import { defaultRuntimeDir } from '../persistence/app-paths.js';
 import {
-  PDF_INSPECTOR_MAIN,
   PDF_INSPECTOR_VERSION,
   PLATFORM_ARTIFACTS,
-  assertArtifactUrlAllowed,
   currentRuntimePlatform,
   type PdfRuntimePlatform,
 } from './pdf-artifacts.js';
-import { extractTarGz, type ArchiveEntry } from '@study-studio/archive';
+import { fileURLToPath } from 'node:url';
 
-/**
- * PDF 运行时管理器（按需下载，不进安装包）。
- *
- * - 首次导入 PDF 时下载 pdf-inspector（主包 + 对应平台 napi 包，~10MB）到用户数据目录；
- * - Agent 按需查看扫描页时准备 PDFium；不下载 OCR 模型或 ONNX Runtime；
- * - 全部构件经域名白名单 + integrity/sha256 校验；缺 pin 的平台直接拒绝（不猜）。
- */
+/** 随安装包交付的 PDF 组件；只读加载，缺失/损坏时直接报错，不联网补装。 */
 
 export interface PdfInspectorLike {
   processPdf(pdf: Uint8Array, pages?: number[]): PdfClassifyResult;
@@ -38,7 +29,7 @@ export interface PdfInspectorLike {
   extractEmbeddedOutline?: (pdf: Uint8Array) => EmbeddedOutlineResult;
   /**
    * 可选：受限页渲染 PNG（fork 1.18.2+ `renderPdfPages`；老版本缺席即报错，
-   * 提示重启网关以下载新运行时）。只做内存 PNG，不写文件、不跑 OCR。
+   * 提示更新完整安装包）。只做内存 PNG，不写文件、不跑 OCR。
    */
   renderPdfPages?: (
     pdf: Uint8Array,
@@ -122,34 +113,32 @@ export interface PdfRuntimePaths {
 }
 
 export interface EnsureRuntimeOptions {
-  /** 测试注入：跳过真实下载，直接返回该 extractor */
+  /** 测试注入：直接返回该 extractor */
   loadInspector?: () => Promise<PdfInspectorLike>;
   runtimeDir?: string;
-  fetchImpl?: typeof fetch;
   /** Agent 按需查看扫描页时准备 PDFium。 */
   needPdfium?: boolean;
   platform?: PdfRuntimePlatform;
   /**
    * CMD-LINGUA-P2.1：调用方取消信号（如下游 HTTP 请求 abort）。
-   * 仅透传给构件下载 fetch；native 解包/加载阶段仍不可中断，
+   * 只读加载前检查取消；native 加载阶段仍不可中断，
    * 调用方须在 await 前后自行检查 signal（流式编排已做）。
    */
   signal?: AbortSignal;
   /**
-   * CMD-LINGUA-P2.1：运行时阶段钩子（可选；只报告“是否命中缓存/是否下载”，
+   * CMD-LINGUA-P2.1：运行时阶段钩子（可选；只报告“组件是否就绪”，
    * 无路径、无 URL、无体积以外的任何信息）。缺省不打扰任何调用方。
    */
   onRuntimeEvent?: (event: PdfRuntimeStageEvent) => void;
 }
 
 /**
- * CMD-LINGUA-P2.1 运行时阶段（缓存命中 vs 真实下载的诚实区分，
+ * CMD-LINGUA-P2.1 运行时阶段（本地组件就绪状态，
  * 供流式进度与开发诊断消费；字段仅阶段名，无敏感信息）。
  */
 export interface PdfRuntimeStageEvent {
   stage:
     | 'inspector_cached'
-    | 'inspector_downloaded'
     | 'pdfium_ready';
 }
 
@@ -157,95 +146,10 @@ export interface PdfRuntimeStageEvent {
 export function napiDirName(napiPkg: string): string {
   return napiPkg.includes('/') ? (napiPkg.split('/')[1] as string) : napiPkg;
 }
-const MAX_DOWNLOAD_BYTES = 200 * 1024 * 1024;
-const DOWNLOAD_TIMEOUT_MS = 180000;
 
 const inFlight = new Map<string, Promise<{ inspector: PdfInspectorLike; paths: PdfRuntimePaths }>>();
 
 export { defaultRuntimeDir };
-
-function sha512Base64(data: Uint8Array): string {
-  return createHash('sha512').update(data).digest('base64');
-}
-
-function sha256Hex(data: Uint8Array): string {
-  return createHash('sha256').update(data).digest('hex');
-}
-
-type AbortSignalWithAny = typeof AbortSignal & {
-  any?: (signals: AbortSignal[]) => AbortSignal;
-};
-
-/**
- * CMD-LINGUA-P2.1：下载超时与调用方取消二合一信号。
- * 调用方已 abort 时直接返回其 signal（fetch 立刻以 AbortError 失败，
- * 调用方按 signal.aborted 判取消而非失败）；AbortSignal.any 缺席时
- * 退化为纯超时（旧行为，不改变既有调用方语义）。
- */
-function downloadSignal(timeoutMs: number, external?: AbortSignal): AbortSignal {
-  const timeout = AbortSignal.timeout(timeoutMs);
-  if (!external) return timeout;
-  try {
-    if (external.aborted) return external;
-  } catch {
-    return timeout;
-  }
-  const anyFn = (AbortSignal as AbortSignalWithAny).any;
-  if (typeof anyFn === 'function') {
-    try {
-      return anyFn([timeout, external]);
-    } catch {
-      return timeout;
-    }
-  }
-  return timeout;
-}
-
-async function downloadArtifact(
-  url: string,
-  fetchImpl: typeof fetch,
-  integrity?: string,
-  sha256?: string,
-  signal?: AbortSignal
-): Promise<Uint8Array> {
-  assertArtifactUrlAllowed(url);
-  if (!integrity && !sha256) {
-    throw new BusinessError(
-      'E_RUNTIME_PIN_MISSING',
-      '构件缺少完整性 pin，拒绝下载（请先登记官方摘要）',
-      'TOOL_EXECUTION'
-    );
-  }
-  let res: Response;
-  try {
-    // data: URL 不走网络，不挂超时信号（Bun 下 data: + signal 会直接抛错）
-    const init = url.startsWith('data:') ? undefined : { signal: downloadSignal(DOWNLOAD_TIMEOUT_MS, signal) };
-    res = await fetchImpl(url, init);
-  } catch {
-    throw new BusinessError('E_RUNTIME_DOWNLOAD', '构件下载超时或网络不可达，请检查网络后重试', 'NETWORK');
-  }
-  if (!res.ok) {
-    throw new BusinessError(
-      'E_RUNTIME_DOWNLOAD',
-      `构件下载失败（HTTP ${res.status}），请稍后重试`,
-      'NETWORK'
-    );
-  }
-  const buf = new Uint8Array(await res.arrayBuffer());
-  if (buf.length === 0 || buf.length > MAX_DOWNLOAD_BYTES) {
-    throw new BusinessError('E_RUNTIME_DOWNLOAD', '构件体积异常，拒绝写入', 'TOOL_EXECUTION');
-  }
-  if (integrity) {
-    const [algo, expected] = integrity.split('-', 2);
-    if (algo !== 'sha512' || sha512Base64(buf) !== expected) {
-      throw new BusinessError('E_RUNTIME_VERIFY', '构件完整性校验失败，已丢弃（疑似被篡改或传输出错）', 'TOOL_EXECUTION');
-    }
-  }
-  if (sha256 && sha256Hex(buf) !== sha256.toLowerCase()) {
-    throw new BusinessError('E_RUNTIME_VERIFY', '构件完整性校验失败，已丢弃（疑似被篡改或传输出错）', 'TOOL_EXECUTION');
-  }
-  return buf;
-}
 
 async function fileExists(p: string): Promise<boolean> {
   try {
@@ -253,17 +157,6 @@ async function fileExists(p: string): Promise<boolean> {
     return true;
   } catch {
     return false;
-  }
-}
-
-async function writeEntries(baseDir: string, entries: ArchiveEntry[]): Promise<void> {
-  for (const e of entries) {
-    const target = path.resolve(baseDir, e.path);
-    if (!target.startsWith(path.resolve(baseDir) + path.sep)) {
-      throw new BusinessError('E_RUNTIME_VERIFY', '构件包内含越界路径，拒绝解包', 'TOOL_EXECUTION');
-    }
-    await fsp.mkdir(path.dirname(target), { recursive: true });
-    await fsp.writeFile(target, e.data);
   }
 }
 
@@ -285,9 +178,8 @@ async function findFileByName(dir: string, fileName: string): Promise<string | n
       } else if (it.name === fileName) {
         return full;
       } else if (!fallbackMatch) {
-        // 跨平台容错匹配（针对 Linux/macOS 压缩包内只有带版本号后缀的实体文件，如 libonnxruntime.so.1.27.0 或 libonnxruntime.1.27.0.dylib）
+        // Linux/macOS 发布包可能使用带版本号的 PDFium 实体文件名。
         if (
-          (fileName.includes('onnxruntime') && it.name.includes('onnxruntime') && (it.name.includes('.so') || it.name.includes('.dylib') || it.name.endsWith('.dll'))) ||
           (fileName.includes('pdfium') && it.name.includes('pdfium') && (it.name.includes('.so') || it.name.includes('.dylib') || it.name.endsWith('.dll')))
         ) {
           fallbackMatch = full;
@@ -304,7 +196,7 @@ interface ManifestShape {
   platform: PdfRuntimePlatform;
 }
 
-async function readManifest(runtimeDir: string): Promise<ManifestShape | null> {
+export async function readManifest(runtimeDir: string): Promise<ManifestShape | null> {
   try {
     const raw = await fsp.readFile(path.join(runtimeDir, 'manifest.json'), 'utf8');
     const parsed = JSON.parse(raw) as ManifestShape;
@@ -315,8 +207,11 @@ async function readManifest(runtimeDir: string): Promise<ManifestShape | null> {
   }
 }
 
-function loadInspectorFromDir(inspectorDir: string): PdfInspectorLike {
+function loadInspectorFromDir(inspectorDir: string, nativeLibrary: string): PdfInspectorLike {
+  const previousNativeLibrary = process.env.NAPI_RS_NATIVE_LIBRARY_PATH;
   try {
+    // 使用组件自带的 NAPI-RS 入口；编译后的 Bun 不依赖外部包的相对模块搜索。
+    process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeLibrary;
     const req = createRequire(path.join(inspectorDir, 'index.js'));
     const mod = req(inspectorDir) as {
       processPdf?: unknown;
@@ -328,16 +223,21 @@ function loadInspectorFromDir(inspectorDir: string): PdfInspectorLike {
   } catch (e) {
     throw new BusinessError(
       'E_RUNTIME_LOAD',
-      'PDF 解析运行时加载失败，请删除运行时目录后重试（将重新按需下载）',
-      'TOOL_EXECUTION'
+      'PDF 组件加载失败，请重新安装完整应用；开发环境请重新准备构建资源',
+      'TOOL_EXECUTION',
+      false,
+      e
     );
+  } finally {
+    if (previousNativeLibrary === undefined) delete process.env.NAPI_RS_NATIVE_LIBRARY_PATH;
+    else process.env.NAPI_RS_NATIVE_LIBRARY_PATH = previousNativeLibrary;
   }
 }
 
 export function ensurePdfRuntime(
   options: EnsureRuntimeOptions = {}
 ): Promise<{ inspector: PdfInspectorLike; paths: PdfRuntimePaths }> {
-  const runtimeDir = options.runtimeDir ?? defaultRuntimeDir();
+  const runtimeDir = options.runtimeDir ?? defaultPdfRuntimeDir();
   const key = `${runtimeDir}|pdfium=${options.needPdfium ? 1 : 0}`;
   const existing = inFlight.get(key);
   if (existing) return existing;
@@ -348,115 +248,40 @@ export function ensurePdfRuntime(
   return task;
 }
 
+/** PDF 安装资源与用户媒体/任务临时目录分开；桌面壳传入真实安装位置。 */
+export function defaultPdfRuntimeDir(): string {
+  const installed = process.env.STUDY_STUDIO_PDF_RUNTIME_DIR?.trim();
+  return installed || fileURLToPath(new URL('../../../../desktop/src-tauri/resources/pdf-runtime/', import.meta.url));
+}
+
 async function ensurePdfRuntimeInner(
   options: EnsureRuntimeOptions & { runtimeDir: string }
 ): Promise<{ inspector: PdfInspectorLike; paths: PdfRuntimePaths }> {
   const { runtimeDir } = options;
-  const fetchImpl = options.fetchImpl ?? fetch;
+  if (options.signal?.aborted) throw new BusinessError('E_CANCELLED', '教材处理已取消', 'TOOL_EXECUTION');
+  if (options.loadInspector) {
+    return { inspector: await options.loadInspector(), paths: { runtimeDir, inspectorDir: runtimeDir, pdfiumLib: null } };
+  }
   const platform = options.platform ?? currentRuntimePlatform();
   const pins = PLATFORM_ARTIFACTS[platform];
-
-  if (options.loadInspector) {
-    return {
-      inspector: await options.loadInspector(),
-      paths: {
-        runtimeDir,
-        inspectorDir: runtimeDir,
-        pdfiumLib: null,
-      },
-    };
-  }
-
-  await fsp.mkdir(runtimeDir, { recursive: true });
-  const nodeModulesDir = path.join(runtimeDir, 'node_modules', '@firecrawl');
-  const inspectorDir = path.join(nodeModulesDir, 'pdf-inspector');
-  const napiDir = path.join(nodeModulesDir, pins.napiPkg);
-  const inspectorIndex = path.join(inspectorDir, 'index.js');
-
   const manifest = await readManifest(runtimeDir);
-  const extractorReady =
-    manifest?.pdfInspector === PDF_INSPECTOR_VERSION &&
-    manifest.platform === platform &&
-    (await fileExists(inspectorIndex));
-  let inspectorInstalled = false;
-  const notify = options.onRuntimeEvent;
-  if (!extractorReady) {
-    logger.info('[pdf-runtime] 首次使用：按需下载 PDF 解析运行时（约 10MB，一次性）');
-    const [mainPkg, napiPkg] = await Promise.all([
-      downloadArtifact(PDF_INSPECTOR_MAIN.url, fetchImpl, PDF_INSPECTOR_MAIN.integrity, PDF_INSPECTOR_MAIN.sha256, options.signal),
-      downloadArtifact(pins.napi.url, fetchImpl, pins.napi.integrity, pins.napi.sha256, options.signal),
-    ]);
-    const napiShortName = napiDirName(pins.napiPkg);
-    await writeEntries(nodeModulesDir, [
-      ...extractTarGz(mainPkg).map((e) => ({
-        path: path.join('pdf-inspector', e.path.replace(/^package\//, '')),
-        data: e.data,
-      })),
-      ...extractTarGz(napiPkg).map((e) => ({
-        path: path.join(napiShortName, e.path.replace(/^package\//, '')),
-        data: e.data,
-      })),
-    ]);
-    inspectorInstalled = true;
-    notify?.({ stage: 'inspector_downloaded' });
-  } else {
-    notify?.({ stage: 'inspector_cached' });
+  const inspectorDir = path.join(runtimeDir, 'node_modules', '@firecrawl', 'pdf-inspector');
+  const napiDir = path.join(runtimeDir, 'node_modules', pins.napiPkg);
+  const nativeFiles = await fsp.readdir(napiDir).catch(() => [] as string[]);
+  const nativeFile = nativeFiles.find(file => file.endsWith('.node'));
+  if (manifest?.pdfInspector !== PDF_INSPECTOR_VERSION || manifest.platform !== platform ||
+      !(await fileExists(path.join(inspectorDir, 'index.js'))) || !nativeFile) {
+    throw new BusinessError('E_RUNTIME_MISSING', '安装包中的 PDF 组件缺失或版本不匹配，请重新安装完整应用；开发环境请重新准备构建资源', 'TOOL_EXECUTION');
   }
-
-  let pdfiumLib: string | null = null;
-  const pdfiumDir = path.join(runtimeDir, 'pdfium');
-  if (options.needPdfium) {
-    // CMD-LINGUA-P4A-2：页面渲染只要 PDFium——版本对上 + 文件在即用，
-    // 不下载 ORT/模型；版本对不上或文件缺失才下载 pdfium 包（SHA 照常校验）。
-    const pdfiumManifest = await readManifest(runtimeDir);
-    const pdfiumReady =
-      pdfiumManifest?.pdfInspector === PDF_INSPECTOR_VERSION &&
-      pdfiumManifest.platform === platform &&
-      (await findFileByName(pdfiumDir, pins.pdfiumLibName)) !== null;
-    if (!pdfiumReady) {
-      logger.info('[pdf-runtime] 目录页渲染：按需准备 PDFium（仅渲染库，不含 OCR 模型）');
-      const pdfiumPkg = await downloadArtifact(pins.pdfiumUrl, fetchImpl, undefined, pins.pdfiumSha256, options.signal);
-      await writeEntries(pdfiumDir, extractTarGz(pdfiumPkg));
-    }
-    pdfiumLib = await findFileByName(pdfiumDir, pins.pdfiumLibName);
-    if (!pdfiumLib) {
-      throw new BusinessError('E_RUNTIME_LOAD', 'PDFium 解包不完整（缺少本地库），请重试下载', 'TOOL_EXECUTION');
-    }
-    notify?.({ stage: 'pdfium_ready' });
-    if (!process.env.PDFIUM_LIB_PATH) process.env.PDFIUM_LIB_PATH = pdfiumLib;
+  options.onRuntimeEvent?.({ stage: 'inspector_cached' });
+  const pdfiumLib = options.needPdfium ? await findFileByName(path.join(runtimeDir, 'pdfium'), pins.pdfiumLibName) : null;
+  if (options.needPdfium && !pdfiumLib) {
+    throw new BusinessError('E_RUNTIME_MISSING', '安装包中的 PDFium 组件缺失，请重新安装完整应用', 'TOOL_EXECUTION');
   }
-
-  const prevManifest = await readManifest(runtimeDir);
-  await fsp.writeFile(
-    path.join(runtimeDir, 'manifest.json'),
-    JSON.stringify({
-      version: 1,
-      pdfInspector: inspectorInstalled ? PDF_INSPECTOR_VERSION : (prevManifest?.pdfInspector ?? PDF_INSPECTOR_VERSION),
-      platform,
-    } satisfies ManifestShape)
-  );
-
-  return {
-    inspector: loadInspectorFromDir(inspectorDir),
-    paths: { runtimeDir, inspectorDir, pdfiumLib },
-  };
-}
-
-/** 纯下载+校验（单测/脚本用，不解包）。 */
-export async function fetchRuntimeArtifact(
-  url: string,
-  options: { fetchImpl?: typeof fetch; integrity?: string; sha256?: string } = {}
-): Promise<Result<Uint8Array, BusinessError>> {
-  try {
-    const data = await downloadArtifact(
-      url,
-      options.fetchImpl ?? fetch,
-      options.integrity,
-      options.sha256
-    );
-    return ok(data);
-  } catch (e) {
-    if (e instanceof BusinessError) return err(e);
-    return err(new BusinessError('E_RUNTIME_DOWNLOAD', '构件下载失败，请稍后重试', 'NETWORK'));
+  if (pdfiumLib) {
+    // 使用本次安装的库，避免旧缓存/继承环境变量把加载导向另一版本。
+    process.env.PDFIUM_LIB_PATH = pdfiumLib;
+    options.onRuntimeEvent?.({ stage: 'pdfium_ready' });
   }
+  return { inspector: loadInspectorFromDir(inspectorDir, path.join(napiDir, nativeFile)), paths: { runtimeDir, inspectorDir, pdfiumLib } };
 }

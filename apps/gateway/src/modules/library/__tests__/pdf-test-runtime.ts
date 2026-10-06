@@ -13,7 +13,7 @@ import { ensurePdfRuntime, type PdfInspectorLike, type PdfRuntimePaths } from '.
  * - 目录：只认 `STUDY_STUDIO_TEST_RUNTIME_DIR`，否则用 `apps/gateway/src/.test-runtime/`（gitignored）；
  * - 通用生产变量 `STUDY_STUDIO_RUNTIME_DIR` 一律无视（见 pinProcessToTestRuntime），
  *   避免开发者 shell 里 export 的生产路径把测试写进真 runtime；
- * - 首次调用即 bootstrap pinned 构件（原生 PDF 读取与按需查看，供扫描页用例），复用已下载；
+ * - 测试前显式准备 pinned 构件，测试只读加载（原生 PDF 读取与按需查看，供扫描页用例），复用已下载；
  * - 缺失/损坏/离线导致无法就绪时直接抛（测试文件加载失败→非零退出），绝不 `it.skip`。
  * 生产 `~/.study-studio` 绝不作为测试状态读写。产品 `defaultRuntimeDir` 行为一字未动。
  */
@@ -32,6 +32,7 @@ export function testRuntimeDir(): string {
 export function pinProcessToTestRuntime(): string {
   const dir = testRuntimeDir();
   process.env.STUDY_STUDIO_RUNTIME_DIR = dir;
+  process.env.STUDY_STUDIO_PDF_RUNTIME_DIR = dir;
   return dir;
 }
 
@@ -50,7 +51,7 @@ export function ensurePdfTestRuntime(): Promise<{ inspector: PdfInspectorLike; p
         const code = e instanceof BusinessError ? e.code : 'E_RUNTIME_UNKNOWN';
         throw new Error(
           `[pdf-test-runtime] 测试运行时 bootstrap 失败（${code}，目录=${dir}）：` +
-            '检查网络后重跑；离线环境请预置该目录。绝不静默跳过 native 用例。'
+            '先运行 bun run --filter @study-studio/gateway pdf:prepare:test 准备组件。测试期间不联网补装，绝不静默跳过 native 用例。'
         );
       }
     })();
