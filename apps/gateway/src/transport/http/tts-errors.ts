@@ -40,6 +40,7 @@ function errorDetails(error: unknown): { statuses: number[]; text: string } {
 }
 
 function synthesisError(error: unknown): LocalTTSError {
+  console.error('[TTS Gateway] 语音合成调用失败:', error);
   const { statuses, text } = errorDetails(error);
   const limited = statuses.includes(429) || /RESOURCE_EXHAUSTED|RATE_LIMIT_EXCEEDED|insufficient_quota/i.test(text);
   if (limited) {

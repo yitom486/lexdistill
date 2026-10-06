@@ -60,4 +60,15 @@ describe('TTS local preference migration', () => {
     });
     expect(withBackup.backupApiKeys).toEqual({ gemini: 'backup-gemini-key' });
   });
+
+  it('normalizes legacy experimental voice IDs to official verified prebuilt voices', () => {
+    const migrated = migrateTtsPreferences({
+      voiceId: 'achernar',
+      voiceIdMale: 'achird',
+      voiceIdFemale: 'ar-001-advisor-1',
+    });
+    expect(migrated.voiceId).toBe('Achernar');
+    expect(migrated.voiceIdMale).toBe('Puck');
+    expect(migrated.voiceIdFemale).toBe('Aoede');
+  });
 });

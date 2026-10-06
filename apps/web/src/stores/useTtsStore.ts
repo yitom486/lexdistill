@@ -69,6 +69,22 @@ export interface TtsStoreState extends SpeechStudioConfig {
   downloadLastAudio: () => boolean;
 }
 
+function normalizeVoicePref(val: unknown): string | undefined {
+  if (typeof val !== 'string') return undefined;
+  const trimmed = val.trim();
+  if (!trimmed) return undefined;
+  const lower = trimmed.toLowerCase();
+  if (lower === 'achernar') return 'Achernar';
+  if (lower === 'aoede') return 'Aoede';
+  if (lower === 'puck') return 'Puck';
+  if (lower === 'fenrir') return 'Fenrir';
+  if (lower === 'charon') return 'Charon';
+  if (lower === 'kore') return 'Kore';
+  if (lower === 'achird' || lower.includes('advisor-10')) return 'Puck';
+  if (lower.startsWith('ar-001') || lower.includes('advisor-1')) return 'Aoede';
+  return trimmed;
+}
+
 /** 旧版单独存储厂商 Key；升级时只在本机迁入按服务 ID 索引的偏好。 */
 export function migrateTtsPreferences(persisted: unknown): Record<string, unknown> {
   if (!persisted || typeof persisted !== 'object') return { providerApiKeys: {} };
@@ -97,7 +113,19 @@ export function migrateTtsPreferences(persisted: unknown): Record<string, unknow
       if (typeof key === 'string') backupApiKeys[provider] = key;
     }
   }
-  return { ...preferences, providerApiKeys, backupApiKeys, modelId, saveAudioCache };
+  const voiceId = preferences['voiceId'] ? normalizeVoicePref(preferences['voiceId']) : undefined;
+  const voiceIdMale = preferences['voiceIdMale'] ? normalizeVoicePref(preferences['voiceIdMale']) : undefined;
+  const voiceIdFemale = preferences['voiceIdFemale'] ? normalizeVoicePref(preferences['voiceIdFemale']) : undefined;
+  return {
+    ...preferences,
+    ...(voiceId ? { voiceId } : {}),
+    ...(voiceIdMale ? { voiceIdMale } : {}),
+    ...(voiceIdFemale ? { voiceIdFemale } : {}),
+    providerApiKeys,
+    backupApiKeys,
+    modelId,
+    saveAudioCache,
+  };
 }
 
 export const useTtsStore = create<TtsStoreState>()(
@@ -148,9 +176,9 @@ export const useTtsStore = create<TtsStoreState>()(
         }),
         setAzureRegion: (azureRegion) => update({ azureRegion: azureRegion.trim() }),
         setLocalBaseUrl: (localBaseUrl) => update({ localBaseUrl: localBaseUrl.trim() }),
-        voiceId: speechStudio.getConfig().voiceId,
-        voiceIdMale: speechStudio.getConfig().voiceIdMale,
-        voiceIdFemale: speechStudio.getConfig().voiceIdFemale,
+        voiceId: speechStudio.getConfig().voiceId || 'Aoede',
+        voiceIdMale: speechStudio.getConfig().voiceIdMale || 'Puck',
+        voiceIdFemale: speechStudio.getConfig().voiceIdFemale || 'Aoede',
         setVoiceId: (voiceId) => update({ voiceId: voiceId.trim() }),
         setVoiceIdMale: (voiceIdMale) => update({ voiceIdMale: voiceIdMale.trim() }),
         setVoiceIdFemale: (voiceIdFemale) => update({ voiceIdFemale: voiceIdFemale.trim() }),
@@ -195,9 +223,9 @@ export const useTtsStore = create<TtsStoreState>()(
           backupApiKeys: state.backupApiKeys ?? {},
           azureRegion: state.azureRegion,
           localBaseUrl: state.localBaseUrl,
-          voiceId: state.voiceId,
-          voiceIdMale: state.voiceIdMale ?? '',
-          voiceIdFemale: state.voiceIdFemale ?? '',
+          voiceId: state.voiceId || 'Aoede',
+          voiceIdMale: state.voiceIdMale || 'Puck',
+          voiceIdFemale: state.voiceIdFemale || 'Aoede',
           modelId: state.modelId,
           saveAudioCache: state.saveAudioCache ?? true,
         });
