@@ -34,8 +34,8 @@ const TOOL_DESCRIPTIONS: Record<TextbookContentKind, string> = {
   grammar: '提交本章知识点、用法或发音知识（title/explanation/examples）。只填写内容。',
   vocabulary: '提交本章词汇（word/reading/meaning/level 等）。只填写内容。',
   exercises: '提交本章练习（type/prompt/answer 等）。只填写内容，新增练习标注 source=AI。',
-  articles: '提交本章完整文章或会话（text/translation）。没有文章不用调用。',
-  sentences: '提交本章可独立学习的句子。没有句子不用调用。',
+  articles: '提交本章完整文章或会话（text/translation）。若内容为会话对白，正文按每行「说话人：台词」标准格式保留角色名（如「ミラー：...」），译文按对应的「说话人：译文」逐行对齐，以便系统进行角色切片与双角色朗读。没有文章不用调用。',
+  sentences: '提交本章可独立学习的句子或单句对白。若为对话，可填写 speaker（说话人姓名或身份）。没有句子不用调用。',
   material: '提交本章的一份整理材料（text）。没有材料不用调用。',
 };
 
@@ -135,14 +135,20 @@ export class TextbookMcpRegistry {
   private registerTools(entry: WorkerEndpoint, taskToken: string, workerIndex: number): void {
     for (const kind of Object.keys(TOOL_NAMES) as TextbookContentKind[]) {
       // 操作 schema 带 superRefine（ZodEffects）：取内层 object 的 shape 做模型可见声明，
-      // 完整校验（含跨字段规则）仍在 handler 内用原 schema 执行，单一事实源。
+      // 跨包实例时避免 instanceof z.ZodEffects 失效；完整校验仍在 handler 内用原 schema 执行。
       const operation = TextbookContentOperationSchemas[kind];
-      const inner = operation instanceof z.ZodEffects ? operation.innerType() : operation;
+      const inner =
+        '_def' in operation &&
+        (operation._def as { typeName?: string }).typeName === 'ZodEffects' &&
+        'innerType' in operation &&
+        typeof (operation as { innerType?: unknown }).innerType === 'function'
+          ? (operation as { innerType: () => unknown }).innerType()
+          : operation;
       const shape = (inner as z.ZodObject<Record<string, z.ZodTypeAny>>).shape;
       entry.server.registerTool(
         TOOL_NAMES[kind],
         { description: TOOL_DESCRIPTIONS[kind], inputSchema: shape },
-        async (args: Record<string, unknown>, extra: { requestId?: unknown; signal?: AbortSignal }) => {
+        async (args: Record<string, unknown>, extra?: { requestId?: unknown; signal?: AbortSignal }) => {
           const outcome = await this.executeTool(taskToken, workerIndex, kind, args, extra);
           if (!outcome.ok) {
             return { content: [{ type: 'text' as const, text: outcome.error.userMessage }], isError: true };
@@ -158,7 +164,7 @@ export class TextbookMcpRegistry {
     workerIndex: number,
     kind: TextbookContentKind,
     args: Record<string, unknown>,
-    extra: { requestId?: unknown; signal?: AbortSignal },
+    extra?: { requestId?: unknown; signal?: AbortSignal },
   ): Promise<Result<BufferedContentReceipt, BusinessError>> {
     const task = this.tasks.get(taskToken);
     const worker = task && !task.revoked ? task.workers[workerIndex] : undefined;
@@ -168,13 +174,13 @@ export class TextbookMcpRegistry {
     if (!task || !worker || !scope || !snapshot) {
       return err(new BusinessError('E_SUBMISSION_SCOPE_INVALID', '本次课程处理已经结束，迟到调用已拒绝', 'VALIDATION'));
     }
-    if (extra.signal?.aborted) {
+    if (extra?.signal?.aborted) {
       return err(new BusinessError('E_CANCELLED', '本次课程处理已经结束，迟到调用已拒绝', 'VALIDATION'));
     }
     if (!scope.isCurrent(snapshot)) {
       return err(new BusinessError('E_SUBMISSION_SCOPE_INVALID', '本次课程处理已经结束，迟到调用已拒绝', 'VALIDATION'));
     }
-    const rpcId = typeof extra.requestId === 'string' || typeof extra.requestId === 'number' ? (extra.requestId as RpcId) : null;
+    const rpcId = typeof extra?.requestId === 'string' || typeof extra?.requestId === 'number' ? (extra.requestId as RpcId) : null;
     const result = await scope.submission.execute(kind, args, rpcId);
     if (!result.ok) return result;
     // 执行收尾复核：处理期间被撤销/切换，本次结果作废（不污染）。

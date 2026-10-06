@@ -33,10 +33,15 @@ export function TtsVoiceLibrary({ previewText, lang }: Props) {
   const azureRegion = useTtsStore((s) => s.azureRegion);
   const voiceId = useTtsStore((s) => s.voiceId);
   const setVoiceId = useTtsStore((s) => s.setVoiceId);
+  const voiceIdMale = useTtsStore((s) => s.voiceIdMale);
+  const setVoiceIdMale = useTtsStore((s) => s.setVoiceIdMale);
+  const voiceIdFemale = useTtsStore((s) => s.voiceIdFemale);
+  const setVoiceIdFemale = useTtsStore((s) => s.setVoiceIdFemale);
   const isSpeaking = useTtsStore((s) => s.isSpeaking);
   const speak = useTtsStore((s) => s.speak);
   const stop = useTtsStore((s) => s.stop);
 
+  const [activeSlot, setActiveSlot] = useState<'default' | 'male' | 'female'>('default');
   const [query, setQuery] = useState('');
   const [customId, setCustomId] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -97,6 +102,16 @@ export function TtsVoiceLibrary({ previewText, lang }: Props) {
     });
   };
 
+  const handleSelectVoice = (id: string): void => {
+    if (activeSlot === 'default') {
+      setVoiceId(id);
+    } else if (activeSlot === 'male') {
+      setVoiceIdMale(id);
+    } else {
+      setVoiceIdFemale(id);
+    }
+  };
+
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -116,6 +131,47 @@ export function TtsVoiceLibrary({ previewText, lang }: Props) {
           刷新
         </Button>
       </div>
+
+      {/* 角色音色分配槽位切换 */}
+      <div className="mb-3 flex items-center gap-1.5 rounded-xl border border-line bg-surface-soft p-1">
+        <button
+          type="button"
+          onClick={() => setActiveSlot('default')}
+          className={`flex-1 rounded-lg py-1.5 px-2 text-xs font-medium transition-colors text-center ${
+            activeSlot === 'default'
+              ? 'bg-surface text-ink shadow-xs border border-line-soft'
+              : 'text-ink-mute hover:text-ink'
+          }`}
+        >
+          默认朗读
+          {voiceId ? ` (${voiceId})` : ''}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSlot('male')}
+          className={`flex-1 rounded-lg py-1.5 px-2 text-xs font-medium transition-colors text-center ${
+            activeSlot === 'male'
+              ? 'bg-surface text-ink shadow-xs border border-line-soft'
+              : 'text-ink-mute hover:text-ink'
+          }`}
+        >
+          男角色音色
+          {voiceIdMale ? ` (${voiceIdMale})` : ''}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSlot('female')}
+          className={`flex-1 rounded-lg py-1.5 px-2 text-xs font-medium transition-colors text-center ${
+            activeSlot === 'female'
+              ? 'bg-surface text-ink shadow-xs border border-line-soft'
+              : 'text-ink-mute hover:text-ink'
+          }`}
+        >
+          女角色音色
+          {voiceIdFemale ? ` (${voiceIdFemale})` : ''}
+        </button>
+      </div>
+
       <div className="mb-2 flex gap-2">
         <input
           className="w-full rounded-xl border border-line bg-surface px-4 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -130,7 +186,7 @@ export function TtsVoiceLibrary({ previewText, lang }: Props) {
           placeholder="自定义 ID"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && customId.trim()) {
-              setVoiceId(customId.trim());
+              handleSelectVoice(customId.trim());
               setCustomId('');
             }
           }}
@@ -143,7 +199,10 @@ export function TtsVoiceLibrary({ previewText, lang }: Props) {
           <p className="col-span-2 text-sm text-ink-mute">无匹配音色，换个关键词试试。</p>
         )}
         {list.map((voice) => {
-          const selected = voiceId === voice.id;
+          const isDefault = voiceId === voice.id;
+          const isMale = voiceIdMale === voice.id;
+          const isFemale = voiceIdFemale === voice.id;
+          const selected = activeSlot === 'default' ? isDefault : activeSlot === 'male' ? isMale : isFemale;
           const playing = playingId === voice.id;
           const gender = genderLabel(voice.gender);
           return (
@@ -153,14 +212,17 @@ export function TtsVoiceLibrary({ previewText, lang }: Props) {
               aria-selected={selected}
               className={`relative rounded-xl border p-3 transition-colors ${selected ? 'border-ring ring-1 ring-ring' : 'border-line bg-surface'}`}
             >
-              <button type="button" className="block w-full cursor-pointer text-left" onClick={() => setVoiceId(voice.id)}>
+              <button type="button" className="block w-full cursor-pointer text-left" onClick={() => handleSelectVoice(voice.id)}>
                 <div className="mb-1 flex items-center justify-between gap-1">
                   <span className="mr-1 truncate text-sm font-semibold text-ink">{voice.name}</span>
                   {selected && <Check className="h-3.5 w-3.5 shrink-0" aria-label="已选中" />}
                 </div>
                 <p className="line-clamp-2 pr-6 text-xs leading-tight text-ink-mute">{voice.description}</p>
-                <div className="mt-1.5 flex gap-1">
+                <div className="mt-1.5 flex flex-wrap gap-1">
                   {gender ? <Badge variant="outline">{gender}</Badge> : null}
+                  {isDefault ? <Badge variant="secondary">默认</Badge> : null}
+                  {isMale ? <Badge variant="amber">男角色</Badge> : null}
+                  {isFemale ? <Badge variant="destructive">女角色</Badge> : null}
                   {voice.kind && voice.kind !== 'prebuilt' ? <Badge variant="secondary">定制</Badge> : null}
                 </div>
               </button>

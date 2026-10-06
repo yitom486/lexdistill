@@ -4,7 +4,7 @@ import type { LearningSection } from '../../../stores/useTextbookNavigationStore
 
 /** Temporary presentation contract. Proposed persisted fields are documented separately. */
 export interface StudySegment {
-  text: string; translation?: string; speaker?: string; note?: string; knowledgeTitles?: string[];
+  text: string; translation?: string; speaker?: string; gender?: 'male' | 'female' | 'neutral'; note?: string; knowledgeTitles?: string[];
 }
 export interface ChapterStudy {
   introduction: string; goals: string[];

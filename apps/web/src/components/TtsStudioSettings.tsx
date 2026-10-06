@@ -27,6 +27,8 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
   const azureRegion = useTtsStore((state) => state.azureRegion);
   const localBaseUrl = useTtsStore((state) => state.localBaseUrl);
   const voiceId = useTtsStore((state) => state.voiceId);
+  const voiceIdMale = useTtsStore((state) => state.voiceIdMale);
+  const voiceIdFemale = useTtsStore((state) => state.voiceIdFemale);
   const modelId = useTtsStore((state) => state.modelId);
   const saveAudioCache = useTtsStore((state) => state.saveAudioCache);
 
@@ -153,7 +155,9 @@ export function TtsStudioSettings({ lang }: { lang: SupportedLanguage }) {
               <div>
                 <h4 className="text-sm font-semibold text-ink">高级配置：模型与音色库</h4>
                 <p className="text-xs text-ink-mute">
-                  {modelId || voiceId ? `当前已选：${modelId || '默认模型'} · ${voiceId || '默认音色'}` : '使用服务商默认推荐模型与音色'}
+                  {modelId || voiceId || voiceIdMale || voiceIdFemale
+                    ? `当前已选：${modelId || '默认模型'} · 默认(${voiceId || '默认'}) / 男声(${voiceIdMale || '默认'}) / 女声(${voiceIdFemale || '默认'})`
+                    : '使用服务商默认推荐模型与音色'}
                 </p>
               </div>
             </div>

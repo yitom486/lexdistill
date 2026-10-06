@@ -38,6 +38,10 @@ export interface UnifiedTtsPlayerProps {
   className?: string;
   /** 紧凑/按钮形态下的附带文案 */
   label?: string;
+  /** 说话者/角色名称 */
+  speaker?: string | undefined;
+  /** 说话者推断或指定性别 */
+  gender?: 'male' | 'female' | 'neutral' | undefined;
 }
 
 export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
@@ -55,6 +59,8 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
   onPlayEnd,
   className = '',
   label,
+  speaker,
+  gender,
 }) => {
   const { isSpeaking, currentText, rate, speak, stop, setRate } = useTts();
   const waveBaseDuration = readCssDurationSeconds('--motion-wave-tts-base-duration');
@@ -74,6 +80,8 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
       await speak(text, {
         lang,
         rate,
+        speaker,
+        gender,
         onStart: () => onPlayStart?.(),
         onEnd: () => onPlayEnd?.(),
       });

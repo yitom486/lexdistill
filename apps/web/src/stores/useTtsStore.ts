@@ -14,6 +14,8 @@ export interface SpeakOptions {
   purpose?: TtsPurpose;
   voiceId?: string;
   modelId?: string;
+  speaker?: string | undefined;
+  gender?: 'male' | 'female' | 'neutral' | undefined;
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (error?: unknown) => void;
@@ -32,6 +34,8 @@ export interface ReplayOptions {
   purpose?: TtsPurpose;
   voiceId?: string;
   modelId?: string;
+  speaker?: string | undefined;
+  gender?: 'male' | 'female' | 'neutral' | undefined;
   onEnd?: () => void;
   onError?: (error?: unknown) => void;
 }
@@ -52,6 +56,8 @@ export interface TtsStoreState extends SpeechStudioConfig {
   setAzureRegion: (region: string) => void;
   setLocalBaseUrl: (url: string) => void;
   setVoiceId: (id: string) => void;
+  setVoiceIdMale: (id: string) => void;
+  setVoiceIdFemale: (id: string) => void;
   setModelId: (id: string) => void;
   setSaveAudioCache: (enabled: boolean) => void;
   speak: (text: string, options?: SpeakOptions) => Promise<void>;
@@ -143,7 +149,11 @@ export const useTtsStore = create<TtsStoreState>()(
         setAzureRegion: (azureRegion) => update({ azureRegion: azureRegion.trim() }),
         setLocalBaseUrl: (localBaseUrl) => update({ localBaseUrl: localBaseUrl.trim() }),
         voiceId: speechStudio.getConfig().voiceId,
+        voiceIdMale: speechStudio.getConfig().voiceIdMale,
+        voiceIdFemale: speechStudio.getConfig().voiceIdFemale,
         setVoiceId: (voiceId) => update({ voiceId: voiceId.trim() }),
+        setVoiceIdMale: (voiceIdMale) => update({ voiceIdMale: voiceIdMale.trim() }),
+        setVoiceIdFemale: (voiceIdFemale) => update({ voiceIdFemale: voiceIdFemale.trim() }),
         setModelId: (modelId) => update({ modelId: modelId.trim() }),
         setSaveAudioCache: (saveAudioCache) => update({ saveAudioCache }),
         speak: (text, options) => speechStudio.speak(text, {
@@ -172,6 +182,8 @@ export const useTtsStore = create<TtsStoreState>()(
         azureRegion: state.azureRegion,
         localBaseUrl: state.localBaseUrl,
         voiceId: state.voiceId,
+        voiceIdMale: state.voiceIdMale,
+        voiceIdFemale: state.voiceIdFemale,
         modelId: state.modelId,
         saveAudioCache: state.saveAudioCache,
       }),
@@ -184,6 +196,8 @@ export const useTtsStore = create<TtsStoreState>()(
           azureRegion: state.azureRegion,
           localBaseUrl: state.localBaseUrl,
           voiceId: state.voiceId,
+          voiceIdMale: state.voiceIdMale ?? '',
+          voiceIdFemale: state.voiceIdFemale ?? '',
           modelId: state.modelId,
           saveAudioCache: state.saveAudioCache ?? true,
         });

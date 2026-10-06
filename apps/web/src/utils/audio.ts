@@ -9,6 +9,7 @@ import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { buildAudioCacheKey, getAudioCache, saveAudioCache, updateAudioCacheLastPlayed } from '../lib/audio-cache.js';
 import { audioChunksToBlob, isRawPcmMime, PcmStreamPlayer } from '../lib/pcm-audio.js';
 import { buildTtsStreamBody, fetchTtsStream, matchTtsRequest, TtsStreamError, type TtsRequestDescriptor } from '../lib/tts-stream.js';
+import { detectSpeakerGender } from '../components/textbook/preview/dialogue-parser.js';
 
 export type { TtsRequestDescriptor };
 
@@ -20,6 +21,8 @@ export interface SpeechStudioConfig {
   azureRegion: string;
   localBaseUrl: string;
   voiceId: string;
+  voiceIdMale: string;
+  voiceIdFemale: string;
   modelId: string;
   saveAudioCache: boolean;
 }
@@ -179,7 +182,7 @@ class SpeechStudioEngine {
   private listeners = new Set<() => void>();
   private config: SpeechStudioConfig = {
     rate: 0.9, preferredService: '',
-    providerApiKeys: {}, backupApiKeys: {}, azureRegion: '', localBaseUrl: '', voiceId: '', modelId: '',
+    providerApiKeys: {}, backupApiKeys: {}, azureRegion: '', localBaseUrl: '', voiceId: '', voiceIdMale: '', voiceIdFemale: '', modelId: '',
     saveAudioCache: true,
   };
   private cooldowns = new Map<string, number>();
@@ -454,6 +457,8 @@ class SpeechStudioEngine {
       personaName?: string;
       modelId?: string;
       voiceId?: string;
+      speaker?: string | undefined;
+      gender?: 'male' | 'female' | 'neutral' | undefined;
       neural?: { voiceId?: string; stylePrompt?: string; modelId?: string };
       onStart?: () => void;
       onEnd?: () => void;
@@ -484,7 +489,24 @@ class SpeechStudioEngine {
       const provider = (config.preferredService || '').toLowerCase()
         || await this.fetchDefaultProvider(credentialHeaders, controller.signal);
       const language = resolveTrackLanguageTag(options?.lang);
-      const wantedVoice = options?.voiceId || options?.neural?.voiceId || config.voiceId;
+      let wantedVoice = options?.voiceId || options?.neural?.voiceId;
+      if (!wantedVoice) {
+        if (options?.gender === 'male' && config.voiceIdMale) {
+          wantedVoice = config.voiceIdMale;
+        } else if (options?.gender === 'female' && config.voiceIdFemale) {
+          wantedVoice = config.voiceIdFemale;
+        } else if (options?.speaker) {
+          const detected = detectSpeakerGender(options.speaker);
+          if (detected === 'male' && config.voiceIdMale) {
+            wantedVoice = config.voiceIdMale;
+          } else if (detected === 'female' && config.voiceIdFemale) {
+            wantedVoice = config.voiceIdFemale;
+          }
+        }
+      }
+      if (!wantedVoice) {
+        wantedVoice = config.voiceId;
+      }
       const wantedModel = options?.modelId || options?.neural?.modelId || config.modelId;
       const { model, voice } = await this.resolveStreamVoice(
         provider, credentialHeaders, wantedModel, wantedVoice, controller.signal,

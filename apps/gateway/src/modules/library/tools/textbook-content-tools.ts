@@ -17,8 +17,8 @@ const descriptions: Record<TextbookContentKind, string> = {
   grammar: '管理本课知识点、用法或发音知识。explanation 为规则说明，aiExplanation 为独立的 AI 补充，UI 按 Markdown 渲染这两个字段，可用段落、列表、加粗和表格；卡片已展示 title，说明不必重复大标题。title、connection 和 examples 的 text/translation 按普通文本展示，例句单独填写，不混进说明。',
   vocabulary: '管理本课词汇。填写词面、读音、释义及估计等级 ' + JlptLevelSchema.options.join('|') + '，可提供词性、讲解和例句。explanation 按 Markdown 渲染；word、reading、meaning、partOfSpeech、pitch 和例句 text/translation 按普通文本展示，讲解不要混入释义。最终事务新增全局缺失词，已有词复用、不覆盖。等级不是掌握度。',
   exercises: '管理本课练习。填写题型、题干、difficultyTier（复杂度 1–5）及 difficultyReason。选择题和排序题均需 options（至少两项），待排序词块不能只写在题干里。单选 answer 用一个选项文字，多选用选项文字数组；排序 answer 用全部词块的有序数组，重复词块的次数与 options 一致。配对用左右文字配对，可复用右项；多空答案按空位顺序。翻译、简答和写作提供 gradingNotes，参考表达可省略。新增练习标注 source=AI。',
-  articles: '管理本课完整文章或会话。title、text、translation 按普通文本展示，不添加 Markdown 标记；正文和译文分开填写，换行分段。保留完整语境，不逐行拆成文章。没有文章无需调用。',
-  sentences: '管理本课可独立学习的句子。explanation 按 Markdown 渲染，可用段落、列表和加粗；text、translation、speaker 按普通文本展示，句子和译文分开填写。没有句子无需调用。',
+  articles: '管理本课完整文章或会话。title、text、translation 按普通文本展示，不添加 Markdown 标记；正文和译文分开填写，换行分段。若为会话对白，正文与译文各行均按「说话人：台词/译文」格式规范记录，以便角色扮演与分角色发音。保留完整语境，不逐行拆成文章。没有文章无需调用。',
+  sentences: '管理本课可独立学习的句子或单句对白。explanation 按 Markdown 渲染，可用段落、列表和加粗；text、translation、speaker 按普通文本展示，若为对话可填写 speaker（说话人）。句子和译文分开填写。没有句子无需调用。',
   material: '管理本课的一份整理材料，items 中填写 text。UI 按保留换行的普通文本展示，不解析 Markdown；保留有意义的结构，使用文本标题和分行。没有材料无需调用。',
 };
 const names: Record<TextbookContentKind, string> = { grammar: 'knowledge', vocabulary: 'vocabulary', exercises: 'exercises', articles: 'articles', sentences: 'sentences', material: 'material' };

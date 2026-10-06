@@ -3,7 +3,7 @@ import { pdfReadingInstructions } from '../pdf-import/pdf-task-workspace.js';
 
 export function buildLessonExtractionPrompt(job: LessonExtractionJob, toolNames: readonly string[], correction?: string): string {
   return [
-    '根据本章实际内容整理可直接学习的材料，视情况选择知识点、词汇、练习、文章、句子或整理材料；有则提交，无则省略，不为凑齐类别生成内容。课内小标题仅作参考。讲解与例句按各自字段填写，文章和会话保留完整语境。',
+    '根据本章实际内容整理可直接学习的材料，视情况选择知识点、词汇、练习、文章、句子或整理材料；有则提交，无则省略，不为凑齐类别生成内容。课内小标题仅作参考。讲解与例句按各自字段填写，文章和会话保留完整语境。若包含会话对白，正文请按「说话人：台词」格式逐行记录（如「ミラー：...」），译文按对应「说话人：译文」行对齐，以便系统自动建立角色扮演与男女声朗读。',
     `可用工具：${toolNames.join('、')}。可多次新增、查询、修改和删除；只填写内容，修改或删除使用工具回执的本任务短引用，不填写数据库 ID 或页码。`,
     job.allowAiExercises ? '可按本章知识点补充练习，如实标注 AI 来源。' : '本次不新增 AI 练习，保留原书习题。',
     `语种: ${job.language}\n章节: ${job.title}`,

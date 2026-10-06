@@ -13,6 +13,42 @@ export interface CommitLessonKnowledgeOutput {
 
 type Tx = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];
 const parseExamples = (text: string) => TextbookExampleSchema.array().parse(JSON.parse(text));
+const COLON_SPEAKER_RE = /^(.{1,16})[：:]\s*(.+)$/;
+
+function projectArticleToDialogues(article: { text: string; translation?: string | null }): Array<{ speaker: string; japanese: string; chinese: string }> {
+  const rawText = article.text.trim();
+  if (!rawText) return [];
+  const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+  const transLines = (article.translation ?? '').split('\n').map(l => l.trim()).filter(Boolean);
+
+  let matchedCount = 0;
+  for (const line of lines) {
+    const m = COLON_SPEAKER_RE.exec(line);
+    if (m && !/^\d+$/.test(m[1]!.trim())) {
+      matchedCount++;
+    }
+  }
+
+  if (matchedCount >= 2 || (matchedCount >= 1 && lines.length === 1)) {
+    return lines.map((line, idx) => {
+      const m = COLON_SPEAKER_RE.exec(line);
+      if (m && !/^\d+$/.test(m[1]!.trim())) {
+        const speaker = m[1]!.trim();
+        const japanese = m[2]!.trim();
+        let chinese = '';
+        if (idx < transLines.length) {
+          const tm = COLON_SPEAKER_RE.exec(transLines[idx]!);
+          chinese = tm ? tm[2]!.trim() : transLines[idx]!;
+        }
+        return { speaker, japanese, chinese };
+      }
+      return { speaker: '', japanese: line, chinese: transLines[idx] ?? '' };
+    });
+  }
+
+  return [{ speaker: '', japanese: article.text, chinese: article.translation ?? '' }];
+}
+
 const contentTables = [textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems] as const;
 
 export function textbookStatsInTx(tx: Tx, documentId: string): TextbookAssetStats {
@@ -66,7 +102,7 @@ export function textbookViewInTx(tx: Tx, documentId: string): TextbookAST | null
       }),
       grammarPoints: grammar.filter(point => point.chapterId === chapter.id).map(point => ({ id: point.id, title: point.title, connection: point.connection ?? '', explanation: point.explanation,
         examples: parseExamples(point.examplesJson).map(example => ({ japanese: example.text, chinese: example.translation ?? '' })) })),
-      dialogues: [...articles.filter(article => article.chapterId === chapter.id).map(article => ({ speaker: '', japanese: article.text, chinese: article.translation ?? '' })),
+      dialogues: [...articles.filter(article => article.chapterId === chapter.id).flatMap(projectArticleToDialogues),
         ...sentences.filter(sentence => sentence.chapterId === chapter.id).map(sentence => ({ speaker: sentence.speaker ?? '', japanese: sentence.text, chinese: sentence.translation ?? '' }))],
       passageMd: articles.filter(article => article.chapterId === chapter.id).map(article => article.text).join('\n\n') || null,
       exercises: exercises.filter(exercise => exercise.chapterId === chapter.id).map(exercise => ({ id: exercise.id, type: ExerciseTypeSchema.parse(exercise.type), prompt: exercise.prompt,
