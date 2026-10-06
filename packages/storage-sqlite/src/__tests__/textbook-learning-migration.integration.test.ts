@@ -23,7 +23,7 @@ describe('v37 existing textbook migration',()=>{
    db.run("INSERT INTO textbook_grammar(document_id,lesson_id,ord,title,explanation,examples_json) VALUES('book','sub',0,'です','Explanation','[]')");
    db.run("INSERT INTO textbook_lines(document_id,lesson_id,ord,ja,zh,kind,block_id,source) VALUES('book','ch',0,'Article','Translation','PARAGRAPH','a1','TEXTBOOK'),('book','sub',0,'Sentence','Meaning','DIALOGUE','s1','TEXTBOOK')");
    db.run(`INSERT INTO textbook_exercises(document_id,lesson_id,ord,type,prompt,answer,exercise_id,options_json,answer_json,source) VALUES('book','sub',0,'CHOICE','Choose','cat','e1','[{"id":"o1","text":"cat"},{"id":"o2","text":"dog"}]','{"optionIds":["o1"]}','TEXTBOOK')`);
-   expect(runMigrations(db).applied).toEqual([37,38,39,40,41]);
+   expect(runMigrations(db).applied).toEqual([37,38,39,40,41,42]);
    expect(db.query("SELECT word,reading,jlpt_level FROM global_vocabulary").get()).toEqual({word:'猫',reading:'ねこ',jlpt_level:null});
    expect(db.query("SELECT chapter_id,meaning,examples_json FROM textbook_vocabulary").get()).toEqual({chapter_id:'ch',meaning:'cat',examples_json:'[{"text":"猫です","translation":"It is a cat"}]'});
    expect(db.query("SELECT id,chapter_id,text FROM textbook_sentences").get()).toEqual({id:'s1',chapter_id:'ch',text:'Sentence'});
@@ -58,7 +58,7 @@ describe('v37 existing textbook migration',()=>{
     db.query("INSERT INTO textbook_lines(document_id,lesson_id,ord,ja,kind,block_id,source) VALUES('b',?,0,?,'DIALOGUE','line1','TEXTBOOK')").run(chapter,chapter+' sentence');
     db.query("INSERT INTO textbook_exercises(document_id,lesson_id,ord,type,prompt,answer,exercise_id,options_json,answer_json,content_json,source) VALUES('b',?,0,'CHOICE','Choose','yes','ex1',?,?,?,'TEXTBOOK')").run(chapter,JSON.stringify(['yes','no']),JSON.stringify({optionIds:['o1']}),JSON.stringify({options:[{id:'o1',text:'yes'},{id:'o2',text:'no'}]}));
    }
-   expect(runMigrations(db).applied).toEqual([37,38,39,40,41]);
+   expect(runMigrations(db).applied).toEqual([37,38,39,40,41,42]);
    for(const table of ['textbook_knowledge','textbook_sentences','textbook_exercise_items']) expect(db.query(`SELECT count(*) AS n,count(DISTINCT id) AS ids FROM ${table}`).get()).toEqual({n:2,ids:2});
    expect(db.query('SELECT answer_json FROM textbook_exercise_items').all()).toEqual([{answer_json:'["yes"]'},{answer_json:'["yes"]'}]);
    expect(db.query('PRAGMA integrity_check').get()).toEqual({integrity_check:'ok'});
@@ -78,6 +78,23 @@ describe('v41 textbook vocabulary learning fields',()=>{
    expect(db.query('SELECT usage_notes,context_note,source FROM textbook_vocabulary').get()).toEqual({usage_notes:null,context_note:null,source:'TEXTBOOK'});
    db.run("UPDATE textbook_vocabulary SET usage_notes='学校へ行く',context_note='本课指场所' WHERE id='v'");
    expect(db.query('SELECT usage_notes,context_note,source FROM textbook_vocabulary').get()).toEqual({usage_notes:'学校へ行く',context_note:'本课指场所',source:'TEXTBOOK'});
+  } finally {db.close();}
+ });
+});
+describe('v42 vocabulary learning content fields',()=>{
+ it('两表学习内容列可空、版本默认 0；旧行不受影响',()=>{
+  const db=new Database(':memory:');
+  try {
+   initSchema(db);
+   for(const table of ['global_vocabulary','textbook_vocabulary']) {
+    const cols=(db.query(`SELECT name FROM pragma_table_info('${table}')`).all() as Array<{name:string}>).map(c=>c.name);
+    for(const name of ['learning_json','learning_version','learning_updated_at','learning_session_id']) expect(cols).toContain(name);
+   }
+   db.run("INSERT INTO documents(id,user_id,title,source_kind,language,content,created_at,updated_at) VALUES('book','owner','Book','user_import','ja','','t','t')");
+   db.run("INSERT INTO global_vocabulary(id,user_id,language,word,reading,meaning,created_at) VALUES('g','owner','ja','学校','','学校','t')");
+   db.run("INSERT INTO textbook_vocabulary(id,document_id,chapter_id,ord,vocabulary_id,meaning) VALUES('v','book','ch',0,'g','学校')");
+   expect(db.query('SELECT learning_json,learning_version,learning_session_id FROM global_vocabulary').get()).toEqual({learning_json:null,learning_version:0,learning_session_id:null});
+   expect(db.query('SELECT learning_json,learning_version,learning_session_id FROM textbook_vocabulary').get()).toEqual({learning_json:null,learning_version:0,learning_session_id:null});
   } finally {db.close();}
  });
 });

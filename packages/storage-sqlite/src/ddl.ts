@@ -631,14 +631,18 @@ CREATE TABLE IF NOT EXISTS global_vocabulary (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL, language TEXT NOT NULL,
   word TEXT NOT NULL, reading TEXT NOT NULL DEFAULT '', meaning TEXT NOT NULL,
   jlpt_level TEXT CHECK(jlpt_level IS NULL OR jlpt_level IN ('N5','N4','N3','N2','N1')),
-  level_source TEXT CHECK(level_source IS NULL OR level_source = 'MODEL_ESTIMATE'), created_at TEXT NOT NULL
+  level_source TEXT CHECK(level_source IS NULL OR level_source = 'MODEL_ESTIMATE'), created_at TEXT NOT NULL,
+  learning_json TEXT, learning_version INTEGER NOT NULL DEFAULT 0,
+  learning_updated_at TEXT, learning_session_id TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_global_vocabulary_identity ON global_vocabulary(user_id, language, word, reading);
 CREATE TABLE IF NOT EXISTS textbook_vocabulary (
   id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   chapter_id TEXT NOT NULL, ord INTEGER NOT NULL, vocabulary_id TEXT NOT NULL REFERENCES global_vocabulary(id),
   meaning TEXT NOT NULL, part_of_speech TEXT, pitch TEXT, explanation TEXT, examples_json TEXT NOT NULL DEFAULT '[]',
-  usage_notes TEXT, context_note TEXT, source TEXT NOT NULL DEFAULT 'TEXTBOOK'
+  usage_notes TEXT, context_note TEXT, source TEXT NOT NULL DEFAULT 'TEXTBOOK',
+  learning_json TEXT, learning_version INTEGER NOT NULL DEFAULT 0,
+  learning_updated_at TEXT, learning_session_id TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_textbook_vocabulary_word ON textbook_vocabulary(document_id, chapter_id, vocabulary_id);
 CREATE TABLE IF NOT EXISTS textbook_knowledge (

@@ -6,6 +6,8 @@ export const globalVocabulary = sqliteTable('global_vocabulary', {
   id: text('id').primaryKey(), userId: text('user_id').notNull(), language: text('language').notNull(),
   word: text('word').notNull(), reading: text('reading').notNull().default(''), meaning: text('meaning').notNull(),
   jlptLevel: text('jlpt_level'), levelSource: text('level_source'), createdAt: text('created_at').notNull(),
+  learningJson: text('learning_json'), learningVersion: integer('learning_version').notNull().default(0),
+  learningUpdatedAt: text('learning_updated_at'), learningSessionId: text('learning_session_id'),
 }, table => [uniqueIndex('idx_global_vocabulary_identity').on(table.userId, table.language, table.word, table.reading)]);
 
 const textbookContentColumns = () => ({
@@ -15,6 +17,8 @@ export const textbookVocabulary = sqliteTable('textbook_vocabulary', {
   ...textbookContentColumns(), vocabularyId: text('vocabulary_id').notNull().references(() => globalVocabulary.id), meaning: text('meaning').notNull(),
   partOfSpeech: text('part_of_speech'), pitch: text('pitch'), explanation: text('explanation'), examplesJson: text('examples_json').notNull().default('[]'),
   usageNotes: text('usage_notes'), contextNote: text('context_note'), source: text('source').notNull().default('TEXTBOOK'),
+  learningJson: text('learning_json'), learningVersion: integer('learning_version').notNull().default(0),
+  learningUpdatedAt: text('learning_updated_at'), learningSessionId: text('learning_session_id'),
 }, table => [index('idx_textbook_vocabulary_chapter').on(table.documentId, table.chapterId, table.ord),
   uniqueIndex('idx_textbook_vocabulary_word').on(table.documentId, table.chapterId, table.vocabularyId)]);
 export const textbookKnowledge = sqliteTable('textbook_knowledge', {
