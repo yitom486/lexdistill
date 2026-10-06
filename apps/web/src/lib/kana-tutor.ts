@@ -2,7 +2,7 @@
  * 假名 AI 导师上下文构造器（纯函数，不绑定任何 UI）。
  * 任何页面（矩阵详情卡、自测反馈、错题回炉…）只需传入假名与题池，
  * 即可拿到可直接灌入导师抽屉的 AiTutorContext；基础记忆引导语来自可审校的课程讲义资产，
- * 易混对照由混淆算法实时推导，个性化追问再交给 AI。
+ * 讲义有明确对照时使用课程内容，旧数据才从题池补充；个性化追问交给 AI。
  */
 import type { KanaItem } from '@study-studio/protocol';
 import type { AiTutorContext } from '../stores/tutor-context.js';
@@ -31,20 +31,28 @@ function faceOf(kana: KanaItem, script: KanaScript): string {
 export function buildKanaTutorContext(input: KanaTutorInput): AiTutorContext {
   const { kana, pool = [], script = 'HIRAGANA', wasWrong = false, userPick = null } = input;
   const face = faceOf(kana, script);
-  const neighbors = confusionDistractors(kana, pool, script, 3);
+  const guide = kana.learningGuide;
+  const scriptGuide = guide?.scripts?.[script === 'KATAKANA' ? 'katakana' : 'hiragana'];
+  const neighbors = scriptGuide
+    ? scriptGuide.contrasts.map((item) => item.kana)
+    : confusionDistractors(kana, pool, script, 3);
   const contrast = neighbors.length > 0 ? `它和「${neighbors.join('」「')}」` : '它';
   const skillTag = script === 'KATAKANA' ? 'jp.kana.katakana' : 'jp.kana.hiragana';
-  const guide = kana.learningGuide;
   const guideFacts = guide
     ? [
         `课程事实：${guide.soundDescription}`,
-        `内置联想：${guide.memoryTip}`,
+        `内置联想（不是字源）：${scriptGuide?.memoryTip ?? (script === 'HIRAGANA' ? guide.memoryTip : '使用当前片假名的实际形状，不套用平假名字形联想。')}`,
         `发音提示：${guide.pronunciationTip}`,
-        ...(guide.confusionNotes ? [`易混提醒：${guide.confusionNotes}`] : []),
+        ...(scriptGuide ? [
+          `字形观察：${scriptGuide.shapeFeatures.join(' ')}`,
+          `辨认口令：${scriptGuide.recognitionCue}`,
+          `具体对照：${scriptGuide.contrasts.map((item) => `${item.kana}：${item.difference}`).join(' ')}`,
+        ] : script === 'HIRAGANA' && guide.confusionNotes ? [`易混提醒：${guide.confusionNotes}`] : []),
       ].join(' ')
     : `课程事实：它表示 ${kana.romaji} 这一拍；假名本身通常没有独立中文词义。`;
-  const exampleHint = guide?.exampleWords?.length
-    ? `可参考例词：${guide.exampleWords
+  const examples = scriptGuide?.exampleWords ?? guide?.exampleWords;
+  const exampleHint = examples?.length
+    ? `可参考例词：${examples
         .map((item) => `${item.word}（${item.reading}，${item.meaning}）`)
         .join('、')}。`
     : '';
@@ -60,9 +68,9 @@ export function buildKanaTutorContext(input: KanaTutorInput): AiTutorContext {
       : `只讲记忆法，不要展开超纲语法。`);
 
   const explanationParts = [
-    `假名【${face}】(${kana.romaji})，${kana.mnemonic || '标准发音单元'}。`,
+    `假名【${face}】(${kana.romaji})，${script === 'HIRAGANA' && !scriptGuide ? kana.mnemonic || '标准发音单元' : '标准发音单元'}。`,
     guide?.soundDescription,
-    guide?.memoryTip,
+    scriptGuide?.memoryTip ?? (script === 'HIRAGANA' ? guide?.memoryTip : undefined),
     guide?.pronunciationTip,
     ...(neighbors.length > 0 ? [`易混对照：${neighbors.join('、')}。`] : []),
   ].filter((part): part is string => Boolean(part));

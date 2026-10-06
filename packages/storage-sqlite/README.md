@@ -52,7 +52,7 @@ createDrizzleDb(path | Database)
 
 | 文件 | 内容与落库位置 | 主要导出 / 作用 |
 |---|---|---|
-| `kana-seed.ts` | 日语清音、浊音、半浊音、拗音等权威假名课程资产，包含行列、罗马字、助记、发音文本和学习引导。写入 `curriculum_kana`。 | `KANA_SEEDS` 是最终种子数组；内部 `example()` 统一例词形状，`buildKanaLearningGuide()` 从单个假名构建学习引导。前者用于五十音工作室和出题约束，后者避免每条重复手写讲解结构。 |
+| `kana-seed.ts` | 日语清音、浊音、半浊音、拗音等权威假名课程资产，包含行列、罗马字、助记、发音文本和学习引导。写入 `curriculum_kana`。 | `KANA_SEEDS` 是最终种子数组；内部 `example()` 统一例词形状；发音提示由 `buildKanaLearningGuide()` 构建。逐字字形观察、原创联想、辨认口令与明确对照分别在 `kana-shape-hiragana.ts` 和 `kana-shape-katakana.ts` 维护，`kana-script-guides.ts` 只复用浊点/拗音组成规则并组合遮答自检与通常写法的例词。两套讲义保存到 `learning_guide_json.scripts`，旧库启动时更新公共课程，不改学习记录。 |
 | `hangul-seed.ts` | 韩语谚文的子音、基本/复合母音和收音代表音等课程资产。写入 `curriculum_hangul`。 | `HANGUL_SEEDS`：含字母、名称、修正罗马字、位置、助记与 TTS 文本，供 Hangul Studio 查询和练习。 |
 | `lesson-seed.ts` | “先讲后测”的日语语法讲义，如 `で/に`、目的地 `に`、`か`、`の`、`から`、自我介绍和 `たら`。写入 `curriculum_lessons`。 | `LESSON_SEEDS`；`LessonSeed`、`LessonSectionSeed`、`LessonExampleSeed` 描述讲义的章节、例句、易错点、最低等级和排序。Bootstrap 使用 UPSERT 覆盖公共讲义的版本更新。 |
 | `content-template-seed.ts` | `learning.content` 的离线内容模板库：三语选择、填空、讲解、例句、听写、阅读和写作等结构化内容。写入 `learning_content_templates`。 | `LEARNING_CONTENT_TEMPLATE_SEEDS` 是工具无模型或降级时的内容 SSOT；`ContentTemplateAction` 限定可执行动作；`ContentTemplateSeed` 定义语种、题型、技能、难度和 JSON `payload`。工具读取表，不应在工具实现里堆硬编码题干。 |

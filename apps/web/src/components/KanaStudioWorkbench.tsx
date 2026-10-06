@@ -12,10 +12,7 @@ import {
   Flame,
   Award,
   BookOpen,
-  Info,
   Lightbulb,
-  Mic2,
-  GitCompareArrows,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sound, speechStudio } from '../utils/audio.js';
@@ -23,13 +20,7 @@ import { fireSuccessConfetti, ShimmerButton } from './magicui/index.js';
 import { Tabs, TabsList, TabsTrigger, TabsIndicator } from './ui/tabs.js';
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog.js';
+import { KanaCharacterGuideDialog } from './ja/kana/KanaCharacterGuideDialog.js';
 import { KanaMemoryGuideDialog } from './ja/kana/KanaMemoryGuideDialog.js';
 import { KanaRowGuideDialog } from './ja/kana/KanaRowGuideDialog.js';
 import { getKanaCardHighlight, KanaRowLabel } from './ja/kana/KanaRowLabel.js';
@@ -43,7 +34,7 @@ import {
 } from '../queries/useLearnerQueries.js';
 import { romajiToKana, toHiragana } from '../lib/kana-input.js';
 import { playKanaAudio } from '../lib/kana-audio.js';
-import { confusionDistractorItems, confusionDistractors } from '../lib/kana-confusion.js';
+import { confusionDistractorItems } from '../lib/kana-confusion.js';
 import { buildKanaTutorContext } from '../lib/kana-tutor.js';
 import type { KanaItem } from '@study-studio/protocol';
 import type { AiTutorContext } from './AiTutorDrawer.js';
@@ -447,29 +438,19 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
   // 呼出导师深度解析（记忆引导语由 lib/kana-tutor 构造，UI 只负责调用）
   const handleAskTutor = (
     kana: KanaItem,
-    extra?: { wasWrong?: boolean; userPick?: string | null }
+    extra?: { wasWrong?: boolean; userPick?: string | null; script?: 'HIRAGANA' | 'KATAKANA' }
   ) => {
     sound.playClick();
     onOpenTutor?.(
       buildKanaTutorContext({
         kana,
         pool: allKana,
-        script: scriptMode === 'KATAKANA' ? 'KATAKANA' : 'HIRAGANA',
+        script: extra?.script ?? (scriptMode === 'KATAKANA' ? 'KATAKANA' : 'HIRAGANA'),
         ...(extra?.wasWrong ? { wasWrong: true as const } : {}),
         ...(extra?.userPick ? { userPick: extra.userPick } : {}),
       })
     );
   };
-
-  const activeKanaConfusions = useMemo(() => {
-    if (!activeKana) return [];
-    return confusionDistractors(
-      activeKana,
-      allKana,
-      scriptMode === 'KATAKANA' ? 'KATAKANA' : 'HIRAGANA',
-      3
-    );
-  }, [activeKana, allKana, scriptMode]);
 
   return (
     <div className="space-y-6">
@@ -1197,188 +1178,21 @@ export function KanaStudioWorkbench({ onOpenTutor }: KanaStudioWorkbenchProps) {
         />
       )}
 
-      <Dialog
-        open={isKanaGuideOpen && Boolean(activeKana)}
-        onOpenChange={setIsKanaGuideOpen}
-      >
-        {isKanaGuideOpen && activeKana && (
-          <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
-            <DialogHeader className="pr-8">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="amber" className="text-xs">
-                  假名讲义
-                </Badge>
-                <span className="text-xs text-ink-ghost">
-                  {activeKana.row} · {activeKana.col}
-                </span>
-              </div>
-              <DialogTitle className="text-xl sm:text-2xl">
-                {activeKana.hiragana} · {activeKana.katakana} 怎么读、怎么记？
-              </DialogTitle>
-              <DialogDescription className="leading-relaxed">
-                先记住：假名通常不像汉字那样有独立“含义”，它首先表示一个发音单位；真正的词义要看它组成的单词。
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 rounded-2xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o15 sm:flex-row sm:items-center sm:justify-between transition-colors">
-                <div className="flex min-w-0 items-center gap-4">
-                  <div className="flex h-20 min-w-20 shrink-0 flex-col items-center justify-center rounded-2xl border border-line-amber-500o30 bg-tone-amber-500o20 text-ink">
-                    <div className="flex items-baseline gap-1 text-3xl font-serif font-bold">
-                      {scriptMode === 'BOTH' ? (
-                        <>
-                          <span>{activeKana.hiragana}</span>
-                          <span className="text-sm text-ink-ghost">
-                            / {activeKana.katakana}
-                          </span>
-                        </>
-                      ) : scriptMode === 'KATAKANA' ? (
-                        activeKana.katakana
-                      ) : (
-                        activeKana.hiragana
-                      )}
-                    </div>
-                    <span className="mt-0.5 text-xs font-mono text-accent-ink-strong">
-                      {activeKana.romaji}
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-ink-mute-deep">
-                      一个发音单位 · {activeKana.romaji}
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-ink-faint">
-                      先把声音、字形和口形绑定起来，再用下面的例词确认它在词中的读法。
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handlePlayAudio(activeKana)}
-                    className="flex-1 gap-1 text-xs sm:flex-none"
-                  >
-                    <Volume2 className="h-3.5 w-3.5" />
-                    朗读发音
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => handleAskTutor(activeKana)}
-                    className="flex-1 gap-1 bg-tone-amber-600 text-xs text-tone-white hover:bg-tone-amber-700 sm:flex-none"
-                  >
-                    <Bot className="h-3.5 w-3.5" />
-                    AI 假名点拨
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10 transition-colors">
-                  <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
-                    <Info className="h-3.5 w-3.5 text-accent-ink" />
-                    发音抓手
-                  </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
-                    {activeKana.learningGuide?.soundDescription ??
-                      `它表示 ${activeKana.romaji} 这一拍，先把声音和字形绑定起来。`}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10 transition-colors">
-                  <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
-                    <Lightbulb className="h-3.5 w-3.5 text-accent-ink" />
-                    记忆窍门
-                  </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
-                    {activeKana.learningGuide?.memoryTip ??
-                      `先把 ${activeKana.romaji} 的声音和字形绑定，再用例词重复认读。`}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10 transition-colors">
-                  <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
-                    <Mic2 className="h-3.5 w-3.5 text-accent-ink" />
-                    发音动作
-                  </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
-                    {activeKana.learningGuide?.pronunciationTip ??
-                      '保持短而清楚的一拍，不要拖成长音，也不要额外添加中文声调。'}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo70-stone-900o35 p-3 dark:border-wash-amber-500o10 transition-colors">
-                  <div className="flex items-center gap-2 text-xs font-bold text-ink-deep">
-                    <GitCompareArrows className="h-3.5 w-3.5 text-accent-ink" />
-                    易混淆对照
-                  </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
-                    {activeKana.learningGuide?.confusionNotes ??
-                      '先看收笔方向和是否有圆圈，再结合罗马字与例词确认。'}
-                  </p>
-                  {activeKanaConfusions.length > 0 && (
-                    <p className="mt-1.5 text-[11px] text-accent-ink-strong">
-                      本表形近对照：{activeKanaConfusions.join('、')}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {activeKana.mnemonic && (
-                <p className="text-[11px] text-ink-ghost">
-                  字源/来源：{activeKana.mnemonic}
-                </p>
-              )}
-
-              {(activeKana.learningGuide?.exampleWords ?? []).length > 0 && (
-                <div className="rounded-xl border border-line-amber-900o10 bg-veil-whiteo55-stone-900o25 p-3 dark:border-wash-amber-500o10 transition-colors">
-                  <div className="mb-2 text-xs font-bold text-ink-deep">
-                    放进词里记
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(activeKana.learningGuide?.exampleWords ?? []).map((exampleWord, index) => (
-                      <Button
-                        key={`${exampleWord.word}-${index}`}
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          sound.playClick();
-                          void speechStudio.speak(exampleWord.reading, {
-                            lang: 'JA',
-                            purpose: 'preview',
-                          });
-                        }}
-                        className="h-auto min-h-8 justify-start rounded-lg bg-veil-whiteo80 px-2.5 py-1.5 text-left whitespace-normal dark:bg-veil-stone-800o70 transition-colors"
-                        title="播放例词发音"
-                        aria-label={`播放例词 ${exampleWord.word} 的发音`}
-                      >
-                        <span className="text-sm font-serif font-semibold text-ink">
-                          {exampleWord.word}
-                        </span>
-                        <span className="text-[11px] font-mono text-ink-ghost">
-                          {exampleWord.reading}
-                        </span>
-                        <span className="text-[11px] text-ink-faint">
-                          · {exampleWord.meaning}
-                        </span>
-                        <Volume2 className="h-3 w-3 text-accent-ink" />
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <p className="text-[11px] text-ink-ghost">
-                基础讲解来自应用内置课程资产；想结合你的错误记录换一种说法，再点击“AI 假名点拨”。
-              </p>
-            </div>
-          </DialogContent>
-        )}
-      </Dialog>
+      {isKanaGuideOpen && activeKana && (
+        <KanaCharacterGuideDialog
+          key={`${activeKana.id}-${scriptMode}`}
+          open={isKanaGuideOpen}
+          onOpenChange={setIsKanaGuideOpen}
+          kana={activeKana}
+          scriptMode={scriptMode}
+          onPlayAudio={handlePlayAudio}
+          onPlayExample={(word) => {
+            sound.playClick();
+            void speechStudio.speak(word.reading, { lang: 'JA', purpose: 'preview' });
+          }}
+          onAskTutor={(kana, script) => handleAskTutor(kana, { script })}
+        />
+      )}
     </div>
   );
 }

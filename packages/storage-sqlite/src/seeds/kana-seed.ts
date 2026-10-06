@@ -1,4 +1,6 @@
 import type { KanaExampleWord, KanaItem, KanaLearningGuide } from '@study-studio/protocol';
+import { HIRAGANA_SHAPES } from './kana-shape-hiragana.js';
+import { buildKanaScriptGuides } from './kana-script-guides.js';
 
 /** 例词只用于点击讲义中的认读示范，不把假名误当成独立词义。 */
 function example(word: string, reading: string, meaning: string): KanaExampleWord {
@@ -118,56 +120,6 @@ const KANA_EXAMPLES: Record<string, KanaExampleWord[]> = {
   kana_pyo: [example('ぴょんぴょん', 'ぴょんぴょん', '蹦蹦跳')],
 };
 
-/** 清音的形状联想：它们是可替换的学习提示，不是字形的语言学事实。 */
-const SEION_MEMORY_TIPS: Record<string, string> = {
-  kana_a: '张大嘴说“啊”，把「あ」和 a 绑在一起。',
-  kana_i: '「い」像两条并排的小鱼鳍，联想 i 的两根直线。',
-  kana_u: '「う」像乌鸦低头的嘴，联想“乌”开头的 u。',
-  kana_e: '「え」像一只鹅转身，联想“鹅”开头的 e。',
-  kana_o: '「お」像人挥手说“哦”，先记住右侧的小钩。',
-  kana_ka: '「か」像卡片折起一个角，联想“卡”开头的 ka。',
-  kana_ki: '「き」的两横像钥匙齿，key 的 ki 提醒你读音。',
-  kana_ku: '「く」像张开的嘴角，联想“哭”开头的 ku。',
-  kana_ke: '「け」像一根竖杆穿过两道刻痕，联想“刻”的 ke。',
-  kana_ko: '「こ」像两条平行横线，联想“口”字的两条边和 ko。',
-  kana_sa: '「さ」像一把小剪刀张开，联想“撒”开头的 sa。',
-  kana_shi: '「し」像一条向下滑的溪流，联想 shi 的长音起点。',
-  kana_su: '「す」像丝线绕成一个结，联想“丝”开头的 su。',
-  kana_se: '「せ」像十字架少了一笔，联想“世”开头的 se。',
-  kana_so: '「そ」像一条弯弯的钩线，联想 so 的弯曲收笔。',
-  kana_ta: '「た」像十字旁伸出一撇，联想“他”开头的 ta。',
-  kana_chi: '「ち」像一把弯钩，联想“七”开头的 chi。',
-  kana_tsu: '「つ」像一条小波浪，联想 tsu 的起伏气流。',
-  kana_te: '「て」像摊开的手掌，联想“手”开头的 te。',
-  kana_to: '「と」像一根带钩的长针，联想“图”开头的 to。',
-  kana_na: '「な」像线绕过一个十字结，联想“那”开头的 na。',
-  kana_ni: '「に」像两条并排的轨道，联想“你”开头的 ni。',
-  kana_nu: '「ぬ」像一根线打结后拖出长尾，记住它有一个圈。',
-  kana_ne: '「ね」像绳结带着向右的尾巴，联想“呢”开头的 ne。',
-  kana_no: '「の」就是一笔绕成的圆，联想 NO 的 no。',
-  kana_ha: '「は」像两片分开的叶子，联想“哈”开头的 ha。',
-  kana_hi: '「ひ」像嘴角向上弯，联想 hi 的微笑。',
-  kana_fu: '「ふ」像两朵轻轻吹散的云，联想“呼”开头的 fu。',
-  kana_he: '「へ」像山峰或箭头，联想 he 的上扬形。',
-  kana_ho: '「ほ」像一棵有横枝的小树，联想“火”开头的 ho。',
-  kana_ma: '「ま」像线绕成一个结再向下收，联想“麻”开头的 ma。',
-  kana_mi: '「み」像三道连续的水波，联想 mi 的三笔节奏。',
-  kana_mu: '「む」像牛角和弯嘴组合，联想“木”开头的 mu。',
-  kana_me: '「め」像两条线交叉打结，联想“眉”开头的 me。',
-  kana_mo: '「も」像毛刷的两道横纹，联想“毛”开头的 mo。',
-  kana_ya: '「や」像一把分叉的鱼叉，联想 ya 的开叉形。',
-  kana_yu: '「ゆ」像鱼钩穿过圆圈，联想“鱼”开头的 yu。',
-  kana_yo: '「よ」像一只挂钩，联想 yo 的短促收尾。',
-  kana_ra: '「ら」像数字 7 弯下去，联想 ra 的弯钩。',
-  kana_ri: '「り」像两把利落的小刀，联想“利”开头的 ri。',
-  kana_ru: '「る」像留字的尾巴绕成圈，联想“留”开头的 ru。',
-  kana_re: '「れ」像礼物丝带甩出一笔，联想“礼”开头的 re。',
-  kana_ro: '「ろ」像一个打开的口，联想“路”开头的 ro。',
-  kana_wa: '「わ」像弯弯的碗，联想“哇”开头的 wa。',
-  kana_wo: '「を」先记作助词里的 o；把它和普通的「お」放在例句中一起比较。',
-  kana_n: '「ん」像鼻音拖出的尾巴，联想 n 收在鼻腔里。',
-};
-
 /** 清音卡片中的听感抓手：解释“怎么听”，不把假名写成有独立词义的汉字。 */
 const SOUND_DESCRIPTIONS: Record<string, string> = {
   kana_a: 'a：先听张口、舌位低的短元音；声音落在 a，不拖成长音。',
@@ -219,15 +171,15 @@ const SOUND_DESCRIPTIONS: Record<string, string> = {
 const PRONUNCIATION_TIPS: Record<string, string> = {
   kana_a: '下颌自然下沉，嘴巴打开，声带平稳振动；一拍收住，不加中文声调。',
   kana_i: '嘴角向两侧展开，舌位靠前靠高；保持短 i，不要在前面加 y。',
-  kana_u: '舌位偏后，嘴唇轻轻收圆但不要突出；日语 u 比中文“乌”更放松。',
+  kana_u: '舌位偏后，嘴唇轻收、不要向前撅圆；日语 u 不照搬中文“乌”的圆唇动作。',
   kana_e: '口形比 a 收一些，舌位保持稳定，直接发 e；不要把结尾滑成 i。',
   kana_o: '嘴唇略圆、下颌放松，发短 o；不要把一个拍拖成 ou。',
-  kana_ka: '舌根在软腭处短暂闭塞，声带不振动，释放后马上接 a；不要把 k 发成 g。',
+  kana_ka: '舌根在软腭处短暂闭塞，辅音起音时声带不振动，释放后马上接 a；不要把 k 发成 g。',
   kana_ki: '同样先做清音 k 的舌根闭塞，但随后嘴角展开接 i；k 不要浊化。',
   kana_ku: '舌根释放 k 后接放松的 u；嘴唇不要像中文乌那样明显前突。',
   kana_ke: '舌根释放 k 后直接接 e；保持一拍，不要在 e 后补 i。',
-  kana_ko: '舌根释放 k 后接略圆的 o；声带不振动，尾音不要滑向 u。',
-  kana_sa: '舌尖靠近上齿龈，让气流细细摩擦后接 a；声带不振动。',
+  kana_ko: '舌根释放 k 后接略圆的 o；辅音起音时声带不振动，尾音不要滑向 u。',
+  kana_sa: '舌尖靠近上齿龈，让气流细细摩擦后接 a；辅音起音时声带不振动。',
   kana_shi: '舌面靠近硬腭形成擦音，直接接 i；不要先发完整 s 再拼 i。',
   kana_su: '舌尖靠近上齿龈摩擦，嘴唇不突出，u 只轻轻带过；不要拖成 suu。',
   kana_se: '舌尖摩擦后直接接 e；口形稳定，不要把 e 读成 ei。',
@@ -236,7 +188,7 @@ const PRONUNCIATION_TIPS: Record<string, string> = {
   kana_chi: '先有短暂闭塞，再让气流摩擦出去接 i；不要发成纯 ti。',
   kana_tsu: '舌尖先形成 ts 的塞擦，再快速接放松的 u；不要把它发成 su 或 tu。',
   kana_te: '舌尖闭塞释放 t 后直接接 e；e 要短，不要加 i。',
-  kana_to: '舌尖闭塞释放 t 后接略圆的 o；声带不振动，保持一拍。',
+  kana_to: '舌尖闭塞释放 t 后接略圆的 o；辅音起音时声带不振动，保持一拍。',
   kana_na: '舌尖靠近上齿龈，气流先从鼻腔通过，再打开到 a；不要憋成 d。',
   kana_ni: '保持 n 的鼻音起头，舌位靠前接 i；不要把 n 丢掉或加 y。',
   kana_nu: 'n 后接放松的 u；鼻音和元音连成一拍，u 不要过分圆唇。',
@@ -263,55 +215,6 @@ const PRONUNCIATION_TIPS: Record<string, string> = {
   kana_wa: '双唇轻收后快速滑向 a；w 不单独成拍，不要读成 wu-a。',
   kana_wo: '现代标准日语中作助词时读 o；嘴唇直接发 o，不要为了拼写 wo 加 w。',
   kana_n: '让声音收在鼻腔，鼻音占一拍；不要在 n 后补 a/i/u/e/o。',
-};
-
-const CONFUSION_NOTES: Record<string, string> = {
-  kana_a: '与「お」对照：あ有中间的交叉/分叉结构，お的右侧有小钩；读音按 a/o 听，不要只看外轮廓。',
-  kana_i: '与「り」对照：い是两条向下的短笔，り的右笔会向内弯；读音是 i/ri。',
-  kana_u: '与「つ」对照：う上方有小短笔，つ主体是一条波形；读音是 u/tsu。',
-  kana_e: '与「ん」对照：え有横折和下方的大弯，ん没有横折、主要是一笔回弯；读音是 e/n。',
-  kana_o: '与「を」对照：お是普通音节 o，を主要写在宾语助词位置；听起来相近时看句法和字形。',
-  kana_ka: '与「が」对照：两者主体相同，が右上多两个浊点；差异在标记和清/浊的起音。',
-  kana_ki: '与「さ」对照：き有多条横线和竖向收笔，さ下方是回钩；读音是 ki/sa。',
-  kana_ku: '与「へ」对照：く是单个尖折线，へ像山峰且转折更开；读音是 ku/he。',
-  kana_ke: '与「は」对照：け的右侧竖画穿过横线，は是左右分开的两部分；读音是 ke/ha。',
-  kana_ko: '与「に」对照：こ只有两条平行横线，に还多出一条竖向弯笔；读音是 ko/ni。',
-  kana_sa: '与「き」对照：さ的下方是圆弯收笔，き有竖向收笔和更多横线；读音是 sa/ki。',
-  kana_shi: '与「つ」对照：し是一条向下滑的弯线，つ是上方连续的波形；读音是 shi/tsu。',
-  kana_su: '与「つ」对照：す有横画、圆弯和长尾，つ只有波形主体；读音是 su/tsu。',
-  kana_se: '与「き」对照：せ有一条竖钩穿过主体，き的横线和下竖更明显；读音是 se/ki。',
-  kana_so: '与「ん」对照：そ通常能看到上方短笔后接长尾，ん是连续回弯的一笔；读音是 so/n。',
-  kana_ta: '与「な」对照：た有明显十字和右下弯笔，な像绕结后向下收；读音是 ta/na。',
-  kana_chi: '与「ら」对照：ち上方有横画、下方是钩弯，ら从小短笔落向右下；读音是 chi/ra。',
-  kana_tsu: '与「す」和「し」对照：つ的上方是波形且有 ts 起音，す有交叉和长尾、し是单条向下弯线；读音是 tsu/su/shi。',
-  kana_te: '与「と」对照：て有横画后向下弯，と有分开的短笔和长弯；读音是 te/to。',
-  kana_to: '与「て」对照：と的上方短笔与下方长弯分开，て先横后弯；读音是 to/te。',
-  kana_na: '与「ぬ」对照：な下方没有完整圆圈，ぬ有圆圈并拖出长尾；读音是 na/nu。',
-  kana_ni: '与「こ」对照：に的竖向弯笔会穿过/连接两条横线，こ只有两条横线；读音是 ni/ko。',
-  kana_nu: '与「め」对照：ぬ有圆圈和向外拖出的长尾，め是交叉收笔；读音是 nu/me。',
-  kana_ne: '与「れ」对照：ね有明显圆圈和向右回钩，れ没有圆圈；读音是 ne/re。',
-  kana_no: '与「ぬ」对照：の只有一笔圆弯，ぬ会形成圆圈并拖出尾巴；读音是 no/nu。',
-  kana_ha: '与「ほ」对照：ほ比は多一条横线/竖向结构；先数中间横画，再听 ha/ho。',
-  kana_hi: '与「ん」对照：ひ的弯口更开、笔势分成两段，ん是一条回弯鼻音线；读音是 hi/n。',
-  kana_fu: '与「ら」对照：ふ上方有两小笔和下方弯线，ら没有这组双小笔；读音是 fu/ra。',
-  kana_he: '与「く」对照：へ是两笔形成的山峰，く是一笔尖折；读音是 he/ku。',
-  kana_ho: '与「は」对照：ほ多出中间的横线和竖向结构，は的两部分更分开；读音是 ho/ha。',
-  kana_ma: '与「ほ」对照：ま有圆弧结和下收尾，ほ有十字状横竖结构；读音是 ma/ho。',
-  kana_mi: '与「ぬ」对照：み是连续弯笔但不形成完整圆圈，ぬ有圆圈和长尾；读音是 mi/nu。',
-  kana_mu: '与「す」对照：む上方横笔后有明显右侧长尾，す有交叉和圆弯；读音是 mu/su。',
-  kana_me: '与「ぬ」对照：め是交叉后收笔，ぬ会绕出圆圈并拖长尾；读音是 me/nu。',
-  kana_mo: '与「ほ」对照：も主要是两道横线和下方弯钩，ほ有横竖交叉；读音是 mo/ho。',
-  kana_ya: '与「か」对照：や有分叉上笔和长斜线，か有十字与右下弯；读音是 ya/ka。',
-  kana_yu: '与「ぬ」对照：ゆ有竖线穿过较开的弯圈，没有ぬ那样的长尾；读音是 yu/nu。',
-  kana_yo: '与「ま」对照：よ是横线加右侧钩，ま有圆弧结和下收尾；读音是 yo/ma。',
-  kana_ra: '与「う」对照：ら的下方弯笔向右下展开，う是小短笔加碗形弯线；读音是 ra/u。',
-  kana_ri: '与「い」对照：り的右笔向内弯并更长，い是两条简单下行笔；读音是 ri/i。',
-  kana_ru: '与「ろ」对照：る会闭出小圈并拖长尾，ろ只是打开的弯线；读音是 ru/ro。',
-  kana_re: '与「ね」对照：れ没有圆圈，ね有圆圈和向右回钩；读音是 re/ne。',
-  kana_ro: '与「る」对照：ろ没有闭合小圈和长尾，る会绕出圈；读音是 ro/ru。',
-  kana_wa: '与「ね」对照：わ没有闭合圆圈，ね有圆圈并向右回钩；读音是 wa/ne。',
-  kana_wo: '与「お」对照：两者现代读音都常为 o，但を主要是宾语助词；不能只靠声音区分，要看句子功能。',
-  kana_n: '与「ね」「ぬ」对照：ん是鼻音收尾，不会再打开 e/u 元音；ね、ぬ都会继续发出元音。',
 };
 
 const VOICING_BASE_BY_HIRAGANA: Record<string, string> = {
@@ -549,22 +452,22 @@ function buildKanaLearningGuide(kana: KanaItem): KanaLearningGuide {
       return {
         soundDescription:
           '「を」在现代标准日语中通常听作 o；记忆重点不是给它找词义，而是认出它常放在动作对象后面。',
-        memoryTip: SEION_MEMORY_TIPS[kana.id] ?? '把「を」和动作的对象绑定，在短句中整体记。',
+        memoryTip: HIRAGANA_SHAPES[kana.hiragana]?.[2] ?? '把「を」和动作的对象绑定，在短句中整体记。',
         pronunciationTip:
           PRONUNCIATION_TIPS[kana.id] ?? '作助词时直接发 o，短而清楚；不要为了拼写 wo 加出 w。',
         confusionNotes:
-          CONFUSION_NOTES[kana.id] ?? '与「お」同音时看功能：「を」标记宾语，「お」是普通假名。',
+          HIRAGANA_SHAPES[kana.hiragana]?.[5] ?? '与「お」同音时看功能：「を」标记宾语，「お」是普通假名。',
         ...examplesField,
       };
     }
     return {
       soundDescription:
         '「ん」是一个鼻音拍：声音收在鼻腔，不像普通假名那样再打开固定的 a/i/u/e/o。',
-      memoryTip: SEION_MEMORY_TIPS[kana.id] ?? '把「ん」记成鼻音收尾，不要给它强行补一个元音。',
+      memoryTip: HIRAGANA_SHAPES[kana.hiragana]?.[2] ?? '把「ん」记成鼻音收尾，不要给它强行补一个元音。',
       pronunciationTip:
         PRONUNCIATION_TIPS[kana.id] ?? '让声音收在鼻腔，不要读成“恩啊/恩嗯”等多余音节。',
       confusionNotes:
-        CONFUSION_NOTES[kana.id] ?? '与「ね」「ぬ」对照：ん收在鼻音，ね/ぬ还会打开 e/u 元音。',
+        HIRAGANA_SHAPES[kana.hiragana]?.[5] ?? '与「ね」「ぬ」对照：ん收在鼻音，ね/ぬ还会打开 e/u 元音。',
       ...examplesField,
     };
   }
@@ -620,9 +523,9 @@ function buildKanaLearningGuide(kana: KanaItem): KanaLearningGuide {
         memoryTip:
           `先认出「${baseKana}」的字形，再把右上圆圈想成“气流清脆释放”的开关：圆圈在，读 p。`,
         pronunciationTip:
-          `双唇完全闭合，声带不振动，释放 p 后接${vowelArticulation}；不要把圆圈漏掉而读成 b。`,
+          `双唇完全闭合，辅音起音时声带不振动，释放 p 后接${vowelArticulation}；不要把圆圈漏掉而读成 b。`,
         confusionNotes:
-          `与「${voicedKana}」对照：两者都先闭双唇，但${kana.hiragana}有圆圈、声带不振动，${voicedKana}有两点、声带振动。`,
+          `与「${voicedKana}」对照：两者都先闭双唇，但${kana.hiragana}有圆圈、辅音起音时声带不振动，${voicedKana}有两点、声带振动。`,
         ...examplesField,
       };
     }
@@ -643,7 +546,7 @@ function buildKanaLearningGuide(kana: KanaItem): KanaLearningGuide {
   }
 
   const memoryTip =
-    SEION_MEMORY_TIPS[kana.id] ??
+    HIRAGANA_SHAPES[kana.hiragana]?.[2] ??
     `先记住「${kana.hiragana}」的形状，再把它和 ${kana.romaji} 的声音绑定。`;
   const soundDescription =
     SOUND_DESCRIPTIONS[kana.id] ??
@@ -652,7 +555,7 @@ function buildKanaLearningGuide(kana: KanaItem): KanaLearningGuide {
     PRONUNCIATION_TIPS[kana.id] ??
     `保持 ${kana.romaji} 短而清楚的一拍，元音口形稳定，不要拖长或加中文声调。`;
   const confusionNotes =
-    CONFUSION_NOTES[kana.id] ??
+    HIRAGANA_SHAPES[kana.hiragana]?.[5] ??
     `把「${kana.hiragana}」和同一行的其他假名逐笔对照，再用 ${kana.romaji} 的起音确认；不要只凭模糊外轮廓猜。`;
 
   return {
@@ -669,5 +572,8 @@ function buildKanaLearningGuide(kana: KanaItem): KanaLearningGuide {
  */
 export const KANA_SEEDS: KanaItem[] = BASE_KANA_SEEDS.map((kana) => ({
   ...kana,
-  learningGuide: buildKanaLearningGuide(kana),
+  learningGuide: {
+    ...buildKanaLearningGuide(kana),
+    scripts: buildKanaScriptGuides(kana, BASE_KANA_SEEDS, KANA_EXAMPLES[kana.id] ?? []),
+  },
 }));

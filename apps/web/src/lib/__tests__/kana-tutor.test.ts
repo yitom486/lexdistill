@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { buildKanaTutorContext } from '../kana-tutor.js';
 import type { KanaItem } from '@study-studio/protocol';
+import { KANA_SEEDS } from '../../../../../packages/storage-sqlite/src/seeds/kana-seed.js';
 
 const A: KanaItem = {
   id: 'kana_a',
@@ -31,6 +32,21 @@ const I: KanaItem = {
 } as KanaItem;
 
 describe('buildKanaTutorContext', () => {
+  it('uses selected script facts and curated comparisons, with no random pool filler or wrong etymology', () => {
+    const a = KANA_SEEDS.find((item) => item.id === 'kana_a')!;
+    const ctx = buildKanaTutorContext({ kana: a, pool: [a, I], script: 'KATAKANA' });
+    expect(ctx.questionText).toContain('滑梯');
+    expect(ctx.questionText).toContain('マ');
+    expect(ctx.questionText).toContain('アイス');
+    expect(ctx.questionText).not.toContain('绳子');
+    expect(ctx.questionText).not.toContain('イ」');
+    expect(ctx.explanation).not.toContain('安');
+    expect(ctx.explanation).not.toContain('绳子');
+    const hira = buildKanaTutorContext({ kana: a, script: 'HIRAGANA' });
+    expect(hira.questionText).toContain('绳子');
+    expect(hira.questionText).toContain('お');
+  });
+
   it('builds a memorization prompt with face, romaji and confusables', () => {
     const ctx = buildKanaTutorContext({ kana: A, pool: [A, I] });
     expect(ctx.questionText).toContain('あ');
