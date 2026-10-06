@@ -1,5 +1,8 @@
 export type TargetLanguage = 'ja' | 'en' | 'ko';
 
+import type { JlptLevel } from '@study-studio/protocol';
+export type { JlptLevel };
+
 export type StudyGoal =
   | 'JLPT_N5'
   | 'JLPT_N4'
@@ -51,6 +54,10 @@ export interface LearnerProfile {
   retentionRate: number;
   dailyGoalQuizzes: number;
   dailyGoalCards: number;
+  /** 每日新词数（与 protocol LearnerProfileSchema 同步扩展） */
+  dailyGoalNewWords: number;
+  /** 用户限定的 JLPT 集合；null = 按词汇门自动定级（与 protocol 同步扩展） */
+  wordLevelFilter: JlptLevel[] | null;
   totalStudyMinutes: number;
   totalCardsReviewed: number;
   totalQuizzesAnswered: number;

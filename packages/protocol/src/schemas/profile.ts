@@ -27,6 +27,10 @@ export type LearnerLevel = z.infer<typeof LearnerLevelSchema>;
 export const TargetLanguageSchema = z.enum(['ja', 'en', 'ko']);
 export type TargetLanguageCode = z.infer<typeof TargetLanguageSchema>;
 
+/** JLPT 等级集合（契约唯一定义；排序/门逻辑见 learner-core vocab-gate）。 */
+export const JlptLevelSchema = z.enum(['N5', 'N4', 'N3', 'N2', 'N1']);
+export type JlptLevel = z.infer<typeof JlptLevelSchema>;
+
 /** 按目标语种隔离的学情档案 */
 export const LearnerLanguageProfileSchema = z.object({
   userId: z.string(),
@@ -41,6 +45,9 @@ export const LearnerLanguageProfileSchema = z.object({
   retentionRate: z.number().min(0).max(1),
   dailyGoalQuizzes: z.number().int().min(1),
   dailyGoalCards: z.number().int().min(1),
+  dailyGoalNewWords: z.number().int().min(0).max(50),
+  /** null = 按词汇门自动定级；非空 = 用户限定的等级集合 */
+  wordLevelFilter: z.array(JlptLevelSchema).max(5).nullable(),
   totalStudyMinutes: z.number().int().min(0),
   totalCardsReviewed: z.number().int().min(0),
   totalQuizzesAnswered: z.number().int().min(0),
@@ -62,6 +69,8 @@ export const LearnerProfileSchema = z.object({
   retentionRate: z.number().min(0).max(1),
   dailyGoalQuizzes: z.number().int().min(1),
   dailyGoalCards: z.number().int().min(1),
+  dailyGoalNewWords: z.number().int().min(0).max(50),
+  wordLevelFilter: z.array(JlptLevelSchema).max(5).nullable(),
   totalStudyMinutes: z.number().int().min(0),
   totalCardsReviewed: z.number().int().min(0),
   totalQuizzesAnswered: z.number().int().min(0),
@@ -76,6 +85,8 @@ export const UpdateLearnerProfileSchema = z.object({
   learnerLevel: LearnerLevelSchema.optional(),
   dailyGoalQuizzes: z.number().int().min(1).max(100).optional(),
   dailyGoalCards: z.number().int().min(1).max(200).optional(),
+  dailyGoalNewWords: z.number().int().min(0).max(50).optional(),
+  wordLevelFilter: z.array(JlptLevelSchema).max(5).nullable().optional(),
 });
 export type UpdateLearnerProfileInput = z.infer<typeof UpdateLearnerProfileSchema>;
 

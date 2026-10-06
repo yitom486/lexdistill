@@ -100,6 +100,8 @@ export async function mirrorLanguageProfileToMain(
     retentionRate: langRow.retentionRate,
     dailyGoalQuizzes: langRow.dailyGoalQuizzes,
     dailyGoalCards: langRow.dailyGoalCards,
+    dailyGoalNewWords: langRow.dailyGoalNewWords,
+    wordLevelFilterJson: langRow.wordLevelFilterJson,
     totalStudyMinutes: langRow.totalStudyMinutes,
     totalCardsReviewed: langRow.totalCardsReviewed,
     totalQuizzesAnswered: langRow.totalQuizzesAnswered,

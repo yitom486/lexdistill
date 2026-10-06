@@ -15,6 +15,7 @@ import type {
   LearnerProfileSnapshot,
   LearnerProfile,
 } from '@study-studio/learner-core';
+import { JlptLevelSchema } from '@study-studio/protocol';
 import {
   learnerProfiles,
   learnerLanguageProfiles,
@@ -31,6 +32,23 @@ import {
  * 画像域（由 DrizzleLearnerRepository 搬迁而来，行为不变）。
  * 跨域调用一律走 `deps.repo`（接口方法）；同域 helper 从 profile-internals import。
  */
+
+/** word_level_filter_json → JLPT 集合；坏值/空一律回 null（自动定级），读侧永不抛。 */
+function parseWordLevelFilter(raw: unknown): LearnerProfile['wordLevelFilter'] {
+  let value: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  } else if (raw != null && !Array.isArray(raw)) {
+    return null;
+  }
+  if (value == null) return null;
+  const parsed = JlptLevelSchema.array().max(5).safeParse(value);
+  return parsed.success ? [...new Set(parsed.data)] : null;
+}
 
 /**
  * 获取或初始化学习者基础档案（主表 + 当前语种档案合并）
@@ -59,7 +77,8 @@ function coerceSkillStatus(value: unknown): SkillStatus {
 }
 export async function getLearnerProfile(
   deps: RepoDeps,
-  userId: string
+  userId: string,
+  langOverride?: string
 ): Promise<Result<LearnerProfile, BusinessError>> {
   try {
     const rows = await deps.db
@@ -70,8 +89,8 @@ export async function getLearnerProfile(
 
     if (rows.length > 0) {
       const row = rows[0]!;
-      const language = normalizeTrackLanguage(row.targetLanguage);
-      const langRow = await ensureLanguageProfile(deps, userId, language, {
+      const language = normalizeTrackLanguage(langOverride ?? row.targetLanguage);
+      const langRow = await ensureLanguageProfile(deps, userId, language, language === normalizeTrackLanguage(row.targetLanguage) ? {
         studyGoal: row.studyGoal,
         learnerLevel: row.learnerLevel,
         overallLevel: row.overallLevel,
@@ -85,7 +104,7 @@ export async function getLearnerProfile(
         totalStudyMinutes: row.totalStudyMinutes,
         totalCardsReviewed: row.totalCardsReviewed,
         totalQuizzesAnswered: row.totalQuizzesAnswered,
-      });
+      } : undefined);
 
       return ok({
         userId: row.userId,
@@ -101,6 +120,8 @@ export async function getLearnerProfile(
         retentionRate: langRow.retentionRate,
         dailyGoalQuizzes: langRow.dailyGoalQuizzes,
         dailyGoalCards: langRow.dailyGoalCards,
+        dailyGoalNewWords: langRow.dailyGoalNewWords ?? 10,
+        wordLevelFilter: parseWordLevelFilter(langRow.wordLevelFilterJson),
         totalStudyMinutes: langRow.totalStudyMinutes,
         totalCardsReviewed: langRow.totalCardsReviewed,
         totalQuizzesAnswered: langRow.totalQuizzesAnswered,
@@ -122,6 +143,8 @@ export async function getLearnerProfile(
       retentionRate: 1.0,
       dailyGoalQuizzes: 5,
       dailyGoalCards: 10,
+      dailyGoalNewWords: 10,
+      wordLevelFilter: null,
       totalStudyMinutes: 0,
       totalCardsReviewed: 0,
       totalQuizzesAnswered: 0,
@@ -133,7 +156,8 @@ export async function getLearnerProfile(
     });
     await ensureLanguageProfile(deps, userId, 'en', defaultProfile);
 
-    return ok(defaultProfile);
+    return langOverride && normalizeTrackLanguage(langOverride) !== 'en'
+      ? deps.repo.getLearnerProfile(userId, langOverride) : ok(defaultProfile);
   } catch (error) {
     return err(
       translateToBusinessError(error, {
@@ -192,6 +216,10 @@ export async function updateLearnerProfile(
       langPatch.overallProficiency = input.overallProficiency;
     if (input.dailyGoalQuizzes !== undefined) langPatch.dailyGoalQuizzes = input.dailyGoalQuizzes;
     if (input.dailyGoalCards !== undefined) langPatch.dailyGoalCards = input.dailyGoalCards;
+    if (input.dailyGoalNewWords !== undefined) langPatch.dailyGoalNewWords = input.dailyGoalNewWords;
+    if (input.wordLevelFilter !== undefined) {
+      langPatch.wordLevelFilterJson = input.wordLevelFilter === null ? null : JSON.stringify([...new Set(input.wordLevelFilter)]);
+    }
     if (input.streakDays !== undefined) langPatch.streakDays = input.streakDays;
     if (input.maxStreakDays !== undefined) langPatch.maxStreakDays = input.maxStreakDays;
     if (input.lastActiveDate !== undefined) langPatch.lastActiveDate = input.lastActiveDate;
@@ -262,10 +290,10 @@ export async function getProfileSnapshot(
   langOverride?: string
 ): Promise<Result<LearnerProfileSnapshot, BusinessError>> {
   try {
-    const profileRes = await deps.repo.getLearnerProfile(userId);
+    const profileRes = await deps.repo.getLearnerProfile(userId, langOverride);
     const profile = isOk(profileRes) ? profileRes.value : undefined;
 
-    const dailyTaskRes = await deps.repo.getDailyTaskProgress(userId);
+    const dailyTaskRes = await deps.repo.getDailyTaskProgress(userId, undefined, langOverride);
     const dailyTask = isOk(dailyTaskRes) ? dailyTaskRes.value : undefined;
 
     const language = langOverride

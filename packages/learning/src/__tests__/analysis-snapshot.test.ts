@@ -28,6 +28,8 @@ function profile(): LearnerProfileSnapshot {
       retentionRate: 0.8,
       dailyGoalQuizzes: 5,
       dailyGoalCards: 10,
+      dailyGoalNewWords: 10,
+      wordLevelFilter: null,
       totalStudyMinutes: 120,
       totalCardsReviewed: 30,
       totalQuizzesAnswered: 20,

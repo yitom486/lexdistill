@@ -25,6 +25,19 @@ export interface WordlistWord {
   sourceLabel: string;
   collected: boolean;
   studied: boolean;
+  /** 词库隐含等级（n5_ 前缀 → N5；starter 等入门包无等级，不参与门判定）。 */
+  jlpt?: string | undefined;
+}
+
+/**
+ * 词库组→隐含 JLPT（唯一映射点；调用方不得各自猜）。
+ * 约定：组 id 含 `-n{1-5}-` 片段即取该级（如 ja-n5-core → N5）；
+ * 无此片段（starter 入门包等）返回 null，表示不限级、恒放行
+ * （与“未知技能只走难度闸，不断新内容活路”同哲学）。
+ */
+export function bankJlptLevel(groupId: string): string | null {
+  const matched = /-n([1-5])-/i.exec(groupId);
+  return matched ? `N${matched[1]}` : null;
 }
 
 export interface WordlistGroup {
@@ -113,7 +126,7 @@ export async function listWordlists(
       ]);
     }
     const starter = rows.filter((r) => r.id.startsWith('starter_ja_')).map(toWord);
-    const n5 = rows.filter((r) => r.id.startsWith('n5_ja_')).map(toWord);
+    const n5 = rows.filter((r) => r.id.startsWith('n5_ja_')).map(word => ({ ...toWord(word), jlpt: 'N5' }));
     return ok([
       {
         id: 'ja-kana-starter',

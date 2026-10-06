@@ -3,6 +3,9 @@ import { Database } from 'bun:sqlite';
 import { initSchema,runMigrations } from '../ddl.js';
 import type {SchemaMigration} from '../migrations/types.js';
 import { SCHEMA_MIGRATIONS } from '../migrations/index.js';
+import { drizzle } from 'drizzle-orm/bun-sqlite';
+import * as schema from '../schema.js';
+import { getVocabularyMasteryByJlpt } from '../adapters/flashcards/vocabulary-cards.js';
 function v36(db:Database) {
   // Synchronous fixture setup: run the unchanged historic catalog, then restore it.
   // The catalog is an ordinary mutable array; mutation is confined to synchronous fixture setup.
@@ -23,7 +26,7 @@ describe('v37 existing textbook migration',()=>{
    db.run("INSERT INTO textbook_grammar(document_id,lesson_id,ord,title,explanation,examples_json) VALUES('book','sub',0,'です','Explanation','[]')");
    db.run("INSERT INTO textbook_lines(document_id,lesson_id,ord,ja,zh,kind,block_id,source) VALUES('book','ch',0,'Article','Translation','PARAGRAPH','a1','TEXTBOOK'),('book','sub',0,'Sentence','Meaning','DIALOGUE','s1','TEXTBOOK')");
    db.run(`INSERT INTO textbook_exercises(document_id,lesson_id,ord,type,prompt,answer,exercise_id,options_json,answer_json,source) VALUES('book','sub',0,'CHOICE','Choose','cat','e1','[{"id":"o1","text":"cat"},{"id":"o2","text":"dog"}]','{"optionIds":["o1"]}','TEXTBOOK')`);
-   expect(runMigrations(db).applied).toEqual([37,38,39,40,41,42]);
+   expect(runMigrations(db).applied).toEqual([37,38,39,40,41,42,43]);
    expect(db.query("SELECT word,reading,jlpt_level FROM global_vocabulary").get()).toEqual({word:'猫',reading:'ねこ',jlpt_level:null});
    expect(db.query("SELECT chapter_id,meaning,examples_json FROM textbook_vocabulary").get()).toEqual({chapter_id:'ch',meaning:'cat',examples_json:'[{"text":"猫です","translation":"It is a cat"}]'});
    expect(db.query("SELECT id,chapter_id,text FROM textbook_sentences").get()).toEqual({id:'s1',chapter_id:'ch',text:'Sentence'});
@@ -58,7 +61,7 @@ describe('v37 existing textbook migration',()=>{
     db.query("INSERT INTO textbook_lines(document_id,lesson_id,ord,ja,kind,block_id,source) VALUES('b',?,0,?,'DIALOGUE','line1','TEXTBOOK')").run(chapter,chapter+' sentence');
     db.query("INSERT INTO textbook_exercises(document_id,lesson_id,ord,type,prompt,answer,exercise_id,options_json,answer_json,content_json,source) VALUES('b',?,0,'CHOICE','Choose','yes','ex1',?,?,?,'TEXTBOOK')").run(chapter,JSON.stringify(['yes','no']),JSON.stringify({optionIds:['o1']}),JSON.stringify({options:[{id:'o1',text:'yes'},{id:'o2',text:'no'}]}));
    }
-   expect(runMigrations(db).applied).toEqual([37,38,39,40,41,42]);
+   expect(runMigrations(db).applied).toEqual([37,38,39,40,41,42,43]);
    for(const table of ['textbook_knowledge','textbook_sentences','textbook_exercise_items']) expect(db.query(`SELECT count(*) AS n,count(DISTINCT id) AS ids FROM ${table}`).get()).toEqual({n:2,ids:2});
    expect(db.query('SELECT answer_json FROM textbook_exercise_items').all()).toEqual([{answer_json:'["yes"]'},{answer_json:'["yes"]'}]);
    expect(db.query('PRAGMA integrity_check').get()).toEqual({integrity_check:'ok'});
@@ -95,6 +98,27 @@ describe('v42 vocabulary learning content fields',()=>{
    db.run("INSERT INTO textbook_vocabulary(id,document_id,chapter_id,ord,vocabulary_id,meaning) VALUES('v','book','ch',0,'g','学校')");
    expect(db.query('SELECT learning_json,learning_version,learning_session_id FROM global_vocabulary').get()).toEqual({learning_json:null,learning_version:0,learning_session_id:null});
    expect(db.query('SELECT learning_json,learning_version,learning_session_id FROM textbook_vocabulary').get()).toEqual({learning_json:null,learning_version:0,learning_session_id:null});
+  } finally {db.close();}
+ });
+});
+describe('vocabulary mastery by JLPT',()=>{
+ it('掌握统计口径：分级总数与达标卡数；未定级与未关联卡不计入',()=>{
+  const db=new Database(':memory:');
+  try {
+   initSchema(db);
+   db.run("INSERT INTO documents(id,user_id,title,source_kind,language,content,created_at,updated_at) VALUES('book','owner','Book','user_import','ja','','t','t')");
+   const words=[['w1','N5'],['w2','N5'],['w3','N4'],['w4',null]] as Array<[string,string|null]>;
+   for(const [word,jlpt] of words) {
+    db.query('INSERT INTO global_vocabulary(id,user_id,language,word,reading,meaning,created_at) VALUES(?,\'owner\',\'ja\',?,\'\',\'x\',\'t\')').run('g-'+word,word);
+    if(jlpt) db.query('UPDATE global_vocabulary SET jlpt_level=? WHERE id=?').run(jlpt,'g-'+word);
+   }
+   const fsrs=(stability:number)=>JSON.stringify({stability,difficulty:3,reps:5,lapses:0,dueAt:'2030-01-01T00:00:00Z',state:'REVIEW'});
+   const stable=(word:string,stability:number)=>db.query("INSERT INTO flashcards(id,user_id,language,type,vocabulary_id,front,back,fsrs,tags) VALUES(?,'owner','ja','VOCABULARY',?,?,?,?,'[]')").run('c-'+word,'g-'+word,word,word,fsrs(stability));
+   stable('w1',30); stable('w2',5); stable('w3',99);
+   db.query("INSERT INTO flashcards(id,user_id,language,type,front,back,fsrs,tags) VALUES('c-orphan','owner','ja','VOCABULARY','野','野',?,'[]')").run(fsrs(99));
+   // 阈值字面量与 learner-core MASTERED_STABILITY_DAYS 同值：改阈值必须同步改此用例数据（w1=30 达标、w2=5 不达标）。
+   const rows=getVocabularyMasteryByJlpt(drizzle(db,{schema}),'owner','ja',21).sort((a,b)=>a.jlpt.localeCompare(b.jlpt));
+   expect(rows).toEqual([{jlpt:'N4',total:1,stable:1},{jlpt:'N5',total:2,stable:1}]);
   } finally {db.close();}
  });
 });

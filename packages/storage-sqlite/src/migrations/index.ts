@@ -39,6 +39,7 @@ import { migration as v039 } from './v039-exercise-attempt-history.js';
 import { migration as v040 } from './v040-vocabulary-flashcards.js';
 import { migration as v041 } from './v041-textbook-vocabulary-learning-fields.js';
 import { migration as v042 } from './v042-vocabulary-learning-content-fields.js';
+import { migration as v043 } from './v043-daily-new-words-config.js';
 import type { SchemaMigration } from './types.js';
 
 export type { SchemaMigration } from './types.js';
@@ -90,5 +91,6 @@ export const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
   v040,
   v041,
   v042,
+  v043,
 ];
 

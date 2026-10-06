@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { FlashcardSchema } from './card.js';
 import { VocabularyLearningContentSchema } from '@study-studio/document-model';
+import { JlptLevelSchema } from './profile.js';
 
 export const VocabularyScopeSchema = z.object({
   documentId: z.string().min(1).optional(),
@@ -23,3 +24,43 @@ export const VocabularyEntrySchema = z.object({
 export type VocabularyEntry = z.infer<typeof VocabularyEntrySchema>;
 export const VocabularyCollectionSchema = z.object({ card: FlashcardSchema, created: z.boolean() });
 export type VocabularyCollection = z.infer<typeof VocabularyCollectionSchema>;
+
+/** 每日抽词请求：bankId 必填；order 取 random（随机）或 sequential（词库编排顺序）。 */
+export const DailyPickOrderSchema = z.enum(['random', 'sequential']);
+export type DailyPickOrder = z.infer<typeof DailyPickOrderSchema>;
+export const DailyPickRequestSchema = z.object({
+  lang: z.enum(['ja', 'en', 'ko']),
+  count: z.number().int().min(1).max(50),
+  order: DailyPickOrderSchema,
+  bankId: z.string().min(1),
+}).strict();
+export type DailyPickRequest = z.infer<typeof DailyPickRequestSchema>;
+
+/** 每日抽词响应：locked 出现即整库被门拦下（words 为空），前端展示锁定横幅，不绕过。 */
+export const DailyPickWordSchema = z.object({
+  entryId: z.string(),
+  headword: z.string(),
+  reading: z.string().optional(),
+  meanings: z.array(z.string()),
+  partOfSpeech: z.string().optional(),
+  sourceLabel: z.string(),
+  collected: z.boolean(),
+  studied: z.boolean(),
+  jlpt: JlptLevelSchema.optional(),
+});
+export const DailyPickResponseSchema = z.object({
+  words: z.array(DailyPickWordSchema),
+  pick: z.object({
+    bankId: z.string(),
+    requested: z.number().int(),
+    returned: z.number().int(),
+    unlockedJlptMax: JlptLevelSchema,
+    skippedLocked: z.number().int(),
+  }),
+  locked: z.object({
+    requiredJlpt: JlptLevelSchema,
+    requiredMastery: z.number(),
+    currentMastery: z.number(),
+  }).optional(),
+});
+export type DailyPickResponse = z.infer<typeof DailyPickResponseSchema>;

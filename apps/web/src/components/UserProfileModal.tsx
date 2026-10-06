@@ -34,7 +34,7 @@ import { toast } from 'sonner';
 import { invalidateAllLearningQueries } from '../queries/useLearnerQueries.js';
 import { getLearningShellConfig } from '../learning/learning-shell.js';
 import { sound } from '../utils/audio.js';
-import type { StudyGoal, LearnerLevel } from '@study-studio/protocol';
+import type { StudyGoal, LearnerLevel, JlptLevel } from '@study-studio/protocol';
 import type { TargetLanguage } from '@study-studio/learner-core';
 import {
   LEARNER_LEVELS,
@@ -59,6 +59,8 @@ export function UserProfileModal() {
   const [learnerLevel, setLearnerLevel] = useState<LearnerLevel>(profile.learnerLevel);
   const [dailyGoalQuizzes, setDailyGoalQuizzes] = useState(profile.dailyGoalQuizzes);
   const [dailyGoalCards, setDailyGoalCards] = useState(profile.dailyGoalCards);
+  const [dailyGoalNewWords, setDailyGoalNewWords] = useState(profile.dailyGoalNewWords);
+  const [wordLevels, setWordLevels] = useState<JlptLevel[] | null>(profile.wordLevelFilter);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -69,6 +71,8 @@ export function UserProfileModal() {
       setLearnerLevel(profile.learnerLevel);
       setDailyGoalQuizzes(profile.dailyGoalQuizzes);
       setDailyGoalCards(profile.dailyGoalCards);
+      setDailyGoalNewWords(profile.dailyGoalNewWords);
+      setWordLevels(profile.wordLevelFilter);
     }
   }, [isOpen, profile]);
 
@@ -96,6 +100,8 @@ export function UserProfileModal() {
       targetLanguage,
       dailyGoalQuizzes,
       dailyGoalCards,
+      dailyGoalNewWords,
+      wordLevelFilter: wordLevels,
     });
 
     // 强隔离闭环：失效全量学习域缓存，确保新轨道干净无污染
@@ -313,6 +319,66 @@ export function UserProfileModal() {
                   }
                 }}
               />
+            </div>
+
+            {/* 每日新词数滑块 */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-ink-faint flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-tone-amber-500" />
+                  每日新词抽取量（0 = 只复习不推新词）
+                </span>
+                <span className="font-mono font-bold text-accent-ink bg-surface px-2 py-0.5 rounded border border-tone-amber-500o20 text-xs">
+                  {dailyGoalNewWords} 词
+                </span>
+              </div>
+              <Slider
+                value={[dailyGoalNewWords]}
+                min={0}
+                max={30}
+                step={1}
+                onValueChange={(val) => {
+                  const num = Array.isArray(val) ? val[0] : typeof val === 'number' ? val : undefined;
+                  if (typeof num === 'number') {
+                    setDailyGoalNewWords(num);
+                  }
+                }}
+              />
+            </div>
+
+            {/* 词类型多选：空 = 按词汇门自动定级 */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-ink-faint flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-tone-amber-500" />
+                  生词等级范围（不选 = 按掌握率自动解锁）
+                </span>
+                {wordLevels !== null && (
+                  <button type="button" onClick={() => setWordLevels(null)} className="text-[11px] text-accent-ink hover:underline">
+                    恢复自动
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="生词等级范围">
+                {(['N5', 'N4', 'N3', 'N2', 'N1'] as const).map(level => {
+                  const selected = wordLevels?.includes(level) ?? false;
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => {
+                        const current = wordLevels ?? [];
+                        const next = current.includes(level) ? current.filter(item => item !== level) : [...current, level];
+                        setWordLevels(next.length > 0 ? next : null);
+                      }}
+                      className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${selected ? 'border-tone-amber-500 bg-tone-amber-500o20 text-ink' : 'border-line text-ink-ghost hover:text-ink'}`}
+                    >
+                      {level}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <p className="text-[11px] text-ink-ghost leading-relaxed">

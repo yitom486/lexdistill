@@ -22,6 +22,24 @@ describe('DrizzleLearnerRepository', () => {
     expect(res.value.streakDays).toBe(0);
     expect(res.value.dailyGoalQuizzes).toBe(5);
     expect(res.value.dailyGoalCards).toBe(10);
+    expect(res.value.dailyGoalNewWords).toBe(10);
+    expect(res.value.wordLevelFilter).toBeNull();
+  });
+
+  it('should update daily new-words quota and level filter cleanly', async () => {
+    const updateRes = await repo.updateLearnerProfile(testUserId, {
+      dailyGoalNewWords: 20,
+      wordLevelFilter: ['N5', 'N4'],
+    });
+    expect(isOk(updateRes)).toBe(true);
+    if (!isOk(updateRes)) return;
+    expect(updateRes.value.dailyGoalNewWords).toBe(20);
+    expect(updateRes.value.wordLevelFilter).toEqual(['N5', 'N4']);
+    const cleared = await repo.updateLearnerProfile(testUserId, { wordLevelFilter: null });
+    expect(isOk(cleared)).toBe(true);
+    if (!isOk(cleared)) return;
+    expect(cleared.value.wordLevelFilter).toBeNull();
+    expect(cleared.value.dailyGoalNewWords).toBe(20);
   });
 
   it('should update learner profile fields cleanly', async () => {

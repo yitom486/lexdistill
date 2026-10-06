@@ -113,6 +113,37 @@ export function saveVocabularyLearning(db: DrizzleDb, input: SaveVocabularyLearn
   });
 }
 
+export interface VocabularyMasteryRow {
+  jlpt: string;
+  total: number;
+  stable: number;
+}
+
+/**
+ * 各 JLPT 等级掌握统计（画像与词汇门共用同一口径，禁两处各算）。
+ * - total：该级全局词数（含未收词；未定级词不计入任何等级）。
+ * - stable：其中已建卡且 FSRS stability ≥ stableDaysThreshold 数；未关联词的卡不归属任何等级。
+ * 阈值由调用方按 learner-core MASTERED_STABILITY_DAYS 传入：定义只存一处，
+ * storage 保持对 learner-core 仅类型引用（包边界锁要求）。
+ */
+export function getVocabularyMasteryByJlpt(db: DrizzleDb, userId: string, language: string, stableDaysThreshold: number): VocabularyMasteryRow[] {
+  return db.transaction(tx => {
+    const totals = tx.select({ jlpt: globalVocabulary.jlptLevel, n: sql<number>`count(*)` }).from(globalVocabulary)
+      .where(and(eq(globalVocabulary.userId, userId), eq(globalVocabulary.language, language), sql`${globalVocabulary.jlptLevel} IS NOT NULL`))
+      .groupBy(globalVocabulary.jlptLevel).all();
+    const stables = tx.select({ jlpt: globalVocabulary.jlptLevel, n: sql<number>`count(*)` }).from(flashcards)
+      .innerJoin(globalVocabulary, eq(flashcards.vocabularyId, globalVocabulary.id))
+      .where(and(eq(flashcards.userId, userId), eq(flashcards.language, language), eq(flashcards.type, 'VOCABULARY'),
+        sql`${globalVocabulary.jlptLevel} IS NOT NULL`,
+        sql`coalesce(cast(json_extract(${flashcards.fsrs}, '$.stability') as real), 0) >= ${stableDaysThreshold}`))
+      .groupBy(globalVocabulary.jlptLevel).all();
+    const stableByJlpt = new Map((stables as Array<{ jlpt: string | null; n: number }>).map(row => [row.jlpt ?? '', row.n]));
+    return (totals as Array<{ jlpt: string | null; n: number }>)
+      .filter(row => row.jlpt)
+      .map(row => ({ jlpt: row.jlpt as string, total: row.n, stable: stableByJlpt.get(row.jlpt as string) ?? 0 }));
+  });
+}
+
 export function listVocabulary(db: DrizzleDb, userId: string, language: string, scope: VocabularyScope = {}): VocabularyEntry[] {
   return db.transaction(tx => {
     const words = tx.select().from(globalVocabulary).where(and(eq(globalVocabulary.userId, userId), eq(globalVocabulary.language, language))).all();

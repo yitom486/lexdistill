@@ -1,7 +1,10 @@
 import { Database } from 'bun:sqlite';
+import { submitObjectiveAnswer } from '../modules/practice/persistence/objective-answer.js';
+import type { ObjectiveAnswerInput } from '@study-studio/protocol';
 import { prepareTextbookAttempt, getTextbookAttempt, claimTextbookGrade, settleTextbookGrade, textbookExerciseHistory } from '@study-studio/storage-sqlite';
 import type { ExerciseGrade, SubmitTextbookExercise } from '@study-studio/protocol';
 import type { TextbookGradeAudit, TextbookPracticeRepository } from '@study-studio/learner-core';
+import { MASTERED_STABILITY_DAYS } from '@study-studio/learner-core';
 import { eq } from 'drizzle-orm';
 import { isOk, ok, err, type Result, BusinessError, translateToBusinessError } from '@study-studio/shared';
 import type {
@@ -327,7 +330,7 @@ import {
   defaultLanguageProfileSeed,
 } from '@study-studio/shared';
 import type { RepoDeps } from './persistence/repo-context.js';
-import { collectGlobalVocabulary, listVocabulary, saveVocabularyLearning as saveVocabularyLearningDomain } from '@study-studio/storage-sqlite';
+import { collectGlobalVocabulary, listVocabulary, saveVocabularyLearning as saveVocabularyLearningDomain, getVocabularyMasteryByJlpt } from '@study-studio/storage-sqlite';
 import type { SaveVocabularyLearningInput } from '@study-studio/storage-sqlite';
 import type { VocabularyScope } from '@study-studio/protocol';
 
@@ -390,6 +393,7 @@ export class DrizzleLearnerRepository
   public settleTextbookGrade(userId: string, id: string, audit: TextbookGradeAudit | undefined, grade: ExerciseGrade | undefined, errorCode?: string) { return this.textbookCommand(() => settleTextbookGrade(this.db, userId, id, audit, grade, errorCode)); }
   public textbookExerciseHistory(userId: string, documentId: string, chapterId: string) { return this.textbookCommand(() => textbookExerciseHistory(this.db, userId, documentId, chapterId)); }
   public listVocabulary(userId: string, language: string, scope: VocabularyScope = {}) { return this.textbookCommand(() => listVocabulary(this.db, userId, language, scope), '词汇库读取失败，请重试'); }
+  public getVocabularyMasteryByJlpt(userId: string, language: string) { return this.textbookCommand(() => getVocabularyMasteryByJlpt(this.db, userId, language, MASTERED_STABILITY_DAYS), '词汇掌握统计读取失败，请重试'); }
   public saveVocabularyLearning(userId: string, input: Omit<SaveVocabularyLearningInput, 'userId'>) { return this.textbookCommand(() => saveVocabularyLearningDomain(this.db, { ...input, userId }), '词汇讲解保存失败，请重试'); }
   public collectGlobalVocabulary(userId: string, vocabularyId: string, scope: VocabularyScope = {}) { return this.textbookCommand(() => collectGlobalVocabulary(this.db, userId, vocabularyId, scope), '词汇加入复习失败，请重试'); }
   public getFlashcard(userId: string, cardId: string) { return getFlashcardDomain(this.deps, userId, cardId); }
@@ -1061,8 +1065,8 @@ export class DrizzleLearnerRepository
   /**
    * 实现已下沉 domains/profile.ts，此处仅委托。
    */
-  public async getLearnerProfile(userId: string): Promise<Result<LearnerProfile, BusinessError>> {
-    return getLearnerProfileDomain(this.deps, userId);
+  public async getLearnerProfile(userId: string, language?: string): Promise<Result<LearnerProfile, BusinessError>> {
+    return getLearnerProfileDomain(this.deps, userId, language);
   }
 
   /**
@@ -1080,9 +1084,10 @@ export class DrizzleLearnerRepository
    */
   public async getDailyTaskProgress(
     userId: string,
-    date?: string
+    date?: string,
+    language?: string
   ): Promise<Result<DailyTaskProgress, BusinessError>> {
-    return getDailyTaskProgressDomain(this.deps, userId, date);
+    return getDailyTaskProgressDomain(this.deps, userId, date, language);
   }
 
   /**
@@ -1141,9 +1146,10 @@ export class DrizzleLearnerRepository
    */
   public async getOrCreateDailyStudyPlan(
     userId: string,
-    date?: string
+    date?: string,
+    language?: string
   ): Promise<Result<DailyStudyPlan, BusinessError>> {
-    return getOrCreateDailyStudyPlanDomain(this.deps, userId, date);
+    return getOrCreateDailyStudyPlanDomain(this.deps, userId, date, language);
   }
 
   /**
@@ -1152,9 +1158,10 @@ export class DrizzleLearnerRepository
   public async completeDailyPlanStep(
     userId: string,
     stepId: string,
-    date?: string
+    date?: string,
+    language?: string
   ): Promise<Result<DailyStudyPlan, BusinessError>> {
-    return completeDailyPlanStepDomain(this.deps, userId, stepId, date);
+    return completeDailyPlanStepDomain(this.deps, userId, stepId, date, language);
   }
 
   /**
@@ -1249,6 +1256,10 @@ export class DrizzleLearnerRepository
       await maybeEvaluateLevelDomain(this.deps, attempt.userId, inferLanguageFromSkillId(attempt.testedSkillId));
     }
     return res;
+  }
+
+  public submitObjectiveAnswer(userId: string, input: ObjectiveAnswerInput) {
+    return submitObjectiveAnswer(this.deps, userId, input);
   }
 
   /**

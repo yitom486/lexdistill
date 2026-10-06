@@ -1,0 +1,92 @@
+import { BusinessError, err, ok, type Result } from '@study-studio/shared';
+import {
+  MASTERY_UNLOCK_RATIO,
+  isVocabularyAllowed,
+  jlptIndex,
+  unlockedJlptMax,
+  type LearnerLevel,
+  type VocabMastery,
+} from '@study-studio/learner-core';
+import type { DailyPickOrder, DailyPickResponse } from '@study-studio/protocol';
+import { bankJlptLevel, type WordlistGroup } from '@study-studio/storage-sqlite';
+
+export interface DailyPickDeps {
+  getLearnerProfile(userId: string): Promise<Result<{ learnerLevel: LearnerLevel; dailyGoalNewWords: number; wordLevelFilter: string[] | null }, BusinessError>>;
+  listWordlists(userId: string, language: string): Promise<Result<WordlistGroup[], BusinessError>>;
+  getVocabularyMasteryByJlpt(userId: string, language: string): Promise<Result<Array<{ jlpt: string; total: number; stable: number }>, BusinessError>>;
+}
+
+export interface DailyPickInput {
+  count: number;
+  order: DailyPickOrder;
+  bankId: string;
+}
+
+/** Fisher–Yates：无偏洗牌（前端 Math.random 排序有偏，此处唯一的随机实现）。 */
+function shuffled<T>(items: readonly T[]): T[] {
+  const array = [...items];
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j]!, array[i]!];
+  }
+  return array;
+}
+
+/**
+ * 每日抽词装配（唯一入口）：画像配置 → 词汇门 → 词库抽取。
+ * - 未学透优先；全部学透则循环整库（与旧 UI 行为一致，不断活路）。
+ * - 整库被门拦下时返回 locked（words 为空），前端只展示横幅，不绕过。
+ * - 用户过滤只做减法：显式排除某级只会抽空，不会开锁。
+ */
+export async function pickDailyWords(
+  deps: DailyPickDeps,
+  userId: string,
+  language: string,
+  input: DailyPickInput
+): Promise<Result<DailyPickResponse, BusinessError>> {
+  const count = Math.min(50, Math.max(1, Math.floor(input.count)));
+  const profile = await deps.getLearnerProfile(userId);
+  if (!profile.ok) return err(profile.error);
+  const groups = await deps.listWordlists(userId, language);
+  if (!groups.ok) return err(groups.error);
+  const group = groups.value.find(entry => entry.id === input.bankId);
+  if (!group) return err(new BusinessError('E_INVALID_INPUT', '请选择有效的词库', 'VALIDATION'));
+  const stats = await deps.getVocabularyMasteryByJlpt(userId, language);
+  if (!stats.ok) return err(stats.error);
+  const mastery: VocabMastery[] = stats.value
+    .filter(row => jlptIndex(row.jlpt) >= 0)
+    .map(row => ({ jlpt: row.jlpt as VocabMastery['jlpt'], total: row.total, stable: row.stable }));
+  const unlockedMax = unlockedJlptMax(profile.value.learnerLevel, mastery);
+  const rawBankLevel = bankJlptLevel(group.id);
+  const bankLevel = rawBankLevel !== null && jlptIndex(rawBankLevel) >= 0 ? (rawBankLevel as VocabMastery['jlpt']) : null;
+  const userFilter = profile.value.wordLevelFilter;
+  const gateOpen = bankLevel === null || isVocabularyAllowed(bankLevel, profile.value.learnerLevel, mastery);
+  const filterOpen = bankLevel === null || userFilter === null || userFilter.includes(bankLevel);
+  if (bankLevel !== null && !gateOpen) {
+    const row = mastery.find(entry => entry.jlpt === bankLevel);
+    const current = row && row.total > 0 ? row.stable / row.total : 0;
+    return ok({
+      words: [],
+      pick: { bankId: group.id, requested: count, returned: 0, unlockedJlptMax: unlockedMax, skippedLocked: group.words.length },
+      locked: { requiredJlpt: bankLevel, requiredMastery: MASTERY_UNLOCK_RATIO, currentMastery: current },
+    });
+  }
+  const pool0 = group.words.filter(word => !word.studied);
+  const pool = (pool0.length > 0 ? pool0 : group.words).filter(word => filterOpen);
+  const ordered = input.order === 'random' ? shuffled(pool) : pool;
+  const picked = ordered.slice(0, count);
+  return ok({
+    words: picked.map(word => ({
+      entryId: word.entryId,
+      headword: word.headword,
+      ...(word.reading ? { reading: word.reading } : {}),
+      meanings: word.meanings,
+      ...(word.partOfSpeech ? { partOfSpeech: word.partOfSpeech } : {}),
+      sourceLabel: word.sourceLabel,
+      collected: word.collected,
+      studied: word.studied,
+      ...(bankLevel ? { jlpt: bankLevel } : {}),
+    })),
+    pick: { bankId: group.id, requested: count, returned: picked.length, unlockedJlptMax: unlockedMax, skippedLocked: 0 },
+  });
+}

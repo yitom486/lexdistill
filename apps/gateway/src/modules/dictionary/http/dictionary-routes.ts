@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
-import { VocabularyScopeSchema } from '@study-studio/protocol';
+import { VocabularyScopeSchema, DailyPickRequestSchema } from '@study-studio/protocol';
 import { isOk, BusinessError } from '@study-studio/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
+import { pickDailyWords } from '../application/daily-pick.js';
 import {
   installDictionaryPackage,
   listDictionaryPackages,
@@ -21,6 +22,14 @@ export function createDictionaryRoutes(deps: GatewayDeps) {
     if (!['ja', 'en', 'ko'].includes(language) || !scope.success) return formatBusinessErrorResponse(c, new BusinessError('E_INVALID_INPUT', '请选择有效的语种和教材章节', 'VALIDATION'));
     const result = await deps.repo.listVocabulary(c.req.param('userId'), language, scope.data);
     return result.ok ? c.json(result.value) : formatBusinessErrorResponse(c, result.error);
+  })
+  .post('/api/vocabulary/:userId/daily-pick', async c => {
+    try {
+      const parsed = DailyPickRequestSchema.safeParse(await c.req.json());
+      if (!parsed.success) return formatBusinessErrorResponse(c, new BusinessError('E_INVALID_INPUT', '请选择有效的词库、数量与出词方式', 'VALIDATION'));
+      const result = await pickDailyWords(deps.repo, c.req.param('userId'), parsed.data.lang, parsed.data);
+      return result.ok ? c.json(result.value) : formatBusinessErrorResponse(c, result.error);
+    } catch (cause) { return formatBusinessErrorResponse(c, cause, 'dailyPick'); }
   })
   .post('/api/vocabulary/:userId/:vocabularyId/collect', async c => {
     try {
