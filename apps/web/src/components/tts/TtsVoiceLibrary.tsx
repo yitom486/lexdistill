@@ -49,10 +49,12 @@ export function TtsVoiceLibrary({ previewText, lang }: Props) {
   const defaults = useTtsDefaultsQuery();
   const effectiveService = preferredService || defaults.data?.defaultProvider || '';
 
+  const currentApiKey = providerApiKeys[effectiveService] ?? '';
+
   const voices = useQuery({
-    queryKey: ['tts-studio', 'voices', effectiveService, azureRegion],
+    queryKey: ['tts-studio', 'voices', effectiveService, currentApiKey, azureRegion],
     queryFn: () => {
-      const key = providerApiKeys[effectiveService];
+      const key = currentApiKey;
       const credentialHeaders = key && /^[a-z0-9-]+$/.test(effectiveService)
         ? { [`x-${effectiveService}-api-key`]: key }
         : {};

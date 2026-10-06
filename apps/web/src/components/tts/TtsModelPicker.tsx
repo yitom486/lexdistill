@@ -36,10 +36,12 @@ export function TtsModelPicker() {
   const defaults = useTtsDefaultsQuery();
   const effectiveService = preferredService || defaults.data?.defaultProvider || '';
 
+  const currentApiKey = providerApiKeys[effectiveService] ?? '';
+
   const models = useQuery({
-    queryKey: ['tts-studio', 'models', effectiveService, azureRegion],
+    queryKey: ['tts-studio', 'models', effectiveService, currentApiKey, azureRegion],
     queryFn: () => {
-      const key = providerApiKeys[effectiveService];
+      const key = currentApiKey;
       const credentialHeaders = key && /^[a-z0-9-]+$/.test(effectiveService)
         ? { [`x-${effectiveService}-api-key`]: key }
         : {};

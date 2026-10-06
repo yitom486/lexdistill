@@ -6,6 +6,7 @@ import { bcp47ForTrack, normalizeTtsTrackLanguage } from '@study-studio/speech';
 import { createTTSClient } from 'gemini-tts-studio/client';
 import { toast } from 'sonner';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
+import { buildAudioCacheKey, getAudioCache, saveAudioCache, updateAudioCacheLastPlayed } from '../lib/audio-cache.js';
 import { audioChunksToBlob, isRawPcmMime, PcmStreamPlayer } from '../lib/pcm-audio.js';
 import { buildTtsStreamBody, fetchTtsStream, matchTtsRequest, TtsStreamError, type TtsRequestDescriptor } from '../lib/tts-stream.js';
 
@@ -19,6 +20,7 @@ export interface SpeechStudioConfig {
   localBaseUrl: string;
   voiceId: string;
   modelId: string;
+  saveAudioCache: boolean;
 }
 
 export interface LastTtsAudio {
@@ -177,6 +179,7 @@ class SpeechStudioEngine {
   private config: SpeechStudioConfig = {
     rate: 0.9, preferredService: '',
     providerApiKeys: {}, azureRegion: '', localBaseUrl: '', voiceId: '', modelId: '',
+    saveAudioCache: true,
   };
   private isSpeaking = false;
   private isStreaming = false;
@@ -473,6 +476,67 @@ class SpeechStudioEngine {
       );
       if (sequence !== this.sequence) return;
       const rate = options?.rate ?? config.rate;
+      const cacheKey = buildAudioCacheKey({
+        text,
+        provider,
+        voice,
+        model,
+        rate,
+        lang: language,
+        purpose: options?.purpose,
+      });
+
+      if (config.saveAudioCache) {
+        const cached = await getAudioCache(cacheKey);
+        if (cached && sequence === this.sequence) {
+          const audioUrl = URL.createObjectURL(cached.blob);
+          if (this.lastAudioUrl && this.lastAudioUrl !== audioUrl) {
+            URL.revokeObjectURL(this.lastAudioUrl);
+          }
+          this.lastAudio = {
+            mimeType: cached.mimeType,
+            provider: cached.provider,
+            voice: cached.voice,
+            model: cached.model,
+            text: cached.text,
+            sizeBytes: cached.sizeBytes,
+          };
+          this.lastAudioUrl = audioUrl;
+          this.lastRequest = {
+            text,
+            provider,
+            voice,
+            voiceAuto: !wantedVoice,
+            model: provider === 'gemini' ? model : '',
+            modelAuto: provider === 'gemini' ? !wantedModel : true,
+            lang: language ?? '',
+            rate,
+            purpose: options?.purpose ?? '',
+          };
+          this.isStreaming = false;
+          this.notify();
+
+          const audio = new Audio(audioUrl);
+          this.currentAudio = audio;
+          this.currentAudioUrl = audioUrl;
+          audio.onended = () => {
+            if (sequence !== this.sequence) return;
+            this.finishPlayback();
+            options?.onEnd?.();
+          };
+          audio.onerror = () => {
+            if (sequence !== this.sequence) return;
+            const error = new BusinessError('E_TTS_AUDIO', '缓存音频播放失败。', 'TOOL_EXECUTION', false);
+            this.finishPlayback();
+            toast.error(error.userMessage);
+            options?.onError?.(error);
+          };
+          await audio.play();
+          void updateAudioCacheLastPlayed(cacheKey);
+          return;
+        }
+      }
+
       const body = buildTtsStreamBody({
         provider,
         text,
@@ -511,6 +575,21 @@ class SpeechStudioEngine {
       if (sequence !== this.sequence) return;
       // 按 mime 拼装：PCM 包 WAV 头，完整文件直接拼接，绝不二次封装。
       const blob = audioChunksToBlob(chunks, mimeType, sampleRate);
+      if (config.saveAudioCache) {
+        void saveAudioCache({
+          id: cacheKey,
+          text,
+          provider,
+          voice,
+          model: provider === 'gemini' ? model : '',
+          rate,
+          lang: language ?? '',
+          purpose: options?.purpose ?? '',
+          mimeType: blob.type || mimeType,
+          sizeBytes: blob.size,
+          blob,
+        });
+      }
       if (this.lastAudioUrl) URL.revokeObjectURL(this.lastAudioUrl);
       const audioUrl = URL.createObjectURL(blob);
       // 末次音频保留为可下载/重播入口：finishPlayback 只清当前播放，不清 lastAudioUrl。

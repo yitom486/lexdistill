@@ -23,7 +23,7 @@
     "@study-studio/tool-core": "workspace:*",
     "agentpools": "^0.1.9",
     "drizzle-orm": "^0.45.2",
-    "gemini-tts-studio": "0.3.1",
+    "gemini-tts-studio": "0.3.2",
     "hono": "^4.13.5",
     "jsdom": "^30.0.1",
     "pdf-lib": "1.17.1"
@@ -33,7 +33,9 @@
     "start": "bun src/index.ts",
     "test": "bun test",
     "dictionary:import:oewn": "bun src/scripts/import-oewn.ts",
-    "sidecar:build": "bun scripts/build-sidecar.ts"
+    "sidecar:build": "bun scripts/build-sidecar.ts",
+    "pdf:prepare": "bun scripts/prepare-pdf-runtime.ts",
+    "pdf:prepare:test": "bun scripts/prepare-pdf-runtime.ts --test"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",

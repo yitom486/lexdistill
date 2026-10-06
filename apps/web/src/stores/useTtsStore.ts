@@ -52,6 +52,7 @@ export interface TtsStoreState extends SpeechStudioConfig {
   setLocalBaseUrl: (url: string) => void;
   setVoiceId: (id: string) => void;
   setModelId: (id: string) => void;
+  setSaveAudioCache: (enabled: boolean) => void;
   speak: (text: string, options?: SpeakOptions) => Promise<void>;
   stop: () => void;
   /** 本地缓存命中时免费重播，无缓存返回 false（调用方转合成）。 */
@@ -82,7 +83,8 @@ export function migrateTtsPreferences(persisted: unknown): Record<string, unknow
   }
   const { gender: _legacyGender, ...preferences } = saved;
   const modelId = typeof preferences['modelId'] === 'string' ? (preferences['modelId'] as string) : '';
-  return { ...preferences, providerApiKeys, modelId };
+  const saveAudioCache = preferences['saveAudioCache'] !== false;
+  return { ...preferences, providerApiKeys, modelId, saveAudioCache };
 }
 
 export const useTtsStore = create<TtsStoreState>()(
@@ -132,6 +134,7 @@ export const useTtsStore = create<TtsStoreState>()(
         setLocalBaseUrl: (localBaseUrl) => update({ localBaseUrl: localBaseUrl.trim() }),
         setVoiceId: (voiceId) => update({ voiceId: voiceId.trim() }),
         setModelId: (modelId) => update({ modelId: modelId.trim() }),
+        setSaveAudioCache: (saveAudioCache) => update({ saveAudioCache }),
         speak: (text, options) => speechStudio.speak(text, {
           ...options,
           // 不强制默认语种：缺省即自动识别（网关行为），调用方传轨道语种仅作提示。
@@ -158,6 +161,7 @@ export const useTtsStore = create<TtsStoreState>()(
         localBaseUrl: state.localBaseUrl,
         voiceId: state.voiceId,
         modelId: state.modelId,
+        saveAudioCache: state.saveAudioCache,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) speechStudio.configure({
@@ -168,6 +172,7 @@ export const useTtsStore = create<TtsStoreState>()(
           localBaseUrl: state.localBaseUrl,
           voiceId: state.voiceId,
           modelId: state.modelId,
+          saveAudioCache: state.saveAudioCache ?? true,
         });
       },
     },

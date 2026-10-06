@@ -41,7 +41,7 @@
         "@study-studio/tool-core": "workspace:*",
         "agentpools": "^0.1.9",
         "drizzle-orm": "^0.45.2",
-        "gemini-tts-studio": "0.3.1",
+        "gemini-tts-studio": "0.3.2",
         "hono": "^4.13.5",
         "jsdom": "^30.0.1",
         "pdf-lib": "1.17.1",
@@ -71,7 +71,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "framer-motion": "^13.2.0",
-        "gemini-tts-studio": "0.3.1",
+        "gemini-tts-studio": "0.3.2",
         "hono": "^4.13.5",
         "lucide-react": "^0.475.0",
         "react": "^19.0.0",
@@ -209,6 +209,7 @@
         "@study-studio/flashcards": "workspace:*",
         "@study-studio/learner-core": "workspace:*",
         "@study-studio/learning": "workspace:*",
+        "@study-studio/learning-algorithms": "workspace:*",
         "@study-studio/protocol": "workspace:*",
         "@study-studio/shared": "workspace:*",
         "drizzle-orm": "^0.45.2",
@@ -783,7 +784,7 @@
 
     "gcp-metadata": ["gcp-metadata@8.1.2", "", { "dependencies": { "gaxios": "^7.0.0", "google-logging-utils": "^1.0.0", "json-bigint": "^1.0.0" } }, "sha512-zV/5HKTfCeKWnxG0Dmrw51hEWFGfcF2xiXqcA3+J90WDuP0SvoiSO5ORvcBsifmx/FoIjgQN3oNOGaQ5PhLFkg=="],
 
-    "gemini-tts-studio": ["gemini-tts-studio@0.3.1", "", { "dependencies": { "@google/genai": "^2.3.0", "clsx": "^2.1.1", "hono": "^4.7.4", "lucide-react": "^1.16.0", "react": "^19.0.0", "react-dom": "^19.0.0", "tailwind-merge": "^3.0.2" } }, "sha512-LEB0TNPZI04ugJNELpqd5UmynDH99x9i3kX3HKayEN9CIbKcd8nE69w3varuZcLAAkkn9Zfvn2dxM3XLIGMlFA=="],
+    "gemini-tts-studio": ["gemini-tts-studio@0.3.2", "", { "dependencies": { "@google/genai": "^2.3.0", "clsx": "^2.1.1", "hono": "^4.7.4", "lucide-react": "^1.16.0", "react": "^19.0.0", "react-dom": "^19.0.0", "tailwind-merge": "^3.0.2" } }, "sha512-Er+48UNlc45fgc2yr2z0OfDRbwF+RXyIzFHSM6x/0i7heP2wiTq0kyDjIUrujij+MzjEoEaFMYGCKIyyvLDH6w=="],
 
     "gensync": ["gensync@1.0.0-beta.2", "", {}, "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="],
 

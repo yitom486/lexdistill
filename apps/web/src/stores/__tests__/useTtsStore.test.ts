@@ -39,4 +39,15 @@ describe('TTS local preference migration', () => {
     const migrated = migrateTtsPreferences({ modelId: 123 });
     expect(migrated.modelId).toBe('');
   });
+
+  it('defaults saveAudioCache to true and preserves saved boolean', () => {
+    const defaultMigrated = migrateTtsPreferences({});
+    expect(defaultMigrated.saveAudioCache).toBe(true);
+
+    const falseMigrated = migrateTtsPreferences({ saveAudioCache: false });
+    expect(falseMigrated.saveAudioCache).toBe(false);
+
+    const trueMigrated = migrateTtsPreferences({ saveAudioCache: true });
+    expect(trueMigrated.saveAudioCache).toBe(true);
+  });
 });
