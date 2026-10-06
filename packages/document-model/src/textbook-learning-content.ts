@@ -14,6 +14,8 @@ export const GrammarItemSchema = z.object({
 export const VocabularyItemSchema = z.object({
   word: text(), reading: text().optional(), meaning: text(), level: JlptLevelSchema,
   partOfSpeech: text().optional(), pitch: text().optional(), explanation: text().optional(), examples: z.array(TextbookExampleSchema).default([]),
+  usage: text().optional().describe('本课用法：常见搭配、句型与适用场合'),
+  contextNote: text().optional().describe('本课取义说明：该词在本课语境中的具体含义与使用方式'),
 }).strict();
 export const ArticleItemSchema = z.object({ title: text().optional(), text: text(), translation: text().optional() }).strict();
 export const SentenceItemSchema = z.object({ text: text(), translation: text().optional(), explanation: text().optional(), speaker: text().optional() }).strict();
@@ -43,7 +45,7 @@ export type LearningExerciseItem = z.infer<typeof LearningExerciseItemSchema>;
 /** Read contract: storage identity is added by the system, never requested from the model. */
 export const TextbookLearningContentSchema = z.object({
   grammar: z.array(GrammarItemSchema.extend({ id: text(), source: origin, explanation: z.string() })),
-  vocabulary: z.array(VocabularyItemSchema.omit({ level: true }).extend({ id: text(), vocabularyId: text(), meaning: z.string(), level: JlptLevelSchema.nullable() })),
+  vocabulary: z.array(VocabularyItemSchema.omit({ level: true }).extend({ id: text(), vocabularyId: text(), meaning: z.string(), level: JlptLevelSchema.nullable(), source: origin })),
   articles: z.array(ArticleItemSchema.extend({ id: text(), source: origin })),
   sentences: z.array(SentenceItemSchema.extend({ id: text(), source: origin })),
   exercises: z.array(LearningExerciseItemSchema.extend({ id: text(), source: origin, difficultyTier: LearningExerciseItemSchema.shape.difficultyTier.nullable(), difficultyReason: text().nullable() })),

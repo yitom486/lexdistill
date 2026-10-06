@@ -11,12 +11,12 @@ export const previewLesson = {
   subtitle: '指认身边的物品，询问名称与归属。',
   content: {
     vocabulary: [
-      { id: 'preview-v1', vocabularyId: 'preview-global-v1', word: '本', reading: 'ほん', meaning: '书；书本', level: 'N5', partOfSpeech: '名词', explanation: '这里表示书籍，不是数量单位。', examples: [{ text: 'これは日本語の本です。', translation: '这是一本日语书。' }] },
-      { id: 'preview-v2', vocabularyId: 'preview-global-v2', word: '辞書', reading: 'じしょ', meaning: '词典', level: 'N5', partOfSpeech: '名词', examples: [{ text: 'それは辞書ですか。', translation: '那是词典吗？' }] },
-      { id: 'preview-v3', vocabularyId: 'preview-global-v3', word: 'ノート', reading: 'ノート', meaning: '笔记本', level: 'N5', partOfSpeech: '名词', examples: [{ text: 'これはわたしのノートです。', translation: '这是我的笔记本。' }] },
-      { id: 'preview-v4', vocabularyId: 'preview-global-v4', word: '鉛筆', reading: 'えんぴつ', meaning: '铅笔', level: 'N5', partOfSpeech: '名词', examples: [{ text: 'あれは鉛筆です。', translation: '那个是铅笔。' }] },
-      { id: 'preview-v5', vocabularyId: 'preview-global-v5', word: '時計', reading: 'とけい', meaning: '钟；手表', level: 'N5', partOfSpeech: '名词', examples: [{ text: 'これはだれの時計ですか。', translation: '这是谁的手表？' }] },
-      { id: 'preview-v6', vocabularyId: 'preview-global-v6', word: 'かばん', reading: 'かばん', meaning: '包；书包', level: 'N5', partOfSpeech: '名词', examples: [{ text: 'それは田中さんのかばんです。', translation: '那是田中的包。' }] },
+      { id: 'preview-v1', vocabularyId: 'preview-global-v1', word: '本', reading: 'ほん', meaning: '书；书本', level: 'N5', partOfSpeech: '名词', explanation: '这里表示书籍，不是数量单位。', examples: [{ text: 'これは日本語の本です。', translation: '这是一本日语书。' }], source: 'TEXTBOOK' },
+      { id: 'preview-v2', vocabularyId: 'preview-global-v2', word: '辞書', reading: 'じしょ', meaning: '词典', level: 'N5', partOfSpeech: '名词', examples: [{ text: 'それは辞書ですか。', translation: '那是词典吗？' }], source: 'TEXTBOOK' },
+      { id: 'preview-v3', vocabularyId: 'preview-global-v3', word: 'ノート', reading: 'ノート', meaning: '笔记本', level: 'N5', partOfSpeech: '名词', examples: [{ text: 'これはわたしのノートです。', translation: '这是我的笔记本。' }], source: 'TEXTBOOK' },
+      { id: 'preview-v4', vocabularyId: 'preview-global-v4', word: '鉛筆', reading: 'えんぴつ', meaning: '铅笔', level: 'N5', partOfSpeech: '名词', examples: [{ text: 'あれは鉛筆です。', translation: '那个是铅笔。' }], source: 'TEXTBOOK' },
+      { id: 'preview-v5', vocabularyId: 'preview-global-v5', word: '時計', reading: 'とけい', meaning: '钟；手表', level: 'N5', partOfSpeech: '名词', examples: [{ text: 'これはだれの時計ですか。', translation: '这是谁的手表？' }], source: 'TEXTBOOK' },
+      { id: 'preview-v6', vocabularyId: 'preview-global-v6', word: 'かばん', reading: 'かばん', meaning: '包；书包', level: 'N5', partOfSpeech: '名词', examples: [{ text: 'それは田中さんのかばんです。', translation: '那是田中的包。' }], source: 'TEXTBOOK' },
     ],
     grammar: [
       { id: 'preview-g1', kind: 'GRAMMAR', title: 'これ・それ・あれ：指认物品', explanation: 'これ指靠近说话人的物品；それ指靠近听话人的物品；あれ指离双方都较远的物品。它们可以直接作为名词使用。', connection: 'これ／それ／あれ ＋ は ＋ 名词 ＋ です', aiExplanation: '先判断物品靠近谁，再选指示词。直接说「これは本です」即可；如果要放在「本」前面修饰，则使用「この本」。', examples: [{ text: 'これは本です。', translation: '这是书。' }, { text: 'それは辞書ですか。', translation: '那是词典吗？' }], source: 'AI' },
@@ -48,7 +48,7 @@ TextbookLearningContentSchema.parse(previewLesson.content);
 export const previewBooks: LearningLibraryBook[] = [
   { id: previewLesson.bookId, title: '日语入门：从问候到日常表达', language: 'JA', level: 'N5', temporary: true, chapters: [
     { id: 'preview-greetings', title: '第 1 课 · はじめまして', subtitle: '初次见面时，介绍自己并回应对方。', content: {
-      vocabulary: [{ id: 'preview-greeting-v1', vocabularyId: 'preview-greeting-global-v1', word: '学生', reading: 'がくせい', meaning: '学生', level: 'N5', examples: [{ text: 'わたしは学生です。', translation: '我是学生。' }] }],
+      vocabulary: [{ id: 'preview-greeting-v1', vocabularyId: 'preview-greeting-global-v1', word: '学生', reading: 'がくせい', meaning: '学生', level: 'N5', examples: [{ text: 'わたしは学生です。', translation: '我是学生。' }], source: 'TEXTBOOK' }],
       grammar: [{ id: 'preview-greeting-g1', kind: 'GRAMMAR', title: '名词 ＋ は ＋ 名词 ＋ です', connection: 'わたし ＋ は ＋ 学生 ＋ です', explanation: '「は」提示话题，「です」用于礼貌地说明身份。这里的「は」读作 wa。', examples: [{ text: 'わたしは李です。', translation: '我姓李。' }], source: 'AI' }],
       articles: [{ id: 'preview-greeting-a1', title: '初次见面', text: segmentText(previewStudy['preview-greetings']!.articles['preview-greeting-a1']!), translation: segmentText(previewStudy['preview-greetings']!.articles['preview-greeting-a1']!, true), source: 'AI' }],
       sentences: [{ id: 'preview-greeting-s1', text: 'よろしくお願いします。', translation: '请多关照。', explanation: '初次见面、开始合作或请别人帮忙时使用。', source: 'AI' }],
@@ -72,7 +72,7 @@ export const previewBooks: LearningLibraryBook[] = [
   ] },
   { id: 'preview-travel-japanese', title: '旅行日语：在城市里问路', language: 'JA', level: 'N5', temporary: true, chapters: [
     { id: 'preview-directions', title: '第 1 课 · 駅はどこですか', subtitle: '礼貌问路，听懂简单的方向指引。', content: {
-      vocabulary: [{ id: 'preview-travel-v1', vocabularyId: 'preview-travel-global-v1', word: '駅', reading: 'えき', meaning: '车站', level: 'N5', examples: [{ text: '駅はどこですか。', translation: '车站在哪里？' }] }, { id: 'preview-travel-v2', vocabularyId: 'preview-travel-global-v2', word: '右', reading: 'みぎ', meaning: '右；右侧', level: 'N5', examples: [{ text: '右に曲がってください。', translation: '请向右转。' }] }],
+      vocabulary: [{ id: 'preview-travel-v1', vocabularyId: 'preview-travel-global-v1', word: '駅', reading: 'えき', meaning: '车站', level: 'N5', examples: [{ text: '駅はどこですか。', translation: '车站在哪里？' }], source: 'TEXTBOOK' }, { id: 'preview-travel-v2', vocabularyId: 'preview-travel-global-v2', word: '右', reading: 'みぎ', meaning: '右；右侧', level: 'N5', examples: [{ text: '右に曲がってください。', translation: '请向右转。' }], source: 'TEXTBOOK' }],
       grammar: [{ id: 'preview-travel-g1', kind: 'USAGE', title: 'すみません：礼貌地引起注意', explanation: '向陌生人问路前先说「すみません」，表示“打扰一下”。', examples: [{ text: 'すみません。駅はどこですか。', translation: '打扰一下，车站在哪里？' }], source: 'AI' }],
       articles: [{ id: 'preview-travel-a1', title: '去车站的路', text: segmentText(previewStudy['preview-directions']!.articles['preview-travel-a1']!), translation: segmentText(previewStudy['preview-directions']!.articles['preview-travel-a1']!, true), source: 'AI' }],
       sentences: [], exercises: [{ id: 'preview-travel-e1', difficultyTier: 1, difficultyReason: '基础方向词匹配。', type: 'MATCHING', prompt: '把方向与词义配对。', left: ['右', '左'], right: ['左侧', '右侧'], answer: [{ left: '右', right: '右侧' }, { left: '左', right: '左侧' }], source: 'AI' }], material: null,

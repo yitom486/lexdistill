@@ -14,6 +14,7 @@ const textbookContentColumns = () => ({
 export const textbookVocabulary = sqliteTable('textbook_vocabulary', {
   ...textbookContentColumns(), vocabularyId: text('vocabulary_id').notNull().references(() => globalVocabulary.id), meaning: text('meaning').notNull(),
   partOfSpeech: text('part_of_speech'), pitch: text('pitch'), explanation: text('explanation'), examplesJson: text('examples_json').notNull().default('[]'),
+  usageNotes: text('usage_notes'), contextNote: text('context_note'), source: text('source').notNull().default('TEXTBOOK'),
 }, table => [index('idx_textbook_vocabulary_chapter').on(table.documentId, table.chapterId, table.ord),
   uniqueIndex('idx_textbook_vocabulary_word').on(table.documentId, table.chapterId, table.vocabularyId)]);
 export const textbookKnowledge = sqliteTable('textbook_knowledge', {

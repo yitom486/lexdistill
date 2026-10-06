@@ -637,7 +637,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_global_vocabulary_identity ON global_vocab
 CREATE TABLE IF NOT EXISTS textbook_vocabulary (
   id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   chapter_id TEXT NOT NULL, ord INTEGER NOT NULL, vocabulary_id TEXT NOT NULL REFERENCES global_vocabulary(id),
-  meaning TEXT NOT NULL, part_of_speech TEXT, pitch TEXT, explanation TEXT, examples_json TEXT NOT NULL DEFAULT '[]'
+  meaning TEXT NOT NULL, part_of_speech TEXT, pitch TEXT, explanation TEXT, examples_json TEXT NOT NULL DEFAULT '[]',
+  usage_notes TEXT, context_note TEXT, source TEXT NOT NULL DEFAULT 'TEXTBOOK'
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_textbook_vocabulary_word ON textbook_vocabulary(document_id, chapter_id, vocabulary_id);
 CREATE TABLE IF NOT EXISTS textbook_knowledge (

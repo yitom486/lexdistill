@@ -32,7 +32,7 @@ const TOOL_NAMES: Record<TextbookContentKind, string> = {
 
 const TOOL_DESCRIPTIONS: Record<TextbookContentKind, string> = {
   grammar: '提交本章知识点、用法或发音知识（title/explanation/examples）。只填写内容。',
-  vocabulary: '提交本章词汇（word/reading/meaning/level 等）。只填写内容。',
+  vocabulary: '提交本章词汇（word/reading/meaning/level 等；可选 usage 本课用法、contextNote 本课取义说明）。只填写内容。',
   exercises: '提交本章练习（type/prompt/answer 等）。只填写内容，新增练习标注 source=AI。',
   articles: '提交本章完整文章或会话（text/translation）。若内容为会话对白，正文按每行「说话人：台词」标准格式保留角色名（如「ミラー：...」），译文按对应的「说话人：译文」逐行对齐，以便系统进行角色切片与双角色朗读。没有文章不用调用。',
   sentences: '提交本章可独立学习的句子或单句对白。若为对话，可填写 speaker（说话人姓名或身份）。没有句子不用调用。',

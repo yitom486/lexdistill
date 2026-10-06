@@ -54,7 +54,7 @@ export function writeTextbookContentInTx(tx: Tx, scope: TextbookScope, kind: Tex
             }
             if (!global) throw new BusinessError('E_VOCABULARY_SAVE_FAILED', '全局词汇保存失败，本次写入已撤回', 'DATABASE');
             // Existing global entries are never overwritten by another extraction.
-            const inserted = tx.insert(textbookVocabulary).values({ ...base(word, ord), vocabularyId: global.id, meaning: word.meaning, partOfSpeech: word.partOfSpeech ?? null, pitch: word.pitch ?? null, explanation: word.explanation ?? null, examplesJson: JSON.stringify(word.examples) }).onConflictDoNothing().returning({ id: textbookVocabulary.id }).all();
+            const inserted = tx.insert(textbookVocabulary).values({ ...base(word, ord), vocabularyId: global.id, meaning: word.meaning, partOfSpeech: word.partOfSpeech ?? null, pitch: word.pitch ?? null, explanation: word.explanation ?? null, usageNotes: word.usage ?? null, contextNote: word.contextNote ?? null, examplesJson: JSON.stringify(word.examples) }).onConflictDoNothing().returning({ id: textbookVocabulary.id }).all();
             saved += inserted.length;
           } break;
         }

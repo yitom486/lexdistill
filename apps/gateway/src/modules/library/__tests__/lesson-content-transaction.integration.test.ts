@@ -269,3 +269,20 @@ describe('agentpool 课程 CRUD 暂存与整课事务', () => {
     expect(env.repo.getRawDb().query('SELECT chapter_id, text FROM textbook_articles').all()).toEqual([{ chapter_id: 'b', text: '乙的最终正文' }]);
   });
 });
+
+it('词汇提交可带本课用法与取义说明；落库后读回保留且来源为 TEXTBOOK', async () => {
+  const env = setup();
+  const harness = harnessInjection(env.repo, new Map<string, ChapterScript>([['a', async (scope) => {
+    await submitScope(scope, 'grammar', requiredContent.grammar);
+    await submitScope(scope, 'vocabulary', { items: [{ word: '学校', meaning: '学校', level: 'N5', usage: '学校へ行く；常见搭配', contextNote: '本课指上学的场所' }] });
+    await submitScope(scope, 'exercises', requiredContent.exercises);
+  }]]));
+  const result = await env.repo.executeTextbookPipeline({ ...input(env), ...harness.extra });
+  expect(result.ok && result.value.allLessonsReady).toBe(true);
+  const saved = await env.repo.readTextbookChapter({ userId: 'owner', documentId: 'book', chapterId: 'a' });
+  if (!saved.ok) throw saved.error;
+  expect(saved.value.vocabulary).toHaveLength(1);
+  expect(saved.value.vocabulary[0]).toMatchObject({ usage: '学校へ行く；常见搭配', contextNote: '本课指上学的场所', source: 'TEXTBOOK' });
+  expect(env.repo.getRawDb().query('SELECT usage_notes, context_note, source FROM textbook_vocabulary').get()).toEqual(
+    { usage_notes: '学校へ行く；常见搭配', context_note: '本课指上学的场所', source: 'TEXTBOOK' });
+});
