@@ -118,3 +118,26 @@ export function tauriInvoke(cmd: string, args?: Record<string, unknown>): Promis
   }
   return invoke(cmd, args);
 }
+
+/** 最小化桌面窗口 */
+export async function minimizeDesktopWindow(): Promise<void> {
+  await tauriInvoke('platform_window_minimize');
+}
+
+/** 切换最大化/还原桌面窗口，返回切换后是否为最大化 */
+export async function toggleMaximizeDesktopWindow(): Promise<boolean> {
+  const isMax = await tauriInvoke('platform_window_toggle_maximize');
+  return Boolean(isMax);
+}
+
+/** 查询桌面窗口当前是否最大化 */
+export async function isDesktopWindowMaximized(): Promise<boolean> {
+  const isMax = await tauriInvoke('platform_window_is_maximized');
+  return Boolean(isMax);
+}
+
+/** 关闭桌面窗口（触发优雅退出流程） */
+export async function closeDesktopWindow(): Promise<void> {
+  await tauriInvoke('platform_window_close');
+}
+

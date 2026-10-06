@@ -90,6 +90,39 @@ async fn platform_pick_file(
     }
 }
 
+/// 窗口控制命令（沉浸式无边框自定义顶栏）。
+#[tauri::command]
+async fn platform_window_minimize(window: tauri::Window) -> Result<(), String> {
+    window.minimize().map_err(|e| format!("最小化窗口失败：{e}"))
+}
+
+#[tauri::command]
+async fn platform_window_toggle_maximize(window: tauri::Window) -> Result<bool, String> {
+    let is_max = window
+        .is_maximized()
+        .map_err(|e| format!("检查窗口最大化状态失败：{e}"))?;
+    if is_max {
+        window.unmaximize().map_err(|e| format!("还原窗口失败：{e}"))?;
+        Ok(false)
+    } else {
+        window.maximize().map_err(|e| format!("最大化窗口失败：{e}"))?;
+        Ok(true)
+    }
+}
+
+#[tauri::command]
+async fn platform_window_is_maximized(window: tauri::Window) -> Result<bool, String> {
+    window
+        .is_maximized()
+        .map_err(|e| format!("获取最大化状态失败：{e}"))
+}
+
+#[tauri::command]
+async fn platform_window_close(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|e| format!("关闭窗口失败：{e}"))
+}
+
+
 // ---------------------------------------------------------------------------
 // P4-B：Agent Gateway sidecar 生命周期与数据库备份
 // 网关以编译产物 sidecar 随壳启动（`bun scripts/build-sidecar.ts` 产出
@@ -536,6 +569,10 @@ pub fn run() {
             platform_backup_database,
             gateway_connection,
             platform_pick_file,
+            platform_window_minimize,
+            platform_window_toggle_maximize,
+            platform_window_is_maximized,
+            platform_window_close,
         ])
         .setup(|app| {
             let port = match pick_gateway_port() {

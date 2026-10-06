@@ -19,6 +19,7 @@ import { UserProfileModal } from './UserProfileModal.js';
 import { useGatewayStore } from '../stores/useGatewayStore.js';
 import { getPlatform } from '../platform/capabilities.js';
 import { checkForAppUpdate, logUpdaterFailure } from '../platform/app-updater.js';
+import { DesktopWindowControls } from './DesktopWindowControls.js';
 
 interface AppHeaderProps {
   onOpenMobileNav?: () => void;
@@ -74,8 +75,8 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
   };
 
   return (
-    <header className="shrink-0 border-b border-line-stone-200o80-stone-800o80 bg-veil-whiteo85 dark:bg-surface-h1a1917o85 backdrop-blur-md sticky top-0 z-40 transition-colors">
-      <div className="px-4 sm:px-6 h-14 sm:h-15 flex items-center justify-between gap-3">
+    <header data-tauri-drag-region className="shrink-0 border-b border-line-stone-200o80-stone-800o80 bg-veil-whiteo85 dark:bg-surface-h1a1917o85 backdrop-blur-md sticky top-0 z-40 transition-colors select-none">
+      <div data-tauri-drag-region className="px-4 sm:px-6 h-14 sm:h-15 flex items-center justify-between gap-3">
         {/* 左侧：移动端汉堡菜单 + 品牌标志 + 网关微指示灯 */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <Button
@@ -220,6 +221,7 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
               <Sun className="w-4 h-4 text-ink-amber-400" />
             )}
           </Button>
+          {isDesktop && <DesktopWindowControls />}
         </div>
       </div>
 

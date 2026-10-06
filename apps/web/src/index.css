@@ -9,6 +9,7 @@
  * animation APIs read those tokens through lib/css-tokens.ts.
  */
 :root {
+  color-scheme: light;
   --theme-transition-duration: 200ms;
   --theme-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-reduced-duration: 1ms;
@@ -104,6 +105,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --visual-agent-beam-from: #7dd3fc;
   --visual-agent-beam-to: #c4b5fd;
   --visual-shadowing-beam-from: #34d399;
@@ -236,6 +238,29 @@
 @layer base {
   html {
     scrollbar-gutter: stable;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-ghost);
   }
 
   body {

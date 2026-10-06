@@ -89,6 +89,7 @@ export interface PreferencesState {
 const applyThemeToDom = (theme: 'light' | 'dark') => {
   if (typeof document !== 'undefined') {
     const root = document.documentElement;
+    root.style.colorScheme = theme;
     if (theme === 'dark') {
       root.classList.add('dark');
     } else {
