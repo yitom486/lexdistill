@@ -4,10 +4,12 @@ import { useVocabularyQuery, useCollectVocabularyMutation } from '../queries/voc
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select.js';
+import { WordStudyDetail } from './WordStudyDetail.js';
 
 export function VocabularyLibraryPanel({ language }: { language: string }) {
   const query = useVocabularyQuery(language), collect = useCollectVocabularyMutation();
   const [search, setSearch] = useState(''), [bookId, setBookId] = useState('ALL'), [chapterId, setChapterId] = useState('ALL');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const words = query.data ?? [];
   const books = new Map(words.flatMap(word => word.sources.map(source => [source.documentId, source.bookTitle] as const)));
   const chapters = new Map(words.flatMap(word => word.sources.filter(source => source.documentId === bookId).map(source => [source.chapterId, source.chapterTitle] as const)));
@@ -26,12 +28,16 @@ export function VocabularyLibraryPanel({ language }: { language: string }) {
     <div className="max-h-96 space-y-3 overflow-y-auto">{visible.map(word => {
       const source = word.sources.find(item => (bookId === 'ALL' || item.documentId === bookId) && (chapterId === 'ALL' || item.chapterId === chapterId));
       return <article key={word.id} className="rounded-xl border border-line p-3">
-        <div className="flex items-center justify-between gap-3"><div><strong>{word.word}</strong>{word.reading && <span className="ml-2 text-sm text-ink-muted">{word.reading}</span>}{word.level && <Badge variant="outline" className="ml-2">{word.level}</Badge>}</div>
+        <div className="flex items-center justify-between gap-3"><div>
+          <button type="button" aria-label={`学习单词：${word.word}`} aria-expanded={expandedId === word.id} onClick={() => setExpandedId(current => current === word.id ? null : word.id)} className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <strong>{word.word}</strong>{word.reading && <span className="ml-2 text-sm text-ink-muted">{word.reading}</span>}{word.level && <Badge variant="outline" className="ml-2">{word.level}</Badge>}
+          </button></div>
           <Button size="sm" variant="outline" disabled={word.collected || collect.isPending} onClick={() => collect.mutate({ vocabularyId: word.id, ...(source ? { documentId: source.documentId, chapterId: source.chapterId } : {}) }, {
             onSuccess: result => toast.success(result.created ? '已加入复习' : '已在复习中，进度已保留'), onError: error => toast.error(error.message),
           })}>{word.collected ? '已加入复习' : collect.isPending && collect.variables?.vocabularyId === word.id ? '加入中…' : '加入复习'}</Button></div>
         <p className="mt-2 text-sm">{source?.meaning ?? word.meaning}</p>
         {!!word.sources.length && <p className="mt-1 text-xs text-ink-muted">{word.sources.map(item => `${item.bookTitle} · ${item.chapterTitle}`).join('；')}</p>}
+        {expandedId === word.id && <WordStudyDetail word={word} />}
       </article>;
     })}</div>
   </section>;

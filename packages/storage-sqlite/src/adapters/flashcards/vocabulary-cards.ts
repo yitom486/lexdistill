@@ -1,7 +1,7 @@
 import { and, eq, or, sql } from 'drizzle-orm';
 import { initFsrsState } from '@study-studio/learning-algorithms';
 import { CardTypeSchema, FlashcardSchema, type Flashcard, type VocabularyCollection, type VocabularyEntry, type VocabularyScope } from '@study-studio/protocol';
-import { ChapterManifestSchema } from '@study-studio/document-model';
+import { ChapterManifestSchema, VocabularyLearningContentSchema, type VocabularyLearningContent } from '@study-studio/document-model';
 import { BusinessError, generateId, nowIso, normalizeTrackLanguage } from '@study-studio/shared';
 import type { DrizzleDb } from '../../connection.js';
 import { documents, flashcards, globalVocabulary, textbookVocabulary } from '../../schema.js';
@@ -99,13 +99,23 @@ export function listVocabulary(db: DrizzleDb, userId: string, language: string, 
       const sources = sourcesByWord.get(local.vocabularyId) ?? [];
       sources.push({ documentId: doc.id, chapterId: local.chapterId, bookTitle: doc.title,
         chapterTitle: titles.get(local.chapterId) ?? '章节', meaning: local.meaning,
-        ...(local.partOfSpeech ? { partOfSpeech: local.partOfSpeech } : {}), examples: readCardExamples(local.examplesJson) });
+        ...(local.partOfSpeech ? { partOfSpeech: local.partOfSpeech } : {}), examples: readCardExamples(local.examplesJson),
+        ...(local.usageNotes ? { usage: local.usageNotes } : {}), ...(local.contextNote ? { contextNote: local.contextNote } : {}),
+        ...(local.source === 'AI' || local.source === 'TEXTBOOK' ? { source: local.source } : {}) });
       sourcesByWord.set(local.vocabularyId, sources);
     }
     return words.filter(word => !scope.documentId || sourcesByWord.has(word.id)).map(word => {
       const cardId = cardByWord.get(word.id);
+      let learning: VocabularyLearningContent | undefined;
+      if (word.learningJson) {
+        try {
+          const parsed = VocabularyLearningContentSchema.safeParse(JSON.parse(word.learningJson));
+          if (parsed.success) learning = parsed.data;
+        } catch { /* 坏内容当作未生成，读链路永不抛 */ }
+      }
       return { id: word.id, word: word.word, reading: word.reading, language: normalizeTrackLanguage(word.language), meaning: word.meaning,
         level: word.jlptLevel, collected: !!cardId, ...(cardId ? { cardId } : {}),
+        ...(learning ? { learning } : {}),
         sources: sourcesByWord.get(word.id) ?? [],
       };
     });

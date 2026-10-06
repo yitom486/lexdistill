@@ -17,6 +17,19 @@ export const VocabularyItemSchema = z.object({
   usage: text().optional().describe('本课用法：常见搭配、句型与适用场合'),
   contextNote: text().optional().describe('本课取义说明：该词在本课语境中的具体含义与使用方式'),
 }).strict();
+/** 词汇 AI 讲解内容（只存生成物；词面/读音/词义/用法/例句仍在行字段）。两轨道共用同一结构。 */
+export const VocabularyLearningContentSchema = z.object({
+  explanation: z.string().trim().min(1).optional().describe('综合讲解：含义、用法与易错点'),
+  scenarios: z.array(z.object({
+    title: text(),
+    dialogue: z.array(z.object({ speaker: text(), text: text(), translation: text().optional() })).min(1),
+    note: text().optional(),
+  })).max(3).optional().describe('情景演示：短对话及用法说明'),
+  pitfalls: z.array(text()).max(5).optional().describe('易错提示或近义词区别'),
+  quiz: z.object({ prompt: text(), answer: text(), explanation: text().optional() }).optional().describe('理解检查及参考解释'),
+  source: z.enum(['AI']).describe('生成内容来源标记，不当作原书内容'),
+}).strict();
+export type VocabularyLearningContent = z.infer<typeof VocabularyLearningContentSchema>;
 export const ArticleItemSchema = z.object({ title: text().optional(), text: text(), translation: text().optional() }).strict();
 export const SentenceItemSchema = z.object({ text: text(), translation: text().optional(), explanation: text().optional(), speaker: text().optional() }).strict();
 export const LearningExerciseItemSchema = z.object({
