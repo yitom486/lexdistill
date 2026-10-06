@@ -21,7 +21,7 @@ interface WordTutorTarget {
 }
 
 /** 单词内嵌 AI 会话：流式输出逐字进组件；模型调工具落库后刷新词汇查询，内容立变。 */
-export function useWordTutor(target: WordTutorTarget) {
+export function useWordTutor(target: WordTutorTarget, options?: { onComplete?: () => void }) {
   const gateway = useAgentGateway();
   const [messages, setMessages] = useState<WordTutorMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -69,6 +69,7 @@ export function useWordTutor(target: WordTutorTarget) {
         setMessages(previous => previous.map(message => message.id === aiMsg.id
           ? { ...message, text: data.finalOutput || message.text, isStreaming: false, toolCalls: (message.toolCalls ?? []).map(tool => ({ ...tool, done: true })) }
           : message));
+        options?.onComplete?.();
       },
       onError: () => {
         setIsTyping(false);
@@ -77,7 +78,7 @@ export function useWordTutor(target: WordTutorTarget) {
           : message));
       },
     });
-  }, [gateway, target]);
+  }, [gateway, target, options?.onComplete]);
 
   const stop = useCallback(() => {
     gateway.interruptTurn('learning');

@@ -17,6 +17,7 @@ export const VocabularyEntrySchema = z.object({
     documentId: z.string(), chapterId: z.string(), bookTitle: z.string(), chapterTitle: z.string(),
     meaning: z.string(), partOfSpeech: z.string().optional(), examples: z.array(ExampleSchema),
     usage: z.string().optional(), contextNote: z.string().optional(), source: z.enum(['TEXTBOOK', 'AI']).optional(),
+    textbookVocabularyId: z.string().optional(),
   })),
 });
 export type VocabularyEntry = z.infer<typeof VocabularyEntrySchema>;

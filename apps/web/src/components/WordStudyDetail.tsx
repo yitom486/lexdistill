@@ -62,7 +62,7 @@ export function WordStudyDetail({ word }: { word: VocabularyEntry }) {
     </dl>
     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
       <Button size="sm" onClick={() => setAiOpen(open => !open)} aria-expanded={aiOpen}>{aiOpen ? '收起追问' : '问 AI'}</Button>
-      <Button size="sm" variant="outline" disabled title="AI 讲解下一阶段上线">AI 讲解</Button>
+      {!word.learning && <Button size="sm" variant="outline" onClick={() => setAiOpen(true)}>AI 讲解</Button>}
       {!usages.length && !examples.length && <span className="text-xs text-ink-muted">暂无用法与例句，新导入的教材会自动补充。</span>}
     </div>
     {aiOpen && <WordAiPanel word={word} />}

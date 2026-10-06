@@ -7,6 +7,7 @@ import { registerLearningProgressTools } from '../../modules/learning-progress/t
 import { registerCurriculumTools } from '../../modules/curriculum/tools/register-curriculum-tools.js';
 import { registerLibraryTools } from '../../modules/library/tools/register-library-tools.js';
 import { registerDictionaryTools } from '../../modules/dictionary/tools/register-dictionary-tools.js';
+import { registerVocabularyLearningTools } from '../../modules/vocabulary-learning/tools/vocabulary-learning-tools.js';
 import { registerFlashcardsTools } from '../../modules/flashcards/tools/register-flashcards-tools.js';
 import { LearningContentTool } from '../../modules/learning-content/public.js';
 import { LearningPlanTool } from './learning-plan-tool.js';
@@ -39,6 +40,7 @@ export function registerGatewayTools(
   registerCurriculumTools(registry, drizzle);
   registerLibraryTools(registry, drizzle);
   registerDictionaryTools(registry, drizzle);
+  registerVocabularyLearningTools(registry, drizzle);
   registerFlashcardsTools(registry, drizzle);
   registry.register(new UiNavigateTool());
   registry.register(new UiPresentTool());

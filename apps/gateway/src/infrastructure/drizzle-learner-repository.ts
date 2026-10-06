@@ -327,7 +327,8 @@ import {
   defaultLanguageProfileSeed,
 } from '@study-studio/shared';
 import type { RepoDeps } from './persistence/repo-context.js';
-import { collectGlobalVocabulary, listVocabulary } from '@study-studio/storage-sqlite';
+import { collectGlobalVocabulary, listVocabulary, saveVocabularyLearning as saveVocabularyLearningDomain } from '@study-studio/storage-sqlite';
+import type { SaveVocabularyLearningInput } from '@study-studio/storage-sqlite';
 import type { VocabularyScope } from '@study-studio/protocol';
 
 export type {
@@ -389,6 +390,7 @@ export class DrizzleLearnerRepository
   public settleTextbookGrade(userId: string, id: string, audit: TextbookGradeAudit | undefined, grade: ExerciseGrade | undefined, errorCode?: string) { return this.textbookCommand(() => settleTextbookGrade(this.db, userId, id, audit, grade, errorCode)); }
   public textbookExerciseHistory(userId: string, documentId: string, chapterId: string) { return this.textbookCommand(() => textbookExerciseHistory(this.db, userId, documentId, chapterId)); }
   public listVocabulary(userId: string, language: string, scope: VocabularyScope = {}) { return this.textbookCommand(() => listVocabulary(this.db, userId, language, scope), '词汇库读取失败，请重试'); }
+  public saveVocabularyLearning(userId: string, input: Omit<SaveVocabularyLearningInput, 'userId'>) { return this.textbookCommand(() => saveVocabularyLearningDomain(this.db, { ...input, userId }), '词汇讲解保存失败，请重试'); }
   public collectGlobalVocabulary(userId: string, vocabularyId: string, scope: VocabularyScope = {}) { return this.textbookCommand(() => collectGlobalVocabulary(this.db, userId, vocabularyId, scope), '词汇加入复习失败，请重试'); }
   public getFlashcard(userId: string, cardId: string) { return getFlashcardDomain(this.deps, userId, cardId); }
 

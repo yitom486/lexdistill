@@ -44,6 +44,7 @@ const WRITE_BY_HINT: Array<{ pattern: RegExp; tools: string[] }> = [
   { pattern: /不要|丢弃|删掉.*草稿|草稿.*删/, tools: ['flashcards.draft_dismiss'] },
   { pattern: /攻克|解决这道|掌握了|我会了|标为已会/, tools: ['mistakes.resolve'] },
   { pattern: /anki|Anki|推送/, tools: ['flashcards.anki_push', 'flashcards.render'] },
+  { pattern: /AI讲解|生成讲解|保存讲解/, tools: ['vocabulary.learning.submit'] },
   { pattern: /模板|卡片样式|正面|背面/, tools: ['flashcards.render'] },
   { pattern: /导入|牌组|apkg|APKG/, tools: ['flashcards.apkg_analyze'] },
 ];
@@ -53,6 +54,7 @@ const READ_BY_HINT: Array<{ pattern: RegExp; tools: string[] }> = [
   { pattern: /错题|错了|回炉|薄弱/, tools: ['mistakes.list'] },
   { pattern: /查词|什么意思|怎么读/, tools: ['dictionary.lookup'] },
   { pattern: /见过|眼熟|老是忘|总见到|还没记/, tools: ['learning.encounters'] },
+  { pattern: /讲透|精学|学透|AI讲解|生成讲解/, tools: ['vocabulary.learning.context'] },
 ];
 
 export function selectTurnTools(input: TurnToolsInput): string[] {

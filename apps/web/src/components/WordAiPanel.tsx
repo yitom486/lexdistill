@@ -1,16 +1,31 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { VocabularyEntry } from '@study-studio/protocol';
 import { Button } from './ui/button.js';
 import { MarkdownText } from './common/MarkdownText.js';
 import { useWordTutor } from '../hooks/useWordTutor.js';
+import { QUERY_KEYS } from '../queries/query-keys.js';
+
+/** 生成讲解固定指令：关键词确保本轮可见 context＋submit；任务绑定由后端强制。 */
+function buildGeneratePrompt(word: VocabularyEntry): string {
+  return `请为「${word.word}」（${word.reading || '无读音'}）生成AI讲解并保存讲解：先调用 vocabulary.learning.context 读取词汇依据与任务，再按要求生成讲解内容并调用 vocabulary.learning.submit 提交保存。`;
+}
 
 /** 单词内嵌 AI 面板：对话直接长在详情里；模型工具写入后由调用方刷新查询即时呈现。 */
 export function WordAiPanel({ word }: { word: VocabularyEntry }) {
+  const client = useQueryClient();
   const usage = [...new Set(word.sources.flatMap(source => [source.contextNote, source.usage].filter((text): text is string => !!text)))].join('；');
-  const { messages, isTyping, connected, send, stop } = useWordTutor({ word: word.word, reading: word.reading, meaning: word.meaning, usage });
+  const { messages, isTyping, connected, send, stop } = useWordTutor(
+    { word: word.word, reading: word.reading, meaning: word.meaning, usage },
+    { onComplete: () => { void client.invalidateQueries({ queryKey: QUERY_KEYS.VOCABULARY }); } },
+  );
   const [draft, setDraft] = useState('');
   const submit = () => { if (send(draft)) setDraft(''); };
+  const generate = () => { send(buildGeneratePrompt(word)); };
   return <div className="mt-3 rounded-xl border border-line bg-paper-soft p-3" aria-label={`AI 追问：${word.word}`}>
+    {!word.learning && messages.length === 0 && <div className="mb-2">
+      <Button size="sm" variant="outline" disabled={!connected || isTyping} onClick={generate}>生成讲解</Button>
+    </div>}
     <div className="space-y-2" aria-live="polite">
       {messages.length === 0 && <p className="text-xs text-ink-muted">在这里直接追问，回答实时显示；AI 调用工具更新内容后，下方释义自动刷新。</p>}
       {messages.map(message => <div key={message.id} className={message.sender === 'user' ? 'text-right' : ''}>

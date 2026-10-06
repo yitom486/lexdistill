@@ -78,6 +78,41 @@ export function collectVocabularyCardInTx(tx: Tx, input: VocabularyCardInput): V
   return { created: true, card: flashcardFromRow(tx.select().from(flashcards).where(eq(flashcards.id, id)).get()!) };
 }
 
+export type VocabularyLearningTarget =
+  | { kind: 'global'; vocabularyId: string }
+  | { kind: 'textbook'; textbookVocabularyId: string };
+export interface SaveVocabularyLearningInput {
+  userId: string; target: VocabularyLearningTarget;
+  content: VocabularyLearningContent; sessionId?: string | undefined;
+}
+
+/**
+ * 保存词汇 AI 讲解（按词覆盖，版本+1）。
+ * 只写两张词汇表；卡片与 FSRS 调度绝不触碰。
+ */
+export function saveVocabularyLearning(db: DrizzleDb, input: SaveVocabularyLearningInput): { version: number } {
+  return db.transaction(tx => {
+    const payload = JSON.stringify(input.content);
+    const stamp = nowIso();
+    if (input.target.kind === 'global') {
+      const row = tx.select().from(globalVocabulary).where(and(eq(globalVocabulary.id, input.target.vocabularyId), eq(globalVocabulary.userId, input.userId))).get();
+      if (!row) throw new BusinessError('E_NOT_FOUND', '未找到当前用户的词汇', 'VALIDATION');
+      const version = (row.learningVersion ?? 0) + 1;
+      tx.update(globalVocabulary).set({ learningJson: payload, learningVersion: version, learningUpdatedAt: stamp,
+        ...(input.sessionId ? { learningSessionId: input.sessionId } : {}) }).where(eq(globalVocabulary.id, row.id)).run();
+      return { version };
+    }
+    const row = tx.select({ local: textbookVocabulary }).from(textbookVocabulary)
+      .innerJoin(documents, eq(documents.id, textbookVocabulary.documentId))
+      .where(and(eq(textbookVocabulary.id, input.target.textbookVocabularyId), eq(documents.userId, input.userId))).get();
+    if (!row) throw new BusinessError('E_NOT_FOUND', '未找到当前用户的教材词汇', 'VALIDATION');
+    const version = (row.local.learningVersion ?? 0) + 1;
+    tx.update(textbookVocabulary).set({ learningJson: payload, learningVersion: version, learningUpdatedAt: stamp,
+      ...(input.sessionId ? { learningSessionId: input.sessionId } : {}) }).where(eq(textbookVocabulary.id, row.local.id)).run();
+    return { version };
+  });
+}
+
 export function listVocabulary(db: DrizzleDb, userId: string, language: string, scope: VocabularyScope = {}): VocabularyEntry[] {
   return db.transaction(tx => {
     const words = tx.select().from(globalVocabulary).where(and(eq(globalVocabulary.userId, userId), eq(globalVocabulary.language, language))).all();
@@ -101,7 +136,7 @@ export function listVocabulary(db: DrizzleDb, userId: string, language: string, 
         chapterTitle: titles.get(local.chapterId) ?? '章节', meaning: local.meaning,
         ...(local.partOfSpeech ? { partOfSpeech: local.partOfSpeech } : {}), examples: readCardExamples(local.examplesJson),
         ...(local.usageNotes ? { usage: local.usageNotes } : {}), ...(local.contextNote ? { contextNote: local.contextNote } : {}),
-        ...(local.source === 'AI' || local.source === 'TEXTBOOK' ? { source: local.source } : {}) });
+        ...(local.source === 'AI' || local.source === 'TEXTBOOK' ? { source: local.source } : {}), textbookVocabularyId: local.id });
       sourcesByWord.set(local.vocabularyId, sources);
     }
     return words.filter(word => !scope.documentId || sourcesByWord.has(word.id)).map(word => {
