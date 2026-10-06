@@ -7,7 +7,7 @@ import {
   type LearnerLevel,
   type VocabMastery,
 } from '@study-studio/learner-core';
-import type { DailyPickOrder, DailyPickResponse } from '@study-studio/protocol';
+import type { DailyPickOrder, DailyPickResponse, JlptLevel } from '@study-studio/protocol';
 import { bankJlptLevel, type WordlistGroup } from '@study-studio/storage-sqlite';
 
 export interface DailyPickDeps {
@@ -22,6 +22,33 @@ export interface DailyPickInput {
   bankId: string;
 }
 
+export interface DailyPickLockedInfo {
+  requiredJlpt: JlptLevel;
+  requiredMastery: number;
+  currentMastery: number;
+}
+
+export interface DailyPickResult {
+  words: DailyPickResponse['words'];
+  pick: DailyPickResponse['pick'];
+  locked: DailyPickLockedInfo | null;
+}
+
+/** 锁库 409 负载（纯函数）：文案口径唯一，路由与测试共用。 */
+export function formatLockedPayload(
+  result: Pick<DailyPickResult, 'words' | 'pick' | 'locked'> & { locked: DailyPickLockedInfo }
+): { status: 409; body: unknown } {
+  const locked = result.locked;
+  const percent = (ratio: number) => `${Math.round(ratio * 100)}%`;
+  return {
+    status: 409,
+    body: {
+      ...result,
+      error: { code: 'E_BANK_LOCKED', userMessage: `该词库需 ${locked.requiredJlpt} 掌握率 ${percent(locked.requiredMastery)} 解锁，当前 ${percent(locked.currentMastery)}` },
+      data: { requiredMastery: locked.requiredMastery, currentMastery: locked.currentMastery },
+    },
+  };
+}
 /** Fisher–Yates：无偏洗牌（前端 Math.random 排序有偏，此处唯一的随机实现）。 */
 function shuffled<T>(items: readonly T[]): T[] {
   const array = [...items];
@@ -43,7 +70,7 @@ export async function pickDailyWords(
   userId: string,
   language: string,
   input: DailyPickInput
-): Promise<Result<DailyPickResponse, BusinessError>> {
+): Promise<Result<DailyPickResult, BusinessError>> {
   const count = Math.min(50, Math.max(1, Math.floor(input.count)));
   const profile = await deps.getLearnerProfile(userId);
   if (!profile.ok) return err(profile.error);
@@ -88,5 +115,6 @@ export async function pickDailyWords(
       ...(bankLevel ? { jlpt: bankLevel } : {}),
     })),
     pick: { bankId: group.id, requested: count, returned: picked.length, unlockedJlptMax: unlockedMax, skippedLocked: 0 },
+    locked: null,
   });
 }

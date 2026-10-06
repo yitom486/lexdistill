@@ -57,10 +57,18 @@ export const DailyPickResponseSchema = z.object({
     unlockedJlptMax: JlptLevelSchema,
     skippedLocked: z.number().int(),
   }),
+});
+export type DailyPickResponse = z.infer<typeof DailyPickResponseSchema>;
+
+/** 锁库响应（HTTP 409）：words 为空，data 携带解锁进度供横幅展示。 */
+export const DailyPickLockedResponseSchema = DailyPickResponseSchema.extend({
+  words: z.array(DailyPickWordSchema).max(0),
   locked: z.object({
     requiredJlpt: JlptLevelSchema,
     requiredMastery: z.number(),
     currentMastery: z.number(),
-  }).optional(),
+  }),
+  error: z.object({ code: z.literal('E_BANK_LOCKED'), userMessage: z.string() }),
+  data: z.object({ requiredMastery: z.number(), currentMastery: z.number() }),
 });
-export type DailyPickResponse = z.infer<typeof DailyPickResponseSchema>;
+export type DailyPickLockedResponse = z.infer<typeof DailyPickLockedResponseSchema>;

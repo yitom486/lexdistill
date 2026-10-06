@@ -3,8 +3,8 @@ import { Hono } from 'hono';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../../../runtime/gateway-runtime.js';
 import { createDictionaryRoutes } from '../http/dictionary-routes.js';
-import { pickDailyWords } from '../application/daily-pick.js';
-import { DailyPickResponseSchema } from '@study-studio/protocol';
+import { pickDailyWords, formatLockedPayload } from '../application/daily-pick.js';
+import { DailyPickResponseSchema, DailyPickLockedResponseSchema } from '@study-studio/protocol';
 
 const N4_BANK = {
   id: 'ja-n4-core',
@@ -37,7 +37,7 @@ describe('pickDailyWords', () => {
     if (!open.ok) throw open.error;
     expect(open.value.words.map(word => word.headword)).toEqual(['約束', '案内']);
     expect(open.value.pick).toMatchObject({ bankId: 'ja-n4-core', requested: 2, returned: 2, unlockedJlptMax: 'N4', skippedLocked: 0 });
-    expect(open.value.locked).toBeUndefined();
+    expect(open.value.locked).toBeNull();
     const unknown = await pickDailyWords(stubDeps(N4_BANK.words), 'u', 'ja', { count: 1, order: 'sequential', bankId: 'nope' });
     expect(unknown.ok ? '' : unknown.error.code).toBe('E_INVALID_INPUT');
   });
@@ -56,13 +56,13 @@ describe('pickDailyWords', () => {
     const opened = await pickDailyWords(withMastery, 'u', 'ja', { count: 5, order: 'sequential', bankId: 'ja-n4-core' });
     if (!opened.ok) throw opened.error;
     expect(opened.value.words).toHaveLength(2);
-    expect(opened.value.locked).toBeUndefined();
+    expect(opened.value.locked).toBeNull();
     const filtered = await pickDailyWords(
       { ...withMastery, getLearnerProfile: async () => ({ ok: true as const, value: { learnerLevel: 'BEGINNER' as const, dailyGoalNewWords: 10, wordLevelFilter: ['N5'] } }) },
       'u', 'ja', { count: 5, order: 'sequential', bankId: 'ja-n4-core' });
     if (!filtered.ok) throw filtered.error;
     expect(filtered.value.words).toEqual([]);
-    expect(filtered.value.locked).toBeUndefined();
+    expect(filtered.value.locked).toBeNull();
   });
 
   it('未学透优先；全部学透则循环；随机不丢词', async () => {
@@ -103,6 +103,21 @@ describe('POST /api/vocabulary/:userId/daily-pick', () => {
       expect((await post({ lang: 'ja', count: 2, order: 'sequential', bankId: 'nope' })).status).toBe(400);
     } finally {
       repo.getRawDb().close();
+    }
+  });
+
+  it('锁库 409 负载契约：状态码＋文案＋进度字段一次配齐', async () => {
+    const locked = await pickDailyWords(stubDeps(N4_BANK.words), 'u', 'ja', { count: 2, order: 'sequential', bankId: 'ja-n4-core' });
+    if (!locked.ok) throw locked.error;
+    if (!locked.value.locked) throw new Error('expected locked payload');
+    const shaped = formatLockedPayload({ words: [], pick: locked.value.pick, locked: locked.value.locked });
+    expect(shaped.status).toBe(409);
+    const parsed = DailyPickLockedResponseSchema.safeParse(shaped.body);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.error.code).toBe('E_BANK_LOCKED');
+      expect(parsed.data.error.userMessage).toContain('N4');
+      expect(parsed.data.data).toEqual({ requiredMastery: 0.8, currentMastery: 0 });
     }
   });
 });
