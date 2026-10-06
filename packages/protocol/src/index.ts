@@ -19,3 +19,4 @@ export * from './schemas/learning-analysis.js';
 export * from './schemas/practice-plan.js';
 export * from './schemas/textbook-inspection.js';
 export * from './schemas/textbook-practice.js';
+export * from './schemas/question-generation.js';

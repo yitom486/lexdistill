@@ -96,6 +96,7 @@ createDrizzleDb(path | Database)
 ## 依赖策略（D3 叶子规则，2026-09-14 修订）
 
 - 基座：`shared`、`protocol`、`document-model`、`drizzle-orm`（外加 `bun:sqlite` / `node:` 运行时）。
+- 出题题库的音频元数据通过 `node:util` 内置 `MIMEType` 解析器校验，保留 PCM 编码和采样率参数；不依赖语音厂商 SDK。
 - 例外：允许依赖经白名单明确列出的**纯叶子领域包**（定义：仅依赖 shared、
   无存储/网络/Agent、无厂商 SDK，且禁反向依赖本包——由该包自身的相对内聚测试锁定）。
   当前许可：`flashcards`（adapter 持久化的正是其语义：Anki 端点常量与校验、

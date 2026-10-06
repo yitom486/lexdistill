@@ -474,6 +474,7 @@ describe('M1-1 package 依赖方向', () => {
         'node:fs',
         'node:os',
         'node:path',
+        'node:util', // Standard MIMEType parser for persisted provider audio metadata.
       ])
     ).toEqual([]);
   });

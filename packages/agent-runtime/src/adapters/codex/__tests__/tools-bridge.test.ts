@@ -9,6 +9,21 @@ import { toolsToDynamicSpecs, sanitizeToolName, resolveToolName } from '../tools
  * 否则模型拿到的是裸类型（如层级约定丢失，目录 level 必错）。
  */
 describe('tools-bridge schema 透传', () => {
+  it('preserves nested discriminated question formats and their required answer fields', () => {
+    const schema = z.object({ questions: z.array(z.object({ answer: z.discriminatedUnion('type', [
+      z.object({ type: z.literal('CHOICE'), correctKey: z.string(), options: z.array(z.string()).min(2) }),
+      z.object({ type: z.literal('WRITING'), rubric: z.string(), referenceAnswer: z.string() }),
+    ]) }).superRefine(() => {})).min(1).max(20) });
+    const { specs } = toolsToDynamicSpecs([{ name: 'generation.submit', description: 'Submit', location: 'SERVER', permission: 'WRITE', schema, execute: async () => ok(undefined) }]);
+    const result = specs[0]!.inputSchema as { properties: { questions: { minItems: number; maxItems: number; items: { properties: { answer: { anyOf: { properties: Record<string, unknown>; required: string[] }[] } } } } } };
+    expect(result.properties.questions.minItems).toBe(1); expect(result.properties.questions.maxItems).toBe(20);
+    const variants = result.properties.questions.items.properties.answer.anyOf;
+    expect(variants).toHaveLength(2);
+    expect(variants[0]!.properties.type).toEqual({ const: 'CHOICE' });
+    expect(variants[0]!.required).toEqual(['type', 'correctKey', 'options']);
+    expect(variants[1]!.properties.type).toEqual({ const: 'WRITING' });
+    expect(variants[1]!.required).toEqual(['type', 'rubric', 'referenceAnswer']);
+  });
   it('.describe() 说明透传到模型可见 schema', () => {
     const schema = z.object({
       concept: z.string().min(1).max(200).describe('知识点概念'),

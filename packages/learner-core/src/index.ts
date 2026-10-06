@@ -15,3 +15,4 @@ export * from './repository.js';
 export * from './learning-evidence.js';
 export * from './textbook-practice.js';
 export * from './textbook-growth.js';
+export type { QuestionGenerationRepository } from './question-generation.js';

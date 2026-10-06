@@ -127,6 +127,7 @@ function convertZod(schema: z.ZodTypeAny): Record<string, unknown> {
     case 'ZodNullable':
       return withDescription({ anyOf: [convertZod(def.innerType as z.ZodTypeAny), { type: 'null' }] });
     case 'ZodUnion':
+    case 'ZodDiscriminatedUnion':
       return withDescription({ anyOf: (def.options as z.ZodTypeAny[] | undefined)?.map(convertZod) ?? [] });
     case 'ZodRecord':
       return withDescription({ type: 'object', additionalProperties: true });
