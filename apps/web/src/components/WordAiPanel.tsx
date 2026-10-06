@@ -4,6 +4,7 @@ import type { VocabularyEntry } from '@study-studio/protocol';
 import { Button } from './ui/button.js';
 import { MarkdownText } from './common/MarkdownText.js';
 import { useWordTutor } from '../hooks/useWordTutor.js';
+import { WordChatConfig } from './WordChatConfig.js';
 import { QUERY_KEYS } from '../queries/query-keys.js';
 
 /** 生成讲解固定指令：关键词确保本轮可见 context＋submit；任务绑定由后端强制。 */
@@ -23,6 +24,7 @@ export function WordAiPanel({ word }: { word: VocabularyEntry }) {
   const submit = () => { if (send(draft)) setDraft(''); };
   const generate = () => { send(buildGeneratePrompt(word)); };
   return <div className="mt-3 rounded-xl border border-line bg-paper-soft p-3" aria-label={`AI 追问：${word.word}`}>
+    <WordChatConfig />
     {!word.learning && messages.length === 0 && <div className="mb-2">
       <Button size="sm" variant="outline" disabled={!connected || isTyping} onClick={generate}>生成讲解</Button>
     </div>}

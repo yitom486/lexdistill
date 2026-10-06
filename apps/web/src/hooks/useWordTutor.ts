@@ -35,7 +35,10 @@ export function useWordTutor(target: WordTutorTarget, options?: { onComplete?: (
     setMessages(previous => [...previous, userMsg, aiMsg]);
     setIsTyping(true);
     const profile = useUserProfileStore.getState().profile;
-    const threadId = usePreferencesStore.getState().learningThreadId;
+    const prefs = usePreferencesStore.getState();
+    const threadId = prefs.learningThreadId;
+    const coachModelId = prefs.coachModelId;
+    const coachEffort = prefs.coachEffort;
     const snapshot = {
       targetLanguage: normalizeTrackLanguage(profile.targetLanguage),
       learnerLevel: profile.overallLevel,
@@ -54,7 +57,14 @@ export function useWordTutor(target: WordTutorTarget, options?: { onComplete?: (
       input: text,
       intent: 'EXPLAIN',
       contextSnapshot: snapshot,
-      agentOptions: { preferCodex: true, lane: 'learning', ephemeral: false, ...(threadId ? { threadId } : {}) },
+      agentOptions: {
+        preferCodex: true,
+        lane: 'learning',
+        ephemeral: false,
+        ...(threadId ? { threadId } : {}),
+        ...(coachModelId ? { model: coachModelId } : {}),
+        ...(coachEffort ? { effort: coachEffort } : {}),
+      },
       onDelta: (_delta, accumulated) => {
         setMessages(previous => previous.map(message => message.id === aiMsg.id ? { ...message, text: accumulated } : message));
       },
