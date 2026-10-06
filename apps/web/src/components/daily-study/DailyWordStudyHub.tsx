@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import type { VocabularyEntry } from '@study-studio/protocol';
 import { useWordlistsQuery, type WordlistWord } from '../../queries/wordlists.js';
-import { useVocabularyQuery } from '../../queries/vocabulary.js';
+import { useVocabularyQuery, useDailyPickMutation, BankLockedError } from '../../queries/vocabulary.js';
 import {
   useCollectDictionaryEntryMutation,
   useMarkCardStudiedMutation,
@@ -27,12 +27,14 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
   const [sessionWords, setSessionWords] = useState<WordlistWord[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [lockMessage, setLockMessage] = useState<string | null>(null);
 
   const wordlistsQuery = useWordlistsQuery(DEFAULT_USER_ID, language);
   const vocabularyQuery = useVocabularyQuery(language);
   const cardsQuery = useCardsQuery();
   const collectMutation = useCollectDictionaryEntryMutation();
   const markStudiedMutation = useMarkCardStudiedMutation();
+  const dailyPickMutation = useDailyPickMutation(DEFAULT_USER_ID);
 
   const groups = wordlistsQuery.data ?? [];
 
@@ -55,28 +57,40 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
   }, [sources, selectedSourceId]);
 
   // 抽取词汇并启动学习会话
-  const handleStart = () => {
+  const handleStart = async () => {
     const group = groups.find((g) => g.id === activeSourceId);
-    if (!group || group.words.length === 0) {
-      toast.error('当前词库暂无可学习词汇');
+    if (!group) {
+      toast.error('当前词库不存在');
       return;
     }
 
-    // 优先抽取尚未学透的生词；若全部已学透，则循环抽取
-    const unstudied = group.words.filter((w) => !w.studied);
-    const pool = unstudied.length > 0 ? unstudied : group.words;
+    setLockMessage(null);
 
-    let chosen: WordlistWord[];
-    if (isRandom) {
-      const shuffled = [...pool].sort(() => Math.random() - 0.5);
-      chosen = shuffled.slice(0, batchSize);
-    } else {
-      chosen = pool.slice(0, batchSize);
+    try {
+      const trackLang = (language === 'en' || language === 'ko' ? language : 'ja') as 'ja' | 'en' | 'ko';
+      const result = await dailyPickMutation.mutateAsync({
+        lang: trackLang,
+        count: batchSize,
+        order: isRandom ? 'random' : 'sequential',
+        bankId: activeSourceId,
+      });
+
+      if (!result.words || result.words.length === 0) {
+        toast.error('当前词库暂无可学习词汇');
+        return;
+      }
+
+      setSessionWords(result.words);
+      setCurrentIndex(0);
+      setMode('studying');
+    } catch (err: unknown) {
+      if (err instanceof BankLockedError || (err as { code?: string })?.code === 'E_BANK_LOCKED') {
+        const msg = (err as { userMessage?: string }).userMessage || (err instanceof Error ? err.message : '该词库已锁定');
+        setLockMessage(msg);
+        return;
+      }
+      toast.error(err instanceof Error ? err.message : '抽取词汇失败，请重试');
     }
-
-    setSessionWords(chosen);
-    setCurrentIndex(0);
-    setMode('studying');
   };
 
   // 当前激活词汇
@@ -97,20 +111,9 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
       reading: currentWord.reading ?? '',
       language: (language === 'en' || language === 'ko' ? language : 'ja') as 'ja' | 'en' | 'ko',
       meaning: currentWord.meanings.join('；'),
-      level: 'N5',
+      level: currentWord.jlpt ?? null,
       collected: currentWord.collected,
-      sources: [
-        {
-          documentId: 'n5-lexicon',
-          chapterId: 'n5-core',
-          bookTitle: 'JLPT N5 核心词库',
-          chapterTitle: currentWord.partOfSpeech ?? '核心词汇',
-          meaning: currentWord.meanings.join('；'),
-          partOfSpeech: currentWord.partOfSpeech,
-          examples: [],
-          source: 'AI' as const,
-        },
-      ],
+      sources: [],
     };
   }, [currentWord, vocabularyQuery.data, language]);
 
@@ -176,7 +179,7 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
         totalCount={sessionWords.length}
         currentIndex={currentIndex}
         activeVocab={activeVocab}
-        sourceTitle={activeSourceMeta?.title ?? 'N5 核心词库'}
+        sourceTitle={activeSourceMeta?.title ?? '词库'}
         isCollected={currentWord.collected}
         isStudied={currentWord.studied}
         isProcessing={isProcessing}
@@ -198,13 +201,17 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
     <DailyStudySetup
       sources={sources}
       selectedSourceId={activeSourceId}
-      onSelectSource={setSelectedSourceId}
+      onSelectSource={(id) => {
+        setSelectedSourceId(id);
+        setLockMessage(null);
+      }}
       batchSize={batchSize}
       onSelectBatchSize={setBatchSize}
       isRandom={isRandom}
       onToggleRandom={() => setIsRandom((v) => !v)}
       onStart={handleStart}
-      isLoading={wordlistsQuery.isLoading}
+      isLoading={wordlistsQuery.isLoading || dailyPickMutation.isPending}
+      lockMessage={lockMessage}
     />
   );
 }

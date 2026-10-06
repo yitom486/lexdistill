@@ -13,6 +13,7 @@ export interface WordlistWord {
   sourceLabel: string;
   collected: boolean;
   studied: boolean;
+  jlpt?: string | undefined;
 }
 
 export interface WordlistGroup {
@@ -33,6 +34,7 @@ function toWord(row: Record<string, unknown>): WordlistWord {
     sourceLabel: typeof row.sourceLabel === 'string' ? row.sourceLabel : '',
     collected: row.collected === true,
     studied: row.studied === true,
+    ...(typeof row.jlpt === 'string' ? { jlpt: row.jlpt } : {}),
   };
 }
 

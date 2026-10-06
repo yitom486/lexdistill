@@ -49,3 +49,79 @@ export function useCollectVocabularyMutation() {
     },
   });
 }
+
+export class BankLockedError extends Error {
+  readonly code = 'E_BANK_LOCKED';
+  readonly userMessage: string;
+  readonly requiredMastery?: number | undefined;
+  readonly currentMastery?: number | undefined;
+
+  constructor(userMessage: string, data?: { requiredMastery?: number; currentMastery?: number }) {
+    super(userMessage);
+    this.name = 'BankLockedError';
+    this.userMessage = userMessage;
+    this.requiredMastery = data?.requiredMastery;
+    this.currentMastery = data?.currentMastery;
+  }
+}
+
+export interface DailyPickParams {
+  lang: 'ja' | 'en' | 'ko';
+  count: number;
+  order: 'random' | 'sequential';
+  bankId?: string | undefined;
+}
+
+export interface DailyPickResult {
+  words: import('./wordlists.js').WordlistWord[];
+  pick: {
+    bankId: string | null;
+    requested: number;
+    returned: number;
+    unlockedJlptMax: 'N5' | 'N4' | 'N3' | 'N2' | 'N1';
+    skippedLocked: number;
+  };
+}
+
+export async function postDailyPick(
+  userId: string,
+  params: DailyPickParams
+): Promise<DailyPickResult> {
+  const res = await fetch(`${GATEWAY_BASE_URL}/api/vocabulary/${encodeURIComponent(userId)}/daily-pick`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+
+  const raw: unknown = await res.json().catch(() => null);
+
+  if (res.status === 409) {
+    const errorData = (raw as {
+      error?: {
+        code?: string;
+        userMessage?: string;
+      };
+      data?: {
+        requiredMastery?: number;
+        currentMastery?: number;
+      };
+    }) ?? {};
+    const userMessage = errorData.error?.userMessage || '该词库已锁定';
+    throw new BankLockedError(userMessage, errorData.data);
+  }
+
+  if (!res.ok) {
+    const parsed = ErrorSchema.safeParse(raw);
+    throw new Error(parsed.success ? parsed.data.error.userMessage : '抽取词汇失败，请重试');
+  }
+
+  return raw as DailyPickResult;
+}
+
+export function useDailyPickMutation(userIdOverride?: string) {
+  const profileUserId = useUserProfileStore((state) => state.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
+  return useMutation({
+    mutationFn: (params: DailyPickParams) => postDailyPick(userId, params),
+  });
+}

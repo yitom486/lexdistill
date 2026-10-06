@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, BookOpen, Layers, Dices, ArrowRight } from 'lucide-react';
+import { Sparkles, BookOpen, Layers, Dices, ArrowRight, Lock } from 'lucide-react';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { sound } from '../../utils/audio.js';
@@ -23,6 +23,7 @@ interface DailyStudySetupProps {
   onToggleRandom: () => void;
   onStart: () => void;
   isLoading: boolean;
+  lockMessage?: string | null | undefined;
 }
 
 export function DailyStudySetup({
@@ -35,6 +36,7 @@ export function DailyStudySetup({
   onToggleRandom,
   onStart,
   isLoading,
+  lockMessage,
 }: DailyStudySetupProps) {
   const activeSource = sources.find((s) => s.id === selectedSourceId) || sources[0];
 
@@ -143,12 +145,12 @@ export function DailyStudySetup({
       </div>
 
       {/* 启动按钮 */}
-      <div className="pt-2">
+      <div className="pt-2 space-y-3">
         <Button
           type="button"
           size="default"
           className="w-full gap-2 text-sm font-semibold h-11"
-          disabled={isLoading || !activeSource}
+          disabled={isLoading || !activeSource || Boolean(lockMessage)}
           onClick={() => {
             sound.playClick();
             onStart();
@@ -157,6 +159,19 @@ export function DailyStudySetup({
           <span>🚀 开启今日 {batchSize} 词精学之旅</span>
           <ArrowRight className="h-4 w-4" />
         </Button>
+
+        {lockMessage && (
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-2xl border border-line-amber-900o10 bg-wash-amber-500o10-stone-900o60 p-3.5 text-xs"
+          >
+            <Lock className="h-4 w-4 shrink-0 mt-0.5 text-accent-ink-warm" />
+            <div className="space-y-0.5">
+              <span className="font-semibold text-ink">词库已锁定</span>
+              <p className="text-ink-ghost leading-relaxed">{lockMessage}</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
