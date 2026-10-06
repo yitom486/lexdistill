@@ -30,6 +30,7 @@ import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { useLearningShell } from '../hooks/useLearningShell.js';
 import { trackToSpeechLang } from '../config/speech-language.js';
 import { TtsStudioSettings } from './TtsStudioSettings.js';
+import { AudioInputSettings } from './audio/AudioInputSettings.js';
 import {
   useDictionaryPackagesQuery,
   useInstallDictionaryPackageMutation,
@@ -191,11 +192,12 @@ export function SystemSettingsPage() {
       <Tabs value={section} onValueChange={(value) => setSection(value === 'more' ? 'more' : 'speech')}>
         <TabsList className="w-full justify-start sm:w-auto">
           <TabsIndicator />
-          <TabsTrigger value="speech" className="px-6 py-3 text-base">语音朗读</TabsTrigger>
+          <TabsTrigger value="speech" className="px-6 py-3 text-base">语音设置</TabsTrigger>
           <TabsTrigger value="more" className="px-6 py-3 text-base">其他设置</TabsTrigger>
         </TabsList>
-        <TabsContent value="speech" className="mt-6">
+        <TabsContent value="speech" className="mt-6 space-y-6">
           <TtsStudioSettings lang={speechLang} />
+          <AudioInputSettings />
         </TabsContent>
         <TabsContent value="more" className="mt-6">
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">

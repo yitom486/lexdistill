@@ -37,7 +37,6 @@ import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
 import { BorderBeam } from './magicui/index.js';
 import type { SupportedLanguage } from '../utils/audio.js';
-import { readCssDurationSeconds } from '../lib/css-tokens.js';
 
 interface ListeningShadowingWorkbenchProps {
   onOpenTutor?: (context: AiTutorContext) => void;
@@ -56,8 +55,6 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
   onOpenTutor,
   onAddMistake,
 }) => {
-  const waveBaseDuration = readCssDurationSeconds('--motion-wave-shadow-base-duration');
-  const waveDurationStep = readCssDurationSeconds('--motion-wave-shadow-step-duration');
 
   // 模式切换: 'SHADOWING' (对话影子跟读) | 'DICTATION' (精听挖词听写)
   const [activeSubMode, setActiveSubMode] = useState<'SHADOWING' | 'DICTATION'>('SHADOWING');
@@ -430,25 +427,6 @@ export const ListeningShadowingWorkbench: React.FC<ListeningShadowingWorkbenchPr
                 </div>
               </div>
 
-              {/* 动态波形可视化柱条 (音频播放时产生呼吸震荡) */}
-              <div className="flex items-center justify-center gap-1.5 h-8 py-1">
-                {[12, 24, 18, 28, 14, 20, 26, 16, 22, 10, 25, 15, 30, 18, 12].map((baseH, i) => (
-                  <motion.div
-                    key={i}
-                    animate={{
-                      height: isSpeaking ? [baseH * 0.4, baseH * 1.2, baseH * 0.6] : 4,
-                    }}
-                    transition={{
-                      repeat: Infinity,
-                      duration: waveBaseDuration + (i % 4) * waveDurationStep,
-                      ease: 'easeInOut',
-                    }}
-                    className={`w-1.5 rounded-full transition-colors ${
-                      isSpeaking ? 'bg-visual-shadow-wave-active' : 'bg-visual-shadow-wave-idle'
-                    }`}
-                  />
-                ))}
-              </div>
 
               {/* 日语原句与假名标注区域 */}
               <div className="min-h-[90px] flex flex-col justify-center items-center text-center px-4">

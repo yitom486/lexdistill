@@ -1,4 +1,4 @@
-import { Download, Pause, Play, RotateCcw } from 'lucide-react';
+import { Pause, Play, RotateCcw } from 'lucide-react';
 import { Button } from '../ui/button.js';
 import { Slider } from '../ui/slider.js';
 import { Badge } from '../ui/badge.js';
@@ -15,7 +15,7 @@ interface Props {
 }
 
 /**
- * 试听条：一套播放状态（合成→本地缓存→重播/保存），同一按钮按状态切换。
+ * 试听条：一套播放状态（合成→本地缓存→重播），同一按钮按状态切换。
  * 同一组合命中本地缓存即免费重播，不再合成计费；任一条件变化自动转回试听。
  */
 export function TtsPreviewBar({ lang, serverText, userText, onUserTextChange }: Props) {
@@ -31,7 +31,6 @@ export function TtsPreviewBar({ lang, serverText, userText, onUserTextChange }: 
   const stop = useTtsStore((s) => s.stop);
   const replayLast = useTtsStore((s) => s.replayLast);
   const canReplay = useTtsStore((s) => s.canReplay);
-  const downloadLastAudio = useTtsStore((s) => s.downloadLastAudio);
 
   const effectiveText = userText.trim() || serverText;
   const ready = effectiveText.trim().length > 0;
@@ -92,17 +91,6 @@ export function TtsPreviewBar({ lang, serverText, userText, onUserTextChange }: 
           >
             {isSpeaking ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {isSpeaking ? '停止' : replayable ? '重播' : '试听'}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-12 gap-2 px-4 text-base"
-            disabled={!hasLastAudio}
-            title={hasLastAudio ? '保存末次试听音频到本地' : '先试听一次再保存'}
-            onClick={() => downloadLastAudio()}
-          >
-            <Download className="h-4 w-4" />
-            保存
           </Button>
         </div>
       </div>
