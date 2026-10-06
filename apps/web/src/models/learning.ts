@@ -12,6 +12,7 @@ export interface QuizQuestionItem {
   content: string;
   options?: { key: string; text: string; note?: string }[];
   chunks?: string[]; // for reorder type
+  reading?: { setId: string; title: string; body: string };
   correctAnswer: string;
   explanation: string;
   testedSkill: string;

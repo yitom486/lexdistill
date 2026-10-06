@@ -565,21 +565,17 @@ export class GatewayClient {
         const status = (envelope.payload as { status?: unknown })?.status;
         if (status === 'APPROVAL_ACK' || status === 'STEER_ACK' || status === 'TOOL_RESULT_ACK') return;
 
-        if (this.activeStream) {
-          const listener = this.activeStream;
-          this.activeStream = null;
-          listener.onComplete(envelope.payload as TurnCompletedPayload);
-        }
-
         if (status === 'INITIALIZED') {
           this.sessionId = envelope.sessionId;
           useGatewayStore.getState().setSessionId(envelope.sessionId);
+          return;
         } else if (Array.isArray((envelope.payload as { questions?: unknown })?.questions)) {
           const resolver = this.pendingResolvers.get(WsEventTypes.CLIENT_QUIZ_GENERATE);
           if (resolver) {
             this.pendingResolvers.delete(WsEventTypes.CLIENT_QUIZ_GENERATE);
             resolver(envelope.payload);
           }
+          return;
         } else if (
           (envelope.payload as { refinementSuggestion?: unknown })?.refinementSuggestion !== undefined ||
           (envelope.payload as { errorDiagnosis?: unknown })?.errorDiagnosis !== undefined
@@ -591,6 +587,13 @@ export class GatewayClient {
             this.pendingResolvers.delete(WsEventTypes.CLIENT_QUIZ_GRADE_SUBJECTIVE);
             resolver(envelope.payload);
           }
+          return;
+        }
+        if (status === 'RECORDED') return;
+        if (this.activeStream) {
+          const listener = this.activeStream;
+          this.activeStream = null;
+          listener.onComplete(envelope.payload as TurnCompletedPayload);
         }
       } else if (envelope.type === WsEventTypes.AGENT_QUEUE_CHANGED) {
         const sessionId = (envelope.payload as { sessionId?: string } | undefined)?.sessionId;

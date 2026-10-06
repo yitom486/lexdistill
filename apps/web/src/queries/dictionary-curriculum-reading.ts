@@ -4,6 +4,7 @@ import type { HangulItem, HangulScriptType, KanaItem, ReadingPassageSet, NewsTop
 import { logger } from '@study-studio/shared';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
+import { normalizeTrackLanguage } from '../learning/learning-shell.js';
 
 /** P1-2 拆分：词典/假名/课程阅读/新闻组（自 useLearnerQueries.ts 逐行平移，仅改 import）。 */
 
@@ -741,6 +742,7 @@ export type DictationChallengeItem = {
 
 /** 调用 Gateway learning.content 生成写作题干 */
 export function useGenerateWritingPromptsMutation(userId = DEFAULT_USER_ID) {
+  const language = normalizeTrackLanguage(useUserProfileStore(s => s.profile.targetLanguage));
   return useMutation({
     mutationFn: async (payload: {
       genre?: string;
@@ -758,7 +760,7 @@ export function useGenerateWritingPromptsMutation(userId = DEFAULT_USER_ID) {
           count: payload.count || 3,
           skillIds: payload.skillIds,
           collect: payload.collect ?? true,
-          language: 'ja',
+          language,
         },
       });
       if (!res.ok) throw new Error('生成写作题干失败');
@@ -856,6 +858,7 @@ export function useGenerateHangulWordsMutation(userId = DEFAULT_USER_ID) {
 
 /** 调用 Gateway learning.content 生成挖词听写 */
 export function useGenerateDictationMutation(userId = DEFAULT_USER_ID) {
+  const language = normalizeTrackLanguage(useUserProfileStore(s => s.profile.targetLanguage));
   return useMutation({
     mutationFn: async (payload?: { count?: number; skillIds?: string[] }) => {
       const res = await apiClient.api.learning.content[':userId'].$post({
@@ -866,7 +869,7 @@ export function useGenerateDictationMutation(userId = DEFAULT_USER_ID) {
           count: payload?.count || 4,
           skillIds: payload?.skillIds,
           collect: true,
-          language: 'ja',
+          language,
         },
       });
       if (!res.ok) throw new Error('生成听写题失败');

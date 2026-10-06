@@ -21,6 +21,7 @@ import type { MistakeEntry } from './mistake.js';
 
 export interface QuizAttemptRecord {
   id: string;
+  sourceAttemptId?: string;
   userId: string;
   questionId: string;
   userAnswer: string;
@@ -37,7 +38,7 @@ export interface QuizAttemptRecord {
 export interface LearnerRepository {
   // 画像与学情大盘
   getProfileSnapshot(userId: string, langOverride?: string): Promise<Result<LearnerProfileSnapshot, BusinessError>>;
-  getLearnerProfile(userId: string): Promise<Result<LearnerProfile, BusinessError>>;
+  getLearnerProfile(userId: string, language?: string): Promise<Result<LearnerProfile, BusinessError>>;
   updateLearnerProfile(userId: string, input: Partial<LearnerProfile>): Promise<Result<LearnerProfile, BusinessError>>;
   /**
    * 档位信息（可选能力：组卷难度门消费；缺实现时调用方用前端等级标签兜底）。
@@ -78,7 +79,7 @@ export interface LearnerRepository {
   ): Promise<Result<CourseRouteSnapshot, BusinessError>>;
 
   // 每日任务打卡与足迹
-  getDailyTaskProgress(userId: string, date?: string): Promise<Result<DailyTaskProgress, BusinessError>>;
+  getDailyTaskProgress(userId: string, date?: string, language?: string): Promise<Result<DailyTaskProgress, BusinessError>>;
   recordDailyActivity(
     userId: string,
     delta: {
@@ -88,18 +89,21 @@ export interface LearnerRepository {
       mistakesResolved?: number;
       reading?: number;
       date?: string;
+      language?: string;
     }
   ): Promise<Result<DailyTaskProgress, BusinessError>>;
 
   /** 获取或生成当日学习计划（步骤顺序稳定，done 由实时学情叠加） */
   getOrCreateDailyStudyPlan(
     userId: string,
-    date?: string
+    date?: string,
+    language?: string
   ): Promise<Result<DailyStudyPlan, BusinessError>>;
   completeDailyPlanStep(
     userId: string,
     stepId: string,
-    date?: string
+    date?: string,
+    language?: string
   ): Promise<Result<DailyStudyPlan, BusinessError>>;
 
   // 技能雷达

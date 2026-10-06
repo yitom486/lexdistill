@@ -3,6 +3,8 @@
  * 运行时工具只读库，不在工具文件内堆题干。
  */
 
+import { CLOZE_TEMPLATE_SEEDS, KOREAN_DICTATION_TEMPLATE_SEEDS } from './cloze-seed.js';
+
 export type ContentTemplateAction =
   | 'generate_quiz'
   | 'explain'
@@ -26,6 +28,8 @@ export interface ContentTemplateSeed {
 }
 
 export const LEARNING_CONTENT_TEMPLATE_SEEDS: ContentTemplateSeed[] = [
+  ...CLOZE_TEMPLATE_SEEDS,
+  ...KOREAN_DICTATION_TEMPLATE_SEEDS,
   // ── JA 自适应选择题（助词） ──
   {
     id: 'tpl_ja_quiz_particle_de',

@@ -73,6 +73,7 @@ export function useDailyPlanQuery(userId = DEFAULT_USER_ID, date?: string, langO
     queryFn: async () => {
       try {
         const url = new URL(`${GATEWAY_BASE_URL}/api/learning/plan/${userId}`);
+        url.searchParams.set('lang', targetLanguage);
         if (date) url.searchParams.set('date', date);
         const res = await fetch(url.toString());
         if (res.ok) {
@@ -150,13 +151,14 @@ export function useCourseRouteQuery(userId = DEFAULT_USER_ID, langOverride?: str
 
 export function useCompletePlanStepMutation(userId = DEFAULT_USER_ID) {
   const queryClient = useQueryClient();
+  const language = normalizeTrackLanguage(useUserProfileStore(s => s.profile.targetLanguage));
 
   return useMutation({
     mutationFn: async (payload: { stepId: string; date?: string }) => {
       const res = await fetch(`${GATEWAY_BASE_URL}/api/learning/plan/${userId}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, language }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as {

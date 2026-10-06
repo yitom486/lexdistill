@@ -7,6 +7,8 @@ describe('withTtsErrorMessages', () => {
     id: 'test',
     displayName: 'Test Provider',
     resolveApiKey: () => 'key',
+    listModels: async () => ({ models: [], source: 'remote' }),
+    listVoices: async () => [],
     synthesize: async () => ({ audioBuffer: Buffer.from([]), mimeType: 'audio/wav' }),
   };
 
@@ -18,7 +20,7 @@ describe('withTtsErrorMessages', () => {
       },
     });
     try {
-      await wrapped.synthesize({ text: 'test' });
+      await wrapped.synthesize({ text: 'test' } as any, 'key');
       expect.unreachable();
     } catch (err) {
       expect(err instanceof LocalTTSError).toBe(true);
@@ -35,7 +37,7 @@ describe('withTtsErrorMessages', () => {
       },
     });
     try {
-      await wrapped.synthesize({ text: 'test' });
+      await wrapped.synthesize({ text: 'test' } as any, 'key');
       expect.unreachable();
     } catch (err) {
       expect(err instanceof LocalTTSError).toBe(true);
@@ -52,7 +54,7 @@ describe('withTtsErrorMessages', () => {
       },
     });
     try {
-      await wrapped.synthesize({ text: 'test' });
+      await wrapped.synthesize({ text: 'test' } as any, 'key');
       expect.unreachable();
     } catch (err) {
       expect(err instanceof LocalTTSError).toBe(true);

@@ -431,7 +431,7 @@ describe('M1-1 package 依赖方向', () => {
     const cases: Array<[string, string[]]> = [
       ['runtime/context/context-builder.ts', ['summarizeLearningEvidence']],
       ['modules/learning-progress/application/learning-analysis.ts', ['summarizeLearningEvidence']],
-      ['modules/practice/application/submit-practice-attempt.ts', ['recordSkillAttempt']],
+      ['modules/practice/domain/record-practice-attempt.ts', ['recordSkillAttempt']],
     ];
     for (const [file, symbols] of cases) {
       const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');

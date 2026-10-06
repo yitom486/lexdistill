@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, ArrowUp, ArrowDown, Save, Loader2 } from 'lucide-react';
+import { Plus, Save, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,8 @@ import {
   SelectContent,
   SelectItem,
 } from '../ui/select.js';
-import { Slider } from '../ui/slider.js';
+import { BlockRow } from './PracticeBlockEditor.js';
+import { BLOCK_KINDS, BLOCK_KIND_LABELS, VOCAB_KINDS } from './practice-plan-editor-options.js';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { useSavePracticeTemplateMutation } from '../../queries/useLearnerQueries.js';
@@ -35,40 +36,6 @@ interface PracticePlanEditorProps {
   proposal?: { suggestedName: string; blocks: PracticeBlockSpec[] } | null;
 }
 
-const BLOCK_KINDS: PracticeBlockKind[] = [
-  'VOCAB_REVIEW',
-  'VOCAB_NEW',
-  'QUIZ',
-  'TRANSLATION',
-  'DICTATION',
-  'READING',
-  'WRITING',
-];
-/** 块类型中文名（界面只展示中文，存库仍用枚举值） */
-const BLOCK_KIND_LABELS: Record<PracticeBlockKind, string> = {
-  VOCAB_REVIEW: '到期复习',
-  VOCAB_NEW: '新词学习',
-  QUIZ: '综合做题',
-  TRANSLATION: '翻译练习',
-  DICTATION: '听写练习',
-  READING: '阅读理解',
-  WRITING: '写作练习',
-};
-const GRADING_MODES: GradingMode[] = ['AUTO_IMMEDIATE', 'AI_IMMEDIATE', 'AI_BATCH'];
-/** 批改方式中文名 */
-const GRADING_MODE_LABELS: Record<GradingMode, string> = {
-  AUTO_IMMEDIATE: '即时判定',
-  AI_IMMEDIATE: 'AI 即时批改',
-  AI_BATCH: 'AI 批量批改',
-};
-/** 翻译方向语言选项（存库仍用 zh/en/ja/ko 代码） */
-const TRANSLATION_LANG_OPTIONS = [
-  { value: 'zh', label: '中文' },
-  { value: 'en', label: '英语' },
-  { value: 'ja', label: '日语' },
-  { value: 'ko', label: '韩语' },
-];
-const VOCAB_KINDS = new Set<PracticeBlockKind>(['VOCAB_REVIEW', 'VOCAB_NEW']);
 /** P6-1：星期选择（0=周日…6=周六） */
 const WEEKDAYS: Array<{ value: number; label: string }> = [
   { value: 1, label: '一' },
@@ -81,7 +48,7 @@ const WEEKDAYS: Array<{ value: number; label: string }> = [
 ];
 
 function defaultBlock(kind: PracticeBlockKind, language: string): PracticeBlockSpec {
-  const isObjective = kind === 'VOCAB_REVIEW' || kind === 'VOCAB_NEW' || kind === 'QUIZ';
+  const isObjective = kind === 'VOCAB_REVIEW' || kind === 'VOCAB_NEW' || kind === 'QUIZ' || kind === 'CLOZE' || kind === 'READING' || kind === 'DICTATION';
   const grading: GradingMode = isObjective ? 'AUTO_IMMEDIATE' : 'AI_BATCH';
   const block: PracticeBlockSpec = { id: generateId('blk'), kind, count: 5, gradingMode: grading };
   if (kind === 'TRANSLATION') {
@@ -188,18 +155,19 @@ export function PracticePlanEditor({ isOpen, onClose, userId, language, template
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>{template ? '编辑练习计划' : '新建练习计划'}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-4 pr-1">
           <div className="flex items-center gap-3">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：考研英语晚间 35 分钟"
-              className="flex-1 rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600 transition-colors"
+              aria-label="模板名称"
+              className="min-w-0 flex-1 rounded-md border border-line-slate-300 px-3 py-2 text-sm dark:border-ink-slate-600 transition-colors"
             />
             <label className="flex items-center gap-2 text-xs">
               <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
@@ -210,7 +178,7 @@ export function PracticePlanEditor({ isOpen, onClose, userId, language, template
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-ink-slate-500">重复</span>
             <Select value={scheduleKind} onValueChange={(v) => v && setScheduleKind(v as 'daily' | 'weekly')}>
-              <SelectTrigger className="w-[8rem]"><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="重复安排" className="w-[8rem]"><SelectValue>{scheduleKind === 'daily' ? '每天' : '按星期'}</SelectValue></SelectTrigger>
               <SelectContent>
                 <SelectItem value="daily">每天</SelectItem>
                 <SelectItem value="weekly">按星期</SelectItem>
@@ -275,7 +243,7 @@ export function PracticePlanEditor({ isOpen, onClose, userId, language, template
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 gap-2">
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>
@@ -286,141 +254,5 @@ export function PracticePlanEditor({ isOpen, onClose, userId, language, template
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-interface BlockRowProps {
-  block: PracticeBlockSpec;
-  index: number;
-  onUpdate: (patch: Partial<PracticeBlockSpec>) => void;
-  onRemove: () => void;
-  onUp: () => void;
-  onDown: () => void;
-}
-
-function BlockRow({ block, index, onUpdate, onRemove, onUp, onDown }: BlockRowProps) {
-  const isVocab = VOCAB_KINDS.has(block.kind);
-  return (
-    <div className="rounded-md border border-line-slate-200-slate-700 p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-ink-slate-500">第 {index + 1} 块 · {BLOCK_KIND_LABELS[block.kind]}</span>
-        <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={onUp}><ArrowUp className="h-3 w-3" /></Button>
-          <Button size="sm" variant="ghost" onClick={onDown}><ArrowDown className="h-3 w-3" /></Button>
-          <Button size="sm" variant="ghost" onClick={onRemove}><Trash2 className="h-3 w-3" /></Button>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={block.kind} onValueChange={(v) => v && onUpdate({ kind: v as PracticeBlockKind })}>
-          <SelectTrigger className="w-[8.5rem]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {BLOCK_KINDS.map((k) => (
-              <SelectItem key={k} value={k}>{BLOCK_KIND_LABELS[k]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={block.gradingMode} onValueChange={(v) => v && onUpdate({ gradingMode: v as GradingMode })}>
-          <SelectTrigger className="w-[8.5rem]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {GRADING_MODES.map((g) => (
-              <SelectItem key={g} value={g}>{GRADING_MODE_LABELS[g]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={String(block.difficulty ?? 3)}
-          onValueChange={(v) => v && onUpdate({ difficulty: Number(v) })}
-        >
-          <SelectTrigger className="w-[6rem]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {[1, 2, 3, 4, 5].map((d) => (
-              <SelectItem key={d} value={String(d)}>难度 {d}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="mt-3 flex items-center gap-3">
-        <span className="text-xs text-ink-slate-500">题量 {block.count}</span>
-        <Slider
-          value={[block.count]}
-          min={1}
-          max={20}
-          step={1}
-          onValueChange={(val) => {
-            const n = Array.isArray(val) ? val[0] : typeof val === 'number' ? val : undefined;
-            if (typeof n === 'number') onUpdate({ count: n });
-          }}
-          className="flex-1"
-        />
-      </div>
-      {isVocab && (
-        <div className="mt-2">
-          <Select
-            value={block.vocabularySource ?? 'DUE_CARDS'}
-            onValueChange={(v) => v && onUpdate({ vocabularySource: v as PracticeBlockSpec['vocabularySource'] })}
-          >
-            <SelectTrigger className="w-[12rem]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="DUE_CARDS">到期卡片</SelectItem>
-              <SelectItem value="COLLECTED_WORDS">已收集生词</SelectItem>
-              <SelectItem value="TOPIC_WORDS">指定主题新词</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-      {block.kind === 'TRANSLATION' && (
-        <div className="mt-2 flex items-center gap-2">
-          <Select
-            value={block.translationDirection?.sourceLanguage ?? 'zh'}
-            onValueChange={(v) =>
-              v &&
-              onUpdate({
-                translationDirection: {
-                  sourceLanguage: v,
-                  targetLanguage: block.translationDirection?.targetLanguage ?? 'en',
-                },
-              })
-            }
-          >
-            <SelectTrigger className="w-[7rem]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {TRANSLATION_LANG_OPTIONS.map((l) => (
-                <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
-              ))}
-              {TRANSLATION_LANG_OPTIONS.every((l) => l.value !== (block.translationDirection?.sourceLanguage ?? 'zh')) && (
-                <SelectItem value={block.translationDirection?.sourceLanguage ?? 'zh'}>
-                  {block.translationDirection?.sourceLanguage ?? 'zh'}
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-          <span className="self-center text-ink-slate-400">→</span>
-          <Select
-            value={block.translationDirection?.targetLanguage ?? 'en'}
-            onValueChange={(v) =>
-              v &&
-              onUpdate({
-                translationDirection: {
-                  sourceLanguage: block.translationDirection?.sourceLanguage ?? 'zh',
-                  targetLanguage: v,
-                },
-              })
-            }
-          >
-            <SelectTrigger className="w-[7rem]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {TRANSLATION_LANG_OPTIONS.map((l) => (
-                <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
-              ))}
-              {TRANSLATION_LANG_OPTIONS.every((l) => l.value !== (block.translationDirection?.targetLanguage ?? 'en')) && (
-                <SelectItem value={block.translationDirection?.targetLanguage ?? 'en'}>
-                  {block.translationDirection?.targetLanguage ?? 'en'}
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-    </div>
   );
 }

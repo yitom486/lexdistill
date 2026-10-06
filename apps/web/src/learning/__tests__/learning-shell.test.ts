@@ -19,7 +19,7 @@ describe('resolveGuardTab (P5-E6)', () => {
     expect(resolveGuardTab('en', 'KANA')).toBe('QUIZ');
     expect(resolveGuardTab('en', 'PITCH')).toBe('QUIZ');
     expect(resolveGuardTab('en', 'TEXTBOOK')).toBe('QUIZ');
-    expect(resolveGuardTab('en', 'SHADOWING')).toBe('QUIZ');
+    expect(resolveGuardTab('en', 'SHADOWING')).toBe('SHADOWING');
     expect(resolveGuardTab('ko', 'KANA')).toBe('QUIZ');
   });
 
@@ -29,9 +29,11 @@ describe('resolveGuardTab (P5-E6)', () => {
     expect(resolveGuardTab('ja', 'HANGUL')).toBe('QUIZ');
   });
 
-  it('sends writing back to READING on ko track; shadowing follows JA-only rule', () => {
-    expect(resolveGuardTab('ko', 'WRITING')).toBe('READING');
-    expect(resolveGuardTab('ko', 'SHADOWING')).toBe('QUIZ');
+  it('opens listening and writing on every learning track', () => {
+    for (const language of ['en', 'ja', 'ko'] as const) {
+      expect(resolveGuardTab(language, 'WRITING')).toBe('WRITING');
+      expect(resolveGuardTab(language, 'SHADOWING')).toBe('SHADOWING');
+    }
   });
 
   it('falls back to track fallbackTab for unknown invalid tabs', () => {

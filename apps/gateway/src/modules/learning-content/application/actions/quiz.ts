@@ -15,7 +15,6 @@ import {
   defaultQuizSkill,
   loadTemplates,
   maybeCollect,
-  pickCycled,
 } from './shared.js';
 
 export async function handleQuizAction(
@@ -74,7 +73,7 @@ export async function handleQuizAction(
     );
   }
 
-  const picked = pickCycled(templates.value, count);
+  const picked = templates.value.slice(0, count);
   // P4-2 来源补链：行 id 与题目配对携带，门过滤后仍对齐（被滤掉的行 id 不进 sourceRef）。
   const built = picked.map((row) => {
     const q = (row.payload as { question: Omit<GeneratedQuestion, 'id'> }).question;
@@ -132,7 +131,7 @@ export async function buildDictation(
     return err(new BusinessError('E_CONTENT_EMPTY', MSG.emptyDictation(language), 'TOOL_EXECUTION'));
   }
 
-  const picked = pickCycled(templates.value, count);
+  const picked = templates.value.slice(0, count);
   const pickedRowIds = picked.map((row) => row.id);
   const dictationItems = picked.map((row) => {
     const item = (

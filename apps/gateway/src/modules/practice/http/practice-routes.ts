@@ -5,7 +5,7 @@ import type { PracticeBlockSpec } from '@study-studio/protocol';
 import { isQuestionAllowed, resolveStudyGate } from '@study-studio/learner-core';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { assemblePracticeRun } from '../application/practice-assembly.js';
-import { gradeObjectiveAnswer } from '../application/practice-grading.js';
+import { submitObjectiveItem } from '../application/submit-objective-item.js';
 import { createProposal, consumeProposal } from '../application/practice-proposal.js';
 import { summarizePracticeRun } from '../application/practice-summary.js';
 import type { PersistableQuestion } from '../persistence/questions.js';
@@ -155,41 +155,7 @@ export function createPracticeRoutes(deps: GatewayDeps) {
     async (c) => {
       try {
         const body = c.req.valid('json');
-        // 服务端权威判题：按 runId+itemId 读取装配时的权威题目，前端传来的
-        // isCorrect 仅作向后兼容回退，不再作为判题依据。
-        let isCorrect = body.isCorrect ?? false;
-        let authoritative = false;
-        try {
-          const itemsRes = await deps.repo.getPracticeRunItems(body.userId, body.runId);
-          if (isOk(itemsRes)) {
-            const found = itemsRes.value.find((d) => d.itemId === body.itemId);
-            const graded = gradeObjectiveAnswer(
-              found?.question as { type?: string; correctAnswer?: string; acceptableVariants?: string[] } | undefined,
-              body.userAnswer ?? '',
-            );
-            if (graded.authoritative) {
-              isCorrect = graded.isCorrect;
-              authoritative = true;
-            }
-          }
-        } catch {
-          /* 权威题目读取失败时回退到客户端值，保证可用性 */
-        }
-        const gradingResult = {
-          isCorrect,
-          score: typeof body.score === 'number' ? body.score : isCorrect ? 1 : 0,
-          testedSkillId: body.testedSkillId ?? 'review',
-          source: 'AUTO_IMMEDIATE',
-          ...(authoritative ? { gradedBy: 'gateway' } : { gradedBy: 'client-fallback' }),
-        };
-        const res = await deps.repo.submitPracticeItem(
-          body.userId,
-          body.runId,
-          body.itemId,
-          body.userAnswer,
-          gradingResult,
-          body.timeSpentMs
-        );
+        const res = await submitObjectiveItem(deps.repo, body);
         if (isOk(res)) return c.json(res.value);
         return formatBusinessErrorResponse(c, res.error);
       } catch (e: unknown) {

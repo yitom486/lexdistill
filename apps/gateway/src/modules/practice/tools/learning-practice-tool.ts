@@ -14,6 +14,7 @@ import type {
 } from '@study-studio/protocol';
 import { PracticeBlockSpecSchema } from '@study-studio/protocol';
 import { summarizePracticeRun, type RunSummaryReport } from '../application/practice-summary.js';
+import { submitObjectiveItem } from '../application/submit-objective-item.js';
 
 /**
  * P5：练习计划执行会话的受控写入工具。
@@ -168,22 +169,8 @@ export class LearningPracticeTool
     if (!input.runId || !input.itemId || input.userAnswer === undefined) {
       return err(new BusinessError('E_INVALID_INPUT', 'submit_objective 需要 runId/itemId/userAnswer', 'VALIDATION'));
     }
-    const isCorrect = input.isCorrect ?? false;
-    const score = typeof input.score === 'number' ? input.score : isCorrect ? 1 : 0;
-    const gradingResult = {
-      isCorrect,
-      score,
-      testedSkillId: input.testedSkillId ?? 'review',
-      source: 'AUTO_IMMEDIATE',
-    };
-    const res = await this.learnerRepo.submitPracticeItem(
-      userId,
-      input.runId,
-      input.itemId,
-      input.userAnswer,
-      gradingResult,
-      input.timeSpentMs
-    );
+    const res = await submitObjectiveItem(this.learnerRepo, { userId, runId: input.runId, itemId: input.itemId,
+      userAnswer: input.userAnswer, timeSpentMs: input.timeSpentMs });
     if (!isOk(res)) return err(res.error);
     return ok({ attempt: res.value });
   }

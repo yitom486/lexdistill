@@ -113,7 +113,7 @@ export function usePracticeRunner(opts: {
 
   const doneCount = items.filter((it) => {
     const s = viewStates[it.itemId];
-    return s?.status === 'GRADED' || (s?.status === 'SUBMITTED' && !s.submitting);
+    return s?.status === 'GRADED';
   }).length;
   const progress = items.length > 0 ? (doneCount / items.length) * 100 : 0;
   const isSubmitting =

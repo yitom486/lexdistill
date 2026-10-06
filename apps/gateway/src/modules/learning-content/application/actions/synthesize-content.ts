@@ -35,6 +35,8 @@ export function synthesizeContentInputForBlock(
     }
     case 'DICTATION':
       return { ...base, action: 'generate_quiz', format: 'LISTENING_DICTATION' };
+    case 'CLOZE':
+      return { ...base, action: 'generate_quiz', format: 'MULTIPLE_CHOICE', skillIds: [`${language === 'ja' ? 'jp' : language}.reading.cloze`] };
     case 'TRANSLATION':
       return { ...base, action: 'generate_writing_prompt', genre: 'translation' };
     case 'WRITING':

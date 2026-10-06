@@ -3,8 +3,9 @@ import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Play, Loader2, Sparkles, CopyPlus } from 'lucide-react';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
+import { BLOCK_KIND_LABELS } from './practice-plan-editor-options.js';
 import { Switch } from '../ui/switch.js';
-import { isTemplateDueOn } from '@study-studio/learning';
+import { isTemplateDueOn, buildBalancedPracticeBlocks } from '@study-studio/learning';
 import { usePracticeTemplatesQuery, useDeletePracticeTemplateMutation, useStartPracticeRunMutation, useProposeTemplateMutation, useTogglePracticeTemplateMutation, useCopyPracticeTemplateMutation } from '../../queries/useLearnerQueries.js';
 import { PracticePlanEditor } from './PracticePlanEditor.js';
 import { PracticeRunWorkbench } from './PracticeRunWorkbench.js';
@@ -120,9 +121,14 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">我的练习计划</h3>
         <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={() => {
+            setEditing(null);
+            setProposal({ suggestedName: `${language === 'en' ? '英语' : language === 'ja' ? '日语' : '韩语'}综合学习`, blocks: buildBalancedPracticeBlocks(language) });
+            setEditorOpen(true);
+          }}><Plus className="mr-1 h-3 w-3" />综合学习</Button>
           <Button size="sm" variant="outline" onClick={handlePropose} disabled={proposeMutation.isPending}>
             <Sparkles className="mr-1 h-3 w-3" />智能建议
           </Button>
@@ -142,16 +148,16 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
 
       <div className="flex flex-col gap-2">
         {sortedTemplates.map((tpl) => (
-          <div key={tpl.id} className="flex items-center justify-between rounded-md border border-line-slate-200-slate-700 p-3">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
+          <div key={tpl.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-md border border-line-slate-200-slate-700 p-3">
+            <div className="min-w-0 flex flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
                 <Switch
                   checked={tpl.enabled}
                   onCheckedChange={(checked) => handleToggle(tpl, checked)}
                   disabled={toggleMutation.isPending}
                   title={tpl.enabled ? '点击停用该模板' : '点击启用该模板'}
                 />
-                <span className={tpl.enabled ? 'text-sm font-medium' : 'text-sm font-medium text-ink-slate-400'}>
+                <span className={tpl.enabled ? 'break-words text-sm font-medium' : 'break-words text-sm font-medium text-ink-slate-400'}>
                   {tpl.name}
                 </span>
                 {isDueToday(tpl) && (
@@ -160,10 +166,10 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
                 <Badge variant="secondary">revision {tpl.revision}</Badge>
               </div>
               <span className="text-xs text-ink-slate-500">
-                {tpl.blocks.map((b) => `${b.kind}×${b.count}`).join(' · ')}
+                {tpl.blocks.map((b) => `${b.title ?? BLOCK_KIND_LABELS[b.kind]}×${b.count}`).join(' · ')}
               </span>
             </div>
-            <div className="flex gap-1">
+            <div className="flex shrink-0 gap-1">
               <Button size="sm" variant="ghost" onClick={() => openEdit(tpl)} title="编辑模板"><Pencil className="h-3 w-3" /></Button>
               <Button
                 size="sm"

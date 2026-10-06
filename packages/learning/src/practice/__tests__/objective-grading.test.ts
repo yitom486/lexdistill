@@ -3,6 +3,16 @@ import { gradeObjectiveAnswer } from '../index.js';
 
 /** M7-15 自 Gateway practice-grading.test.ts 迁入（行为一致；Gateway 原文件保留作兼容层覆盖）。 */
 describe('practice objective grading (server-authoritative)', () => {
+  it('maps option letters to canonical text and keyed legacy options', () => {
+    expect(gradeObjectiveAnswer({ type: 'MULTIPLE_CHOICE', options: ['go', 'went'], correctAnswer: 'went' }, 'B').isCorrect).toBe(true);
+    expect(gradeObjectiveAnswer({ type: 'MULTIPLE_CHOICE', options: [{ key: 'x', text: 'went' }, { key: 'y', text: 'go' }], correctAnswer: 'went' }, 'x').isCorrect).toBe(true);
+    expect(gradeObjectiveAnswer({ type: 'MULTIPLE_CHOICE', options: ['go', 'went'], correctAnswer: 'B' }, 'went').isCorrect).toBe(true);
+  });
+  it('normalizes English dictation case and width without changing non-English letter case', () => {
+    expect(gradeObjectiveAnswer({ type: 'LISTENING_DICTATION', language: 'en', correctAnswer: 'went' }, ' ＷＥＮＴ ').isCorrect).toBe(true);
+    expect(gradeObjectiveAnswer({ type: 'FILL_IN_BLANK', language: 'ja', correctAnswer: 'ABC' }, 'abc').isCorrect).toBe(false);
+    expect(gradeObjectiveAnswer({ type: 'FILL_IN_BLANK', correctAnswer: '' }, '').authoritative).toBe(false);
+  });
   it('grades multiple-choice by exact match', () => {
     expect(
       gradeObjectiveAnswer({ type: 'MULTIPLE_CHOICE', correctAnswer: 'B' }, 'B').isCorrect,

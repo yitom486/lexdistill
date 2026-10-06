@@ -13,6 +13,7 @@ import {
   buildTranslationQuestionsFromCards,
   buildReadingQuestions,
   mapPoolQuestion,
+  mapQuestionType,
   type PoolQuestionRow,
 } from '@study-studio/learning';
 
@@ -34,11 +35,11 @@ export {
  * 1. VOCAB_REVIEW/VOCAB_NEW → 从 FSRS 闪卡装配词义选择题（到期卡优先 / 新卡优先），不复制 FSRS 状态；
  * 2. QUIZ/TRANSLATION/DICTATION/WRITING → 先按题型（+难度）从 quiz_questions 池精选；
  * 3. 池不足 → 经 learning.content `generate_for_block` 模板驱动补齐（不调 LLM，语种模板缺失则跳过）；
- * 4. 仍不足 → 回退同语种任意可用题；
+ * 4. 不以其他练习类型冒充缺失语料；
  * 5. 全链为空 → 记入 skippedBlocks 显式上报（不再静默跳块）。
  * 6. 跨块去重：同一 run 内同一道题不重复装入。
  *
- * READING 块 v1 仍回退客观题（阅读篇目套题链路另行接入）。
+ * 阅读与完形必须带正文；听写必须带完整音频语料。
  */
 
 export interface AssembledBlock {
@@ -80,6 +81,7 @@ function toPoolQuestionRow(q: PersistableQuestion): PoolQuestionRow {
     testedSkillId: q.testedSkillId,
     difficulty: q.difficulty,
     dictation: q.dictation,
+    reading: q.reading,
   };
 }
 
@@ -275,7 +277,11 @@ export async function assemblePracticeRun(
     const strictDedupe = examBlueprint != null;
     const pushFresh = (list: GeneratedQuestion[]) => {
       for (const q of list) {
+        if ((block.kind === 'READING' || block.kind === 'CLOZE') && !q.reading) continue;
+        if (block.kind === 'CLOZE' && !q.testedSkillId.endsWith('.reading.cloze')) continue;
+        if (block.kind === 'DICTATION' && (q.type !== 'LISTENING_DICTATION' || !q.dictation?.fullJapanese)) continue;
         if (usedQuestionIds.has(q.id)) continue;
+        if (candidates.some(candidate => candidate.id === q.id)) continue;
         const hasContent = String(q.content ?? '').trim().length > 0;
         if (strictDedupe && hasContent) {
           const key = questionContentKey(q);
@@ -348,23 +354,30 @@ export async function assemblePracticeRun(
 
     // 2) 题型（+难度）池精选
     if (candidates.length < block.count) {
-      const wantedTypes = acceptedDbTypesForBlock(block);
+      const historicalTypes = acceptedDbTypesForBlock(block);
+      const wantedTypes = [...new Set([...historicalTypes, ...historicalTypes.map(mapQuestionType)])];
       const fetchLimit = block.count * 4 + 8;
       const typedRes = await repo.getQuestions(userId, fetchLimit, run.language, {
         types: wantedTypes,
         difficulty: block.difficulty,
-      });      let pool = isOk(typedRes) ? (typedRes.value ?? []) : [];
+        skillIds: block.kind === 'CLOZE' ? [`${run.language === 'ja' ? 'jp' : run.language}.reading.cloze`] : block.skillIds,
+      });
+      let pool = isOk(typedRes) ? (typedRes.value ?? []) : [];
       // 难度过严 → 放宽难度，保留题型
       if (pool.length < block.count && typeof block.difficulty === 'number') {
         const relaxedRes = await repo.getQuestions(userId, fetchLimit, run.language, {
           types: wantedTypes,
+          skillIds: block.kind === 'CLOZE' ? [`${run.language === 'ja' ? 'jp' : run.language}.reading.cloze`] : block.skillIds,
         });
         if (isOk(relaxedRes)) {
           const relaxedPool = relaxedRes.value ?? [];
           if (relaxedPool.length > pool.length) pool = relaxedPool;
         }
       }
-      pushFresh(applyGate(pool.map((row) => mapPoolQuestion(toPoolQuestionRow(row)))));
+      pushFresh(applyGate(pool.map((row) => mapPoolQuestion(toPoolQuestionRow(row))).filter(question =>
+        (block.kind !== 'READING' && block.kind !== 'CLOZE' || Boolean(question.reading)) &&
+        (block.kind !== 'DICTATION' || Boolean(question.dictation?.fullJapanese))
+      )));
     }
 
     // 3) 模板驱动生成补齐（不调 LLM；模板缺失自动跳过）
@@ -377,12 +390,6 @@ export async function assemblePracticeRun(
         const first = genRes.value.perBlock?.[0];
         pushFresh(applyGate(first?.questions ?? []));
       }
-    }
-
-    // 4) 同语种任意题兜底（同样过门：兜底不是法外之地）
-    if (candidates.length < block.count) {
-      const anyRes = await repo.getQuestions(userId, block.count * 4 + 8, run.language);
-      if (isOk(anyRes)) pushFresh(applyGate((anyRes.value ?? []).map((row) => mapPoolQuestion(toPoolQuestionRow(row)))));
     }
 
     const selected = candidates.slice(0, block.count);
@@ -410,7 +417,7 @@ export async function assemblePracticeRun(
       blockId: block.id,
       gradingMode: block.gradingMode,
     });
-    if (!isOk(collectRes)) continue;
+    if (!isOk(collectRes)) return err(collectRes.error);
 
     blocks.push({
       blockId: block.id,

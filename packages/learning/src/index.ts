@@ -94,3 +94,4 @@ export {
 
 /** 练习计划建议草案（快照确定性规则；令牌/存储/时钟归调用方）。 */
 export { proposeTemplateFromSnapshot } from './practice-proposal.js';
+export { buildBalancedPracticeBlocks } from './practice/balanced-plan.js';

@@ -43,8 +43,8 @@ export function WritingStudioWorkbench() {
         }))
       );
       toast.success('题干已由 learning.content 生成');
-    } catch {
-      toast.error('生成失败，可在下方工作台使用本地演示题或重试');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '生成失败，请重试。');
     }
   };
 

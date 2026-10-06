@@ -92,6 +92,26 @@ export const QuizSubmitPayloadSchema = z.object({
 });
 export type QuizSubmitPayload = z.infer<typeof QuizSubmitPayloadSchema>;
 
+export const ObjectiveAnswerInputSchema = z.object({
+  submissionId: z.string().min(1).max(120),
+  questionId: z.string().min(1),
+  language: z.enum(['en', 'ja', 'ko']),
+  userAnswer: z.string().trim().min(1).max(10000),
+  timeSpentMs: z.number().int().nonnegative(),
+});
+export type ObjectiveAnswerInput = z.infer<typeof ObjectiveAnswerInputSchema>;
+
+export const ObjectiveAnswerResultSchema = z.object({
+  submissionId: z.string(),
+  questionId: z.string(),
+  isCorrect: z.boolean(),
+  score: z.number().min(0).max(1),
+  correctAnswer: z.string(),
+  explanation: z.string(),
+  persistedToDb: z.literal(true),
+});
+export type ObjectiveAnswerResult = z.infer<typeof ObjectiveAnswerResultSchema>;
+
 export const ErrorDiagnosisSchema = z.object({
   category: z.enum([
     'PARTICLE',

@@ -50,11 +50,12 @@ import { getTodayString, getYesterdayString, safeJsonParse } from '@study-studio
 export async function getDailyTaskProgress(
   deps: RepoDeps,
   userId: string,
-  date?: string
+  date?: string,
+  langOverride?: string
 ): Promise<Result<DailyTaskProgress, BusinessError>> {
   try {
     const targetDate = date || getTodayString();
-    const profileRes = await deps.repo.getLearnerProfile(userId);
+    const profileRes = await deps.repo.getLearnerProfile(userId, langOverride);
     if (!isOk(profileRes)) return profileRes;
     const profile = profileRes.value;
     const language: TrackLanguage = normalizeTrackLanguage(profile.targetLanguage) ?? 'ja';
@@ -244,6 +245,12 @@ export async function recordDailyActivity(
     if (!isOk(profileRes)) return profileRes;
     let profile = profileRes.value;
     const language: TrackLanguage = normalizeTrackLanguage(delta.language ?? profile.targetLanguage) ?? 'ja';
+    const activeLanguage = normalizeTrackLanguage(profile.targetLanguage);
+    if (activeLanguage !== language) {
+      const trackProfile = await deps.repo.getLearnerProfile(userId, language);
+      if (!isOk(trackProfile)) return trackProfile;
+      profile = trackProfile.value;
+    }
 
     const existingLogs = await deps.db
       .select()
@@ -344,7 +351,7 @@ export async function recordDailyActivity(
         )
       )
       .limit(1);
-    if (refreshedLang[0] && normalizeTrackLanguage(profile.targetLanguage) === language) {
+    if (refreshedLang[0] && activeLanguage === language) {
       await mirrorLanguageProfileToMain(deps, userId, language, refreshedLang[0]);
     }
 
@@ -417,10 +424,11 @@ export async function recordDailyActivity(
 export async function getOrCreateDailyStudyPlan(
   deps: RepoDeps,
   userId: string,
-  date?: string
+  date?: string,
+  langOverride?: string
 ): Promise<Result<DailyStudyPlan, BusinessError>> {
   try {
-    return await hydrateDailyStudyPlan(deps, userId, date);
+    return await hydrateDailyStudyPlan(deps, userId, date, langOverride);
   } catch (error) {
     return err(
       translateToBusinessError(error, {
@@ -436,10 +444,11 @@ export async function completeDailyPlanStep(
   deps: RepoDeps,
   userId: string,
   stepId: string,
-  date?: string
+  date?: string,
+  langOverride?: string
 ): Promise<Result<DailyStudyPlan, BusinessError>> {
   try {
-    const planRes = await hydrateDailyStudyPlan(deps, userId, date);
+    const planRes = await hydrateDailyStudyPlan(deps, userId, date, langOverride);
     if (!isOk(planRes)) return planRes;
     const plan = planRes.value;
     if (!plan.steps.some((step) => step.id === stepId)) {
@@ -469,7 +478,7 @@ export async function completeDailyPlanStep(
         .where(eq(dailyStudyPlans.id, plan.id));
     }
 
-    return hydrateDailyStudyPlan(deps, userId, plan.planDate);
+    return hydrateDailyStudyPlan(deps, userId, plan.planDate, plan.language);
   } catch (error) {
     return err(
       translateToBusinessError(error, {
@@ -545,10 +554,11 @@ export async function getPracticePlanRunSignal(
 export async function hydrateDailyStudyPlan(
   deps: RepoDeps,
   userId: string,
-  date?: string
+  date?: string,
+  langOverride?: string
 ): Promise<Result<DailyStudyPlan, BusinessError>> {
   const targetDate = date || getTodayString();
-  const profileRes = await deps.repo.getLearnerProfile(userId);
+  const profileRes = await deps.repo.getLearnerProfile(userId, langOverride);
   if (!isOk(profileRes)) return profileRes;
   const profile = profileRes.value;
   const language = normalizeTrackLanguage(profile.targetLanguage);
@@ -557,7 +567,7 @@ export async function hydrateDailyStudyPlan(
     deps.repo.getDueCards(userId, 200, { dueOnly: true, language }),
     deps.repo.getMistakes(userId, { resolved: false, language }),
     deps.repo.getProfileSnapshot(userId, language),
-    deps.repo.getDailyTaskProgress(userId, targetDate),
+    deps.repo.getDailyTaskProgress(userId, targetDate, language),
   ]);
   if (!isOk(dueRes)) return dueRes;
   if (!isOk(mistakesRes)) return mistakesRes;

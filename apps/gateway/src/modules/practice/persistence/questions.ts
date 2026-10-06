@@ -10,6 +10,7 @@ import {
   generateId,
 } from '@study-studio/shared';
 import type { QuizAttemptRecord } from '@study-studio/learner-core';
+import { GeneratedQuestionSchema } from '@study-studio/protocol';
 import { quizAttempts, quizQuestions } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import {
@@ -43,6 +44,8 @@ export type PersistableQuestion = {
   language?: unknown;
   createdAt?: unknown;
   dictation?: unknown;
+  reading?: unknown;
+  acceptableVariants?: unknown;
 };
 
 /** 未知输入收敛为写入字符串（非字符串一律回退，保证列类型稳定）。 */
@@ -78,6 +81,23 @@ function parseDictationExtras(raw: unknown): Record<string, unknown> | undefined
   } catch {
     return undefined;
   }
+}
+
+function extractReadingExtras(value: unknown) {
+  const parsed = GeneratedQuestionSchema.shape.reading.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function parseQuestionExtras(raw: string | null) {
+  try {
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object') return {};
+    const value = parsed as Record<string, unknown>;
+    const reading = extractReadingExtras(value.reading);
+    const result = GeneratedQuestionSchema.shape.acceptableVariants.safeParse(value.acceptableVariants);
+    const variants = result.success ? result.data : undefined;
+    return { ...(reading ? { reading } : {}), ...(variants ? { acceptableVariants: variants } : {}) };
+  } catch { return {}; }
 }
 
 /**
@@ -138,6 +158,7 @@ export async function getQuestions(
         difficulty: r.difficulty,
         createdAt: r.createdAt,
         ...(dictation ? { dictation } : {}),
+        ...parseQuestionExtras(r.extrasJson),
       };
     });
 
@@ -191,9 +212,12 @@ export async function saveQuestion(
         ? question.chunks
         : JSON.stringify(question.chunks)
       : null;
-    // P6-2：仅持久化 dictation 语料（reading 正文不入库）
+    // The question keeps its passage and answer variants when reloaded from the pool.
     const dictationExtras = extractDictationExtras(question);
-    const extrasStr = dictationExtras ? JSON.stringify({ dictation: dictationExtras }) : null;
+    const reading = extractReadingExtras(question.reading);
+    const acceptableVariants = GeneratedQuestionSchema.shape.acceptableVariants.safeParse(question.acceptableVariants).data;
+    const extras = { ...(dictationExtras ? { dictation: dictationExtras } : {}), ...(reading ? { reading } : {}), ...(acceptableVariants ? { acceptableVariants } : {}) };
+    const extrasStr = Object.keys(extras).length ? JSON.stringify(extras) : null;
 
     const row = {
       language,
@@ -256,6 +280,7 @@ export async function recordQuizAttempt(
   try {
     await deps.db.insert(quizAttempts).values({
       id: attempt.id,
+      ...(attempt.sourceAttemptId ? { sourceAttemptId: attempt.sourceAttemptId } : {}),
       userId: attempt.userId,
       language: inferLanguageFromSkillId(attempt.testedSkillId),
       questionId: attempt.questionId,
@@ -268,7 +293,10 @@ export async function recordQuizAttempt(
     });
 
     // 自动累计每日做题任务足迹
-    await deps.repo.recordDailyActivity(attempt.userId, { quizzes: 1 });
+    const activity = await deps.repo.recordDailyActivity(attempt.userId, {
+      quizzes: 1, language: inferLanguageFromSkillId(attempt.testedSkillId),
+    });
+    if (!isOk(activity)) return err(activity.error);
 
     return ok(undefined);
   } catch (error) {

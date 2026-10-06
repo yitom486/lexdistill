@@ -119,6 +119,10 @@ export async function maybeCollect(
   if (!input.collect || !questions?.length) {
     return ok(base);
   }
+  if (learnerRepo.saveQuestions) {
+    const saved = await learnerRepo.saveQuestions(questions.map(question => ({ ...question, userId: context.userId, language })));
+    if (!isOk(saved)) return saved;
+  }
   // P4-2 题目来源补链：模板行 id 去重保序附到既有 sourceRef（旧行 skillId 语义保留）。
   const uniqueTemplateIds = [...new Set(templateIds ?? [])];
   const skill = input.skillIds?.[0];

@@ -27,6 +27,7 @@ const OBJECTIVE_KINDS: ReadonlySet<PracticeBlockKind> = new Set([
   'VOCAB_REVIEW',
   'VOCAB_NEW',
   'QUIZ',
+  'CLOZE',
 ]);
 
 /** 必须人工/AI 批改的主观题块（不应配 AUTO_IMMEDIATE） */
@@ -45,6 +46,7 @@ const KIND_SET = new Set<string>([
   'TRANSLATION',
   'DICTATION',
   'READING',
+  'CLOZE',
   'WRITING',
 ]);
 

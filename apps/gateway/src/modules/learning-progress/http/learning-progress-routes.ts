@@ -36,7 +36,7 @@ export function createLearningProgressRoutes(deps: GatewayDeps) {
   .get('/api/task/progress/:userId', async (c) => {
     const userId = c.req.param('userId');
     const date = c.req.query('date') || undefined;
-    const res = await deps.repo.getDailyTaskProgress(userId, date);
+    const res = await deps.repo.getDailyTaskProgress(userId, date, c.req.query('lang'));
     if (isOk(res)) return c.json(res.value);
     return formatBusinessErrorResponse(c, res.error);
   })
@@ -75,7 +75,7 @@ export function createLearningProgressRoutes(deps: GatewayDeps) {
     try {
       const userId = c.req.param('userId');
       const date = c.req.query('date') || undefined;
-      const res = await deps.repo.getOrCreateDailyStudyPlan(userId, date);
+      const res = await deps.repo.getOrCreateDailyStudyPlan(userId, date, c.req.query('lang'));
       if (isOk(res)) return c.json(res.value);
       return formatBusinessErrorResponse(c, res.error);
     } catch (e: unknown) {
@@ -84,7 +84,7 @@ export function createLearningProgressRoutes(deps: GatewayDeps) {
   })
   .post(
     '/api/learning/plan/:userId/complete',
-    validator('json', (value) => value as { stepId?: string; date?: string }),
+    validator('json', (value) => value as { stepId?: string; date?: string; language?: string }),
     async (c) => {
       try {
         const userId = c.req.param('userId');
@@ -95,7 +95,7 @@ export function createLearningProgressRoutes(deps: GatewayDeps) {
             new BusinessError('E_INVALID_INPUT', '标记完成需要 stepId', 'VALIDATION')
           );
         }
-        const res = await deps.repo.completeDailyPlanStep(userId, body.stepId, body.date);
+        const res = await deps.repo.completeDailyPlanStep(userId, body.stepId, body.date, body.language);
         if (isOk(res)) return c.json(res.value);
         return formatBusinessErrorResponse(c, res.error);
       } catch (e: unknown) {

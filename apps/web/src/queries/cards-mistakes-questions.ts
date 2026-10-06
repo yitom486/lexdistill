@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { generateId, logger } from '@study-studio/shared';
 import type { FsrsState } from '@study-studio/learner-core';
 import type { CardReviewRating } from '@study-studio/protocol';
-import { toUiQuizType } from '@study-studio/protocol';
+import { GeneratedQuestionSchema, toUiQuizType } from '@study-studio/protocol';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import type {
   MistakeNotebookItem,
@@ -407,7 +407,9 @@ export function useQuestionsQuery(userId = DEFAULT_USER_ID, langOverride?: strin
         if (res.ok) {
           const dynamicQuestions = (await res.json()) as unknown;
           if (Array.isArray(dynamicQuestions)) {
-            return (dynamicQuestions as Array<Record<string, unknown>>).map((q) => {
+            return (dynamicQuestions as Array<Record<string, unknown>>).filter(q =>
+              ['MULTIPLE_CHOICE', 'FILL_IN_BLANK', 'SENTENCE_REORDER', 'CHOICE', 'FILL_BLANK', 'REORDER'].includes(rowStr(q, 'type'))
+            ).map((q) => {
               const optionList = Array.isArray(q.options)
                 ? q.options.map((opt: unknown, i: number) => {
                     if (typeof opt === 'string') {
@@ -421,7 +423,9 @@ export function useQuestionsQuery(userId = DEFAULT_USER_ID, langOverride?: strin
                     };
                   })
                 : undefined;
-              const chunkList: string[] | undefined = Array.isArray(q.chunks) ? q.chunks : undefined;
+              const chunkList: string[] | undefined = Array.isArray(q.chunks) ? q.chunks
+                : toUiQuizType(rowStr(q, 'type')) === 'REORDER' ? rowStr(q, 'content').split(/\s+/).filter(Boolean) : undefined;
+              const reading = GeneratedQuestionSchema.shape.reading.safeParse(q.reading);
               return {
                 id: rowStr(q, 'id'),
                 type: toUiQuizType(rowStr(q, 'type') || 'MULTIPLE_CHOICE'),
@@ -430,6 +434,7 @@ export function useQuestionsQuery(userId = DEFAULT_USER_ID, langOverride?: strin
                 content: rowStr(q, 'content'),
                 ...(optionList ? { options: optionList } : {}),
                 ...(chunkList ? { chunks: chunkList } : {}),
+                ...(reading.success && reading.data ? { reading: reading.data } : {}),
                 correctAnswer: rowStr(q, 'correctAnswer'),
                 explanation: rowStr(q, 'explanation'),
                 testedSkill:
@@ -440,8 +445,9 @@ export function useQuestionsQuery(userId = DEFAULT_USER_ID, langOverride?: strin
         }
       } catch (e) {
         logger.debug('[useQuestionsQuery] failed to load questions', e);
+        throw e;
       }
-      return [];
+      throw new Error('题库读取失败，请重试。');
     },
     staleTime: 1000 * 60 * 5,
   });

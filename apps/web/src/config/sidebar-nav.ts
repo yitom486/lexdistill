@@ -89,10 +89,10 @@ export const SIDEBAR_NAV_GROUPS: SidebarNavGroupDef[] = [
   },
   {
     id: 'listen',
-    label: '听说',
+    label: '听力',
     defaultOpen: false,
     items: [
-      { id: 'SHADOWING', label: '听力跟读', icon: 'Headphones', badge: { kind: 'static', value: '原声' }, tracks: ['ja'] },
+      { id: 'SHADOWING', label: '精听与听写', icon: 'Headphones' },
       { id: 'PITCH', label: '声调纠音', icon: 'Mic', badge: { kind: 'static', value: 'AI' }, tracks: ['ja'] },
     ],
   },

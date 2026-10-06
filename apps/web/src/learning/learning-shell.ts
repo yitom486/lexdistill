@@ -52,7 +52,7 @@ export const LEARNING_SHELL_CONFIGS: Record<TrackLanguage, LearningShellConfig> 
   en: {
     track: 'en',
     trackName: '英语',
-    allowedTabs: ['TODAY', 'PRACTICE_PLAN', 'QUIZ', 'CARDS', 'READING', 'WRITING', 'MISTAKES', 'RADAR'],
+    allowedTabs: ['TODAY', 'PRACTICE_PLAN', 'QUIZ', 'CARDS', 'READING', 'WRITING', 'SHADOWING', 'MISTAKES', 'RADAR'],
     featureFlags: {
       kanaStudio: false,
       hangulStudio: false,
@@ -111,7 +111,7 @@ export const LEARNING_SHELL_CONFIGS: Record<TrackLanguage, LearningShellConfig> 
   ko: {
     track: 'ko',
     trackName: '韩语',
-    allowedTabs: ['TODAY', 'PRACTICE_PLAN', 'QUIZ', 'CARDS', 'READING', 'HANGUL', 'MISTAKES', 'RADAR'],
+    allowedTabs: ['TODAY', 'PRACTICE_PLAN', 'QUIZ', 'CARDS', 'READING', 'WRITING', 'SHADOWING', 'HANGUL', 'MISTAKES', 'RADAR'],
     featureFlags: {
       kanaStudio: false,
       hangulStudio: true,
@@ -127,22 +127,9 @@ export const LEARNING_SHELL_CONFIGS: Record<TrackLanguage, LearningShellConfig> 
       readingEmptyHint: '韩语篇目骨架已接入 · 空列表时可点生成；完整 TOPIK 题库仍在筹备',
       quizEmptyHint: '暂无韩语示范题 · 可点「AI 针对弱项出题」从内容模板组卷',
       interimBanner:
-        '韩语轨道为 TOPIK interim：写作/听力仍在筹备；阅读新闻已接联合新闻等公开韩语源（原文摘录失败则回退摘要）。',
+        '韩语轨道为 TOPIK interim，学习材料仍在扩充。',
     },
-    comingSoonModules: [
-      {
-        tab: 'WRITING',
-        label: '写作翻译',
-        hint: 'TOPIK 写作批改筹备中，敬请期待',
-        icon: 'PenLine',
-      },
-      {
-        tab: 'SHADOWING',
-        label: '听力跟读',
-        hint: '韩语听力材料接入前暂不可用',
-        icon: 'Headphones',
-      },
-    ],
+    comingSoonModules: [],
     defaultReadingLang: 'KO',
     fallbackTab: 'TODAY',
   },

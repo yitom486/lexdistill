@@ -59,7 +59,7 @@ describe('practice assembly by block spec (P5-E4)', () => {
     ).toEqual(['TRANSLATION']);
   });
 
-  it('selects per-block question types, dedupes across blocks, and falls back when a type is missing', async () => {
+  it('selects per-block types and reports missing listening instead of substituting unrelated questions', async () => {
     await repo.updateLearnerProfile(userId, { targetLanguage: 'en', learnerLevel: 'BEGINNER' });
     await seed('CHOICE', 'q_mc_1');
     await seed('CHOICE', 'q_mc_2');
@@ -81,9 +81,9 @@ describe('practice assembly by block spec (P5-E4)', () => {
     const asm = await assemblePracticeRun(repo, userId, runRes.value.id);
     expect(isOk(asm)).toBe(true);
     if (!isOk(asm)) return;
-    expect(asm.value.blocks.length).toBe(3);
-    expect(asm.value.totalItems).toBe(4);
-    expect(asm.value.skippedBlocks).toEqual([]);
+    expect(asm.value.blocks.length).toBe(2);
+    expect(asm.value.totalItems).toBe(3);
+    expect(asm.value.skippedBlocks).toEqual([{ blockId: 'blk_dic', kind: 'DICTATION' }]);
 
     const itemsRes = await repo.getPracticeRunItems(userId, runRes.value.id);
     expect(isOk(itemsRes)).toBe(true);
@@ -108,9 +108,9 @@ describe('practice assembly by block spec (P5-E4)', () => {
     const trItems = byBlock.get('blk_tr') ?? [];
     expect(trItems.map((q) => q.id)).toEqual(['q_tr_1']);
 
-    // DICTATION 池无题 → 回退同语种可用题，不空跑
+    // DICTATION 池无语料 → 如实跳过，不用普通题冒充听力。
     const dicItems = byBlock.get('blk_dic') ?? [];
-    expect(dicItems.length).toBe(1);
+    expect(dicItems.length).toBe(0);
 
     // 跨块去重：三块题目 id 互不相同
     const allIds = [...quizItems, ...trItems, ...dicItems].map((q) => q.id);

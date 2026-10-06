@@ -259,6 +259,10 @@ export function useFinalizePracticeRunMutation(userId = DEFAULT_USER_ID) {
     },
     onSuccess: (run) => {
       void queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.PRACTICE_RUN, userId, run.id] });
+      void useUserProfileStore.getState().fetchProfile(userId);
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.MISTAKES });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACTIVITY_HISTORY });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DAILY_TASK });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DAILY_PLAN });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LEARNING_ANALYSIS });

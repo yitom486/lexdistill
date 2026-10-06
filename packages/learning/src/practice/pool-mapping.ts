@@ -22,6 +22,7 @@ export interface PoolQuestionRow {
   testedSkillId?: unknown;
   difficulty?: unknown;
   dictation?: unknown;
+  reading?: unknown;
 }
 
 /** 把 quiz_questions 池行映射为协议 GeneratedQuestion（含 P6-2 语料透传）。 */
@@ -43,6 +44,9 @@ export function mapPoolQuestion(q: PoolQuestionRow): GeneratedQuestion {
             : {}),
         }
       : undefined;
+  const reading = q.reading && typeof q.reading === 'object' && 'body' in q.reading && 'title' in q.reading && 'setId' in q.reading &&
+    typeof q.reading.body === 'string' && typeof q.reading.title === 'string' && typeof q.reading.setId === 'string'
+    ? { setId: q.reading.setId, title: q.reading.title, body: q.reading.body } : undefined;
   return {
     id: String(q.id ?? ''),
     type: mapQuestionType(q.type),
@@ -54,6 +58,7 @@ export function mapPoolQuestion(q: PoolQuestionRow): GeneratedQuestion {
     testedSkillId: String(q.testedSkillId ?? q.testedSkill ?? 'review'),
     difficultyTier: typeof q.difficulty === 'number' ? q.difficulty : 3,
     ...(dictation ? { dictation } : {}),
+    ...(reading ? { reading } : {}),
   };
 }
 

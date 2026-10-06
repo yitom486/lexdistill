@@ -22,6 +22,8 @@ function defaultFormatsForKind(kind: PracticeBlockSpec['kind']): GeneratedQuesti
   switch (kind) {
     case 'QUIZ':
       return ['MULTIPLE_CHOICE', 'FILL_IN_BLANK', 'SENTENCE_REORDER'];
+    case 'CLOZE':
+      return ['MULTIPLE_CHOICE', 'FILL_IN_BLANK'];
     case 'VOCAB_REVIEW':
     case 'VOCAB_NEW':
       return ['MULTIPLE_CHOICE', 'FILL_IN_BLANK'];

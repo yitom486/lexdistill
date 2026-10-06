@@ -23,6 +23,7 @@ export const PracticeBlockKindSchema = z.enum([
   'TRANSLATION',
   'DICTATION',
   'READING',
+  'CLOZE',
   'WRITING',
 ]);
 export type PracticeBlockKind = z.infer<typeof PracticeBlockKindSchema>;

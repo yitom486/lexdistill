@@ -102,18 +102,23 @@ describe('P5 PhaseB practice tools', () => {
   describe('learning.practice two submit paths', () => {
     it('per-item objective path: submit_objective then finalize records once', async () => {
       const startRes = await practice.execute(
-        { action: 'start_run', language: 'en', blocks: [quizBlock()] },
+        { action: 'start_run', language: 'en', blocks: [{ ...quizBlock(), count: 1 }] },
         { userId, sessionId: 's1' }
       );
       expect(isOk(startRes)).toBe(true);
       if (!isOk(startRes)) return;
       const runId = (startRes.value as { run?: { id: string } }).run!.id;
 
+      const collected = await repo.collectPracticeQuestions({ userId, title: 'Objective test', intent: 'GENERATE_QUIZ', planRunId: runId,
+        blockId: 'b1', gradingMode: 'AUTO_IMMEDIATE', questions: [{ id: 'q1', type: 'MULTIPLE_CHOICE', prompt: 'Choose', content: 'Past tense',
+          options: ['went', 'go'], correctAnswer: 'went', explanation: 'Past tense.', testedSkillId: 'en.grammar.past', difficultyTier: 2 }] });
+      if (!isOk(collected)) throw collected.error;
+
       const subRes = await practice.execute(
         {
           action: 'submit_objective',
           runId,
-          itemId: 'q1',
+          itemId: collected.value.items[0]!.id,
           userAnswer: 'A',
           isCorrect: true,
           testedSkillId: 'en.vocab',

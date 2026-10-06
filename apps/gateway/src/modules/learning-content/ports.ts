@@ -32,7 +32,7 @@ export interface LearningContentRepository {
 
 /** Optional write capability: content generation can run without collection persistence. */
 export type LearningContentCollectionRepository = Partial<
-  Pick<LearningRepository, 'collectPracticeQuestions'>
+  Pick<LearningRepository, 'collectPracticeQuestions' | 'saveQuestions'>
 >;
 
 export type LearningContentTemplateRepository = LearningContentRepository &
