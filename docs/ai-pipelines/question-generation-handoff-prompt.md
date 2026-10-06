@@ -30,6 +30,10 @@
 
 现有练习、作答、错题与批改能力必须先读代码再复用；新题库的作答接线仍是后续阶段，不能因为已有历史查询测试就宣称闭环完成。
 
+现有练习整合已经包含三语综合练习、完型、听写、阅读材料保存、后端客观判分、响应丢失后的同身份重试、事务记录和按语种隔离的学习进度。重点复用 `apps/gateway/src/modules/practice/persistence/objective-answer.ts` 和 `domain/record-practice-attempt.ts`，并阅读 `apps/gateway/src/__tests__/objective-answer.integration.test.ts`。现有入口读 `quiz_questions`，专用工具写 `bank_questions`，不能未经接线直接互换 ID。
+
+独立词汇学习板块由另一条工作线维护，本批不修改它。综合练习中的词汇复习配置可以读取和复用，不重写词汇学习系统。
+
 ## 实现规则
 
 1. 宿主生成可信任务身份、冻结配置和额度；密钥留在服务边界，不进入提示词、快照、模型参数或日志。

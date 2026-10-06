@@ -22,7 +22,7 @@
 | 教材授权读取 | 已有范围与归属校验 | 教材正文是资料，不是指令 |
 | 已做题与错题查询 | 能读既有历史 | 新题库的真实作答写入闭环仍待接通 |
 | 专用智能体运行器、任务接口与界面 | 本模块尚未接通 | 下一阶段优先完成 |
-| 现有练习、客观判分与主观批改 | 项目已有相关实现 | 核对契约后复用，不能宣称自动兼容新题库 |
+| 现有练习、客观判分与主观批改 | 已有客观作答提交、重试幂等、事务记录及主观批改边界 | 核对契约后复用，不能宣称自动兼容新题库 |
 | 真实模型、真实 TTS、安装包验证 | 本模块未完成验收 | 与模拟测试分别报告 |
 
 代码入口：
@@ -36,6 +36,17 @@
 - [现有客观作答入口](../../apps/gateway/src/modules/practice/application/submit-objective-item.ts)
 
 以实际代码类型为准；历史架构文档中的示例接口可能早于当前代码。
+
+现有练习整合还包含三语综合练习块、完型模板、听写材料、阅读材料保存、按语言隔离的每日进度，以及拆分后的练习和听力组件。这里的词汇复习块只是综合练习的一部分，不代表需要重做独立词汇学习板块。
+
+尤其注意：现有客观作答入口读的是 `quiz_questions`，新专用出题工具写的是 `bank_questions` 与类型详情表，两者尚未自动连通。后续 P2 必须明确新题身份与试卷快照如何进入同一学习记录逻辑，不能把新题 ID 直接送入旧入口并声称集成完成。
+
+进一步接手入口：
+
+- [既有客观作答持久化](../../apps/gateway/src/modules/practice/persistence/objective-answer.ts)
+- [共享学习记录逻辑](../../apps/gateway/src/modules/practice/domain/record-practice-attempt.ts)
+- [作答、组卷与语言隔离测试](../../apps/gateway/src/__tests__/objective-answer.integration.test.ts)
+- [响应丢失重试与听力播放状态测试](../../apps/web/src/components/practice/practice-records.dom.test.tsx)
 
 ## 3. 固定层
 
