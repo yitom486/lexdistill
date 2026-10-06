@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, BookPlus, Check, ExternalLink, Search, Send } from 'lucide-react';
+import { BookOpen, BookPlus, Check, ExternalLink, Search, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useCollectDictionaryEntryMutation,
@@ -28,6 +28,7 @@ type DictionaryLookupPanelProps = {
   helper: string;
   /** 卡面点词等嵌入场景的预填查询（对话框每次打开带不同词时同步）。 */
   initialQuery?: string;
+  onGoToStudy?: () => void;
 };
 
 /** pronunciation.pitch 安全抽取（label + positions；结构不对返回 null，不抛）。 */
@@ -96,7 +97,7 @@ function groupEntriesBySource(entries: LookupEntry[]): Array<{ source: string; e
  * 可嵌入任意学习工作台的词典入口。它只组合 Query 与领域 Mutation，
  * 不拥有词典、FSRS 或每日统计的业务规则。
  */
-export function DictionaryLookupPanel({ language, title, helper, initialQuery = '' }: DictionaryLookupPanelProps) {
+export function DictionaryLookupPanel({ language, title, helper, initialQuery = '', onGoToStudy }: DictionaryLookupPanelProps) {
   const [input, setInput] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
   // 嵌入弹窗带词打开：initialQuery 变化即同步为新查询（面板常驻场景传空串，不干扰）。
@@ -272,7 +273,27 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
         </div>
       )}
       {!query && showWordlist && (
-        <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800 space-y-3 transition-colors">
+        <div className="mt-3 border-t border-ink-stone-200 pt-3 dark:border-tone-stone-800 space-y-3 transition-colors">          {onGoToStudy && (
+            <div className="flex items-center justify-between rounded-2xl border border-line-amber-900o10 bg-wash-amber-500o5 p-3 text-xs">
+              <div className="space-y-0.5">
+                <span className="font-semibold text-ink flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-accent-ink-warm" />
+                  想要每天从 N5 抽取 10–20 词系统学习？
+                </span>
+                <p className="text-[11px] text-ink-ghost">
+                  推荐使用「今日学词」模块，享受多角色情景短剧、避坑指南与互动随堂小测！
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 px-3 text-xs gap-1 shrink-0"
+                onClick={onGoToStudy}
+              >
+                前往今日学词 →
+              </Button>
+            </div>
+          )}
           <p className="text-[11px] font-bold text-ink-ghost">
             零基础单词表 · 按顺序点词展开学透（收进生词本即计入带路第 3 天）
           </p>

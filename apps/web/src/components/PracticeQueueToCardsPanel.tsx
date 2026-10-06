@@ -14,12 +14,16 @@ import { humanizeCollectionTitle } from '../utils/collection-titles.js';
 /**
  * 练习队列 → 勾选转入 FSRS（collect 入库 ≠ 自动建卡）
  */
-export function PracticeQueueToCardsPanel() {
+export function PracticeQueueToCardsPanel({ hideWhenEmpty = false }: { hideWhenEmpty?: boolean } = {}) {
   const { data: collections = [], isLoading } = usePracticeCollectionsQuery();
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const { data: items = [], isLoading: itemsLoading } = usePracticeItemsQuery(activeCollectionId);
   const toCards = usePracticeItemsToCardsMutation();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  if (hideWhenEmpty && !isLoading && collections.length === 0) {
+    return null;
+  }
 
   useEffect(() => {
     if (!activeCollectionId && collections[0]?.id) {

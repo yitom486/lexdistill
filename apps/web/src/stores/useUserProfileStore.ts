@@ -29,6 +29,8 @@ const defaultProfile: LearnerProfile = {
   retentionRate: 1.0,
   dailyGoalQuizzes: 5,
   dailyGoalCards: 10,
+  dailyGoalNewWords: 10,
+  wordLevelFilter: null,
   totalStudyMinutes: 0,
   totalCardsReviewed: 0,
   totalQuizzesAnswered: 0,
