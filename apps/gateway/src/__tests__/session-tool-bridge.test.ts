@@ -65,17 +65,40 @@ describe('SessionToolBridge', () => {
 });
 
 describe('GET /api/agent/runtimes', () => {
-  it('id 与前端目录一致；codex 配置态为布尔', async () => {
+  it('id 与前端目录一致（＋custom 伪条目）；codex 配置态为布尔', async () => {
     const repo = new DrizzleLearnerRepository(':memory:');
     try {
       const app = new Hono().route('/', createAgentRoutes({ repo, server: new GatewayServer(repo), port: 0 }));
       const res = await app.request('/api/agent/runtimes');
       expect(res.status).toBe(200);
       const body = (await res.json()) as { runtimes: Array<{ id: string; label: string; hint: string; configured: boolean | null }> };
-      expect(body.runtimes.map(entry => entry.id)).toEqual(FRONTEND_RUNTIME_IDS);
+      expect(body.runtimes.map(entry => entry.id)).toEqual([...FRONTEND_RUNTIME_IDS, 'custom']);
       const codex = body.runtimes.find(entry => entry.id === 'codex-acp');
       expect(typeof codex?.configured).toBe('boolean');
       expect(typeof codex?.label).toBe('string');
+      const custom = body.runtimes.find(entry => entry.id === 'custom');
+      expect(custom?.label).toBe('自定义 API');
+      expect(typeof custom?.configured).toBe('boolean');
+    } finally {
+      repo.getRawDb().close();
+    }
+  });
+
+  it('provider 状态脱敏；非法保存 400 且不写盘', async () => {
+    const repo = new DrizzleLearnerRepository(':memory:');
+    try {
+      const app = new Hono().route('/', createAgentRoutes({ repo, server: new GatewayServer(repo), port: 0 }));
+      const status = await app.request('/api/agent/provider');
+      expect(status.status).toBe(200);
+      const body = (await status.json()) as { provider: { configured?: boolean; hasApiKey?: boolean; apiKey?: string } };
+      expect(typeof body.provider.configured).toBe('boolean');
+      expect(body.provider.apiKey).toBeUndefined();
+      expect(body.provider.hasApiKey).not.toBe(true);
+      const bad = await app.request('/api/agent/provider', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseUrl: 'not-a-url', model: '', apiKey: '' }),
+      });
+      expect(bad.status).toBe(400);
     } finally {
       repo.getRawDb().close();
     }

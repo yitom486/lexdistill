@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
 import { isOk, BusinessError } from '@study-studio/shared';
+import { clearAcpProvider, getAcpProviderStatus, saveAcpProvider } from '@yitom/acp-client';
 import { formatBusinessErrorResponse } from '../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../composition/gateway-deps.js';
-import { listAgentRuntimes } from '../../runtime/router/runtime-catalog.js';
+import { listAgentRuntimes, customRuntimeStatus } from '../../runtime/router/runtime-catalog.js';
 
 /** Provider-neutral Agent management routes. */
 export function createAgentRoutes(deps: GatewayDeps) {
@@ -181,9 +182,34 @@ export function createAgentRoutes(deps: GatewayDeps) {
     // 注册表工具名探测：前端固定任务发送前预检，缺失直接提示重启网关，不浪费模型轮次。
     return c.json({ tools: deps.server.toolRegistry.list().map(tool => tool.name) });
   })
-  .get('/api/agent/runtimes', (c) => {
-    // Agent 运行时目录：id 与前端配置对齐；configured 为凭证就绪态（codex 实探，其余看环境 Key）。
-    return c.json({ runtimes: listAgentRuntimes() });
+  .get('/api/agent/runtimes', async (c) => {
+    // Agent 运行时目录＋自定义供应商伪条目：id 与前端配置对齐。
+    return c.json({ runtimes: [...listAgentRuntimes(), await customRuntimeStatus()] });
+  })
+  .get('/api/agent/provider', async (c) => {
+    // 自定义供应商状态（脱敏：Key 永不回传）。
+    return c.json({ provider: await getAcpProviderStatus() });
+  })
+  .post('/api/agent/provider', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      name?: string; baseUrl?: string; model?: string; apiKey?: string; wireApi?: string;
+    };
+    const saved = await saveAcpProvider({
+      ...(typeof body.name === 'string' ? { name: body.name } : {}),
+      baseUrl: String(body.baseUrl || ''),
+      model: String(body.model || ''),
+      apiKey: String(body.apiKey || ''),
+      wireApi: body.wireApi === 'responses' ? 'responses' : 'chat',
+    });
+    if (!saved.ok) {
+      return formatBusinessErrorResponse(c,
+        new BusinessError('E_INVALID_INPUT', saved.error.message, 'VALIDATION'), 'AGENT_PROVIDER_SAVE');
+    }
+    return c.json({ provider: saved.value });
+  })
+  .delete('/api/agent/provider', async (c) => {
+    await clearAcpProvider();
+    return c.json({ ok: true });
   })
   .all('/mcp/session/:token', async (c) => {
     // 会话级工具 MCP 桥（ACP 会话挂载；token 未知即 404，不泄漏）。

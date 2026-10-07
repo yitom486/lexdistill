@@ -59,7 +59,7 @@ export interface AcpAdapterOptions {
     onPermissionRequest: (payload: AcpPermissionPayload) => Promise<AcpPermissionResolution>;
     onLog: (level: 'info' | 'warn' | 'error', message: string, meta?: unknown) => void;
     onStderrLine: (line: string) => void;
-  }) => AcpClientLike;
+  }) => AcpClientLike | Promise<AcpClientLike>;
   /** 把本轮 ToolDefinition 装成 ACP mcpServers（网关侧提供 HTTP 桥实现）。 */
   buildMcpServers: (
     tools: ToolDefinition[],
@@ -352,7 +352,7 @@ export class AcpAdapter implements AgentAdapter {
 
   private async ensureClient(): Promise<AcpClientLike> {
     if (!this.client) {
-      this.client = this.options.createClient({
+      this.client = await this.options.createClient({
         onSessionUpdate: (params) => {
           this.options.debugUpdates?.(params);
           const id = sessionIdOf(params);

@@ -6,6 +6,7 @@ import {
   SelectValue,
 } from './ui/select.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
+import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { AGENT_RUNTIME_OPTIONS, agentRuntimeLabel } from '../config/agent-runtimes.js';
 import { useAgentRuntimesQuery } from '../queries/useAgentQueries.js';
 import { chatMenuItem, compactSelect } from './agent-chat/chat-shared.js';
@@ -15,18 +16,20 @@ interface AgentRuntimeSelectProps {
   onCustomApi?: () => void;
 }
 
-/** Agent 运行时下拉（自读写偏好）：ChatGPT 默认；自定义 API 走 onCustomApi（未传则隐藏入口）。 */
+/** Agent 运行时下拉（自读写偏好）：ChatGPT 默认；自定义 API 默认进设置页（可被覆盖）。 */
 export function AgentRuntimeSelect({ disabled, onCustomApi }: AgentRuntimeSelectProps) {
   const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
   const setAgentRuntimeId = usePreferencesStore(state => state.setAgentRuntimeId);
+  const setActiveTab = useStudySessionStore(state => state.setActiveTab);
   const { data: statuses = [] } = useAgentRuntimesQuery(true);
   const statusOf = (id: string) => statuses.find(entry => entry.id === id)?.configured ?? null;
+  const goCustomApi = onCustomApi ?? (() => setActiveTab('SETTINGS'));
   return (
     <Select
       value={agentRuntimeId || 'codex-acp'}
       onValueChange={(value) => {
         if (value === '__custom__') {
-          onCustomApi?.();
+          goCustomApi();
           return;
         }
         if (value) setAgentRuntimeId(String(value));
@@ -46,14 +49,10 @@ export function AgentRuntimeSelect({ disabled, onCustomApi }: AgentRuntimeSelect
             </SelectItem>
           );
         })}
-        {onCustomApi && (
-          <>
-            <div className="px-2 py-1 text-[10px] text-ink-ghost">认证 / 供应商</div>
-            <SelectItem value="__custom__" className={chatMenuItem}>
-              自定义 API…
-            </SelectItem>
-          </>
-        )}
+        <div className="px-2 py-1 text-[10px] text-ink-ghost">认证 / 供应商</div>
+        <SelectItem value="__custom__" className={chatMenuItem}>
+          自定义 API…
+        </SelectItem>
       </SelectContent>
     </Select>
   );

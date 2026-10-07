@@ -42,6 +42,7 @@ import {
 import { Switch } from './ui/switch.js';
 import { useGatewayStore } from '../stores/useGatewayStore.js';
 import { AnkiTemplateWorkbench } from './AnkiTemplateWorkbench.js';
+import { ProviderSettingsSection } from './ProviderSettingsSection.js';
 import { getPlatform } from '../platform/capabilities.js';
 import { backupDesktopDatabase } from '../platform/tauri-capabilities.js';
 import { checkForAppUpdate } from '../platform/app-updater.js';
@@ -383,8 +384,7 @@ export function SystemSettingsPage() {
 
         </div>
         <div className="space-y-6">
-          {/* 3b. Anki 推送（EXTERNAL 桥接，默认关闭；只连本机 AnkiConnect）。 */}
-          <div className="space-y-4 rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6">
+          {/* 3b. Anki 推送（EXTERNAL 桥接，默认关闭；只连本机 AnkiConnect）。 */}          <div className="space-y-4 rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6">
             <div className="flex items-center justify-between font-medium text-ink-mute">
               <div className="flex items-center gap-1.5">
                 <Plug className="w-3.5 h-3.5 text-tone-amber-500" />
@@ -421,6 +421,9 @@ export function SystemSettingsPage() {
               />
             </div>
           </div>
+
+          {/* 3c. 自定义 API 供应商（OpenAI 兼容端点；Key 只存网关）。 */}
+          <ProviderSettingsSection />
 
           {/* 4. 学情画像与打卡目标入口 */}
           <div className="space-y-4 rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6">

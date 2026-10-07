@@ -12,6 +12,7 @@ export const AGENT_QUERY_KEYS = {
   SKILLS: ['agent', 'skills'] as const,
   USAGE: ['agent', 'usage'] as const,
   MCP_SERVERS: ['integrations', 'mcpServers'] as const,
+  PROVIDER: ['agent', 'provider'] as const,
 };
 
 type AgentInvalidateListener = (event: {
@@ -398,8 +399,7 @@ export interface AgentRuntimeStatusDto {
   configured: boolean | null;
 }
 
-export function useAgentRuntimesQuery(enabled = true) {
-  return useQuery<AgentRuntimeStatusDto[]>({
+export function useAgentRuntimesQuery(enabled = true) {  return useQuery<AgentRuntimeStatusDto[]>({
     queryKey: [...AGENT_QUERY_KEYS.MCP_SERVERS, 'runtimes'] as const,
     enabled,
     queryFn: async () => {
@@ -410,5 +410,71 @@ export function useAgentRuntimesQuery(enabled = true) {
     },
     staleTime: 1000 * 60 * 5,
     retry: 1,
+  });
+}
+
+export interface AgentProviderStatusDto {
+  configured: boolean;
+  name?: string;
+  baseUrl?: string;
+  model?: string;
+  hasApiKey: boolean;
+}
+
+export interface AgentProviderSaveInput {
+  name?: string;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  wireApi?: 'chat' | 'responses';
+}
+
+async function readProviderResponse(res: Response): Promise<AgentProviderStatusDto> {
+  const data = (await res.json().catch(() => ({}))) as { provider?: AgentProviderStatusDto; error?: { userMessage?: string } };
+  if (!res.ok || !data.provider) {
+    throw new Error(data.error?.userMessage || '供应商保存失败，请检查地址/模型/Key');
+  }
+  return data.provider;
+}
+
+export function useAgentProviderQuery(enabled = true) {
+  return useQuery<AgentProviderStatusDto>({
+    queryKey: AGENT_QUERY_KEYS.PROVIDER,
+    enabled,
+    queryFn: async () => {
+      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/provider`);
+      if (!res.ok) return { configured: false, hasApiKey: false };
+      return readProviderResponse(res);
+    },
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+  });
+}
+
+export function useSaveAgentProviderMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: AgentProviderSaveInput) => {
+      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/provider`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      });
+      return readProviderResponse(res);
+    },
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.PROVIDER });
+    },
+  });
+}
+
+export function useDeleteAgentProviderMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/provider`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('供应商删除失败，请重试');
+    },
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.PROVIDER });
+    },
   });
 }
