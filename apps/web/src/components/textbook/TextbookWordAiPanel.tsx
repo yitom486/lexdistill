@@ -1,10 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { LessonContent } from '@study-studio/document-model';
-import { Button } from '../ui/button.js';
-import { useWordTutor } from '../../hooks/useWordTutor.js';
-import { WordChatConfig } from '../WordChatConfig.js';
-import { WordChatThread } from '../WordChatThread.js';
+import { WordTutorPanel } from '../WordTutorPanel.js';
 import { QUERY_KEYS } from '../../queries/query-keys.js';
 
 type TextbookWordRow = LessonContent['vocabularies'][number];
@@ -17,26 +14,22 @@ function buildTextbookGeneratePrompt(row: TextbookWordRow): string {
 /** 教材行内嵌 AI 面板：长在生词行下；保存后刷新词汇库与教材词表查询即时呈现。 */
 export function TextbookWordAiPanel({ row }: { row: TextbookWordRow }) {
   const client = useQueryClient();
-  const usage = [row.gloss, ...(row.examples ?? []).map(e => e.text)].filter((text): text is string => !!text).join('；');
-  const { messages, isTyping, connected, send, stop } = useWordTutor(
-    { word: row.surface, reading: row.reading ?? '', meaning: row.gloss ?? '', usage },
-    { onComplete: () => {
-      void client.invalidateQueries({ queryKey: QUERY_KEYS.VOCABULARY });
-      void client.invalidateQueries({ queryKey: QUERY_KEYS.WORDLISTS });
-    } },
-  );
-  const [draft, setDraft] = useState('');
-  const submit = () => { if (send(draft)) setDraft(''); };
-  const generate = () => { send(buildTextbookGeneratePrompt(row)); };
-  return <div className="mt-2 rounded-xl border border-line bg-paper-soft p-3" aria-label={`AI 讲透：${row.surface}`}>
-    <WordChatConfig />
-    <WordChatThread messages={messages} isTyping={isTyping} connected={connected}
-      draft={draft} onDraftChange={setDraft} onSend={submit} onStop={stop}
-      inputPlaceholder={`继续追问「${row.surface}」…`}
-      header={<>
-        {messages.length === 0 && <div className="mb-2">
-          <Button size="sm" variant="outline" disabled={!connected || isTyping} onClick={generate}>生成讲解</Button>
-        </div>}
-      </>} />
-  </div>;
+  const target = useMemo(() => ({
+    word: row.surface,
+    reading: row.reading ?? '',
+    meaning: row.gloss ?? '',
+    usage: [row.gloss, ...(row.examples ?? []).map(e => e.text)].filter((text): text is string => !!text).join('；'),
+  }), [row]);
+  const handleComplete = useCallback(() => {
+    void client.invalidateQueries({ queryKey: QUERY_KEYS.VOCABULARY });
+    void client.invalidateQueries({ queryKey: QUERY_KEYS.WORDLISTS });
+  }, [client]);
+  return <WordTutorPanel
+    target={target}
+    generatePrompt={buildTextbookGeneratePrompt(row)}
+    showGenerate
+    ariaLabel={`AI 讲透：${row.surface}`}
+    inputPlaceholder={`继续追问「${row.surface}」…`}
+    onComplete={handleComplete}
+  />;
 }

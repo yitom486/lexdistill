@@ -3,12 +3,13 @@ import type { VocabularyEntry } from '@study-studio/protocol';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { WordAiPanel } from './WordAiPanel.js';
+import { getWordUsageList } from '../queries/vocabulary.js';
 
 /** 单词学习详情（纯展示，不挂任何教材来源）：读音词性头、意思、用法、例句，AI 追问内嵌。 */
 export function WordStudyDetail({ word }: { word: VocabularyEntry }) {
   const [aiOpen, setAiOpen] = useState(false);
   const meanings = useMemo(() => [...new Set([word.meaning, ...word.sources.map(source => source.meaning)].filter(Boolean))], [word]);
-  const usages = useMemo(() => [...new Set(word.sources.flatMap(source => [source.contextNote, source.usage].filter((text): text is string => !!text)))], [word]);
+  const usages = useMemo(() => getWordUsageList(word.sources), [word]);
   const examples = useMemo(() => {
     const seen = new Set<string>();
     return word.sources.flatMap(source => source.examples).filter(example => {

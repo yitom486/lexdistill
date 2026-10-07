@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { VocabularyEntrySchema, VocabularyCollectionSchema, type VocabularyScope } from '@study-studio/protocol';
+import { VocabularyEntrySchema, VocabularyCollectionSchema, type VocabularyEntry, type VocabularyScope } from '@study-studio/protocol';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
@@ -124,4 +124,33 @@ export function useDailyPickMutation(userIdOverride?: string) {
   return useMutation({
     mutationFn: (params: DailyPickParams) => postDailyPick(userId, params),
   });
+}
+
+type UsageSource = Pick<VocabularyEntry['sources'][number], 'contextNote' | 'usage'>;
+
+/** 用法去重列表（单一事实源）：全局词详情与 AI 面板共用，教材行另按 gloss＋例句组装。 */
+export function getWordUsageList(sources: readonly UsageSource[]): string[] {
+  return [...new Set(sources.flatMap(source => [source.contextNote, source.usage].filter((text): text is string => !!text)))];
+}
+
+export interface CardVocabularyMatch {
+  vocabularyId?: string | undefined;
+  entryId?: string | undefined;
+  surface: string;
+}
+
+/**
+ * 卡片→词汇库单一选择器：id 精确命中优先，同词兜底。
+ * 调用方传 surface 兜底合成时 collected 保持透传（需调用方自定），本函数只做查找。
+ */
+export function selectVocabularyForCard(
+  list: readonly VocabularyEntry[],
+  match: CardVocabularyMatch,
+): VocabularyEntry | undefined {
+  const id = match.vocabularyId || match.entryId;
+  if (id) {
+    const exact = list.find((v) => v.id === id);
+    if (exact) return exact;
+  }
+  return list.find((v) => v.word === match.surface);
 }

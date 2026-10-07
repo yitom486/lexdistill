@@ -10,15 +10,19 @@
 - `useWordTutor`：首个 `task: 'vocabulary.explain'` 发送方。
 - 文档：`agent-runtime.md` 门禁第 5 条＋路由 README＋PDF 流程 MCP 归属。
 
-## P1 主聊默认 vocab 读工具（本轮）
+## P1 主聊默认 vocab 读工具（已完成）
 - `READ_BY_INTENT.FREE_COACH` 加 `vocabulary.learning.context`（只读；`submit` 仍需“生成讲解”类明示）。
-- 测试：主聊默认含 context、不含 submit；WRITE 误开断言。
-- 验收：`tool-catalog`＋`turn-tools`＋`session-tools`＋`boundaries` 全绿。
 
 ## P2 教材行学习 UI 接线（已完成）
 - `WordChatThread` 纯展示线程抽出（`WordAiPanel` 改调，行为不变）；`TextbookWordAiPanel` 教材行面板（行 ID 进指令经 `textbookVocabularyId` 绑定，存后刷词汇库＋词表）。
 - `StructuredVocabularyList` 加 `enableAi`（默认关，导入预览不受影响）；`TextbookCurriculum` 学习路径开启。
 - 验收：dom 测试（默认无入口→展开→收起）。
+
+## P6 Batch A 前端去重（已完成，本轮）
+- `WordTutorPanel` 容器合一（`WordAiPanel`＋`TextbookWordAiPanel` 变薄；target 按字段 memo，send 稳定）。
+- `getWordUsageList`＋`selectVocabularyForCard`（id 优先两段式）收归 `queries/vocabulary.ts`；`WordStudyDetail`＋`FsrsCardWorkbench` 改调（Hub 侧等对方合入）。
+- 旧会话工具缺失升级按本轮解析集判定＋缺失工具服务端 warn（`32adc715`，修用户截图“找不到工具”）。
+- 验收：选择器单测＋面板 dom 回归 18/0；typecheck 零新增。
 
 ## P3 Hub 锁态 409 对齐（对方地盘，只 review 不动手）
 - `DailyWordStudyHub` 课程单元扩展返回 400 而非 409，锁 banner 失效；文件在对方手里，等它改。

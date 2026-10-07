@@ -12,7 +12,7 @@ import {
   useExportApkgMutation,
   usePracticeCollectionsQuery,
 } from '../queries/useLearnerQueries.js';
-import { useVocabularyQuery } from '../queries/vocabulary.js';
+import { selectVocabularyForCard, useVocabularyQuery } from '../queries/vocabulary.js';
 import { useLearningShell } from '../hooks/useLearningShell.js';
 import { trackToSpeechLang } from '../config/speech-language.js';
 import { Tabs, TabsContent } from './ui/tabs.js';
@@ -88,13 +88,14 @@ export function FsrsCardWorkbench() {
     }
   }, [cardFlipped, currentCardIndex, filteredCards.length, setCardFlipped, setCurrentCardIndex]);
 
-  // 同步当前卡片至后端的真实 VocabularyEntry 事实源
+  // 同步当前卡片至后端的真实 VocabularyEntry 事实源（查找归选择器，兜底合成保留调用方 collected 语义）
   const matchingVocab: VocabularyEntry | undefined = useMemo(() => {
     if (!activeCard) return undefined;
     const list = vocabularyQuery.data ?? [];
-    const found = list.find(
-      (v) => (activeCard.vocabularyId && v.id === activeCard.vocabularyId) || v.word === activeCard.frontWord
-    );
+    const found = selectVocabularyForCard(list, {
+      ...(activeCard.vocabularyId ? { vocabularyId: activeCard.vocabularyId } : {}),
+      surface: activeCard.frontWord,
+    });
     if (found) return found;
     return {
       id: activeCard.vocabularyId || activeCard.id,
