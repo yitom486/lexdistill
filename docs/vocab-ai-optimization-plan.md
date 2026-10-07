@@ -43,7 +43,8 @@
 
 ## P10 ACP Phase 1（进行中）
 - 适配器补完已合入（审批流＋单测）；UI 先行：`AgentRuntimeSelect`（8 运行时＋自定义 API 钩子，主聊＋单词配置均有入口，偏好持久化，`runtimeId` 已下发，网关暂忽略）。
-- 待办：网关按 runtime 选适配器＋`GET /api/agent/runtimes`（认证状态）＋自定义 API 凭证管理。
+- 网关底座已合入：`SessionToolBridge`（会话 token 端点＋最小工具集＋TTL/sweep）＋`runtime-catalog`（id/认证态）＋`GET /api/agent/runtimes`＋`/mcp/session/:token` 路由。
+- 待办：网关按 runtime 选适配器（默认 Codex 不变）＋下拉认证状态点＋自定义 API 凭证管理。
 - 审批流：`request_permission`→挂起→`APPROVAL_REQUESTED`→`submitApproval`→`APPROVAL_RESOLVED`（120s 超时 decline；inflight 跟踪修掉“yield 后找不到”真 bug）。
 - never/缺席自动放行（与当前 vocab 零点击一致）；中断/steer/`submitToolResult` 明确拒绝。
 - 验收：model-free 单测 3/0；typecheck 零新增。
