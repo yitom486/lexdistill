@@ -41,6 +41,15 @@
 - 附带修通：更新包实形状映射、HTTP 必填 `headers`、Bun 长连接超时、SDK prompt 120s、本地 pin（`@agentclientprotocol/codex-acp ^2.1.1`，不再赌 bunx）、建连抖动重试、单 adapter 只连一次。
 - 遗留要求（Phase 1 立项条件）：`pickAllowOptionId` 审批映射、事件全量映射、中断/steer、温进程池、turn 预算收敛。
 
+## P10 ACP Phase 1（进行中：适配器补完已合入）
+- 审批流：`request_permission`→挂起→`APPROVAL_REQUESTED`→`submitApproval`→`APPROVAL_RESOLVED`（120s 超时 decline；inflight 跟踪修掉“yield 后找不到”真 bug）。
+- never/缺席自动放行（与当前 vocab 零点击一致）；中断/steer/`submitToolResult` 明确拒绝。
+- 验收：model-free 单测 3/0；typecheck 零新增。
+- 待办：网关按 runtime 选适配器＋`GET /api/agent/runtimes`＋表头下拉＋偏好持久化。
+- 桥记录铁证：首轮 `dictionary.lookup` 调用＋resume（`session restore ok`）后 `flashcards.due` 再调——resume 带工具成立，Codex 旧链路的死结解开。
+- 附带修通：更新包实形状映射、HTTP 必填 `headers`、Bun 长连接超时、SDK prompt 120s、本地 pin（`@agentclientprotocol/codex-acp ^2.1.1`，不再赌 bunx）、建连抖动重试、单 adapter 只连一次。
+- 遗留要求（Phase 1 立项条件）：`pickAllowOptionId` 审批映射、事件全量映射、中断/steer、温进程池、turn 预算收敛。
+
 ## P3 Hub 锁态 409 对齐（对方地盘，只 review 不动手）
 - `DailyWordStudyHub` 课程单元扩展返回 400 而非 409，锁 banner 失效；文件在对方手里，等它改。
 
