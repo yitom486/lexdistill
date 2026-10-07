@@ -57,7 +57,8 @@ it('教材行默认无 AI 入口；enableAi 开启后可展开讲透面板', asy
 it('网关缺任务工具时就地拦截：提示重启网关，不发送回合', async () => {
   globalThis.fetch = (async (input: string | URL | Request) => {
     if (String(input).includes('/api/agent/tools')) {
-      return Response.json({ tools: ['dictionary.lookup'] });
+      // 旧网关：端点不存在（404 HTML，非 JSON）。
+      return new Response('<html>not found</html>', { status: 404, headers: { 'Content-Type': 'text/html' } });
     }
     throw new Error(`unexpected fetch ${String(input)}`);
   }) as typeof fetch;

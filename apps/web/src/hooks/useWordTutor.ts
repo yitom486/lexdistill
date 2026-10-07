@@ -29,10 +29,13 @@ async function missingRegistryTools(wanted: readonly string[]): Promise<string[]
   if (!cachedRegistryTools || now - cachedRegistryTools.at > 60_000) {
     try {
       const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/tools`);
+      // 网关可达但无此端点（404 等）= 旧构建：全部按缺失拦截，不放行。
+      if (!res.ok) return [...wanted];
       const data = (await res.json()) as { tools?: unknown };
       const names = Array.isArray(data.tools) ? data.tools.filter((name): name is string => typeof name === 'string') : [];
       cachedRegistryTools = { at: now, names };
     } catch {
+      // 连不上网关才放行（网关侧 fail-fast 兜底）；可达必严查。
       return [];
     }
   }
