@@ -26,5 +26,6 @@
 ## P4 E2E 真机验证（等用户）
 - 用户重启网关（新代码）＋确认 luna；一次生成 run，验保存→渲染。
 
-## P5 MCP 外部真通道（大改动，需单独批准）
-- `ToolRouter` EXTERNAL 现为 `E_MCP_NOT_IMPLEMENTED` stub；真接 Anki/Notion 另立项。
+## P5 MCP 外部真通道（已关闭：无需求，不做）
+- 立项分析结论：全仓零 `EXTERNAL` 注册工具（仅 `permissions` 定义＋`ToolRouter` stub 分支）；Anki 经 SERVER 工具 `flashcards.anki_push` 直连本机 AnkiConnect，已覆盖；Notion 等无需求方。
+- 按简单优先＋`agent-runtime.md`（禁 Server Tools 无故改道 MCP），stub 保留，待真实外部系统出现再立项。
