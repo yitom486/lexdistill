@@ -257,7 +257,8 @@ getActiveTab()
 | 文件 | 作用 |
 |---|---|
 | `runtime/router/agent-router.ts` | 根据路由策略选择 `codex`、Responses 或未来的其他 `AgentAdapter`。业务模块不直接选择厂商 SDK。 |
-| `runtime/router/turn-tools.ts` | 按意图与本轮信息收窄 Agent 可用工具集，并执行会话级 allowlist 约束。 |
+| `runtime/router/tool-catalog.ts` | Gateway 工具中央目录：基线/意图/提示词表 + 固定任务显式集 + `resolveSessionTools` 单一解析入口（选型唯一 owner，实现仍在各域）。 |
+| `runtime/router/turn-tools.ts` | 薄包装（对外签名不变，转发 tool-catalog；历史测试入口保留）。 |
 | `runtime/router/tool-router.ts` | 根据 Tool Registry 的定义执行 Server/Client/External Tool，检查权限，并把结果回传给 Agent。 |
 
 推荐的数据流是：

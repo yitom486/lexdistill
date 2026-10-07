@@ -154,4 +154,5 @@ export type AgentEvent =
 2. **真仓储 round-trip**：`new XxxTool(new DrizzleLearnerRepository(':memory:')).execute()` 落库可回读；
 3. **元数据锁定**：`name/location/permission` 断言（CLIENT 工具还要断言网关侧无副作用、只回显）；
 4. **降级语义**（如有）：缺 adapter / 缺登录时必须显式报错（`E_*_NO_ADAPTER`），禁止静默编造。
+5. **选型登记**：需进入回合子集或固定任务的工具，必须在 `runtime/router/tool-catalog.ts` 登记（hint 表或 `TASK_TOOL_PRESETS`），不得只在前端 `agentOptions.tools` 写字面量；教材 MCP 服务器形状/命名改动必须走 `modules/library/mcp/textbook-mcp-catalog.ts` 并同步其测试。
 参考样例：`apps/gateway/src/__tests__/ui-command-tools.test.ts`（Client Tool）、`apps/gateway/src/modules/library/__tests__/knowledge-points.test.ts`（Server Tool + 真仓储）。

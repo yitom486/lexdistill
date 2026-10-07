@@ -12,7 +12,7 @@
 
 1. 用户确认目录，系统按一级标题分组，子标题仅作为当前任务参考。页码边界取相邻一级标题，不根据教材名称或标题类型硬编码。
 2. 全部待处理章节先裁剪到本次任务的临时目录，之后才经 agentpools 执行器启动连续 Worker（`AgentPool` API v2、`sharedProcess`，复用 `D:\project\rust\agentpools` 现成池/lease，不自建池）。
-3. 默认最多 6 个 Worker，用户已保存的模型、思考等级和并发偏好经 `mcpServers`/`model`/`effort` 真实注入（approval `never` + `windows.sandbox="unelevated"`）。同一 Worker 连续处理不同章节（连续会话，历史真实保留），故障时由池重建会话。不同 Worker 经每 Worker 独立 MCP 端点隔离，不共用线程。
+3. 默认最多 6 个 Worker，用户已保存的模型、思考等级和并发偏好经 `mcpServers`/`model`/`effort` 真实注入（approval `never` + `windows.sandbox="unelevated"`）。同一 Worker 连续处理不同章节（连续会话，历史真实保留），故障时由池重建会话。不同 Worker 经每 Worker 独立 MCP 端点隔离，不共用线程（服务器形状与命名归 `apps/gateway/src/modules/library/mcp/textbook-mcp-catalog.ts` 所有，管线只调用 `buildTextbookWorkerMcpServer`）。
 4. 每轮明确当前文件和章节。原生内容工具多次校验、暂存，模型完成且没有未修正错误时，每章一次事务保存。无内容的类别不用调用；不要求每章同时出现词汇、语法和练习。
 5. 暂时性数据库错误仅重试保存；结束、取消、超时及旧原生轮次写入被拒绝。已保存章节保留。
 6. 任务结束或取消后先关闭工作会话，再清理本任务目录。Worker cwd 是稳定父目录，避免删除被用作 cwd 的目录。清理只允许已核对归属的 import-* 子目录，不删除用户原 PDF。
