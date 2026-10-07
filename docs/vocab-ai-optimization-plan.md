@@ -31,6 +31,11 @@
 - 掌握统计联表补用户＋语种归属。
 - 验收：vocab-learning／daily-pick／flashcards／gate 33/0；typecheck 零新增。
 
+## P8 “找不到工具”根治（已完成，本轮）
+- 发送前预检（`GET /api/agent/tools` 60s 缓存，缺失就地拦截提示，不烧模型轮次；探测失败放行）。
+- 网关 fail-fast（显式任务零落点：不建会话不调模型，直接回可操作文案；`toolWarnings` 进回执）。
+- 验收：路由单测＋预检 dom＋回归 25/0；typecheck 零新增。
+
 ## P3 Hub 锁态 409 对齐（对方地盘，只 review 不动手）
 - `DailyWordStudyHub` 课程单元扩展返回 400 而非 409，锁 banner 失效；文件在对方手里，等它改。
 
