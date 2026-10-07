@@ -42,14 +42,11 @@
 - 遗留要求（Phase 1 立项条件）：`pickAllowOptionId` 审批映射、事件全量映射、中断/steer、温进程池、turn 预算收敛。
 
 ## P10 ACP Phase 1（进行中）
-- 适配器补完已合入（审批流＋单测）；UI 先行：`AgentRuntimeSelect`（8 运行时＋自定义 API 钩子，主聊＋单词配置均有入口，偏好持久化，`runtimeId` 已下发，网关暂忽略）。
-- 网关底座已合入：`SessionToolBridge`（会话 token 端点＋最小工具集＋TTL/sweep）＋`runtime-catalog`（id/认证态）＋`GET /api/agent/runtimes`＋`/mcp/session/:token` 路由。
-- 本轮：网关按 runtime 选适配器（codex-acp 留守 Codex 等 parity，其余走 ACP 温复用池；切换必重建，跨协议不续接）＋下拉认证状态点。
-- 待办：自定义 API 凭证管理＋codex-acp 切 ACP（模型/思考深度映射验证后）。
-- 审批流：`request_permission`→挂起→`APPROVAL_REQUESTED`→`submitApproval`→`APPROVAL_RESOLVED`（120s 超时 decline；inflight 跟踪修掉“yield 后找不到”真 bug）。
-- never/缺席自动放行（与当前 vocab 零点击一致）；中断/steer/`submitToolResult` 明确拒绝。
-- 验收：model-free 单测 3/0；typecheck 零新增。
-- 待办：网关按 runtime 选适配器＋`GET /api/agent/runtimes`＋表头下拉＋偏好持久化。
+- 适配器补完：审批全流（REQUESTED→RESOLVED、120s 超时、inflight 跟踪）；never/缺席自动放行；中断/steer/`submitToolResult` 明确拒绝；model-free 单测 3/0。
+- UI 先行：`AgentRuntimeSelect`（8 运行时＋自定义 API，主聊＋单词配置双入口，偏好持久化，`runtimeId` 已下发；未配置标灰，进设置页）。
+- 网关底座：`SessionToolBridge`（token 端点＋最小工具集＋TTL/sweep）＋`runtime-catalog`（id/认证态，custom 伪条目）＋`GET /api/agent/runtimes`＋`/mcp/session/:token`＋凭证存取路由（Key 永不回传）。
+- 路由：codex-acp 留守 Codex（等 parity 再翻），其余＋custom 走 ACP 温复用池；切换必重建，跨协议不续接；custom 供隔离 CODEX_HOME＋Key 环境（需 acp-client 发版生效 env 合并，改动已在你仓库 WIP）。
+- 待办：codex-acp 切 ACP（模型/思考深度映射验证后）。
 - 桥记录铁证：首轮 `dictionary.lookup` 调用＋resume（`session restore ok`）后 `flashcards.due` 再调——resume 带工具成立，Codex 旧链路的死结解开。
 - 附带修通：更新包实形状映射、HTTP 必填 `headers`、Bun 长连接超时、SDK prompt 120s、本地 pin（`@agentclientprotocol/codex-acp ^2.1.1`，不再赌 bunx）、建连抖动重试、单 adapter 只连一次。
 - 遗留要求（Phase 1 立项条件）：`pickAllowOptionId` 审批映射、事件全量映射、中断/steer、温进程池、turn 预算收敛。
