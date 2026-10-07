@@ -32,12 +32,8 @@ export async function handleHangulDrillAction(
   const questions: GeneratedQuestion[] = [];
   const used = new Set<string>();
   for (let i = 0; i < Math.min(count, pool.length); i++) {
-    let item = pool[Math.floor(Math.random() * pool.length)]!;
-    let guard = 0;
-    while (used.has(item.id) && guard < 20) {
-      item = pool[Math.floor(Math.random() * pool.length)]!;
-      guard++;
-    }
+    const remaining = pool.filter(candidate => !used.has(candidate.id));
+    const item = remaining[Math.floor(Math.random() * remaining.length)]!;
     used.add(item.id);
 
     // 选项罗马字逐项去重：跨类同音（子音 ㅋ k / 收音 ㄱ k）既不能与题干重复，彼此也不能重复
@@ -59,7 +55,7 @@ export async function handleHangulDrillAction(
       id: generateId('q_hangul'),
       type: 'MULTIPLE_CHOICE',
       prompt: MSG.hangulPrompt,
-      content: `\u300c${item.jamo}\u300d`,
+      content: `\u300c${item.jamo}\u300d${item.type === 'CODA' ? ' (收音)' : ''}`,
       options,
       correctAnswer: item.romanization,
       explanation:

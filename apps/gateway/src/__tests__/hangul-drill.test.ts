@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import { isOk } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { LearningContentTool } from '../modules/learning-content/public.js';
@@ -56,6 +56,32 @@ describe('learning.content hangul_drill', () => {
     for (const q of questions) {
       expect(new Set(q.options).size).toBe(4);
       expect(q.options?.filter((o) => o === q.correctAnswer).length).toBe(1);
+    }
+  });
+
+  it('samples without replacement even with repeated random values and distinguishes consonants from codas', async () => {
+    const repo = new DrizzleLearnerRepository(':memory:');
+    const random = spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const curriculum = await repo.getCurriculumHangul();
+      expect(isOk(curriculum)).toBe(true);
+      if (!isOk(curriculum)) return;
+      const result = await new LearningContentTool(repo).execute(
+        { action: 'hangul_drill', count: curriculum.value.length },
+        { userId: 'u_hangul_unique', sessionId: 's1' },
+      );
+      expect(isOk(result)).toBe(true);
+      if (!isOk(result)) return;
+      const questions = result.value.questions ?? [];
+      expect(questions.length).toBe(curriculum.value.length);
+      expect(new Set(questions.map(question => question.content)).size).toBe(questions.length);
+      const consonant = questions.find(question => question.content === '「ㄱ」');
+      const coda = questions.find(question => question.content === '「ㄱ」 (收音)');
+      expect(consonant?.correctAnswer).toBe('g');
+      expect(coda?.correctAnswer).toBe('k');
+    } finally {
+      random.mockRestore();
+      repo.getRawDb().close();
     }
   });
 });

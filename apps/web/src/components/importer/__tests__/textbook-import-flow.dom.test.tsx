@@ -171,6 +171,15 @@ afterEach(() => {
 
 describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码组件', () => {
   it('文件导入只显示步骤操作；JSON 确认只属于 JSON 入口', async () => {
+    if (process.env['LINGUA_IMPORT_DIALOG_CHILD'] !== '1') {
+      // Base UI caches a no-op layout hook when SSR tests load it before a DOM exists.
+      const child = Bun.spawn([process.execPath, 'test', '--path-ignore-patterns', '**/dist/**', import.meta.path, '--test-name-pattern', '文件导入只显示步骤操作'], {
+        env: { ...process.env, LINGUA_IMPORT_DIALOG_CHILD: '1' }, stdout: 'ignore', stderr: 'pipe',
+      });
+      const [exit, output] = await Promise.all([child.exited, new Response(child.stderr).text()]);
+      expect({ exit, output: exit ? output : '' }).toEqual({ exit: 0, output: '' });
+      return;
+    }
     await prepare();
     const { TextbookImporterModal } = await import('../../TextbookImporterModal.js');
     let closed = 0;
