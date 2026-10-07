@@ -64,6 +64,8 @@ export function useWordTutor(target: WordTutorTarget, options?: { onComplete?: (
         ...(threadId ? { threadId } : {}),
         ...(coachModelId ? { model: coachModelId } : {}),
         ...(coachEffort ? { effort: coachEffort } : {}),
+        // 固定任务 id（网关按中央目录解析）；tools 字面量保留作旧网关兼容。
+        task: 'vocabulary.explain',
         tools: ['vocabulary.learning.context', 'vocabulary.learning.submit', 'dictionary.lookup'],
       },
       onDelta: (_delta, accumulated) => {

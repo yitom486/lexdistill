@@ -18,7 +18,7 @@ import type { ToolDefinition } from '@study-studio/tool-core';
 import type { AgentLane } from '../session/session-manager.js';
 import { buildGenericCoachReply } from '../coach-language-policy.js';
 import { selectAgentRoute } from '../router/agent-router.js';
-import { resolveSessionTools } from '../router/tool-catalog.js';
+import { resolveSessionTools, resolveTaskTools } from '../router/tool-catalog.js';
 import { needsSessionToolUpgrade } from '../router/session-tools.js';
 import { resolveResponsesLiteCoach } from '../responses-lite-coach.js';
 import { buildTurnExecutionSummary, formatCodexLocalFallbackNote } from '../turn-summary-builder.js';
@@ -82,6 +82,8 @@ export async function handleTurnSend(
       collaborationMode?: string;
       /** 显式工具 allowlist（业务名）：固定任务直接采用，不走关键词正则 */
       tools?: string[];
+      /** 固定任务 id（命中中央目录 TASK_TOOL_PRESETS 直接采用；未知 id 回退 tools/提示词） */
+      task?: string;
       /** coach=聊天；learning=出题/批改/题目导师 */
       lane?: string;
     };
@@ -209,12 +211,15 @@ export async function handleTurnSend(
       let streamedFromCodex = false;
       let codexFailHint = '';
       if (!reply && decision.route === 'learning-loop') {
-        // 固定任务显式工具集优先；未声明走中央目录的意图+提示词子集（只在建新会话时生效）。
+        // 固定任务显式工具集优先（task 命中中央目录 > 自带 tools 字面量）；未声明走中央目录的意图+提示词子集（只在建新会话时生效）。
         const preferredTools = Array.isArray(payload.agentOptions?.tools)
           ? payload.agentOptions.tools.filter((name): name is string => typeof name === 'string' && name.length > 0)
           : [];
+        const requestedTools = resolveTaskTools(
+          typeof payload.agentOptions?.task === 'string' ? payload.agentOptions.task : undefined,
+        ) ?? preferredTools;
         // 意图感知 Tool 子集（READ 按意图、WRITE 须明示；只在建新会话时生效）
-        const learningTools = (preferredTools.length > 0 ? preferredTools : resolveSessionTools({
+        const learningTools = (requestedTools.length > 0 ? requestedTools : resolveSessionTools({
           ...(typeof intent === 'string' ? { intent } : {}),
           userPrompt,
         }))
@@ -227,9 +232,9 @@ export async function handleTurnSend(
 
         // 固定任务升级：复用会话缺显式工具即关旧建新（thread 续接，历史不断）。
         let resumeThreadId = preferredThreadId;
-        if (agentSession && preferredTools.length > 0) {
+        if (agentSession && requestedTools.length > 0) {
           const have = (agentSession.toolSpecs ?? []).map(spec => spec.businessName || spec.name);
-          if (needsSessionToolUpgrade(have, preferredTools)) {
+          if (needsSessionToolUpgrade(have, requestedTools)) {
             resumeThreadId = preferredThreadId ?? agentSession.threadId;
             void agentSession.close();
             server.sessionManager.detachAgentSession(envelope.sessionId, agentLane);

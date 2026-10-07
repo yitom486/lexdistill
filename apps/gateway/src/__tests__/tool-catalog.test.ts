@@ -4,6 +4,7 @@ import {
   TASK_TOOL_PRESETS,
   VOCABULARY_EXPLAIN_TOOLS,
   resolveSessionTools,
+  resolveTaskTools,
 } from '../runtime/router/tool-catalog.js';
 import { selectTurnTools } from '../runtime/router/turn-tools.js';
 
@@ -40,5 +41,12 @@ describe('tool-catalog（中央目录）', () => {
   it('未知任务 id 回退到意图/提示词路径，不抛', () => {
     const tools = resolveSessionTools({ task: 'no.such.task', userPrompt: '随便聊聊' });
     expect(tools).toEqual(selectTurnTools({ userPrompt: '随便聊聊' }));
+  });
+
+  it('resolveTaskTools：命中返回副本，未知/缺席返回 undefined', () => {
+    expect(resolveTaskTools('vocabulary.explain')).toEqual([...VOCABULARY_EXPLAIN_TOOLS]);
+    expect(resolveTaskTools('no.such.task')).toBeUndefined();
+    expect(resolveTaskTools(undefined)).toBeUndefined();
+    expect(resolveTaskTools('')).toBeUndefined();
   });
 });

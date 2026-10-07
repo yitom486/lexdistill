@@ -36,6 +36,8 @@ export interface StreamTurnOptions {
     collaborationMode?: string;
     /** 显式工具 allowlist（业务名）：固定任务建会话/升级会话时直接采用，不走关键词正则 */
     tools?: string[];
+    /** 固定任务 id（网关按中央目录解析；旧网关忽略本字段，仍用 tools） */
+    task?: string;
     /** coach=聊天界面；learning=出题/批改/题目导师（与聊天隔离） */
     lane?: 'coach' | 'learning';
   };

@@ -72,6 +72,13 @@ export const TASK_TOOL_PRESETS: Record<string, readonly string[]> = {
   'vocabulary.explain': VOCABULARY_EXPLAIN_TOOLS,
 };
 
+/** 任务 id 解析：命中返回显式集副本；未知/缺席返回 undefined（调用方回退提示词路径）。 */
+export function resolveTaskTools(task?: string | undefined): string[] | undefined {
+  if (!task) return undefined;
+  const preset = TASK_TOOL_PRESETS[task];
+  return preset ? [...preset] : undefined;
+}
+
 export interface SessionToolsInput {
   intent?: string | undefined;
   userPrompt: string;
@@ -81,8 +88,8 @@ export interface SessionToolsInput {
 
 /** 单一解析入口：任务显式集优先，否则意图 + 提示词子集（与旧 selectTurnTools 同行为）。 */
 export function resolveSessionTools(input: SessionToolsInput): string[] {
-  const preset = input.task ? TASK_TOOL_PRESETS[input.task] : undefined;
-  if (preset) return [...preset];
+  const taskTools = resolveTaskTools(input.task);
+  if (taskTools) return taskTools;
   const prompt = input.userPrompt || '';
   const intent = input.intent || '';
   const picked: string[] = [...BASE_TOOLS];
