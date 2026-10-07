@@ -219,10 +219,15 @@ export async function handleTurnSend(
           typeof payload.agentOptions?.task === 'string' ? payload.agentOptions.task : undefined,
         ) ?? preferredTools;
         // 意图感知 Tool 子集（READ 按意图、WRITE 须明示；只在建新会话时生效）
-        const learningTools = (requestedTools.length > 0 ? requestedTools : resolveSessionTools({
+        const resolvedNames = requestedTools.length > 0 ? requestedTools : resolveSessionTools({
           ...(typeof intent === 'string' ? { intent } : {}),
           userPrompt,
-        }))
+        });
+        const dropped = resolvedNames.filter((name) => !server.toolRegistry.get(name));
+        if (dropped.length > 0) {
+          console.warn(`[turn-tools] 注册表缺失请求工具（已丢弃，网关构建过期请重启到最新）: ${dropped.join(', ')}`);
+        }
+        const learningTools = resolvedNames
           .map((name) => server.toolRegistry.get(name))
           .filter((tool): tool is ToolDefinition => Boolean(tool));
 
@@ -230,11 +235,13 @@ export async function handleTurnSend(
         let agentSession =
           server.sessionManager.getAgentSession(envelope.sessionId, agentLane) ?? null;
 
-        // 固定任务升级：复用会话缺显式工具即关旧建新（thread 续接，历史不断）。
+        // 固定任务升级：复用会话缺本轮解析集即关旧建新（thread 续接，历史不断）。
+        // 注意用已注册子集比对：目录先行于注册表时，未注册名不触发重建（免空转）。
         let resumeThreadId = preferredThreadId;
-        if (agentSession && requestedTools.length > 0) {
+        const upgradeWanted = resolvedNames.filter((name) => server.toolRegistry.get(name));
+        if (agentSession && upgradeWanted.length > 0) {
           const have = (agentSession.toolSpecs ?? []).map(spec => spec.businessName || spec.name);
-          if (needsSessionToolUpgrade(have, requestedTools)) {
+          if (needsSessionToolUpgrade(have, upgradeWanted)) {
             resumeThreadId = preferredThreadId ?? agentSession.threadId;
             void agentSession.close();
             server.sessionManager.detachAgentSession(envelope.sessionId, agentLane);
