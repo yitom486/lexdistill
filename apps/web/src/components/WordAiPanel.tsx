@@ -23,6 +23,7 @@ export function WordAiPanel({ word }: { word: VocabularyEntry }) {
     ariaLabel={`AI 追问：${word.word}`}
     inputPlaceholder="继续追问这个词…"
     presets={presets}
+    requiredTools={['vocabulary.learning.context', 'vocabulary.learning.submit', 'dictionary.lookup']}
     onComplete={handleComplete}
   />;
 }

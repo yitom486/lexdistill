@@ -18,22 +18,25 @@ interface WordTutorPanelProps {
   ariaLabel: string;
   inputPlaceholder: string;
   presets?: string[];
+  /** 发送前必须在网关注册表存在的工具名；缺失就地提示并拦截。 */
+  requiredTools: string[];
   onComplete?: () => void;
 }
 
 /** 单词 AI 会话容器（全局词/教材行共用）：target 按字段 memo，send 身份稳定；纯展示归 WordChatThread。 */
 export function WordTutorPanel({
-  target, generatePrompt, showGenerate, ariaLabel, inputPlaceholder, presets = [], onComplete,
+  target, generatePrompt, showGenerate, ariaLabel, inputPlaceholder, presets = [], requiredTools, onComplete,
 }: WordTutorPanelProps) {
   const stableTarget = useMemo(
     () => ({ word: target.word, reading: target.reading, meaning: target.meaning, usage: target.usage }),
     [target.word, target.reading, target.meaning, target.usage],
   );
   const handleComplete = useCallback(() => { onComplete?.(); }, [onComplete]);
-  const { messages, isTyping, connected, send, stop } = useWordTutor(stableTarget, { onComplete: handleComplete });
+  const { messages, isTyping, connected, send, stop, ensureTaskTools } = useWordTutor(stableTarget, { onComplete: handleComplete });
   const [draft, setDraft] = useState('');
-  const submit = () => { if (send(draft)) setDraft(''); };
-  const generate = () => { send(generatePrompt); };
+  const guarded = (fn: () => void) => { void ensureTaskTools(requiredTools).then(ok => { if (ok) fn(); }); };
+  const submit = () => { const text = draft; guarded(() => { if (send(text)) setDraft(''); }); };
+  const generate = () => { guarded(() => { send(generatePrompt); }); };
   return <div className="mt-3 rounded-xl border border-line bg-paper-soft p-3" aria-label={ariaLabel}>
     <WordChatConfig />
     <WordChatThread messages={messages} isTyping={isTyping} connected={connected}

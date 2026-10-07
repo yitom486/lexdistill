@@ -4,6 +4,7 @@ import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { normalizeTrackLanguage } from '../learning/learning-shell.js';
+import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 
 export interface WordTutorMessage {
   id: string;
@@ -18,6 +19,25 @@ interface WordTutorTarget {
   reading: string;
   meaning: string;
   usage: string;
+}
+
+/** 注册表探测缓存（60s）：固定任务发送前确认网关真有这些工具，没有就地提示，不断活路靠网关 fail-fast。 */
+let cachedRegistryTools: { at: number; names: string[] } | null = null;
+
+async function missingRegistryTools(wanted: readonly string[]): Promise<string[]> {
+  const now = Date.now();
+  if (!cachedRegistryTools || now - cachedRegistryTools.at > 60_000) {
+    try {
+      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/tools`);
+      const data = (await res.json()) as { tools?: unknown };
+      const names = Array.isArray(data.tools) ? data.tools.filter((name): name is string => typeof name === 'string') : [];
+      cachedRegistryTools = { at: now, names };
+    } catch {
+      return [];
+    }
+  }
+  const have = new Set(cachedRegistryTools.names);
+  return wanted.filter(name => !have.has(name));
 }
 
 /** 单词内嵌 AI 会话：流式输出逐字进组件；模型调工具落库后刷新词汇查询，内容立变。 */
@@ -99,5 +119,15 @@ export function useWordTutor(target: WordTutorTarget, options?: { onComplete?: (
     setMessages(previous => previous.map(message => message.isStreaming ? { ...message, isStreaming: false } : message));
   }, [gateway]);
 
-  return { messages, isTyping, connected: gateway.isConnected, send, stop };
+  /** 发送前预检：网关缺任务工具就地提示并拦截，不浪费模型轮次；探测失败放行（网关 fail-fast 兜底）。 */
+  const ensureTaskTools = useCallback(async (wanted: readonly string[]): Promise<boolean> => {
+    const missing = await missingRegistryTools(wanted);
+    if (missing.length === 0) return true;
+    const aiMsg: WordTutorMessage = { id: `wta-${++idRef.current}`, sender: 'ai',
+      text: `网关缺少任务所需工具（${missing.join('、')}），请把网关更新到最新构建后重启，再重发一次。本次未发送。` };
+    setMessages(previous => [...previous, aiMsg]);
+    return false;
+  }, []);
+
+  return { messages, isTyping, connected: gateway.isConnected, send, stop, ensureTaskTools };
 }

@@ -30,6 +30,7 @@ export function TextbookWordAiPanel({ row }: { row: TextbookWordRow }) {
     showGenerate
     ariaLabel={`AI 讲透：${row.surface}`}
     inputPlaceholder={`继续追问「${row.surface}」…`}
+    requiredTools={['vocabulary.learning.context', 'vocabulary.learning.submit', 'dictionary.lookup']}
     onComplete={handleComplete}
   />;
 }

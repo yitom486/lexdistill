@@ -176,6 +176,10 @@ export function createAgentRoutes(deps: GatewayDeps) {
     }
     return c.json(res.value);
   })
+  .get('/api/agent/tools', (c) => {
+    // 注册表工具名探测：前端固定任务发送前预检，缺失直接提示重启网关，不浪费模型轮次。
+    return c.json({ tools: deps.server.toolRegistry.list().map(tool => tool.name) });
+  })
   .get('/api/integrations/mcp/servers', async (c) => {
     const limit = Number(c.req.query('limit') || 40);
     const cursor = c.req.query('cursor') || undefined;

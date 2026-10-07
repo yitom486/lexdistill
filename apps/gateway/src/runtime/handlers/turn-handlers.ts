@@ -157,6 +157,8 @@ export async function handleTurnSend(
   let codexFailureMessage: string | undefined;
   // P3-C：保留 Codex 失败的结构化业务错误，供执行摘要翻译为用户友好状态（不泄漏栈）
   let codexFailureError: BusinessError | undefined;
+  // 请求的工具缺注册表实现时记名：回执透出，前端可直接提示用户重启网关，不让模型背锅。
+  let toolWarnings: string[] = [];
 
   try {
     const track = normalizeTrackLanguage(snapshot.targetLanguage);
@@ -225,11 +227,17 @@ export async function handleTurnSend(
         });
         const dropped = resolvedNames.filter((name) => !server.toolRegistry.get(name));
         if (dropped.length > 0) {
+          toolWarnings = [...dropped];
           console.warn(`[turn-tools] 注册表缺失请求工具（已丢弃，网关构建过期请重启到最新）: ${dropped.join(', ')}`);
         }
         const learningTools = resolvedNames
           .map((name) => server.toolRegistry.get(name))
           .filter((tool): tool is ToolDefinition => Boolean(tool));
+        // 显式任务一个工具都落不到注册表：直接失败，不建会话、不烧模型轮次、不让模型瞎编“找不到”。
+        if (requestedTools.length > 0 && learningTools.length === 0) {
+          reply = `当前网关缺少任务所需工具（${requestedTools.join('、')}），请把网关更新到最新构建后重启，再重发一次。`;
+          replySource = 'local';
+        }
 
         // 按 lane 复用 Codex thread（coach 与 learning 互不共享）
         let agentSession =
@@ -260,7 +268,7 @@ export async function handleTurnSend(
           agentSession = null;
         }
 
-        if (!agentSession) {
+        if (!agentSession && !reply) {
           const sessionOpts: {
             sessionId: string;
             userId: string;
@@ -300,7 +308,7 @@ export async function handleTurnSend(
           }
         }
 
-        if (agentSession) {
+        if (agentSession && !reply) {
           if (agentSession.threadId) codexThreadId = agentSession.threadId;
           let acc = '';
           for await (const ev of agentSession.send({
@@ -501,6 +509,7 @@ export async function handleTurnSend(
       // 旧字段兼容（codexOutcome / codexFailureMessage）保留，便于过渡期前端旧逻辑
       codexOutcome: outcome,
       ...(codexFailureMessage ? { codexFailureMessage } : {}),
+      ...(toolWarnings.length > 0 ? { toolWarnings } : {}),
     },
     timestamp: Date.now(),
   };
