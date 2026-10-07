@@ -38,6 +38,12 @@ describe('tool-catalog（中央目录）', () => {
     }
   });
 
+  it('主聊默认给词汇读依据、不给写：含 context、不含 submit', () => {
+    const coach = resolveSessionTools({ intent: 'FREE_COACH', userPrompt: '随便聊聊' });
+    expect(coach.includes('vocabulary.learning.context')).toBe(true);
+    expect(coach.includes('vocabulary.learning.submit')).toBe(false);
+  });
+
   it('未知任务 id 回退到意图/提示词路径，不抛', () => {
     const tools = resolveSessionTools({ task: 'no.such.task', userPrompt: '随便聊聊' });
     expect(tools).toEqual(selectTurnTools({ userPrompt: '随便聊聊' }));

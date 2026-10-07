@@ -59,12 +59,12 @@ describe('selectTurnTools', () => {
     expect(tools.indexOf('learning.content') < tools.indexOf('mistakes.list')).toBe(true);
   });
 
-  it('词汇讲解提示词同时可见读写工具；普通聊天都不给', () => {
+  it('主聊默认给词汇读依据；写工具仍需明示', () => {
     const generate = selectTurnTools({ intent: 'FREE_COACH', userPrompt: '请为「学校」生成AI讲解并保存讲解' });
     expect(generate.includes('vocabulary.learning.context')).toBe(true);
     expect(generate.includes('vocabulary.learning.submit')).toBe(true);
     const plain = selectTurnTools({ intent: 'FREE_COACH', userPrompt: '随便聊聊' });
-    expect(plain.includes('vocabulary.learning.context')).toBe(false);
+    expect(plain.includes('vocabulary.learning.context')).toBe(true);
     expect(plain.includes('vocabulary.learning.submit')).toBe(false);
   });
 });

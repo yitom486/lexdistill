@@ -30,7 +30,7 @@ export const BASE_TOOLS = [
 ] as const;
 
 export const READ_BY_INTENT: Record<string, string[]> = {
-  FREE_COACH: ['mistakes.list', 'flashcards.due', 'flashcards.render', 'learning.encounters'],
+  FREE_COACH: ['mistakes.list', 'flashcards.due', 'flashcards.render', 'learning.encounters', 'vocabulary.learning.context'],
   EXPLAIN: ['mistakes.list', 'flashcards.render'],
   GENERATE_QUIZ: ['mistakes.list'],
   GRADE: ['mistakes.list'],
