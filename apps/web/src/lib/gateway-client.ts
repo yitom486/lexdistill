@@ -34,6 +34,8 @@ export interface StreamTurnOptions {
     threadId?: string;
     ephemeral?: boolean;
     collaborationMode?: string;
+    /** 显式工具 allowlist（业务名）：固定任务建会话/升级会话时直接采用，不走关键词正则 */
+    tools?: string[];
     /** coach=聊天界面；learning=出题/批改/题目导师（与聊天隔离） */
     lane?: 'coach' | 'learning';
   };

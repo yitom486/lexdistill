@@ -19,6 +19,7 @@ import type { AgentLane } from '../session/session-manager.js';
 import { buildGenericCoachReply } from '../coach-language-policy.js';
 import { selectAgentRoute } from '../router/agent-router.js';
 import { selectTurnTools } from '../router/turn-tools.js';
+import { needsSessionToolUpgrade } from '../router/session-tools.js';
 import { resolveResponsesLiteCoach } from '../responses-lite-coach.js';
 import { buildTurnExecutionSummary, formatCodexLocalFallbackNote } from '../turn-summary-builder.js';
 
@@ -79,6 +80,8 @@ export async function handleTurnSend(
       threadId?: string;
       ephemeral?: boolean;
       collaborationMode?: string;
+      /** 显式工具 allowlist（业务名）：固定任务直接采用，不走关键词正则 */
+      tools?: string[];
       /** coach=聊天；learning=出题/批改/题目导师 */
       lane?: string;
     };
@@ -206,17 +209,33 @@ export async function handleTurnSend(
       let streamedFromCodex = false;
       let codexFailHint = '';
       if (!reply && decision.route === 'learning-loop') {
+        // 固定任务显式工具集优先；未声明走关键词子集（只在建新会话时生效）。
+        const preferredTools = Array.isArray(payload.agentOptions?.tools)
+          ? payload.agentOptions.tools.filter((name): name is string => typeof name === 'string' && name.length > 0)
+          : [];
         // 意图感知 Tool 子集（READ 按意图、WRITE 须明示；只在建新会话时生效）
-        const learningTools = selectTurnTools({
+        const learningTools = (preferredTools.length > 0 ? preferredTools : selectTurnTools({
           ...(typeof intent === 'string' ? { intent } : {}),
           userPrompt,
-        })
+        }))
           .map((name) => server.toolRegistry.get(name))
           .filter((tool): tool is ToolDefinition => Boolean(tool));
 
         // 按 lane 复用 Codex thread（coach 与 learning 互不共享）
         let agentSession =
           server.sessionManager.getAgentSession(envelope.sessionId, agentLane) ?? null;
+
+        // 固定任务升级：复用会话缺显式工具即关旧建新（thread 续接，历史不断）。
+        let resumeThreadId = preferredThreadId;
+        if (agentSession && preferredTools.length > 0) {
+          const have = (agentSession.toolSpecs ?? []).map(spec => spec.businessName || spec.name);
+          if (needsSessionToolUpgrade(have, preferredTools)) {
+            resumeThreadId = preferredThreadId ?? agentSession.threadId;
+            void agentSession.close();
+            server.sessionManager.detachAgentSession(envelope.sessionId, agentLane);
+            agentSession = null;
+          }
+        }
 
         if (
           agentSession &&
@@ -246,7 +265,7 @@ export async function handleTurnSend(
           };
           if (preferredModel) sessionOpts.model = preferredModel;
           if (preferredApproval) sessionOpts.approvalPolicy = preferredApproval;
-          if (preferredThreadId) sessionOpts.resumeThreadId = preferredThreadId;
+          if (resumeThreadId) sessionOpts.resumeThreadId = resumeThreadId;
           if (preferPersistent === true) sessionOpts.ephemeral = false;
           if (preferPersistent === false) sessionOpts.ephemeral = true;
 

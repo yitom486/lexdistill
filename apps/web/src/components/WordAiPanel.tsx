@@ -23,10 +23,19 @@ export function WordAiPanel({ word }: { word: VocabularyEntry }) {
   const [draft, setDraft] = useState('');
   const submit = () => { if (send(draft)) setDraft(''); };
   const generate = () => { send(buildGeneratePrompt(word)); };
+  const presets = [`「${word.word}」在日常生活中到底该怎么用？`, `这个词有哪些最常用的搭配？`, `它和相近词有什么区别？`];
   return <div className="mt-3 rounded-xl border border-line bg-paper-soft p-3" aria-label={`AI 追问：${word.word}`}>
     <WordChatConfig />
     {!word.learning && messages.length === 0 && <div className="mb-2">
       <Button size="sm" variant="outline" disabled={!connected || isTyping} onClick={generate}>生成讲解</Button>
+    </div>}
+    {messages.length === 0 && <div className="mb-2 flex flex-wrap gap-1.5" aria-label="预设追问">
+      {presets.map(preset => (
+        <button key={preset} type="button" disabled={!connected || isTyping} onClick={() => send(preset)}
+          className="rounded-xl border border-line bg-paper px-2.5 py-1.5 text-left text-xs text-ink hover:border-tone-amber-500o40 transition-colors disabled:opacity-50">
+          {preset}
+        </button>
+      ))}
     </div>}
     <div className="space-y-2" aria-live="polite">
       {messages.length === 0 && <p className="text-xs text-ink-muted">在这里直接追问，回答实时显示；AI 调用工具更新内容后，下方释义自动刷新。</p>}

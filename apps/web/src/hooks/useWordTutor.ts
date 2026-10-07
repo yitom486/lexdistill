@@ -64,6 +64,7 @@ export function useWordTutor(target: WordTutorTarget, options?: { onComplete?: (
         ...(threadId ? { threadId } : {}),
         ...(coachModelId ? { model: coachModelId } : {}),
         ...(coachEffort ? { effort: coachEffort } : {}),
+        tools: ['vocabulary.learning.context', 'vocabulary.learning.submit', 'dictionary.lookup'],
       },
       onDelta: (_delta, accumulated) => {
         setMessages(previous => previous.map(message => message.id === aiMsg.id ? { ...message, text: accumulated } : message));
