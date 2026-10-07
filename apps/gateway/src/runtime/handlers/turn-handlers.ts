@@ -19,7 +19,7 @@ import type { AgentLane } from '../session/session-manager.js';
 import { buildGenericCoachReply } from '../coach-language-policy.js';
 import { selectAgentRoute } from '../router/agent-router.js';
 import { resolveSessionTools, resolveTaskTools } from '../router/tool-catalog.js';
-import { needsSessionToolUpgrade } from '../router/session-tools.js';
+import { needsSessionToolUpgrade, resolveResumeThreadId } from '../router/session-tools.js';
 import { resolveResponsesLiteCoach } from '../responses-lite-coach.js';
 import { buildTurnExecutionSummary, formatCodexLocalFallbackNote } from '../turn-summary-builder.js';
 
@@ -243,14 +243,14 @@ export async function handleTurnSend(
         let agentSession =
           server.sessionManager.getAgentSession(envelope.sessionId, agentLane) ?? null;
 
-        // 固定任务升级：复用会话缺本轮解析集即关旧建新（thread 续接，历史不断）。
-        // 注意用已注册子集比对：目录先行于注册表时，未注册名不触发重建（免空转）。
-        let resumeThreadId = preferredThreadId;
+        // 固定任务升级：复用会话缺本轮解析集即关旧建新；升级必换线程
+        //（续接旧线程工具不变，换会话不换线程等于没升）。
+        let resumeThreadId = resolveResumeThreadId(preferredThreadId, requestedTools);
         const upgradeWanted = resolvedNames.filter((name) => server.toolRegistry.get(name));
         if (agentSession && upgradeWanted.length > 0) {
           const have = (agentSession.toolSpecs ?? []).map(spec => spec.businessName || spec.name);
           if (needsSessionToolUpgrade(have, upgradeWanted)) {
-            resumeThreadId = preferredThreadId ?? agentSession.threadId;
+            resumeThreadId = undefined;
             void agentSession.close();
             server.sessionManager.detachAgentSession(envelope.sessionId, agentLane);
             agentSession = null;
