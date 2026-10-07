@@ -27,6 +27,8 @@ export interface PreferencesState {
   tutorPanelWidthPx: number;
   /** Study Coach 选用的 Codex 模型 id；空=本机默认 */
   coachModelId: string;
+  /** Agent 运行时 id（codex-acp 默认；与 acp-client 内置运行时对齐） */
+  agentRuntimeId: string;
   /** 思考等级（turn/start.effort） */
   coachEffort: string;
   /** 审批策略：never | on-request | untrusted */
@@ -72,6 +74,7 @@ export interface PreferencesState {
   setTutorPanelWidthPx: (widthPx: number) => void;
 
   setCoachModelId: (modelId: string) => void;
+  setAgentRuntimeId: (runtimeId: string) => void;
   setCoachEffort: (effort: string) => void;
   setCoachApprovalPolicy: (policy: string) => void;
   setCoachThreadId: (threadId: string) => void;
@@ -139,6 +142,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       tutorContextSnapshot: null,
       tutorPanelWidthPx: 448,
       coachModelId: '',
+      agentRuntimeId: 'codex-acp',
       coachEffort: 'medium',
       coachApprovalPolicy: 'never',
       coachThreadId: '',
@@ -193,6 +197,7 @@ export const usePreferencesStore = create<PreferencesState>()(
         }),
 
       setCoachModelId: (coachModelId: string) => set({ coachModelId }),
+      setAgentRuntimeId: (agentRuntimeId: string) => set({ agentRuntimeId }),
       setCoachEffort: (coachEffort: string) => set({ coachEffort }),
       setCoachApprovalPolicy: (coachApprovalPolicy: string) => set({ coachApprovalPolicy }),
       setCoachThreadId: (coachThreadId: string) => set({ coachThreadId }),

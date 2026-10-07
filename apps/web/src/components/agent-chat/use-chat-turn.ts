@@ -9,6 +9,7 @@ import { buildTutorOfflineReply } from '../../copy/tutor-track-copy.js';
 import { AGENT_QUERY_KEYS } from '../../queries/useAgentQueries.js';
 import type { useQueryClient } from '@tanstack/react-query';
 import type { ChatMessage, AgentTurnHealth } from './chat-shared.js';
+import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 
 /** P2-1 拆分：AgentChatPanel 的轮次执行逻辑（发送/steer/队列消费/重试/审批/中断），纯搬运。 */
 
@@ -339,6 +340,9 @@ export function useChatTurn(deps: ChatTurnDeps) {
           ...(coachThreadId ? { threadId: coachThreadId } : {}),
           ...(coachCollaborationMode
             ? { collaborationMode: coachCollaborationMode }
+            : {}),
+          ...(usePreferencesStore.getState().agentRuntimeId
+            ? { runtimeId: usePreferencesStore.getState().agentRuntimeId }
             : {}),
         },
         onDelta: (_d, acc) => {

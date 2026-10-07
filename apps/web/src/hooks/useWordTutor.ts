@@ -90,6 +90,7 @@ export function useWordTutor(target: WordTutorTarget, options?: { onComplete?: (
         // 固定任务 id（网关按中央目录解析）；tools 字面量保留作旧网关兼容。
         task: 'vocabulary.explain',
         tools: ['vocabulary.learning.context', 'vocabulary.learning.submit', 'dictionary.lookup'],
+        ...(prefs.agentRuntimeId ? { runtimeId: prefs.agentRuntimeId } : {}),
       },
       onDelta: (_delta, accumulated) => {
         setMessages(previous => previous.map(message => message.id === aiMsg.id ? { ...message, text: accumulated } : message));

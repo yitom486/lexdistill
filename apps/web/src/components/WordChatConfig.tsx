@@ -9,6 +9,7 @@ import {
 import { useAgentModelsQuery } from '../queries/useAgentQueries.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { FALLBACK_EFFORTS, chatMenuItem, compactSelect, effortLabel } from './agent-chat/chat-shared.js';
+import { AgentRuntimeSelect } from './AgentRuntimeSelect.js';
 
 /** 单词面板精简配置（折叠）：模型＋思考深度，读写与主聊同一份偏好，选 luna 全局生效。 */
 export function WordChatConfig() {
@@ -34,6 +35,10 @@ export function WordChatConfig() {
       </button>
       {open && (
         <div className="mt-1.5 grid grid-cols-2 gap-2">
+          <label className="block col-span-2">
+            <span className="mb-0.5 block text-[10px] text-ink-ghost">Agent 运行时</span>
+            <AgentRuntimeSelect />
+          </label>
           <label className="block">
             <span className="mb-0.5 block text-[10px] text-ink-ghost">模型</span>
             <Select value={coachModelId || '__default__'} onValueChange={value => setCoachModelId(value === '__default__' ? '' : String(value ?? ''))}>

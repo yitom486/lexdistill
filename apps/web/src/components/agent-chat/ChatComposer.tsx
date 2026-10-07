@@ -1,5 +1,6 @@
 import { ArrowUp, ListOrdered, Settings2, Square } from 'lucide-react';
 import { Button } from '../ui/button.js';
+import { AgentRuntimeSelect } from '../AgentRuntimeSelect.js';
 import {
   Select,
   SelectContent,
@@ -199,6 +200,10 @@ export function ChatComposer(props: ChatComposerProps) {
               </div>
             </PopoverContent>
           </Popover>
+
+          <div className="min-w-0 flex-1">
+            <AgentRuntimeSelect disabled={busy} />
+          </div>
 
           <div className="min-w-0 flex-1">
             <Select

@@ -38,6 +38,8 @@ export interface StreamTurnOptions {
     tools?: string[];
     /** 固定任务 id（网关按中央目录解析；旧网关忽略本字段，仍用 tools） */
     task?: string;
+    /** Agent 运行时 id（网关按 runtime 选适配器；旧网关忽略，沿用 Codex） */
+    runtimeId?: string;
     /** coach=聊天界面；learning=出题/批改/题目导师（与聊天隔离） */
     lane?: 'coach' | 'learning';
   };
