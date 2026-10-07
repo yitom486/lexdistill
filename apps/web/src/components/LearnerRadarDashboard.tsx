@@ -152,7 +152,7 @@ export function LearnerRadarDashboard({
                   <TabsTrigger
                     key={key}
                     value={key}
-                    className="px-2.5 py-1 text-xs data-[selected]:text-tone-stone-950 data-[selected]:font-bold"
+                    className="px-2.5 py-1 text-xs aria-selected:text-tone-stone-950 aria-selected:font-bold"
                   >
                     {label}
                     {count > 0 && (

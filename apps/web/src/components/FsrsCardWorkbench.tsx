@@ -27,9 +27,13 @@ import { WorkbenchNavHeader, type WorkbenchTab } from './WorkbenchNavHeader.js';
 import { DailyWordStudyHub } from './daily-study/DailyWordStudyHub.js';
 import type { StudyCardItem } from '../models/learning.js';
 import type { VocabularyEntry } from '@study-studio/protocol';
+import { unitsForTrack, selectCourseWords } from '@study-studio/learner-core';
+import { useWordlistsQuery } from '../queries/wordlists.js';
 
 export function FsrsCardWorkbench() {
-  const [workbenchTab, setWorkbenchTab] = useState<WorkbenchTab>('study');
+  const planIntent = useStudySessionStore((s) => s.planIntent);
+  const workbenchTab = useStudySessionStore((s) => s.workbenchTab);
+  const setWorkbenchTab = useStudySessionStore((s) => s.setWorkbenchTab);
   const [dictQuery, setDictQuery] = useState<string | null>(null);
   const [deepStudyOpen, setDeepStudyOpen] = useState(false);
   const { data: cards = [] } = useCardsQuery();
@@ -49,6 +53,9 @@ export function FsrsCardWorkbench() {
   const shell = useLearningShell();
   const cardSpeechLang: SupportedLanguage = trackToSpeechLang(shell.track);
   const vocabularyQuery = useVocabularyQuery(shell.track);
+  const wordlists = useWordlistsQuery(undefined, shell.track);
+  const courseUnit = unitsForTrack(shell.track).find(u => u.id === planIntent?.courseUnitId);
+  const unitWordIds = courseUnit?.evidence.type === 'words-studied' ? new Set(selectCourseWords(courseUnit, wordlists.data ?? []).map(w => w.entryId)) : undefined;
 
   const dictionaryCopy =
     shell.track === 'en'
@@ -64,7 +71,9 @@ export function FsrsCardWorkbench() {
   const cardFlipped = useStudySessionStore((s) => s.reviewCardFlipped);
   const setCardFlipped = useStudySessionStore((s) => s.setReviewCardFlipped);
 
-  const filteredCards = cards.filter((c) => cardFilter === 'ALL' || c.type === cardFilter);
+  const filteredCards = cards.filter((c) => (cardFilter === 'ALL' || c.type === cardFilter)
+    && (!unitWordIds || !!c.sourceEntryId && unitWordIds.has(c.sourceEntryId))
+    && (planIntent?.kind !== 'CARDS' || !!c.dueAt && Date.parse(c.dueAt) <= Date.now()));
   const activeCard: StudyCardItem | undefined = filteredCards[currentCardIndex] || filteredCards[0];
 
   useEffect(() => {
@@ -162,7 +171,7 @@ export function FsrsCardWorkbench() {
             sound.playMistake();
             toast('已加入今日重练队列，稍后将再次强化。');
           }
-          if (currentCardIndex < filteredCards.length - 1) {
+          if (planIntent?.kind !== 'CARDS' && currentCardIndex < filteredCards.length - 1) {
             setCurrentCardIndex(currentCardIndex + 1);
           } else {
             setCurrentCardIndex(0);
@@ -205,6 +214,7 @@ export function FsrsCardWorkbench() {
           <DailyWordStudyHub
             key={shell.track}
             language={shell.track}
+            courseUnitId={planIntent?.courseUnitId}
             onGoToReview={() => {
               sound.playClick();
               setWorkbenchTab('review');

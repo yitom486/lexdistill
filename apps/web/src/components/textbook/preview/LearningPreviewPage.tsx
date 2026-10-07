@@ -44,7 +44,7 @@ export function LearningPreviewPage({ content, bookTitle, bookId = '', chapterTi
       <aside className="flex min-h-0 flex-col overflow-y-auto border-r border-line-soft bg-paper-soft px-4 py-6">
         <p className="mb-4 px-3 text-xs font-semibold tracking-wider text-ink-muted">本课内容</p>
         <TabsList aria-label="学习内容分类" className="flex w-full flex-col items-stretch gap-2 rounded-none border-0 bg-transparent p-0">
-          {categories.map(category => <TabsTrigger key={category.key} value={category.key} className="w-full justify-start rounded-xl px-3 py-3.5 text-sm text-ink-muted data-[selected]:bg-wash-amber-500o15 data-[selected]:text-accent-ink"><category.icon className="h-4 w-4 shrink-0" />{category.title}<span className="ml-auto text-xs tabular-nums opacity-70">{category.count}</span></TabsTrigger>)}
+          {categories.map(category => <TabsTrigger key={category.key} value={category.key} className="w-full justify-start rounded-xl px-3 py-3.5 text-sm text-ink-muted aria-selected:bg-wash-amber-500o15 aria-selected:text-accent-ink"><category.icon className="h-4 w-4 shrink-0" />{category.title}<span className="ml-auto text-xs tabular-nums opacity-70">{category.count}</span></TabsTrigger>)}
         </TabsList>
         {content.material && <div className="mt-4 px-3"><PreviewMaterial text={content.material} /></div>}
         {!!content.grammar.length && <div className="mt-5 space-y-1 border-t border-line-soft pt-4"><p className="px-3 text-xs font-semibold text-ink-muted">本课重点</p>{content.grammar.map(point => <Button key={point.id} variant="ghost" size="sm" className="h-auto w-full justify-start whitespace-normal text-left text-xs leading-6" onClick={() => setActive('grammar')}>{point.title}</Button>)}</div>}

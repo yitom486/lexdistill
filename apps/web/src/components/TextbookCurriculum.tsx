@@ -570,19 +570,19 @@ function StoredTextbookCurriculum({
                   <TabsIndicator className="bg-tone-amber-500 shadow-sm" />
                   <TabsTrigger
                     value="READER"
-                    className="px-3 py-1.5 text-xs data-[selected]:text-tone-stone-950"
+                    className="px-3 py-1.5 text-xs aria-selected:text-tone-stone-950"
                   >
                     📖 交互精读与排版 ({currentLesson.dialogues.length})
                   </TabsTrigger>
                   <TabsTrigger
                     value="VOCAB"
-                    className="px-3 py-1.5 text-xs data-[selected]:text-tone-stone-950"
+                    className="px-3 py-1.5 text-xs aria-selected:text-tone-stone-950"
                   >
                     📚 重点词汇库 ({currentLesson.vocabularies.length})
                   </TabsTrigger>
                   <TabsTrigger
                     value="GRAMMAR"
-                    className="px-3 py-1.5 text-xs data-[selected]:text-tone-stone-950"
+                    className="px-3 py-1.5 text-xs aria-selected:text-tone-stone-950"
                   >
                     💡 核心文法剖析 ({currentLesson.grammarPoints.length})
                   </TabsTrigger>

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { GeneratedQuestion } from '@study-studio/protocol';
-import type { DailyPlanStepKind } from '@study-studio/learner-core';
+import type { DailyPlanStepKind, DailyPlanStepTemplate, DailyPlanNavigateTarget } from '@study-studio/learner-core';
 import type { AiTutorContext } from './tutor-context.js';
 import { usePreferencesStore } from './usePreferencesStore.js';
 
@@ -29,6 +29,8 @@ export interface PlanIntent {
   title: string;
   skillId?: string | undefined;
   skillName?: string | undefined;
+  courseUnitId?: string | undefined;
+  navigateTo?: DailyPlanNavigateTarget | undefined;
 }
 
 export type TutorSurface = 'free' | 'question';
@@ -47,6 +49,7 @@ export interface StudySessionState {
   activeTab: NavigationTab;
   isCommandOpen: boolean;
   cardFilter: 'ALL' | 'VOCAB' | 'GRAMMAR' | 'CONFUSION';
+  workbenchTab: 'study' | 'review' | 'library' | 'dictionary' | 'queue';
   questionIndex: number;
   reviewCardIndex: number;
   reviewCardFlipped: boolean;
@@ -63,6 +66,7 @@ export interface StudySessionState {
   setIsCommandOpen: (open: boolean) => void;
   toggleCommandOpen: () => void;
   setCardFilter: (filter: 'ALL' | 'VOCAB' | 'GRAMMAR' | 'CONFUSION') => void;
+  setWorkbenchTab: (tab: 'study' | 'review' | 'library' | 'dictionary' | 'queue') => void;
   setQuestionIndex: (index: number) => void;
   setReviewCardIndex: (index: number) => void;
   setReviewCardFlipped: (flipped: boolean) => void;
@@ -72,6 +76,7 @@ export interface StudySessionState {
   presentQuiz: (pkg: Omit<PresentedQuizPackage, 'presentedAt'> & { presentedAt?: string }) => void;
   clearPresentedQuiz: () => void;
   setPlanIntent: (intent: PlanIntent | null) => void;
+  startPlanStep: (step: DailyPlanStepTemplate) => void;
   applyUiNavigate: (target: string, openTutor?: boolean) => void;
 }
 
@@ -110,6 +115,7 @@ export const useStudySessionStore = create<StudySessionState>()(
   activeTab: 'TODAY',
   isCommandOpen: false,
   cardFilter: 'ALL',
+  workbenchTab: 'study',
   questionIndex: 0,
   reviewCardIndex: 0,
   reviewCardFlipped: false,
@@ -119,10 +125,14 @@ export const useStudySessionStore = create<StudySessionState>()(
   presentedQuiz: null,
   planIntent: null,
 
-  setActiveTab: (activeTab) => set({ activeTab }),
+  setActiveTab: (activeTab) => set((state) => ({
+    activeTab,
+    planIntent: state.planIntent?.navigateTo === activeTab ? state.planIntent : null,
+  })),
   setIsCommandOpen: (isCommandOpen) => set({ isCommandOpen }),
   toggleCommandOpen: () => set((state) => ({ isCommandOpen: !state.isCommandOpen })),
   setCardFilter: (cardFilter) => set({ cardFilter }),
+  setWorkbenchTab: (workbenchTab) => set({ workbenchTab }),
   setQuestionIndex: (questionIndex) => set({ questionIndex }),
   setReviewCardIndex: (reviewCardIndex) => set({ reviewCardIndex }),
   setReviewCardFlipped: (reviewCardFlipped) => set({ reviewCardFlipped }),
@@ -177,13 +187,25 @@ export const useStudySessionStore = create<StudySessionState>()(
     }),
   clearPresentedQuiz: () => set({ presentedQuiz: null }),
   setPlanIntent: (planIntent) => set({ planIntent }),
+  startPlanStep: (step) => set({
+    activeTab: step.navigateTo,
+    planIntent: { stepId: step.id, kind: step.kind, title: step.title,
+      skillId: step.skillId, skillName: step.skillName, courseUnitId: step.courseUnitId,
+      navigateTo: step.navigateTo },
+    presentedQuiz: null,
+    questionIndex: 0,
+    reviewCardIndex: 0,
+    reviewCardFlipped: false,
+    ...(step.kind === 'NEW_WORDS' ? { cardFilter: 'VOCAB' as const, workbenchTab: 'study' as const } : {}),
+    ...(step.kind === 'CARDS' ? { cardFilter: 'ALL' as const, workbenchTab: 'review' as const } : {}),
+  }),
   applyUiNavigate: (target, openTutorFlag) => {
     if (target === 'TUTOR' || openTutorFlag) {
       get().openTutor(null);
       return;
     }
     if (TAB_SET.has(target)) {
-      set({ activeTab: target as NavigationTab });
+      get().setActiveTab(target as NavigationTab);
     }
   },
     }),
@@ -193,6 +215,7 @@ export const useStudySessionStore = create<StudySessionState>()(
       partialize: (state) => ({
         activeTab: state.activeTab,
         cardFilter: state.cardFilter,
+        workbenchTab: state.workbenchTab,
         questionIndex: state.questionIndex,
         reviewCardIndex: state.reviewCardIndex,
         reviewCardFlipped: state.reviewCardFlipped,
