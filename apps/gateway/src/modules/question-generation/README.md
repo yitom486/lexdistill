@@ -44,8 +44,11 @@ the dedicated model runner and UI configuration, using these contracts unchanged
 - `run-manager.ts` (`GenerationRunManager`, wired in `bootstrap/create-gateway.ts` with one
   `CodexAdapter` per task) is the only production entry into `runGenerationTask`: `POST
   …/tasks/:userId/:taskId/run` returns 202 and runs the full loop in the background,
-  `GET …/run-state` reports progress. Real TTS is wired in P5; until then the audio step
-  fails honestly with `E_AUDIO_UNAVAILABLE`.
+  `GET …/run-state` reports progress. P5 production audio resolves via
+  `infrastructure/resolve-audio.ts` from host env only (`GEMINI_API_KEY`/`GOOGLE_API_KEY`,
+  `AZURE_TTS_KEY`, `STUDY_STUDIO_ENABLE_LOCAL_TTS=1` for local); unconfigured providers
+  return undefined and the audio step fails honestly with `E_AUDIO_UNAVAILABLE`.
+  Keys never enter config, prompts, tool args or logs.
 - `runner.ts` (`runGenerationTask`) drives one isolated model session per task through the
   public `AgentAdapter`/`AgentSession` interface: only the six generation tools, no
   `workingDirectory`, `sandboxMode: 'read-only'`, `approvalPolicy: 'untrusted'` with every
@@ -123,6 +126,19 @@ the dedicated model runner and UI configuration, using these contracts unchanged
   reused on retries. Controlled UI tests include a response lost after the database commit,
   not merely a request rejected before reaching the server. Production model/TTS and
   installed Tauri verification remain separate delivery checks.
+
+## P5 Production Wiring And Remaining Live Verification
+
+- Audio: `resolveGenerationAudio(config, env)` is the single host owner. No paid call is
+  made by tests or by wiring itself; real synthesis only happens when a user-authorized
+  run executes `generation.audio` with a configured provider key.
+- Migrations v044–v048 verified contiguous on a memory DB (`max schema_migrations = 48`);
+  no real learner DB was touched. Desktop bundle contract (`apps/desktop/src-tauri/tauri.conf.json`,
+  Lingua Studio 0.1.2, gateway sidecar + web dist) is present; on-device run, small-quota
+  real model/TTS, and clean-install delivery remain **unverified** pending the user's
+  service selection, explicit quota authorization, and backup path confirmation
+  (`docs/db-backup-recovery.md`). Controlled tests, real-service runs, desktop checks and
+  install delivery must be reported separately.
 
 ## Fixed Tools
 

@@ -1,5 +1,7 @@
 export { createQuestionGenerationTools, GENERATION_TOOL_NAMES } from './tools.js';
 export { createGenerationTtsRenderer } from './infrastructure/tts-renderer.js';
+export { resolveGenerationAudio } from './infrastructure/resolve-audio.js';
+export type { GenerationAudioEnv } from './infrastructure/resolve-audio.js';
 export type { QuestionGenerationRepository, GenerationAudioRenderer } from './ports.js';
 export { GenerationTaskService } from './service.js';
 export { GenerationRunManager } from './run-manager.js';
