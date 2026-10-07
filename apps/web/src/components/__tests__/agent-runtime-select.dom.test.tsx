@@ -1,13 +1,16 @@
 import { afterEach, expect, it } from 'bun:test';
 import * as React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AgentRuntimeSelect } from '../AgentRuntimeSelect.js';
 import { AGENT_RUNTIME_OPTIONS, agentRuntimeLabel, DEFAULT_AGENT_RUNTIME_ID } from '../../config/agent-runtimes.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { act, setupDom, type DomHandle } from '../toc/__tests__/dom-setup.js';
 
 let dom: DomHandle | undefined;
+const originalFetch = globalThis.fetch;
 afterEach(() => {
   dom?.teardown(); dom = undefined;
+  globalThis.fetch = originalFetch;
   usePreferencesStore.setState({ agentRuntimeId: '' });
 });
 
@@ -23,7 +26,14 @@ it('运行时目录与默认：8 运行时候选，缺席回落 ChatGPT', () => 
 it('下拉默认选中 ChatGPT；切换写偏好', async () => {
   dom = await setupDom(true);
   const doc = dom.dom.window.document;
-  await act(async () => dom!.root.render(<AgentRuntimeSelect />));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  globalThis.fetch = (async () => Response.json({ runtimes: [] })) as unknown as typeof fetch;
+  await act(async () => dom!.root.render(
+    <QueryClientProvider client={client}>
+      <AgentRuntimeSelect />
+    </QueryClientProvider>,
+  ));
+  client.clear();
   expect(doc.querySelector('[aria-label="选择 Agent 运行时"]')?.textContent).toContain('ChatGPT');
   act(() => { usePreferencesStore.getState().setAgentRuntimeId('deepseek'); });
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); });

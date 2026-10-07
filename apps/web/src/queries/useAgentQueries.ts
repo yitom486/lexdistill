@@ -390,3 +390,25 @@ export function useMcpServersQuery(enabled = true) {
     retry: 1,
   });
 }
+
+export interface AgentRuntimeStatusDto {
+  id: string;
+  label: string;
+  hint: string;
+  configured: boolean | null;
+}
+
+export function useAgentRuntimesQuery(enabled = true) {
+  return useQuery<AgentRuntimeStatusDto[]>({
+    queryKey: [...AGENT_QUERY_KEYS.MCP_SERVERS, 'runtimes'] as const,
+    enabled,
+    queryFn: async () => {
+      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/runtimes`);
+      if (!res.ok) return [];
+      const data = (await res.json()) as { runtimes?: AgentRuntimeStatusDto[] };
+      return Array.isArray(data.runtimes) ? data.runtimes : [];
+    },
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+  });
+}

@@ -61,7 +61,13 @@ export interface AcpAdapterOptions {
     onStderrLine: (line: string) => void;
   }) => AcpClientLike;
   /** 把本轮 ToolDefinition 装成 ACP mcpServers（网关侧提供 HTTP 桥实现）。 */
-  buildMcpServers: (tools: ToolDefinition[]) => Promise<unknown[]> | unknown[];
+  buildMcpServers: (
+    tools: ToolDefinition[],
+    context?: { userId: string; sessionId: string } | undefined,
+  ) => Promise<unknown[]> | unknown[];
+  /** 由 spec 反查桥 token（网关侧维护映射；会话 close 即 revoke）。 */
+  resolveMcpToken?: ((spec: unknown) => string | undefined) | undefined;
+  revokeMcpServer?: ((token: string) => void) | undefined;
   /** 诊断透出（spike/test）；生产不接。 */
   debugUpdates?: ((params: Record<string, unknown>) => void) | undefined;
   debugLog?: ((level: string, message: string) => void) | undefined;
@@ -137,6 +143,7 @@ export class AcpAgentSession implements AgentSession {
   private readonly approvals: PendingApproval[] = [];
   private readonly inflight = new Map<string, PendingApproval>();
   private readonly resolvedEvents: AgentEvent[] = [];
+  private mcpTokens: string[] = [];
   private waiters: Array<() => void> = [];
   private promptDone = false;
   private readonly autoApprove: boolean;
@@ -147,11 +154,16 @@ export class AcpAgentSession implements AgentSession {
     private readonly handle: AcpSessionHandleLike,
     toolSpecs: NonNullable<AcpAgentSession['toolSpecs']>,
     approvalPolicy: string | undefined,
+    private readonly mcpRevoke?: ((token: string) => void) | undefined,
   ) {
     this.sessionId = sessionId;
     this.threadId = acpSessionId;
     this.toolSpecs = toolSpecs;
     this.autoApprove = !approvalPolicy || approvalPolicy === 'never';
+  }
+
+  public attachMcpTokens(tokens: string[]): void {
+    this.mcpTokens = [...tokens];
   }
 
   public pushUpdate(params: Record<string, unknown>): void {
@@ -311,6 +323,9 @@ export class AcpAgentSession implements AgentSession {
       this.resolvedEvents.push({ type: 'APPROVAL_RESOLVED', approvalId: approval.approvalId, decision: 'cancel', reason: 'interrupt' });
     }
     this.inflight.clear();
+    for (const token of this.mcpTokens.splice(0)) {
+      try { this.mcpRevoke?.(token); } catch { /* 撤销失败由 sweep 兜底 */ }
+    }
     return ok(undefined);
   }
 }
@@ -379,7 +394,10 @@ export class AcpAdapter implements AgentAdapter {
     try {
       const client = await this.ensureClient();
       const tools = sessionOptions.tools ?? [];
-      const mcpServers = await this.options.buildMcpServers(tools);
+      const mcpServers = await this.options.buildMcpServers(tools, {
+        userId: sessionOptions.userId,
+        sessionId: sessionOptions.sessionId,
+      });
       const opened = await client.createSession({
         ...(sessionOptions.resumeThreadId ? { resumeSessionId: sessionOptions.resumeThreadId } : {}),
         mcpServers,
@@ -388,13 +406,18 @@ export class AcpAdapter implements AgentAdapter {
         return err(toBusinessError(opened.error.code ?? 'E_ACP_SESSION', `ACP 会话建立失败：${opened.error.message}`));
       }
       const handle = opened.value;
+      const tokens = this.options.resolveMcpToken
+        ? mcpServers.map(spec => this.options.resolveMcpToken!(spec)).filter((token): token is string => !!token)
+        : [];
       const session = new AcpAgentSession(
         sessionOptions.sessionId,
         handle.sessionId,
         handle,
         tools.map(tool => ({ name: tool.name, businessName: tool.name, description: tool.description, inputSchema: {} })),
         sessionOptions.approvalPolicy,
+        this.options.revokeMcpServer,
       );
+      session.attachMcpTokens(tokens);
       this.sessions.set(handle.sessionId, session);
       return ok(session);
     } catch (cause) {
@@ -404,5 +427,14 @@ export class AcpAdapter implements AgentAdapter {
 
   public async resumeSession(): Promise<Result<AgentSession, BusinessError>> {
     return err(toBusinessError('E_ACP_UNSUPPORTED', '暂不支持无参 resumeSession（显式拒绝）'));
+  }
+
+  /** 关闭底层客户端（池释放用；会话级 close 不杀共享进程）。 */
+  public async shutdown(reason = 'acp adapter shutdown'): Promise<void> {
+    this.sessions.clear();
+    if (this.client) {
+      try { await this.client.disconnect(reason); } catch { /* 忽略清理失败 */ }
+      finally { this.client = null; this.connectedOnce = false; }
+    }
   }
 }

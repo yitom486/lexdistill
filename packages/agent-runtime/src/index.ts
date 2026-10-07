@@ -38,8 +38,11 @@ export {
   ResponsesAdapter,
   ResponsesSession,
   buildLightweightReply,
+  AcpAdapter,
+  AcpAgentSession,
 } from './adapters/index.js';
 export type {
   CodexAdapterOptions,
   ExternalToolExecutor,
+  AcpAdapterOptions,
 } from './adapters/index.js';

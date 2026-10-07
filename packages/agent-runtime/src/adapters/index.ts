@@ -18,3 +18,6 @@ export {
   ResponsesSession,
   buildLightweightReply,
 } from './responses/index.js';
+// Phase 1：ACP 适配器（网关按 runtime 选用；Approval/中断语义见文件头）。
+export { AcpAdapter, AcpAgentSession } from './acp/acp-adapter.js';
+export type { AcpAdapterOptions } from './acp/acp-adapter.js';

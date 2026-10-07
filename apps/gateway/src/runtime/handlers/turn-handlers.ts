@@ -13,12 +13,14 @@ import {
 } from '@study-studio/shared';
 import type { GatewayServer } from '../gateway-runtime.js';
 import type { ContextSnapshot } from '@study-studio/agent-runtime';
+import { AcpAgentSession } from '@study-studio/agent-runtime';
 import { sanitizeSnapshotReading } from '../context/context-builder.js';
 import type { ToolDefinition } from '@study-studio/tool-core';
 import type { AgentLane } from '../session/session-manager.js';
 import { buildGenericCoachReply } from '../coach-language-policy.js';
 import { selectAgentRoute } from '../router/agent-router.js';
 import { resolveSessionTools, resolveTaskTools } from '../router/tool-catalog.js';
+import { resolveSessionAdapterId } from '../router/runtime-catalog.js';
 import { needsSessionToolUpgrade, resolveResumeThreadId } from '../router/session-tools.js';
 import { resolveResponsesLiteCoach } from '../responses-lite-coach.js';
 import { buildTurnExecutionSummary, formatCodexLocalFallbackNote } from '../turn-summary-builder.js';
@@ -84,6 +86,8 @@ export async function handleTurnSend(
       tools?: string[];
       /** 固定任务 id（命中中央目录 TASK_TOOL_PRESETS 直接采用；未知 id 回退 tools/提示词） */
       task?: string;
+      /** Agent 运行时 id（网关按 runtime 选适配器；缺席/未知沿用 Codex） */
+      runtimeId?: string;
       /** coach=聊天；learning=出题/批改/题目导师 */
       lane?: string;
     };
@@ -108,6 +112,12 @@ export async function handleTurnSend(
     payload.agentOptions.threadId.trim()
       ? payload.agentOptions.threadId.trim()
       : undefined;
+  const requestedRuntimeId =
+    typeof payload.agentOptions?.runtimeId === 'string' &&
+    payload.agentOptions.runtimeId.trim()
+      ? payload.agentOptions.runtimeId.trim()
+      : undefined;
+  const wantedAdapter = resolveSessionAdapterId(requestedRuntimeId);
   const preferredCollab =
     typeof payload.agentOptions?.collaborationMode === 'string' &&
     payload.agentOptions.collaborationMode.trim()
@@ -239,13 +249,25 @@ export async function handleTurnSend(
           replySource = 'local';
         }
 
-        // 按 lane 复用 Codex thread（coach 与 learning 互不共享）
+        // 按 lane 复用会话（coach 与 learning 互不共享）；换适配器必重建
+        //（跨协议 resume 无意义：Codex threadId 对 ACP 不是会话）。
         let agentSession =
           server.sessionManager.getAgentSession(envelope.sessionId, agentLane) ?? null;
+        let adapterSwitched = false;
+        if (agentSession) {
+          const currentAdapter = agentSession instanceof AcpAgentSession ? 'acp' : 'codex';
+          if (currentAdapter !== wantedAdapter) {
+            void agentSession.close();
+            server.sessionManager.detachAgentSession(envelope.sessionId, agentLane);
+            agentSession = null;
+            adapterSwitched = true;
+          }
+        }
 
         // 固定任务升级：复用会话缺本轮解析集即关旧建新；升级必换线程
         //（续接旧线程工具不变，换会话不换线程等于没升）。
         let resumeThreadId = resolveResumeThreadId(preferredThreadId, requestedTools);
+        if (adapterSwitched) resumeThreadId = undefined;
         const upgradeWanted = resolvedNames.filter((name) => server.toolRegistry.get(name));
         if (agentSession && upgradeWanted.length > 0) {
           const have = (agentSession.toolSpecs ?? []).map(spec => spec.businessName || spec.name);
@@ -289,7 +311,10 @@ export async function handleTurnSend(
           if (preferPersistent === true) sessionOpts.ephemeral = false;
           if (preferPersistent === false) sessionOpts.ephemeral = true;
 
-          const sessionRes = await server.agentAdapter.createSession(sessionOpts);
+          const adapter = wantedAdapter === 'acp'
+            ? server.acpAdapterPool.get(requestedRuntimeId ?? 'codex-acp')
+            : server.agentAdapter;
+          const sessionRes = await adapter.createSession(sessionOpts);
           if (isOk(sessionRes)) {
             server.sessionManager.attachAgentSession(
               envelope.sessionId,

@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'bun:test';
+import { listAgentRuntimes, resolveSessionAdapterId } from '../runtime/router/runtime-catalog.js';
+import { SessionToolBridge } from '../runtime/mcp/session-tool-bridge.js';
+import { AcpAdapterPool } from '../infrastructure/acp/acp-adapter-pool.js';
+import { ok } from '@study-studio/shared';
+
+describe('resolveSessionAdapterId', () => {
+  it('缺席/codex-acp/未知走 Codex（默认行为不变）；其余走 ACP', () => {
+    expect(resolveSessionAdapterId(undefined)).toBe('codex');
+    expect(resolveSessionAdapterId('')).toBe('codex');
+    expect(resolveSessionAdapterId('codex-acp')).toBe('codex');
+    expect(resolveSessionAdapterId('nope')).toBe('codex');
+    expect(resolveSessionAdapterId('deepseek')).toBe('acp');
+    expect(resolveSessionAdapterId('claude')).toBe('acp');
+  });
+});
+
+describe('listAgentRuntimes', () => {
+  it('8 运行时齐全；codex 配置态为布尔', () => {
+    const runtimes = listAgentRuntimes();
+    expect(runtimes.map(entry => entry.id)).toEqual(
+      ['codex-acp', 'claude', 'gemini', 'copilot', 'opencode', 'cursor-cli', 'deepseek', 'agy']);
+    expect(typeof runtimes.find(entry => entry.id === 'codex-acp')?.configured).toBe('boolean');
+  });
+});
+
+describe('AcpAdapterPool', () => {
+  it('同 runtime 单例复用；异 runtime 隔离；closeAll 可重复调用', async () => {
+    const bridge = new SessionToolBridge({
+      execute: async () => ok(null),
+      resolveBaseUrl: () => 'http://127.0.0.1:9',
+    });
+    const pool = new AcpAdapterPool({ bridge, workspaceRoot: process.cwd() });
+    expect(pool.get('deepseek')).toBe(pool.get('deepseek'));
+    expect(pool.get('deepseek')).not.toBe(pool.get('claude'));
+    await pool.closeAll('test');
+    await pool.closeAll('test');
+  });
+});

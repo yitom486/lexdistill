@@ -2,6 +2,7 @@ import { SessionManager, type AgentLane } from './session/session-manager.js';
 import { ContextBuilder } from './context/context-builder.js';
 import { ToolRouter } from './router/tool-router.js';
 import { SessionToolBridge } from './mcp/session-tool-bridge.js';
+import { AcpAdapterPool } from '../infrastructure/acp/acp-adapter-pool.js';
 import { ToolRegistry } from '@study-studio/tool-core';
 import { CodexAdapter } from '@study-studio/agent-runtime';
 import type { AgentAdapterFactory } from '../composition/agent-deps.js';
@@ -77,6 +78,8 @@ export class GatewayServer {
     resolveBaseUrl: () => this.mcpBaseUrl,
   });
   public mcpBaseUrl = 'http://127.0.0.1:8080';
+  /** ACP 适配器池（按 runtime 温复用；默认 Codex 通路不受影响）。 */
+  public readonly acpAdapterPool = new AcpAdapterPool({ bridge: this.sessionToolBridge });
   /** 轻量旁路：快问快答；学习闭环默认走 Codex App Server */
   public readonly responsesAdapter = new ResponsesAdapter();
   public readonly learnerRepo: LearnerRepository;

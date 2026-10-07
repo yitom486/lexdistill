@@ -5,7 +5,7 @@ import { AcpClient, pickAllowOptionId } from '@yitom/acp-client';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { DictionaryLookupTool } from '../modules/dictionary/tools/dictionary-lookup-tool.js';
 import { FlashcardsDueTool } from '../modules/flashcards/tools/flashcards-due-tool.js';
-import { AcpAdapter } from '../../../../packages/agent-runtime/src/adapters/acp/acp-adapter.js';
+import { AcpAdapter } from '@study-studio/agent-runtime';
 import { startSpikeToolBridge, type SpikeBridgeCall } from './acp-spike-bridge.js';
 
 /**
