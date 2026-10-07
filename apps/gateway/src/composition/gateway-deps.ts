@@ -1,5 +1,7 @@
 import type { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import type { GatewayServer } from '../runtime/gateway-runtime.js';
+import type { GenerationTaskService } from '../modules/question-generation/service.js';
+import type { GenerationRunManager } from '../modules/question-generation/run-manager.js';
 
 /**
  * 网关依赖束（G2）：路由只经 deps 访问仓储与运行时，
@@ -14,4 +16,6 @@ export interface GatewayDeps {
   server: GatewayServer;
   /** 健康检查回显用端口；仅展示，不决定监听 */
   port: number;
+  /** P1 专用出题宿主服务与后台调度（装配根构造，路由只消费；缺席时出题接口明确 503）。 */
+  generation?: { service: GenerationTaskService; runs?: GenerationRunManager | undefined } | undefined;
 }

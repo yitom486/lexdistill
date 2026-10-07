@@ -8,7 +8,7 @@ It does not replace the current coach, seed-based practice UI, or start a model 
 The host creates one tool set per task with `createQuestionGenerationTools`:
 
 - Inject `SqliteQuestionGenerationRepository` with the host-owned SQLite connection.
-  The normal schema initializer applies migrations v044/v045. Do not open a second connection
+  The normal schema initializer applies migrations v044 through v048. Do not open a second connection
   or run migrations inside a model tool.
 - Supply a trusted `{ taskId, userId, sessionId, turnId }` binding and a future expiration.
   The runtime must own these identities; model input cannot override them.
@@ -32,6 +32,97 @@ The host creates one tool set per task with `createQuestionGenerationTools`:
 
 No new endpoint or credential provisioning is enabled in this step. The next step is
 the dedicated model runner and UI configuration, using these contracts unchanged.
+
+## P1 Dedicated Runner And Host Task Service
+
+- `service.ts` (`GenerationTaskService`) owns host task identity: `createTask` validates
+  `CreateGenerationTaskSchema`, checks the exact blueprint against frozen max quotas and
+  persists blueprint/runLimits/objective via v046 columns. `queryTask`/`cancelTask`/paper/audio
+  reads verify ownership (`userId` + `taskId`) and remain readable after `COMPLETED`/`CANCELLED`.
+  One in-memory owner per task rejects concurrent runs; restart orphans are terminated with
+  `recoverOrphanedTasks` (cleans `RUNNING` audio placeholders, never replays paid synthesis).
+- `run-manager.ts` (`GenerationRunManager`, wired in `bootstrap/create-gateway.ts` with one
+  `CodexAdapter` per task) is the only production entry into `runGenerationTask`: `POST
+  …/tasks/:userId/:taskId/run` returns 202 and runs the full loop in the background,
+  `GET …/run-state` reports progress. Real TTS is wired in P5; until then the audio step
+  fails honestly with `E_AUDIO_UNAVAILABLE`.
+- `runner.ts` (`runGenerationTask`) drives one isolated model session per task through the
+  public `AgentAdapter`/`AgentSession` interface: only the six generation tools, no
+  `workingDirectory`, `sandboxMode: 'read-only'`, `approvalPolicy: 'untrusted'` with every
+  approval request declined by the runner, `ephemeral: true`, and the frozen
+  `config.modelId` (caller overrides are not accepted). Tool calls execute with the trusted
+  host binding (engine session `gen:<taskId>` mapped by `userId`), non-whitelist names are
+  rejected before touching the registry, and model rounds/failed repairs/wall time are bounded
+  by `GenerationRunLimits` across the whole lifecycle (timer starts at owner acquisition;
+  exhaustion aborts the model session and reports the quota error, not generic cancellation).
+  Cancellation aborts the model and disposes the tool set immediately, so the TTS provider
+  observes the abort and no audio is persisted afterwards. Success is decided by persisted
+  assets (latest paper exists, exact blueprint verified, listening audio `READY`); a model
+  claiming completion without assets fails with `E_GENERATION_INCOMPLETE` and the task is
+  left `CANCELLED`, never reported success. Native sandbox internals beyond the public
+  interface remain Codex-implementation-governed; the strictest available档 is enforced and
+  asserted by tests, residual risk is documented here rather than hidden.
+- `system-prompt.ts` is the single code owner of the fixed system rules (mirrors
+  `docs/ai-pipelines/question-generation-runtime-prompt.md`); `blueprint.ts` enforces
+  max-quota fit at creation and exact paper verification at completion; the exact blueprint
+  and run budget are also injected into `dynamicPrompt()` and `generation.config` as host
+  facts so the model plans against the real acceptance criteria. `student-view.ts` strips
+  correct answers, reference answers, explanations, rubrics and listening transcripts.
+- HTTP (`http/generation-routes.ts`, mounted in `transport/http/create-app.ts`) exposes only
+  create/query/cancel/recover, background-run dispatch, student-only paper reads (no host
+  full-answer reader; review-stage release arrives with the P2 practice loop) and audio bytes
+  with MIME. Model driving is never triggered synchronously over HTTP.
+
+## P2 Answer Loop Into The Shared Practice Records
+
+- `practice/persistence/bank-answer.ts` answers bank papers through snapshots: objective
+  MC/FILL/REORDER normalized (`normalizeBankObjective`) into the shared `gradeObjectiveAnswer`
+  owner (same key/text, variants and join rules, no similarity invention). Subjective answer
+  retention is owned by `practice/persistence/bank-subjective-answer.ts`, with both paths
+  using `prepareBankSubmission` from `bank-submission.ts` for the shared identity ledger.
+  SHORT may use deterministic exact-match; TRANSLATION/WRITING always require explicit
+  rubric grading, even when the answer equals the sample.
+- Recording reuses the single `submitPracticeAttempt` owner into the same `quiz_attempts`,
+  skill-metric and `mistakes` tables: no second history source, no rows in `quiz_questions`.
+  Submission identity mirrors the objective path (`att_<len>:<user>:<submissionId>`); changed
+  content, paper context or elapsed time on a reused key is `E_SUBMISSION_CONFLICT`.
+  Both answer routes reserve the same submission identity. Legacy record paths reject
+  validated bank questions without a host-settled receipt; legacy pending questions
+  remain usable through the established legacy workflow.
+- Answer retention commits before subjective grading. v048 preserves elapsed time,
+  attempt identity, model/adapter and structured grading feedback. Failed grade commits
+  roll back grade + learning facts, then save `GRADING_FAILED` without losing the answer.
+  A validated model receipt is retained privately on a failed statistics commit;
+  retrying the same model configuration reuses it instead of paying for another run.
+- Explicit grading/retry: `POST /api/generation/tasks/:userId/:taskId/papers/:paperId/answers/subjective/:submissionId/grade`
+  accepts optional `model`/`effort`, not scores or reference answers. Omitted model uses
+  the task's frozen model. Saving an answer does not implicitly call a paid model.
+  `BankGrading` reuses `TextbookGrading` and the turn-bound `learning.submit_grade` tool;
+  model prose, invalid receipts and client scores cannot become grades. Writing word
+  limits use `Intl.Segmenter` word-like segments and are checked before model execution
+  and before persistence. A normalized score >= 0.8 is correct; raw rubric scores and
+  feedback are retained. Concurrent identical requests share one execution; graded
+  requests replay without another model call. Real model verification remains P5.
+- Review release is server-computed from matching settled submissions + `quiz_attempts` (`bankAnswerStates`):
+  `readReviewPaper` + `?view=review` reveal full snapshots only for answered items.
+
+## P4 Preset Resolution And Suggestions
+
+- `presets.ts` resolves the versioned catalogue into a validated blueprint, frozen quotas
+  and matching task objective. The unchanged comprehensive baseline reuses the quick
+  preset; adjusted counts or listening modes are never replaced with the baseline.
+  Disabling listening removes default modes and audio requirements; explicitly nonzero
+  modes with zero listening questions remain invalid. Writing counts are rejected when
+  the preset excludes the required writing answer format, before starting a model.
+- `GET /api/generation/suggest/:userId?language=...` uses the selected track first, then
+  the existing profile, then a visible English default. Level, mistake signals and owned
+  document counts all refer to that same language. Suggestions do not initialize profiles
+  or language rows; failed fact reads are reported, not represented as an absence of mistakes.
+  Recommendations remain optional and levels are defaults, not proficiency estimates.
+- Submission identities retain a full random UUID, with the saved identity and duration
+  reused on retries. Controlled UI tests include a response lost after the database commit,
+  not merely a request rejected before reaching the server. Production model/TTS and
+  installed Tauri verification remain separate delivery checks.
 
 ## Fixed Tools
 

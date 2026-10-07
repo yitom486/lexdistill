@@ -174,17 +174,16 @@ export function LevelCard() {
     <section className="rounded-2xl border border-line-accent bg-paper-soft p-4 shadow-sm space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <Award className="w-4 h-4 text-accent-ink" />
-        <span className="text-sm font-bold">当前档位</span>
+        <span className="text-sm font-bold text-ink">当前档位</span>
         <Badge variant="amber">{LEVEL_LABELS[current]}</Badge>
-        {info && <span className="text-[11px] text-ink-ghost">{info.hint}</span>}
         <span className="flex-1" />
-        {higher.map((lv) => (
+        {higher.map((lv, idx) => (
           <Button
             key={lv}
             size="sm"
-            variant="outline"
+            variant={idx === 0 ? 'default' : 'outline'}
             disabled={startExam.isPending}
-            title={`考过即定为${LEVEL_LABELS[lv]}（字母+20 道题，可重考）`}
+            title={`考过即定为${LEVEL_LABELS[lv]}（20 道题，可重考）`}
             onClick={() => {
               sound.playClick();
               startExam.mutate(
@@ -202,13 +201,15 @@ export function LevelCard() {
                 }
               );
             }}
+            className={idx === 0 ? 'font-semibold' : ''}
           >
             {startExam.isPending ? '开考中…' : `考${LEVEL_LABELS[lv]}`}
           </Button>
         ))}
       </div>
-      <p className="text-[11px] text-ink-stone-400">
-        通过阶段测评后升级；日常失误不降级。收藏数量不计入晋级。
+      <p className="text-xs text-ink-ghost">
+        {info?.hint ? info.hint : `通过${higher[0] ? LEVEL_LABELS[higher[0]] : ''}阶段测评后升级`}
+        <span className="text-ink-stone-400 ml-1.5">（日常失误不降级 · 收藏数量不计入晋级）</span>
       </p>
     </section>
   );

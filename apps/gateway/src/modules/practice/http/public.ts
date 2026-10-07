@@ -6,3 +6,4 @@ export { createPracticeRoutes } from './practice-routes.js';
 export { createAnswerRoutes } from './answer-routes.js';
 export { createPlacementRoutes } from './placement-routes.js';
 export { createTextbookPracticeRoutes } from './textbook-practice-routes.js';
+export { createBankGradingRoutes } from './bank-grading-routes.js';

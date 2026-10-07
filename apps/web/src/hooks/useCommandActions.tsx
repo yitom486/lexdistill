@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import {
   BookOpen,
   Zap,
+  Sparkles,
   Layers,
   Headphones,
   Mic,
@@ -70,6 +71,14 @@ export function useCommandActions(unresolvedMistakeCount: number): CommandAction
         icon: <Zap className="w-4 h-4" />,
         shortcut: 'Tab 1',
         onSelect: () => setActiveTab('QUIZ'),
+      },
+      {
+        id: 'nav-generation',
+        category: '导航',
+        title: '前往 AI 出题',
+        subtitle: '冻结配置后台出题 · 试卷作答与复盘',
+        icon: <Sparkles className="w-4 h-4" />,
+        onSelect: () => setActiveTab('GENERATION'),
       },
       {
         id: 'nav-cards',

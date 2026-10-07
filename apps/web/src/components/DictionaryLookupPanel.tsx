@@ -278,7 +278,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
               <div className="space-y-0.5">
                 <span className="font-semibold text-ink flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-accent-ink-warm" />
-                  想要每天从 N5 抽取 10–20 词系统学习？
+                  想要每天抽取 10–20 词系统深度精学？
                 </span>
                 <p className="text-[11px] text-ink-ghost">
                   推荐使用「今日学词」模块，享受多角色情景短剧、避坑指南与互动随堂小测！
@@ -295,7 +295,7 @@ export function DictionaryLookupPanel({ language, title, helper, initialQuery = 
             </div>
           )}
           <p className="text-[11px] font-bold text-ink-ghost">
-            零基础单词表 · 按顺序点词展开学透（收进生词本即计入带路第 3 天）
+            零基础单词表 · 按顺序点词展开学透（收进生词本直接纳入 FSRS 科学复习）
           </p>
           {wordlists.isLoading && <p className="text-xs text-ink-stone-500">单词表加载中…</p>}
           {(wordlists.data ?? []).map((group) => {

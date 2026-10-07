@@ -19,6 +19,7 @@ import {
   createPracticeRoutes,
   createAnswerRoutes,
   createTextbookPracticeRoutes,
+  createBankGradingRoutes,
   createPlacementRoutes,
 } from '../../modules/practice/http/public.js';
 import { createReviewRoutes } from '../../modules/review/http/public.js';
@@ -32,6 +33,7 @@ import {
   createPdfImportRoutes,
 } from '../../modules/library/http/public.js';
 import { createCurriculumRoutes } from '../../modules/curriculum/http/public.js';
+import { createGenerationRoutes } from '../../modules/question-generation/http/generation-routes.js';
 
 /**
  * 应用构建工厂（G2）：只组装路由，不创建 DB/Adapter/监听。
@@ -72,6 +74,7 @@ export function createApp(deps: GatewayDeps) {
     .route('/', createPracticeRoutes(deps))
     .route('/', createAnswerRoutes(deps))
     .route('/', createTextbookPracticeRoutes(deps))
+    .route('/', createBankGradingRoutes(deps))
     .route('/', createPlacementRoutes(deps))
     .route('/', createReviewRoutes(deps))
     .route('/', createLibraryRoutes(deps))
@@ -82,6 +85,7 @@ export function createApp(deps: GatewayDeps) {
     .route('/', createTextbookQuizRoutes(deps))
     .route('/', createPdfImportRoutes(deps))
     .route('/', createCurriculumRoutes(deps))
+    .route('/', createGenerationRoutes(deps))
     .route('/', createTtsRoutes())
     .route('/', createLearningCompatRoutes(deps));
 }

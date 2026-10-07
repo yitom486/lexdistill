@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ExerciseGradeSchema, type ExerciseGrade } from './textbook-practice.js';
 
 const text = z.string().trim().min(1).max(12000);
 const id = z.string().trim().min(1).max(200);
@@ -89,6 +90,105 @@ export type SubmitBankQuestions = z.infer<typeof SubmitBankQuestionsSchema>;
 export type QueryBank = z.infer<typeof QueryBankSchema>;
 export type ReadGenerationTextbook = z.infer<typeof ReadGenerationTextbookSchema>;
 export type AssembleBankPaper = z.infer<typeof AssembleBankPaperSchema>;
+export const GenerationListeningModeSchema = z.enum(['DIALOGUE', 'PASSAGE', 'NEWS']);
+export type GenerationListeningMode = z.infer<typeof GenerationListeningModeSchema>;
+/**
+ * P1 精确组卷蓝图：与 GenerationConfig 的最大额度不同，这里是必须精确满足的要求。
+ * totalItems 必须等于 categoryCounts 之和；若给出 listeningModes，其和必须等于 LISTENING 数量。
+ * 仅表达宿主已校验的任务事实，不替代后端对最终试卷的核对。
+ */
+export const GenerationBlueprintSchema = z.object({
+  totalItems: z.number().int().min(1).max(100),
+  categoryCounts: z.record(BankCategorySchema, z.number().int().min(0).max(100)),
+  listeningModes: z.record(GenerationListeningModeSchema, z.number().int().min(0).max(100)).optional(),
+}).strict().superRefine((value, ctx) => {
+  const categories = Object.values(value.categoryCounts);
+  if (!categories.some(n => (n ?? 0) > 0)) ctx.addIssue({ code: 'custom', path: ['categoryCounts'], message: 'At least one category must be required.' });
+  const sum = categories.reduce((n, c) => n + (c ?? 0), 0);
+  if (sum !== value.totalItems) ctx.addIssue({ code: 'custom', path: ['totalItems'], message: 'totalItems must equal the sum of categoryCounts.' });
+  if (value.listeningModes) {
+    const listening = value.categoryCounts.LISTENING ?? 0;
+    const modeSum = Object.values(value.listeningModes).reduce((n, c) => n + (c ?? 0), 0);
+    if (modeSum !== listening) ctx.addIssue({ code: 'custom', path: ['listeningModes'], message: 'Listening mode counts must equal the LISTENING category count.' });
+  }
+});
+export type GenerationBlueprint = z.infer<typeof GenerationBlueprintSchema>;
+/**
+ * P1 模型运行预算：全部由宿主执行，不在提示词里口头约束。
+ * maxModelRounds 限制工具调用总数；maxRepairAttempts 限制失败工具结果总数；maxDurationMs 限制整轮墙钟时间。
+ */
+export const GenerationRunLimitsSchema = z.object({
+  maxModelRounds: z.number().int().min(1).max(100).default(20),
+  maxRepairAttempts: z.number().int().min(0).max(20).default(5),
+  maxDurationMs: z.number().int().min(1000).max(600000).default(120000),
+}).strict();
+export type GenerationRunLimits = z.infer<typeof GenerationRunLimitsSchema>;
+export const GenerationTaskStatusSchema = z.enum(['ACTIVE', 'COMPLETED', 'CANCELLED']);
+export type GenerationTaskStatus = z.infer<typeof GenerationTaskStatusSchema>;
+export const CreateGenerationTaskSchema = z.object({
+  taskId: id.optional(), userId: id, sessionId: id, turnId: id,
+  config: GenerationConfigSchema, blueprint: GenerationBlueprintSchema.optional(),
+  runLimits: GenerationRunLimitsSchema.optional(),
+  objective: z.string().trim().max(2000).optional(),
+  expiresAt: z.string().datetime().optional(),
+}).strict();
+export type CreateGenerationTask = z.infer<typeof CreateGenerationTaskSchema>;
+export interface GenerationTaskUsage { usedQuestions: number; usedAudio: number; usedAudioAttempts: number; usedPapers: number }
+export interface GenerationPaperSummary { paperId: string; title: string; questionIds: string[] }
+export interface GenerationTaskSummary {
+  taskId: string; status: GenerationTaskStatus; isExpired: boolean; expiresAt: string;
+  language: GenerationConfig['language']; targetLevel: string;
+  usedQuestions: number; usedPapers: number; paperCount: number;
+}
+export interface GenerationAudioSummary { materialId: string; mimeType: string; byteLength: number }
+export interface GenerationTaskSnapshot {
+  binding: GenerationBinding; status: GenerationTaskStatus; isExpired: boolean; expiresAt: string;
+  config: GenerationConfig; blueprint: GenerationBlueprint | null; runLimits: GenerationRunLimits;
+  objective: string | null;
+  usage: GenerationTaskUsage; papers: GenerationPaperSummary[]; audio: GenerationAudioSummary[];
+}
+export interface GenerationPaperDetail { paperId: string; title: string; items: Array<BankQuestionRecord & { material: BankMaterial | null }> }
+/**
+ * P2 新题库作答边界：经试卷快照作答，判分与记录复用练习所有者。
+ * 客观后端权威判分；主观先保存，再经显式批改入口提交结构化评分。
+ */
+export const BankAnswerSubmitSchema = z.object({
+  submissionId: id, taskId: id, paperId: id, questionId: id,
+  userAnswer: z.string().trim().min(1).max(10000),
+  timeSpentMs: z.number().int().min(0).max(3600000).default(0),
+}).strict();
+export type BankAnswerSubmit = z.infer<typeof BankAnswerSubmitSchema>;
+export const BankGradeSubmitSchema = z.object({
+  submissionId: id, taskId: id, paperId: id,
+  model: z.string().trim().min(1).max(128).optional(),
+  effort: z.string().trim().min(1).max(32).optional(),
+}).strict();
+export type BankGradeSubmit = z.infer<typeof BankGradeSubmitSchema>;
+export const BankObjectiveAnswerResultSchema = z.object({
+  submissionId: z.string(), questionId: z.string(),
+  isCorrect: z.boolean(), score: z.number().min(0).max(1),
+  correctAnswer: z.string(), explanation: z.string(),
+  persistedToDb: z.literal(true),
+}).strict();
+export type BankObjectiveAnswerResult = z.infer<typeof BankObjectiveAnswerResultSchema>;
+export const BankSubjectiveAnswerResultSchema = z.object({
+  submissionId: z.string(), questionId: z.string(),
+  status: z.enum(['SUBMITTED', 'GRADED', 'GRADING_FAILED']),
+  isCorrect: z.boolean().optional(), score: z.number().min(0).max(1).optional(),
+  gradingError: z.string().optional(),
+  grading: ExerciseGradeSchema.optional(),
+  persistedToDb: z.literal(true),
+}).strict();
+export type BankSubjectiveAnswerResult = z.infer<typeof BankSubjectiveAnswerResultSchema>;
+export interface BankSubmissionRecord {
+  submissionId: string; taskId: string; paperId: string; questionId: string;
+  answerType: string; userAnswer: string;
+  status: 'SUBMITTED' | 'GRADED' | 'GRADING_FAILED';
+  isCorrect: boolean | null; score: number | null;
+  timeSpentMs: number; attemptId: string | null; gradingError: string | null;
+  model: string | null; adapter: string | null;
+  grading: ExerciseGrade | null;
+}
 export interface GenerationBinding { taskId: string; userId: string; sessionId: string; turnId: string }
 export interface BankQuestionRecord extends Omit<BankQuestionDraft, 'material'> {
   id: string; language: GenerationConfig['language']; materialId: string | null;

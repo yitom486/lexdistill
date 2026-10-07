@@ -1,30 +1,27 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Flame,
-  Calendar,
-  CheckCircle2,
-  Award,
-  Sparkles,
-  TrendingUp,
-  Target,
-} from 'lucide-react';
+import { Flame, Calendar, Target } from 'lucide-react';
 import { sound } from '../utils/audio.js';
 import { Button } from './ui/button.js';
 import { Progress } from './ui/progress.js';
-
+import { DEFAULT_USER_ID } from '../queries/query-keys.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { useActivityHistoryQuery } from '../queries/useLearnerQueries.js';
 
 interface HeatmapDay {
   date: string;
   dayNumber: number;
+  dayOfWeek: number; // 0=Mon, ..., 6=Sun
   intensity: 0 | 1 | 2 | 3 | 4; // 0=未打卡, 1=轻度, 2=中度, 3=高, 4=满负荷
   quizCount: number;
   cardCount: number;
-  accuracy: number;
+  mistakesResolvedCount: number;
+  isGoalCompleted: boolean;
   isToday?: boolean;
+  isFuture?: boolean;
 }
+
+const WEEKDAY_HEADERS = ['一', '二', '三', '四', '五', '六', '日'];
 
 export function StudyStreakHeatmap() {
   const profile = useUserProfileStore((s) => s.profile);
@@ -32,9 +29,10 @@ export function StudyStreakHeatmap() {
   const setOpenProfile = useUserProfileStore((s) => s.setProfileModalOpen);
   const recordActivity = useUserProfileStore((s) => s.recordActivity);
 
+  const effectiveUserId = profile.userId || DEFAULT_USER_ID;
   const { data: activityHistory = [] } = useActivityHistoryQuery(
     28,
-    profile.userId || 'student_web_01',
+    effectiveUserId,
     profile.targetLanguage
   );
 
@@ -45,18 +43,20 @@ export function StudyStreakHeatmap() {
   const todayTarget = dailyTask.dailyGoalQuizzes + dailyTask.dailyGoalCards;
   const targetPercent = Math.min(100, Math.round((todayCompleted / Math.max(todayTarget, 1)) * 100));
 
-  // 构造最近 28 天的打卡数据 (基于真实的 SQLite 学习日志与自然日历)
+  // 构造最近 4 周 (28 天) 结构化日历数据，按周一至周日自然周对齐
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
+  const currentDayOfWeek = (now.getDay() + 6) % 7; // 0=Mon, ..., 6=Sun
+  const startMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - currentDayOfWeek - 21);
+
   const days: HeatmapDay[] = Array.from({ length: 28 }, (_, i) => {
-    // i = 0 为 27 天前，i = 27 为今天
-    const d = new Date(now.getTime() - (27 - i) * 86400000);
+    const d = new Date(startMonday.getFullYear(), startMonday.getMonth(), startMonday.getDate() + i);
     const dateStr = d.toISOString().slice(0, 10);
-    const isToday = i === 27 || dateStr === todayStr;
+    const isToday = dateStr === todayStr;
+    const isFuture = d > now && !isToday;
+    const dayOfWeek = (d.getDay() + 6) % 7;
 
-    // 从真实历史记录中索引
     const hist = activityHistory.find((h) => h.activityDate === dateStr);
-
     const month = d.getMonth() + 1;
     const day = d.getDate();
     const dateLabel = isToday ? '今天' : `${month}月${day < 10 ? '0' + day : day}日`;
@@ -68,11 +68,14 @@ export function StudyStreakHeatmap() {
       return {
         date: dateLabel,
         dayNumber: day,
+        dayOfWeek,
         intensity,
         quizCount,
         cardCount,
-        accuracy: quizCount > 0 ? 92 : 0,
+        mistakesResolvedCount: Math.max(dailyTask.mistakesResolvedCount, hist?.mistakesResolvedCount ?? 0),
+        isGoalCompleted: dailyTask.isGoalCompleted || (hist?.isGoalCompleted ?? false),
         isToday: true,
+        isFuture: false,
       };
     }
 
@@ -83,15 +86,21 @@ export function StudyStreakHeatmap() {
     return {
       date: dateLabel,
       dayNumber: day,
-      intensity,
+      dayOfWeek,
+      intensity: isFuture ? 0 : intensity,
       quizCount,
       cardCount,
-      accuracy: quizCount > 0 ? 85 : 0,
+      mistakesResolvedCount: hist?.mistakesResolvedCount ?? 0,
+      isGoalCompleted: hist?.isGoalCompleted ?? false,
       isToday: false,
+      isFuture,
     };
   });
 
-  const getIntensityColor = (intensity: number, isToday?: boolean) => {
+  const getIntensityColor = (intensity: number, isToday?: boolean, isFuture?: boolean) => {
+    if (isFuture) {
+      return 'opacity-40 border-dashed border-line-soft bg-transparent text-ink-ghost cursor-default';
+    }
     if (isToday && dailyTask.isOvertimeBurst) {
       return 'bg-gradient-to-tr from-tone-amber-500 to-grad-yellow-400 border-line-yellow-300 text-tone-stone-950 font-bold shadow-md animate-pulse';
     }
@@ -150,12 +159,12 @@ export function StudyStreakHeatmap() {
         </div>
       </div>
 
-      {/* 28 天热力方格 */}
+      {/* 28 天热力方格 (自然周对齐) */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs text-ink-ghost">
-          <span className="flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5" />
-            最近 4 周学习投入热力图 (Activity Matrix)
+          <span className="flex items-center gap-1 font-medium text-ink-mute">
+            <Calendar className="w-3.5 h-3.5 text-accent-ink" />
+            最近 4 周学习投入热力图 (周一 ~ 周日)
           </span>
           <div className="flex items-center gap-1 text-[10px]">
             <span>少</span>
@@ -168,7 +177,15 @@ export function StudyStreakHeatmap() {
           </div>
         </div>
 
-        <div className="grid grid-cols-7 sm:grid-cols-14 gap-1.5 pt-1">
+        {/* 星期表头 */}
+        <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-semibold text-ink-stone-400">
+          {WEEKDAY_HEADERS.map((h, idx) => (
+            <div key={idx}>{h}</div>
+          ))}
+        </div>
+
+        {/* 日历方格 */}
+        <div className="grid grid-cols-7 gap-1.5 pt-0.5">
           {days.map((day, i) => {
             const isSelected = selectedDay?.date === day.date;
             return (
@@ -176,16 +193,19 @@ export function StudyStreakHeatmap() {
                 key={`${day.date}-${i}`}
                 size="icon"
                 variant="ghost"
+                disabled={day.isFuture}
                 onClick={() => {
+                  if (day.isFuture) return;
                   sound.playClick();
                   setSelectedDay(day);
                 }}
                 className={`h-8 sm:h-9 w-full rounded-lg border text-xs font-mono transition-all ${getIntensityColor(
                   day.intensity,
-                  day.isToday
-                )} ${isSelected ? 'ring-2 ring-tone-amber-600 scale-105' : 'hover:scale-105'}`}
+                  day.isToday,
+                  day.isFuture
+                )} ${isSelected ? 'ring-2 ring-tone-amber-600 scale-105' : day.isFuture ? '' : 'hover:scale-105'}`}
               >
-                {day.isToday ? '今' : day.dayNumber}
+                {day.isToday ? '今' : day.isFuture ? '·' : day.dayNumber}
               </Button>
             );
           })}
@@ -217,8 +237,13 @@ export function StudyStreakHeatmap() {
             {selectedDay.intensity > 0 || (selectedDay.isToday && (dailyTask.quizzesCount > 0 || dailyTask.cardsReviewedCount > 0)) ? (
               <span className="text-ink-mute">
                 完成做题 <strong className="text-accent-ink-warm font-mono">{selectedDay.quizCount}</strong> 道 ·
-                复习卡片 <strong className="text-accent-ink-warm font-mono">{selectedDay.cardCount}</strong> 张 ·
-                正确率 <strong className="text-ink-emerald-700-emerald-400 font-mono">{selectedDay.accuracy}%</strong>
+                复习卡片 <strong className="text-accent-ink-warm font-mono">{selectedDay.cardCount}</strong> 张
+                {selectedDay.mistakesResolvedCount > 0 && (
+                  <> · 攻克错题 <strong className="text-accent-ink-warm font-mono">{selectedDay.mistakesResolvedCount}</strong> 项</>
+                )}
+                {selectedDay.isGoalCompleted && (
+                  <span className="ml-1.5 text-tone-emerald-600 dark:text-tone-emerald-400 font-semibold">✓ 达成目标</span>
+                )}
               </span>
             ) : (
               <span className="text-ink-stone-500">当日暂未记录学习足迹</span>

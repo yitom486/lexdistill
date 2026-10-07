@@ -9,7 +9,7 @@ import {
   inferLanguageFromSkillId,
 } from '@study-studio/shared';
 import { recordSkillAttempt } from '@study-studio/learning';
-import type { QuizQuestionType } from '@study-studio/protocol';
+import type { QuizGradingResult, QuizQuestionType } from '@study-studio/protocol';
 import {
   createMistakeEntry,
   type LearnerRepository,
@@ -29,6 +29,8 @@ export interface SubmitPracticeAttemptInput {
   questionContent?: string;
   correctAnswer?: string;
   explanation?: string;
+  /** Validated rubric receipt; normalized attempt scores and 0-100 review scores use different scales. */
+  grading?: QuizGradingResult;
 }
 
 export type PracticeSubmissionRepository = Pick<
@@ -90,9 +92,10 @@ export async function submitPracticeAttempt(
       },
       input.userAnswer,
       {
+        ...input.grading,
         questionId: input.questionId,
         isCorrect: false,
-        score: 0,
+        score: input.grading?.score ?? 0,
         correctAnswer: input.correctAnswer ?? '',
         userSubmission: input.userAnswer,
         explanation: input.explanation ?? '回答有误',

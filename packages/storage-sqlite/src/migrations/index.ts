@@ -42,6 +42,9 @@ import { migration as v042 } from './v042-vocabulary-learning-content-fields.js'
 import { migration as v043 } from './v043-daily-new-words-config.js';
 import { migration as v044 } from './v044-question-generation-bank.js';
 import { migration as v045 } from './v045-generation-audio-budget-and-legacy-types.js';
+import { migration as v046 } from './v046-generation-task-blueprint-and-limits.js';
+import { migration as v047 } from './v047-bank-answer-submissions.js';
+import { migration as v048 } from './v048-bank-answer-context.js';
 import type { SchemaMigration } from './types.js';
 
 export type { SchemaMigration } from './types.js';
@@ -96,5 +99,8 @@ export const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
   v043,
   v044,
   v045,
+  v046,
+  v047,
+  v048,
 ];
 

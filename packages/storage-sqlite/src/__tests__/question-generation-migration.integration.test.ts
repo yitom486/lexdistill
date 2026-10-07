@@ -31,14 +31,14 @@ describe('v44/v45 question bank migrations', () => {
   });
   it('creates the bank for a fresh database and is safe to initialize repeatedly', () => {
     db = new Database(':memory:'); db.run('PRAGMA foreign_keys=ON'); initSchema(db); initSchema(db);
-    expect(db.query('SELECT max(version) AS v FROM schema_migrations').get()).toEqual({ v: 45 });
+    expect(db.query('SELECT max(version) AS v FROM schema_migrations').get()).toEqual({ v: 48 });
     expect(db.query("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name LIKE 'bank_%_questions'").get()).toEqual({ n: 6 });
   });
   it('migrates known formats into their own detail tables without guessing levels, preserves history, and survives reopening', () => {
     folder = mkdtempSync(join(tmpdir(), 'lingua-bank-test-'));
     const path = join(folder, 'bank.db'); db = new Database(path); v43(db);
     const original = db.query('SELECT * FROM quiz_questions ORDER BY id').all();
-    expect(runMigrations(db).applied).toEqual([44, 45]);
+    expect(runMigrations(db).applied).toEqual([44, 45, 46, 47, 48]);
     expect(db.query('SELECT * FROM quiz_questions ORDER BY id').all()).toEqual(original);
     expect(db.query('SELECT * FROM quiz_attempts').all()).toEqual([{ id: 'attempt', user_id: 'user', question_id: 'choice', is_correct: 0 }]);
     expect(db.query('SELECT * FROM mistakes').all()).toEqual([{ id: 'mistake', user_id: 'user', question_id: 'choice', is_resolved: 0 }]);
@@ -59,7 +59,7 @@ describe('v44/v45 question bank migrations', () => {
     expect(db.query('SELECT max(version) AS v FROM schema_migrations').get()).toEqual({ v: 43 });
     expect(db.query('SELECT count(*) AS n FROM preserved_questions').get()).toEqual({ n: 7 });
     db.run('ALTER TABLE preserved_questions RENAME TO quiz_questions');
-    expect(runMigrations(db).applied).toEqual([44, 45]);
+    expect(runMigrations(db).applied).toEqual([44, 45, 46, 47, 48]);
     expect(db.query('SELECT count(*) AS n FROM bank_questions').get()).toEqual({ n: 7 });
   });
   it('upgrades an already-applied v44 without replacing its schema or losing task config', () => {
@@ -70,8 +70,9 @@ describe('v44/v45 question bank migrations', () => {
     }).immediate();
     db.run("INSERT INTO generation_tasks VALUES ('task','user','session','turn','{}','ACTIVE','2099-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z')");
     expect(db.query("SELECT count(*) AS n FROM pragma_table_info('generation_tasks') WHERE name='audio_attempts'").get()).toEqual({ n: 0 });
-    expect(runMigrations(db).applied).toEqual([45]);
+    expect(runMigrations(db).applied).toEqual([45, 46, 47, 48]);
     expect(db.query('SELECT id,config_json,audio_attempts FROM generation_tasks').get()).toEqual({ id: 'task', config_json: '{}', audio_attempts: 0 });
+    expect(db.query("SELECT count(*) AS n FROM pragma_table_info('generation_tasks') WHERE name IN ('blueprint_json','limits_json','objective_text')").get()).toEqual({ n: 3 });
     expect(db.query('SELECT answer_type,status FROM bank_questions WHERE id=?').get('choice')).toEqual({ answer_type: 'MULTIPLE_CHOICE', status: 'LEGACY_PENDING' });
     expect(runMigrations(db).applied).toEqual([]);
   });
@@ -88,7 +89,36 @@ describe('v44/v45 question bank migrations', () => {
     expect(db.query("SELECT count(*) AS n FROM bank_questions WHERE answer_type='LEGACY'").get()).toEqual({ n: 7 });
     expect(db.query('SELECT count(*) AS n FROM bank_multiple_choice_questions').get()).toEqual({ n: 0 });
     db.run('DROP TRIGGER fail_typed_legacy');
-    expect(runMigrations(db).applied).toEqual([45]);
+    expect(runMigrations(db).applied).toEqual([45, 46, 47, 48]);
     expect(db.query('SELECT count(*) AS n FROM bank_writing_questions').get()).toEqual({ n: 1 });
+  });
+  it('v48 upgrades v47 submissions in place and preserves pending answers and retry idempotency', () => {
+    db = new Database(':memory:'); v43(db);
+    for (const migration of SCHEMA_MIGRATIONS.filter(item => item.version >= 44 && item.version <= 47)) {
+      for (const sql of migration.statements!) db.run(sql);
+      db.query('INSERT INTO schema_migrations VALUES (?,?,?)').run(migration.version, migration.name, new Date().toISOString());
+    }
+    db.run("INSERT INTO generation_tasks (id,user_id,session_id,turn_id,config_json,status,expires_at,created_at) VALUES ('task','user','s','t','{}','COMPLETED','2099-01-01T00:00:00.000Z','now')");
+    db.run("INSERT INTO bank_papers VALUES ('paper','task','user','Paper','now')");
+    db.run("INSERT INTO bank_submissions (user_id,submission_id,task_id,paper_id,question_id,answer_type,user_answer,status,created_at,updated_at) VALUES ('user','sub','task','paper','short','SHORT_ANSWER','Original answer','SUBMITTED','now','now')");
+    const original = db.query('SELECT user_id,submission_id,user_answer,status FROM bank_submissions').all();
+    expect(runMigrations(db).applied).toEqual([48]);
+    expect(db.query('SELECT user_id,submission_id,user_answer,status FROM bank_submissions').all()).toEqual(original);
+    expect(db.query('SELECT time_spent_ms,attempt_id,model,adapter FROM bank_submissions').get()).toEqual({ time_spent_ms: 0, attempt_id: null, model: null, adapter: null });
+    expect(runMigrations(db).applied).toEqual([]);
+  });
+  it('v48 schema failure rolls back added columns and version and permits retry', () => {
+    db = new Database(':memory:'); v43(db);
+    for (const migration of SCHEMA_MIGRATIONS.filter(item => item.version >= 44 && item.version <= 47)) {
+      for (const sql of migration.statements!) db.run(sql);
+      db.query('INSERT INTO schema_migrations VALUES (?,?,?)').run(migration.version, migration.name, new Date().toISOString());
+    }
+    const columns = db.query("SELECT name FROM pragma_table_info('bank_submissions')").all();
+    db.run("CREATE TEMP TRIGGER fail_v48_version BEFORE INSERT ON schema_migrations WHEN NEW.version=48 BEGIN SELECT RAISE(ABORT,'controlled version write failure'); END");
+    expect(() => runMigrations(db)).toThrow();
+    expect(db.query("SELECT name FROM pragma_table_info('bank_submissions')").all()).toEqual(columns);
+    expect(db.query('SELECT max(version) AS v FROM schema_migrations').get()).toEqual({ v: 47 });
+    db.run('DROP TRIGGER fail_v48_version');
+    expect(runMigrations(db).applied).toEqual([48]);
   });
 });

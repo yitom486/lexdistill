@@ -1,6 +1,11 @@
 import { Database } from 'bun:sqlite';
 import { submitObjectiveAnswer } from '../modules/practice/persistence/objective-answer.js';
-import type { ObjectiveAnswerInput } from '@study-studio/protocol';
+import { submitBankObjectiveAnswer } from '../modules/practice/persistence/bank-answer.js';
+import { submitBankSubjectiveAnswer } from '../modules/practice/persistence/bank-subjective-answer.js';
+import { readBankGradingContext, settleBankSubjectiveGrade } from '../modules/practice/persistence/bank-grade.js';
+import { suggestPreset } from '../modules/question-generation/suggest.js';
+import { SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
+import type { BankAnswerSubmit, BankGradeSubmit, ObjectiveAnswerInput } from '@study-studio/protocol';
 import { prepareTextbookAttempt, getTextbookAttempt, claimTextbookGrade, settleTextbookGrade, textbookExerciseHistory } from '@study-studio/storage-sqlite';
 import type { ExerciseGrade, SubmitTextbookExercise } from '@study-studio/protocol';
 import type { TextbookGradeAudit, TextbookPracticeRepository } from '@study-studio/learner-core';
@@ -33,7 +38,7 @@ import type {
   GeneratedQuestion,
   CardReviewRating,
 } from '@study-studio/protocol';
-import { createDrizzleDb, type DrizzleDb, learnerLanguageProfiles } from '@study-studio/storage-sqlite';
+import { createDrizzleDb, type DrizzleDb, learnerLanguageProfiles, learnerProfiles } from '@study-studio/storage-sqlite';
 import type {
   PracticePlanTemplate,
   PracticePlanRun,
@@ -1260,6 +1265,49 @@ export class DrizzleLearnerRepository
 
   public submitObjectiveAnswer(userId: string, input: ObjectiveAnswerInput) {
     return submitObjectiveAnswer(this.deps, userId, input);
+  }
+
+  /**
+   * P2 新题库作答：经试卷快照判分并写入同一 quiz_attempts/mistakes 事实表。
+   * 实现已下沉 practice/persistence/bank-answer，此处仅委托（与客观入口同口径）。
+   */
+  public submitBankObjectiveAnswer(userId: string, input: BankAnswerSubmit) {
+    return submitBankObjectiveAnswer({ ...this.deps, bank: new SqliteQuestionGenerationRepository(this.sqlite) }, userId, input);
+  }
+
+  public submitBankSubjectiveAnswer(userId: string, input: BankAnswerSubmit) {
+    return submitBankSubjectiveAnswer({ ...this.deps, bank: new SqliteQuestionGenerationRepository(this.sqlite) }, userId, input);
+  }
+
+  public readBankGradingContext(userId: string, input: BankGradeSubmit) {
+    return readBankGradingContext({ ...this.deps, bank: new SqliteQuestionGenerationRepository(this.sqlite) }, userId, input);
+  }
+
+  public settleBankSubjectiveGrade(userId: string, input: BankGradeSubmit,
+    outcome: Parameters<typeof settleBankSubjectiveGrade>[3]) {
+    return settleBankSubjectiveGrade({ ...this.deps, bank: new SqliteQuestionGenerationRepository(this.sqlite) }, userId, input, outcome);
+  }
+
+  /**
+   * P4 出题建议：只读画像目标语种、未解决错题与授权教材数，不做复杂画像，
+   * 无数据用可见默认值。实现为纯函数（suggestPreset），此处仅组装事实源。
+   */
+  public async suggestGenerationPreset(userId: string, language?: string) {
+    if (!userId.trim()) throw new BusinessError('E_GENERATION_SCOPE', '任务归属不正确', 'SECURITY');
+    const [profile] = await this.db.select({ targetLanguage: learnerProfiles.targetLanguage }).from(learnerProfiles)
+      .where(eq(learnerProfiles.userId, userId)).limit(1);
+    const track = (language === 'ja' || language === 'ko' || language === 'en') ? language
+      : (profile?.targetLanguage === 'ja' || profile?.targetLanguage === 'ko' ? profile.targetLanguage : 'en');
+    const mistakes = await this.getMistakes(userId, { resolved: false, language: track });
+    if (!isOk(mistakes)) throw mistakes.error;
+    const course = this.sqlite.query('SELECT count(*) AS n FROM documents WHERE user_id=? AND language=?').get(
+      userId, track) as { n: number };
+    return suggestPreset({
+      requestedLanguage: language === 'ja' || language === 'ko' || language === 'en' ? language : undefined,
+      profileLanguage: profile?.targetLanguage ?? null,
+      unresolvedMistakeSkillIds: mistakes.value.map(entry => entry.question.testedSkillId).filter((skill): skill is string => typeof skill === 'string'),
+      textbookCount: course.n,
+    });
   }
 
   /**

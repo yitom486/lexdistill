@@ -1,3 +1,15 @@
 export { createQuestionGenerationTools, GENERATION_TOOL_NAMES } from './tools.js';
 export { createGenerationTtsRenderer } from './infrastructure/tts-renderer.js';
 export type { QuestionGenerationRepository, GenerationAudioRenderer } from './ports.js';
+export { GenerationTaskService } from './service.js';
+export { GenerationRunManager } from './run-manager.js';
+export { runGenerationTask } from './runner.js';
+export { GENERATION_FIXED_SYSTEM_RULES, buildGenerationSystemPrompt } from './system-prompt.js';
+export { assertBlueprintFitsConfig, verifyPaperMeetsBlueprint } from './blueprint.js';
+export { buildQuickPracticePreset } from './preset.js';
+export { listPresets, resolvePreset } from './presets.js';
+export type { PresetDefinition, ResolvePresetInput, ResolvedPreset } from './presets.js';
+export { suggestPreset } from './suggest.js';
+export type { PresetSuggestion, SuggestionSources, SuggestionBasis } from './suggest.js';
+export { toStudentQuestion, toStudentPaper, toReviewPaper } from './student-view.js';
+export type { StudentBankQuestion, ReviewPaperItem } from './student-view.js';

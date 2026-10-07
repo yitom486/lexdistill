@@ -66,6 +66,7 @@ export const SIDEBAR_NAV_GROUPS: SidebarNavGroupDef[] = [
     defaultOpen: true,
     items: [
       { id: 'QUIZ', label: '自适应做题', icon: 'Zap', badge: { kind: 'quizProgress' } },
+      { id: 'GENERATION', label: 'AI 出题', icon: 'Sparkles', badge: { kind: 'static', value: 'AI' } },
       { id: 'READING', label: '阅读理解', icon: 'Newspaper', badge: { kind: 'static', value: '双栏' } },
       { id: 'WRITING', label: '写作翻译', icon: 'PenLine', badge: { kind: 'static', value: 'AI' } },
       {

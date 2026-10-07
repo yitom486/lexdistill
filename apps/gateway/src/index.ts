@@ -27,7 +27,7 @@ export const gatewayServer = gateway.server;
  * Hono 应用（全栈 RPC 类型安全契约 GatewayAppType 与统一错误拦截闭环）。
  * 路由按领域拆分在 transport/http 与各 modules 子目录，行为与拆分前一致。
  */
-export const app = createApp({ repo: drizzleRepo, server: gatewayServer, port: PORT });
+export const app = createApp({ repo: drizzleRepo, server: gatewayServer, port: PORT, generation: gateway.generation });
 
 export type GatewayAppType = typeof app;
 

@@ -49,6 +49,9 @@ const HangulStudioWorkbench = lazy(() =>
 const MistakeSprintWorkbench = lazy(() =>
   import('./components/MistakeSprintWorkbench.js').then((m) => ({ default: m.MistakeSprintWorkbench }))
 );
+const GenerationWorkbench = lazy(() =>
+  import('./components/generation/GenerationWorkbench.js').then((m) => ({ default: m.GenerationWorkbench }))
+);
 import { ErrorBoundary } from './components/common/ErrorBoundary.js';
 import { useEnsureGateway } from './hooks/useAgentGateway.js';
 import { useLearningShell } from './hooks/useLearningShell.js';
@@ -379,6 +382,10 @@ export function App() {
                   openTutor(ctx);
                 }}
               />
+            )}
+
+            {activeTab === 'GENERATION' && (
+              <GenerationWorkbench key={shell.track} userId={profileUserId} track={shell.track} />
             )}
 
             {activeTab === 'CARDS' && (

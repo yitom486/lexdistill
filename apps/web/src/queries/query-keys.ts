@@ -30,6 +30,11 @@ export const QUERY_KEYS = {
   ACTIVITY_HISTORY: ['learner', 'activityHistory'] as const,
   PRACTICE_TEMPLATES: ['learner', 'practiceTemplates'] as const,
   PRACTICE_RUN: ['learner', 'practiceRun'] as const,
+  GENERATION_TASKS: ['learner', 'generationTasks'] as const,
+  GENERATION_TASK: ['learner', 'generationTask'] as const,
+  GENERATION_RUN: ['learner', 'generationRun'] as const,
+  GENERATION_PAPER: ['learner', 'generationPaper'] as const,
+  GENERATION_SUBMISSIONS: ['learner', 'generationSubmissions'] as const,
   LESSONS: ['curriculum', 'lessons'] as const,
   WORDLISTS: ['learner', 'wordlists'] as const,
 };

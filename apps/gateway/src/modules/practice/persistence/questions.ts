@@ -11,7 +11,7 @@ import {
 } from '@study-studio/shared';
 import type { QuizAttemptRecord } from '@study-studio/learner-core';
 import { GeneratedQuestionSchema } from '@study-studio/protocol';
-import { quizAttempts, quizQuestions } from '@study-studio/storage-sqlite';
+import { quizAttempts, quizQuestions, SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import {
   normalizeTrackLanguage,
@@ -278,6 +278,7 @@ export async function recordQuizAttempt(
   attempt: QuizAttemptRecord
 ): Promise<Result<void, BusinessError>> {
   try {
+    new SqliteQuestionGenerationRepository(deps.sqlite).assertAttemptSource(attempt);
     await deps.db.insert(quizAttempts).values({
       id: attempt.id,
       ...(attempt.sourceAttemptId ? { sourceAttemptId: attempt.sourceAttemptId } : {}),
