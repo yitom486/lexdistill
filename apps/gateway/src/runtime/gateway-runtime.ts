@@ -1,6 +1,7 @@
 import { SessionManager, type AgentLane } from './session/session-manager.js';
 import { ContextBuilder } from './context/context-builder.js';
 import { ToolRouter } from './router/tool-router.js';
+import { SessionToolBridge } from './mcp/session-tool-bridge.js';
 import { ToolRegistry } from '@study-studio/tool-core';
 import { CodexAdapter } from '@study-studio/agent-runtime';
 import type { AgentAdapterFactory } from '../composition/agent-deps.js';
@@ -70,6 +71,12 @@ export class GatewayServer {
   public readonly toolRegistry = new ToolRegistry();
   public readonly toolRouter = new ToolRouter(this.toolRegistry);
   public readonly agentAdapter: CodexAdapter;
+  /** 会话级工具 MCP 桥（ACP 多运行时底座；基址由启动层 listen 后绑定）。 */
+  public readonly sessionToolBridge = new SessionToolBridge({
+    execute: (toolName, args, context) => this.toolRegistry.execute(toolName, args, context),
+    resolveBaseUrl: () => this.mcpBaseUrl,
+  });
+  public mcpBaseUrl = 'http://127.0.0.1:8080';
   /** 轻量旁路：快问快答；学习闭环默认走 Codex App Server */
   public readonly responsesAdapter = new ResponsesAdapter();
   public readonly learnerRepo: LearnerRepository;

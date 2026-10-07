@@ -52,6 +52,7 @@ export function startGateway(app: CreatedApp, server: GatewayServer, port = PORT
   }
 
   console.log(`🚀 Lingua Studio Agent Gateway (Hono + Bun WS) listening on http://localhost:${started.port}`);
+  server.mcpBaseUrl = `http://127.0.0.1:${started.port}`;
   return started;
 }
 
