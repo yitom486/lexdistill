@@ -30,7 +30,7 @@ function zodShapeOf(tool: ToolDefinition): Record<string, z.ZodTypeAny> {
 export async function startSpikeToolBridge(
   tools: ToolDefinition[],
   onCall: (call: SpikeBridgeCall) => void,
-): Promise<{ mcpServer: { name: string; type: 'http'; url: string }; close: () => Promise<void> }> {
+): Promise<{ mcpServer: { name: string; type: 'http'; url: string; headers: Array<{ name: string; value: string }> }; close: () => Promise<void> }> {
   const server = new McpServer({ name: 'lingua-spike-tools', version: '0.0.0' });
   for (const tool of tools) {
     server.registerTool(
@@ -52,9 +52,17 @@ export async function startSpikeToolBridge(
   }
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
   await server.connect(transport);
-  const http = Bun.serve({ port: 0, fetch: (req) => transport.handleRequest(req) });
+  // StreamableHTTP 的 GET 事件流是长连接：Bun 默认 10s 空闲杀掉会掐断 Agent 订阅，spike 给足。
+  const http = Bun.serve({ port: 0, idleTimeout: 120, fetch: async (req) => {
+    const body = req.method === 'POST' ? await req.clone().text().catch(() => '') : '';
+    const method = body ? (JSON.parse(body) as { method?: unknown }).method ?? '?' : req.method;
+    const res = await transport.handleRequest(req);
+    console.log(`[spike-bridge] ${req.method} ${method} -> ${res.status}`);
+    return res;
+  } });
   return {
-    mcpServer: { name: 'lingua-spike', type: 'http', url: `http://127.0.0.1:${http.port}/mcp` },
+    // codex-acp 的 new/load/resume 全接受 mcpServers；HTTP 形态必填 headers（缺失会被静默跳过，无错）。
+    mcpServer: { name: 'lingua-spike', type: 'http', url: `http://127.0.0.1:${http.port}/mcp`, headers: [] as Array<{ name: string; value: string }> },
     close: async () => {
       http.stop(true);
       await transport.close();

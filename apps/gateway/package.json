@@ -4,6 +4,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "dependencies": {
+    "@agentclientprotocol/codex-acp": "^2.1.1",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "@mozilla/readability": "^0.6.0",
     "@study-studio/agent-runtime": "workspace:*",

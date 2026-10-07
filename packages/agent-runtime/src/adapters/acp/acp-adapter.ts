@@ -44,9 +44,15 @@ export interface AcpClientLike {
 export interface AcpAdapterOptions {
   createClient: (callbacks: {
     onSessionUpdate: (params: Record<string, unknown>) => void;
+    onLog: (level: 'info' | 'warn' | 'error', message: string, meta?: unknown) => void;
+    onStderrLine: (line: string) => void;
   }) => AcpClientLike;
   /** 把本轮 ToolDefinition 装成 ACP mcpServers（网关侧提供 HTTP 桥实现）。 */
   buildMcpServers: (tools: ToolDefinition[]) => Promise<unknown[]> | unknown[];
+  /** 诊断用原始更新透出（spike/test）；生产不接。 */
+  debugUpdates?: ((params: Record<string, unknown>) => void) | undefined;
+  /** 子进程日志透出（连接抖动时定位死因；默认吞掉只在测试打印）。 */
+  debugLog?: ((level: string, message: string) => void) | undefined;
 }
 
 function toBusinessError(code: string, message: string): BusinessError {
@@ -63,12 +69,16 @@ function sessionIdOf(params: Record<string, unknown>): string | null {
   return null;
 }
 
-function textDeltaOf(params: Record<string, unknown>): string | null {
+function chunkTextOf(params: Record<string, unknown>): { kind: 'text' | 'thought'; text: string } | null {
+  // 实测 codex-acp 形状：{ sessionId, update: { sessionUpdate: 'agent_message_chunk'|'agent_thought_chunk',
+  //   content: { type: 'text', text } } }。只认此形状，不猜。
   const update = params['update'] as Record<string, unknown> | undefined;
-  const candidates = [params['textDelta'], params['delta'], update?.['text'], update?.['delta']];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate) return candidate;
-  }
+  if (!update || typeof update !== 'object') return null;
+  const content = update['content'] as Record<string, unknown> | undefined;
+  const text = content && content['type'] === 'text' && typeof content['text'] === 'string' ? content['text'] : null;
+  if (!text) return null;
+  if (update['sessionUpdate'] === 'agent_thought_chunk') return { kind: 'thought', text };
+  if (update['sessionUpdate'] === 'agent_message_chunk') return { kind: 'text', text };
   return null;
 }
 
@@ -115,36 +125,43 @@ class AcpAgentSession implements AgentSession {
 
   public async *send(input: AgentInput): AsyncIterable<AgentEvent> {
     const message = typeof input.message === 'string' ? input.message : '';
-    const pending = this.handle.prompt(message).then(
-      (result) => ({ result }),
-      (cause: unknown) => ({ thrown: cause }),
+    let finalText: string | null = null;
+    let promptError: string | null = null;
+    // 模型轮（尤其挂载 MCP 后首轮工具装载）经常超过 SDK 默认 120s：spike 给足，生产 Phase 再按 turn 预算收敛。
+    void this.handle.prompt(message, { timeoutMs: 540_000 }).then(
+      (result) => {
+        if (!result.ok) {
+          promptError = `${result.error.code ?? 'E_ACP_PROMPT'}: ${result.error.message}`;
+        } else {
+          const value = result.value as { text?: unknown; finalOutput?: unknown } | string | null | undefined;
+          finalText =
+            typeof value === 'string' ? value
+            : typeof value?.text === 'string' ? value.text
+            : typeof value?.finalOutput === 'string' ? value.finalOutput
+            : JSON.stringify(value ?? '');
+        }
+        this.notePromptDone();
+      },
+      (cause: unknown) => {
+        promptError = String(cause);
+        this.notePromptDone();
+      },
     );
     for (;;) {
       await this.waitForUpdate();
-      const next = this.updates.shift();
-      if (!next) break;
-      const delta = textDeltaOf(next);
-      if (delta) yield { type: 'TEXT_DELTA', delta };
-      if (this.updates.length === 0 && this.promptDone) break;
+      let next: Record<string, unknown> | undefined;
+      while ((next = this.updates.shift())) {
+        const chunk = chunkTextOf(next);
+        if (chunk?.kind === 'text') yield { type: 'TEXT_DELTA', delta: chunk.text };
+        else if (chunk?.kind === 'thought') yield { type: 'REASONING_DELTA', delta: chunk.text };
+      }
+      if (this.promptDone) break;
     }
-    const settled = await pending;
-    this.notePromptDone();
-    if ('thrown' in settled) {
-      yield { type: 'ERROR', error: toBusinessError('E_ACP_PROMPT', String(settled.thrown)) };
+    if (promptError) {
+      yield { type: 'ERROR', error: toBusinessError('E_ACP_PROMPT', promptError) };
       return;
     }
-    const { result } = settled;
-    if (!result.ok) {
-      yield { type: 'ERROR', error: toBusinessError(result.error.code ?? 'E_ACP_PROMPT', result.error.message) };
-      return;
-    }
-    const value = result.value as { text?: unknown; finalOutput?: unknown } | string | null | undefined;
-    const finalOutput =
-      typeof value === 'string' ? value
-      : typeof value?.text === 'string' ? value.text
-      : typeof value?.finalOutput === 'string' ? value.finalOutput
-      : JSON.stringify(value ?? '');
-    yield { type: 'COMPLETED', finalOutput };
+    yield { type: 'COMPLETED', finalOutput: finalText ?? '' };
   }
 
   public async submitToolResult(): Promise<Result<void, BusinessError>> {
@@ -174,21 +191,46 @@ export class AcpAdapter implements AgentAdapter {
 
   private client: AcpClientLike | null = null;
   private readonly sessions = new Map<string, AcpAgentSession>();
+  private connectedOnce = false;
 
   constructor(private readonly options: AcpAdapterOptions) {}
+
+  private async connectOnce(): Promise<void> {
+    if (!this.client) {
+      throw toBusinessError('E_ACP_CONNECT', 'ACP 客户端未创建');
+    }
+    const connected = await this.client.connect();
+    if (!connected.ok) {
+      throw toBusinessError(connected.error.code ?? 'E_ACP_CONNECT', `ACP 连接失败：${connected.error.message}`);
+    }
+  }
 
   private async ensureClient(): Promise<AcpClientLike> {
     if (!this.client) {
       this.client = this.options.createClient({
         onSessionUpdate: (params) => {
+          this.options.debugUpdates?.(params);
           const id = sessionIdOf(params);
           if (id) this.sessions.get(id)?.pushUpdate(params);
         },
+        onLog: (level, message) => { this.options.debugLog?.(level, message); },
+        onStderrLine: (line) => { this.options.debugLog?.('stderr', line); },
       });
     }
-    const connected = await this.client.connect();
-    if (!connected.ok) {
-      throw toBusinessError(connected.error.code ?? 'E_ACP_CONNECT', `ACP 连接失败：${connected.error.message}`);
+    if (this.connectedOnce) return this.client;
+    try {
+      await this.connectOnce();
+      this.connectedOnce = true;
+    } catch (first) {
+      // 握手抖动：杀掉毒进程冷启动重试一次（inkdown 同款自愈）；再失败如实抛。
+      try { await this.client.disconnect('acp handshake retry'); } catch { /* 忽略清理失败 */ }
+      await new Promise(resolve => setTimeout(resolve, 500));
+      try {
+        await this.connectOnce();
+        this.connectedOnce = true;
+      } catch {
+        throw first;
+      }
     }
     return this.client;
   }

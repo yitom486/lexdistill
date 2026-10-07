@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { AcpClient, pickAllowOptionId } from '@yitom/acp-client';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { DictionaryLookupTool } from '../modules/dictionary/tools/dictionary-lookup-tool.js';
@@ -24,15 +26,37 @@ describe('ACP resume spike (manual, LINGUA_ACP_SPIKE=1)', () => {
     const toolDefs = [new DictionaryLookupTool(repo), new FlashcardsDueTool(repo)];
     const bridge = await startSpikeToolBridge(toolDefs, (call) => { calls.push(call); });
     const tmp = await import('node:os').then(os => os.tmpdir());
+    // 本地优先（lumina 同款 fallback 链）：直调 lock 死的 codex-acp，不走 bunx @latest（抖）。
+    const codexAcpEntry = join(dirname(createRequire(import.meta.url).resolve('@agentclientprotocol/codex-acp/package.json')), 'dist', 'index.js');
+    const permissionRequests: unknown[] = [];
+    const rawUpdates: string[] = [];
+    const childLog: string[] = [];
     const adapter = new AcpAdapter({
+      debugUpdates: (params) => {
+        if (rawUpdates.length < 6) rawUpdates.push(JSON.stringify(params).slice(0, 400));
+      },
+      debugLog: (level, message) => {
+        console.log(`[spike-child:${level}] ${message.slice(0, 300)}`);
+        if (childLog.length < 15) childLog.push(`[${level}] ${message.slice(0, 300)}`);
+      },
       createClient: (callbacks) => new AcpClient({
-        runtime: 'codex-acp',
+        runtime: {
+          id: 'codex-acp-local',
+          name: 'Codex ACP（本地 pin 版）',
+          description: '直调本地 codex-acp，不走 bunx @latest',
+          command: process.execPath,
+          args: [codexAcpEntry],
+          requiredEnvKeys: [],
+        },
         workspaceRoot: tmp,
         clientInfo: { name: 'lingua-spike', version: '0.0.0' },
         callbacks: {
           onSessionUpdate: callbacks.onSessionUpdate,
-          onPermissionRequest: async ({ params }) => {
-            const optionId = pickAllowOptionId((params ?? {}) as Record<string, unknown>);
+          onLog: callbacks.onLog,
+          onStderrLine: callbacks.onStderrLine,
+          onPermissionRequest: async (payload) => {
+            permissionRequests.push(payload);
+            const optionId = pickAllowOptionId((payload.params ?? {}) as Record<string, unknown>);
             return optionId ? { outcome: 'selected' as const, optionId } : { outcome: 'cancelled' as const };
           },
         },
@@ -43,11 +67,16 @@ describe('ACP resume spike (manual, LINGUA_ACP_SPIKE=1)', () => {
       const first = await adapter.createSession({ sessionId: 'spike-1', userId: 'spike', tools: toolDefs });
       if (!first.ok) throw first.error;
       const seen1: string[] = [];
-      for await (const event of first.value.send({ message: 'Call the dictionary.lookup tool with {"language":"ja","word":"学校"} then reply DONE in one sentence.' })) {
+      for await (const event of first.value.send({ message: 'First list all MCP tools you currently have available (names only). Then call the dictionary.lookup tool with {"language":"ja","word":"学校"} and reply DONE.' })) {
         if (event.type === 'TEXT_DELTA') seen1.push(event.delta);
-        if (event.type === 'ERROR') throw event.error;
+        if (event.type === 'ERROR') { console.log('SPIKE-ROUND1 send error:', event.error.code, event.error.userMessage); throw event.error; }
         if (event.type === 'COMPLETED') break;
       }
+      console.log('SPIKE-ROUND1 calls:', JSON.stringify(calls));
+      console.log('SPIKE-ROUND1 permissions:', JSON.stringify(permissionRequests).slice(0, 800));
+      console.log('SPIKE-ROUND1 text:', seen1.join('').slice(0, 500));
+      console.log('SPIKE-RAW-UPDATES:', JSON.stringify(rawUpdates).slice(0, 2000));
+      console.log('SPIKE-CHILD-LOG:', JSON.stringify(childLog).slice(0, 2000));
       expect(calls.some(call => call.tool === 'dictionary.lookup')).toBe(true);
       const threadId = first.value.threadId;
       expect(typeof threadId === 'string' && threadId.length > 0).toBe(true);
