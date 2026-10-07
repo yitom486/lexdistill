@@ -6,16 +6,18 @@ import type { AgentEvent } from '../../contracts/event.js';
 import type { AgentInput } from '../../contracts/context.js';
 
 /**
- * Phase 0 spike：ACP 适配器骨架（未接入网关、不导出到包 public surface）。
+ * ACP 适配器（Phase 1 可用版；包 public surface 仍不导出，接线前先过网关评审）。
  *
- * 设计要点（相对 Codex App Server 的差异）：
- * - 工具不走 in-process executeTool：由调用方经 `buildMcpServers` 把 ToolDefinition
- *   装成 MCP 服务器，`session/new|resume|load` 全程携带（ACP resume 带 mcpServers，
- *   旧线程工具不可刷新问题不存在——待 spike 实跑证明）。
+ * 与 Codex App Server 的关键差异：
+ * - 工具不走 in-process executeTool：调用方经 `buildMcpServers` 把 ToolDefinition
+ *   装成 MCP 服务器，`session/new|resume|load` 全程携带（resume 带工具，旧线程
+ *   工具冻结问题不存在）。
  * - MCP 工具由 Agent 直调 MCP 服务器，宿主看不到 TOOL_CALL：`submitToolResult`
  *   明确拒绝（E_ACP_MCP_DIRECT），不伪造成功。
- * - AcpClient 经 `createClient` 注入（更新回调随构造传入做按会话分发）：
- *   agent-runtime 不新增第三方依赖。
+ * - 审批走 ACP `session/request_permission`：approvalPolicy never/缺席自动放行
+ *   （与当前 vocab 链路零点击行为一致）；其余策略挂起等前端决策，120s 超时
+ *   自动 decline（与 CodexAdapter APPROVAL_TIMEOUT_MS 同口径）。
+ * - 中断/steer 明确拒绝（E_ACP_UNSUPPORTED）；单 adapter 只建连一次。
  */
 
 export interface AcpSessionHandleLike {
@@ -25,6 +27,16 @@ export interface AcpSessionHandleLike {
     | { ok: false; error: { code?: string; message: string } }
   >;
 }
+
+export interface AcpPermissionPayload {
+  sessionId?: string;
+  toolCall?: { id?: string; title?: string; kind?: string };
+  params: Record<string, unknown>;
+}
+
+export type AcpPermissionResolution =
+  | { outcome: 'selected'; optionId: string }
+  | { outcome: 'cancelled' };
 
 export interface AcpClientLike {
   connect(): Promise<
@@ -44,28 +56,49 @@ export interface AcpClientLike {
 export interface AcpAdapterOptions {
   createClient: (callbacks: {
     onSessionUpdate: (params: Record<string, unknown>) => void;
+    onPermissionRequest: (payload: AcpPermissionPayload) => Promise<AcpPermissionResolution>;
     onLog: (level: 'info' | 'warn' | 'error', message: string, meta?: unknown) => void;
     onStderrLine: (line: string) => void;
   }) => AcpClientLike;
   /** 把本轮 ToolDefinition 装成 ACP mcpServers（网关侧提供 HTTP 桥实现）。 */
   buildMcpServers: (tools: ToolDefinition[]) => Promise<unknown[]> | unknown[];
-  /** 诊断用原始更新透出（spike/test）；生产不接。 */
+  /** 诊断透出（spike/test）；生产不接。 */
   debugUpdates?: ((params: Record<string, unknown>) => void) | undefined;
-  /** 子进程日志透出（连接抖动时定位死因；默认吞掉只在测试打印）。 */
   debugLog?: ((level: string, message: string) => void) | undefined;
 }
+
+const APPROVAL_TIMEOUT_MS = 120_000;
 
 function toBusinessError(code: string, message: string): BusinessError {
   return new BusinessError(code, message, 'AGENT_RUNTIME', true);
 }
 
+/** 从 permission options 挑允许项（与 @yitom/acp-client pickAllowOptionId 同规则，免跨包依赖）。 */
+function pickAllowOptionId(params: Record<string, unknown>): string | null {
+  const options = params['options'];
+  if (!Array.isArray(options)) return null;
+  const idOf = (item: unknown): string | null => {
+    if (!item || typeof item !== 'object') return null;
+    const record = item as Record<string, unknown>;
+    if (typeof record['optionId'] === 'string') return record['optionId'];
+    if (typeof record['id'] === 'string') return record['id'];
+    return null;
+  };
+  for (const item of options) {
+    const id = idOf(item);
+    const kind = item && typeof item === 'object' ? (item as Record<string, unknown>)['kind'] : undefined;
+    if (id && typeof kind === 'string' && (kind.includes('allow') || kind === 'allow_once' || kind === 'allow_always')) return id;
+  }
+  for (const item of options) {
+    const id = idOf(item);
+    if (id) return id;
+  }
+  return null;
+}
+
 function sessionIdOf(params: Record<string, unknown>): string | null {
   const direct = params['sessionId'];
   if (typeof direct === 'string' && direct) return direct;
-  const nested = params['session'] as Record<string, unknown> | undefined;
-  if (nested && typeof nested['sessionId'] === 'string' && nested['sessionId']) {
-    return nested['sessionId'] as string;
-  }
   return null;
 }
 
@@ -82,7 +115,18 @@ function chunkTextOf(params: Record<string, unknown>): { kind: 'text' | 'thought
   return null;
 }
 
-class AcpAgentSession implements AgentSession {
+interface PendingApproval {
+  approvalId: string;
+  action: string;
+  description: string;
+  allowOptionId: string | null;
+  resolve: (resolution: AcpPermissionResolution) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+let approvalSeq = 0;
+
+export class AcpAgentSession implements AgentSession {
   public readonly toolSpecs?: readonly {
     name: string; businessName: string; description: string; inputSchema: Record<string, unknown>;
   }[];
@@ -90,22 +134,77 @@ class AcpAgentSession implements AgentSession {
   public readonly threadId?: string;
 
   private readonly updates: Record<string, unknown>[] = [];
+  private readonly approvals: PendingApproval[] = [];
+  private readonly inflight = new Map<string, PendingApproval>();
+  private readonly resolvedEvents: AgentEvent[] = [];
   private waiters: Array<() => void> = [];
   private promptDone = false;
+  private readonly autoApprove: boolean;
 
   constructor(
     sessionId: string,
     acpSessionId: string,
     private readonly handle: AcpSessionHandleLike,
     toolSpecs: NonNullable<AcpAgentSession['toolSpecs']>,
+    approvalPolicy: string | undefined,
   ) {
     this.sessionId = sessionId;
     this.threadId = acpSessionId;
     this.toolSpecs = toolSpecs;
+    this.autoApprove = !approvalPolicy || approvalPolicy === 'never';
   }
 
   public pushUpdate(params: Record<string, unknown>): void {
     this.updates.push(params);
+    this.wake();
+  }
+
+  public pushApproval(approval: PendingApproval): void {
+    this.approvals.push(approval);
+    this.wake();
+  }
+
+  public requestPermission(payload: AcpPermissionPayload): Promise<AcpPermissionResolution> {
+    if (this.autoApprove) {
+      const optionId = pickAllowOptionId(payload.params);
+      return Promise.resolve(
+        optionId ? { outcome: 'selected' as const, optionId } : { outcome: 'cancelled' as const },
+      );
+    }
+    return new Promise<AcpPermissionResolution>((resolve) => {
+      const approvalId = `acp-appr-${++approvalSeq}`;
+      const approval: PendingApproval = {
+        approvalId,
+        action: payload.toolCall?.title || payload.toolCall?.kind || '工具调用',
+        description: `Agent 请求${payload.toolCall?.title ? `“${payload.toolCall.title}”` : '执行工具'}`,
+        allowOptionId: pickAllowOptionId(payload.params),
+        resolve,
+        timer: setTimeout(() => {
+          this.settleApproval(approvalId, 'decline', 'timeout');
+        }, APPROVAL_TIMEOUT_MS),
+      };
+      this.pushApproval(approval);
+    });
+  }
+
+  public settleApproval(approvalId: string, decision: 'accept' | 'acceptForSession' | 'decline' | 'cancel', reason: 'user' | 'timeout' | 'interrupt' = 'user'): boolean {
+    const index = this.approvals.findIndex(item => item.approvalId === approvalId);
+    const approval = index >= 0 ? this.approvals.splice(index, 1)[0]! : this.inflight.get(approvalId);
+    if (!approval) return false;
+    this.inflight.delete(approvalId);
+    clearTimeout(approval.timer);
+    if (decision === 'accept' || decision === 'acceptForSession') {
+      if (approval.allowOptionId) approval.resolve({ outcome: 'selected', optionId: approval.allowOptionId });
+      else approval.resolve({ outcome: 'cancelled' });
+    } else {
+      approval.resolve({ outcome: 'cancelled' });
+    }
+    this.resolvedEvents.push({ type: 'APPROVAL_RESOLVED', approvalId, decision, reason });
+    this.wake();
+    return true;
+  }
+
+  private wake(): void {
     const waiters = this.waiters;
     this.waiters = [];
     for (const wake of waiters) wake();
@@ -113,13 +212,11 @@ class AcpAgentSession implements AgentSession {
 
   public notePromptDone(): void {
     this.promptDone = true;
-    const waiters = this.waiters;
-    this.waiters = [];
-    for (const wake of waiters) wake();
+    this.wake();
   }
 
-  private waitForUpdate(): Promise<void> {
-    if (this.updates.length > 0 || this.promptDone) return Promise.resolve();
+  private waitForActivity(): Promise<void> {
+    if (this.updates.length > 0 || this.approvals.length > 0 || this.resolvedEvents.length > 0 || this.promptDone) return Promise.resolve();
     return new Promise<void>((resolve) => { this.waiters.push(resolve); });
   }
 
@@ -148,12 +245,28 @@ class AcpAgentSession implements AgentSession {
       },
     );
     for (;;) {
-      await this.waitForUpdate();
+      await this.waitForActivity();
       let next: Record<string, unknown> | undefined;
       while ((next = this.updates.shift())) {
         const chunk = chunkTextOf(next);
         if (chunk?.kind === 'text') yield { type: 'TEXT_DELTA', delta: chunk.text };
         else if (chunk?.kind === 'thought') yield { type: 'REASONING_DELTA', delta: chunk.text };
+      }
+      let approval: PendingApproval | undefined;
+      while ((approval = this.approvals.shift())) {
+        this.inflight.set(approval.approvalId, approval);
+        yield {
+          type: 'APPROVAL_REQUESTED',
+          approvalId: approval.approvalId,
+          action: approval.action,
+          description: approval.description,
+          riskLevel: 'medium',
+          expiresAt: Date.now() + APPROVAL_TIMEOUT_MS,
+        };
+      }
+      let resolved: AgentEvent | undefined;
+      while ((resolved = this.resolvedEvents.shift())) {
+        yield resolved;
       }
       if (this.promptDone) break;
     }
@@ -168,19 +281,36 @@ class AcpAgentSession implements AgentSession {
     return err(toBusinessError('E_ACP_MCP_DIRECT', 'ACP 会话的工具由 Agent 直调 MCP 服务器，宿主不中转结果'));
   }
 
-  public async submitApproval(): Promise<Result<void, BusinessError>> {
-    return err(toBusinessError('E_ACP_APPROVAL_PENDING', 'spike 未实现审批挂起映射（Phase 1 接 onPermissionRequest）'));
+  public async submitApproval(
+    approvalId: string,
+    decision: boolean | 'accept' | 'acceptForSession' | 'decline' | 'cancel',
+  ): Promise<Result<void, BusinessError>> {
+    const normalized = decision === true ? 'accept' : decision === false ? 'decline' : decision;
+    const settled = this.settleApproval(approvalId, normalized, 'user');
+    if (!settled) return err(toBusinessError('E_ACP_APPROVAL_UNKNOWN', `未知审批 ${approvalId}（可能已超时自动拒绝）`));
+    return ok(undefined);
   }
 
   public async steer(): Promise<Result<void, BusinessError>> {
-    return err(toBusinessError('E_ACP_UNSUPPORTED', 'ACP spike 不支持 steer（显式拒绝，不静默）'));
+    return err(toBusinessError('E_ACP_UNSUPPORTED', 'ACP 暂不支持 steer（显式拒绝，不静默）'));
   }
 
   public async interrupt(): Promise<Result<void, BusinessError>> {
-    return err(toBusinessError('E_ACP_UNSUPPORTED', 'ACP spike 不支持 interrupt（显式拒绝，不静默）'));
+    return err(toBusinessError('E_ACP_UNSUPPORTED', 'ACP 暂不支持 interrupt（显式拒绝，不静默）'));
   }
 
   public async close(): Promise<Result<void, BusinessError>> {
+    for (const approval of this.approvals.splice(0)) {
+      clearTimeout(approval.timer);
+      approval.resolve({ outcome: 'cancelled' });
+      this.resolvedEvents.push({ type: 'APPROVAL_RESOLVED', approvalId: approval.approvalId, decision: 'cancel', reason: 'interrupt' });
+    }
+    for (const approval of this.inflight.values()) {
+      clearTimeout(approval.timer);
+      approval.resolve({ outcome: 'cancelled' });
+      this.resolvedEvents.push({ type: 'APPROVAL_RESOLVED', approvalId: approval.approvalId, decision: 'cancel', reason: 'interrupt' });
+    }
+    this.inflight.clear();
     return ok(undefined);
   }
 }
@@ -213,6 +343,7 @@ export class AcpAdapter implements AgentAdapter {
           const id = sessionIdOf(params);
           if (id) this.sessions.get(id)?.pushUpdate(params);
         },
+        onPermissionRequest: async (payload) => this.handlePermission(payload),
         onLog: (level, message) => { this.options.debugLog?.(level, message); },
         onStderrLine: (line) => { this.options.debugLog?.('stderr', line); },
       });
@@ -222,7 +353,7 @@ export class AcpAdapter implements AgentAdapter {
       await this.connectOnce();
       this.connectedOnce = true;
     } catch (first) {
-      // 握手抖动：杀掉毒进程冷启动重试一次（inkdown 同款自愈）；再失败如实抛。
+      // 握手抖动：杀掉毒进程冷启动重试一次；再失败如实抛。
       try { await this.client.disconnect('acp handshake retry'); } catch { /* 忽略清理失败 */ }
       await new Promise(resolve => setTimeout(resolve, 500));
       try {
@@ -233,6 +364,15 @@ export class AcpAdapter implements AgentAdapter {
       }
     }
     return this.client;
+  }
+
+  private handlePermission(payload: AcpPermissionPayload): Promise<AcpPermissionResolution> {
+    const session = payload.sessionId ? this.sessions.get(payload.sessionId) : undefined;
+    if (!session) {
+      // 会话尚未登记（竞态）：保守拒绝，不静默放行。
+      return Promise.resolve({ outcome: 'cancelled' });
+    }
+    return session.requestPermission(payload);
   }
 
   public async createSession(sessionOptions: CreateSessionOptions): Promise<Result<AgentSession, BusinessError>> {
@@ -253,6 +393,7 @@ export class AcpAdapter implements AgentAdapter {
         handle.sessionId,
         handle,
         tools.map(tool => ({ name: tool.name, businessName: tool.name, description: tool.description, inputSchema: {} })),
+        sessionOptions.approvalPolicy,
       );
       this.sessions.set(handle.sessionId, session);
       return ok(session);
@@ -262,6 +403,6 @@ export class AcpAdapter implements AgentAdapter {
   }
 
   public async resumeSession(): Promise<Result<AgentSession, BusinessError>> {
-    return err(toBusinessError('E_ACP_UNSUPPORTED', 'spike 不支持无参 resumeSession（显式拒绝）'));
+    return err(toBusinessError('E_ACP_UNSUPPORTED', '暂不支持无参 resumeSession（显式拒绝）'));
   }
 }
