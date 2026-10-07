@@ -18,11 +18,18 @@
 - `StructuredVocabularyList` 加 `enableAi`（默认关，导入预览不受影响）；`TextbookCurriculum` 学习路径开启。
 - 验收：dom 测试（默认无入口→展开→收起）。
 
-## P6 Batch A 前端去重（已完成，本轮）
+## P6 Batch A 前端去重（已完成）
 - `WordTutorPanel` 容器合一（`WordAiPanel`＋`TextbookWordAiPanel` 变薄；target 按字段 memo，send 稳定）。
 - `getWordUsageList`＋`selectVocabularyForCard`（id 优先两段式）收归 `queries/vocabulary.ts`；`WordStudyDetail`＋`FsrsCardWorkbench` 改调（Hub 侧等对方合入）。
 - 旧会话工具缺失升级按本轮解析集判定＋缺失工具服务端 warn（`32adc715`，修用户截图“找不到工具”）。
 - 验收：选择器单测＋面板 dom 回归 18/0；typecheck 零新增。
+
+## P7 Batch B 后端正确性（已完成，本轮）
+- 任务一次一用（成功即消费，重试重调 context；TTL 单一 `TASK_TTL_MS` 源）。
+- `getVocabularyEntry` 按 id 直查（context 热路径不再全表扫描；组装与列表页共用）。
+- 每日抽词逐词门禁（混级词按自带 jlpt 判定＋`skippedLocked` 实计数；有效词等级不再被库等级覆盖；空级显示 0% 为有意口径，注释锁定）。
+- 掌握统计联表补用户＋语种归属。
+- 验收：vocab-learning／daily-pick／flashcards／gate 33/0；typecheck 零新增。
 
 ## P3 Hub 锁态 409 对齐（对方地盘，只 review 不动手）
 - `DailyWordStudyHub` 课程单元扩展返回 400 而非 409，锁 banner 失效；文件在对方手里，等它改。

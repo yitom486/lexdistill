@@ -8,6 +8,44 @@ import { documents, flashcards, globalVocabulary, textbookVocabulary } from '../
 
 type Tx = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];
 type CardRow = typeof flashcards.$inferSelect;
+type GlobalVocabularyRow = typeof globalVocabulary.$inferSelect;
+type TextbookVocabularyRow = typeof textbookVocabulary.$inferSelect;
+type VocabularySource = VocabularyEntry['sources'][number];
+
+function toSourceEntry(
+  local: TextbookVocabularyRow,
+  doc: { id: string; title: string },
+  chapterTitle: string,
+): VocabularySource {
+  return { documentId: doc.id, chapterId: local.chapterId, bookTitle: doc.title,
+    chapterTitle, meaning: local.meaning,
+    ...(local.partOfSpeech ? { partOfSpeech: local.partOfSpeech } : {}), examples: readCardExamples(local.examplesJson),
+    ...(local.usageNotes ? { usage: local.usageNotes } : {}), ...(local.contextNote ? { contextNote: local.contextNote } : {}),
+    ...(local.source === 'AI' || local.source === 'TEXTBOOK' ? { source: local.source } : {}), textbookVocabularyId: local.id };
+}
+
+function toVocabularyEntry(word: GlobalVocabularyRow, sources: VocabularyEntry['sources'], cardId: string | undefined): VocabularyEntry {
+  let learning: VocabularyLearningContent | undefined;
+  if (word.learningJson) {
+    try {
+      const parsed = VocabularyLearningContentSchema.safeParse(JSON.parse(word.learningJson));
+      if (parsed.success) learning = parsed.data;
+    } catch { /* 坏内容当作未生成，读链路永不抛 */ }
+  }
+  return { id: word.id, word: word.word, reading: word.reading, language: normalizeTrackLanguage(word.language), meaning: word.meaning,
+    level: word.jlptLevel, collected: !!cardId, ...(cardId ? { cardId } : {}),
+    ...(learning ? { learning } : {}), sources };
+}
+
+function chapterTitlesOf(docId: string, chaptersJson: string | null, cache: Map<string, Map<string, string>>): Map<string, string> {
+  let titles = cache.get(docId);
+  if (!titles) {
+    const chapters = ChapterManifestSchema.safeParse(JSON.parse(chaptersJson ?? '[]'));
+    titles = new Map(chapters.success ? chapters.data.map(chapter => [chapter.id, chapter.title]) : []);
+    cache.set(docId, titles);
+  }
+  return titles;
+}
 const ExamplesSchema = FlashcardSchema.shape.examples.unwrap();
 type Examples = NonNullable<Flashcard['examples']>;
 export function readCardExamples(raw: string): Examples {
@@ -132,7 +170,8 @@ export function getVocabularyMasteryByJlpt(db: DrizzleDb, userId: string, langua
       .where(and(eq(globalVocabulary.userId, userId), eq(globalVocabulary.language, language), sql`${globalVocabulary.jlptLevel} IS NOT NULL`))
       .groupBy(globalVocabulary.jlptLevel).all();
     const stables = tx.select({ jlpt: globalVocabulary.jlptLevel, n: sql<number>`count(*)` }).from(flashcards)
-      .innerJoin(globalVocabulary, eq(flashcards.vocabularyId, globalVocabulary.id))
+      .innerJoin(globalVocabulary, and(eq(flashcards.vocabularyId, globalVocabulary.id),
+        eq(globalVocabulary.userId, userId), eq(globalVocabulary.language, language)))
       .where(and(eq(flashcards.userId, userId), eq(flashcards.language, language), eq(flashcards.type, 'VOCABULARY'),
         sql`${globalVocabulary.jlptLevel} IS NOT NULL`,
         sql`coalesce(cast(json_extract(${flashcards.fsrs}, '$.stability') as real), 0) >= ${stableDaysThreshold}`))
@@ -156,35 +195,32 @@ export function listVocabulary(db: DrizzleDb, userId: string, language: string, 
     const sourcesByWord = new Map<string, VocabularyEntry['sources']>();
     const chapterTitles = new Map<string, Map<string, string>>();
     for (const { local, doc } of contexts) {
-      let titles = chapterTitles.get(doc.id);
-      if (!titles) {
-        const chapters = ChapterManifestSchema.safeParse(JSON.parse(doc.chaptersJson ?? '[]'));
-        titles = new Map(chapters.success ? chapters.data.map(chapter => [chapter.id, chapter.title]) : []);
-        chapterTitles.set(doc.id, titles);
-      }
+      const titles = chapterTitlesOf(doc.id, doc.chaptersJson, chapterTitles);
       const sources = sourcesByWord.get(local.vocabularyId) ?? [];
-      sources.push({ documentId: doc.id, chapterId: local.chapterId, bookTitle: doc.title,
-        chapterTitle: titles.get(local.chapterId) ?? '章节', meaning: local.meaning,
-        ...(local.partOfSpeech ? { partOfSpeech: local.partOfSpeech } : {}), examples: readCardExamples(local.examplesJson),
-        ...(local.usageNotes ? { usage: local.usageNotes } : {}), ...(local.contextNote ? { contextNote: local.contextNote } : {}),
-        ...(local.source === 'AI' || local.source === 'TEXTBOOK' ? { source: local.source } : {}), textbookVocabularyId: local.id });
+      sources.push(toSourceEntry(local, doc, titles.get(local.chapterId) ?? '章节'));
       sourcesByWord.set(local.vocabularyId, sources);
     }
     return words.filter(word => !scope.documentId || sourcesByWord.has(word.id)).map(word => {
-      const cardId = cardByWord.get(word.id);
-      let learning: VocabularyLearningContent | undefined;
-      if (word.learningJson) {
-        try {
-          const parsed = VocabularyLearningContentSchema.safeParse(JSON.parse(word.learningJson));
-          if (parsed.success) learning = parsed.data;
-        } catch { /* 坏内容当作未生成，读链路永不抛 */ }
-      }
-      return { id: word.id, word: word.word, reading: word.reading, language: normalizeTrackLanguage(word.language), meaning: word.meaning,
-        level: word.jlptLevel, collected: !!cardId, ...(cardId ? { cardId } : {}),
-        ...(learning ? { learning } : {}),
-        sources: sourcesByWord.get(word.id) ?? [],
-      };
+      return toVocabularyEntry(word, sourcesByWord.get(word.id) ?? [], cardByWord.get(word.id));
     });
+  });
+}
+
+/** 按 id 直查单条（context 热路径；全表扫描只留给列表页）。 */
+export function getVocabularyEntry(db: DrizzleDb, userId: string, language: string, vocabularyId: string): VocabularyEntry | undefined {
+  return db.transaction(tx => {
+    const word = tx.select().from(globalVocabulary)
+      .where(and(eq(globalVocabulary.id, vocabularyId), eq(globalVocabulary.userId, userId), eq(globalVocabulary.language, language))).get();
+    if (!word) return undefined;
+    const contexts = tx.select({ local: textbookVocabulary, doc: documents }).from(textbookVocabulary)
+      .innerJoin(documents, eq(documents.id, textbookVocabulary.documentId))
+      .where(and(eq(textbookVocabulary.vocabularyId, vocabularyId), eq(documents.userId, userId), eq(documents.language, language))).all();
+    const cache = new Map<string, Map<string, string>>();
+    const sources = contexts.map(({ local, doc }) =>
+      toSourceEntry(local, doc, chapterTitlesOf(doc.id, doc.chaptersJson, cache).get(local.chapterId) ?? '章节'));
+    const card = tx.select({ id: flashcards.id }).from(flashcards)
+      .where(and(eq(flashcards.userId, userId), eq(flashcards.language, language), eq(flashcards.type, 'VOCABULARY'), eq(flashcards.vocabularyId, vocabularyId))).get();
+    return toVocabularyEntry(word, sources, card?.id);
   });
 }
 

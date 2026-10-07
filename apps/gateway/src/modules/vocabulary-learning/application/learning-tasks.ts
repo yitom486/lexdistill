@@ -10,7 +10,7 @@ export interface VocabularyLearningTask {
 }
 
 /** 任务有效期 30 分钟；桌面单进程内存保存，重启即失效（提交时提示重调 context）。 */
-const TASK_TTL_MS = 30 * 60 * 1000;
+export const TASK_TTL_MS = 30 * 60 * 1000;
 const tasks = new Map<string, VocabularyLearningTask>();
 
 function pruneExpired(now: number): void {
@@ -37,6 +37,11 @@ export function getLearningTask(taskId: string): VocabularyLearningTask | null {
     return null;
   }
   return task;
+}
+
+/** 消费任务：成功提交后调用，同一 taskId 不可二次提交（重试请重调 context）。 */
+export function consumeLearningTask(taskId: string): void {
+  tasks.delete(taskId);
 }
 
 /** 仅测试使用。 */

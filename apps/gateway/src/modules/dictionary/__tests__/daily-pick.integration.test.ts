@@ -65,8 +65,7 @@ describe('pickDailyWords', () => {
     expect(filtered.value.locked).toBeNull();
   });
 
-  it('未学透优先；全部学透则循环；随机不丢词', async () => {
-    const deps = stubDeps(N4_BANK.words);
+  it('未学透优先；全部学透则循环；随机不丢词', async () => {    const deps = stubDeps(N4_BANK.words);
     const partial = await pickDailyWords(
       { ...deps, listWordlists: async () => ({ ok: true as const, value: [{ ...N4_BANK, words: [{ ...N4_BANK.words[0]!, studied: true }, N4_BANK.words[1]!] }] }),
         getLearnerProfile: async () => ({ ok: true as const, value: { learnerLevel: 'BEGINNER' as const, dailyGoalNewWords: 10, wordLevelFilter: null } }) },
@@ -80,6 +79,26 @@ describe('pickDailyWords', () => {
     if (!cycled.ok) throw cycled.error;
     expect(cycled.value.words).toHaveLength(2);
     expect([...cycled.value.words.map(word => word.headword)].sort()).toEqual(['案内', '約束']);
+  });
+
+  it('混级库逐词门禁：高阶混入词被拦并计入 skippedLocked；词自带有效等级不被库等级覆盖', async () => {
+    const bank = {
+      ...N4_BANK,
+      words: [
+        { ...N4_BANK.words[0]!, jlpt: 'N1' },
+        N4_BANK.words[1]!,
+      ],
+    };
+    const deps = {
+      getLearnerProfile: async () => ({ ok: true as const, value: { learnerLevel: 'BEGINNER' as const, dailyGoalNewWords: 10, wordLevelFilter: null } }),
+      listWordlists: async () => ({ ok: true as const, value: [bank] }),
+      getVocabularyMasteryByJlpt: async () => ({ ok: true as const, value: [{ jlpt: 'N4', total: 10, stable: 8 }] }),
+    };
+    const res = await pickDailyWords(deps, 'u', 'ja', { count: 5, order: 'sequential', bankId: 'ja-n4-core' });
+    if (!res.ok) throw res.error;
+    expect(res.value.words.map(word => word.headword)).toEqual(['案内']);
+    expect(res.value.pick.skippedLocked).toBe(1);
+    expect(res.value.words[0]).toMatchObject({ jlpt: 'N4' });
   });
 });
 

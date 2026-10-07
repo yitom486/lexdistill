@@ -335,7 +335,7 @@ import {
   defaultLanguageProfileSeed,
 } from '@study-studio/shared';
 import type { RepoDeps } from './persistence/repo-context.js';
-import { collectGlobalVocabulary, listVocabulary, saveVocabularyLearning as saveVocabularyLearningDomain, getVocabularyMasteryByJlpt } from '@study-studio/storage-sqlite';
+import { collectGlobalVocabulary, listVocabulary, getVocabularyEntry, saveVocabularyLearning as saveVocabularyLearningDomain, getVocabularyMasteryByJlpt } from '@study-studio/storage-sqlite';
 import type { SaveVocabularyLearningInput } from '@study-studio/storage-sqlite';
 import type { VocabularyScope } from '@study-studio/protocol';
 
@@ -398,6 +398,7 @@ export class DrizzleLearnerRepository
   public settleTextbookGrade(userId: string, id: string, audit: TextbookGradeAudit | undefined, grade: ExerciseGrade | undefined, errorCode?: string) { return this.textbookCommand(() => settleTextbookGrade(this.db, userId, id, audit, grade, errorCode)); }
   public textbookExerciseHistory(userId: string, documentId: string, chapterId: string) { return this.textbookCommand(() => textbookExerciseHistory(this.db, userId, documentId, chapterId)); }
   public listVocabulary(userId: string, language: string, scope: VocabularyScope = {}) { return this.textbookCommand(() => listVocabulary(this.db, userId, language, scope), '词汇库读取失败，请重试'); }
+  public getVocabularyById(userId: string, language: string, vocabularyId: string) { return this.textbookCommand(() => getVocabularyEntry(this.db, userId, language, vocabularyId), '词汇读取失败，请重试'); }
   public getVocabularyMasteryByJlpt(userId: string, language: string) { return this.textbookCommand(() => getVocabularyMasteryByJlpt(this.db, userId, language, MASTERED_STABILITY_DAYS), '词汇掌握统计读取失败，请重试'); }
   public saveVocabularyLearning(userId: string, input: Omit<SaveVocabularyLearningInput, 'userId'>) { return this.textbookCommand(() => saveVocabularyLearningDomain(this.db, { ...input, userId }), '词汇讲解保存失败，请重试'); }
   public collectGlobalVocabulary(userId: string, vocabularyId: string, scope: VocabularyScope = {}) { return this.textbookCommand(() => collectGlobalVocabulary(this.db, userId, vocabularyId, scope), '词汇加入复习失败，请重试'); }

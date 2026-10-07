@@ -2,11 +2,12 @@ import { BusinessError, err, nowIso, ok, type Result } from '@study-studio/share
 import type { VocabularyEntry } from '@study-studio/protocol';
 import type { VocabularyLearningTarget } from '@study-studio/storage-sqlite';
 import type { VocabularyLearningContextInput, VocabularyLearningSubmitInput, VocabularyLearningSubmitOutput } from '../contracts.js';
-import { createLearningTask, getLearningTask } from './learning-tasks.js';
+import { createLearningTask, getLearningTask, consumeLearningTask, TASK_TTL_MS } from './learning-tasks.js';
 
 /** 服务依赖的最小仓储面（DrizzleLearnerRepository 结构满足，不引入实现循环）。 */
 export interface VocabularyLearningRepo {
   listVocabulary(userId: string, language: string): Promise<Result<VocabularyEntry[], BusinessError>>;
+  getVocabularyById(userId: string, language: string, vocabularyId: string): Promise<Result<VocabularyEntry | undefined, BusinessError>>;
   saveVocabularyLearning(
     userId: string,
     input: { target: VocabularyLearningTarget; content: VocabularyLearningSubmitInput['content']; sessionId?: string | undefined },
@@ -34,9 +35,9 @@ export async function getVocabularyLearningContext(
   userId: string,
   input: VocabularyLearningContextInput,
 ): Promise<Result<VocabularyLearningContextOutput, BusinessError>> {
-  const listed = await repo.listVocabulary(userId, input.language);
-  if (!listed.ok) return err(listed.error);
-  const word = listed.value.find(entry => entry.id === input.vocabularyId);
+  const found = await repo.getVocabularyById(userId, input.language, input.vocabularyId);
+  if (!found.ok) return err(found.error);
+  const word = found.value;
   if (!word) return err(new BusinessError('E_NOT_FOUND', '未找到当前用户的词汇', 'VALIDATION'));
   let target: VocabularyLearningTarget = { kind: 'global', vocabularyId: word.id };
   if (input.textbookVocabularyId) {
@@ -51,12 +52,12 @@ export async function getVocabularyLearningContext(
       taskId: task.id,
       target,
       requirements: target.kind === 'global' ? GLOBAL_REQUIREMENTS : TEXTBOOK_REQUIREMENTS,
-      expiresInSec: 30 * 60,
+      expiresInSec: Math.floor(TASK_TTL_MS / 1000),
     },
   });
 }
 
-/** 提交保存：无任务/过期/跨用户/跨词一律拒绝；同一目标重复提交只覆盖，版本+1。 */
+/** 提交保存：无任务/过期/跨用户/跨词一律拒绝；任务一次一用，成功即消费（覆盖靠新任务）。 */
 export async function submitVocabularyLearning(
   repo: VocabularyLearningRepo,
   userId: string,
@@ -65,12 +66,13 @@ export async function submitVocabularyLearning(
 ): Promise<Result<VocabularyLearningSubmitOutput, BusinessError>> {
   const task = getLearningTask(input.taskId);
   if (!task) {
-    return err(new BusinessError('E_TASK_INVALID', '任务不存在或已过期，请重新调用 vocabulary.learning.context 建立任务', 'VALIDATION', true));
+    return err(new BusinessError('E_TASK_INVALID', '任务不存在、已过期或已使用，请重新调用 vocabulary.learning.context 建立任务', 'VALIDATION', true));
   }
   if (task.userId !== userId) {
     return err(new BusinessError('E_TASK_MISMATCH', '任务不属于当前用户，不能提交', 'VALIDATION'));
   }
   const saved = await repo.saveVocabularyLearning(userId, { target: task.target, content: input.content, sessionId });
   if (!saved.ok) return err(saved.error);
+  consumeLearningTask(input.taskId);
   return ok({ version: saved.value.version, updatedAt: nowIso(), vocabularyId: task.vocabularyId });
 }

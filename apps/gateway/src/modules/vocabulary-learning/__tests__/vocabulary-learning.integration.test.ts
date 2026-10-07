@@ -48,7 +48,7 @@ async function wordId(repo: DrizzleLearnerRepository, word: string): Promise<str
 }
 
 describe('vocabulary.learning context/submit', () => {
-  it('context 建任务 → submit 保存 → 读回可见；重复提交只覆盖，版本+1', async () => {
+  it('context 建任务 → submit 保存 → 读回可见；任务一次一用，覆盖靠新任务', async () => {
     const { repo } = await seed();
     const { context, submit } = tools(repo);
     const id = await wordId(repo, '学校');
@@ -60,7 +60,11 @@ describe('vocabulary.learning context/submit', () => {
     if (!first.ok) throw first.error;
     expect(first.value.version).toBe(1);
     expect(first.value.vocabularyId).toBe(id);
-    const second = await submit.execute({ taskId: ctx.value.task.taskId, content: { ...CONTENT, explanation: '第二版讲解。' } }, CTX);
+    const reuse = await submit.execute({ taskId: ctx.value.task.taskId, content: { ...CONTENT, explanation: '第二版讲解。' } }, CTX);
+    expect(reuse.ok ? '' : reuse.error.code).toBe('E_TASK_INVALID');
+    const ctx2 = await context.execute({ vocabularyId: id, language: 'ja' }, CTX);
+    if (!ctx2.ok) throw ctx2.error;
+    const second = await submit.execute({ taskId: ctx2.value.task.taskId, content: { ...CONTENT, explanation: '第二版讲解。' } }, CTX);
     if (!second.ok) throw second.error;
     expect(second.value.version).toBe(2);
     const db = repo.getRawDb();

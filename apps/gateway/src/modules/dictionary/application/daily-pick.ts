@@ -86,11 +86,17 @@ export async function pickDailyWords(
   const unlockedMax = unlockedJlptMax(profile.value.learnerLevel, mastery);
   const rawBankLevel = bankJlptLevel(group.id);
   const bankLevel = rawBankLevel !== null && jlptIndex(rawBankLevel) >= 0 ? (rawBankLevel as VocabMastery['jlpt']) : null;
+  const level = profile.value.learnerLevel;
   const userFilter = profile.value.wordLevelFilter;
-  const gateOpen = bankLevel === null || isVocabularyAllowed(bankLevel, profile.value.learnerLevel, mastery);
-  const filterOpen = bankLevel === null || userFilter === null || userFilter.includes(bankLevel);
+  // 逐词等级：词自带有效 jlpt 优先，缺失/非法回落整库等级（混级库不再整库误杀或漏放）。
+  const wordLevel = (word: { jlpt?: string | undefined }): VocabMastery['jlpt'] | null => {
+    if (word.jlpt && jlptIndex(word.jlpt) >= 0) return word.jlpt as VocabMastery['jlpt'];
+    return bankLevel;
+  };
+  const gateOpen = bankLevel === null || isVocabularyAllowed(bankLevel, level, mastery);
   if (bankLevel !== null && !gateOpen) {
     const row = mastery.find(entry => entry.jlpt === bankLevel);
+    // 展示口径（有意与门判定分离）：空级显示 0%，门内空级按掌握处理（masteryRatio），各自由测试锁定。
     const current = row && row.total > 0 ? row.stable / row.total : 0;
     return ok({
       words: [],
@@ -99,22 +105,31 @@ export async function pickDailyWords(
     });
   }
   const pool0 = group.words.filter(word => !word.studied);
-  const pool = (pool0.length > 0 ? pool0 : group.words).filter(word => filterOpen);
+  const base = pool0.length > 0 ? pool0 : group.words;
+  const kept = base.filter(word => {
+    const wl = wordLevel(word);
+    return wl === null || userFilter === null || userFilter.includes(wl);
+  });
+  const pool = kept.filter(word => isVocabularyAllowed(wordLevel(word), level, mastery));
+  const skippedLocked = kept.length - pool.length;
   const ordered = input.order === 'random' ? shuffled(pool) : pool;
   const picked = ordered.slice(0, count);
   return ok({
-    words: picked.map(word => ({
-      entryId: word.entryId,
-      headword: word.headword,
-      ...(word.reading ? { reading: word.reading } : {}),
-      meanings: word.meanings,
-      ...(word.partOfSpeech ? { partOfSpeech: word.partOfSpeech } : {}),
-      sourceLabel: word.sourceLabel,
-      collected: word.collected,
-      studied: word.studied,
-      ...(bankLevel ? { jlpt: bankLevel } : {}),
-    })),
-    pick: { bankId: group.id, requested: count, returned: picked.length, unlockedJlptMax: unlockedMax, skippedLocked: 0 },
+    words: picked.map(word => {
+      const wl = wordLevel(word);
+      return {
+        entryId: word.entryId,
+        headword: word.headword,
+        ...(word.reading ? { reading: word.reading } : {}),
+        meanings: word.meanings,
+        ...(word.partOfSpeech ? { partOfSpeech: word.partOfSpeech } : {}),
+        sourceLabel: word.sourceLabel,
+        collected: word.collected,
+        studied: word.studied,
+        ...(wl ? { jlpt: wl } : {}),
+      };
+    }),
+    pick: { bankId: group.id, requested: count, returned: picked.length, unlockedJlptMax: unlockedMax, skippedLocked },
     locked: null,
   });
 }
