@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { VocabularyEntry } from '@study-studio/protocol';
 import { Button } from './ui/button.js';
-import { MarkdownText } from './common/MarkdownText.js';
 import { useWordTutor } from '../hooks/useWordTutor.js';
 import { WordChatConfig } from './WordChatConfig.js';
+import { WordChatThread } from './WordChatThread.js';
 import { QUERY_KEYS } from '../queries/query-keys.js';
 
 /** 生成讲解固定指令：关键词确保本轮可见 context＋submit；任务绑定由后端强制。 */
@@ -26,35 +26,21 @@ export function WordAiPanel({ word }: { word: VocabularyEntry }) {
   const presets = [`「${word.word}」在日常生活中到底该怎么用？`, `这个词有哪些最常用的搭配？`, `它和相近词有什么区别？`];
   return <div className="mt-3 rounded-xl border border-line bg-paper-soft p-3" aria-label={`AI 追问：${word.word}`}>
     <WordChatConfig />
-    {!word.learning && messages.length === 0 && <div className="mb-2">
-      <Button size="sm" variant="outline" disabled={!connected || isTyping} onClick={generate}>生成讲解</Button>
-    </div>}
-    {messages.length === 0 && <div className="mb-2 flex flex-wrap gap-1.5" aria-label="预设追问">
-      {presets.map(preset => (
-        <button key={preset} type="button" disabled={!connected || isTyping} onClick={() => send(preset)}
-          className="rounded-xl border border-line bg-paper px-2.5 py-1.5 text-left text-xs text-ink hover:border-tone-amber-500o40 transition-colors disabled:opacity-50">
-          {preset}
-        </button>
-      ))}
-    </div>}
-    <div className="space-y-2" aria-live="polite">
-      {messages.length === 0 && <p className="text-xs text-ink-muted">在这里直接追问，回答实时显示；AI 调用工具更新内容后，下方释义自动刷新。</p>}
-      {messages.map(message => <div key={message.id} className={message.sender === 'user' ? 'text-right' : ''}>
-        <div className={`inline-block max-w-full rounded-lg px-3 py-2 text-left text-sm ${message.sender === 'user' ? 'bg-paper' : 'bg-paper'}`}>
-          {message.sender === 'ai' ? <MarkdownText text={message.text || (message.isStreaming ? '思考中…' : '')} /> : message.text}
-        </div>
-        {!!message.toolCalls?.length && <p className="mt-0.5 text-xs text-ink-muted">调用工具：{message.toolCalls.map(tool => `${tool.toolName}${tool.done ? '✓' : '… '}`).join('、')}</p>}
-      </div>)}
-    </div>
-    <div className="mt-2 flex gap-2">
-      <input aria-label="追问输入" placeholder={connected ? '继续追问这个词…' : '网关未连接'} value={draft} disabled={!connected || isTyping}
-        onChange={event => setDraft(event.target.value)}
-        onKeyDown={event => { if (event.key === 'Enter') submit(); }}
-        className="min-w-0 flex-1 rounded-md border border-line bg-paper px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-      {isTyping
-        ? <Button size="sm" variant="outline" onClick={stop}>停止</Button>
-        : <Button size="sm" onClick={submit} disabled={!connected || !draft.trim()}>发送</Button>}
-    </div>
-    {!connected && <p className="mt-1 text-xs text-ink-muted">网关未连接：先启动网关再追问。</p>}
+    <WordChatThread messages={messages} isTyping={isTyping} connected={connected}
+      draft={draft} onDraftChange={setDraft} onSend={submit} onStop={stop}
+      inputPlaceholder="继续追问这个词…"
+      header={<>
+        {!word.learning && messages.length === 0 && <div className="mb-2">
+          <Button size="sm" variant="outline" disabled={!connected || isTyping} onClick={generate}>生成讲解</Button>
+        </div>}
+        {messages.length === 0 && <div className="mb-2 flex flex-wrap gap-1.5" aria-label="预设追问">
+          {presets.map(preset => (
+            <button key={preset} type="button" disabled={!connected || isTyping} onClick={() => send(preset)}
+              className="rounded-xl border border-line bg-paper px-2.5 py-1.5 text-left text-xs text-ink hover:border-tone-amber-500o40 transition-colors disabled:opacity-50">
+              {preset}
+            </button>
+          ))}
+        </div>}
+      </>} />
   </div>;
 }

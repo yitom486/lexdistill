@@ -15,10 +15,10 @@
 - 测试：主聊默认含 context、不含 submit；WRITE 误开断言。
 - 验收：`tool-catalog`＋`turn-tools`＋`session-tools`＋`boundaries` 全绿。
 
-## P2 教材行学习 UI 接线
-- 教材词汇行（`StructuredVocabularyList`／`VocabularyExplanation` 处）加“讲透”入口，复用 `useWordTutor`＋`WordStudyDetail`（textbook track：`(user,word,lesson)` 幂等，后端已就绪 v041/v042）。
-- 不动已导入教材数据；只新会话拿工具（旧会话不升级）。
-- 验收：dom 测试（行点击→讲解面板→保存回读）。
+## P2 教材行学习 UI 接线（已完成）
+- `WordChatThread` 纯展示线程抽出（`WordAiPanel` 改调，行为不变）；`TextbookWordAiPanel` 教材行面板（行 ID 进指令经 `textbookVocabularyId` 绑定，存后刷词汇库＋词表）。
+- `StructuredVocabularyList` 加 `enableAi`（默认关，导入预览不受影响）；`TextbookCurriculum` 学习路径开启。
+- 验收：dom 测试（默认无入口→展开→收起）。
 
 ## P3 Hub 锁态 409 对齐（对方地盘，只 review 不动手）
 - `DailyWordStudyHub` 课程单元扩展返回 400 而非 409，锁 banner 失效；文件在对方手里，等它改。

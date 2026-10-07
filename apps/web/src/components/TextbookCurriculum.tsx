@@ -607,7 +607,7 @@ function StoredTextbookCurriculum({
 
           {/* 子内容 2: 重点词汇库 */}
           {lessonSubTab === 'VOCAB' && (
-            currentLesson.content ? <StructuredVocabularyList words={currentLesson.content.vocabularies} {...(currentLesson.directory ? { directory: currentLesson.directory } : {})} added={addedCardsMap}
+            currentLesson.content ? <StructuredVocabularyList words={currentLesson.content.vocabularies} {...(currentLesson.directory ? { directory: currentLesson.directory } : {})} added={addedCardsMap} enableAi
               onAdd={id => { const word = currentLesson.vocabularies.find(item => item.id === id); if (word) handleAddCard(word); }} /> :
             <div className="bg-paper-soft rounded-2xl p-5 border border-line-accent space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
