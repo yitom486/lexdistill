@@ -36,6 +36,11 @@
 - 网关 fail-fast（显式任务零落点：不建会话不调模型，直接回可操作文案；`toolWarnings` 进回执）。
 - 验收：路由单测＋预检 dom＋回归 25/0；typecheck 零新增。
 
+## P9 ACP 迁移 Phase 0 spike（骨架已就绪，实跑待凭证）
+- `agent-runtime/.../adapters/acp/acp-adapter.ts`：骨架（未导出、不接网关；工具经注入的 MCP 桥，resume 天然带工具）。
+- `__tests__/acp-spike-bridge.ts`＋`acp-resume-spike.test.ts`：2 真工具＋调用记录断言，缺 `LINGUA_ACP_SPIKE=1` 跳过。
+- 阻塞：本机无 ChatGPT 登录，codex-acp 实跑待用户备凭证＋每次显式批准；另发现 `@yitom/acp-client` 审批类型只有 selected/cancelled（README 的 approved 已过期），spike 用 `pickAllowOptionId` 自动选允许项。
+
 ## P3 Hub 锁态 409 对齐（对方地盘，只 review 不动手）
 - `DailyWordStudyHub` 课程单元扩展返回 400 而非 409，锁 banner 失效；文件在对方手里，等它改。
 
