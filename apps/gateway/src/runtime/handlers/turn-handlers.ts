@@ -18,7 +18,7 @@ import type { ToolDefinition } from '@study-studio/tool-core';
 import type { AgentLane } from '../session/session-manager.js';
 import { buildGenericCoachReply } from '../coach-language-policy.js';
 import { selectAgentRoute } from '../router/agent-router.js';
-import { selectTurnTools } from '../router/turn-tools.js';
+import { resolveSessionTools } from '../router/tool-catalog.js';
 import { needsSessionToolUpgrade } from '../router/session-tools.js';
 import { resolveResponsesLiteCoach } from '../responses-lite-coach.js';
 import { buildTurnExecutionSummary, formatCodexLocalFallbackNote } from '../turn-summary-builder.js';
@@ -209,12 +209,12 @@ export async function handleTurnSend(
       let streamedFromCodex = false;
       let codexFailHint = '';
       if (!reply && decision.route === 'learning-loop') {
-        // 固定任务显式工具集优先；未声明走关键词子集（只在建新会话时生效）。
+        // 固定任务显式工具集优先；未声明走中央目录的意图+提示词子集（只在建新会话时生效）。
         const preferredTools = Array.isArray(payload.agentOptions?.tools)
           ? payload.agentOptions.tools.filter((name): name is string => typeof name === 'string' && name.length > 0)
           : [];
         // 意图感知 Tool 子集（READ 按意图、WRITE 须明示；只在建新会话时生效）
-        const learningTools = (preferredTools.length > 0 ? preferredTools : selectTurnTools({
+        const learningTools = (preferredTools.length > 0 ? preferredTools : resolveSessionTools({
           ...(typeof intent === 'string' ? { intent } : {}),
           userPrompt,
         }))

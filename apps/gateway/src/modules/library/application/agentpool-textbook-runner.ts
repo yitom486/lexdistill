@@ -14,6 +14,7 @@ import type { TextbookLessonStage, TextbookModelActivity } from '@study-studio/d
 import type { AgentPoolDriver } from '@study-studio/agent-runtime';
 import { GatewayAgentpoolDriver } from '../../../infrastructure/agentpools/agentpool-driver.js';
 import { TextbookMcpRegistry } from '../mcp/textbook-mcp-server.js';
+import { buildTextbookWorkerMcpServer } from '../mcp/textbook-mcp-catalog.js';
 import type { McpChapterScope } from '../mcp/textbook-mcp-scope.js';
 import { buildLessonExtractionPrompt } from './prompts/lesson-extraction-prompt.js';
 import type { LessonExtractionJob } from './lesson-batch-extractor.js';
@@ -88,7 +89,6 @@ type AgentpoolBootInput = Pick<AgentpoolRunInput,
  */
 export async function bootAgentpoolChapters(input: AgentpoolBootInput, workerCount: number): Promise<AgentpoolBoot> {
   const { taskToken, workerPaths } = input.registry.createTask(input.userId, input.documentId, workerCount);
-  const base = input.gatewayBaseUrl.replace(/\/$/, '');
   try {
     const driver = input.driver ?? (await GatewayAgentpoolDriver.create({
     program: '',
@@ -99,26 +99,13 @@ export async function bootAgentpoolChapters(input: AgentpoolBootInput, workerCou
     ...(input.codexArgs?.length ? { codexArgs: input.codexArgs } : {}),
     ...(input.approvalPolicy ? { approvalPolicy: input.approvalPolicy } : {}),
     ...(input.sandbox ? { sandbox: input.sandbox } : {}),
-    // 每 Worker 只配自己的端点，名称按 Worker 唯一，后端按名入表不会串。
+    // 每 Worker 只配自己的端点，形状与命名归 textbook-mcp-catalog 所有，后端按名入表不会串。
     // 预授权：六个教材工具全部 approve（官方 default_tools_approval_mode +
     // 按工具覆盖），真机已验证零问话、写入成功。approvalPolicy 保持默认 never。
     mcpServersForWorker: (_workerIndex: number) => {
       const path = workerPaths[_workerIndex];
       if (!path) return [];
-      return [{
-        name: `lingua-textbook-w${_workerIndex}`,
-        type: 'http',
-        url: `${base}${path}`,
-        default_tools_approval_mode: 'approve',
-        tools: {
-          write_grammar: { approval_mode: 'approve' },
-          write_vocabulary: { approval_mode: 'approve' },
-          write_exercises: { approval_mode: 'approve' },
-          write_articles: { approval_mode: 'approve' },
-          write_sentences: { approval_mode: 'approve' },
-          write_material: { approval_mode: 'approve' },
-        },
-      }];
+      return [buildTextbookWorkerMcpServer(_workerIndex, input.gatewayBaseUrl, path)];
     },
     poolSize: workerCount,
     sharedProcess: true,

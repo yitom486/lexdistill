@@ -61,6 +61,8 @@ export interface GatewayAgentpoolConfig extends AgentPoolDriverOptions {
    * 按 Worker 下发 MCP 服务（每 Worker 只配自己的端点）。
    * 缺席时所有 Worker 共用 `mcpServers`。名称必须每 Worker 唯一，
    * 否则运行侧按名入表会互相覆盖。
+   * 教材管线的服务器形状与命名归 `modules/library/mcp/textbook-mcp-catalog.ts`
+   * 所有；Gateway 工具选型归 `runtime/router/tool-catalog.ts`。本驱动只透传。
    */
   readonly mcpServersForWorker?: ((workerIndex: number) => readonly unknown[]) | undefined;
 }
