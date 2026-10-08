@@ -48,6 +48,7 @@
 - 路由：codex-acp 留守 Codex（等 parity 再翻），其余＋custom 走 ACP 温复用池；切换必重建，跨协议不续接；custom 供隔离 CODEX_HOME＋Key 环境（需 acp-client 发版生效 env 合并，改动已在你仓库 WIP）。
 - 待办：codex-acp 切 ACP（模型/思考深度映射验证后）。
 - 面板去 Codex 化已合入：历史/技能/MCP/用量/队列查询按开关停拉，表头用量与历史/技能入口隐藏＋明示，输入条脚注按运行时切换，回执带 `adapter`＋`runtimeId` 诊断。
+- 选择驱动修正：非 Codex 下模型标签显示“运行时自带”（不再残留 luna 旧名造成“无法选中”误会）；表头副标题显示选中运行时；18/0。
 - codex-acp 已翻转（spike 带 luna＋medium 建会话＋两轮工具＋resume 全绿）：已知残留差异——中断/steer 明确拒绝、collaborationMode 暂忽略、旧 codex thread 续接首轮失忆（均有声失败或注释）。
 - 能力开关已合入：模型/思考深度控件由后端 capabilities 驱动禁用（codex 全开保 luna，其余用 Agent 默认；零按 id 特例），`useSelectedRuntimeCaps` fail-open。
 - 桥记录铁证：首轮 `dictionary.lookup` 调用＋resume（`session restore ok`）后 `flashcards.due` 再调——resume 带工具成立，Codex 旧链路的死结解开。
