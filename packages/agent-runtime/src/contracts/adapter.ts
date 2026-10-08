@@ -9,6 +9,8 @@ export interface CreateSessionOptions {
   tools?: ToolDefinition[];
   /** 可选：覆盖本轮 / 本会话模型（Codex App Server thread/start.model） */
   model?: string;
+  /** 可选：思考深度（ACP session/set_config_option.reasoning_effort；Codex 通路沿用 turn 透传） */
+  effort?: string;
   /** 可选：thread/start.approvalPolicy（never / on-request / untrusted） */
   approvalPolicy?: string;
   /** 恢复已有 Codex thread（thread/resume），而非 thread/start */

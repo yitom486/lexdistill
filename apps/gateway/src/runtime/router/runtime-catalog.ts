@@ -56,16 +56,16 @@ export async function customRuntimeStatus(): Promise<AgentRuntimeStatus> {
 }
 
 /**
- * 会话适配器选型：codex-acp 在 ACP parity（模型/思考深度映射）验证前沿用
- * Codex App Server，默认行为零变；显式切其他已知运行时走 ACP。
+ * 会话适配器选型：codex-acp 已走 ACP（模型 gpt-6-luna＋reasoning_effort 实跑验证通过，
+ * resume 带工具亦证）；其余已知运行时走 ACP。
  * 空/未知 runtimeId 回落 codex（旧网关/旧前端兼容，绝不因拼写漂到新链路）。
  */
 const ACP_RUNTIME_IDS: ReadonlySet<string> = new Set(
-  BUILTIN_ACP_RUNTIMES.map(entry => entry.id).filter(id => id !== 'codex-acp'),
+  [...BUILTIN_ACP_RUNTIMES.map(entry => entry.id), 'custom'].filter(id => id !== 'codex-appserver'),
 );
 
 export function resolveSessionAdapterId(runtimeId?: string | undefined): 'codex' | 'acp' {
-  if (!runtimeId || runtimeId === 'codex-acp') return 'codex';
-  if (runtimeId === 'custom') return 'acp';
+  if (!runtimeId) return 'codex';
+  if (runtimeId === 'codex-appserver') return 'codex';
   return ACP_RUNTIME_IDS.has(runtimeId) ? 'acp' : 'codex';
 }

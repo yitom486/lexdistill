@@ -64,7 +64,7 @@ describe('ACP resume spike (manual, LINGUA_ACP_SPIKE=1)', () => {
       buildMcpServers: () => [bridge.mcpServer],
     });
     try {
-      const first = await adapter.createSession({ sessionId: 'spike-1', userId: 'spike', tools: toolDefs });
+      const first = await adapter.createSession({ sessionId: 'spike-1', userId: 'spike', tools: toolDefs, model: 'gpt-6-luna', effort: 'medium' });
       if (!first.ok) throw first.error;
       const seen1: string[] = [];
       for await (const event of first.value.send({ message: 'First list all MCP tools you currently have available (names only). Then call the dictionary.lookup tool with {"language":"ja","word":"学校"} and reply DONE.' })) {

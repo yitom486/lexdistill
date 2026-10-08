@@ -47,6 +47,7 @@
 - 网关底座：`SessionToolBridge`（token 端点＋最小工具集＋TTL/sweep）＋`runtime-catalog`（id/认证态，custom 伪条目）＋`GET /api/agent/runtimes`＋`/mcp/session/:token`＋凭证存取路由（Key 永不回传）。
 - 路由：codex-acp 留守 Codex（等 parity 再翻），其余＋custom 走 ACP 温复用池；切换必重建，跨协议不续接；custom 供隔离 CODEX_HOME＋Key 环境（需 acp-client 发版生效 env 合并，改动已在你仓库 WIP）。
 - 待办：codex-acp 切 ACP（模型/思考深度映射验证后）。
+- codex-acp 已翻转（spike 带 luna＋medium 建会话＋两轮工具＋resume 全绿）：已知残留差异——中断/steer 明确拒绝、collaborationMode 暂忽略、旧 codex thread 续接首轮失忆（均有声失败或注释）。
 - 能力开关已合入：模型/思考深度控件由后端 capabilities 驱动禁用（codex 全开保 luna，其余用 Agent 默认；零按 id 特例），`useSelectedRuntimeCaps` fail-open。
 - 桥记录铁证：首轮 `dictionary.lookup` 调用＋resume（`session restore ok`）后 `flashcards.due` 再调——resume 带工具成立，Codex 旧链路的死结解开。
 - 附带修通：更新包实形状映射、HTTP 必填 `headers`、Bun 长连接超时、SDK prompt 120s、本地 pin（`@agentclientprotocol/codex-acp ^2.1.1`，不再赌 bunx）、建连抖动重试、单 adapter 只连一次。

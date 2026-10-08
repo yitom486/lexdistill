@@ -5,11 +5,12 @@ import { AcpAdapterPool } from '../infrastructure/acp/acp-adapter-pool.js';
 import { ok } from '@study-studio/shared';
 
 describe('resolveSessionAdapterId', () => {
-  it('缺席/codex-acp/未知走 Codex（默认行为不变）；已知其他＋custom 走 ACP', () => {
+  it('缺席/未知/留守 id 走 Codex；codex-acp 与已知运行时＋custom 走 ACP', () => {
     expect(resolveSessionAdapterId(undefined)).toBe('codex');
     expect(resolveSessionAdapterId('')).toBe('codex');
-    expect(resolveSessionAdapterId('codex-acp')).toBe('codex');
     expect(resolveSessionAdapterId('nope')).toBe('codex');
+    expect(resolveSessionAdapterId('codex-appserver')).toBe('codex');
+    expect(resolveSessionAdapterId('codex-acp')).toBe('acp');
     expect(resolveSessionAdapterId('deepseek')).toBe('acp');
     expect(resolveSessionAdapterId('claude')).toBe('acp');
     expect(resolveSessionAdapterId('custom')).toBe('acp');

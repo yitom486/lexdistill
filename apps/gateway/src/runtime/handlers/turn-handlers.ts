@@ -296,6 +296,7 @@ export async function handleTurnSend(
             userId: string;
             tools?: ToolDefinition[];
             model?: string;
+            effort?: string;
             approvalPolicy?: string;
             resumeThreadId?: string;
             ephemeral?: boolean;
@@ -306,6 +307,7 @@ export async function handleTurnSend(
             tools: learningTools,
           };
           if (preferredModel) sessionOpts.model = preferredModel;
+          if (preferredEffort) sessionOpts.effort = preferredEffort;
           if (preferredApproval) sessionOpts.approvalPolicy = preferredApproval;
           if (resumeThreadId) sessionOpts.resumeThreadId = resumeThreadId;
           if (preferPersistent === true) sessionOpts.ephemeral = false;

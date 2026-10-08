@@ -5,6 +5,7 @@ import type { AgentEvent } from '../../../contracts/event.js';
 const HANDLE = {
   sessionId: 'acp-sess-1',
   prompt: async () => ({ ok: true as const, value: 'DONE' }),
+  setConfigOption: async () => ({ ok: true as const, value: 'ok' }),
 };
 
 const PERMISSION = {

@@ -26,6 +26,10 @@ export interface AcpSessionHandleLike {
     | { ok: true; value: unknown }
     | { ok: false; error: { code?: string; message: string } }
   >;
+  setConfigOption(configId: string, value: string | boolean): Promise<
+    | { ok: true; value: unknown }
+    | { ok: false; error: { code?: string; message: string } }
+  >;
 }
 
 export interface AcpPermissionPayload {
@@ -406,6 +410,19 @@ export class AcpAdapter implements AgentAdapter {
         return err(toBusinessError(opened.error.code ?? 'E_ACP_SESSION', `ACP 会话建立失败：${opened.error.message}`));
       }
       const handle = opened.value;
+      // 模型/思考深度直通（codex-acp 原生 select；失败即大声报错，不静默回退默认）。
+      if (sessionOptions.model) {
+        const applied = await handle.setConfigOption('model', sessionOptions.model);
+        if (!applied.ok) {
+          return err(toBusinessError(applied.error.code ?? 'E_ACP_CONFIG', `ACP 模型设置失败：${applied.error.message}`));
+        }
+      }
+      if (sessionOptions.effort) {
+        const appliedEffort = await handle.setConfigOption('reasoning_effort', sessionOptions.effort);
+        if (!appliedEffort.ok) {
+          return err(toBusinessError(appliedEffort.error.code ?? 'E_ACP_CONFIG', `ACP 思考深度设置失败：${appliedEffort.error.message}`));
+        }
+      }
       const tokens = this.options.resolveMcpToken
         ? mcpServers.map(spec => this.options.resolveMcpToken!(spec)).filter((token): token is string => !!token)
         : [];
