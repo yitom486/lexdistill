@@ -25,10 +25,12 @@ describe('listAgentRuntimes', () => {
     expect(typeof runtimes.find(entry => entry.id === 'codex-acp')?.configured).toBe('boolean');
   });
 
-  it('能力开关：codex 全开，其余关闭（无硬编码特例，统一走开关）', () => {
+  it('能力开关：codex-acp 模型/思考深度走 ACP 探针（与会话同口径），其余 ACP 运行时全探针', () => {
     const runtimes = listAgentRuntimes();
+    // codex-acp 会话跑在 ACP 上：App Server model/list 是另一套旧目录（曾漏 gpt-6.1-sol），
+    // 故模型/思考深度必须取探针；线程/用量面板沿用旧链路查询。
     expect(runtimes.find(entry => entry.id === 'codex-acp')?.capabilities)
-      .toEqual({ supportsModelPicker: true, supportsEffort: true, supportsThreads: true, supportsUsage: true });
+      .toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: true, supportsUsage: true });
     for (const entry of runtimes.filter(item => item.id !== 'codex-acp')) {
       expect(entry.capabilities).toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false });
     }

@@ -15,20 +15,24 @@ export interface AgentRuntimeStatus {
 }
 
 /**
- * 按运行时能力开关（单一事实源，前端据此禁用模型/思考深度控件，禁止按 id 硬编码特例）。
- * codex-acp 沿用 Codex 旧链路故全开；ACP 侧模型/思考深度映射未验证前一律关闭，
- * 由 Agent 用自带默认（而非前端瞎传 codex 专属值）。
+ * 按运行时能力开关（单一事实源，前端据此选择模型/思考深度的数据源，禁止按 id 硬编码特例）。
+ * codex-acp 的会话跑在 ACP 上（App Server 的 model/list 是另一套旧目录，两边曾不一致：
+ * ACP 侧有 gpt-6.1-sol 而 App Server 侧没有），故模型/思考深度必须走 ACP 探针，
+ * 与 setConfigOption 同一口径；线程/用量面板沿用旧链路查询，保持不动。
  */
 export interface AgentRuntimeCapabilities {
+  /** true=模型下拉走 App Server model/list；false=走 ACP 探针（运行时真实目录）。 */
   supportsModelPicker: boolean;
+  /** true=思考深度走前端常量；false=走 ACP 探针。 */
   supportsEffort: boolean;
   /** Codex thread 历史/压缩/队列/用量/技能/MCP 状态（ACP 会话无此体系）。 */
   supportsThreads: boolean;
   supportsUsage: boolean;
 }
 
-const FULL_CAPABILITIES: AgentRuntimeCapabilities = {
-  supportsModelPicker: true, supportsEffort: true, supportsThreads: true, supportsUsage: true,
+/** codex-acp：会话走 ACP，模型/思考深度取 ACP 探针（与会话同口径）；线程/用量面板不动。 */
+const CODEX_ACP_CAPABILITIES: AgentRuntimeCapabilities = {
+  supportsModelPicker: false, supportsEffort: false, supportsThreads: true, supportsUsage: true,
 };
 const AGENT_DEFAULT_CAPABILITIES: AgentRuntimeCapabilities = {
   supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false,
@@ -46,7 +50,7 @@ export function listAgentRuntimes(): AgentRuntimeStatus[] {
     label: entry.name,
     hint: entry.authHint || entry.description,
     configured: entry.id === 'codex-acp' ? probeCodexAuth().looksLoggedIn : envConfigured(entry.requiredEnvKeys, entry.id),
-    capabilities: entry.id === 'codex-acp' ? FULL_CAPABILITIES : AGENT_DEFAULT_CAPABILITIES,
+    capabilities: entry.id === 'codex-acp' ? CODEX_ACP_CAPABILITIES : AGENT_DEFAULT_CAPABILITIES,
   }));
 }
 

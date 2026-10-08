@@ -81,7 +81,7 @@ export function ChatComposer(props: ChatComposerProps) {
   const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
   const runtimeOptions = useAgentRuntimeOptionsQuery(
     agentRuntimeId || 'codex-acp',
-    !!agentRuntimeId && agentRuntimeId !== 'codex-acp',
+    !!agentRuntimeId,
   );
   const modelChoices = runtimeCaps.supportsModelPicker
     ? models.map(m => ({ value: m.id || m.model, label: m.displayName || m.model }))
