@@ -962,6 +962,8 @@ export interface ExtractTocWithLlmVars {
   language?: string;
   model?: string;
   effort?: string;
+  /** Agent 运行时 id（缺席走 Codex 原通路；ACP 需网关开 flag） */
+  runtimeId?: string;
 }
 
 const ExtractTocWithLlmResultSchema = z.object({ title: z.string().optional(), entries: z.array(TocEntrySchema), tocEndPage: z.number().int().positive(), pageOffset: z.number().int().optional() });
@@ -982,6 +984,7 @@ export async function requestExtractTocWithLlm(
     if (vars.language) fd.append('language', vars.language);
     if (vars.model) fd.append('model', vars.model);
     if (vars.effort) fd.append('effort', vars.effort);
+    if (vars.runtimeId) fd.append('runtimeId', vars.runtimeId);
     res = await fetchPdfGateway(url, { method: 'POST', body: fd, ...(vars.traceId ? { headers: { 'X-Textbook-Trace': vars.traceId } } : {}) });
   } else {
     res = await fetchPdfGateway(url, {
@@ -995,6 +998,7 @@ export async function requestExtractTocWithLlm(
         ...(vars.language ? { language: vars.language } : {}),
         ...(vars.model ? { model: vars.model } : {}),
         ...(vars.effort ? { effort: vars.effort } : {}),
+        ...(vars.runtimeId ? { runtimeId: vars.runtimeId } : {}),
       }),
       ...(vars.traceId ? { headers: { 'Content-Type': 'application/json', 'X-Textbook-Trace': vars.traceId } } : {}),
     });

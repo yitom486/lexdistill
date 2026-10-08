@@ -208,9 +208,38 @@ export function createPdfImportRoutes(
         const materialized = await workspace.prepareImages(file.value, c.req.raw.signal);
         if (!materialized.ok) return reject(materialized.error);
         trace.record('request_accepted', { pdfPages: pages, source: 'local-pdf-file', model: input.value.model ?? 'default' });
+        // 批适配器选型：运行时可配（缺席/关 flag → Codex 原通路）；ACP 走文字内嵌＋桥工具。
+        const batch = deps.server.resolveBatchAdapter(input.value.runtimeId, 'toc');
+        let embeddedText: Array<{ originalPage: number; text: string }> | undefined;
+        if (batch.batchLane) {
+          const checked = await deps.server.checkBatchModelEffort(
+            input.value.runtimeId!, input.value.model, input.value.effort);
+          if (checked.dropModel || checked.dropEffort) {
+            const message = checked.warnings.join('；');
+            trace.finish('failed', { code: 'E_TOC_MODEL_MISMATCH' });
+            return formatBusinessErrorResponse(c,
+              new BusinessError('E_TOC_MODEL_MISMATCH', `${message}（请重选该运行时的模型/档位）`, 'VALIDATION'), '目录识别');
+          }
+          if (materialized.value.images.length > 0) {
+            trace.finish('failed', { code: 'E_TOC_SCANNED_ACP' });
+            return formatBusinessErrorResponse(c,
+              new BusinessError('E_TOC_SCANNED_ACP', '扫描版目录识别暂需 Codex 通道读图（ACP 暂不支持图片输入），请切换运行时或先做 OCR', 'VALIDATION'), '目录识别');
+          }
+          const texts = workspace.extractOriginalPageTexts(materialized.value.originalPages);
+          const paired = materialized.value.originalPages.map((page, index) => ({
+            originalPage: page, text: (texts?.[index] ?? '').trim(),
+          })).filter(entry => entry.text);
+          if (paired.length === 0) {
+            trace.finish('failed', { code: 'E_TOC_NO_TEXT' });
+            return formatBusinessErrorResponse(c,
+              new BusinessError('E_TOC_NO_TEXT', '本轮取不到可内嵌文字（请更新 PDF 组件后重试，或走 Codex 通道）', 'TOOL_EXECUTION'), '目录识别');
+          }
+          embeddedText = paired;
+        }
         const res = await extractTocWithLlm({ userId, title: input.value.filename.replace(/\.[^/.]+$/, ''), language: input.value.language ?? 'ja',
-          pdfFile: materialized.value, adapter: pdfOverrides?.adapter ?? deps.server.agentAdapter, proposalTool, traceId: trace.id, onDiagnostic: trace.record,
+          pdfFile: materialized.value, adapter: pdfOverrides?.adapter ?? batch.adapter, proposalTool, traceId: trace.id, onDiagnostic: trace.record,
           signal: c.req.raw.signal,
+          ...(embeddedText ? { fileAccess: 'embedded-text' as const, embeddedText } : {}),
           ...(c.req.header('X-Textbook-Trace') ? { monitor: new ImportMonitor(deps.repo, userId, c.req.header('X-Textbook-Trace')!) } : {}),
           ...(input.value.model ? { model: input.value.model } : {}), ...(input.value.effort ? { effort: input.value.effort } : {}),
         });
@@ -524,6 +553,8 @@ interface PdfRouteInput {
   effort?: string;
   /** 目标语种（空=服务端默认） */
   language?: string;
+  /** Agent 运行时 id（空=Codex 原通路；ACP 需 LINGUA_ACP_BATCH=1） */
+  runtimeId?: string;
 }
 
 /**
@@ -672,6 +703,7 @@ async function readPdfInput(
     const model = strField((body as Record<string, unknown>)['model']);
     const effort = strField((body as Record<string, unknown>)['effort']);
     const language = strField((body as Record<string, unknown>)['language']);
+    const runtimeId = strField((body as Record<string, unknown>)['runtimeId']);
     return {
       ok: true,
       value: {
@@ -688,6 +720,7 @@ async function readPdfInput(
         ...(model ? { model } : {}),
         ...(effort ? { effort } : {}),
         ...(language ? { language } : {}),
+        ...(runtimeId ? { runtimeId } : {}),
       },
     };
   }
@@ -704,6 +737,7 @@ async function readPdfInput(
   let modelRaw: unknown;
   let effortRaw: unknown;
   let languageRaw: unknown;
+  let runtimeIdRaw: unknown;
   try {
     const body = await c.req.parseBody();
     const candidate = body['file'];
@@ -720,6 +754,7 @@ async function readPdfInput(
     modelRaw = body['model'];
     effortRaw = body['effort'];
     languageRaw = body['language'];
+    runtimeIdRaw = body['runtimeId'];
   } catch {
     return fail('上传体不是合法 multipart，请用 file 字段上传 PDF');
   }
@@ -746,6 +781,7 @@ async function readPdfInput(
   const model = strField(modelRaw);
   const effort = strField(effortRaw);
   const language = strField(languageRaw);
+  const runtimeId = strField(runtimeIdRaw);
   return {
     ok: true,
     value: {
@@ -762,6 +798,7 @@ async function readPdfInput(
       ...(model ? { model } : {}),
       ...(effort ? { effort } : {}),
       ...(language ? { language } : {}),
+      ...(runtimeId ? { runtimeId } : {}),
     },
   };
 }

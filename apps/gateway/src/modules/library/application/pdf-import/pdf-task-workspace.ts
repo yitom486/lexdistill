@@ -63,6 +63,22 @@ export class PdfTaskWorkspace {
     }
   }
   get pageCount(): number { return this.source.getPageCount(); }
+  /**
+   * 原 PDF 指定页逐页取字（ACP 文本内嵌用；与切片页序一一对应，空页给空串）。
+   * 无提取方法/异常一律回 null（调用方大声报错，不静默降级）。
+   * 逐页单调：item.page 口径各实现不一，单页请求下全量归属该页，无歧义。
+   */
+  extractOriginalPageTexts(originalPages: number[], signal?: AbortSignal): string[] | null {
+    const extract = this.inspector.extractTextWithPositions;
+    if (!extract) return null;
+    try {
+      return originalPages.map((page) => {
+        if (signal?.aborted) throw new Error('aborted');
+        const items = extract(this.bytes, [page]) ?? [];
+        return items.map(item => item.text).join('\n').trim();
+      });
+    } catch { return null; }
+  }
   /** 内置书签定位目录页（物理页）：无书签、无命中或组件缺失时返回 null，不抛错。 */
   findDirectoryPage(): number | null {
     try {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useExtractTocWithLlmMutation } from '../../queries/useLearnerQueries.js';
 import { useAgentModelsQuery } from '../../queries/useAgentQueries.js';
+import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { nextManualKey } from '../../lib/toc-confirm-flow.js';
 import {
@@ -40,6 +41,7 @@ export function useTocRecognition({
   const extractLlm = useExtractTocWithLlmMutation();
   const modelsQuery = useAgentModelsQuery();
   const models = modelsQuery.data ?? [];
+  const runtimeCaps = useSelectedRuntimeCaps();
   const tocReviewModel = usePreferencesStore((s) => s.tocReviewModel);
   const setTocReviewModel = usePreferencesStore((s) => s.setTocReviewModel);
   const tocReviewEffort = usePreferencesStore((s) => s.tocReviewEffort);
@@ -51,10 +53,12 @@ export function useTocRecognition({
   const effectiveTocReviewModel = isKnownModel ? tocReviewModel : '__default__';
 
   useEffect(() => {
+    // 仅 Codex 目录权威时自动清掉未知 id；ACP 探针归属以后端 400 为准，不在此误删有效选择。
+    if (!runtimeCaps.supportsModelPicker) return;
     if (tocReviewModel && models.length > 0 && !isKnownModel) {
       setTocReviewModel('');
     }
-  }, [tocReviewModel, models.length, isKnownModel, setTocReviewModel]);
+  }, [tocReviewModel, models.length, isKnownModel, setTocReviewModel, runtimeCaps.supportsModelPicker]);
 
   const hasInitial = Boolean(initialEntries && initialEntries.length > 0);
   const [start, setStart] = useState('');
@@ -120,6 +124,10 @@ export function useTocRecognition({
       ...(hasRange ? { startPage, endPage } : {}),
       ...(effectiveTocReviewModel !== '__default__' ? { model: effectiveTocReviewModel } : {}),
       ...(tocReviewEffort ? { effort: tocReviewEffort } : {}),
+      // 教材目录 lane 跟随所选运行时（缺席走 Codex 原通路）。
+      ...(usePreferencesStore.getState().agentRuntimeId
+        ? { runtimeId: usePreferencesStore.getState().agentRuntimeId }
+        : {}),
     };
 
     extractLlm.mutate(vars, {

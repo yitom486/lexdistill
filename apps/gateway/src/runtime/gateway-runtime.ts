@@ -3,12 +3,15 @@ import { ContextBuilder } from './context/context-builder.js';
 import { ToolRouter } from './router/tool-router.js';
 import { SessionToolBridge } from './mcp/session-tool-bridge.js';
 import { AcpAdapterPool } from '../infrastructure/acp/acp-adapter-pool.js';
+import { resolveSessionAdapterId } from './router/runtime-catalog.js';
+import { checkProvenOptions } from './router/model-effort-guard.js';
+import { batchLane, isAcpBatchEnabled } from './acp-batch/acp-batch-support.js';
 import {
   AcpConversationLedger,
   type AcpLedgerBackend,
 } from './acp-history/acp-conversation-ledger.js';
 import { ToolRegistry } from '@study-studio/tool-core';
-import { CodexAdapter } from '@study-studio/agent-runtime';
+import { CodexAdapter, type AcpAdapter } from '@study-studio/agent-runtime';
 import type { AgentAdapterFactory } from '../composition/agent-deps.js';
 import { createDefaultAgentAdapterFactory } from '../composition/agent-deps.js';
 import { ResponsesAdapter } from '@study-studio/agent-runtime';
@@ -86,6 +89,33 @@ export class GatewayServer {
   public readonly acpAdapterPool = new AcpAdapterPool({ bridge: this.sessionToolBridge });
   /** ACP 会话台账（历史/排队走 acp-client 的网关侧索引；Codex 通路不受影响）。 */
   public readonly acpLedger: AcpConversationLedger;
+
+  /**
+   * 批处理适配器选型（目录提炼/出题等）：`LINGUA_ACP_BATCH=1` 且指名 ACP 运行时才走池，
+   * 其余一律 Codex 原通路。返回 lane 命名（用户历史默认排除批 lane）。
+   */
+  public resolveBatchAdapter(
+    runtimeId: string | undefined,
+    batchName: string,
+  ): { adapter: CodexAdapter | AcpAdapter; batchLane: string | null } {
+    if (runtimeId && isAcpBatchEnabled() && resolveSessionAdapterId(runtimeId) === 'acp') {
+      return { adapter: this.acpAdapterPool.get(runtimeId), batchLane: batchLane(batchName) };
+    }
+    return { adapter: this.agentAdapter, batchLane: null };
+  }
+
+  /**
+   * 批处理模型/档位发前证伪（与聊天回合同一实现，见 model-effort-guard；
+   * 域路由经此方法调用，不直引 runtime/，守模块边界）。
+   */
+  public async checkBatchModelEffort(
+    runtimeId: string,
+    model?: string,
+    effort?: string,
+  ): Promise<{ dropModel: boolean; dropEffort: boolean; warnings: string[] }> {
+    const proven = await this.acpAdapterPool.getRuntimeOptions(runtimeId, model ? { model } : undefined);
+    return checkProvenOptions(proven, model, effort);
+  }
   /** 轻量旁路：快问快答；学习闭环默认走 Codex App Server */
   public readonly responsesAdapter = new ResponsesAdapter();
   public readonly learnerRepo: LearnerRepository;
