@@ -50,6 +50,7 @@
 - 面板去 Codex 化已合入：历史/技能/MCP/用量/队列查询按开关停拉，表头用量与历史/技能入口隐藏＋明示，输入条脚注按运行时切换，回执带 `adapter`＋`runtimeId` 诊断。
 - 选择驱动修正：非 Codex 下模型标签显示“运行时自带”（不再残留 luna 旧名造成“无法选中”误会）；表头副标题显示选中运行时；18/0。
 - 真实选项已合入：`GET /api/agent/runtimes/:id/options`（建会话读 configOptions，10 分钟缓存）＋网关发前证伪拦截（旧 id 串台改默认＋toast 警告）＋前端按运行时拉真实模型/深度列表＋按运行时记忆选择＋切换重置会话；22/0。解析已委托 acp-client（`parseAcpConfigOptions`＋`findModelConfigOption`，网关手搓 `pickEntry` 已删；effort 暂无 SDK finder，按同款哲学最小匹配）。codex-acp 模型源已纠正：实测 ACP 探针有 `gpt-6.1-sol` 而 App Server `model/list` 没有（两套目录不一致，会话跑在 ACP 上），故 codex-acp 模型/思考深度改走 ACP 探针，前端 codex 特例门控已删；16/0＋8/0＋typecheck 零错。
+- 历史/排队走 ACP 已合入（`AcpConversationLedger` 网关台账：建会话/回合完成入索引＋transcript，JSON 落盘；`session/load` 只恢复上下文。sessions/items/改名/归档/队列按归属路由，compact/fork 对 ACP 大声拒绝；MCP 注入 SDK 全程携带已由 spike 证实，无需另建；队列消费走 WS 同一事件映射；前端零改动）；48/0＋14/0＋typecheck 零错。
 - acp-client 对接收尾（本轮）：SDK 侧 `env` 透传＋图片 prompt 块已提交待发版（`cb14b00`，0.1.1，未 push）；网关侧 custom 探针改走 codex-acp＋自定义 env（与会话同链路，未配置不 spawn）＋旧 SDK（0.1.0）fail-fast（`E_ACP_CLIENT_OUTDATED` 可读错，不静默鉴权失败）；16/0＋typecheck 零错。
 - codex-acp 已翻转（spike 带 luna＋medium 建会话＋两轮工具＋resume 全绿）：已知残留差异——中断/steer 明确拒绝、collaborationMode 暂忽略、旧 codex thread 续接首轮失忆（均有声失败或注释）。
 - 能力开关已合入：模型/思考深度控件由后端 capabilities 驱动禁用（codex 全开保 luna，其余用 Agent 默认；零按 id 特例），`useSelectedRuntimeCaps` fail-open。

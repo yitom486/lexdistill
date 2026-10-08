@@ -3,6 +3,10 @@ import { ContextBuilder } from './context/context-builder.js';
 import { ToolRouter } from './router/tool-router.js';
 import { SessionToolBridge } from './mcp/session-tool-bridge.js';
 import { AcpAdapterPool } from '../infrastructure/acp/acp-adapter-pool.js';
+import {
+  AcpConversationLedger,
+  type AcpLedgerBackend,
+} from './acp-history/acp-conversation-ledger.js';
 import { ToolRegistry } from '@study-studio/tool-core';
 import { CodexAdapter } from '@study-studio/agent-runtime';
 import type { AgentAdapterFactory } from '../composition/agent-deps.js';
@@ -80,6 +84,8 @@ export class GatewayServer {
   public mcpBaseUrl = 'http://127.0.0.1:8080';
   /** ACP 适配器池（按 runtime 温复用；默认 Codex 通路不受影响）。 */
   public readonly acpAdapterPool = new AcpAdapterPool({ bridge: this.sessionToolBridge });
+  /** ACP 会话台账（历史/排队走 acp-client 的网关侧索引；Codex 通路不受影响）。 */
+  public readonly acpLedger: AcpConversationLedger;
   /** 轻量旁路：快问快答；学习闭环默认走 Codex App Server */
   public readonly responsesAdapter = new ResponsesAdapter();
   public readonly learnerRepo: LearnerRepository;
@@ -105,8 +111,11 @@ export class GatewayServer {
     /** @internal 测试注入 mock adapter；产品调用走装配根注入的工厂 */
     adapterOverride?: CodexAdapter,
     /** DI 工厂：缺席时用 composition 默认工厂；测试传 adapterOverride 可完全绕过 */
-    adapterFactory?: AgentAdapterFactory
+    adapterFactory?: AgentAdapterFactory,
+    /** 台账持久化后端（缺席走文件；单测注入内存后端） */
+    ledgerBackend?: AcpLedgerBackend
   ) {
+    this.acpLedger = new AcpConversationLedger(ledgerBackend);
     this.learnerRepo = learnerRepo ?? new DrizzleLearnerRepository(':memory:');
     const repository = this.learnerRepo;
     this.practiceWsDependencies = {
@@ -262,11 +271,35 @@ export class GatewayServer {
     limit?: number;
     cursor?: string;
     searchTerm?: string;
-  }) {
+  }): Promise<Result<{
+    sessions: Array<{
+      id: string;
+      preview: string;
+      name: string | null;
+      createdAt: number;
+      updatedAt: number;
+      ephemeral: boolean;
+    }>;
+    nextCursor: string | null;
+  }, BusinessError>> {
+    // ACP 会话拼进同一列表（台账索引在前，Codex 线程随后；前端零改动）。
+    const ledgerSessions = this.acpLedger.listConversations(params?.limit ?? 50).map(item => ({
+      id: item.id,
+      preview: item.preview,
+      name: item.name as string | null,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      ephemeral: item.ephemeral,
+    }));
     const res = await this.agentAdapter.listThreads(params);
-    if (!isOk(res)) return res;
-    return ok({
-      sessions: res.value.threads.map((thread) => ({
+    if (!isOk(res)) {
+      // Codex 侧失败但台账有货：照常返回 ACP 历史；两边都空才把错抛出去（不静默）。
+      if (ledgerSessions.length > 0) return ok({ sessions: ledgerSessions, nextCursor: null });
+      return err(res.error);
+    }
+    const sessions = [
+      ...ledgerSessions,
+      ...res.value.threads.map((thread) => ({
         id: thread.id,
         preview: thread.preview,
         name: thread.name,
@@ -274,11 +307,26 @@ export class GatewayServer {
         updatedAt: thread.updatedAt,
         ephemeral: thread.ephemeral,
       })),
-      nextCursor: res.value.nextCursor,
-    });
+    ].sort((a, b) => b.updatedAt - a.updatedAt);
+    return ok({ sessions, nextCursor: res.value.nextCursor ?? null });
   }
 
-  public async listAgentSessionItems(params: { sessionId: string; limit?: number }) {
+  public async listAgentSessionItems(params: { sessionId: string; limit?: number }): Promise<Result<{
+    items: Array<{
+      turnId: string;
+      type: string;
+      text?: string;
+      id?: string;
+      toolName?: string;
+      arguments?: Record<string, unknown>;
+    }>;
+    nextCursor: string | null;
+  }, BusinessError>> {
+    // 台账命中走 ACP transcript（session/load 只负责恢复上下文，不解析回放）。
+    if (this.acpLedger.has(params.sessionId)) {
+      const items = this.acpLedger.getTranscriptItems(params.sessionId, params.limit ?? 200);
+      return ok({ items: items ?? [], nextCursor: null });
+    }
     const res = await this.agentAdapter.listThreadItems({
       threadId: params.sessionId,
       ...(params.limit !== undefined ? { limit: params.limit } : {}),
@@ -294,14 +342,32 @@ export class GatewayServer {
   }
 
   public async setAgentSessionName(sessionId: string, name: string) {
+    if (this.acpLedger.has(sessionId)) {
+      const renamed = this.acpLedger.rename(sessionId, name);
+      if (!renamed) {
+        return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
+      }
+      return ok(undefined);
+    }
     return this.agentAdapter.setThreadName(sessionId, name);
   }
 
   public async archiveAgentSession(sessionId: string) {
+    if (this.acpLedger.has(sessionId)) {
+      const archived = this.acpLedger.archive(sessionId);
+      if (!archived) {
+        return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
+      }
+      return ok(undefined);
+    }
     return this.agentAdapter.archiveThread(sessionId);
   }
 
   public async compactAgentSession(sessionId: string) {
+    // ACP 无压缩原语：大声拒绝，不静默走错后端。
+    if (this.acpLedger.has(sessionId)) {
+      return err(new BusinessError('E_ACP_UNSUPPORTED', 'ACP 会话暂不支持压缩（显式拒绝）', 'AGENT_RUNTIME'));
+    }
     return this.agentAdapter.compactThread(sessionId);
   }
 
@@ -310,6 +376,10 @@ export class GatewayServer {
     ephemeral?: boolean;
     model?: string;
   }) {
+    // ACP 无 fork 原语：大声拒绝，不静默走错后端。
+    if (this.acpLedger.has(params.sessionId)) {
+      return err(new BusinessError('E_ACP_UNSUPPORTED', 'ACP 会话暂不支持分支（显式拒绝）', 'AGENT_RUNTIME'));
+    }
     const res = await this.agentAdapter.forkThread({
       threadId: params.sessionId,
       ...(params.ephemeral !== undefined ? { ephemeral: params.ephemeral } : {}),
@@ -324,6 +394,19 @@ export class GatewayServer {
     message: string;
     clientUserMessageId?: string;
   }) {
+    // 台账命中走网关侧 ACP 队列（Codex queue 只认自家 threadId，串过去必错）。
+    if (this.acpLedger.has(params.sessionId)) {
+      try {
+        const item = this.acpLedger.queueAdd(params.sessionId, params.message);
+        return ok({
+          id: item.id,
+          text: item.message,
+          clientUserMessageId: params.clientUserMessageId ?? '',
+        });
+      } catch (error) {
+        return err(error instanceof BusinessError ? error : new BusinessError('E_QUEUE_ADD', String(error), 'AGENT_RUNTIME'));
+      }
+    }
     return this.agentAdapter.queueAdd({
       threadId: params.sessionId,
       message: params.message,
@@ -334,6 +417,15 @@ export class GatewayServer {
   }
 
   public async listAgentQueue(params: { sessionId: string; limit?: number }) {
+    // 台账命中走网关侧 ACP 队列（与 Codex queue 同 DTO，前端零改动）。
+    if (this.acpLedger.has(params.sessionId)) {
+      const items = this.acpLedger.queueList(params.sessionId, params.limit ?? 20).map(item => ({
+        id: item.id,
+        text: item.message,
+        clientUserMessageId: '',
+      }));
+      return ok({ items });
+    }
     return this.agentAdapter.queueList({
       threadId: params.sessionId,
       ...(params.limit !== undefined ? { limit: params.limit } : {}),
@@ -344,6 +436,13 @@ export class GatewayServer {
     sessionId: string;
     queuedSubmissionId: string;
   }) {
+    if (this.acpLedger.has(params.sessionId)) {
+      const removed = this.acpLedger.queueRemove(params.sessionId, params.queuedSubmissionId);
+      if (!removed) {
+        return err(new BusinessError('E_QUEUE_NOT_FOUND', '队列项不存在（可能已被消费）', 'VALIDATION'));
+      }
+      return ok(undefined);
+    }
     return this.agentAdapter.queueDelete({
       threadId: params.sessionId,
       queuedSubmissionId: params.queuedSubmissionId,
@@ -354,6 +453,11 @@ export class GatewayServer {
     sessionId: string;
     queuedSubmissionId?: string;
   }) {
+    // ACP 队列消费走 WS 流（handleQueueStart 的 ACP 分支，带流式回放）；
+    // HTTP 启不动无 emit 的 turn，大声指路，不静默吞掉。
+    if (this.acpLedger.has(params.sessionId)) {
+      return err(new BusinessError('E_ACP_QUEUE_HTTP_UNSUPPORTED', 'ACP 队列请走工作区消息流消费（自动续跑），HTTP start 仅支持 Codex 通路', 'VALIDATION'));
+    }
     return this.agentAdapter.queueStart({
       threadId: params.sessionId,
       ...(params.queuedSubmissionId

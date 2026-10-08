@@ -340,6 +340,17 @@ export async function handleTurnSend(
               agentLane
             );
             agentSession = sessionRes.value;
+            // ACP 会话入台账（历史/队列的 id 索引；Codex 通路沿用 App Server，不动）。
+            if (wantedAdapter === 'acp' && sessionRes.value.threadId) {
+              server.acpLedger.recordSessionCreated({
+                acpSessionId: sessionRes.value.threadId,
+                userId,
+                lane: agentLane,
+                runtimeId: requestedRuntimeId ?? 'codex-acp',
+                ...(preferredModel && !dropModel ? { model: preferredModel } : {}),
+                ...(preferredEffort && !dropEffort ? { effort: preferredEffort } : {}),
+              });
+            }
           } else {
             codexFailHint =
               sessionRes.error.userMessage || 'Codex 服务暂时不可用，请稍后重试。';
@@ -507,6 +518,10 @@ export async function handleTurnSend(
         }
       }
     }
+  // ACP transcript 入台账（历史面板数据源；上下文恢复靠 session/load，不靠回放解析）。
+  if (wantedAdapter === 'acp' && codexThreadId && reply) {
+    server.acpLedger.recordTurn(codexThreadId, { user: userPrompt, agent: reply, source: replySource });
+  }
   } finally {
     server.activeStreamControllers.delete(envelope.sessionId);
     server.activeTurnEmit = undefined;

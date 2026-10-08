@@ -35,12 +35,12 @@ export async function handleQueueStart(
       )
     );
   }
-  if (typeof agentSession.sendQueued !== 'function') {
+  if (typeof agentSession.sendQueued !== 'function' && !agentSession.threadId) {
     return err(
       new BusinessError(
-        'E_UNSUPPORTED',
-        '当前 Agent 引擎不支持队列消费。',
-        'AGENT_RUNTIME'
+        'E_SESSION_NOT_FOUND',
+        '当前没有可启动队列的 Agent 会话。',
+        'VALIDATION'
       )
     );
   }
@@ -69,14 +69,34 @@ export async function handleQueueStart(
   // P3-C：队列失败时保留结构化业务错误
   let queueFailureError: BusinessError | undefined;
   const threadId = agentSession.threadId;
+  // ACP 会话没有 sendQueued：从网关侧台账队列取下一条，走标准 send（同一事件映射）。
+  // 取数在 try 内：空队列抛 E_QUEUE_EMPTY，经外层统一收口为失败回执，不炸 WS。
+  let queuedMessage: string | null = null;
 
   try {
-    for await (const ev of agentSession.sendQueued({
-      ...(payload.queuedSubmissionId
-        ? { queuedSubmissionId: payload.queuedSubmissionId }
-        : {}),
-      ...(payload.approvalPolicy ? { approvalPolicy: payload.approvalPolicy } : {}),
-    })) {
+    const turnStream =
+      typeof agentSession.sendQueued === 'function'
+        ? agentSession.sendQueued({
+          ...(payload.queuedSubmissionId
+            ? { queuedSubmissionId: payload.queuedSubmissionId }
+            : {}),
+          ...(payload.approvalPolicy ? { approvalPolicy: payload.approvalPolicy } : {}),
+        })
+        : (() => {
+          const next = threadId
+            ? server.acpLedger.queueConsume(threadId, payload.queuedSubmissionId)
+            : null;
+          if (!next) {
+            throw new BusinessError(
+              'E_QUEUE_EMPTY',
+              'ACP 队列为空（可能已被消费或会话尚未入台账，先发一条消息再排队）。',
+              'VALIDATION'
+            );
+          }
+          queuedMessage = next.message;
+          return agentSession.send({ message: next.message });
+        })();
+    for await (const ev of turnStream) {
       if (abortController.signal.aborted) {
         await agentSession.interrupt();
         break;
@@ -163,6 +183,15 @@ export async function handleQueueStart(
         break;
       }
     }
+  } catch (error) {
+    // 同步抛错（含 ACP 空队列）收口为失败回执，不炸 WS。
+    streamed = false;
+    const biz = error instanceof BusinessError
+      ? error
+      : new BusinessError('E_QUEUE_START', String(error), 'AGENT_RUNTIME');
+    reply = biz.userMessage || biz.message || '队列启动失败';
+    replySource = 'local';
+    queueFailureError = biz;
   } finally {
     server.activeStreamControllers.delete(envelope.sessionId);
     server.activeTurnEmit = undefined;
@@ -171,6 +200,10 @@ export async function handleQueueStart(
 
   const isInterrupted = abortController.signal.aborted;
   let queueRemaining = 0;
+  // ACP 队消费回合入台账（与普通回合同一 transcript）。
+  if (queuedMessage && threadId && reply) {
+    server.acpLedger.recordTurn(threadId, { user: queuedMessage, agent: reply, source: replySource });
+  }
   if (threadId && !isInterrupted) {
     const queued = await server.listAgentQueue({ sessionId: threadId, limit: 20 });
     if (isOk(queued)) queueRemaining = queued.value.items.length;
