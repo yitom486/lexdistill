@@ -264,8 +264,9 @@ export class AcpConversationLedger {
     return true;
   }
 
-  /** 历史列表（与 Codex threads 同 DTO，前端零改动；归档的不再列出）。 */
-  public listConversations(limit = 50): Array<{
+  /** 历史列表（与 Codex threads 同 DTO，前端零改动；归档的不再列出）。
+   * 批处理 lane 默认排除（用户历史只看 coach/learning；批调用方传 lane='batch:*'）。 */
+  public listConversations(limit = 50, opts?: { lanes?: readonly string[] }): Array<{
     id: string;
     preview: string;
     name: string;
@@ -274,8 +275,9 @@ export class AcpConversationLedger {
     ephemeral: boolean;
   }> {
     this.ensureLoaded();
+    const lanes = opts?.lanes ?? ['coach', 'learning'];
     return [...this.conversations.values()]
-      .filter(item => !item.archived)
+      .filter(item => !item.archived && lanes.includes(item.lane))
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, Math.max(0, limit))
       .map(item => ({

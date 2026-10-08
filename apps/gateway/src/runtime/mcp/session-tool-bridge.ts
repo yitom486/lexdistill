@@ -28,6 +28,28 @@ export interface SessionToolBridgeDeps {
   resolveBaseUrl: () => string;
 }
 
+/** 桥工具调用记录（批处理收割用：ACP 工具直调 MCP，宿主经此取回参数与结果）。 */
+export interface SessionToolCallRecord {
+  toolName: string;
+  args: unknown;
+  ok: boolean;
+  /** 成功=结果 JSON（截断），失败=可读错误 */
+  result?: string;
+  at: number;
+}
+
+const MAX_RECORDS_PER_TOKEN = 200;
+const MAX_RECORD_JSON_CHARS = 4000;
+
+function clipRecordJson(value: unknown): string {
+  try {
+    const text = JSON.stringify(value) ?? '';
+    return text.length > MAX_RECORD_JSON_CHARS ? `${text.slice(0, MAX_RECORD_JSON_CHARS)}…` : text;
+  } catch {
+    return String(value);
+  }
+}
+
 export interface SessionMcpServerSpec {
   name: string;
   type: 'http';
@@ -60,6 +82,7 @@ function zodShapeOf(tool: ToolDefinition): Record<string, z.ZodTypeAny> {
 
 export class SessionToolBridge {
   private readonly entries = new Map<string, BridgeEntry & SessionToolCallContext>();
+  private readonly records = new Map<string, SessionToolCallRecord[]>();
 
   constructor(private readonly deps: SessionToolBridgeDeps) {}
 
@@ -73,6 +96,19 @@ export class SessionToolBridge {
         { description: tool.description, inputSchema: zodShapeOf(tool) },
         async (args: Record<string, unknown>) => {
           const res = await this.deps.execute(tool.name, args, context);
+          const record: SessionToolCallRecord = res.ok
+            ? { toolName: tool.name, args, ok: true, result: clipRecordJson(res.value), at: Date.now() }
+            : {
+              toolName: tool.name,
+              args,
+              ok: false,
+              result: res.error instanceof BusinessError ? res.error.userMessage : String(res.error),
+              at: Date.now(),
+            };
+          const list = this.records.get(token) ?? [];
+          list.push(record);
+          while (list.length > MAX_RECORDS_PER_TOKEN) list.shift();
+          this.records.set(token, list);
           if (!res.ok) {
             const message = res.error instanceof BusinessError ? res.error.userMessage : String(res.error);
             return { content: [{ type: 'text' as const, text: message }], isError: true };
@@ -104,6 +140,7 @@ export class SessionToolBridge {
   }
 
   public revoke(token: string): boolean {
+    this.records.delete(token);
     return this.entries.delete(token);
   }
 
@@ -112,9 +149,25 @@ export class SessionToolBridge {
     for (const [token, entry] of this.entries) {
       if (now - entry.createdAt > maxAgeMs) {
         this.entries.delete(token);
+        this.records.delete(token);
         removed += 1;
       }
     }
     return removed;
+  }
+
+  /**
+   * 取回并清空某 token 的调用记录（批处理收割：会话 close 前调用，revoke 后记录消失）。
+   * 纯内存，不落盘。
+   */
+  public takeRecords(token: string): SessionToolCallRecord[] {
+    const list = this.records.get(token) ?? [];
+    this.records.delete(token);
+    return list;
+  }
+
+  /** 只读查看（不清空）。 */
+  public peekRecords(token: string): SessionToolCallRecord[] {
+    return [...(this.records.get(token) ?? [])];
   }
 }

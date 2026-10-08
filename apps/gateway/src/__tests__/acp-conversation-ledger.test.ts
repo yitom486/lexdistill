@@ -89,6 +89,16 @@ describe('AcpConversationLedger', () => {
     expect(ledger.getTranscriptItems('ghost')).toBeNull();
   });
 
+  it('lane 过滤：用户历史默认只列 coach/learning，批 lane 隐藏', () => {
+    const ledger = new AcpConversationLedger(memoryAcpLedgerBackend());
+    ledger.recordSessionCreated({ acpSessionId: 'c1', userId: 'u', lane: 'coach', runtimeId: 'opencode' });
+    ledger.recordSessionCreated({ acpSessionId: 'b1', userId: 'u', lane: 'batch:toc', runtimeId: 'opencode' });
+    expect(ledger.listConversations().map(item => item.id)).toEqual(['c1']);
+    expect(ledger.listConversations(50, { lanes: ['batch:toc'] }).map(item => item.id)).toEqual(['b1']);
+    // 批会话回放/队列照常可用（仅列表默认隐藏）
+    expect(ledger.has('b1')).toBe(true);
+  });
+
   it('队列：先进先出＋按 id 取＋删除＋空消费 null', () => {
     const ledger = new AcpConversationLedger(memoryAcpLedgerBackend());
     expect(ledger.queueConsume('t')).toBeNull();

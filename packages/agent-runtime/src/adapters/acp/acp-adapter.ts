@@ -204,6 +204,11 @@ export class AcpAgentSession implements AgentSession {
     this.mcpTokens = [...tokens];
   }
 
+  /** 桥 token 列表（批处理收割调用记录用；revoke 后失效，先收割后 close）。 */
+  public listMcpTokens(): string[] {
+    return [...this.mcpTokens];
+  }
+
   /** 建会话时的偏好降级提醒（模型/思考深度未生效），调用方合并进 turn 回执 toast。 */
   public drainSetupWarnings(): string[] {
     return this.setupWarnings.splice(0);
