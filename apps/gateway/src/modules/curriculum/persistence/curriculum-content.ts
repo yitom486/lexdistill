@@ -123,10 +123,11 @@ export async function getAdaptiveKanaQueue(
             .where(inArray(curriculumKana.type, [...types]))
             .orderBy(asc(curriculumKana.sortOrder))
         : await deps.db.select().from(curriculumKana).orderBy(asc(curriculumKana.sortOrder));
+    const scopedRows = options?.kanaIds ? rows.filter((row) => options.kanaIds!.includes(row.id)) : rows;
     const scriptType = options?.scriptType ?? 'HIRAGANA';
     const memories = await readKanaPracticeMemories(deps.db, userId, scriptType);
     const ids = selectAdaptiveKanaIds(
-      rows.map((row) => {
+      scopedRows.map((row) => {
         const memory = memories.get(row.id);
         return {
           id: row.id,

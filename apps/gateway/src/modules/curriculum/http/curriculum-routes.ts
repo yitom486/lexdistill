@@ -39,7 +39,7 @@ export function createCurriculumRoutes(deps: GatewayDeps) {
   .get(
     '/api/curriculum/kana/queue/:userId',
     validator('query', (value) =>
-      value as { types?: string; scriptType?: string; limit?: string }
+      value as { types?: string; kanaIds?: string; scriptType?: string; limit?: string }
     ),
     async (c) => {
     const requestedTypes = (c.req.query('types') ?? '')
@@ -51,6 +51,7 @@ export function createCurriculumRoutes(deps: GatewayDeps) {
       scriptType: parseKanaScriptType(c.req.query('scriptType')),
       limit: parseKanaQueueLimit(c.req.query('limit')),
       ...(requestedTypes.length > 0 ? { types: requestedTypes } : {}),
+      ...(c.req.query('kanaIds') ? { kanaIds: c.req.query('kanaIds')!.split(',').filter(Boolean).slice(0, 104) } : {}),
     };
     const res = await deps.repo.getAdaptiveKanaQueue(c.req.param('userId'), options);
     if (isOk(res)) return c.json(res.value);
