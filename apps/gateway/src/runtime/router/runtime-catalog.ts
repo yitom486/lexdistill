@@ -28,14 +28,21 @@ export interface AgentRuntimeCapabilities {
   /** Codex thread 历史/压缩/队列/用量/技能/MCP 状态（ACP 会话无此体系）。 */
   supportsThreads: boolean;
   supportsUsage: boolean;
+  /**
+   * 网关台账历史/队列可用（sessions/items/改名/归档/队列按归属路由）。
+   * ACP 运行时全开（台账以 ACP 会话 id 为键）；与 supportsThreads 正交。
+   */
+  supportsHistory: boolean;
 }
 
 /** codex-acp：会话走 ACP，模型/思考深度取 ACP 探针（与会话同口径）；线程/用量面板不动。 */
 const CODEX_ACP_CAPABILITIES: AgentRuntimeCapabilities = {
   supportsModelPicker: false, supportsEffort: false, supportsThreads: true, supportsUsage: true,
+  supportsHistory: true,
 };
 const AGENT_DEFAULT_CAPABILITIES: AgentRuntimeCapabilities = {
   supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false,
+  supportsHistory: true,
 };
 
 function envConfigured(requiredEnvKeys: readonly string[] | undefined, runtimeId: string): boolean | null {

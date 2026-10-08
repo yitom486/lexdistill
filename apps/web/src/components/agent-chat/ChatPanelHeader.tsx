@@ -227,7 +227,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
         ) : (
           <WifiOff className="size-3.5 text-ink-ghost mr-1" />
         )}
-        {runtimeCaps.supportsThreads ? (
+        {runtimeCaps.supportsThreads || runtimeCaps.supportsHistory ? (
         <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
           <PopoverTrigger
             className="inline-flex size-7 items-center justify-center rounded-md text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"

@@ -92,7 +92,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
     agentQueriesReady && runtimeCaps.supportsModelPicker
   );
   const { data: sessionsData, refetch: refetchThreads } = useAgentSessionsQuery(
-    agentQueriesReady && runtimeCaps.supportsThreads
+    agentQueriesReady && (runtimeCaps.supportsThreads || runtimeCaps.supportsHistory)
   );
   const sessions = sessionsData?.sessions ?? [];
   const { data: collabModes = [] } = useAgentCollaborationModesQuery(
@@ -100,7 +100,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   );
   const { data: threadItems = [], isFetched: threadItemsFetched } = useAgentSessionItemsQuery(
     coachThreadId || null,
-    Boolean(coachThreadId) && agentQueriesReady && runtimeCaps.supportsThreads
+    Boolean(coachThreadId) && agentQueriesReady && (runtimeCaps.supportsThreads || runtimeCaps.supportsHistory)
   );
   const archiveThread = useArchiveAgentSessionMutation();
   const compactThread = useCompactAgentSessionMutation();
@@ -110,7 +110,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   const deleteQueueItem = useDeleteAgentQueueItemMutation();
   const { data: queueItems = [] } = useAgentQueueQuery(
     coachThreadId || null,
-    Boolean(coachThreadId) && agentQueriesReady && runtimeCaps.supportsThreads
+    Boolean(coachThreadId) && agentQueriesReady && (runtimeCaps.supportsThreads || runtimeCaps.supportsHistory)
   );
   const { data: skills = [] } = useAgentSkillsQuery(agentQueriesReady && runtimeCaps.supportsThreads);
   const { data: usage } = useAgentUsageQuery(agentQueriesReady && runtimeCaps.supportsUsage);
@@ -138,14 +138,14 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   }, [messages, busy]);
 
   // 偏好水合后再决定问候语 / 恢复提示，避免先闪 greeting 再被 thread items 覆盖
-  // 非 Codex 运行时无 thread 体系：不显示“恢复会话”，直接问候（首轮自动建 ACP 会话）。
+  // 无历史能力才直接问候；ACP 经网关台账恢复（首轮按需建会话）。
   useEffect(() => {
     if (bootedRef.current) return;
     const boot = () => {
       if (bootedRef.current) return;
       bootedRef.current = true;
       const threadId = usePreferencesStore.getState().coachThreadId;
-      if (threadId && runtimeCaps.supportsThreads) {
+      if (threadId && (runtimeCaps.supportsThreads || runtimeCaps.supportsHistory)) {
         setMessages([
           {
             id: 'resume',

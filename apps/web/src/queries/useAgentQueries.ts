@@ -402,6 +402,7 @@ export interface AgentRuntimeStatusDto {
     supportsEffort?: boolean;
     supportsThreads?: boolean;
     supportsUsage?: boolean;
+    supportsHistory?: boolean;
   } | undefined;
 }
 

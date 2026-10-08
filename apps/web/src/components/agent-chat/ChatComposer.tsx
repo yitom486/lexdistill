@@ -87,6 +87,11 @@ export function ChatComposer(props: ChatComposerProps) {
     ? models.map(m => ({ value: m.id || m.model, label: m.displayName || m.model }))
     : (runtimeOptions.data?.models ?? []);
   const modelValue = modelChoices.some(m => m.value === coachModelId) ? coachModelId : '__auto__';
+  // 下拉显示用户真实选择（探针表命中才显示名）；探针失败时标题带错，不静默“默认”。
+  const resolvedModelLabel = modelValue === '__auto__'
+    ? '运行时默认'
+    : (modelChoices.find(m => m.value === coachModelId)?.label ?? modelLabel);
+  const probeError = runtimeOptions.data?.error;
   const effortChoices = runtimeCaps.supportsEffort
     ? [...effortOptions]
     : (runtimeOptions.data?.efforts ?? []);
@@ -242,9 +247,9 @@ export function ChatComposer(props: ChatComposerProps) {
             >
               <SelectTrigger
                 className={`${compactSelect} max-w-[14rem]`}
-                title={!runtimeCaps.supportsModelPicker && modelChoices.length === 0 ? '当前运行时用自带默认模型' : undefined}
+                title={probeError || (!runtimeCaps.supportsModelPicker && modelChoices.length === 0 ? '当前运行时用自带默认模型' : undefined)}
               >
-                <SelectValue placeholder="Model">{modelValue === '__auto__' ? '运行时默认' : modelLabel}</SelectValue>
+                <SelectValue placeholder="Model">{resolvedModelLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent className="border-line bg-paper-soft text-ink">
                 {!runtimeCaps.supportsModelPicker && (
@@ -318,9 +323,11 @@ export function ChatComposer(props: ChatComposerProps) {
         </div>
       </div>
       <p className="mt-1.5 px-1 text-[10px] text-ink-ghost">
-        {runtimeCaps.supportsThreads
+        {runtimeCaps.supportsThreads && runtimeCaps.supportsModelPicker
           ? <>~/.codex · queue/changed · compact · rateLimits{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>
-          : <>当前运行时：历史/队列/用量面板不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>}
+          : runtimeCaps.supportsHistory
+            ? <>当前运行时：历史/队列走网关台账 · 用量面板不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>
+            : <>当前运行时：历史/队列/用量面板不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>}
       </p>
     </footer>
   );

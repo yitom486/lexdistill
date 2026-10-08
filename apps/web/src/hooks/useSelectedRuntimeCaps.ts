@@ -6,7 +6,7 @@ import { usePreferencesStore } from '../stores/usePreferencesStore.js';
  * 后端未返回或查询未就绪时全开（= 当前 Codex 默认行为，fail-open）。
  */
 export function useSelectedRuntimeCaps(): {
-  supportsModelPicker: boolean; supportsEffort: boolean; supportsThreads: boolean; supportsUsage: boolean;
+  supportsModelPicker: boolean; supportsEffort: boolean; supportsThreads: boolean; supportsUsage: boolean; supportsHistory: boolean;
 } {
   const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
   const { data: statuses = [] } = useAgentRuntimesQuery(true);
@@ -16,5 +16,6 @@ export function useSelectedRuntimeCaps(): {
     supportsEffort: caps?.supportsEffort ?? true,
     supportsThreads: caps?.supportsThreads ?? true,
     supportsUsage: caps?.supportsUsage ?? true,
+    supportsHistory: caps?.supportsHistory ?? true,
   };
 }
