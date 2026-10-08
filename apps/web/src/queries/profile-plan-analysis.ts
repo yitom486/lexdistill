@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { DailyStudyPlan, DailyTaskProgress, SkillMetric } from '@study-studio/learner-core';
+import type { CourseRouteSnapshot, UnitRouteItem, DailyStudyPlan, DailyTaskProgress, SkillMetric } from '@study-studio/learner-core';
 import type { LearningAnalysisReport } from '@study-studio/protocol';
 import { logger } from '@study-studio/shared';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
@@ -64,56 +64,28 @@ export function useDailyTaskQuery(userId = DEFAULT_USER_ID, date?: string, langO
   });
 }
 
-export function useDailyPlanQuery(userId = DEFAULT_USER_ID, date?: string, langOverride?: string) {
+export function useDailyPlanQuery(userIdOverride?: string, date?: string, langOverride?: string) {
+  const profileUserId = useUserProfileStore(s => s.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
   const profileLang = useUserProfileStore((s) => s.profile.targetLanguage);
   const targetLanguage = normalizeTrackLanguage(langOverride || profileLang);
 
   return useQuery<DailyStudyPlan | null>({
     queryKey: [...QUERY_KEYS.DAILY_PLAN, userId, date ?? 'today', targetLanguage],
     queryFn: async () => {
-      try {
-        const url = new URL(`${GATEWAY_BASE_URL}/api/learning/plan/${userId}`);
+        const url = new URL(`${GATEWAY_BASE_URL}/api/learning/plan/${encodeURIComponent(userId)}`);
         url.searchParams.set('lang', targetLanguage);
         if (date) url.searchParams.set('date', date);
         const res = await fetch(url.toString());
-        if (res.ok) {
-          return (await res.json()) as DailyStudyPlan;
-        }
-      } catch (e) {
-        logger.debug('[useDailyPlanQuery] Failed to load daily study plan', e);
-      }
-      return null;
+        if (!res.ok) throw new Error('今日学习计划读取失败，请重试。');
+        return (await res.json()) as DailyStudyPlan;
     },
     staleTime: 1000 * 30,
   });
 }
 
-export interface CourseRouteUnit {
-  unit: {
-    id: string;
-    track: string;
-    stage: number;
-    order: number;
-    kind: string;
-    title: string;
-    summary: string;
-    activity: {
-      planKind: string;
-      navigateTo: string;
-      skillId?: string;
-      skillName?: string;
-      targetCount?: number;
-    };
-  };
-  status: 'locked' | 'available' | 'mastered';
-  progress: string;
-  needsReview?: boolean;
-}
-
-export interface CourseRoute {
-  units: CourseRouteUnit[];
-  nextUpId: string | null;
-}
+export type CourseRouteUnit = UnitRouteItem;
+export type CourseRoute = CourseRouteSnapshot;
 
 const STAGE_NAMES: Record<number, string> = { 0: '零基础', 1: '初学者', 2: '中级', 3: '高级' };
 
@@ -122,7 +94,9 @@ export function courseStageName(stage: number): string {
 }
 
 /** 课程路线（长期路线 + 解锁态；失败返回 null，调用方隐藏横幅）。 */
-export function useCourseRouteQuery(userId = DEFAULT_USER_ID, langOverride?: string) {
+export function useCourseRouteQuery(userIdOverride?: string, langOverride?: string) {
+  const profileUserId = useUserProfileStore(s => s.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
   const profileLang = useUserProfileStore((s) => s.profile.targetLanguage);
   const targetLanguage = normalizeTrackLanguage(langOverride || profileLang);
   return useQuery<CourseRoute | null>({
@@ -149,7 +123,9 @@ export function useCourseRouteQuery(userId = DEFAULT_USER_ID, langOverride?: str
   });
 }
 
-export function useCompletePlanStepMutation(userId = DEFAULT_USER_ID) {
+export function useCompletePlanStepMutation(userIdOverride?: string) {
+  const profileUserId = useUserProfileStore(s => s.profile.userId);
+  const userId = userIdOverride || profileUserId || DEFAULT_USER_ID;
   const queryClient = useQueryClient();
   const language = normalizeTrackLanguage(useUserProfileStore(s => s.profile.targetLanguage));
 

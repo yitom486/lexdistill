@@ -70,6 +70,7 @@ export interface DailyPickParams {
   count: number;
   order: 'random' | 'sequential';
   bankId?: string | undefined;
+  courseUnitId?: string | undefined;
 }
 
 export interface DailyPickResult {

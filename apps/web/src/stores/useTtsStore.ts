@@ -46,6 +46,7 @@ export interface TtsStoreState extends SpeechStudioConfig {
   streamedSeconds: number;
   streamedChunks: number;
   currentText: string;
+  stopEpoch: number;
   hasLastAudio: boolean;
   lastAudioInfo: LastTtsAudioInfo | null;
   lastRequest: TtsRequestDescriptor | null;
@@ -139,6 +140,7 @@ export const useTtsStore = create<TtsStoreState>()(
           streamedSeconds: speechStudio.getStreamedSeconds(),
           streamedChunks: speechStudio.getStreamedChunks(),
           currentText: speechStudio.getCurrentText(),
+          stopEpoch: speechStudio.getStopEpoch(),
           hasLastAudio: last !== null,
           lastAudioInfo: last
             ? {
@@ -163,6 +165,7 @@ export const useTtsStore = create<TtsStoreState>()(
         streamedSeconds: speechStudio.getStreamedSeconds(),
         streamedChunks: speechStudio.getStreamedChunks(),
         currentText: speechStudio.getCurrentText(),
+        stopEpoch: speechStudio.getStopEpoch(),
         hasLastAudio: speechStudio.getLastAudio() !== null,
         lastAudioInfo: null,
         lastRequest: null,

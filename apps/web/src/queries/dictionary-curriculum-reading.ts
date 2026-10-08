@@ -36,6 +36,7 @@ type AdaptiveKanaQueueScriptType = 'HIRAGANA' | 'KATAKANA' | 'ROMAJI';
 
 interface AdaptiveKanaQueueQueryOptions {
   types?: readonly string[];
+  kanaIds?: readonly string[];
   scriptType?: AdaptiveKanaQueueScriptType;
   limit?: number;
   round?: number;
@@ -53,7 +54,7 @@ export function useAdaptiveKanaQueueQuery(
   const round = options.round ?? 0;
 
   return useQuery<KanaItem[]>({
-    queryKey: [...QUERY_KEYS.KANA_ADAPTIVE, userId, types.join(','), scriptType, limit, round],
+    queryKey: [...QUERY_KEYS.KANA_ADAPTIVE, userId, types.join(','), scriptType, limit, round, options.kanaIds?.join(',') ?? 'ALL'],
     enabled: options.enabled ?? true,
     queryFn: async () => {
       try {
@@ -63,6 +64,7 @@ export function useAdaptiveKanaQueueQuery(
             types: types.join(','),
             scriptType,
             limit: String(limit),
+            ...(options.kanaIds ? { kanaIds: options.kanaIds.join(',') } : {}),
           },
         });
         if (res.ok) {
@@ -104,10 +106,12 @@ export function useKanaPracticeMutation(userId = DEFAULT_USER_ID) {
       } catch (e) {
         logger.debug('[useKanaPracticeMutation] Failed to post kana practice', e);
       }
-      return { success: true };
+      throw new Error('假名练习保存失败，请重试。');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DAILY_PLAN });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DAILY_TASK });
     },
   });
 }
