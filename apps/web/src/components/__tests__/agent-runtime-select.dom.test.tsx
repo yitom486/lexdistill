@@ -3,6 +3,7 @@ import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AgentRuntimeSelect } from '../AgentRuntimeSelect.js';
 import { WordChatConfig } from '../WordChatConfig.js';
+import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
 import { AGENT_RUNTIME_OPTIONS, agentRuntimeLabel, DEFAULT_AGENT_RUNTIME_ID } from '../../config/agent-runtimes.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { act, setupDom, type DomHandle } from '../toc/__tests__/dom-setup.js';
@@ -62,5 +63,26 @@ it('非 Codex 运行时：模型与思考深度禁用（能力开关驱动）', 
   await act(async () => toggle!.click());
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); });
   expect(doc.querySelector('[aria-label="选择模型"]')?.getAttribute('data-disabled')).not.toBeNull();
+  client.clear();
+});
+
+it('能力开关 fail-open：后端未返回时全开（= 现状）', async () => {
+  globalThis.fetch = (async () => Response.json({ runtimes: [] })) as unknown as typeof fetch;
+  usePreferencesStore.setState({ agentRuntimeId: 'deepseek' });
+  dom = await setupDom(true);
+  const doc = dom.dom.window.document;
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  let caps: { supportsModelPicker: boolean; supportsEffort: boolean; supportsThreads: boolean; supportsUsage: boolean } | null = null;
+  const Probe = () => {
+    caps = useSelectedRuntimeCaps();
+    return null;
+  };
+  await act(async () => dom!.root.render(
+    <QueryClientProvider client={client}><Probe /><WordChatConfig /></QueryClientProvider>,
+  ));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); });
+  expect(caps ?? {}).toEqual({
+    supportsModelPicker: true, supportsEffort: true, supportsThreads: true, supportsUsage: true,
+  });
   client.clear();
 });

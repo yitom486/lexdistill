@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Button } from '../ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
 import { sound } from '../../utils/audio.js';
+import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
 import type {
   AgentStatusDto,
   McpServerStatusDto,
@@ -102,6 +103,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
     onClose,
   } = props;
   const copy = getTutorTrackCopy(track);
+  const runtimeCaps = useSelectedRuntimeCaps();
   return (
     <header className="flex items-start justify-between gap-2 px-3 py-2.5 border-b border-line">
       <div className="min-w-0">
@@ -180,7 +182,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
               重试
             </button>
           ) : null}
-          {typeof usage?.usedPercent === 'number' ? (
+          {runtimeCaps.supportsUsage && typeof usage?.usedPercent === 'number' ? (
             <span
               className="inline-flex items-center gap-1 text-[10px] text-ink-ghost"
               title={
@@ -222,6 +224,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
         ) : (
           <WifiOff className="size-3.5 text-ink-ghost mr-1" />
         )}
+        {runtimeCaps.supportsThreads ? (
         <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
           <PopoverTrigger
             className="inline-flex size-7 items-center justify-center rounded-md text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
@@ -349,6 +352,12 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             </label>
           </PopoverContent>
         </Popover>
+        ) : (
+          <span className="inline-flex h-7 items-center px-1 text-[10px] text-ink-ghost" title="当前运行时无 Codex 会话体系">
+            无历史面板
+          </span>
+        )}
+        {runtimeCaps.supportsThreads ? (
         <Popover open={skillsOpen} onOpenChange={setSkillsOpen}>
           <PopoverTrigger
             className="inline-flex size-7 items-center justify-center rounded-md text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
@@ -416,6 +425,11 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             </div>
           </PopoverContent>
         </Popover>
+        ) : (
+          <span className="inline-flex h-7 items-center px-1 text-[10px] text-ink-ghost" title="当前运行时无 Codex 技能体系">
+            无技能面板
+          </span>
+        )}
         <Button
           type="button"
           variant="ghost"

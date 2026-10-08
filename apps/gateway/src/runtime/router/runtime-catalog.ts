@@ -22,10 +22,17 @@ export interface AgentRuntimeStatus {
 export interface AgentRuntimeCapabilities {
   supportsModelPicker: boolean;
   supportsEffort: boolean;
+  /** Codex thread 历史/压缩/队列/用量/技能/MCP 状态（ACP 会话无此体系）。 */
+  supportsThreads: boolean;
+  supportsUsage: boolean;
 }
 
-const FULL_CAPABILITIES: AgentRuntimeCapabilities = { supportsModelPicker: true, supportsEffort: true };
-const AGENT_DEFAULT_CAPABILITIES: AgentRuntimeCapabilities = { supportsModelPicker: false, supportsEffort: false };
+const FULL_CAPABILITIES: AgentRuntimeCapabilities = {
+  supportsModelPicker: true, supportsEffort: true, supportsThreads: true, supportsUsage: true,
+};
+const AGENT_DEFAULT_CAPABILITIES: AgentRuntimeCapabilities = {
+  supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false,
+};
 
 function envConfigured(requiredEnvKeys: readonly string[] | undefined, runtimeId: string): boolean | null {
   if (runtimeId === 'agy') return true;

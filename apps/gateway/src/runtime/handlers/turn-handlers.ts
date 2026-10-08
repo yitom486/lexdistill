@@ -537,6 +537,9 @@ export async function handleTurnSend(
       codexOutcome: outcome,
       ...(codexFailureMessage ? { codexFailureMessage } : {}),
       ...(toolWarnings.length > 0 ? { toolWarnings } : {}),
+      // 诊断回显：本轮实际服务的适配器与请求的运行时（排障时一眼定责）。
+      adapter: wantedAdapter,
+      ...(requestedRuntimeId ? { runtimeId: requestedRuntimeId } : {}),
     },
     timestamp: Date.now(),
   };

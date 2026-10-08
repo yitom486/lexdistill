@@ -19,9 +19,9 @@ export function WordChatConfig() {
   const setCoachModelId = usePreferencesStore(state => state.setCoachModelId);
   const coachEffort = usePreferencesStore(state => state.coachEffort);
   const setCoachEffort = usePreferencesStore(state => state.setCoachEffort);
-  const modelsQuery = useAgentModelsQuery(open);
-  const models = modelsQuery.data ?? [];
   const runtimeCaps = useSelectedRuntimeCaps();
+  const modelsQuery = useAgentModelsQuery(open && runtimeCaps.supportsModelPicker);
+  const models = modelsQuery.data ?? [];
   const modelLabel = models.find(model => model.id === coachModelId || model.model === coachModelId)?.displayName
     || coachModelId || '本机默认';
   return (

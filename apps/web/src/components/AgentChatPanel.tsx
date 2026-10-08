@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAgentGateway } from '../hooks/useAgentGateway.js';
+import { useSelectedRuntimeCaps } from '../hooks/useSelectedRuntimeCaps.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
@@ -86,11 +87,12 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   // 与后端 ensureConnection single-flight 形成双保险（启动期只 spawn 一次）。
   const agentQueriesReady =
     Boolean(gateway.isConnected) && agentStatus?.available === true;
+  const runtimeCaps = useSelectedRuntimeCaps();
   const { data: models = [], isFetching: modelsLoading } = useAgentModelsQuery(
-    agentQueriesReady
+    agentQueriesReady && runtimeCaps.supportsModelPicker
   );
   const { data: sessionsData, refetch: refetchThreads } = useAgentSessionsQuery(
-    agentQueriesReady
+    agentQueriesReady && runtimeCaps.supportsThreads
   );
   const sessions = sessionsData?.sessions ?? [];
   const { data: collabModes = [] } = useAgentCollaborationModesQuery(
@@ -98,7 +100,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   );
   const { data: threadItems = [], isFetched: threadItemsFetched } = useAgentSessionItemsQuery(
     coachThreadId || null,
-    Boolean(coachThreadId) && agentQueriesReady
+    Boolean(coachThreadId) && agentQueriesReady && runtimeCaps.supportsThreads
   );
   const archiveThread = useArchiveAgentSessionMutation();
   const compactThread = useCompactAgentSessionMutation();
@@ -108,11 +110,11 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   const deleteQueueItem = useDeleteAgentQueueItemMutation();
   const { data: queueItems = [] } = useAgentQueueQuery(
     coachThreadId || null,
-    Boolean(coachThreadId) && agentQueriesReady
+    Boolean(coachThreadId) && agentQueriesReady && runtimeCaps.supportsThreads
   );
-  const { data: skills = [] } = useAgentSkillsQuery(agentQueriesReady);
-  const { data: usage } = useAgentUsageQuery(agentQueriesReady);
-  const { data: mcpServers = [] } = useMcpServersQuery(agentQueriesReady);
+  const { data: skills = [] } = useAgentSkillsQuery(agentQueriesReady && runtimeCaps.supportsThreads);
+  const { data: usage } = useAgentUsageQuery(agentQueriesReady && runtimeCaps.supportsUsage);
+  const { data: mcpServers = [] } = useMcpServersQuery(agentQueriesReady && runtimeCaps.supportsThreads);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [composerSettingsOpen, setComposerSettingsOpen] = useState(false);
@@ -136,13 +138,14 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   }, [messages, busy]);
 
   // 偏好水合后再决定问候语 / 恢复提示，避免先闪 greeting 再被 thread items 覆盖
+  // 非 Codex 运行时无 thread 体系：不显示“恢复会话”，直接问候（首轮自动建 ACP 会话）。
   useEffect(() => {
     if (bootedRef.current) return;
     const boot = () => {
       if (bootedRef.current) return;
       bootedRef.current = true;
       const threadId = usePreferencesStore.getState().coachThreadId;
-      if (threadId) {
+      if (threadId && runtimeCaps.supportsThreads) {
         setMessages([
           {
             id: 'resume',

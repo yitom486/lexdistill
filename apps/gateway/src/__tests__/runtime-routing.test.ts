@@ -28,9 +28,9 @@ describe('listAgentRuntimes', () => {
   it('能力开关：codex 全开，其余关闭（无硬编码特例，统一走开关）', () => {
     const runtimes = listAgentRuntimes();
     expect(runtimes.find(entry => entry.id === 'codex-acp')?.capabilities)
-      .toEqual({ supportsModelPicker: true, supportsEffort: true });
+      .toEqual({ supportsModelPicker: true, supportsEffort: true, supportsThreads: true, supportsUsage: true });
     for (const entry of runtimes.filter(item => item.id !== 'codex-acp')) {
-      expect(entry.capabilities).toEqual({ supportsModelPicker: false, supportsEffort: false });
+      expect(entry.capabilities).toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false });
     }
   });
 });

@@ -286,8 +286,9 @@ export function ChatComposer(props: ChatComposerProps) {
         </div>
       </div>
       <p className="mt-1.5 px-1 text-[10px] text-ink-ghost">
-        ~/.codex · queue/changed · compact · rateLimits
-        {agentStatus?.message ? ` · ${agentStatus.message}` : ''}
+        {runtimeCaps.supportsThreads
+          ? <>~/.codex · queue/changed · compact · rateLimits{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>
+          : <>当前运行时：历史/队列/用量面板不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>}
       </p>
     </footer>
   );
