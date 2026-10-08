@@ -120,6 +120,17 @@ describe('POST /api/vocabulary/:userId/daily-pick', () => {
       }
       expect((await post({ lang: 'ja', count: 0, order: 'sequential', bankId: 'ja-n5-core' })).status).toBe(400);
       expect((await post({ lang: 'ja', count: 2, order: 'sequential', bankId: 'nope' })).status).toBe(400);
+      const greet = await post({ lang: 'ja', count: 10, order: 'sequential', bankId: 'ja-n5-core', courseUnitId: 'ja-u-greet' });
+      expect(greet.status).toBe(200);
+      const greetingWords = DailyPickResponseSchema.parse(await greet.json()).words;
+      expect(greetingWords.map(w => w.entryId)).toEqual(['starter_ja_ohayou', 'n5_ja_arigatou', 'n5_ja_sumimasen', 'n5_ja_onegaishimasu']);
+      const first20 = await post({ lang: 'ja', count: 50, order: 'random', bankId: 'ja-n5-core', courseUnitId: 'ja-u-words1' });
+      const wordlist = await repo.listWordlists('u', 'ja');
+      if (!wordlist.ok) throw wordlist.error;
+      const allowedIds = wordlist.value.find(g => g.id === 'ja-n5-core')!.words.map(w => w.entryId).sort().slice(0, 20);
+      expect(DailyPickResponseSchema.parse(await first20.json()).words.map(w => w.entryId).sort()).toEqual(allowedIds);
+      expect((await post({ lang: 'ja', count: 2, order: 'sequential', bankId: 'ja-n5-core', courseUnitId: 'en-u-starter' })).status).toBe(400);
+      expect((await post({ lang: 'ja', count: 2, order: 'sequential', bankId: 'ja-n5-core', courseUnitId: 'ja-u-vowels' })).status).toBe(400);
     } finally {
       repo.getRawDb().close();
     }

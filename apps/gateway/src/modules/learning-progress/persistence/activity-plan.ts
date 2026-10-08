@@ -13,6 +13,7 @@ import type {
   DailyTaskProgress,
   DailyStudyPlan,
   DailyPlanStepTemplate,
+  CourseRouteSnapshot,
 } from '@study-studio/learner-core';
 import {
   buildDailyPlanStepTemplates,
@@ -21,6 +22,7 @@ import {
   summarizeDailyStudyPlan,
   appendPracticePlanStep,
   PRACTICE_PLAN_STEP_ID,
+  courseUnitPlanStep,
 } from '@study-studio/learner-core';
 import { parsePracticeBlockSpecs } from '@study-studio/learning';
 import {
@@ -29,6 +31,8 @@ import {
   dailyStudyPlans,
   practicePlanRuns,
   practiceItemAttempts,
+  quizAttempts,
+  skillMetrics,
 } from '@study-studio/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import type { TrackLanguage } from '@study-studio/shared';
@@ -451,10 +455,16 @@ export async function completeDailyPlanStep(
     const planRes = await hydrateDailyStudyPlan(deps, userId, date, langOverride);
     if (!isOk(planRes)) return planRes;
     const plan = planRes.value;
-    if (!plan.steps.some((step) => step.id === stepId)) {
+    const step = plan.steps.find((step) => step.id === stepId);
+    if (!step) {
       return err(
         new BusinessError('E_INVALID_INPUT', '当日计划中没有这一步，请刷新后重试。', 'VALIDATION')
       );
+    }
+    if (step.courseUnitId) {
+      return step.done ? ok(plan) : err(new BusinessError(
+        'E_INVALID_INPUT', '请完成该单元的学习与练习，系统会根据真实记录更新进度。', 'VALIDATION'
+      ));
     }
 
     const rows = await deps.db
@@ -588,29 +598,19 @@ export async function hydrateDailyStudyPlan(
     textbookFocus = undefined;
   }
   // 课程路线：取前 3 个可学单元置顶为计划步（长期路线不随每日重置；
-  // 路由失败/无可用单元时回退纯通用计划，不挡主路径）。
+  // 路线读取失败需显式报错，避免把缺失的单元证据当成通用进度）。
   let unitSteps: DailyPlanStepTemplate[] | undefined;
-  try {
-    const routeRes = await deps.repo.getCourseRoute?.(userId, language);
+  let courseRoute: CourseRouteSnapshot | undefined;
+  if (deps.repo.getCourseRoute) {
+    const routeRes = await deps.repo.getCourseRoute(userId, language);
+    if (routeRes && !isOk(routeRes)) return routeRes;
     if (routeRes && isOk(routeRes)) {
+      courseRoute = routeRes.value;
       const avail = routeRes.value.units.filter((u) => u.status === 'available').slice(0, 3);
       if (avail.length > 0) {
-        unitSteps = avail.map((u) => ({
-          id: `step_unit_${u.unit.id}`,
-          kind: u.unit.activity.planKind,
-          title: u.unit.title,
-          summary: `${u.unit.summary}（进度 ${u.progress}）`,
-          navigateTo: u.unit.activity.navigateTo,
-          ...(u.unit.activity.skillId ? { skillId: u.unit.activity.skillId } : {}),
-          ...(u.unit.activity.skillName ? { skillName: u.unit.activity.skillName } : {}),
-          ...(typeof u.unit.activity.targetCount === 'number'
-            ? { targetCount: u.unit.activity.targetCount }
-            : {}),
-        }));
+        unitSteps = avail.map((u) => courseUnitPlanStep(u.unit));
       }
     }
-  } catch {
-    unitSteps = undefined;
   }
   const signals = {
     track: language,
@@ -695,15 +695,42 @@ export async function hydrateDailyStudyPlan(
     }
   }
 
+  // 旧当日模板保留顺序，补齐定位信息并删除冻结在文案里的过时进度。
+  templates = templates.map((step) => {
+    const unitId = step.courseUnitId ?? (step.id.startsWith('step_unit_') ? step.id.slice('step_unit_'.length) : undefined);
+    const item = courseRoute?.units.find((u) => u.unit.id === unitId);
+    return item ? { ...courseUnitPlanStep(item.unit), id: step.id } : step;
+  });
+
+  const [activityRows, skillAttempts, alphabetSkills] = await Promise.all([
+    deps.db.select({ kanaCount: studyActivityLogs.kanaCount, hangulCount: studyActivityLogs.hangulCount })
+      .from(studyActivityLogs).where(and(eq(studyActivityLogs.userId, userId), eq(studyActivityLogs.language, language), eq(studyActivityLogs.activityDate, targetDate))),
+    deps.db.select({ skillId: quizAttempts.testedSkillId }).from(quizAttempts)
+      .where(and(eq(quizAttempts.userId, userId), eq(quizAttempts.language, language), like(quizAttempts.createdAt, `${targetDate}%`))),
+    deps.db.select({ skillId: skillMetrics.skillId }).from(skillMetrics)
+      .where(and(eq(skillMetrics.userId, userId), eq(skillMetrics.language, language), like(skillMetrics.lastPracticedAt, `${targetDate}%`))),
+  ]);
+  const skillQuizzes: Record<string, number> = {};
+  for (const attempt of skillAttempts) skillQuizzes[attempt.skillId] = (skillQuizzes[attempt.skillId] ?? 0) + 1;
+  // 字母薄弱项每日目标为一次；只采纳对应字母技能当天真实练习记录。
+  for (const skill of alphabetSkills) {
+    if (skill.skillId.startsWith('jp.kana.') || skill.skillId.startsWith('ko.hangul.')) skillQuizzes[skill.skillId] = Math.max(1, skillQuizzes[skill.skillId] ?? 0);
+  }
+
   return ok(
     summarizeDailyStudyPlan(planId, userId, language, targetDate, createdAt, templates, {
       quizzesCount: progressRes.value.quizzesCount,
+      alphabetCount: language === 'ko' ? activityRows[0]?.hangulCount ?? 0 : activityRows[0]?.kanaCount ?? 0,
+      skillQuizzes,
       cardsReviewedCount: progressRes.value.cardsReviewedCount,
       readingCount: progressRes.value.readingCount,
       mistakesResolvedCount: progressRes.value.mistakesResolvedCount,
       unresolvedMistakesCount: mistakesRes.value.length,
       completedStepIds,
       practicePlan: practiceSignal,
+      courseUnits: Object.fromEntries((courseRoute?.units ?? []).map((item) => [
+        item.unit.id, { done: item.status === 'mastered', progressText: item.progress },
+      ])),
     })
   );
 }

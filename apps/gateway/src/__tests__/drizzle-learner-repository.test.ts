@@ -425,15 +425,17 @@ describe('DrizzleLearnerRepository', () => {
     const afterCards = await repo.getOrCreateDailyStudyPlan(userId, '2026-09-05');
     expect(isOk(afterCards)).toBe(true);
     if (!isOk(afterCards)) return;
-    // 单元步目标 3 张：1 张后计数推进但未完成（overlay live 生效）
+    // 不相关的复习总数不能推进指定词汇单元。
     const unitStep = afterCards.value.steps.find((s) => s.id === 'step_unit_en-u-starter');
-    expect(unitStep?.currentCount).toBe(1);
+    expect(unitStep?.progressText).toBe('0/10');
     expect(unitStep?.done).toBe(false);
     await repo.recordDailyActivity(userId, { cards: 2, date: '2026-09-05' });
     const afterMore = await repo.getOrCreateDailyStudyPlan(userId, '2026-09-05');
     expect(isOk(afterMore)).toBe(true);
     if (!isOk(afterMore)) return;
-    expect(afterMore.value.steps.find((s) => s.id === 'step_unit_en-u-starter')?.done).toBe(true);
+    expect(afterMore.value.steps.find((s) => s.id === 'step_unit_en-u-starter')?.done).toBe(false);
+    const manualUnit = await repo.completeDailyPlanStep(userId, 'step_unit_en-u-starter', '2026-09-05');
+    expect(isOk(manualUnit)).toBe(false);
 
     const marked = await repo.completeDailyPlanStep(userId, 'step_quiz', '2026-09-05');
     expect(isOk(marked)).toBe(true);

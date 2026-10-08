@@ -26,6 +26,44 @@ describe('course route', () => {
     expect(byId.get('ja-u-kasa')?.status).toBe('locked');
   });
 
+  it('daily plan restores old unit templates and uses matching mastery evidence', async () => {
+    const date = '2026-10-07';
+    const first = await repo.getOrCreateDailyStudyPlan(userId, date, 'ja');
+    if (!first.ok) throw first.error;
+    const old = first.value.steps.map(s => {
+      const { courseUnitId, ...rest } = s;
+      return { ...rest, summary: '旧冻结进度 0/5' };
+    });
+    repo.getRawDb().query('UPDATE daily_study_plans SET steps_json = ? WHERE id = ?').run(JSON.stringify(old), first.value.id);
+    await repo.recordDailyActivity(userId, { quizzes: 50, date, language: 'ja' });
+    let plan = await repo.getOrCreateDailyStudyPlan(userId, date, 'ja');
+    if (!plan.ok) throw plan.error;
+    const vowelStep = plan.value.steps.find(s => s.id === 'step_unit_ja-u-vowels')!;
+    expect(vowelStep.courseUnitId).toBe('ja-u-vowels');
+    expect(vowelStep.progressText).toBe('0/5');
+    expect(vowelStep.done).toBe(false);
+    expect(vowelStep.summary).not.toContain('旧冻结');
+    for (const kanaId of ['kana_a', 'kana_i', 'kana_u', 'kana_e', 'kana_o']) {
+      await repo.recordKanaPractice(userId, kanaId, true, 'HIRAGANA');
+      await repo.recordKanaPractice(userId, kanaId, true, 'HIRAGANA');
+    }
+    plan = await repo.getOrCreateDailyStudyPlan(userId, date, 'ja');
+    if (!plan.ok) throw plan.error;
+    expect(plan.value.steps.map(s => s.id)).toEqual(first.value.steps.map(s => s.id));
+    expect(plan.value.steps.find(s => s.id === vowelStep.id)?.done).toBe(true);
+    expect(plan.value.steps.find(s => s.id === vowelStep.id)?.progressText).toMatch(/^已(达标|掌握)$/);
+  });
+
+  it('adaptive kana queue stays inside the requested course unit', async () => {
+    const ids = ['kana_ga', 'kana_gi', 'kana_gu', 'kana_ge', 'kana_go'];
+    const queue = await repo.getAdaptiveKanaQueue(userId, { kanaIds: ids, types: ['DAKUON', 'HANDAKUON'], limit: 0 });
+    if (!queue.ok) throw queue.error;
+    expect(queue.value.map(k => k.id).sort()).toEqual([...ids].sort());
+    const empty = await repo.getAdaptiveKanaQueue(userId, { kanaIds: ['unknown'], limit: 10 });
+    if (!empty.ok) throw empty.error;
+    expect(empty.value).toEqual([]);
+  });
+
   it('假名覆盖要“干净且练过两次”：5 元音达标 → 掌握写档，K 行放行', async () => {
     for (const k of ['kana_a', 'kana_i', 'kana_u', 'kana_e', 'kana_o']) {
       // 答对 1 次不够（reps=1）：仍 available

@@ -6,6 +6,8 @@ import {
   unlockedJlptMax,
   type LearnerLevel,
   type VocabMastery,
+  unitsForTrack,
+  selectCourseWords,
 } from '@study-studio/learner-core';
 import type { DailyPickOrder, DailyPickResponse, JlptLevel } from '@study-studio/protocol';
 import { bankJlptLevel, type WordlistGroup } from '@study-studio/storage-sqlite';
@@ -20,6 +22,7 @@ export interface DailyPickInput {
   count: number;
   order: DailyPickOrder;
   bankId: string;
+  courseUnitId?: string | undefined;
 }
 
 export interface DailyPickLockedInfo {
@@ -76,7 +79,12 @@ export async function pickDailyWords(
   if (!profile.ok) return err(profile.error);
   const groups = await deps.listWordlists(userId, language);
   if (!groups.ok) return err(groups.error);
-  const group = groups.value.find(entry => entry.id === input.bankId);
+  const unit = input.courseUnitId ? unitsForTrack(language as 'ja' | 'en' | 'ko').find(u => u.id === input.courseUnitId) : undefined;
+  if (input.courseUnitId && unit?.evidence.type !== 'words-studied') {
+    return err(new BusinessError('E_INVALID_INPUT', '请选择当前语种的词汇单元', 'VALIDATION'));
+  }
+  const rule = unit?.evidence.type === 'words-studied' ? unit.evidence : undefined;
+  const group = groups.value.find(entry => entry.id === (rule?.group ?? input.bankId));
   if (!group) return err(new BusinessError('E_INVALID_INPUT', '请选择有效的词库', 'VALIDATION'));
   const stats = await deps.getVocabularyMasteryByJlpt(userId, language);
   if (!stats.ok) return err(stats.error);
@@ -88,10 +96,11 @@ export async function pickDailyWords(
   const bankLevel = rawBankLevel !== null && jlptIndex(rawBankLevel) >= 0 ? (rawBankLevel as VocabMastery['jlpt']) : null;
   const level = profile.value.learnerLevel;
   const userFilter = profile.value.wordLevelFilter;
-  // 逐词等级：词自带有效 jlpt 优先，缺失/非法回落整库等级（混级库不再整库误杀或漏放）。
+  // 逐词等级：词自带有效 jlpt 优先；回落整库等级仅当词来自所请词库（课程跨库取词回落 null=未知放行，来源库锁定已在上游整库预检）。
+  const fromRequestedBank = !rule?.entryIds;
   const wordLevel = (word: { jlpt?: string | undefined }): VocabMastery['jlpt'] | null => {
     if (word.jlpt && jlptIndex(word.jlpt) >= 0) return word.jlpt as VocabMastery['jlpt'];
-    return bankLevel;
+    return fromRequestedBank ? bankLevel : null;
   };
   const gateOpen = bankLevel === null || isVocabularyAllowed(bankLevel, level, mastery);
   if (bankLevel !== null && !gateOpen) {
@@ -104,8 +113,26 @@ export async function pickDailyWords(
       locked: { requiredJlpt: bankLevel, requiredMastery: MASTERY_UNLOCK_RATIO, currentMastery: current },
     });
   }
-  const pool0 = group.words.filter(word => !word.studied);
-  const base = pool0.length > 0 ? pool0 : group.words;
+  let scopedWords = group.words;
+  if (rule?.entryIds) {
+    // 指定词汇可跨入门词库；每个来源仍服从同一词汇门和用户过滤。
+    const selectedGroups = groups.value.filter(g => g.words.some(w => rule.entryIds!.includes(w.entryId)));
+    for (const source of selectedGroups) {
+      const level = bankJlptLevel(source.id);
+      if (level && jlptIndex(level) >= 0 && !isVocabularyAllowed(level as VocabMastery['jlpt'], profile.value.learnerLevel, mastery)) {
+        return err(new BusinessError('E_BANK_LOCKED', '单元词汇所属词库尚未解锁，请先完成基础学习。', 'VALIDATION'));
+      }
+    }
+    const allowedGroups = selectedGroups.filter(g => {
+      const level = bankJlptLevel(g.id);
+      return !level || !userFilter || userFilter.includes(level);
+    });
+    scopedWords = selectCourseWords(unit!, allowedGroups);
+  } else if (unit) {
+    scopedWords = selectCourseWords(unit, groups.value);
+  }
+  const pool0 = scopedWords.filter(word => !word.studied);
+  const base = pool0.length > 0 ? pool0 : scopedWords;
   const kept = base.filter(word => {
     const wl = wordLevel(word);
     return wl === null || userFilter === null || userFilter.includes(wl);
