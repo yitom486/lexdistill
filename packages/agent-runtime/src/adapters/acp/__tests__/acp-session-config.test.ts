@@ -99,8 +99,11 @@ describe('AcpAdapter 建会话 configId 发现＋偏好降级', () => {
     );
     const res = await adapter.createSession({ ...SESSION_OPTS });
     expect(res.ok).toBe(true);
-    // 仅一次模型改写调用，无独立 effort 设置
-    expect(handle.calls).toEqual([{ id: 'model', value: 'm[reasoning_effort=high]' }]);
+    // 模型先行（刷新级联表），再以变体 id 改写（档位编码进模型设置）
+    expect(handle.calls).toEqual([
+      { id: 'model', value: 'm-x' },
+      { id: 'model', value: 'm[reasoning_effort=high]' },
+    ]);
     if (res.ok) {
       expect((res.value as AcpAgentSession).drainSetupWarnings()).toEqual([]);
     }
@@ -121,6 +124,50 @@ describe('AcpAdapter 建会话 configId 发现＋偏好降级', () => {
       const warnings = (res.value as AcpAgentSession).drainSetupWarnings();
       expect(warnings.length).toBe(1);
       expect(warnings[0]).toContain('high');
+    }
+    await adapter.shutdown('test');
+  });
+
+  it('级联刷新：模型设置回执带出 effort 表，档位随新表直设（OpenCode 案）', async () => {
+    const refreshed = [
+      { configId: 'model', category: 'model', currentValue: 'm-spark', options: [{ value: 'm-spark' }] },
+      { configId: 'effort', category: 'thought_level', options: [{ value: 'minimal' }, { value: 'xhigh' }] },
+    ];
+    const base = trackHandle([{ configId: 'model', category: 'model', options: [{ value: 'm-spark' }] }]);
+    const cascadeCalls = base.calls;
+    const originalSet = base.setConfigOption;
+    const handle: AcpSessionHandleLike = {
+      ...base,
+      setConfigOption: async (id: string, value: string | boolean) => {
+        const res = await originalSet(id, value);
+        if (id === 'model' && res.ok) {
+          return { ok: true as const, value: { configOptions: refreshed } };
+        }
+        return res;
+      },
+    };
+    const adapter = makeAdapter(
+      handle,
+      (configOptions) => {
+        const table = Array.isArray((configOptions as { configOptions?: unknown })?.configOptions)
+          ? (configOptions as { configOptions?: unknown }).configOptions
+          : configOptions;
+        const list = table as Array<{ configId?: string; category?: string }>;
+        const effort = Array.isArray(list)
+          ? list.find(item => item?.configId === 'effort' || item?.category === 'thought_level')
+          : undefined;
+        return { model: 'model', effort: effort ? 'effort' : null };
+      },
+    );
+    const res = await adapter.createSession({ sessionId: 's1', userId: 'u1', model: 'm-spark', effort: 'xhigh' });
+    expect(res.ok).toBe(true);
+    // 模型先行，档位按刷新后表的 effort id 直设
+    expect(cascadeCalls).toEqual([
+      { id: 'model', value: 'm-spark' },
+      { id: 'effort', value: 'xhigh' },
+    ]);
+    if (res.ok) {
+      expect((res.value as AcpAgentSession).drainSetupWarnings()).toEqual([]);
     }
     await adapter.shutdown('test');
   });

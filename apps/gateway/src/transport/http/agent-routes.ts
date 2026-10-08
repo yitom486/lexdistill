@@ -189,12 +189,14 @@ export function createAgentRoutes(deps: GatewayDeps) {
   .get('/api/agent/runtimes/:id/options', async (c) => {
     // 运行时真实选项（模型/思考深度列表，10 分钟缓存；无凭证如实空＋error）。
     // codex-acp 同样走 ACP 会话读表（与 setConfigOption 同一 id 口径，不再猜）。
+    // ?model= 按模型级联：部分 Agent 切模型后才动态下发 effort，探针先设再读。
     const id = c.req.param('id');
     if (!id) {
       return formatBusinessErrorResponse(c,
         new BusinessError('E_INVALID_INPUT', '缺少运行时 id', 'VALIDATION'), 'AGENT_RUNTIME_OPTIONS');
     }
-    return c.json(await deps.server.acpAdapterPool.getRuntimeOptions(id));
+    const model = c.req.query('model') || undefined;
+    return c.json(await deps.server.acpAdapterPool.getRuntimeOptions(id, model ? { model } : undefined));
   })
   .get('/api/agent/provider', async (c) => {
     // 自定义供应商状态（脱敏：Key 永不回传）。

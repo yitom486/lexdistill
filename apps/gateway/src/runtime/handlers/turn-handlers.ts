@@ -250,7 +250,11 @@ export async function handleTurnSend(
         let dropModel = false;
         let dropEffort = false;
         if (wantedAdapter === 'acp' && (preferredModel || preferredEffort)) {
-          const proven = await server.acpAdapterPool.getRuntimeOptions(requestedRuntimeId ?? 'codex-acp');
+          // 按模型级联验证：档位表随模型变，用目标模型的档位表证伪才准确。
+          const proven = await server.acpAdapterPool.getRuntimeOptions(
+            requestedRuntimeId ?? 'codex-acp',
+            preferredModel ? { model: preferredModel } : undefined,
+          );
           if (preferredModel && proven.models.length > 0
             && !proven.models.some(item => item.value === preferredModel)) {
             toolWarnings.push(`模型 ${preferredModel} 在当前运行时不可用，已改用运行时默认模型`);

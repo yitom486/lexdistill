@@ -108,8 +108,8 @@ export class AcpAdapterPool {
    * 独立轻量探针客户端，用完即断，不占用池内温进程。
    * custom 没有独立模板：经 codex-acp＋自定义 env 探针（与会话同链路），未配置直接回 error 不 spawn。
    */
-  public getRuntimeOptions(runtimeId: string): Promise<AgentRuntimeOptions> {
-    if (runtimeId === 'custom') return this.getCustomRuntimeOptions();
+  public getRuntimeOptions(runtimeId: string, opts?: { model?: string }): Promise<AgentRuntimeOptions> {
+    if (runtimeId === 'custom') return this.getCustomRuntimeOptions(opts?.model);
     return getAgentRuntimeOptions(runtimeId, {
       createClient: (id) => new AcpClient({
         runtime: id,
@@ -117,10 +117,10 @@ export class AcpAdapterPool {
         clientInfo: { name: 'lingua-studio-gateway-probe', version: '1.0.0' },
         callbacks: {},
       }),
-    });
+    }, opts?.model ? { model: opts.model } : undefined);
   }
 
-  private async getCustomRuntimeOptions(): Promise<AgentRuntimeOptions> {
+  private async getCustomRuntimeOptions(model?: string): Promise<AgentRuntimeOptions> {
     if (!acpClientHonorsCustomEnv(installedAcpClientVersion())) {
       return {
         models: [],
@@ -151,7 +151,7 @@ export class AcpAdapterPool {
         env,
         callbacks: {},
       }),
-    });
+    }, model ? { model } : undefined);
   }
 
   private baseOptions(

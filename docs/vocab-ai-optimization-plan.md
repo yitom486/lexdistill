@@ -54,6 +54,7 @@
 - 前端 UI 对齐已合入：新增 `supportsHistory`（ACP 全运行时历史/队列走台账；用量仍 Codex 专属），历史面板/查询/开机恢复按 `threads||history` 开门，脚注改写为“历史/队列走网关台账 · 用量面板不可用”，下拉显示探针命中的真实选择名（探针失败标题带错）；34/0＋typecheck 零错。
 - configId 发现＋偏好降级已合入：各 Agent 选项 id 不一（OpenCode 无 `reasoning_effort`，旧代码硬编码致整轮失败回本地）。适配器经注入式 `describeConfigIds` 用会话真表发现 id（解析归网关 SDK，适配器零 SDK 依赖），无选项则跳过、有错则警告走默认（toast 明示，回合照常）；51/0＋7/0＋typecheck 零错。
 - 思考档发现规则移植已合入（网关 `model-thinking`，SDK 零改动零发版）：独立选项 rank2 规则（thought|reason|effort＋thought_level）→直设；方括号变体（同 base listed≥2）→模型 id 改写；两者皆无→不可设如下游一致不发明。探针变体档标 `effortsVariant`（发前不误杀，建会话 live 解析）；opencode 现状（model＋mode 无变体）如实空；77/0＋typecheck 零错。
+- 动态级联已合入（实测破案：OpenCode `session/new` 仅 model＋mode，切模型后回执动态追加 `effort`；SDK 回执本就带全量表，网关此前直接丢弃）。建会话模型设置成功即读刷新表再发现档位 id；探针 `?model=` 先设再读（缓存键带模型）；发前验证用目标模型档位表；前端 model 变化重拉档位。实机铁证：Muse Spark→minimal/low/medium/high/xhigh/default，GPT-6 Luna→none/low/medium/high/xhigh/max/default，与 ACP Studio 截图逐项一致，零硬编码。
 - acp-client 对接收尾（本轮）：SDK 侧 `env` 透传＋图片 prompt 块已提交待发版（`cb14b00`，0.1.1，未 push）；网关侧 custom 探针改走 codex-acp＋自定义 env（与会话同链路，未配置不 spawn）＋旧 SDK（0.1.0）fail-fast（`E_ACP_CLIENT_OUTDATED` 可读错，不静默鉴权失败）；16/0＋typecheck 零错。
 - codex-acp 已翻转（spike 带 luna＋medium 建会话＋两轮工具＋resume 全绿）：已知残留差异——中断/steer 明确拒绝、collaborationMode 暂忽略、旧 codex thread 续接首轮失忆（均有声失败或注释）。
 - 能力开关已合入：模型/思考深度控件由后端 capabilities 驱动禁用（codex 全开保 luna，其余用 Agent 默认；零按 id 特例），`useSelectedRuntimeCaps` fail-open。

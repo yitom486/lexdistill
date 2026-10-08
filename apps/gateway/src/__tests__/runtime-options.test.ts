@@ -79,6 +79,39 @@ describe('getAgentRuntimeOptions 方言委托', () => {
     expect(result.efforts).toEqual(['low', 'high']);
     expect(result.effortsVariant).toBe(true);
   });
+
+  it('按模型级联：设模型后读刷新表（OpenCode effort 案）', async () => {
+    clearRuntimeOptionsCacheForTest();
+    const initial = [
+      { configId: 'model', category: 'model', currentValue: 'base-a', options: [{ value: 'base-a' }, { value: 'base-b' }] },
+    ];
+    const refreshed = [
+      { configId: 'model', category: 'model', currentValue: 'base-b', options: [{ value: 'base-a' }, { value: 'base-b' }] },
+      { configId: 'effort', category: 'thought_level', options: [{ value: 'xhigh' }, { value: 'low' }] },
+    ];
+    const seen: Array<{ id: string; value: string }> = [];
+    const cascading = {
+      connect: async () => ({ ok: true as const, value: { status: 'connected', init: {} } }),
+      createSession: async () => ({
+        ok: true as const,
+        value: {
+          sessionId: 'probe',
+          configOptions: initial,
+          setConfigOption: async (id: string, value: string) => {
+            seen.push({ id, value });
+            return { ok: true as const, value: { configOptions: refreshed } };
+          },
+        },
+      }),
+      disconnect: async () => undefined,
+    } as unknown as AcpClient;
+    const result = await getAgentRuntimeOptions('cascade-a', { createClient: () => cascading }, { model: 'base-b' });
+    // 模型用初始表 id 设置，档位读刷新表
+    expect(seen).toEqual([{ id: 'model', value: 'base-b' }]);
+    expect(result.models.map(m => m.value)).toEqual(['base-a', 'base-b']);
+    expect(result.efforts).toEqual(['xhigh', 'low']);
+    expect(result.error).toBeUndefined();
+  });
 });
 
 describe('acpClientHonorsCustomEnv', () => {  it('0.1.0 忽略 env→false；0.1.1 起→true；未知/非法版本不拦', () => {

@@ -38,8 +38,13 @@ export async function getAgentRuntimeOptions(
     createClient: (runtimeId: string) => AcpClient;
     disconnectClient?: ((client: AcpClient) => Promise<void>) | undefined;
   },
+  opts?: { model?: string },
 ): Promise<AgentRuntimeOptions> {
-  const cached = cache.get(runtimeId);
+  // 档位是按模型的：opencode 类 Agent 在切模型后才动态下发 effort（级联），
+  // 故缓存键带模型，探针按需先设模型再读刷新表（如下游 ACP Studio 同款）。
+  const wantedModel = opts?.model?.trim() || '';
+  const cacheKey = wantedModel ? `${runtimeId}\n${wantedModel}` : runtimeId;
+  const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
   let value: AgentRuntimeOptions;
   let client: AcpClient | null = null;
@@ -49,14 +54,23 @@ export async function getAgentRuntimeOptions(
     if (!connected.ok) throw new Error(connected.error.message);
     const opened = await client.createSession({ mcpServers: [] });
     if (!opened.ok) throw new Error(opened.error.message);
-    const parsed = parseAcpConfigOptions(opened.value.configOptions);
-    const modelEntry = findModelConfigOption(parsed);
-    const thinking = discoverThinking(parsed, modelEntry);
-    const models = (modelEntry?.options ?? [])
+    let liveConfigOptions: unknown = opened.value.configOptions;
+    const parsed0 = parseAcpConfigOptions(liveConfigOptions);
+    const modelEntry0 = findModelConfigOption(parsed0);
+    const models = (modelEntry0?.options ?? [])
       .map(option => ({
         value: option.value,
         label: option.name || option.value,
       }));
+    if (wantedModel) {
+      const setRes = await opened.value.setConfigOption(modelEntry0?.configId ?? 'model', wantedModel);
+      if (!setRes.ok) throw new Error(`模型 ${wantedModel} 设置失败：${setRes.error.message}`);
+      const refreshed = (setRes.value as { configOptions?: unknown } | null)?.configOptions;
+      if (refreshed !== undefined) liveConfigOptions = refreshed;
+    }
+    const parsed = parseAcpConfigOptions(liveConfigOptions);
+    const modelEntry = findModelConfigOption(parsed);
+    const thinking = discoverThinking(parsed, modelEntry);
     const efforts = thinking.efforts;
     value = { models, efforts, ...(thinking.variant ? { effortsVariant: true } : {}) };
   } catch (error) {
@@ -67,7 +81,7 @@ export async function getAgentRuntimeOptions(
       else await client.disconnect('runtime options probed').catch(() => undefined);
     }
   }
-  cache.set(runtimeId, { at: Date.now(), value });
+  cache.set(cacheKey, { at: Date.now(), value });
   return value;
 }
 

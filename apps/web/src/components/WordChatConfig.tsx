@@ -27,6 +27,7 @@ export function WordChatConfig() {
   const runtimeOptions = useAgentRuntimeOptionsQuery(
     agentRuntimeId || 'codex-acp',
     open && !!agentRuntimeId,
+    coachModelId || undefined,
   );
   const modelChoices = runtimeCaps.supportsModelPicker
     ? models.map(m => ({ value: m.id || m.model, label: m.displayName || m.model }))

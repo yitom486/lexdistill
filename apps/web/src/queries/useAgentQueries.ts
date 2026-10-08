@@ -426,13 +426,15 @@ export interface AgentRuntimeOptionsDto {
   error?: string;
 }
 
-/** 运行时真实选项（模型/思考深度；codex 主链路不用，前端按 caps 决定是否拉取）。 */
-export function useAgentRuntimeOptionsQuery(runtimeId: string, enabled = true) {
+/** 运行时真实选项（模型/思考深度；按模型级联：档位表随模型变，model 变化即重拉）。 */
+export function useAgentRuntimeOptionsQuery(runtimeId: string, enabled = true, model?: string) {
+  const scopedModel = model?.trim() || '';
   return useQuery<AgentRuntimeOptionsDto>({
-    queryKey: [...AGENT_QUERY_KEYS.MCP_SERVERS, 'runtime-options', runtimeId] as const,
+    queryKey: [...AGENT_QUERY_KEYS.MCP_SERVERS, 'runtime-options', runtimeId, scopedModel] as const,
     enabled: enabled && !!runtimeId,
     queryFn: async () => {
-      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/runtimes/${encodeURIComponent(runtimeId)}/options`);
+      const url = `${GATEWAY_BASE_URL}/api/agent/runtimes/${encodeURIComponent(runtimeId)}/options${scopedModel ? `?model=${encodeURIComponent(scopedModel)}` : ''}`;
+      const res = await fetch(url);
       if (!res.ok) return { models: [], efforts: [] };
       const data = (await res.json()) as Partial<AgentRuntimeOptionsDto>;
       return {
