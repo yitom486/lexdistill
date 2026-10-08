@@ -24,6 +24,7 @@ interface DailyStudySetupProps {
   onStart: () => void;
   isLoading: boolean;
   lockMessage?: string | null | undefined;
+  unitWordCount?: number | undefined;
 }
 
 export function DailyStudySetup({
@@ -37,6 +38,7 @@ export function DailyStudySetup({
   onStart,
   isLoading,
   lockMessage,
+  unitWordCount,
 }: DailyStudySetupProps) {
   const activeSource = sources.find((s) => s.id === selectedSourceId) || sources[0];
 
@@ -53,7 +55,7 @@ export function DailyStudySetup({
           </Badge>
         </div>
         <p className="text-xs text-ink-ghost leading-relaxed">
-          每日抽取 10–20 个词，结合多角色真实对话、避坑指南与互动小测深度理解，学透后直接纳入 FSRS 科学记忆曲线。
+          {unitWordCount !== undefined ? '按当前路线单元学习指定词汇，完成学习后继续进行闪卡复习。' : '每日抽取 10–20 个词，结合多角色真实对话、避坑指南与互动小测深度理解，学习后纳入 FSRS 科学记忆曲线。'}
         </p>
       </header>
 
@@ -101,7 +103,7 @@ export function DailyStudySetup({
       </div>
 
       {/* 学习参数配置 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-line pt-4">
+      {unitWordCount === undefined && <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-line pt-4">
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-ink">抽取数量</label>
           <div className="flex gap-2">
@@ -144,6 +146,7 @@ export function DailyStudySetup({
         </div>
       </div>
 
+      }
       {/* 启动按钮 */}
       <div className="pt-2 space-y-3">
         <Button
@@ -156,7 +159,7 @@ export function DailyStudySetup({
             onStart();
           }}
         >
-          <span>🚀 开启今日 {batchSize} 词精学之旅</span>
+          <span>{unitWordCount !== undefined ? `开始学习本单元 ${unitWordCount} 词` : `🚀 开启今日 ${batchSize} 词精学之旅`}</span>
           <ArrowRight className="h-4 w-4" />
         </Button>
 

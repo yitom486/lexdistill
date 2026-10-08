@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import type { VocabularyEntry } from '@study-studio/protocol';
+import { unitsForTrack, selectCourseWords } from '@study-studio/learner-core';
+import { useUserProfileStore } from '../../stores/useUserProfileStore.js';
 import { useWordlistsQuery, type WordlistWord } from '../../queries/wordlists.js';
 import { useVocabularyQuery, useDailyPickMutation, BankLockedError } from '../../queries/vocabulary.js';
 import {
@@ -17,11 +19,14 @@ import { DailyStudyComplete } from './DailyStudyComplete.js';
 interface DailyWordStudyHubProps {
   language: string;
   onGoToReview: () => void;
+  courseUnitId?: string | undefined;
 }
 
-export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubProps) {
+export function DailyWordStudyHub({ language, onGoToReview, courseUnitId }: DailyWordStudyHubProps) {
+  const unit = unitsForTrack(language as 'ja' | 'en' | 'ko').find(u => u.id === courseUnitId);
+  const wordRule = unit?.evidence.type === 'words-studied' ? unit.evidence : undefined;
   const [mode, setMode] = useState<'setup' | 'studying' | 'complete'>('setup');
-  const [selectedSourceId, setSelectedSourceId] = useState<string>('ja-n5-core');
+  const [selectedSourceId, setSelectedSourceId] = useState<string>(wordRule?.group ?? 'ja-n5-core');
   const [batchSize, setBatchSize] = useState<10 | 20>(10);
   const [isRandom, setIsRandom] = useState(true);
   const [sessionWords, setSessionWords] = useState<WordlistWord[]>([]);
@@ -29,12 +34,13 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
   const [isProcessing, setIsProcessing] = useState(false);
   const [lockMessage, setLockMessage] = useState<string | null>(null);
 
-  const wordlistsQuery = useWordlistsQuery(DEFAULT_USER_ID, language);
+  const userId = useUserProfileStore(s => s.profile.userId) || DEFAULT_USER_ID;
+  const wordlistsQuery = useWordlistsQuery(userId, language);
   const vocabularyQuery = useVocabularyQuery(language);
   const cardsQuery = useCardsQuery();
   const collectMutation = useCollectDictionaryEntryMutation();
   const markStudiedMutation = useMarkCardStudiedMutation();
-  const dailyPickMutation = useDailyPickMutation(DEFAULT_USER_ID);
+  const dailyPickMutation = useDailyPickMutation(userId);
 
   const groups = wordlistsQuery.data ?? [];
 
@@ -55,6 +61,11 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
     if (sources.some((s) => s.id === selectedSourceId)) return selectedSourceId;
     return sources[0]?.id ?? '';
   }, [sources, selectedSourceId]);
+  const unitWords = unit ? selectCourseWords(unit, groups) : [];
+  const unitSources = unit ? [{ id: activeSourceId, title: unit.title,
+    subtitle: '学习本单元指定词汇；复习后按真实证据更新掌握进度。',
+    total: unitWords.length, studied: unitWords.filter(w => w.studied).length,
+    collected: unitWords.filter(w => w.collected).length }] : sources;
 
   // 抽取词汇并启动学习会话
   const handleStart = async () => {
@@ -70,9 +81,10 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
       const trackLang = (language === 'en' || language === 'ko' ? language : 'ja') as 'ja' | 'en' | 'ko';
       const result = await dailyPickMutation.mutateAsync({
         lang: trackLang,
-        count: batchSize,
-        order: isRandom ? 'random' : 'sequential',
+        count: wordRule?.entryIds?.length ?? batchSize,
+        order: courseUnitId ? 'sequential' : isRandom ? 'random' : 'sequential',
         bankId: activeSourceId,
+        ...(courseUnitId ? { courseUnitId } : {}),
       });
 
       if (!result.words || result.words.length === 0) {
@@ -131,19 +143,16 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
         cardId = result.card?.id;
       } else {
         // 若已收录，从卡片列表反查 cardId
-        const card = cardsQuery.data?.find(
-          (c) => c.frontWord === currentWord.headword || c.vocabularyId === currentWord.entryId
-        );
+        const card = cardsQuery.data?.find((c) => c.sourceEntryId === currentWord.entryId);
         cardId = card?.id;
       }
 
       // 标记为已学透
-      if (cardId) {
-        await markStudiedMutation.mutateAsync(cardId);
-      }
+      if (!cardId) throw new Error('未找到对应生词卡，请重新加载后重试。');
+      await markStudiedMutation.mutateAsync(cardId);
 
       sound.playCorrect();
-      toast.success(`「${currentWord.headword}」已学透并纳入 FSRS 科学复习`);
+      toast.success(`「${currentWord.headword}」已记录学习，请继续复习巩固`);
 
       if (currentIndex < sessionWords.length - 1) {
         setCurrentIndex((i) => i + 1);
@@ -158,7 +167,7 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
     }
   };
 
-  const activeSourceMeta = sources.find((s) => s.id === activeSourceId);
+  const activeSourceMeta = unitSources.find((s) => s.id === activeSourceId);
 
   if (mode === 'complete') {
     return (
@@ -199,7 +208,8 @@ export function DailyWordStudyHub({ language, onGoToReview }: DailyWordStudyHubP
 
   return (
     <DailyStudySetup
-      sources={sources}
+      sources={unitSources}
+      unitWordCount={unit ? Math.min(wordRule?.entryIds?.length ?? batchSize, unitWords.length) : undefined}
       selectedSourceId={activeSourceId}
       onSelectSource={(id) => {
         setSelectedSourceId(id);

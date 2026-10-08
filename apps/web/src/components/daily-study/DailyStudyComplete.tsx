@@ -30,11 +30,11 @@ export function DailyStudyComplete({
 
       <div className="space-y-2 max-w-md">
         <h3 className="text-xl font-bold font-serif text-ink tracking-tight">
-          🎉 今日 {count} 词精学圆满完成！
+          本组 {count} 词学习已结束
         </h3>
         <p className="text-xs text-ink-ghost leading-relaxed">
-          来自「{sourceTitle}」的本组生词已全部完成真实语境对话与随堂检测，并已成功收纳进生词本。
-          FSRS 算法已为您排定科学复习时间表。
+          来自「{sourceTitle}」。系统按已保存的学习和复习记录更新进度；浏览或跳过词汇不会计入单元掌握。
+          继续复习已加入生词本的词汇，巩固主动回忆。
         </p>
       </div>
 
