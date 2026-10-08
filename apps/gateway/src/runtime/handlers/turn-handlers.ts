@@ -340,6 +340,10 @@ export async function handleTurnSend(
               agentLane
             );
             agentSession = sessionRes.value;
+            // ACP 建会话偏好降级（模型/思考深度未生效）合并进本轮 toast，不静默。
+            if (sessionRes.value instanceof AcpAgentSession) {
+              toolWarnings.push(...sessionRes.value.drainSetupWarnings());
+            }
             // ACP 会话入台账（历史/队列的 id 索引；Codex 通路沿用 App Server，不动）。
             if (wantedAdapter === 'acp' && sessionRes.value.threadId) {
               server.acpLedger.recordSessionCreated({

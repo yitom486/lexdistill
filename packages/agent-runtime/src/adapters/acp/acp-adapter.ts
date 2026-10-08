@@ -22,6 +22,8 @@ import type { AgentInput } from '../../contracts/context.js';
 
 export interface AcpSessionHandleLike {
   readonly sessionId: string;
+  /** SDK 侧已合并顶层 models 方言的 configOptions（网关用它发现真实 configId）。 */
+  readonly configOptions?: unknown;
   prompt(text: string, options?: { timeoutMs?: number }): Promise<
     | { ok: true; value: unknown }
     | { ok: false; error: { code?: string; message: string } }
@@ -72,6 +74,14 @@ export interface AcpAdapterOptions {
   /** 由 spec 反查桥 token（网关侧维护映射；会话 close 即 revoke）。 */
   resolveMcpToken?: ((spec: unknown) => string | undefined) | undefined;
   revokeMcpServer?: ((token: string) => void) | undefined;
+  /**
+   * 从会话 configOptions 发现真实 configId（各 Agent 命名不一：reasoning_effort /
+   * reasoning-effort / effort……）。缺席时回落硬编码（model / reasoning_effort）。
+   * 注入式：解析归 SDK 消费者（网关），适配器保持对 SDK 包零依赖。
+   */
+  describeConfigIds?:
+    | ((configOptions: unknown) => { model: string | null; effort: string | null })
+    | undefined;
   /** 诊断透出（spike/test）；生产不接。 */
   debugUpdates?: ((params: Record<string, unknown>) => void) | undefined;
   debugLog?: ((level: string, message: string) => void) | undefined;
@@ -148,6 +158,7 @@ export class AcpAgentSession implements AgentSession {
   private readonly inflight = new Map<string, PendingApproval>();
   private readonly resolvedEvents: AgentEvent[] = [];
   private mcpTokens: string[] = [];
+  private readonly setupWarnings: string[] = [];
   private waiters: Array<() => void> = [];
   private promptDone = false;
   private readonly autoApprove: boolean;
@@ -168,6 +179,18 @@ export class AcpAgentSession implements AgentSession {
 
   public attachMcpTokens(tokens: string[]): void {
     this.mcpTokens = [...tokens];
+  }
+
+  /** 建会话时的偏好降级提醒（模型/思考深度未生效），调用方合并进 turn 回执 toast。 */
+  public drainSetupWarnings(): string[] {
+    return this.setupWarnings.splice(0);
+  }
+
+  /** @internal 适配器建会话时写入 */
+  public noteSetupWarnings(warnings: string[]): void {
+    for (const warning of warnings) {
+      if (warning) this.setupWarnings.push(warning);
+    }
   }
 
   public pushUpdate(params: Record<string, unknown>): void {
@@ -410,17 +433,28 @@ export class AcpAdapter implements AgentAdapter {
         return err(toBusinessError(opened.error.code ?? 'E_ACP_SESSION', `ACP 会话建立失败：${opened.error.message}`));
       }
       const handle = opened.value;
-      // 模型/思考深度直通（codex-acp 原生 select；失败即大声报错，不静默回退默认）。
+      // 模型/思考深度直通：configId 按会话真实表发现（各 Agent 命名不一），
+      // 偏好级失败只警告＋走 Agent 默认，不炸整轮（toast 明示，不静默）。
+      const setupWarnings: string[] = [];
+      const discovered = this.options.describeConfigIds?.(handle.configOptions);
+      const modelConfigId = discovered?.model || 'model';
+      // 注入器在场但没找到 = 该 Agent 真没有 effort 选项（查过真表），跳过；
+      // 注入器缺席 = 没查，按 legacy 照发（失败转警告）。
+      const effortConfigId = discovered ? discovered.effort : 'reasoning_effort';
       if (sessionOptions.model) {
-        const applied = await handle.setConfigOption('model', sessionOptions.model);
+        const applied = await handle.setConfigOption(modelConfigId, sessionOptions.model);
         if (!applied.ok) {
-          return err(toBusinessError(applied.error.code ?? 'E_ACP_CONFIG', `ACP 模型设置失败：${applied.error.message}`));
+          setupWarnings.push(`模型 ${sessionOptions.model} 在当前运行时未生效（${applied.error.message}），已改用运行时默认`);
         }
       }
       if (sessionOptions.effort) {
-        const appliedEffort = await handle.setConfigOption('reasoning_effort', sessionOptions.effort);
-        if (!appliedEffort.ok) {
-          return err(toBusinessError(appliedEffort.error.code ?? 'E_ACP_CONFIG', `ACP 思考深度设置失败：${appliedEffort.error.message}`));
+        if (!effortConfigId) {
+          setupWarnings.push(`当前运行时无思考深度选项，已忽略 ${sessionOptions.effort}（用运行时默认）`);
+        } else {
+          const appliedEffort = await handle.setConfigOption(effortConfigId, sessionOptions.effort);
+          if (!appliedEffort.ok) {
+            setupWarnings.push(`思考深度 ${sessionOptions.effort} 在当前运行时未生效（${appliedEffort.error.message}），已改用运行时默认`);
+          }
         }
       }
       const tokens = this.options.resolveMcpToken
@@ -435,6 +469,7 @@ export class AcpAdapter implements AgentAdapter {
         this.options.revokeMcpServer,
       );
       session.attachMcpTokens(tokens);
+      session.noteSetupWarnings(setupWarnings);
       this.sessions.set(handle.sessionId, session);
       return ok(session);
     } catch (cause) {

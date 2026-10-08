@@ -5,7 +5,9 @@ import {
   AcpClient,
   buildCustomProviderConfigToml,
   buildCustomProviderSpawnEnv,
+  findModelConfigOption,
   getAcpProviderCodexHome,
+  parseAcpConfigOptions,
   readStoredAcpProvider,
 } from '@yitom/acp-client';
 import { BusinessError } from '@study-studio/shared';
@@ -156,6 +158,15 @@ export class AcpAdapterPool {
   ): AcpAdapterOptions {
     return {
       createClient,
+      // 会话真实 configId 发现（各 Agent 命名不一），解析归 SDK，适配器只消费结果。
+      describeConfigIds: (configOptions) => {
+        const parsed = parseAcpConfigOptions(configOptions);
+        const effort = parsed.find(option => option.configId.includes('effort'));
+        return {
+          model: findModelConfigOption(parsed)?.configId ?? null,
+          effort: effort?.configId ?? null,
+        };
+      },
       buildMcpServers: (tools, context) => {
         if (tools.length === 0) return [];
         const created = this.deps.bridge.create(
