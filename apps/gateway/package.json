@@ -22,7 +22,7 @@
     "@study-studio/speech": "workspace:*",
     "@study-studio/storage-sqlite": "workspace:*",
     "@study-studio/tool-core": "workspace:*",
-    "@yitom/acp-client": "^0.1.0",
+    "@yitom/acp-client": "^0.1.2",
     "agentpools": "^0.1.9",
     "drizzle-orm": "^0.45.2",
     "gemini-tts-studio": "0.3.2",
