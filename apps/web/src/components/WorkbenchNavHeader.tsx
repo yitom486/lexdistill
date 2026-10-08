@@ -45,11 +45,11 @@ export function WorkbenchNavHeader({
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-amber-900o10 pb-3">
       <TabsList className="bg-veil-stone-200o60-stone-900">
         <TabsIndicator />
-        <TabsTrigger value="study" className="gap-1.5 px-3 py-1.5 text-xs">
+        <TabsTrigger value="study" className="gap-1.5 px-3 py-1.5 text-xs aria-selected:bg-paper aria-selected:shadow-xs">
           <Sparkles className="h-3.5 w-3.5 text-accent-ink-warm" />
           <span>今日学词</span>
         </TabsTrigger>
-        <TabsTrigger value="review" className="gap-1.5 px-3 py-1.5 text-xs">
+        <TabsTrigger value="review" className="gap-1.5 px-3 py-1.5 text-xs aria-selected:bg-paper aria-selected:shadow-xs">
           <Layers className="h-3.5 w-3.5" />
           <span>闪卡复习</span>
           {cardsCount > 0 && (
@@ -58,15 +58,15 @@ export function WorkbenchNavHeader({
             </Badge>
           )}
         </TabsTrigger>
-        <TabsTrigger value="library" className="gap-1.5 px-3 py-1.5 text-xs">
+        <TabsTrigger value="library" className="gap-1.5 px-3 py-1.5 text-xs aria-selected:bg-paper aria-selected:shadow-xs">
           <BookOpen className="h-3.5 w-3.5" />
           <span>词汇总库</span>
         </TabsTrigger>
-        <TabsTrigger value="dictionary" className="gap-1.5 px-3 py-1.5 text-xs">
+        <TabsTrigger value="dictionary" className="gap-1.5 px-3 py-1.5 text-xs aria-selected:bg-paper aria-selected:shadow-xs">
           <Search className="h-3.5 w-3.5" />
           <span>词典查词</span>
         </TabsTrigger>
-        <TabsTrigger value="queue" className="gap-1.5 px-3 py-1.5 text-xs">
+        <TabsTrigger value="queue" className="gap-1.5 px-3 py-1.5 text-xs aria-selected:bg-paper aria-selected:shadow-xs">
           <Inbox className="h-3.5 w-3.5" />
           <span>练习队列</span>
           {practiceCollectionsCount > 0 && (

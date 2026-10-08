@@ -40,23 +40,11 @@ export function TodayPlanWorkbench() {
   const shell = useLearningShell();
   const { data: plan, isLoading, isError, refetch } = useDailyPlanQuery();
   const completeStep = useCompletePlanStepMutation();
-  const setActiveTab = useStudySessionStore((s) => s.setActiveTab);
-  const setCardFilter = useStudySessionStore((s) => s.setCardFilter);
-  const setPlanIntent = useStudySessionStore((s) => s.setPlanIntent);
+  const startPlanStep = useStudySessionStore((s) => s.startPlanStep);
 
   const startStep = (step: DailyPlanStep) => {
     sound.playClick();
-    setPlanIntent({
-      stepId: step.id,
-      kind: step.kind,
-      title: step.title,
-      skillId: step.skillId,
-      skillName: step.skillName,
-    });
-    if (step.kind === 'NEW_WORDS') setCardFilter('VOCAB');
-    if (step.kind === 'CARDS') setCardFilter('ALL');
-    setActiveTab(step.navigateTo);
-    toast.success(`已进入「${step.title}」`);
+    startPlanStep(step);
   };
 
   const markDone = (step: DailyPlanStep) => {
@@ -96,7 +84,7 @@ export function TodayPlanWorkbench() {
                 今日学习
               </h2>
               <p className="text-xs text-ink-ghost mt-0.5">
-                {shell.trackName}轨道 · 今天要做的 {total > 0 ? `${total} 件事，做完即达标` : '事项'}，每天按你的进度换新；都是现有模块的入口，不另起一套课程。
+                {shell.trackName}轨道 · 按课程解锁、到期复习和学习记录安排；路线单元按对应内容的掌握证据更新。
               </p>
             </div>
           </div>
@@ -175,14 +163,14 @@ export function TodayPlanWorkbench() {
                     </div>
                     <p className="text-xs text-ink-ghost">{step.summary}</p>
                     <p className="text-[11px] font-mono text-ink-stone-400">
-                      {step.currentCount}/{step.targetCount ?? 1}
+                      {step.progressText ?? `${step.currentCount}/${step.targetCount ?? 1}`}
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" onClick={() => startStep(step)} className="gap-1.5">
                         {step.done ? '再练一次' : '开始'}
                         <ArrowRight className="w-3.5 h-3.5" />
                       </Button>
-                      {!step.done && (
+                      {!step.done && !step.courseUnitId && (
                         <Button
                           size="sm"
                           variant="outline"

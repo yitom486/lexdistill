@@ -3,6 +3,7 @@ import type { VocabularyEntry } from '@study-studio/protocol';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { WordAiPanel } from './WordAiPanel.js';
+import { StudySpeakButton } from './audio/StudySpeakButton.js';
 import { getWordUsageList } from '../queries/vocabulary.js';
 
 /** 单词学习详情（纯展示，不挂任何教材来源）：读音词性头、意思、用法、例句，AI 追问内嵌。 */
@@ -24,6 +25,8 @@ export function WordStudyDetail({ word }: { word: VocabularyEntry }) {
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <strong className="text-xl">{word.word}</strong>
       {word.reading && <span className="text-sm text-ink-muted">{word.reading}</span>}
+      <StudySpeakButton text={word.language === 'ja' && word.reading.trim() ? word.reading : word.word}
+        language={word.language} scopeKey={word.id} label={`朗读单词：${word.word}`} caption="听发音" variant="outline" />
       {word.level && <Badge variant="outline">{word.level}</Badge>}
       {pos && <Badge variant="secondary">{pos}</Badge>}
     </div>
@@ -39,7 +42,10 @@ export function WordStudyDetail({ word }: { word: VocabularyEntry }) {
       {examples.length > 0 && <div className="border-t border-line pt-3">
         <dt className="text-xs font-semibold uppercase tracking-wide text-ink-muted">例句</dt>
         <dd className="mt-1 space-y-2">{examples.map((example, index) => <figure key={index} className="rounded-lg bg-paper-soft px-3 py-2 text-sm">
-          <blockquote>{example.text}</blockquote>
+          <div className="flex items-start justify-between gap-2">
+            <blockquote>{example.text}</blockquote>
+            <StudySpeakButton text={example.text} language={word.language} scopeKey={word.id} label={`朗读例句：${example.text}`} />
+          </div>
           {example.translation && <figcaption className="mt-0.5 text-ink-muted">{example.translation}</figcaption>}
         </figure>)}</dd>
       </div>}
@@ -49,7 +55,10 @@ export function WordStudyDetail({ word }: { word: VocabularyEntry }) {
           {word.learning.explanation && <p>{word.learning.explanation}</p>}
           {word.learning.scenarios?.map(scenario => <div key={scenario.title} className="rounded-lg bg-paper-soft px-3 py-2">
             <p className="font-semibold">{scenario.title}</p>
-            {scenario.dialogue.map((line, index) => <p key={index} className="mt-1"><span className="text-ink-muted">{line.speaker}：</span>{line.text}{line.translation && <span className="block text-ink-muted">{line.translation}</span>}</p>)}
+            {scenario.dialogue.map((line, index) => <div key={index} className="mt-1 flex items-start justify-between gap-2">
+              <p><span className="text-ink-muted">{line.speaker}：</span>{line.text}{line.translation && <span className="block text-ink-muted">{line.translation}</span>}</p>
+              <StudySpeakButton text={line.text} language={word.language} scopeKey={word.id} speaker={line.speaker} label={`朗读对话：${line.text}`} />
+            </div>)}
             {scenario.note && <p className="mt-1 text-ink-muted">{scenario.note}</p>}
           </div>)}
           {!!word.learning.pitfalls?.length && <ul className="list-disc space-y-0.5 pl-5">{word.learning.pitfalls.map((pitfall, index) => <li key={index}>{pitfall}</li>)}</ul>}

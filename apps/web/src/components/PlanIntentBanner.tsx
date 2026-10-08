@@ -13,6 +13,7 @@ const KIND_HINT: Record<string, string> = {
   QUIZ: '做完今日目标题量后，这一步会自动勾选。',
   MISTAKES: '两连对即可出库，错题步骤会自动完成。',
   PRACTICE_PLAN: '按计划块作答并提交；全部提交后该步自动勾选。',
+  ALPHABET: '先听音认形，再练习当前范围；系统按对应字母的练习证据更新掌握进度。',
 };
 
 export function PlanIntentBanner() {
@@ -40,7 +41,7 @@ export function PlanIntentBanner() {
         <p className="mt-0.5 text-[11px] text-ink-amber-900o80-amber-100o80">
           {lessonForIntent
             ? `「${lessonForIntent.title}」还没学：先花 2 分钟学完讲义，再做靶向练习。`
-            : (KIND_HINT[planIntent.kind] ?? '完成后可回到今日学习查看进度。')}
+            : planIntent.courseUnitId ? '当前已定位到路线单元；学习并复习对应内容后，掌握进度会自动更新。' : (KIND_HINT[planIntent.kind] ?? '完成后可回到今日学习查看进度。')}
         </p>
       </div>
       {lessonForIntent && (

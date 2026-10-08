@@ -27,7 +27,8 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: { onOpenTutor: (context: 
   const [round, setRound] = useState(0);
   const objective = (presented?.questions ?? []).filter(q =>
     ['MULTIPLE_CHOICE', 'FILL_IN_BLANK', 'SENTENCE_REORDER'].includes(q.type) && inferLanguageFromSkillId(q.testedSkillId) === shell.track);
-  const questions = objective.length ? objective.map(toQuizQuestionItem) : query.data ?? [];
+  const available = objective.length ? objective.map(toQuizQuestionItem) : query.data ?? [];
+  const questions = planIntent?.skillId ? available.filter(q => q.testedSkill === planIntent.skillId) : available;
 
   const generateQuestions = async () => {
     try {
@@ -51,14 +52,14 @@ export function AdaptiveQuizWorkbench({ onOpenTutor }: { onOpenTutor: (context: 
         </Tabs>
         <Button variant="outline" onClick={() => void generateQuestions()} disabled={generate.isPending}>
           {generate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          针对弱项练习
+          {planIntent?.skillId ? `练习${planIntent.skillName ?? '当前考点'}` : '针对弱项练习'}
         </Button>
       </div>
       {mode === 'SUBJECTIVE' ? <SubjectiveWritingWorkbench /> : questions.length ? (
         <QuizRound key={`${shell.track}:${round}:${questions.map(question => question.id).join(',')}`} questions={questions} language={shell.track} onOpenTutor={onOpenTutor} />
       ) : (
         <div className="space-y-3 py-8 text-center">
-          <p className="text-sm text-ink-ghost">{query.isLoading ? '正在读取题库…' : query.isError ? '题库读取失败，请重试。' : shell.copy.quizEmptyHint}</p>
+          <p className="text-sm text-ink-ghost">{query.isLoading ? '正在读取题库…' : query.isError ? '题库读取失败，请重试。' : planIntent?.skillId ? '当前考点暂无题目，请先查看讲义或点击上方按钮准备专项练习。' : shell.copy.quizEmptyHint}</p>
           {query.isError && <Button variant="outline" onClick={() => void query.refetch()}>重试</Button>}
         </div>
       )}

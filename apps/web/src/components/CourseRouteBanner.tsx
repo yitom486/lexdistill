@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { courseUnitPlanStep } from '@study-studio/learner-core';
 import { Check, ChevronDown, Footprints, Lock, RotateCcw } from 'lucide-react';
 import { sound } from '../utils/audio.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
@@ -19,7 +20,7 @@ import { Badge } from './ui/badge.js';
  */
 export function CourseRouteBanner() {
   const { data: route } = useCourseRouteQuery();
-  const setActiveTab = useStudySessionStore((s) => s.setActiveTab);
+  const startPlanStep = useStudySessionStore((s) => s.startPlanStep);
   const [expanded, setExpanded] = useState(false);
   if (!route || route.units.length === 0) return null;
   const nextUp = route.units.find((u) => u.unit.id === route.nextUpId) ?? null;
@@ -28,7 +29,7 @@ export function CourseRouteBanner() {
   const stage = nextUp ? nextUp.unit.stage : (route.units[route.units.length - 1]?.unit.stage ?? 0);
   const goUnit = (u: CourseRouteUnit) => {
     sound.playClick();
-    setActiveTab(u.unit.activity.navigateTo as Parameters<typeof setActiveTab>[0]);
+    startPlanStep(courseUnitPlanStep(u.unit));
   };
   const stages = expanded ? groupUnitsByStage(route.units) : [];
   return (

@@ -61,8 +61,8 @@ it('单词卡片可展开学习详情：意思/用法/例句；无用法的旧�
     expect(detail.textContent).toContain('问路');
     expect(detail.textContent).toContain('学校≠学院');
     expect(detail.textContent).toContain('用学校造一个问路的句子');
-    expect(detail.querySelector('button:not([disabled])')?.textContent).toContain('问 AI');
-    await click(detail.querySelector<HTMLElement>('button:not([disabled])'));
+    const askAi = Array.from(detail.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent === '问 AI');
+    await click(askAi);
     await waitFor(() => !!doc.querySelector('[aria-label="AI 追问：学校"]'));
     expect(doc.querySelector('[aria-label="AI 追问：学校"]')?.textContent).toContain('在这里直接追问');
     await click(doc.querySelector<HTMLElement>('[aria-label="学习单词：猫"]'));
