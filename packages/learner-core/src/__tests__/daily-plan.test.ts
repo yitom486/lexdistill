@@ -193,6 +193,27 @@ describe('daily plan sequencing', () => {
     ]);
     expect(ok?.[0]?.kind).toBe('QUIZ');
   });
+
+  it('accepts textbook and assessment destinations when restoring a stored plan', () => {
+    for (const navigateTo of ['TEXTBOOK', 'RADAR'] as const) {
+      expect(parseDailyPlanStepTemplates([{ id: 'step', kind: 'QUIZ', title: '学习', summary: '学习', navigateTo }])?.[0]?.navigateTo).toBe(navigateTo);
+    }
+  });
+
+  it('course units ignore unrelated activities and manual checkmarks', () => {
+    const template = { id: 'step_unit_ja-u-greet', courseUnitId: 'ja-u-greet', kind: 'NEW_WORDS' as const,
+      title: '问候', summary: '问候', navigateTo: 'CARDS' as const, targetCount: 3 };
+    const progress = { quizzesCount: 99, cardsReviewedCount: 99, readingCount: 99,
+      mistakesResolvedCount: 0, unresolvedMistakesCount: 0, completedStepIds: [template.id] };
+    expect(overlayDailyPlanProgress([template], progress)[0]?.done).toBe(false);
+    const actual = overlayDailyPlanProgress([template], { ...progress,
+      courseUnits: { 'ja-u-greet': { done: false, progressText: '1/3' } } });
+    expect(actual[0]?.done).toBe(false);
+    expect(actual[0]?.progressText).toBe('1/3');
+    expect(overlayDailyPlanProgress([template], { ...progress,
+      courseUnits: { 'ja-u-greet': { done: true, progressText: '已掌握' } } })[0]?.done).toBe(true);
+    expect(parseDailyPlanStepTemplates([template])?.[0]?.courseUnitId).toBe('ja-u-greet');
+  });
 });
 
 describe('practice plan run step (P5-E3)', () => {
@@ -332,10 +353,11 @@ describe('daily plan alphabet gate（零基础不推精读）', () => {
     expect(grammar.navigateTo).toBe('KANA');
   });
 
-  it('ALPHABET 步随字母 drill 完成（quizzes 口径）', () => {
+  it('ALPHABET 步只随字母练习完成，不吃其他题型的总数', () => {
     const templates = buildDailyPlanStepTemplates(gatedBase);
     const overlayed = overlayDailyPlanProgress(templates, {
       quizzesCount: 5,
+      alphabetCount: 5,
       cardsReviewedCount: 0,
       readingCount: 0,
       mistakesResolvedCount: 0,
@@ -343,6 +365,8 @@ describe('daily plan alphabet gate（零基础不推精读）', () => {
       completedStepIds: [],
     });
     expect(overlayed.find((s) => s.kind === 'ALPHABET')?.done).toBe(true);
+    expect(overlayDailyPlanProgress(templates, { quizzesCount: 99, alphabetCount: 0, cardsReviewedCount: 0,
+      readingCount: 0, mistakesResolvedCount: 0, unresolvedMistakesCount: 0, completedStepIds: [] })[0]?.done).toBe(false);
   });
 
   it('ALPHABET 模板持久化往返', () => {
@@ -351,6 +375,16 @@ describe('daily plan alphabet gate（零基础不推精读）', () => {
     const parsed = parseDailyPlanStepTemplates(JSON.parse(JSON.stringify(templates)));
     expect(parsed?.[0]?.kind).toBe('ALPHABET');
   });
+});
+
+it('weakness tasks count only attempts for the requested skill', () => {
+  const step = { id: 'grammar', kind: 'GRAMMAR' as const, title: '语法', summary: '',
+    navigateTo: 'QUIZ' as const, skillId: 'en.grammar.tense', targetCount: 2 };
+  const progress = { quizzesCount: 99, cardsReviewedCount: 0, readingCount: 0,
+    mistakesResolvedCount: 0, unresolvedMistakesCount: 0, completedStepIds: [], skillQuizzes: { 'en.grammar.other': 99 } };
+  expect(overlayDailyPlanProgress([step], progress)[0]?.done).toBe(false);
+  expect(overlayDailyPlanProgress([step], { ...progress, skillQuizzes: { 'en.grammar.tense': 1 } })[0]?.done).toBe(false);
+  expect(overlayDailyPlanProgress([step], { ...progress, skillQuizzes: { 'en.grammar.tense': 2 } })[0]?.done).toBe(true);
 });
 
 describe('trail-mapped plan steps（带路合一）', () => {

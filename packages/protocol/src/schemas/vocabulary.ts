@@ -33,6 +33,7 @@ export const DailyPickRequestSchema = z.object({
   count: z.number().int().min(1).max(50),
   order: DailyPickOrderSchema,
   bankId: z.string().min(1),
+  courseUnitId: z.string().min(1).optional(),
 }).strict();
 export type DailyPickRequest = z.infer<typeof DailyPickRequestSchema>;
 

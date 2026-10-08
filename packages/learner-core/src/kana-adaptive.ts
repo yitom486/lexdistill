@@ -11,6 +11,7 @@ export type KanaPracticeScriptType = 'HIRAGANA' | 'KATAKANA' | 'ROMAJI';
 
 export interface AdaptiveKanaQueueOptions {
   types?: readonly string[];
+  kanaIds?: readonly string[];
   scriptType?: KanaPracticeScriptType;
   limit?: number;
 }

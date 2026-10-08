@@ -38,6 +38,8 @@ export interface DailyPlanStepTemplate {
   skillId?: string | undefined;
   skillName?: string | undefined;
   targetCount?: number | undefined;
+  /** 路线单元以自己的掌握证据计进度，不复用每日活动总数。 */
+  courseUnitId?: string | undefined;
   /** 带路映射步：关联带路 stage id（进度走当日带路计数，而非通用打卡口径）。 */
   trailStageId?: string | undefined;
 }
@@ -45,6 +47,7 @@ export interface DailyPlanStepTemplate {
 export interface DailyPlanStep extends DailyPlanStepTemplate {
   done: boolean;
   currentCount: number;
+  progressText?: string | undefined;
 }
 
 export interface DailyStudyPlan {
@@ -89,6 +92,8 @@ export interface DailyPlanSignals {
 
 export interface DailyPlanProgressSignals {
   quizzesCount: number;
+  alphabetCount?: number | undefined;
+  skillQuizzes?: Record<string, number> | undefined;
   cardsReviewedCount: number;
   readingCount: number;
   mistakesResolvedCount: number;
@@ -104,6 +109,7 @@ export interface DailyPlanProgressSignals {
    * 由仓储在带路未走完时随模板一起提供；缺省时带路步按 0 计。
    */
   trail?: Record<string, number> | undefined;
+  courseUnits?: Record<string, { done: boolean; progressText: string }> | undefined;
 }
 
 const KIND_SET = new Set<string>(DAILY_PLAN_STEP_KINDS);
@@ -278,10 +284,15 @@ export function overlayDailyPlanProgress(
   progress: DailyPlanProgressSignals
 ): DailyPlanStep[] {
   return templates.map((step) => {
+    if (step.courseUnitId) {
+      const unit = progress.courseUnits?.[step.courseUnitId];
+      return { ...step, currentCount: 0, done: unit?.done ?? false,
+        progressText: unit?.progressText ?? '等待读取单元学习记录' };
+    }
     // 带路映射步：走当日带路计数（仓储随模板提供），不吃通用打卡口径。
     const currentCount = step.trailStageId
       ? (progress.trail?.[step.trailStageId] ?? 0)
-      : currentCountForStep(step.kind, progress);
+      : currentCountForStep(step, progress);
     return {
       ...step,
       currentCount,
@@ -351,7 +362,9 @@ export function parseDailyPlanStepTemplates(raw: unknown): DailyPlanStepTemplate
       rec.navigateTo !== 'MISTAKES' &&
       rec.navigateTo !== 'PRACTICE_PLAN' &&
       rec.navigateTo !== 'KANA' &&
-      rec.navigateTo !== 'HANGUL'
+      rec.navigateTo !== 'HANGUL' &&
+      rec.navigateTo !== 'TEXTBOOK' &&
+      rec.navigateTo !== 'RADAR'
     ) {
       return null;
     }
@@ -364,6 +377,7 @@ export function parseDailyPlanStepTemplates(raw: unknown): DailyPlanStepTemplate
     };
     if (typeof rec.skillId === 'string') template.skillId = rec.skillId;
     if (typeof rec.skillName === 'string') template.skillName = rec.skillName;
+    if (typeof rec.courseUnitId === 'string' && rec.courseUnitId) template.courseUnitId = rec.courseUnitId;
     if (typeof rec.targetCount === 'number' && Number.isFinite(rec.targetCount)) {
       template.targetCount = rec.targetCount;
     }
@@ -381,10 +395,11 @@ export function parseCompletedStepIds(raw: unknown): string[] {
 }
 
 function currentCountForStep(
-  kind: DailyPlanStepKind,
+  step: DailyPlanStepTemplate,
   progress: DailyPlanProgressSignals
 ): number {
-  switch (kind) {
+  if (step.kind === 'GRAMMAR' && step.skillId) return progress.skillQuizzes?.[step.skillId] ?? 0;
+  switch (step.kind) {
     case 'CARDS':
     case 'NEW_WORDS':
       return progress.cardsReviewedCount;
@@ -392,9 +407,9 @@ function currentCountForStep(
       return progress.readingCount;
     case 'QUIZ':
     case 'GRAMMAR':
-    case 'ALPHABET':
-      // 字母 drill 同步写 activity.quizzes（见 recordKanaPractice），故 ALPHABET 与 QUIZ 同口径。
       return progress.quizzesCount;
+    case 'ALPHABET':
+      return progress.alphabetCount ?? 0;
     case 'MISTAKES':
       return progress.mistakesResolvedCount;
     case 'PRACTICE_PLAN':
@@ -419,7 +434,7 @@ function isStepDone(
     case 'ALPHABET':
       return currentCount >= target;
     case 'GRAMMAR':
-      return progress.quizzesCount >= 1;
+      return currentCount >= target;
     case 'MISTAKES':
       return progress.mistakesResolvedCount >= 1 || progress.unresolvedMistakesCount === 0;
     case 'PRACTICE_PLAN': {
