@@ -89,8 +89,7 @@ describe('AcpConversationLedger', () => {
     expect(ledger.getTranscriptItems('ghost')).toBeNull();
   });
 
-  it('lane 过滤：用户历史默认只列 coach/learning，批 lane 隐藏', () => {
-    const ledger = new AcpConversationLedger(memoryAcpLedgerBackend());
+  it('lane 过滤：用户历史默认只列 coach/learning，批 lane 隐藏', () => {    const ledger = new AcpConversationLedger(memoryAcpLedgerBackend());
     ledger.recordSessionCreated({ acpSessionId: 'c1', userId: 'u', lane: 'coach', runtimeId: 'opencode' });
     ledger.recordSessionCreated({ acpSessionId: 'b1', userId: 'u', lane: 'batch:toc', runtimeId: 'opencode' });
     expect(ledger.listConversations().map(item => item.id)).toEqual(['c1']);
@@ -195,5 +194,20 @@ describe('GatewayServer ACP 归属路由', () => {
     }
     const codexQueue = await server.listAgentQueue({ sessionId: 'codex-t1' });
     expect(isOk(codexQueue)).toBe(true);
+  });
+});
+
+describe('AcpConversationLedger 身份迁移', () => {
+  it('未知 id 需前置；新档一次后不再；老档（identityV 缺席）补一次', () => {
+    const ledger = new AcpConversationLedger(memoryAcpLedgerBackend());
+    expect(ledger.ensureIdentityApplied('fresh-1')).toBe(true);
+    ledger.recordSessionCreated({ acpSessionId: 'fresh-1', userId: 'u', lane: 'coach', runtimeId: 'agy' });
+    expect(ledger.ensureIdentityApplied('fresh-1')).toBe(true);
+    expect(ledger.ensureIdentityApplied('fresh-1')).toBe(false);
+    // 模拟身份版本之前的老档：无 identityV 字段
+    ledger.recordSessionCreated({ acpSessionId: 'old-1', userId: 'u', lane: 'coach', runtimeId: 'agy' });
+    expect(ledger.ensureIdentityApplied('old-1')).toBe(true);
+    expect(ledger.ensureIdentityApplied('old-1')).toBe(false);
+    expect(ledger.ensureIdentityApplied('')).toBe(false);
   });
 });

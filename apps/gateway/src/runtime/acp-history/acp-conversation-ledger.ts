@@ -21,6 +21,9 @@ export interface AcpConversationTurn {
   source?: string;
 }
 
+/** 会话身份版本：首轮前置导师身份；老会话首次命中即补一次（见 ensureIdentityApplied）。 */
+export const ACP_IDENTITY_VERSION = 1;
+
 export interface AcpConversation {
   acpSessionId: string;
   userId: string;
@@ -33,6 +36,8 @@ export interface AcpConversation {
   createdAt: number;
   updatedAt: number;
   archived: boolean;
+  /** 已前置身份的版本（缺席=0，老会话迁移时补一次）。 */
+  identityV?: number;
   turns: AcpConversationTurn[];
 }
 
@@ -240,6 +245,22 @@ export class AcpConversationLedger {
     conversation.updatedAt = at;
     this.prune();
     this.persist();
+  }
+
+  /**
+   * 首轮身份门：新会话返回 true；身份版本之前的老会话返回一次 true 并打标；
+   * 其余 false。调用方据此决定本轮是否前置导师身份（常驻靠 resume）。
+   */
+  public ensureIdentityApplied(acpSessionId: string): boolean {
+    if (!acpSessionId) return false;
+    this.ensureLoaded();
+    const conversation = this.conversations.get(acpSessionId);
+    if (!conversation) return true;
+    if ((conversation.identityV ?? 0) >= ACP_IDENTITY_VERSION) return false;
+    conversation.identityV = ACP_IDENTITY_VERSION;
+    conversation.updatedAt = Date.now();
+    this.persist();
+    return true;
   }
 
   public rename(acpSessionId: string, title: string): boolean {

@@ -373,8 +373,11 @@ export async function handleTurnSend(
           if (agentSession.threadId) codexThreadId = agentSession.threadId;
           let acc = '';
           // 新 ACP 会话首条消息前置导师身份（常驻上下文靠会话 resume；重启失忆则用户重开话题即重建）。
+          // 老会话（身份版本之前建档）由台账补一次：续跑的旧上下文借此纠正身份。
           const trackLabel = track === 'ja' ? '日语' : track === 'en' ? '英语' : track === 'ko' ? '韩语' : '外语';
-          const sendMessage = isNewAcpConversation && wantedAdapter === 'acp'
+          const needsIdentity = wantedAdapter === 'acp'
+            && (isNewAcpConversation || (codexThreadId ? server.acpLedger.ensureIdentityApplied(codexThreadId) : false));
+          const sendMessage = needsIdentity
             ? `你是 Lingua Studio（${trackLabel}学习应用）中的 AI 导师，只教${trackLabel}、只聊学习；直接用中文回答，正文前不加英文前缀、不自我介绍，直接讲内容。\n\n${userPrompt}`
             : userPrompt;
           for await (const ev of agentSession.send({
