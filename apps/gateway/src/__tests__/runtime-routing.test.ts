@@ -28,9 +28,10 @@ describe('listAgentRuntimes', () => {
   it('能力开关：codex-acp 模型/思考深度走 ACP 探针（与会话同口径），其余 ACP 运行时全探针', () => {
     const runtimes = listAgentRuntimes();
     // codex-acp 会话跑在 ACP 上：App Server model/list 是另一套旧目录（曾漏 gpt-6.1-sol），
-    // 故模型/思考深度必须取探针；线程/用量面板沿用旧链路查询。
+    // 故模型/思考深度必须取探针；Codex 原生面板（Skills/MCP/用量）无 ACP 对应物，不开；
+    // 历史/队列走网关台账。配额类全协议无对应物（额度芯片仅逃生口径保留）。
     expect(runtimes.find(entry => entry.id === 'codex-acp')?.capabilities)
-      .toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: true, supportsUsage: true, supportsHistory: true });
+      .toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true });
     for (const entry of runtimes.filter(item => item.id !== 'codex-acp')) {
       expect(entry.capabilities).toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true });
     }

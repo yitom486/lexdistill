@@ -6,6 +6,7 @@ import {
   SelectValue,
 } from './ui/select.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
+import { useAgentContextUsageStore } from '../stores/useAgentContextUsageStore.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { AGENT_RUNTIME_OPTIONS, agentRuntimeLabel } from '../config/agent-runtimes.js';
 import { useAgentRuntimesQuery } from '../queries/useAgentQueries.js';
@@ -38,6 +39,9 @@ export function AgentRuntimeSelect({ disabled, onCustomApi, onRuntimeChange }: A
     state.setRuntimeEffort(prev, state.coachEffort);
     state.setCoachModelId(state.runtimeModels[value] ?? '');
     state.setCoachEffort(state.runtimeEfforts[value] ?? '');
+    // 上下文用量是按会话的：切运行时即失效，不拿别家的数字充数。
+    useAgentContextUsageStore.getState().setUsage(null);
+    setAgentRuntimeId(value);
     setAgentRuntimeId(value);
     onRuntimeChange?.(prev, value);
   };

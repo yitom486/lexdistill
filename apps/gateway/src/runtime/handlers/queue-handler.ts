@@ -1,5 +1,6 @@
 import { type WsEnvelope, WsEventTypes } from '@study-studio/protocol';
 import { ok, err, type Result, BusinessError, generateId, isOk } from '@study-studio/shared';
+import { AcpAgentSession } from '@study-studio/agent-runtime';
 import type { GatewayServer } from '../gateway-runtime.js';
 import type { AgentLane, SessionManager } from '../session/session-manager.js';
 import { buildTurnExecutionSummary } from '../turn-summary-builder.js';
@@ -237,6 +238,10 @@ export async function handleQueueStart(
       finalOutput: reply,
       // P3-C 结构化执行摘要（含 status/source/outcome/failure/elapsedMs/queueRemaining/lane/threadId/fromQueue/model）
       ...queueSummary,
+      // ACP 上下文用量（同普通回合；配额类无 ACP 对应物）。
+      ...(agentSession instanceof AcpAgentSession && agentSession.getLastUsage()
+        ? { contextUsage: agentSession.getLastUsage() }
+        : {}),
       // 旧字段兼容保留
       fromQueue: true,
     },

@@ -96,7 +96,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   );
   const sessions = sessionsData?.sessions ?? [];
   const { data: collabModes = [] } = useAgentCollaborationModesQuery(
-    agentQueriesReady
+    agentQueriesReady && runtimeCaps.supportsThreads && runtimeCaps.supportsModelPicker
   );
   const { data: threadItems = [], isFetched: threadItemsFetched } = useAgentSessionItemsQuery(
     coachThreadId || null,

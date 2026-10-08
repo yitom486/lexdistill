@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
+import { useAgentContextUsageStore } from '../../stores/useAgentContextUsageStore.js';
 import type { useAgentGateway } from '../../hooks/useAgentGateway.js';
 import {
   markToolCallsDone,
@@ -89,7 +90,11 @@ export function useChatTurn(deps: ChatTurnDeps) {
         retryable?: boolean;
       };
       fromQueue?: boolean;
+      contextUsage?: { used: number; size: number };
     }) => {
+      if (data.contextUsage) {
+        useAgentContextUsageStore.getState().setUsage(data.contextUsage);
+      }
       if (data.status === 'INTERRUPTED') {
         setAgentTurnHealth({ state: 'idle' });
         return;
@@ -153,6 +158,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
         threadId?: string;
         queueRemaining?: number;
         toolWarnings?: string[];
+        contextUsage?: { used: number; size: number };
         status?: 'COMPLETED' | 'INTERRUPTED' | 'FAILED';
         outcome?: 'streamed' | 'fallback' | 'not_requested';
         failure?: {

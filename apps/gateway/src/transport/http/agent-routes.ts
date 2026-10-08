@@ -11,9 +11,6 @@ export function createAgentRoutes(deps: GatewayDeps) {
   return new Hono()
   .get('/api/agent/status', async (c) => {
     const res = await deps.server.getAgentStatus();
-    if (!isOk(res)) {
-      return formatBusinessErrorResponse(c, res.error, 'AGENT_STATUS');
-    }
     return c.json(res.value);
   })
   .get('/api/agent/models', async (c) => {

@@ -91,6 +91,8 @@ export interface StreamTurnOptions {
     lane?: 'coach' | 'learning';
     /** 网关侧非致命提醒（如模型被替换为运行时默认），前端 toast 明示，不静默。 */
     toolWarnings?: string[];
+    /** ACP 上下文用量（usage_update 只读透传；配额类无 ACP 对应物）。 */
+    contextUsage?: { used: number; size: number };
   }) => void;
   onError?: (err: unknown) => void;
 }

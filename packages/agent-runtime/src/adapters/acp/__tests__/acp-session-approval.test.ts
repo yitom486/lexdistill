@@ -57,4 +57,15 @@ describe('AcpAgentSession approval', () => {
     const decided = await auto.requestPermission({ ...PERMISSION, params: {} });
     expect(decided).toEqual({ outcome: 'cancelled' });
   });
+
+  it('usage_update 只读透传：数值存 latest，非数值忽略', () => {
+    const session = makeSession(undefined);
+    expect(session.getLastUsage()).toBeNull();
+    session.pushUpdate({ sessionId: 'acp-sess-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'hi' } } });
+    expect(session.getLastUsage()).toBeNull();
+    session.pushUpdate({ sessionId: 'acp-sess-1', update: { sessionUpdate: 'usage_update', used: 23977, size: 258400 } });
+    expect(session.getLastUsage()).toEqual({ used: 23977, size: 258400 });
+    session.pushUpdate({ sessionId: 'acp-sess-1', update: { sessionUpdate: 'usage_update', used: 'many', size: null } });
+    expect(session.getLastUsage()).toEqual({ used: 23977, size: 258400 });
+  });
 });

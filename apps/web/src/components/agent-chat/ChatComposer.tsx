@@ -143,6 +143,8 @@ export function ChatComposer(props: ChatComposerProps) {
               </div>
 
               <div className="space-y-2">
+                {/* Mode 系 Codex 线程原生概念（default/plan），ACP 会话无对应物：仅旧链路可见 */}
+                {runtimeCaps.supportsThreads && runtimeCaps.supportsModelPicker && (
                 <div className="space-y-0.5">
                   <span className="block px-0.5 text-[10px] text-ink-ghost">Mode</span>
                   <Select
@@ -179,6 +181,7 @@ export function ChatComposer(props: ChatComposerProps) {
                     </SelectContent>
                   </Select>
                 </div>
+                )}
 
                 <div className="space-y-0.5">
                   <span className="block px-0.5 text-[10px] text-ink-ghost">审批</span>

@@ -70,7 +70,7 @@ it('非 Codex 运行时：模型与思考深度禁用（能力开关驱动）', 
 it('非 Codex 运行时：模型标签显示运行时默认（不残留旧模型名）', async () => {
   globalThis.fetch = (async () => Response.json({ runtimes: [
     { id: 'codex-acp', label: 'ChatGPT', hint: '', configured: true,
-      capabilities: { supportsModelPicker: false, supportsEffort: false, supportsThreads: true, supportsUsage: true, supportsHistory: true } },
+      capabilities: { supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true } },
     { id: 'opencode', label: 'OpenCode', hint: '', configured: true,
       capabilities: { supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true } },
   ] })) as unknown as typeof fetch;

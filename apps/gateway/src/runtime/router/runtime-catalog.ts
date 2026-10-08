@@ -35,9 +35,11 @@ export interface AgentRuntimeCapabilities {
   supportsHistory: boolean;
 }
 
-/** codex-acp：会话走 ACP，模型/思考深度取 ACP 探针（与会话同口径）；线程/用量面板不动。 */
+/** codex-acp：会话走 ACP，模型/思考深度取 ACP 探针（与会话同口径）；
+ * 历史/队列走网关台账；Codex 原生面板（Skills/MCP/用量）无 ACP 对应物，不开。
+ * 配额类（额度）全协议无对应物：用量芯片仅 codex-appserver 逃生口径保留。 */
 const CODEX_ACP_CAPABILITIES: AgentRuntimeCapabilities = {
-  supportsModelPicker: false, supportsEffort: false, supportsThreads: true, supportsUsage: true,
+  supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false,
   supportsHistory: true,
 };
 const AGENT_DEFAULT_CAPABILITIES: AgentRuntimeCapabilities = {

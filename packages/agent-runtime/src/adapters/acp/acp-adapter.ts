@@ -129,6 +129,21 @@ function sessionIdOf(params: Record<string, unknown>): string | null {
   return null;
 }
 
+/** Agent 原生上下文用量（`usage_update`：{used, size}，如下游 exemplar 同款只读透传）。 */
+export interface AcpContextUsage {
+  used: number;
+  size: number;
+}
+
+function usageOf(params: Record<string, unknown>): AcpContextUsage | null {
+  const update = params['update'] as Record<string, unknown> | undefined;
+  if (!update || typeof update !== 'object' || update['sessionUpdate'] !== 'usage_update') return null;
+  const used = update['used'];
+  const size = update['size'];
+  if (typeof used !== 'number' || !Number.isFinite(used) || typeof size !== 'number' || !Number.isFinite(size)) return null;
+  return { used, size };
+}
+
 function chunkTextOf(params: Record<string, unknown>): { kind: 'text' | 'thought'; text: string } | null {
   // 实测 codex-acp 形状：{ sessionId, update: { sessionUpdate: 'agent_message_chunk'|'agent_thought_chunk',
   //   content: { type: 'text', text } } }。只认此形状，不猜。
@@ -164,6 +179,7 @@ export class AcpAgentSession implements AgentSession {
   private readonly approvals: PendingApproval[] = [];
   private readonly inflight = new Map<string, PendingApproval>();
   private readonly resolvedEvents: AgentEvent[] = [];
+  private lastUsage: AcpContextUsage | null = null;
   private mcpTokens: string[] = [];
   private readonly setupWarnings: string[] = [];
   private waiters: Array<() => void> = [];
@@ -201,8 +217,15 @@ export class AcpAgentSession implements AgentSession {
   }
 
   public pushUpdate(params: Record<string, unknown>): void {
+    const usage = usageOf(params);
+    if (usage) this.lastUsage = usage;
     this.updates.push(params);
     this.wake();
+  }
+
+  /** 本会话最近一次 Agent 上下文用量（无则 null；调用方进 turn 回执展示）。 */
+  public getLastUsage(): AcpContextUsage | null {
+    return this.lastUsage ? { ...this.lastUsage } : null;
   }
 
   public pushApproval(approval: PendingApproval): void {

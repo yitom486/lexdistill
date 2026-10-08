@@ -253,13 +253,11 @@ export class GatewayServer {
 
   /** Provider-neutral runtime status for the public Agent API. */
   public async getAgentStatus() {
-    const res = await this.agentAdapter.getAccountStatus();
-    if (!isOk(res)) return res;
+    // 网关自有就绪态：各运行时认证态由 /api/agent/runtimes 的 configured 承载，
+    // 回合失败大声报错；不再以 Codex 单账户登录态卡住全运行时查询门禁。
     return ok({
-      available: res.value.linked,
-      message: res.value.linked
-        ? 'Agent runtime is ready.'
-        : 'The configured Agent runtime is not ready. Check its local configuration.',
+      available: true,
+      message: 'Agent runtime is ready.',
     });
   }
 

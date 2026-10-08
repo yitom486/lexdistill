@@ -16,6 +16,7 @@ import { Button } from '../ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
 import { sound } from '../../utils/audio.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
+import { useAgentContextUsageStore } from '../../stores/useAgentContextUsageStore.js';
 import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
 import { agentRuntimeLabel } from '../../config/agent-runtimes.js';
 import type {
@@ -74,6 +75,23 @@ interface ChatPanelHeaderProps {
 }
 
 /** P2-1 拆分：顶栏状态徽标 + 会话历史/Skills 弹层（纯搬运自 AgentChatPanel）。 */
+
+/** ACP 上下文用量徽标（usage_update 只读透传；配额见额度芯片，两者口径不同）。 */
+function ContextUsageChip() {
+  const usage = useAgentContextUsageStore(state => state.usage);
+  if (!usage || !(usage.size > 0)) return null;
+  const percent = Math.min(100, Math.round((usage.used / usage.size) * 100));
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] text-ink-ghost"
+      title={`Agent 上下文用量（本轮结束时）：${usage.used.toLocaleString()} / ${usage.size.toLocaleString()}`}
+    >
+      <Gauge className="size-3" />
+      上下文 {percent}%
+    </span>
+  );
+}
+
 export function ChatPanelHeader(props: ChatPanelHeaderProps) {
   const {
     connected,
@@ -203,6 +221,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
               额度已用 {Math.round(usage.usedPercent)}%
             </span>
           ) : null}
+          <ContextUsageChip />
         </div>
         <p
           className={`mt-0.5 text-[10px] truncate ${

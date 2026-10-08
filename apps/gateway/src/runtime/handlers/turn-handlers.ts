@@ -169,6 +169,8 @@ export async function handleTurnSend(
   let codexFailureError: BusinessError | undefined;
   // 请求的工具缺注册表实现时记名：回执透出，前端可直接提示用户重启网关，不让模型背锅。
   let toolWarnings: string[] = [];
+  // ACP 上下文用量（send 循环内采集，会话对象出作用域后回执仍可用）。
+  let turnContextUsage: { used: number; size: number } | null = null;
 
   try {
     const track = normalizeTrackLanguage(snapshot.targetLanguage);
@@ -491,6 +493,9 @@ export async function handleTurnSend(
             streamedFromCodex = true;
             replySource = 'codex';
           }
+          if (agentSession instanceof AcpAgentSession) {
+            turnContextUsage = agentSession.getLastUsage();
+          }
         }
       }
 
@@ -573,6 +578,8 @@ export async function handleTurnSend(
       toolResults,
       // P3-C 结构化执行摘要（含 status/source/outcome/failure/elapsedMs/queueRemaining/lane/threadId/model）
       ...summary,
+      // ACP 上下文用量（usage_update 只读透传；配额类无 ACP 对应物，不编）。
+      ...(turnContextUsage ? { contextUsage: turnContextUsage } : {}),
       // 旧字段兼容（codexOutcome / codexFailureMessage）保留，便于过渡期前端旧逻辑
       codexOutcome: outcome,
       ...(codexFailureMessage ? { codexFailureMessage } : {}),
