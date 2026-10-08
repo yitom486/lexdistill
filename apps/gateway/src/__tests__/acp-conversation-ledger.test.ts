@@ -50,9 +50,15 @@ function ledgerServer(): GatewayServer {
 describe('AcpConversationLedger', () => {
   it('建会话＋回合记录：列表/回放 DTO 与 Codex 同形', () => {
     const ledger = new AcpConversationLedger(memoryAcpLedgerBackend());
-    ledger.recordSessionCreated({
+    const first = ledger.recordSessionCreated({
       acpSessionId: 'acp-1', userId: 'u1', lane: 'coach', runtimeId: 'codex-acp', model: 'gpt-6.1-sol',
     });
+    expect(first).toBe(true);
+    const second = ledger.recordSessionCreated({
+      acpSessionId: 'acp-1', userId: 'u1', lane: 'coach', runtimeId: 'codex-acp',
+    });
+    // 重复登记返回 false（调用方据此决定是否前置会话身份）。
+    expect(second).toBe(false);
     ledger.recordTurn('acp-1', { user: '6.1 是什么', agent: '新模型', source: 'codex' });
     const listed = ledger.listConversations();
     expect(listed.length).toBe(1);

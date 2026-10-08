@@ -2,6 +2,9 @@
 .plan/
 .studio-internal/
 
+# Agent workspace droppings (machine-local session tokens/ports; never commit)
+.agents/
+
 # Codex App Server generated protocol dump (optional reference;包已并入 agent-runtime/adapters/codex)
 packages/agent-runtime/src/adapters/codex/protocol-gen/
 

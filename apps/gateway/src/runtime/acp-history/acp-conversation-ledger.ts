@@ -165,8 +165,8 @@ export class AcpConversationLedger {
     runtimeId: string;
     model?: string;
     effort?: string;
-  }): void {
-    if (!input.acpSessionId) return;
+  }): boolean {
+    if (!input.acpSessionId) return false;
     this.ensureLoaded();
     const now = Date.now();
     const existing = this.conversations.get(input.acpSessionId);
@@ -186,6 +186,7 @@ export class AcpConversationLedger {
     });
     this.prune();
     this.persist();
+    return !existing;
   }
 
   public recordTurn(

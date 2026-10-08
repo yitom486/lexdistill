@@ -171,6 +171,8 @@ export async function handleTurnSend(
   let toolWarnings: string[] = [];
   // ACP 上下文用量（send 循环内采集，会话对象出作用域后回执仍可用）。
   let turnContextUsage: { used: number; size: number } | null = null;
+  // ACP 新会话首轮身份前置（session/new 无 systemPrompt 字段，身份只能随首条消息下达）。
+  let isNewAcpConversation = false;
 
   try {
     const track = normalizeTrackLanguage(snapshot.targetLanguage);
@@ -352,8 +354,9 @@ export async function handleTurnSend(
               toolWarnings.push(...sessionRes.value.drainSetupWarnings());
             }
             // ACP 会话入台账（历史/队列的 id 索引；Codex 通路沿用 App Server，不动）。
+            // 返回值标记本会话首轮：首条消息前置导师身份（ACP 协议无建会话身份通道）。
             if (wantedAdapter === 'acp' && sessionRes.value.threadId) {
-              server.acpLedger.recordSessionCreated({
+              isNewAcpConversation = server.acpLedger.recordSessionCreated({
                 acpSessionId: sessionRes.value.threadId,
                 userId,
                 lane: agentLane,
@@ -376,8 +379,13 @@ export async function handleTurnSend(
         if (agentSession && !reply) {
           if (agentSession.threadId) codexThreadId = agentSession.threadId;
           let acc = '';
+          // 新 ACP 会话首条消息前置导师身份（常驻上下文靠会话 resume；重启失忆则用户重开话题即重建）。
+          const trackLabel = track === 'ja' ? '日语' : track === 'en' ? '英语' : track === 'ko' ? '韩语' : '外语';
+          const sendMessage = isNewAcpConversation && wantedAdapter === 'acp'
+            ? `你是 Lingua Studio（${trackLabel}学习应用）中的 AI 导师，只教${trackLabel}、只聊学习；直接用中文回答，正文前不加英文前缀、不自我介绍，直接讲内容。\n\n${userPrompt}`
+            : userPrompt;
           for await (const ev of agentSession.send({
-            message: userPrompt,
+            message: sendMessage,
             contextSnapshot: snapshot,
             turnOptions: {
               ...(preferredModel ? { model: preferredModel } : {}),
