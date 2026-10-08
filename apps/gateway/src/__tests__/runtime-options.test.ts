@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import type { AcpClient } from '@yitom/acp-client';
 import { clearRuntimeOptionsCacheForTest, getAgentRuntimeOptions } from '../runtime/router/runtime-options.js';
 import { SessionToolBridge } from '../runtime/mcp/session-tool-bridge.js';
 import { AcpAdapterPool, acpClientHonorsCustomEnv } from '../infrastructure/acp/acp-adapter-pool.js';
@@ -20,8 +21,53 @@ describe('getAgentRuntimeOptions', () => {
   });
 });
 
-describe('acpClientHonorsCustomEnv', () => {
-  it('0.1.0 忽略 env→false；0.1.1 起→true；未知/非法版本不拦', () => {
+describe('getAgentRuntimeOptions 方言委托', () => {
+  const fakeClient = (configOptions: unknown): AcpClient => ({
+    connect: async () => ({ ok: true as const, value: { status: 'connected', init: {} } }),
+    createSession: async () => ({
+      ok: true as const,
+      value: { sessionId: 'probe', configOptions },
+    }),
+    disconnect: async () => undefined,
+  }) as unknown as AcpClient;
+
+  it('configId＋连字符 effort 方言命中（旧手搓 id 精确匹配会漏）', async () => {
+    clearRuntimeOptionsCacheForTest();
+    const result = await getAgentRuntimeOptions('dialect-a', {
+      createClient: () => fakeClient([
+        { configId: 'model', name: 'Model', options: [{ value: '6.1 Sol', name: '6.1 Sol' }] },
+        { configId: 'reasoning-effort', name: 'Effort', options: [{ value: 'xhigh', name: 'Xhigh' }] },
+      ]),
+    });
+    expect(result.models).toEqual([{ value: '6.1 Sol', label: '6.1 Sol' }]);
+    expect(result.efforts).toEqual(['xhigh']);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('id 字段变体＋category 定位命中', async () => {
+    clearRuntimeOptionsCacheForTest();
+    const result = await getAgentRuntimeOptions('dialect-b', {
+      createClient: () => fakeClient([
+        { id: 'model', options: [{ value: 'm1' }] },
+        { configId: 'picker', category: 'model', options: [{ value: 'm2', name: 'M2' }] },
+      ]),
+    });
+    // category 优先于 configId 命中（SDK 规则），取到 M2
+    expect(result.models).toEqual([{ value: 'm2', label: 'M2' }]);
+  });
+
+  it('空 configOptions 如实回空列表（非失败，无 error）', async () => {
+    clearRuntimeOptionsCacheForTest();
+    const result = await getAgentRuntimeOptions('dialect-c', {
+      createClient: () => fakeClient([]),
+    });
+    expect(result.models).toEqual([]);
+    expect(result.efforts).toEqual([]);
+    expect(result.error).toBeUndefined();
+  });
+});
+
+describe('acpClientHonorsCustomEnv', () => {  it('0.1.0 忽略 env→false；0.1.1 起→true；未知/非法版本不拦', () => {
     expect(acpClientHonorsCustomEnv('0.1.0')).toBe(false);
     expect(acpClientHonorsCustomEnv('0.1.1')).toBe(true);
     expect(acpClientHonorsCustomEnv('0.2.0')).toBe(true);
