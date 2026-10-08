@@ -320,8 +320,9 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   });
   const connected = gateway.isConnected;
   const agentAvailable = Boolean(agentStatus?.available);
-  const modelLabel =
-    selectedModel?.displayName || coachModelId || (modelsLoading ? '加载中…' : '本机默认');
+  const modelLabel = !runtimeCaps.supportsModelPicker
+    ? '运行时自带'
+    : selectedModel?.displayName || coachModelId || (modelsLoading ? '加载中…' : '本机默认');
 
   const composerSettingsNonDefault = Boolean(
     Boolean(coachCollaborationMode) ||

@@ -22,8 +22,10 @@ export function WordChatConfig() {
   const runtimeCaps = useSelectedRuntimeCaps();
   const modelsQuery = useAgentModelsQuery(open && runtimeCaps.supportsModelPicker);
   const models = modelsQuery.data ?? [];
-  const modelLabel = models.find(model => model.id === coachModelId || model.model === coachModelId)?.displayName
-    || coachModelId || '本机默认';
+  const modelLabel = !runtimeCaps.supportsModelPicker
+    ? '运行时自带'
+    : models.find(model => model.id === coachModelId || model.model === coachModelId)?.displayName
+      || coachModelId || '本机默认';
   return (
     <div className="mb-2">
       <button

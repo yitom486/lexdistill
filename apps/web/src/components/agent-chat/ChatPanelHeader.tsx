@@ -15,7 +15,9 @@ import { toast } from 'sonner';
 import { Button } from '../ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
 import { sound } from '../../utils/audio.js';
+import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
+import { agentRuntimeLabel } from '../../config/agent-runtimes.js';
 import type {
   AgentStatusDto,
   McpServerStatusDto,
@@ -104,6 +106,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
   } = props;
   const copy = getTutorTrackCopy(track);
   const runtimeCaps = useSelectedRuntimeCaps();
+  const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
   return (
     <header className="flex items-start justify-between gap-2 px-3 py-2.5 border-b border-line">
       <div className="min-w-0">
@@ -215,7 +218,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
         >
           {agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed'
             ? agentTurnHealth.message
-            : `${copy.headerHint} · Agent 流式${coachThreadId ? ` · ${coachThreadId.slice(0, 8)}…` : ''}`}
+            : `${copy.headerHint} · Agent 流式${agentRuntimeId && agentRuntimeId !== 'codex-acp' ? ` · ${agentRuntimeLabel(agentRuntimeId)}` : ''}${coachThreadId ? ` · ${coachThreadId.slice(0, 8)}…` : ''}`}
         </p>
       </div>
       <div className="flex items-center gap-0.5 shrink-0">

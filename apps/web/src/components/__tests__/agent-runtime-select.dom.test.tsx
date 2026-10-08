@@ -66,6 +66,31 @@ it('非 Codex 运行时：模型与思考深度禁用（能力开关驱动）', 
   client.clear();
 });
 
+it('非 Codex 运行时：模型标签显示运行时自带（不残留旧模型名）', async () => {
+  globalThis.fetch = (async () => Response.json({ runtimes: [
+    { id: 'codex-acp', label: 'ChatGPT', hint: '', configured: true,
+      capabilities: { supportsModelPicker: true, supportsEffort: true, supportsThreads: true, supportsUsage: true } },
+    { id: 'opencode', label: 'OpenCode', hint: '', configured: true,
+      capabilities: { supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false } },
+  ] })) as unknown as typeof fetch;
+  usePreferencesStore.setState({ agentRuntimeId: 'opencode', coachModelId: 'GPT-6-Luna' });
+  dom = await setupDom(true);
+  const doc = dom.dom.window.document;
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  await act(async () => dom!.root.render(
+    <QueryClientProvider client={client}><WordChatConfig /></QueryClientProvider>,
+  ));
+  const toggle = doc.querySelector('[aria-label="单词会话配置"]') as HTMLButtonElement | null;
+  await act(async () => toggle!.click());
+  for (let i = 0; i < 50; i++) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+    if (doc.body.textContent?.includes('运行时自带')) break;
+  }
+  expect(doc.body.textContent).toContain('运行时自带');
+  client.clear();
+  usePreferencesStore.setState({ coachModelId: '' });
+});
+
 it('能力开关 fail-open：后端未返回时全开（= 现状）', async () => {
   globalThis.fetch = (async () => Response.json({ runtimes: [] })) as unknown as typeof fetch;
   usePreferencesStore.setState({ agentRuntimeId: 'deepseek' });
