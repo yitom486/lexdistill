@@ -419,6 +419,32 @@ export function useAgentRuntimesQuery(enabled = true) {  return useQuery<AgentRu
   });
 }
 
+export interface AgentRuntimeOptionsDto {
+  models: Array<{ value: string; label: string }>;
+  efforts: string[];
+  error?: string;
+}
+
+/** 运行时真实选项（模型/思考深度；codex 主链路不用，前端按 caps 决定是否拉取）。 */
+export function useAgentRuntimeOptionsQuery(runtimeId: string, enabled = true) {
+  return useQuery<AgentRuntimeOptionsDto>({
+    queryKey: [...AGENT_QUERY_KEYS.MCP_SERVERS, 'runtime-options', runtimeId] as const,
+    enabled: enabled && !!runtimeId,
+    queryFn: async () => {
+      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/runtimes/${encodeURIComponent(runtimeId)}/options`);
+      if (!res.ok) return { models: [], efforts: [] };
+      const data = (await res.json()) as Partial<AgentRuntimeOptionsDto>;
+      return {
+        models: Array.isArray(data.models) ? data.models : [],
+        efforts: Array.isArray(data.efforts) ? data.efforts : [],
+        ...(typeof data.error === 'string' ? { error: data.error } : {}),
+      };
+    },
+    staleTime: 1000 * 60 * 10,
+    retry: 1,
+  });
+}
+
 export interface AgentProviderStatusDto {
   configured: boolean;
   name?: string;

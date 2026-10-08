@@ -2,6 +2,8 @@ import { ArrowUp, ListOrdered, Settings2, Square } from 'lucide-react';
 import { Button } from '../ui/button.js';
 import { AgentRuntimeSelect } from '../AgentRuntimeSelect.js';
 import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
+import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
+import { useAgentRuntimeOptionsQuery } from '../../queries/useAgentQueries.js';
 import {
   Select,
   SelectContent,
@@ -43,6 +45,7 @@ interface ChatComposerProps {
   queueMessage: { isPending: boolean };
   coachThreadId: string;
   agentStatus?: AgentStatusDto | undefined;
+  onRuntimeChange?: (() => void) | undefined;
 }
 
 /** P2-1 拆分：输入区 + 会话参数弹层 + 模型选择 + 发送/排队/停止（纯搬运自 AgentChatPanel）。 */
@@ -72,8 +75,22 @@ export function ChatComposer(props: ChatComposerProps) {
     queueMessage,
     coachThreadId,
     agentStatus,
+    onRuntimeChange,
   } = props;
   const runtimeCaps = useSelectedRuntimeCaps();
+  const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
+  const runtimeOptions = useAgentRuntimeOptionsQuery(
+    agentRuntimeId || 'codex-acp',
+    !!agentRuntimeId && agentRuntimeId !== 'codex-acp',
+  );
+  const modelChoices = runtimeCaps.supportsModelPicker
+    ? models.map(m => ({ value: m.id || m.model, label: m.displayName || m.model }))
+    : (runtimeOptions.data?.models ?? []);
+  const modelValue = modelChoices.some(m => m.value === coachModelId) ? coachModelId : '__auto__';
+  const effortChoices = runtimeCaps.supportsEffort
+    ? [...effortOptions]
+    : (runtimeOptions.data?.efforts ?? []);
+  const effortValue = effortChoices.includes(coachEffort) ? coachEffort : '__auto__';
   return (
     <footer className="shrink-0 p-3 pt-1.5">
       <div className="rounded-2xl border border-line bg-surface focus-within:border-tone-amber-500o40">
@@ -182,18 +199,23 @@ export function ChatComposer(props: ChatComposerProps) {
 
                 <div className="space-y-0.5">
                   <span className="block px-0.5 text-[10px] text-ink-ghost">
-                    思考深度{runtimeCaps.supportsEffort ? '' : '（当前运行时用自带默认）'}
+                    思考深度{!runtimeCaps.supportsEffort && effortChoices.length === 0 ? '（运行时默认）' : ''}
                   </span>
                   <Select
-                    value={coachEffort || 'medium'}
-                    onValueChange={(v) => v && setCoachEffort(String(v))}
-                    disabled={busy || !runtimeCaps.supportsEffort}
+                    value={effortValue}
+                    onValueChange={(v) => v && setCoachEffort(v === '__auto__' ? '' : String(v))}
+                    disabled={busy || (!runtimeCaps.supportsEffort && effortChoices.length === 0)}
                   >
                     <SelectTrigger className={compactSelect}>
-                      <SelectValue>{effortLabel(coachEffort || 'medium')}</SelectValue>
+                      <SelectValue>{effortValue === '__auto__' ? '运行时默认' : effortLabel(effortValue)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent className="border-line bg-paper-soft text-ink">
-                      {effortOptions.map((e) => (
+                      {!runtimeCaps.supportsEffort && (
+                        <SelectItem value="__auto__" className={chatMenuItem}>
+                          运行时默认
+                        </SelectItem>
+                      )}
+                      {effortChoices.map((e) => (
                         <SelectItem key={e} value={e} className={chatMenuItem}>
                           {effortLabel(e)}
                         </SelectItem>
@@ -206,32 +228,42 @@ export function ChatComposer(props: ChatComposerProps) {
           </Popover>
 
           <div className="min-w-0 flex-1">
-            <AgentRuntimeSelect disabled={busy} />
+            <AgentRuntimeSelect
+              disabled={busy}
+              {...(onRuntimeChange ? { onRuntimeChange } : {})}
+            />
           </div>
 
           <div className="min-w-0 flex-1">
             <Select
-              value={coachModelId || '__default__'}
-              onValueChange={(v) => setCoachModelId(v === '__default__' ? '' : String(v ?? ''))}
-              disabled={busy || !runtimeCaps.supportsModelPicker}
+              value={modelValue}
+              onValueChange={(v) => setCoachModelId(v === '__auto__' ? '' : String(v ?? ''))}
+              disabled={busy || (!runtimeCaps.supportsModelPicker && modelChoices.length === 0)}
             >
               <SelectTrigger
                 className={`${compactSelect} max-w-[14rem]`}
-                title={runtimeCaps.supportsModelPicker ? undefined : '当前运行时用自带默认模型'}
+                title={!runtimeCaps.supportsModelPicker && modelChoices.length === 0 ? '当前运行时用自带默认模型' : undefined}
               >
-                <SelectValue placeholder="Model">{modelLabel}</SelectValue>
+                <SelectValue placeholder="Model">{modelValue === '__auto__' ? '运行时默认' : modelLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent className="border-line bg-paper-soft text-ink">
-                <SelectItem value="__default__" className={chatMenuItem}>
-                  本机默认
-                </SelectItem>
-                {models.map((m) => (
+                {!runtimeCaps.supportsModelPicker && (
+                  <SelectItem value="__auto__" className={chatMenuItem}>
+                    运行时默认
+                  </SelectItem>
+                )}
+                {runtimeCaps.supportsModelPicker && (
+                  <SelectItem value="__default__" className={chatMenuItem}>
+                    本机默认
+                  </SelectItem>
+                )}
+                {modelChoices.map((m) => (
                   <SelectItem
-                    key={m.id || m.model}
-                    value={m.id || m.model}
+                    key={m.value}
+                    value={m.value}
                     className={chatMenuItem}
                   >
-                    {m.displayName || m.model}
+                    {m.label}
                   </SelectItem>
                 ))}
               </SelectContent>

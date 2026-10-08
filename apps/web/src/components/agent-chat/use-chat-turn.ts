@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { toast } from 'sonner';
 import type { useAgentGateway } from '../../hooks/useAgentGateway.js';
 import {
   markToolCallsDone,
@@ -151,6 +152,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
         source?: string;
         threadId?: string;
         queueRemaining?: number;
+        toolWarnings?: string[];
         status?: 'COMPLETED' | 'INTERRUPTED' | 'FAILED';
         outcome?: 'streamed' | 'fallback' | 'not_requested';
         failure?: {
@@ -163,6 +165,9 @@ export function useChatTurn(deps: ChatTurnDeps) {
       }) => {
         queueDrainRef.current = false;
         recordCodexTurnCompletion(data);
+        if (data.toolWarnings?.length) {
+          toast.warning(data.toolWarnings.join('；'));
+        }
         if (data.threadId) {
           setCoachThreadId(data.threadId);
           void queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.SESSIONS });

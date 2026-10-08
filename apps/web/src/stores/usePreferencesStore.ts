@@ -29,6 +29,9 @@ export interface PreferencesState {
   coachModelId: string;
   /** Agent 运行时 id（codex-acp 默认；与 acp-client 内置运行时对齐） */
   agentRuntimeId: string;
+  /** 按运行时记忆的模型/思考深度（id 不跨运行时通用，切换时存取，互不串味） */
+  runtimeModels: Record<string, string>;
+  runtimeEfforts: Record<string, string>;
   /** 思考等级（turn/start.effort） */
   coachEffort: string;
   /** 审批策略：never | on-request | untrusted */
@@ -75,6 +78,8 @@ export interface PreferencesState {
 
   setCoachModelId: (modelId: string) => void;
   setAgentRuntimeId: (runtimeId: string) => void;
+  setRuntimeModel: (runtimeId: string, modelId: string) => void;
+  setRuntimeEffort: (runtimeId: string, effort: string) => void;
   setCoachEffort: (effort: string) => void;
   setCoachApprovalPolicy: (policy: string) => void;
   setCoachThreadId: (threadId: string) => void;
@@ -143,6 +148,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       tutorPanelWidthPx: 448,
       coachModelId: '',
       agentRuntimeId: 'codex-acp',
+      runtimeModels: {},
+      runtimeEfforts: {},
       coachEffort: 'medium',
       coachApprovalPolicy: 'never',
       coachThreadId: '',
@@ -198,6 +205,12 @@ export const usePreferencesStore = create<PreferencesState>()(
 
       setCoachModelId: (coachModelId: string) => set({ coachModelId }),
       setAgentRuntimeId: (agentRuntimeId: string) => set({ agentRuntimeId }),
+      setRuntimeModel: (runtimeId: string, modelId: string) => set((state) => ({
+        runtimeModels: { ...state.runtimeModels, [runtimeId]: modelId },
+      })),
+      setRuntimeEffort: (runtimeId: string, effort: string) => set((state) => ({
+        runtimeEfforts: { ...state.runtimeEfforts, [runtimeId]: effort },
+      })),
       setCoachEffort: (coachEffort: string) => set({ coachEffort }),
       setCoachApprovalPolicy: (coachApprovalPolicy: string) => set({ coachApprovalPolicy }),
       setCoachThreadId: (coachThreadId: string) => set({ coachThreadId }),

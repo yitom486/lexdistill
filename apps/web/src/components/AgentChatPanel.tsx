@@ -321,7 +321,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   const connected = gateway.isConnected;
   const agentAvailable = Boolean(agentStatus?.available);
   const modelLabel = !runtimeCaps.supportsModelPicker
-    ? '运行时自带'
+    ? '运行时默认'
     : selectedModel?.displayName || coachModelId || (modelsLoading ? '加载中…' : '本机默认');
 
   const composerSettingsNonDefault = Boolean(
@@ -397,6 +397,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
           setCoachModelId={setCoachModelId}
           modelLabel={modelLabel}
           models={models}
+          onRuntimeChange={() => startNewChat()}
           enqueueQueued={enqueueQueued}
           interrupt={interrupt}
           queueMessage={queueMessage}

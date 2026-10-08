@@ -14,16 +14,34 @@ import { chatMenuItem, compactSelect } from './agent-chat/chat-shared.js';
 interface AgentRuntimeSelectProps {
   disabled?: boolean;
   onCustomApi?: () => void;
+  /** 运行时真正切换时触发（custom 入口不触发）：调用方据此重置会话。 */
+  onRuntimeChange?: (previous: string, next: string) => void;
 }
 
-/** Agent 运行时下拉（自读写偏好）：ChatGPT 默认；自定义 API 默认进设置页（可被覆盖）。 */
-export function AgentRuntimeSelect({ disabled, onCustomApi }: AgentRuntimeSelectProps) {
+/**
+ * Agent 运行时下拉（自读写偏好）：ChatGPT 默认；自定义 API 默认进设置页（可被覆盖）。
+ * 模型 id 不跨运行时通用：切换时存档当前选择并恢复目标槽位（空=运行时默认），互不串味。
+ */
+export function AgentRuntimeSelect({ disabled, onCustomApi, onRuntimeChange }: AgentRuntimeSelectProps) {
   const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
   const setAgentRuntimeId = usePreferencesStore(state => state.setAgentRuntimeId);
   const setActiveTab = useStudySessionStore(state => state.setActiveTab);
   const { data: statuses = [] } = useAgentRuntimesQuery(true);
   const statusOf = (id: string) => statuses.find(entry => entry.id === id)?.configured ?? null;
   const goCustomApi = onCustomApi ?? (() => setActiveTab('SETTINGS'));
+
+  const switchRuntime = (value: string) => {
+    const prev = agentRuntimeId || 'codex-acp';
+    if (!value || value === prev) return;
+    const state = usePreferencesStore.getState();
+    state.setRuntimeModel(prev, state.coachModelId);
+    state.setRuntimeEffort(prev, state.coachEffort);
+    state.setCoachModelId(state.runtimeModels[value] ?? '');
+    state.setCoachEffort(state.runtimeEfforts[value] ?? '');
+    setAgentRuntimeId(value);
+    onRuntimeChange?.(prev, value);
+  };
+
   return (
     <Select
       value={agentRuntimeId || 'codex-acp'}
@@ -32,7 +50,7 @@ export function AgentRuntimeSelect({ disabled, onCustomApi }: AgentRuntimeSelect
           goCustomApi();
           return;
         }
-        if (value) setAgentRuntimeId(String(value));
+        if (value) switchRuntime(String(value));
       }}
       {...(disabled ? { disabled: true as const } : {})}
     >

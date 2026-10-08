@@ -186,6 +186,16 @@ export function createAgentRoutes(deps: GatewayDeps) {
     // Agent 运行时目录＋自定义供应商伪条目：id 与前端配置对齐。
     return c.json({ runtimes: [...listAgentRuntimes(), await customRuntimeStatus()] });
   })
+  .get('/api/agent/runtimes/:id/options', async (c) => {
+    // 运行时真实选项（模型/思考深度列表，10 分钟缓存；无凭证如实空＋error）。
+    // codex-acp 同样走 ACP 会话读表（与 setConfigOption 同一 id 口径，不再猜）。
+    const id = c.req.param('id');
+    if (!id) {
+      return formatBusinessErrorResponse(c,
+        new BusinessError('E_INVALID_INPUT', '缺少运行时 id', 'VALIDATION'), 'AGENT_RUNTIME_OPTIONS');
+    }
+    return c.json(await deps.server.acpAdapterPool.getRuntimeOptions(id));
+  })
   .get('/api/agent/provider', async (c) => {
     // 自定义供应商状态（脱敏：Key 永不回传）。
     return c.json({ provider: await getAcpProviderStatus() });

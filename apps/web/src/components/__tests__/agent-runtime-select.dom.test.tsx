@@ -66,7 +66,7 @@ it('非 Codex 运行时：模型与思考深度禁用（能力开关驱动）', 
   client.clear();
 });
 
-it('非 Codex 运行时：模型标签显示运行时自带（不残留旧模型名）', async () => {
+it('非 Codex 运行时：模型标签显示运行时默认（不残留旧模型名）', async () => {
   globalThis.fetch = (async () => Response.json({ runtimes: [
     { id: 'codex-acp', label: 'ChatGPT', hint: '', configured: true,
       capabilities: { supportsModelPicker: true, supportsEffort: true, supportsThreads: true, supportsUsage: true } },
@@ -84,9 +84,9 @@ it('非 Codex 运行时：模型标签显示运行时自带（不残留旧模型
   await act(async () => toggle!.click());
   for (let i = 0; i < 50; i++) {
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
-    if (doc.body.textContent?.includes('运行时自带')) break;
+    if (doc.body.textContent?.includes('运行时默认')) break;
   }
-  expect(doc.body.textContent).toContain('运行时自带');
+  expect(doc.body.textContent).toContain('运行时默认');
   client.clear();
   usePreferencesStore.setState({ coachModelId: '' });
 });

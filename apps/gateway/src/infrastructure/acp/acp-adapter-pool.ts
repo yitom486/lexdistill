@@ -12,6 +12,7 @@ import { BusinessError } from '@study-studio/shared';
 import { AcpAdapter } from '@study-studio/agent-runtime';
 import type { AcpAdapterOptions } from '@study-studio/agent-runtime';
 import type { SessionToolBridge } from '../../runtime/mcp/session-tool-bridge.js';
+import { getAgentRuntimeOptions, type AgentRuntimeOptions } from '../../runtime/router/runtime-options.js';
 
 /**
  * ACP 适配器池（网关基础设施层；温进程复用，同 runtime 单客户端）。
@@ -74,6 +75,21 @@ export class AcpAdapterPool {
     const adapter = runtimeId === 'custom' ? this.createCustomAdapter() : this.createBuiltinAdapter(runtimeId);
     this.adapters.set(runtimeId, adapter);
     return adapter;
+  }
+
+  /**
+   * 运行时真实选项（模型/思考深度列表，10 分钟缓存）。
+   * 独立轻量探针客户端，用完即断，不占用池内温进程。
+   */
+  public getRuntimeOptions(runtimeId: string): Promise<AgentRuntimeOptions> {
+    return getAgentRuntimeOptions(runtimeId, {
+      createClient: (id) => new AcpClient({
+        runtime: id,
+        workspaceRoot: this.deps.workspaceRoot ?? process.cwd(),
+        clientInfo: { name: 'lingua-studio-gateway-probe', version: '1.0.0' },
+        callbacks: {},
+      }),
+    });
   }
 
   private baseOptions(

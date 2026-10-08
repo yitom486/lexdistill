@@ -243,7 +243,23 @@ export async function handleTurnSend(
         const learningTools = resolvedNames
           .map((name) => server.toolRegistry.get(name))
           .filter((tool): tool is ToolDefinition => Boolean(tool));
-        // 显式任务一个工具都落不到注册表：直接失败，不建会话、不烧模型轮次、不让模型瞎编“找不到”。
+        // ACP 模型/思考深度校验（仅证伪不断言）：探针拿到真实列表且指名不在表里，
+        // 才丢弃改走运行时默认（发前拦截的是旧 codex 模型 id 串台）；探针失败（无凭证等）
+        // 不拦，沿用 setConfigOption 大声报错。
+        let dropModel = false;
+        let dropEffort = false;
+        if (wantedAdapter === 'acp' && (preferredModel || preferredEffort)) {
+          const proven = await server.acpAdapterPool.getRuntimeOptions(requestedRuntimeId ?? 'codex-acp');
+          if (preferredModel && proven.models.length > 0
+            && !proven.models.some(item => item.value === preferredModel)) {
+            toolWarnings.push(`模型 ${preferredModel} 在当前运行时不可用，已改用运行时默认模型`);
+            dropModel = true;
+          }
+          if (preferredEffort && proven.efforts.length > 0 && !proven.efforts.includes(preferredEffort)) {
+            toolWarnings.push(`思考深度 ${preferredEffort} 在当前运行时不可用，已改用运行时默认`);
+            dropEffort = true;
+          }
+        }
         if (requestedTools.length > 0 && learningTools.length === 0) {
           reply = `当前网关缺少任务所需工具（${requestedTools.join('、')}），请把网关更新到最新构建后重启，再重发一次。`;
           replySource = 'local';
@@ -306,8 +322,8 @@ export async function handleTurnSend(
             userId,
             tools: learningTools,
           };
-          if (preferredModel) sessionOpts.model = preferredModel;
-          if (preferredEffort) sessionOpts.effort = preferredEffort;
+          if (preferredModel && !dropModel) sessionOpts.model = preferredModel;
+          if (preferredEffort && !dropEffort) sessionOpts.effort = preferredEffort;
           if (preferredApproval) sessionOpts.approvalPolicy = preferredApproval;
           if (resumeThreadId) sessionOpts.resumeThreadId = resumeThreadId;
           if (preferPersistent === true) sessionOpts.ephemeral = false;
