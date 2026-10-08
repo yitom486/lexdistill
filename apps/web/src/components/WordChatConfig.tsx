@@ -10,6 +10,7 @@ import { useAgentModelsQuery } from '../queries/useAgentQueries.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { FALLBACK_EFFORTS, chatMenuItem, compactSelect, effortLabel } from './agent-chat/chat-shared.js';
 import { AgentRuntimeSelect } from './AgentRuntimeSelect.js';
+import { useSelectedRuntimeCaps } from '../hooks/useSelectedRuntimeCaps.js';
 
 /** 单词面板精简配置（折叠）：模型＋思考深度，读写与主聊同一份偏好，选 luna 全局生效。 */
 export function WordChatConfig() {
@@ -20,6 +21,7 @@ export function WordChatConfig() {
   const setCoachEffort = usePreferencesStore(state => state.setCoachEffort);
   const modelsQuery = useAgentModelsQuery(open);
   const models = modelsQuery.data ?? [];
+  const runtimeCaps = useSelectedRuntimeCaps();
   const modelLabel = models.find(model => model.id === coachModelId || model.model === coachModelId)?.displayName
     || coachModelId || '本机默认';
   return (
@@ -40,8 +42,10 @@ export function WordChatConfig() {
             <AgentRuntimeSelect />
           </label>
           <label className="block">
-            <span className="mb-0.5 block text-[10px] text-ink-ghost">模型</span>
-            <Select value={coachModelId || '__default__'} onValueChange={value => setCoachModelId(value === '__default__' ? '' : String(value ?? ''))}>
+            <span className="mb-0.5 block text-[10px] text-ink-ghost">
+              模型{runtimeCaps.supportsModelPicker ? '' : '（运行时自带）'}
+            </span>
+            <Select value={coachModelId || '__default__'} onValueChange={value => setCoachModelId(value === '__default__' ? '' : String(value ?? ''))} disabled={!runtimeCaps.supportsModelPicker}>
               <SelectTrigger className={compactSelect} aria-label="选择模型">
                 <SelectValue>{modelLabel}</SelectValue>
               </SelectTrigger>
@@ -56,8 +60,10 @@ export function WordChatConfig() {
             </Select>
           </label>
           <label className="block">
-            <span className="mb-0.5 block text-[10px] text-ink-ghost">思考深度</span>
-            <Select value={coachEffort || 'medium'} onValueChange={value => value && setCoachEffort(String(value))}>
+            <span className="mb-0.5 block text-[10px] text-ink-ghost">
+              思考深度{runtimeCaps.supportsEffort ? '' : '（运行时自带）'}
+            </span>
+            <Select value={coachEffort || 'medium'} onValueChange={value => value && setCoachEffort(String(value))} disabled={!runtimeCaps.supportsEffort}>
               <SelectTrigger className={compactSelect} aria-label="选择思考深度">
                 <SelectValue>{effortLabel(coachEffort || 'medium')}</SelectValue>
               </SelectTrigger>

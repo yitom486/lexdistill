@@ -11,7 +11,21 @@ export interface AgentRuntimeStatus {
   hint: string;
   /** true=可连；false=缺凭证；null=无法判定（前端显示未验证）。 */
   configured: boolean | null;
+  capabilities: AgentRuntimeCapabilities;
 }
+
+/**
+ * 按运行时能力开关（单一事实源，前端据此禁用模型/思考深度控件，禁止按 id 硬编码特例）。
+ * codex-acp 沿用 Codex 旧链路故全开；ACP 侧模型/思考深度映射未验证前一律关闭，
+ * 由 Agent 用自带默认（而非前端瞎传 codex 专属值）。
+ */
+export interface AgentRuntimeCapabilities {
+  supportsModelPicker: boolean;
+  supportsEffort: boolean;
+}
+
+const FULL_CAPABILITIES: AgentRuntimeCapabilities = { supportsModelPicker: true, supportsEffort: true };
+const AGENT_DEFAULT_CAPABILITIES: AgentRuntimeCapabilities = { supportsModelPicker: false, supportsEffort: false };
 
 function envConfigured(requiredEnvKeys: readonly string[] | undefined, runtimeId: string): boolean | null {
   if (runtimeId === 'agy') return true;
@@ -25,6 +39,7 @@ export function listAgentRuntimes(): AgentRuntimeStatus[] {
     label: entry.name,
     hint: entry.authHint || entry.description,
     configured: entry.id === 'codex-acp' ? probeCodexAuth().looksLoggedIn : envConfigured(entry.requiredEnvKeys, entry.id),
+    capabilities: entry.id === 'codex-acp' ? FULL_CAPABILITIES : AGENT_DEFAULT_CAPABILITIES,
   }));
 }
 
@@ -36,6 +51,7 @@ export async function customRuntimeStatus(): Promise<AgentRuntimeStatus> {
     label: '自定义 API',
     hint: status.configured ? `${status.name || '已配置'} · ${status.model || ''}`.trim() : '自备兼容端点（OpenAI 兼容）',
     configured: status.configured,
+    capabilities: AGENT_DEFAULT_CAPABILITIES,
   };
 }
 

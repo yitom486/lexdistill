@@ -397,6 +397,7 @@ export interface AgentRuntimeStatusDto {
   label: string;
   hint: string;
   configured: boolean | null;
+  capabilities?: { supportsModelPicker?: boolean; supportsEffort?: boolean } | undefined;
 }
 
 export function useAgentRuntimesQuery(enabled = true) {  return useQuery<AgentRuntimeStatusDto[]>({

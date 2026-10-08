@@ -1,6 +1,7 @@
 import { ArrowUp, ListOrdered, Settings2, Square } from 'lucide-react';
 import { Button } from '../ui/button.js';
 import { AgentRuntimeSelect } from '../AgentRuntimeSelect.js';
+import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
 import {
   Select,
   SelectContent,
@@ -72,6 +73,7 @@ export function ChatComposer(props: ChatComposerProps) {
     coachThreadId,
     agentStatus,
   } = props;
+  const runtimeCaps = useSelectedRuntimeCaps();
   return (
     <footer className="shrink-0 p-3 pt-1.5">
       <div className="rounded-2xl border border-line bg-surface focus-within:border-tone-amber-500o40">
@@ -179,11 +181,13 @@ export function ChatComposer(props: ChatComposerProps) {
                 </div>
 
                 <div className="space-y-0.5">
-                  <span className="block px-0.5 text-[10px] text-ink-ghost">思考深度</span>
+                  <span className="block px-0.5 text-[10px] text-ink-ghost">
+                    思考深度{runtimeCaps.supportsEffort ? '' : '（当前运行时用自带默认）'}
+                  </span>
                   <Select
                     value={coachEffort || 'medium'}
                     onValueChange={(v) => v && setCoachEffort(String(v))}
-                    disabled={busy}
+                    disabled={busy || !runtimeCaps.supportsEffort}
                   >
                     <SelectTrigger className={compactSelect}>
                       <SelectValue>{effortLabel(coachEffort || 'medium')}</SelectValue>
@@ -209,9 +213,12 @@ export function ChatComposer(props: ChatComposerProps) {
             <Select
               value={coachModelId || '__default__'}
               onValueChange={(v) => setCoachModelId(v === '__default__' ? '' : String(v ?? ''))}
-              disabled={busy}
+              disabled={busy || !runtimeCaps.supportsModelPicker}
             >
-              <SelectTrigger className={`${compactSelect} max-w-[14rem]`}>
+              <SelectTrigger
+                className={`${compactSelect} max-w-[14rem]`}
+                title={runtimeCaps.supportsModelPicker ? undefined : '当前运行时用自带默认模型'}
+              >
                 <SelectValue placeholder="Model">{modelLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent className="border-line bg-paper-soft text-ink">

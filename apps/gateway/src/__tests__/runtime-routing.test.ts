@@ -23,6 +23,15 @@ describe('listAgentRuntimes', () => {
       ['codex-acp', 'claude', 'gemini', 'copilot', 'opencode', 'cursor-cli', 'deepseek', 'agy']);
     expect(typeof runtimes.find(entry => entry.id === 'codex-acp')?.configured).toBe('boolean');
   });
+
+  it('能力开关：codex 全开，其余关闭（无硬编码特例，统一走开关）', () => {
+    const runtimes = listAgentRuntimes();
+    expect(runtimes.find(entry => entry.id === 'codex-acp')?.capabilities)
+      .toEqual({ supportsModelPicker: true, supportsEffort: true });
+    for (const entry of runtimes.filter(item => item.id !== 'codex-acp')) {
+      expect(entry.capabilities).toEqual({ supportsModelPicker: false, supportsEffort: false });
+    }
+  });
 });
 
 describe('AcpAdapterPool', () => {
