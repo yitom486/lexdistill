@@ -82,6 +82,13 @@ export interface AcpAdapterOptions {
   describeConfigIds?:
     | ((configOptions: unknown) => { model: string | null; effort: string | null })
     | undefined;
+  /**
+   * 变体思考档应用解析（方括号变体路）：把（模型，档位）翻成 listed 模型 id，
+   * 调用方以此 id 改写模型设置。返回 null 表示不可解析（调用方警告跳过）。
+   */
+  resolveThinkingModelId?:
+    | ((configOptions: unknown, effort: string, modelHint?: string) => { configId: string; value: string } | null)
+    | undefined;
   /** 诊断透出（spike/test）；生产不接。 */
   debugUpdates?: ((params: Record<string, unknown>) => void) | undefined;
   debugLog?: ((level: string, message: string) => void) | undefined;
@@ -438,23 +445,38 @@ export class AcpAdapter implements AgentAdapter {
       const setupWarnings: string[] = [];
       const discovered = this.options.describeConfigIds?.(handle.configOptions);
       const modelConfigId = discovered?.model || 'model';
-      // 注入器在场但没找到 = 该 Agent 真没有 effort 选项（查过真表），跳过；
+      // 注入器在场但没找到 = 该 Agent 真没有 effort 选项（查过真表），走变体解析；
       // 注入器缺席 = 没查，按 legacy 照发（失败转警告）。
       const effortConfigId = discovered ? discovered.effort : 'reasoning_effort';
-      if (sessionOptions.model) {
+      // 变体改写含模型设置，先算档位（命中则跳过随后的独立模型设置，免重复下发）。
+      let modelDoneViaVariant = false;
+      if (sessionOptions.effort && !effortConfigId) {
+        // 变体路：档位编码在模型 id 里，改写模型设置（如下游 Inkdown 同款：只发 listed 原值）。
+        const variant = this.options.resolveThinkingModelId?.(
+          handle.configOptions,
+          sessionOptions.effort,
+          sessionOptions.model,
+        );
+        if (variant) {
+          const appliedVariant = await handle.setConfigOption(variant.configId, variant.value);
+          if (!appliedVariant.ok) {
+            setupWarnings.push(`思考深度 ${sessionOptions.effort} 在当前运行时未生效（${appliedVariant.error.message}），已改用运行时默认`);
+          }
+          modelDoneViaVariant = true;
+        } else {
+          setupWarnings.push(`当前运行时无思考深度选项，已忽略 ${sessionOptions.effort}（用运行时默认）`);
+        }
+      }
+      if (sessionOptions.model && !modelDoneViaVariant) {
         const applied = await handle.setConfigOption(modelConfigId, sessionOptions.model);
         if (!applied.ok) {
           setupWarnings.push(`模型 ${sessionOptions.model} 在当前运行时未生效（${applied.error.message}），已改用运行时默认`);
         }
       }
-      if (sessionOptions.effort) {
-        if (!effortConfigId) {
-          setupWarnings.push(`当前运行时无思考深度选项，已忽略 ${sessionOptions.effort}（用运行时默认）`);
-        } else {
-          const appliedEffort = await handle.setConfigOption(effortConfigId, sessionOptions.effort);
-          if (!appliedEffort.ok) {
-            setupWarnings.push(`思考深度 ${sessionOptions.effort} 在当前运行时未生效（${appliedEffort.error.message}），已改用运行时默认`);
-          }
+      if (sessionOptions.effort && effortConfigId) {
+        const appliedEffort = await handle.setConfigOption(effortConfigId, sessionOptions.effort);
+        if (!appliedEffort.ok) {
+          setupWarnings.push(`思考深度 ${sessionOptions.effort} 在当前运行时未生效（${appliedEffort.error.message}），已改用运行时默认`);
         }
       }
       const tokens = this.options.resolveMcpToken

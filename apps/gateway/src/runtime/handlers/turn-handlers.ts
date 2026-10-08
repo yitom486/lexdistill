@@ -245,7 +245,8 @@ export async function handleTurnSend(
           .filter((tool): tool is ToolDefinition => Boolean(tool));
         // ACP 模型/思考深度校验（仅证伪不断言）：探针拿到真实列表且指名不在表里，
         // 才丢弃改走运行时默认（发前拦截的是旧 codex 模型 id 串台）；探针失败（无凭证等）
-        // 不拦，沿用 setConfigOption 大声报错。
+        // 不拦，沿用 setConfigOption 大声报错。变体档（effortsVariant）只对探针时刻的
+        // 当前模型背书，换 base 后由建会话 live 解析，不在此误杀。
         let dropModel = false;
         let dropEffort = false;
         if (wantedAdapter === 'acp' && (preferredModel || preferredEffort)) {
@@ -255,7 +256,7 @@ export async function handleTurnSend(
             toolWarnings.push(`模型 ${preferredModel} 在当前运行时不可用，已改用运行时默认模型`);
             dropModel = true;
           }
-          if (preferredEffort && proven.efforts.length > 0 && !proven.efforts.includes(preferredEffort)) {
+          if (preferredEffort && !proven.effortsVariant && proven.efforts.length > 0 && !proven.efforts.includes(preferredEffort)) {
             toolWarnings.push(`思考深度 ${preferredEffort} 在当前运行时不可用，已改用运行时默认`);
             dropEffort = true;
           }

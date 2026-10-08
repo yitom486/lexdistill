@@ -10,6 +10,7 @@ import {
   parseAcpConfigOptions,
   readStoredAcpProvider,
 } from '@yitom/acp-client';
+import { discoverThinking, resolveThinkingModelId } from '../../runtime/router/model-thinking.js';
 import { BusinessError } from '@study-studio/shared';
 import { AcpAdapter } from '@study-studio/agent-runtime';
 import type { AcpAdapterOptions } from '@study-studio/agent-runtime';
@@ -158,14 +159,21 @@ export class AcpAdapterPool {
   ): AcpAdapterOptions {
     return {
       createClient,
-      // 会话真实 configId 发现（各 Agent 命名不一），解析归 SDK，适配器只消费结果。
+      // 会话真实 configId 发现（与探针同一实现，不漂移），解析归 SDK＋网关规则，适配器只消费结果。
       describeConfigIds: (configOptions) => {
         const parsed = parseAcpConfigOptions(configOptions);
-        const effort = parsed.find(option => option.configId.includes('effort'));
+        const thinking = discoverThinking(parsed, findModelConfigOption(parsed));
         return {
           model: findModelConfigOption(parsed)?.configId ?? null,
-          effort: effort?.configId ?? null,
+          effort: thinking.effortConfigId,
         };
+      },
+      // 变体思考档应用解析（方括号变体路；横杠不发明，返回 null 即警告跳过）。
+      resolveThinkingModelId: (configOptions, effort, modelHint) => {
+        const parsed = parseAcpConfigOptions(configOptions);
+        const model = findModelConfigOption(parsed);
+        if (!model) return null;
+        return resolveThinkingModelId(model, effort, modelHint);
       },
       buildMcpServers: (tools, context) => {
         if (tools.length === 0) return [];

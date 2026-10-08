@@ -17,7 +17,7 @@ function trackHandle(configOptions: unknown, failIds: string[] = []): AcpSession
   };
 }
 
-function makeAdapter(handle: AcpSessionHandleLike, describeConfigIds?: (configOptions: unknown) => { model: string | null; effort: string | null }): AcpAdapter {
+function makeAdapter(handle: AcpSessionHandleLike, describeConfigIds?: (configOptions: unknown) => { model: string | null; effort: string | null }, resolveThinkingModelId?: (configOptions: unknown, effort: string, modelHint?: string) => { configId: string; value: string } | null): AcpAdapter {
   const client: AcpClientLike = {
     connect: async () => ({ ok: true as const, value: {} }),
     createSession: async () => ({ ok: true as const, value: handle }),
@@ -27,6 +27,7 @@ function makeAdapter(handle: AcpSessionHandleLike, describeConfigIds?: (configOp
     createClient: () => client,
     buildMcpServers: () => [],
     ...(describeConfigIds ? { describeConfigIds } : {}),
+    ...(resolveThinkingModelId ? { resolveThinkingModelId } : {}),
   });
 }
 
@@ -86,6 +87,41 @@ describe('AcpAdapter 建会话 configId 发现＋偏好降级', () => {
       { id: 'model', value: 'm-x' },
       { id: 'reasoning_effort', value: 'high' },
     ]);
+    await adapter.shutdown('test');
+  });
+
+  it('变体路：档位改写模型 id，跳过独立设置（如下游同款）', async () => {
+    const handle = trackHandle([{ configId: 'model' }]);
+    const adapter = makeAdapter(
+      handle,
+      () => ({ model: 'model', effort: null }),
+      () => ({ configId: 'model', value: 'm[reasoning_effort=high]' }),
+    );
+    const res = await adapter.createSession({ ...SESSION_OPTS });
+    expect(res.ok).toBe(true);
+    // 仅一次模型改写调用，无独立 effort 设置
+    expect(handle.calls).toEqual([{ id: 'model', value: 'm[reasoning_effort=high]' }]);
+    if (res.ok) {
+      expect((res.value as AcpAgentSession).drainSetupWarnings()).toEqual([]);
+    }
+    await adapter.shutdown('test');
+  });
+
+  it('变体不可解析：警告跳过，会话照常建成', async () => {
+    const handle = trackHandle([{ configId: 'model' }]);
+    const adapter = makeAdapter(
+      handle,
+      () => ({ model: 'model', effort: null }),
+      () => null,
+    );
+    const res = await adapter.createSession({ sessionId: 's1', userId: 'u1', effort: 'high' });
+    expect(res.ok).toBe(true);
+    expect(handle.calls).toEqual([]);
+    if (res.ok) {
+      const warnings = (res.value as AcpAgentSession).drainSetupWarnings();
+      expect(warnings.length).toBe(1);
+      expect(warnings[0]).toContain('high');
+    }
     await adapter.shutdown('test');
   });
 });

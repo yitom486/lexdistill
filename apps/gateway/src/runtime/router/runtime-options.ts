@@ -1,5 +1,5 @@
 import { AcpClient, findModelConfigOption, parseAcpConfigOptions } from '@yitom/acp-client';
-import type { AcpConfigOption } from '@yitom/acp-client';
+import { discoverThinking } from './model-thinking.js';
 
 /**
  * 运行时选项探测（模型/思考深度真实列表，非硬编码）。
@@ -9,7 +9,8 @@ import type { AcpConfigOption } from '@yitom/acp-client';
  *   acp-client（`parseAcpConfigOptions`＋`findModelConfigOption`：configId/id 双字段、
  *   category 定位、顶层 models 合成，由 SDK 在建会话时完成，网关不再手搓解析）；
  *   model / effort 的 value 直接回填 setConfigOption，来回一致；
- * - 思考深度暂无 SDK finder：以 SDK 同款哲学（configId 含 effort 即命中）匹配解析后选项；
+ * - 思考档发现走网关 `model-thinking`（规则移植自下游 Inkdown：独立选项→直设，
+ *   方括号变体→模型 id 改写，两者皆无→不可设；横杠 `-fast` 系速度/子型号，不算思考档）；
  * - 10 分钟缓存；无凭证/建会话失败如实返回空＋error（前端禁用并明示，不编默认值）。
  */
 export interface AgentRuntimeOptionItem {
@@ -20,20 +21,16 @@ export interface AgentRuntimeOptionItem {
 export interface AgentRuntimeOptions {
   models: AgentRuntimeOptionItem[];
   efforts: string[];
+  /**
+   * true=档位来自变体候选（仅对探针时刻的当前模型背书；换 base 后由建会话 live 解析，
+   * 发前证伪跳过 effort，避免误杀）。
+   */
+  effortsVariant?: boolean;
   error?: string;
 }
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const cache = new Map<string, { at: number; value: AgentRuntimeOptions }>();
-
-/**
- * 思考深度选项定位（SDK 暂未提供 finder，网关只做最小匹配）：
- * 沿用 SDK `findModelConfigOption` 的同款哲学（configId 含关键字即命中），
- * 覆盖 reasoning_effort / reasoning-effort / effort 等方言。
- */
-function findEffortConfigOption(options: AcpConfigOption[]): AcpConfigOption | undefined {
-  return options.find((option) => option.configId.includes('effort'));
-}
 
 export async function getAgentRuntimeOptions(
   runtimeId: string,
@@ -54,14 +51,14 @@ export async function getAgentRuntimeOptions(
     if (!opened.ok) throw new Error(opened.error.message);
     const parsed = parseAcpConfigOptions(opened.value.configOptions);
     const modelEntry = findModelConfigOption(parsed);
-    const effortEntry = findEffortConfigOption(parsed);
+    const thinking = discoverThinking(parsed, modelEntry);
     const models = (modelEntry?.options ?? [])
       .map(option => ({
         value: option.value,
         label: option.name || option.value,
       }));
-    const efforts = (effortEntry?.options ?? []).map(option => option.value);
-    value = { models, efforts };
+    const efforts = thinking.efforts;
+    value = { models, efforts, ...(thinking.variant ? { effortsVariant: true } : {}) };
   } catch (error) {
     value = { models: [], efforts: [], error: error instanceof Error ? error.message : String(error) };
   } finally {

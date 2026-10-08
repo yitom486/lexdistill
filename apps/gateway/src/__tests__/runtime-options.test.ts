@@ -65,6 +65,20 @@ describe('getAgentRuntimeOptions 方言委托', () => {
     expect(result.efforts).toEqual([]);
     expect(result.error).toBeUndefined();
   });
+
+  it('方括号变体：档位来自候选＋effortsVariant 标记（发前不误杀）', async () => {
+    clearRuntimeOptionsCacheForTest();
+    const result = await getAgentRuntimeOptions('dialect-d', {
+      createClient: () => fakeClient([
+        {
+          configId: 'model', category: 'model', currentValue: 'm[reasoning_effort=low]',
+          options: [{ value: 'm[reasoning_effort=low]', name: 'L' }, { value: 'm[reasoning_effort=high]', name: 'H' }],
+        },
+      ]),
+    });
+    expect(result.efforts).toEqual(['low', 'high']);
+    expect(result.effortsVariant).toBe(true);
+  });
 });
 
 describe('acpClientHonorsCustomEnv', () => {  it('0.1.0 忽略 env→false；0.1.1 起→true；未知/非法版本不拦', () => {
