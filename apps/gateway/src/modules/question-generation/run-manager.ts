@@ -1,5 +1,6 @@
 import { BusinessError } from '@study-studio/shared';
-import type { AgentAdapter, ExternalToolExecutor } from '@study-studio/agent-runtime';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
+import type { ToolRegistry } from '@study-studio/tool-core';
 import type { GenerationAudioRenderer, QuestionGenerationRepository } from './ports.js';
 import type { GenerationConfig } from '@study-studio/protocol';
 import type { GenerationTaskService } from './service.js';
@@ -8,8 +9,10 @@ import { runGenerationTask } from './runner.js';
 export interface GenerationRunManagerDeps {
   service: GenerationTaskService;
   repository: QuestionGenerationRepository;
-  /** 每任务独立 Adapter；生产传入 CodexAdapter 构造器，测试传入替身。 */
-  createAdapter: (executeTool: ExternalToolExecutor) => AgentAdapter;
+  /** 按冻结运行时取池适配器（常返 ACP，不过期任务不走此路）。 */
+  resolveRunAdapter: (runtimeId?: string) => { adapter: AgentAdapter; acp: boolean };
+  /** 按次工具克隆注册表（网关 toolRegistry）。 */
+  toolRegistry: ToolRegistry;
   /** 按冻结配置解析语音渲染器；缺席表示未接入，听力音频将如实失败（P5 接真实 TTS）。 */
   resolveAudio?: ((config: GenerationConfig) => GenerationAudioRenderer | undefined) | undefined;
 }
@@ -42,18 +45,18 @@ export class GenerationRunManager {
 
   private async execute(userId: string, taskId: string, config: GenerationConfig): Promise<void> {
     const audio = this.deps.resolveAudio?.(config);
-    let adapter: AgentAdapter | undefined;
     try {
+      const runAdapter = this.deps.resolveRunAdapter(config.runtimeId);
+      if (!runAdapter.acp) {
+        throw new BusinessError('E_GENERATION_NO_ACP', '出题只走 ACP 池', 'AGENT_RUNTIME');
+      }
       const result = await runGenerationTask(this.deps.service, this.deps.repository, audio, {
         userId, taskId,
-        createAdapter: exec => (adapter = this.deps.createAdapter(exec)),
+        acp: { adapter: runAdapter.adapter, toolRegistry: this.deps.toolRegistry },
       });
       this.last.set(taskId, { status: 'COMPLETED', paperId: result.paperId });
     } catch (error) {
       this.last.set(taskId, { status: 'FAILED', code: error instanceof BusinessError ? error.code : 'E_GENERATION_FAILED' });
-    } finally {
-      // 每任务独立 Adapter 用后即关，不遗留 App Server 连接。
-      await (adapter as unknown as { shutdown?: () => Promise<unknown> } | undefined)?.shutdown?.()?.catch(() => undefined);
     }
   }
 }

@@ -32,6 +32,16 @@ export function createGenerationRoutes(deps: GatewayDeps) {
         try {
           const parsed = CreateGenerationTaskSchema.safeParse(await c.req.json().catch(() => null));
           if (!parsed.success) return formatBusinessErrorResponse(c, new BusinessError('E_INVALID_INPUT', '请提供有效的任务配置与身份。', 'VALIDATION'));
+          // 冻结前证伪：指名运行时的模型必须在其目录内，否则运行时即 400 指引（不烧任务）。
+          // 缺席不探针，执行时走默认池。
+          const runtimeId = parsed.data.config.runtimeId;
+          if (runtimeId) {
+            const checked = await deps.server.checkRunModelEffort(runtimeId, parsed.data.config.modelId);
+            if (checked.dropModel) {
+              return formatBusinessErrorResponse(c, new BusinessError('E_GENERATION_MODEL_MISMATCH',
+                `${checked.warnings.join('；')}（请重选该运行时的模型）`, 'VALIDATION'));
+            }
+          }
           const binding = tasksOf(deps).createTask(parsed.data);
           return c.json({ taskId: binding.taskId, binding });
         } catch (e) { return formatBusinessErrorResponse(c, e, 'createGenerationTask'); }

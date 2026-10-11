@@ -42,7 +42,7 @@ the dedicated model runner and UI configuration, using these contracts unchanged
   One in-memory owner per task rejects concurrent runs; restart orphans are terminated with
   `recoverOrphanedTasks` (cleans `RUNNING` audio placeholders, never replays paid synthesis).
 - `run-manager.ts` (`GenerationRunManager`, wired in `bootstrap/create-gateway.ts` with one
-  `CodexAdapter` per task) is the only production entry into `runGenerationTask`: `POST
+  `AcpAdapter` per task) is the only production entry into `runGenerationTask`: `POST
   …/tasks/:userId/:taskId/run` returns 202 and runs the full loop in the background,
   `GET …/run-state` reports progress. P5 production audio resolves via
   `infrastructure/resolve-audio.ts` from host env only (`GEMINI_API_KEY`/`GOOGLE_API_KEY`,
@@ -62,9 +62,9 @@ the dedicated model runner and UI configuration, using these contracts unchanged
   observes the abort and no audio is persisted afterwards. Success is decided by persisted
   assets (latest paper exists, exact blueprint verified, listening audio `READY`); a model
   claiming completion without assets fails with `E_GENERATION_INCOMPLETE` and the task is
-  left `CANCELLED`, never reported success. Native sandbox internals beyond the public
-  interface remain Codex-implementation-governed; the strictest available档 is enforced and
-  asserted by tests, residual risk is documented here rather than hidden.
+  left `CANCELLED`, never reported success. Engine-native actions have no ACP sandbox
+  counterpart (sessions run with `approvalPolicy: 'never'`; only the six allowlisted
+  tools execute via the registry); residual risk is documented here rather than hidden.
 - `system-prompt.ts` is the single code owner of the fixed system rules (mirrors
   `docs/ai-pipelines/question-generation-runtime-prompt.md`); `blueprint.ts` enforces
   max-quota fit at creation and exact paper verification at completion; the exact blueprint

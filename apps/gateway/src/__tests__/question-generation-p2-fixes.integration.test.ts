@@ -3,9 +3,9 @@ import { Hono } from 'hono';
 import { mkdtempSync, rmSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CodexAdapter, type AgentSession, type CreateSessionOptions } from '@study-studio/agent-runtime';
+import { type AgentAdapter, type AgentSession, type CreateSessionOptions } from '@study-studio/agent-runtime';
 import { BankSubjectiveAnswerResultSchema, WsEventTypes } from '@study-studio/protocol';
-import { BusinessError, isOk, ok } from '@study-studio/shared';
+import { BusinessError, isOk, ok, err } from '@study-studio/shared';
 import { SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../runtime/gateway-runtime.js';
@@ -42,8 +42,10 @@ async function setup(path = ':memory:') {
   let score = 55, calls = 0, closed = 0, interrupted = 0;
   let hold: Promise<void> | undefined;
   const created: CreateSessionOptions[] = [];
-  const adapter = new CodexAdapter();
-  adapter.createSession = async options => {
+  const adapter = {
+    id: 'mock-grader',
+    name: 'MockGrader',
+    createSession: async (options: CreateSessionOptions) => {
     calls++; created.push(options);
     const session: AgentSession = { sessionId: options.sessionId,
       send: async function* (input) {
@@ -63,7 +65,9 @@ async function setup(path = ':memory:') {
       }, submitToolResult: async () => ok(undefined), submitApproval: async () => ok(undefined), steer: async () => ok(undefined),
       interrupt: async () => { interrupted++; return ok(undefined); }, close: async () => { closed++; return ok(undefined); } };
     return ok(session);
-  };
+  },
+    resumeSession: async () => err(new BusinessError('E_X', 'x', 'VALIDATION')),
+  } as unknown as AgentAdapter;
   const server = new GatewayServer(repo, adapter);
   const deps = { repo, server, port: 0, generation: { service } };
   const app = new Hono().route('/', createGenerationRoutes(deps)).route('/', createBankGradingRoutes(deps));

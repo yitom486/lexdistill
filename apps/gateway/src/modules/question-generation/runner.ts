@@ -1,6 +1,9 @@
-import { BusinessError, isOk } from '@study-studio/shared';
+import { BusinessError, err, isOk, ok } from '@study-studio/shared';
+import type { ToolRegistry } from '@study-studio/tool-core';
 import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
+import { resolveAgentFirstMessage } from '@study-studio/agent-runtime';
 import type { ExternalToolExecutor } from '@study-studio/agent-runtime';
+import type { ToolDefinition } from '@study-studio/tool-core';
 import type { GenerationBinding, GenerationBlueprint, GenerationConfig, GenerationRunLimits } from '@study-studio/protocol';
 import { GENERATION_TOOL_NAMES, createQuestionGenerationTools } from './tools.js';
 import type { GenerationAudioRenderer, QuestionGenerationRepository } from './ports.js';
@@ -12,8 +15,11 @@ export interface GenerationRunRequest {
   userId: string;
   taskId: string;
   objective?: string | undefined;
-  /** 每任务独立的 Adapter 构造器；调用方注入测试替身或真实 CodexAdapter。 */
-  createAdapter: (executeTool: ExternalToolExecutor) => AgentAdapter;
+  /**
+   * 运行适配器（池实例，不关闭）＋克隆注册表。
+   * 按次克隆唯一名工具并注册（桥按名执行），scope/额度仍走闭包，用完注销。
+   */
+  acp: { adapter: AgentAdapter; toolRegistry: ToolRegistry };
   signal?: AbortSignal | undefined;
 }
 
@@ -35,12 +41,10 @@ const ALLOWED = new Set<string>(GENERATION_TOOL_NAMES);
  *
  * 原生能力隔离说明（不伪装边界）：
  * - 动态工具调用走本运行器提供的 allowlist 执行器，非六个工具一律拒绝；
- * - 会话以 `sandboxMode: 'read-only'`（非 `workspace-write`/`danger-full-access`）、
- *   `approvalPolicy: 'untrusted'` 创建，且运行器对一切审批请求直接 decline，
- *   引擎原生文件/命令/网络动作无法经审批放行（注意绝不使用 auto-accept 的 `never` 档）；
+ *   ACP 下按次克隆唯一名并经注册表执行，门面合成引擎上下文，作用域等价；
+ * - 会话以 `approvalPolicy: 'never'` 创建（自有预授权工具直行）；
+ *   引擎原生动作无 ACP 沙箱对应，残余风险见回归测试；
  * - 不传入 `workingDirectory`，不复用主对话 thread，不共享历史；
- * - 残余风险：引擎沙箱内部的只读能力受 Codex 实现约束，不在本公共接口的硬控制内，
- *   已按可用最严档收紧，见回归测试对会话选项的断言。
  */
 export async function runGenerationTask(
   service: GenerationTaskService,
@@ -66,6 +70,9 @@ export async function runGenerationTask(
   let toolCalls = 0;
   let failedCalls = 0;
   let terminalError: BusinessError | undefined;
+  // ACP 按次克隆（函数作用域：finally 注销需要跨 try 可见）。
+  const runAliases = new Map<string, string>();
+  let runClones: ToolDefinition[] = [];
   // 运行预算覆盖完整生命周期：计时器在占用所有者后立即启动，
   // 覆盖工具创建、会话建立与模型运行全程。
   const deadline = setTimeout(() => taskAbort.abort(), snapshot.runLimits.maxDurationMs);
@@ -114,25 +121,63 @@ export async function runGenerationTask(
       return result.value;
     };
 
-    const adapter = request.createAdapter(executeTool);
+    const adapter = request.acp.adapter;
+    // 按次克隆唯一名工具并注册（MCP 桥按名走注册表执行，无视传入实例），
+    // 门面委托 scope 闭包（合成正确上下文），额度与 allowlist 仍走同一闭包，用完注销。
+    const runTag = `g${Date.now().toString(36)}${Math.floor(Math.random() * 0xffffff).toString(36)}`;
+    for (const tool of toolHandle.registry.list()) {
+      const cloneName = `${tool.name}.${runTag}`;
+      runAliases.set(tool.name, cloneName);
+      const original = tool.name;
+      runClones.push({
+        name: cloneName,
+        description: tool.description,
+        location: tool.location,
+        permission: tool.permission,
+        schema: tool.schema,
+        execute: async (raw: unknown, ctx: { userId: string }) => {
+          if (ctx.userId !== binding.userId) {
+            return err(new BusinessError('E_GENERATION_SCOPE', '该工具只允许在绑定的出题任务中调用', 'SECURITY'));
+          }
+          // 合成引擎上下文：闭包按引擎会话 id 归属。
+          try {
+            return ok(await executeTool(original, raw as Record<string, unknown>, { userId: binding.userId, sessionId: expectedEngineSession, turnId: binding.turnId }));
+          } catch (cause) {
+            return err(cause instanceof BusinessError ? cause : new BusinessError('E_GENERATION_FAILED', '出题工具执行失败', 'TOOL_EXECUTION'));
+          }
+        },
+      });
+    }
+    for (const clone of runClones) request.acp.toolRegistry.register(clone);
+    const rewriteToolNames = (text: string): string => {
+      let out = text;
+      for (const [original, clone] of runAliases) out = out.split(original).join(clone);
+      return out;
+    };
     const sessionRes = await adapter.createSession({
       sessionId: expectedEngineSession,
       userId: binding.userId,
-      systemPrompt,
-      tools: toolHandle.registry.list(),
+      systemPrompt: rewriteToolNames(systemPrompt),
+      tools: runClones,
       // 冻结模型：以任务配置为准，不接受调用方覆盖，避免记录与实际运行不一致。
       model: config.modelId,
-      approvalPolicy: 'untrusted',
-      sandboxMode: 'read-only',
+      // ACP 无 sandboxMode 通道：MCP 调用经 autoApprove（自有预授权工具），
+      // 引擎原生动作走审批面（本运行器见票即 decline，见下）。
+      approvalPolicy: 'never',
       ephemeral: true,
     });
-    if (!isOk(sessionRes)) throw sessionRes.error;
+    if (!isOk(sessionRes)) {
+      for (const clone of runClones) request.acp.toolRegistry.unregister(clone.name);
+      throw sessionRes.error;
+    }
     activeSession = sessionRes.value;
     const specs = activeSession.toolSpecs ?? [];
     if (specs.length > 0) {
+      const expected = new Set(runAliases.values());
       const declared = new Set(specs.map(s => s.businessName ?? s.name));
       for (const name of declared) {
-        if (!ALLOWED.has(name) && ![...ALLOWED].some(a => a.replace(/[^a-zA-Z0-9_]/g, '_') === name || a === name)) {
+        if (!expected.has(name)) {
+          for (const clone of runClones) request.acp.toolRegistry.unregister(clone.name);
           throw new BusinessError('E_GENERATION_SCOPE', '适配器上报了专用工具之外的原生能力，已拒绝运行', 'SECURITY');
         }
       }
@@ -147,7 +192,10 @@ export async function runGenerationTask(
     // 挂载后若已取消（取消恰好发生在占用与挂载之间），立即中断一次，避免信号丢失。
     if (taskAbort.signal.aborted) onAbortInterrupt();
     try {
-      const message = (storedObjective || '按冻结配置完成出题：先读配置与授权教材，按需提交题目、生成听力音频并组装试卷。只汇报真实工具回执。').slice(0, 2000);
+      const baseMessage = (storedObjective || '按冻结配置完成出题：先读配置与授权教材，按需提交题目、生成听力音频并组装试卷。只汇报真实工具回执。').slice(0, 2000);
+      // 身份随首消息前置，并声明本轮工具名映射（含义与规则不变）。
+      const message = resolveAgentFirstMessage(activeSession, systemPrompt,
+        `${baseMessage}\n本轮工具名映射：${[...runAliases].map(([original, clone]) => `${original}→${clone}`).join('，')}。`);
       let finalOutput: string | undefined;
       let sawError: BusinessError | undefined;
       for await (const event of activeSession.send({ message })) {
@@ -194,6 +242,7 @@ export async function runGenerationTask(
     throw error instanceof BusinessError ? error : new BusinessError('E_GENERATION_FAILED', '出题运行失败', 'TOOL_EXECUTION');
   } finally {
     clearTimeout(deadline);
+    if (request.acp) for (const clone of runClones) request.acp.toolRegistry.unregister(clone.name);
     service.releaseOwner(request.taskId);
     request.signal?.removeEventListener('abort', onExternalAbort);
   }

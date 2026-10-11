@@ -4,6 +4,7 @@ import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repo
 import { SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
 import { GenerationTaskService } from '../modules/question-generation/service.js';
 import { GenerationRunManager } from '../modules/question-generation/run-manager.js';
+import { ToolRegistry } from '@study-studio/tool-core';
 import { createGenerationRoutes } from '../modules/question-generation/http/generation-routes.js';
 import type { GatewayDeps } from '../composition/gateway-deps.js';
 import { listPresets, resolvePreset } from '../modules/question-generation/presets.js';
@@ -72,7 +73,9 @@ describe('P4 presets resolve server-side with the same gates', () => {
       await repo.getLearnerProfile(userId);
       const bank = new SqliteQuestionGenerationRepository(repo.getRawDb());
       const service = new GenerationTaskService({ repository: bank });
-      const runs = new GenerationRunManager({ service, repository: bank, createAdapter: () => { throw new Error('no model in preset test'); } });
+      const runs = new GenerationRunManager({ service, repository: bank,
+        resolveRunAdapter: () => { throw new Error('no model in preset test'); },
+        toolRegistry: new ToolRegistry() });
       const app = new Hono().route('/', createGenerationRoutes({ repo, generation: { service, runs } } as unknown as GatewayDeps));
       expect((await (await app.request('/api/generation/presets')).json() as unknown[])).toHaveLength(4);
       const resolved = await (await app.request('/api/generation/presets/resolve', { method: 'POST',

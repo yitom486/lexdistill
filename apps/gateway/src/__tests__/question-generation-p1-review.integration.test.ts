@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { initSchema, SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
 import { BusinessError, ok, err, type Result } from '@study-studio/shared';
+import { ToolRegistry } from '@study-studio/tool-core';
 import type { AgentAdapter, AgentEvent, AgentInput, AgentSession, CreateSessionOptions } from '@study-studio/agent-runtime';
 import type { ExternalToolExecutor } from '@study-studio/agent-runtime';
 import type { BankPaperReceipt, BankSubmitReceipt } from '@study-studio/protocol';
@@ -15,18 +16,24 @@ import { binding, config, listening, question } from './question-generation.fixt
 
 type Script = (call: ExternalToolExecutor, ctx: { sessionId: string; userId: string }, message: string, signal: AbortSignal) => Promise<string>;
 
+interface AcpSeen {
+  options?: CreateSessionOptions;
+  message?: string;
+}
+
 class FakeSession implements AgentSession {
-  readonly threadId = 'fake-thread';
-  readonly toolSpecs = GENERATION_TOOL_NAMES.map(name => ({ name, businessName: name, description: name, inputSchema: {} }));
+  readonly threadId = 'fake-acp-thread';
+  readonly toolSpecs: Array<{ name: string; businessName: string; description: string; inputSchema: Record<string, unknown> }> = [];
   private readonly abort = new AbortController();
   approvals: Array<{ approvalId: string; decision: unknown }> = [];
   interrupts = 0;
   constructor(readonly sessionId: string, readonly userId: string,
-    private readonly exec: ExternalToolExecutor, private readonly script: Script,
-    readonly seen: { options?: CreateSessionOptions }) {}
+    private readonly call: ExternalToolExecutor, private readonly script: Script,
+    readonly seen: AcpSeen) {}
   async *send(input: AgentInput): AsyncIterable<AgentEvent> {
+    this.seen.message = input.message;
     try {
-      const out = await this.script(this.exec, { sessionId: this.sessionId, userId: this.userId }, input.message, this.abort.signal);
+      const out = await this.script(this.call, { sessionId: this.sessionId, userId: this.userId }, input.message, this.abort.signal);
       yield { type: 'COMPLETED', finalOutput: out };
     } catch (raw) {
       yield { type: 'ERROR', error: raw instanceof BusinessError ? raw : new BusinessError('E_GENERATION_FAILED', '受控模型失败', 'TOOL_EXECUTION') };
@@ -43,14 +50,26 @@ class FakeSession implements AgentSession {
 }
 
 class FakeAdapter implements AgentAdapter {
-  readonly id = 'fake-generation';
-  readonly name = 'Fake Generation Adapter';
+  readonly id = 'fake-acp-generation';
+  readonly name = 'Fake Acp Generation Adapter';
   sessions: FakeSession[] = [];
-  constructor(private readonly exec: ExternalToolExecutor, private readonly script: Script,
-    private readonly seen: { options?: CreateSessionOptions }) {}
+  constructor(private readonly toolRegistry: ToolRegistry, private readonly script: Script,
+    private readonly seen: AcpSeen) {}
   async createSession(options: CreateSessionOptions): Promise<Result<AgentSession, BusinessError>> {
     this.seen.options = options;
-    const session = new FakeSession(options.sessionId, options.userId, this.exec, this.script, this.seen);
+    const clones = (options.tools ?? []).map(tool => tool.name);
+    const byOriginal = (name: string): string => {
+      const found = clones.find(n => n === name || n.startsWith(`${name}.`));
+      if (!found) throw new Error(`clone missing for ${name}`);
+      return found;
+    };
+    const registry = this.toolRegistry;
+    const call: ExternalToolExecutor = async (name, args, ctx) => {
+      const res = await registry.execute(byOriginal(name), args, { userId: ctx.userId, sessionId: 'gateway-session' });
+      if (!res.ok) throw res.error;
+      return res.value;
+    };
+    const session = new FakeSession(options.sessionId, options.userId, call, this.script, this.seen);
     this.sessions.push(session);
     return ok(session);
   }
@@ -69,6 +88,15 @@ function setup() {
   return { sqlite, repository, service, renderer };
 }
 
+function acpHarness(script: Script, seen: AcpSeen): { adapter: AgentAdapter; toolRegistry: ToolRegistry } {
+  const toolRegistry = new ToolRegistry();
+  return { adapter: new FakeAdapter(toolRegistry, script, seen), toolRegistry };
+}
+
+function acpRunRequest(harness: { adapter: AgentAdapter; toolRegistry: ToolRegistry }, userId: string, taskId: string) {
+  return { userId, taskId, acp: { adapter: harness.adapter, toolRegistry: harness.toolRegistry } };
+}
+
 async function happyPaperId(s: ReturnType<typeof setup>, taskId: string): Promise<string> {
   const script: Script = async (call, ctx) => {
     const saved = await call('generation.submit', { requestKey: 'b', questions: [question(), listening()] }, { sessionId: ctx.sessionId, userId: ctx.userId }) as BankSubmitReceipt;
@@ -76,9 +104,8 @@ async function happyPaperId(s: ReturnType<typeof setup>, taskId: string): Promis
     const paper = await call('generation.paper', { requestKey: 'p', title: 'T', questionIds: saved.questionIds }, { sessionId: ctx.sessionId, userId: ctx.userId }) as BankPaperReceipt;
     return paper.paperId;
   };
-  const result = await runGenerationTask(s.service, s.repository, s.renderer, {
-    userId: binding.userId, taskId, createAdapter: exec => new FakeAdapter(exec, script, {}),
-  });
+  const result = await runGenerationTask(s.service, s.repository, s.renderer,
+    acpRunRequest(acpHarness(script, {}), binding.userId, taskId));
   return result.paperId;
 }
 
@@ -104,24 +131,27 @@ describe('P1 review regressions', () => {
     } finally { s.sqlite.close(); }
   });
 
-  it('会话隔离使用最严档：只读沙箱、审批全拒绝、冻结模型、无工作目录', async () => {
+  it('会话隔离使用最严档：按次克隆、审批 never、冻结模型、无工作目录', async () => {
     const s = setup();
     try {
       const task = s.service.createTask({ userId: binding.userId, sessionId: binding.sessionId, turnId: binding.turnId, config });
-      const seen: { options?: CreateSessionOptions } = {};
+      const seen: AcpSeen = {};
       const script: Script = async (call, ctx) => {
         const saved = await call('generation.submit', { requestKey: 'b', questions: [question()] }, { sessionId: ctx.sessionId, userId: ctx.userId }) as BankSubmitReceipt;
         await call('generation.paper', { requestKey: 'p', title: 'T', questionIds: saved.questionIds }, { sessionId: ctx.sessionId, userId: ctx.userId });
         return 'done';
       };
-      await runGenerationTask(s.service, s.repository, s.renderer, {
-        userId: binding.userId, taskId: task.taskId, createAdapter: exec => new FakeAdapter(exec, script, seen),
-      });
-      expect(seen.options?.sandboxMode).toBe('read-only');
-      // 绝不使用自动放行的 never 档：风险动作必须先经审批，而审批一律拒绝。
-      expect(seen.options?.approvalPolicy).toBe('untrusted');
+      await runGenerationTask(s.service, s.repository, s.renderer,
+        acpRunRequest(acpHarness(script, seen), binding.userId, task.taskId));
+      const mounted = (seen.options?.tools ?? []).map(tool => tool.name);
+      expect(mounted).toHaveLength(6);
+      for (const original of [...GENERATION_TOOL_NAMES]) {
+        expect(mounted.filter(name => name.startsWith(`${original}.`))).toHaveLength(1);
+      }
+      expect(seen.options).not.toHaveProperty('sandboxMode');
+      // 自有预授权工具直行（never）；引擎原生动作无 ACP 沙箱对应。
+      expect(seen.options?.approvalPolicy).toBe('never');
       expect(seen.options?.ephemeral).toBe(true);
-      expect(seen.options?.tools?.map(t => t.name).sort()).toEqual([...GENERATION_TOOL_NAMES].sort());
       // 冻结模型来自任务配置，调用方无法覆盖。
       expect(seen.options?.model).toBe(config.modelId);
       expect((seen.options as unknown as Record<string, unknown>)?.['workingDirectory']).toBeUndefined();
@@ -154,8 +184,10 @@ describe('P1 review regressions', () => {
         async createSession() { return ok(approvalSession); },
         async resumeSession() { return err(new BusinessError('E_X', 'x', 'VALIDATION')); },
       };
+      const toolRegistry = new ToolRegistry();
       await expect(runGenerationTask(s.service, s.repository, s.renderer, {
-        userId: binding.userId, taskId: task.taskId, createAdapter: () => approvalAdapter,
+        userId: binding.userId, taskId: task.taskId,
+        acp: { adapter: approvalAdapter, toolRegistry },
       })).rejects.toThrow();
       // 高风险审批被直接拒绝，且任务因无资产而不成功。
       expect(declines).toEqual([{ approvalId: 'appr1', decision: 'decline' }]);
@@ -181,9 +213,9 @@ describe('P1 review regressions', () => {
         return 'never';
       };
       let settled: string | undefined;
-      const running = runGenerationTask(s.service, s.repository, slowAudio, {
-        userId: binding.userId, taskId: task.taskId, createAdapter: exec => new FakeAdapter(exec, script, {}),
-      }).then(() => { settled = 'resolved'; }, () => { settled = 'rejected'; });
+      const running = runGenerationTask(s.service, s.repository, slowAudio,
+        acpRunRequest(acpHarness(script, {}), binding.userId, task.taskId),
+      ).then(() => { settled = 'resolved'; }, () => { settled = 'rejected'; });
       await new Promise(r => setTimeout(r, 100));
       await s.service.cancelTask(binding.userId, task.taskId);
       await running;
@@ -205,8 +237,10 @@ describe('P1 review regressions', () => {
         await call('generation.paper', { requestKey: 'p', title: 'T', questionIds: saved.questionIds }, { sessionId: ctx.sessionId, userId: ctx.userId });
         return 'done';
       };
+      const toolRegistry = new ToolRegistry();
       const runs = new GenerationRunManager({ service: s.service, repository: s.repository,
-        createAdapter: exec => new FakeAdapter(exec, script, {}) });
+        resolveRunAdapter: () => ({ adapter: new FakeAdapter(toolRegistry, script, {}), acp: true }),
+        toolRegistry });
       expect(await runs.start(binding.userId, task.taskId)).toEqual({ started: true });
       expect(runs.runState(binding.userId, task.taskId).running).toBe(true);
       expect(await runs.start(binding.userId, task.taskId)).toEqual({ started: false, reason: 'RUNNING' });
@@ -228,20 +262,20 @@ describe('P1 review regressions', () => {
       const task = s.service.createTask({ userId: binding.userId, sessionId: binding.sessionId, turnId: binding.turnId,
         config, runLimits: { maxModelRounds: 20, maxRepairAttempts: 5, maxDurationMs: 1000 } });
       const script: Script = async () => 'too late';
-      const slowFactory = (exec: ExternalToolExecutor): AgentAdapter => {
-        const inner = new FakeAdapter(exec, script, {});
-        const slow: AgentAdapter = {
-          id: 'slow', name: 'slow',
-          async createSession(options: CreateSessionOptions) {
-            await new Promise(r => setTimeout(r, 1300));
-            return inner.createSession(options);
-          },
-          async resumeSession() { return err(new BusinessError('E_X', 'x', 'VALIDATION')); },
-        };
-        return slow;
-      };
+      const toolRegistry = new ToolRegistry();
+      const inner = new FakeAdapter(toolRegistry, script, {});
+      const orig = inner.createSession.bind(inner);
+      const slow = {
+        id: 'slow', name: 'slow',
+        async createSession(options: CreateSessionOptions) {
+          await new Promise(r => setTimeout(r, 1300));
+          return orig(options);
+        },
+        async resumeSession() { return err(new BusinessError('E_X', 'x', 'VALIDATION')); },
+      } satisfies AgentAdapter;
       await expect(runGenerationTask(s.service, s.repository, s.renderer, {
-        userId: binding.userId, taskId: task.taskId, createAdapter: slowFactory,
+        userId: binding.userId, taskId: task.taskId,
+        acp: { adapter: slow, toolRegistry },
       })).rejects.toThrow();
       expect(s.service.queryTask(binding.userId, task.taskId).status).toBe('CANCELLED');
     } finally { s.sqlite.close(); }
@@ -254,31 +288,25 @@ describe('P1 review regressions', () => {
         config, runLimits: { maxModelRounds: 3, maxRepairAttempts: 5, maxDurationMs: 120000 } });
       let attempts = 0;
       let admissions = 0;
-      const seen: { options?: CreateSessionOptions } = {};
-      let sessionRef: FakeSession | undefined;
-      const factory = (exec: ExternalToolExecutor): AgentAdapter => {
-        const counting: ExternalToolExecutor = async (name, input, ctx) => {
+      const toolRegistry = new ToolRegistry();
+      const adapter = new FakeAdapter(toolRegistry, async (call, ctx, message, signal) => {        const countingCall: ExternalToolExecutor = async (name, input, c) => {
           attempts++;
-          const value = await exec(name, input, ctx);
+          const value = await call(name, input, c);
           admissions++;
           return value;
         };
-        const inner = new FakeAdapter(counting, async (call, ctx) => {
-          for (let i = 0; i < 10; i++) {
-            try { await call('generation.config', {}, { sessionId: ctx.sessionId, userId: ctx.userId }); }
-            catch { /* 超限后继续尝试应同样被拒绝 */ }
-          }
-          return 'done';
-        }, seen);
-        const orig = inner.createSession.bind(inner);
-        inner.createSession = async options => { const res = await orig(options); sessionRef = inner.sessions[0]; return res; };
-        return inner;
-      };
+        for (let i = 0; i < 10; i++) {
+          try { await countingCall('generation.config', {}, { sessionId: ctx.sessionId, userId: ctx.userId }); }
+          catch { /* 超限后继续尝试应同样被拒绝 */ }
+        }
+        return 'done';
+      }, {});
       const error = await runGenerationTask(s.service, s.repository, s.renderer, {
-        userId: binding.userId, taskId: task.taskId, createAdapter: factory,
+        userId: binding.userId, taskId: task.taskId,
+        acp: { adapter, toolRegistry },
       }).then(() => null, e => e as BusinessError);
       expect(error?.code).toBe('E_GENERATION_QUOTA');
-      expect((sessionRef?.interrupts ?? 0)).toBeGreaterThan(0);
+      expect((adapter.sessions[0]?.interrupts ?? 0)).toBeGreaterThan(0);
       // 仅前 3 次调用被接纳执行，其余 7 次在预算耗尽后被拒绝，模型会话随即中断。
       expect(attempts).toBe(10);
       expect(admissions).toBe(3);
