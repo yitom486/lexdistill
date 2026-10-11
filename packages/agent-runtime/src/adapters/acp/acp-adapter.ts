@@ -8,7 +8,7 @@ import type { AgentInput } from '../../contracts/context.js';
 /**
  * ACP 适配器（Phase 1 可用版；包 public surface 仍不导出，接线前先过网关评审）。
  *
- * 与 Codex App Server 的关键差异：
+ * 与旧 App Server 通路的关键差异：
  * - 工具不走 in-process executeTool：调用方经 `buildMcpServers` 把 ToolDefinition
  *   装成 MCP 服务器，`session/new|resume|load` 全程携带（resume 带工具，旧线程
  *   工具冻结问题不存在）。
@@ -16,7 +16,7 @@ import type { AgentInput } from '../../contracts/context.js';
  *   明确拒绝（E_ACP_MCP_DIRECT），不伪造成功。
  * - 审批走 ACP `session/request_permission`：approvalPolicy never/缺席自动放行
  *   （与当前 vocab 链路零点击行为一致）；其余策略挂起等前端决策，120s 超时
- *   自动 decline（与 CodexAdapter APPROVAL_TIMEOUT_MS 同口径）。
+ *   自动 decline（与旧通路 APPROVAL_TIMEOUT_MS 同口径）。
  * - 中断/steer 明确拒绝（E_ACP_UNSUPPORTED）；单 adapter 只建连一次。
  */
 
@@ -24,7 +24,7 @@ export interface AcpSessionHandleLike {
   readonly sessionId: string;
   /** SDK 侧已合并顶层 models 方言的 configOptions（网关用它发现真实 configId）。 */
   readonly configOptions?: unknown;
-  prompt(text: string, options?: { timeoutMs?: number }): Promise<
+  prompt(text: string, options?: { timeoutMs?: number; images?: AcpPromptImage[] }): Promise<
     | { ok: true; value: unknown }
     | { ok: false; error: { code?: string; message: string } }
   >;
@@ -94,6 +94,43 @@ export interface AcpAdapterOptions {
   debugLog?: ((level: string, message: string) => void) | undefined;
 }
 
+/** ACP prompt 图片块（acp-client promptSession 原生支持；适配器只做内存态透传）。 */
+export interface AcpPromptImage {
+  /** base64 图片数据（调用方 PNG 字节现编现弃，不落盘）。 */
+  data: string;
+  mimeType: string;
+}
+
+/**
+ * ACP 首消息前置（唯一口径）：ACP `session/new` 无 systemPrompt 通道，
+ * 身份/角色指令只能随首条消息下达；具原生 systemPrompt 能力的通路走原生通道，不加料。
+ * 调用方在 `session.send` 前组装，不分支适配器类型（instanceof 内聚于此）。
+ */
+export function resolveAgentFirstMessage(
+  session: AgentSession,
+  systemPrompt: string,
+  message: string,
+): string {
+  if (session instanceof AcpAgentSession) {
+    const head = systemPrompt.trim();
+    return head ? `${head}\n\n${message}` : message;
+  }
+  return message;
+}
+
+/**
+ * 会话图片附件 → ACP 图片块（纯函数，便于单测锁定映射口径）。
+ * 空/零字节附件丢弃；调用方（批路由）负责张数与总字节预算。
+ */
+export function promptImagesFromAttachments(
+  attachments: readonly { png: Uint8Array }[] | undefined,
+): AcpPromptImage[] {
+  if (!attachments) return [];
+  return attachments
+    .filter((item) => item && item.png && item.png.length > 0)
+    .map((item) => ({ data: Buffer.from(item.png).toString('base64'), mimeType: 'image/png' }));
+}
+
 const APPROVAL_TIMEOUT_MS = 120_000;
 
 function toBusinessError(code: string, message: string): BusinessError {
@@ -145,7 +182,7 @@ function usageOf(params: Record<string, unknown>): AcpContextUsage | null {
 }
 
 function chunkTextOf(params: Record<string, unknown>): { kind: 'text' | 'thought'; text: string } | null {
-  // 实测 codex-acp 形状：{ sessionId, update: { sessionUpdate: 'agent_message_chunk'|'agent_thought_chunk',
+  // 实测 ACP 会话形状：{ sessionId, update: { sessionUpdate: 'agent_message_chunk'|'agent_thought_chunk',
   //   content: { type: 'text', text } } }。只认此形状，不猜。
   const update = params['update'] as Record<string, unknown> | undefined;
   if (!update || typeof update !== 'object') return null;
@@ -298,8 +335,16 @@ export class AcpAgentSession implements AgentSession {
     const message = typeof input.message === 'string' ? input.message : '';
     let finalText: string | null = null;
     let promptError: string | null = null;
+    // 流式增量累积：部分运行时（如 opencode）的 prompt 结果不带文本（仅 stopReason/usage），
+    // COMPLETED 必须回吐累积文本而非结果信封，否则调用方会用信封覆盖已收到的增量。
+    let streamedText = '';
+    // 图片附件（扫描版教材页）随 prompt 直传模型；具原生读文件能力的通路走原生读文件，不经过这里。
+    const images = promptImagesFromAttachments(input.attachments);
     // 模型轮（尤其挂载 MCP 后首轮工具装载）经常超过 SDK 默认 120s：spike 给足，生产 Phase 再按 turn 预算收敛。
-    void this.handle.prompt(message, { timeoutMs: 540_000 }).then(
+    void this.handle.prompt(message, {
+      timeoutMs: 540_000,
+      ...(images.length > 0 ? { images } : {}),
+    }).then(
       (result) => {
         if (!result.ok) {
           promptError = `${result.error.code ?? 'E_ACP_PROMPT'}: ${result.error.message}`;
@@ -309,7 +354,7 @@ export class AcpAgentSession implements AgentSession {
             typeof value === 'string' ? value
             : typeof value?.text === 'string' ? value.text
             : typeof value?.finalOutput === 'string' ? value.finalOutput
-            : JSON.stringify(value ?? '');
+            : null;
         }
         this.notePromptDone();
       },
@@ -323,8 +368,10 @@ export class AcpAgentSession implements AgentSession {
       let next: Record<string, unknown> | undefined;
       while ((next = this.updates.shift())) {
         const chunk = chunkTextOf(next);
-        if (chunk?.kind === 'text') yield { type: 'TEXT_DELTA', delta: chunk.text };
-        else if (chunk?.kind === 'thought') yield { type: 'REASONING_DELTA', delta: chunk.text };
+        if (chunk?.kind === 'text') {
+          streamedText += chunk.text;
+          yield { type: 'TEXT_DELTA', delta: chunk.text };
+        } else if (chunk?.kind === 'thought') yield { type: 'REASONING_DELTA', delta: chunk.text };
       }
       let approval: PendingApproval | undefined;
       while ((approval = this.approvals.shift())) {
@@ -342,13 +389,14 @@ export class AcpAgentSession implements AgentSession {
       while ((resolved = this.resolvedEvents.shift())) {
         yield resolved;
       }
-      if (this.promptDone) break;
+      // prompt 完成后必须排空残留更新再退出，否则尾部增量丢失。
+      if (this.promptDone && this.updates.length === 0 && this.approvals.length === 0 && this.resolvedEvents.length === 0) break;
     }
     if (promptError) {
       yield { type: 'ERROR', error: toBusinessError('E_ACP_PROMPT', promptError) };
       return;
     }
-    yield { type: 'COMPLETED', finalOutput: finalText ?? '' };
+    yield { type: 'COMPLETED', finalOutput: finalText ?? streamedText };
   }
 
   public async submitToolResult(): Promise<Result<void, BusinessError>> {

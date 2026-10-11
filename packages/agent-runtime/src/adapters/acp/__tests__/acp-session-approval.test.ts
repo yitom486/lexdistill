@@ -18,6 +18,58 @@ function makeSession(approvalPolicy?: string) {
   return new AcpAgentSession('s1', 'acp-sess-1', HANDLE, [], approvalPolicy);
 }
 
+describe('AcpAgentSession send 文本回吐', () => {
+  function chunkUpdate(text: string): Record<string, unknown> {
+    return {
+      sessionId: 'acp-sess-1',
+      update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } },
+    };
+  }
+
+  it('结果无文本字段（opencode 实测形状）时 COMPLETED 回吐累积增量，而非结果信封', async () => {
+    // opencode 的 prompt 决议只有 stopReason/usage，没有文本；文本只走增量。
+    const envelopeHandle = {
+      ...HANDLE,
+      prompt: async () => ({ ok: true as const, value: { stopReason: 'end_turn', usage: {} } }),
+    };
+    const session = new AcpAgentSession('s1', 'acp-sess-1', envelopeHandle, [], undefined);
+    const events: AgentEvent[] = [];
+    const consumer = (async () => {
+      for await (const event of session.send({ message: 'hi' })) {
+        events.push(event);
+        if (event.type === 'COMPLETED') break;
+      }
+    })();
+    // 决议前先推两段增量（模拟 opencode 粗粒度流式）
+    session.pushUpdate(chunkUpdate('{"examples": ['));
+    session.pushUpdate(chunkUpdate('{"sentence": "x"}]}'));
+    await consumer;
+    const completed = events.find((e) => e.type === 'COMPLETED');
+    expect(completed).toMatchObject({
+      type: 'COMPLETED',
+      finalOutput: '{"examples": [{"sentence": "x"}]}',
+    });
+    expect(JSON.stringify(completed)).not.toContain('stopReason');
+  });
+
+  it('结果带文本时仍以结果文本为准（ACP 行为不变）', async () => {
+    const session = makeSession(undefined);
+    const events: AgentEvent[] = [];
+    const consumer = (async () => {
+      for await (const event of session.send({ message: 'hi' })) {
+        events.push(event);
+        if (event.type === 'COMPLETED') break;
+      }
+    })();
+    session.pushUpdate(chunkUpdate('stale'));
+    await consumer;
+    expect(events.find((e) => e.type === 'COMPLETED')).toMatchObject({
+      type: 'COMPLETED',
+      finalOutput: 'DONE',
+    });
+  });
+});
+
 describe('AcpAgentSession approval', () => {
   it('never/缺席自动放行，不产生 APPROVAL_REQUESTED', async () => {
     for (const policy of [undefined, 'never'] as const) {

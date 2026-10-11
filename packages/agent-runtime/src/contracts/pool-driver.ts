@@ -19,7 +19,7 @@ export interface AgentPoolActivityEvent {
 }
 
 export interface AgentPoolDriverOptions {
-  /** Agent 可执行文件（如 codex 二进制）。 */
+  /** Agent 可执行文件（如各运行时 CLI 二进制）。 */
   readonly program: string;
   readonly args?: readonly string[];
   readonly env?: Readonly<Record<string, string>>;
@@ -32,7 +32,7 @@ export interface AgentPoolDriverOptions {
   readonly mcpServers?: readonly unknown[];
   /** Worker 数量。 */
   readonly poolSize: number;
-  /** Codex 线程审批策略。缺席走运行时默认（never = 需要审批的一律拒绝）。 */
+  /** 引擎会话审批策略。缺席走运行时默认（never = 需要审批的一律拒绝）。 */
   readonly approvalPolicy?: string | undefined;
   /** 模型执行 shell 的沙箱档（官方 SandboxMode）。缺席走服务端默认。 */
   readonly sandbox?: string | undefined;

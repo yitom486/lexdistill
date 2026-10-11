@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { AcpAdapter, AcpAgentSession } from '../acp-adapter.js';
+import { AcpAdapter, AcpAgentSession, promptImagesFromAttachments, resolveAgentFirstMessage } from '../acp-adapter.js';
 import type { AcpClientLike, AcpSessionHandleLike } from '../acp-adapter.js';
 
 function trackHandle(configOptions: unknown, failIds: string[] = []): AcpSessionHandleLike & { calls: Array<{ id: string; value: string | boolean }> } {
@@ -32,6 +32,37 @@ function makeAdapter(handle: AcpSessionHandleLike, describeConfigIds?: (configOp
 }
 
 const SESSION_OPTS = { sessionId: 's1', userId: 'u1', model: 'm-x', effort: 'high' };
+
+describe('resolveAgentFirstMessage（ACP 首消息前置唯一口径）', () => {
+  it('非 ACP 会话原样返回（具原生 systemPrompt 能力的通路走原生通道）', () => {
+    const session = { sessionId: 's' } as never;
+    expect(resolveAgentFirstMessage(session, '你是批改员', '开始')).toBe('开始');
+  });
+
+  it('ACP 会话前置非空身份；空身份不加料', () => {
+    const handle = { sessionId: 'a', prompt: async () => ({ ok: true as const, value: '' }) };
+    const session = new AcpAgentSession('s', 'acp-1', handle as never, [], undefined, undefined);
+    expect(resolveAgentFirstMessage(session, '你是批改员', '开始')).toBe('你是批改员\n\n开始');
+    expect(resolveAgentFirstMessage(session, '  ', '开始')).toBe('开始');
+  });
+});
+
+describe('promptImagesFromAttachments（扫描页 → ACP 图片块）', () => {
+  it('PNG 字节转 base64＋image/png；空附件丢弃', () => {
+    const images = promptImagesFromAttachments([
+      { png: new Uint8Array([137, 80, 78, 71]) },
+      { png: new Uint8Array(0) },
+    ]);
+    expect(images).toEqual([
+      { data: Buffer.from([137, 80, 78, 71]).toString('base64'), mimeType: 'image/png' },
+    ]);
+  });
+
+  it('缺席/空数组回空（纯文字轮不带图片块）', () => {
+    expect(promptImagesFromAttachments(undefined)).toEqual([]);
+    expect(promptImagesFromAttachments([])).toEqual([]);
+  });
+});
 
 describe('AcpAdapter 建会话 configId 发现＋偏好降级', () => {
   it('用发现的真实 id 设置（连字符方言），成功无警告', async () => {

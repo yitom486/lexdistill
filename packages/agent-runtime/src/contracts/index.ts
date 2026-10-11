@@ -22,6 +22,7 @@ export type { AgentEvent } from './event.js';
 export type {
   AgentSession,
   ApprovalDecision,
+  ExternalToolExecutor,
 } from './session.js';
 export type {
   AgentPoolActivityEvent,

@@ -7,13 +7,13 @@ export interface CreateSessionOptions {
   userId: string;
   systemPrompt?: string;
   tools?: ToolDefinition[];
-  /** 可选：覆盖本轮 / 本会话模型（Codex App Server thread/start.model） */
+  /** 可选：覆盖本轮 / 本会话模型（引擎建会话 model 字段） */
   model?: string;
-  /** 可选：思考深度（ACP session/set_config_option.reasoning_effort；Codex 通路沿用 turn 透传） */
+  /** 可选：思考深度（ACP session/set_config_option.reasoning_effort；其他通路沿用 turn 透传） */
   effort?: string;
-  /** 可选：thread/start.approvalPolicy（never / on-request / untrusted） */
+  /** 可选：建会话审批策略（never / on-request / untrusted） */
   approvalPolicy?: string;
-  /** 恢复已有 Codex thread（thread/resume），而非 thread/start */
+  /** 恢复已有引擎会话（resume），而非新建 */
   resumeThreadId?: string;
   /** false=落盘持久化；默认 true（临时） */
   ephemeral?: boolean;

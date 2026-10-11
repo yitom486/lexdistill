@@ -3,10 +3,10 @@
  *
  * 布局：
  * - `./contracts`：provider-neutral 契约（C3 起本体已并入）；
- * - `./adapters`：Codex / Responses 适配器入口（具名收敛，不含工具桥）。
+ * - `./adapters`：Responses / ACP 适配器入口（具名收敛，不含工具桥）。
  *
  * 不变量：contracts 内禁 provider/厂商内容（单测锁定）；具体厂商实现
- * 只许位于 adapters 各包内部；Codex 专有动态工具桥禁上浮到本入口；
+ * 只许位于 adapters 各包内部；引擎专有动态工具桥禁上浮到本入口；
  * TTS 不并入（保持 speech 包独立）。
  * 本入口一律具名重导出（禁 `export *`，表面由 runtime-facade.test.ts 锁定）。
  */
@@ -17,6 +17,7 @@ export type {
   AgentInput,
   ContextFocusItem,
   ContextSnapshot,
+  ExternalToolExecutor,
   LearnerDigest,
   LearnerWeaknessDigest,
   AgentEvent,
@@ -29,20 +30,13 @@ export type {
   AgentPoolLease,
 } from './contracts/index.js';
 export {
-  CodexAdapter,
-  CodexSession,
-  buildLearnerContextEntry,
-  mapAppServerNotificationToEvents,
-  resolveCodexBinary,
-  backgroundCodexArgs,
   ResponsesAdapter,
   ResponsesSession,
   buildLightweightReply,
   AcpAdapter,
   AcpAgentSession,
+  resolveAgentFirstMessage,
 } from './adapters/index.js';
 export type {
-  CodexAdapterOptions,
-  ExternalToolExecutor,
   AcpAdapterOptions,
 } from './adapters/index.js';
