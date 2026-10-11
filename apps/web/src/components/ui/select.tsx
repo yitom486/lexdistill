@@ -23,7 +23,7 @@ const SelectTrigger = React.forwardRef<
   <BaseSelect.Trigger
     ref={ref}
     className={cn(
-      'flex h-9 w-full items-center justify-between rounded-xl border border-line-amber-900o20-amber-500o20 bg-surface-warm px-3 py-2 text-xs font-medium text-ink shadow-xs ring-offset-background placeholder:text-ink-stone-400 focus:outline-none focus:ring-1 focus:ring-tone-amber-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer transition-all hover:border-tone-amber-500o50',
+      'flex h-9 w-full items-center justify-between rounded-xl border border-line-hairline bg-surface-warm px-3 py-2 text-xs font-medium text-ink shadow-inner-hi ring-offset-background placeholder:text-ink-stone-400 focus:outline-none focus:ring-1 focus:ring-gold-warm disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer transition-all hover:border-gold-warm/40',
       className
     )}
     {...props}
@@ -57,7 +57,7 @@ const SelectContent = React.forwardRef<
       <BaseSelect.Popup
         ref={ref}
         className={cn(
-          'relative z-50 max-h-96 min-w-[10rem] overflow-hidden rounded-xl border border-line-amber-900o15-amber-500o20 bg-surface-paper-coal p-1 text-ink shadow-xl outline-none',
+          'relative z-50 max-h-96 min-w-[10rem] overflow-hidden rounded-xl border border-line-hairline bg-surface-paper-coal p-1 text-ink shadow-xl outline-none',
           className
         )}
         {...props}
@@ -79,10 +79,10 @@ const SelectItem = React.forwardRef<
     ref={ref}
     className={cn(
       'relative flex w-full cursor-pointer select-none items-center rounded-lg py-1.5 pl-8 pr-2 text-xs outline-none transition-colors',
-      // Base UI 用 data-highlighted；避免 amber-950 在深色弹出层上糊成一团
-      'data-[highlighted]:bg-tint-amber-100 data-[highlighted]:text-tone-stone-900',
+      // 高亮走古籍金微洗；深色沿用中性石墨，避免 amber-950 糊成一团
+      'data-[highlighted]:bg-gold-warm/15 data-[highlighted]:text-tone-stone-900',
       'dark:data-[highlighted]:bg-tone-stone-700 dark:data-[highlighted]:text-surface-stone-50',
-      'focus:bg-tint-amber-100 focus:text-tone-stone-900',
+      'focus:bg-gold-warm/15 focus:text-tone-stone-900',
       'dark:focus:bg-tone-stone-700 dark:focus:text-surface-stone-50',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className

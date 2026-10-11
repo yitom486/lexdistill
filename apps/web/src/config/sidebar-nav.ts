@@ -6,9 +6,8 @@
 import type { NavigationTab } from '../stores/useStudySessionStore.js';
 import type { TrackLanguage } from '../learning/learning-shell.js';
 
-/** 角标：静态文案，或由运行时计数/进度填充 */
+/** 角标：仅允许动态业务量化指标；静态调试文案已在 Phase 2 清扫 */
 export type SidebarBadgeSpec =
-  | { kind: 'static'; value: string }
   | { kind: 'quizProgress' }
   | { kind: 'cardCount' }
   | { kind: 'mistakeCount' }
@@ -56,8 +55,8 @@ export const SIDEBAR_NAV_GROUPS: SidebarNavGroupDef[] = [
     defaultOpen: true,
     items: [
       { id: 'TODAY', label: '今日学习', icon: 'CalendarCheck', badge: { kind: 'planProgress' } },
-      { id: 'PRACTICE_PLAN', label: '练习计划', icon: 'ClipboardList', badge: { kind: 'static', value: '自定义' } },
-      { id: 'RADAR', label: '我的学情', icon: 'TrendingUp', badge: { kind: 'static', value: '画像' } },
+      { id: 'PRACTICE_PLAN', label: '练习计划', icon: 'ClipboardList' },
+      { id: 'RADAR', label: '我的学情', icon: 'TrendingUp' },
     ],
   },
   {
@@ -66,9 +65,9 @@ export const SIDEBAR_NAV_GROUPS: SidebarNavGroupDef[] = [
     defaultOpen: true,
     items: [
       { id: 'QUIZ', label: '自适应做题', icon: 'Zap', badge: { kind: 'quizProgress' } },
-      { id: 'GENERATION', label: 'AI 出题', icon: 'Sparkles', badge: { kind: 'static', value: 'AI' } },
-      { id: 'READING', label: '阅读理解', icon: 'Newspaper', badge: { kind: 'static', value: '双栏' } },
-      { id: 'WRITING', label: '写作翻译', icon: 'PenLine', badge: { kind: 'static', value: 'AI' } },
+      { id: 'GENERATION', label: 'AI 出题', icon: 'Sparkles' },
+      { id: 'READING', label: '阅读理解', icon: 'Newspaper' },
+      { id: 'WRITING', label: '写作翻译', icon: 'PenLine' },
       {
         id: 'MISTAKES',
         label: '错题本',
@@ -82,10 +81,10 @@ export const SIDEBAR_NAV_GROUPS: SidebarNavGroupDef[] = [
     label: '记忆与课文',
     defaultOpen: true,
     items: [
-      { id: 'KANA', label: '五十音工作室', icon: 'Sparkles', badge: { kind: 'static', value: '假名' }, tracks: ['ja'] },
+      { id: 'KANA', label: '五十音工作室', icon: 'Sparkles', tracks: ['ja'] },
       { id: 'HANGUL', label: '谚文工作室', icon: 'Sparkles', tracks: ['ko'] },
       { id: 'CARDS', label: '生词闪卡', icon: 'Layers', badge: { kind: 'cardCount' } },
-      { id: 'TEXTBOOK', label: '教材精读', icon: 'BookOpen', badge: { kind: 'static', value: '课文' }, tracks: ['ja'] },
+      { id: 'TEXTBOOK', label: '教材精读', icon: 'BookOpen', tracks: ['ja'] },
     ],
   },
   {
@@ -94,7 +93,7 @@ export const SIDEBAR_NAV_GROUPS: SidebarNavGroupDef[] = [
     defaultOpen: false,
     items: [
       { id: 'SHADOWING', label: '精听与听写', icon: 'Headphones' },
-      { id: 'PITCH', label: '声调纠音', icon: 'Mic', badge: { kind: 'static', value: 'AI' }, tracks: ['ja'] },
+      { id: 'PITCH', label: '声调纠音', icon: 'Mic', tracks: ['ja'] },
     ],
   },
 ];
@@ -112,8 +111,6 @@ export function resolveSidebarBadge(
 ): string | undefined {
   if (!spec) return undefined;
   switch (spec.kind) {
-    case 'static':
-      return spec.value;
     case 'quizProgress':
       return runtime.quizProgress;
     case 'cardCount':

@@ -32,7 +32,7 @@ export function TaskStatusCard({ userId, taskId }: { userId: string; taskId: str
   const failedCode = typeof last?.code === 'string' ? last.code : null;
 
   return (
-    <div className="space-y-3 rounded-xl border border-line bg-surface p-4" aria-label="任务状态">
+    <div className="surface-card space-y-3 rounded-xl p-4" aria-label="任务状态">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={statusVariant(failedCode ? 'FAILED' : snapshot?.status ?? '')}>{statusText(snapshot, running)}</Badge>
         {snapshot && <span className="text-xs text-ink-muted">{snapshot.config.language} · {snapshot.config.targetLevel} · 已出 {snapshot.usage.usedQuestions} 题</span>}

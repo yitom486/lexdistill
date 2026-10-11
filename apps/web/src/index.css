@@ -40,12 +40,12 @@
   --motion-shine-duration: 1.6s;
   --motion-shimmer-button-duration: 1.4s;
 
-  --visual-agent-beam-from: #38bdf8;
-  --visual-agent-beam-to: #a78bfa;
-  --visual-shadowing-beam-from: #10b981;
-  --visual-shadowing-beam-to: #f59e0b;
-  --visual-listening-beam-from: #f59e0b;
-  --visual-listening-beam-to: #0ea5e9;
+  --visual-agent-beam-from: #d97706;
+  --visual-agent-beam-to: #78716c;
+  --visual-shadowing-beam-from: #059669;
+  --visual-shadowing-beam-to: #d97706;
+  --visual-listening-beam-from: #d97706;
+  --visual-listening-beam-to: #44403c;
   --visual-shadow-wave-active: #f59e0b;
   --visual-shadow-wave-idle: #d6d3d1;
   --visual-tts-wave-active: #d97706;
@@ -106,20 +106,21 @@
 
 .dark {
   color-scheme: dark;
-  --visual-agent-beam-from: #7dd3fc;
-  --visual-agent-beam-to: #c4b5fd;
-  --visual-shadowing-beam-from: #34d399;
-  --visual-shadowing-beam-to: #fbbf24;
-  --visual-listening-beam-from: #fbbf24;
-  --visual-listening-beam-to: #38bdf8;
-  --visual-shadow-wave-active: #fbbf24;
+  /* Phase 1: Refined Amber Gold — 古籍金/矿物金，降饱和 (chroma <= 0.12)。 */
+  --visual-agent-beam-from: #e0a96d;
+  --visual-agent-beam-to: #a8a29e;
+  --visual-shadowing-beam-from: #10b981;
+  --visual-shadowing-beam-to: #e0a96d;
+  --visual-listening-beam-from: #e0a96d;
+  --visual-listening-beam-to: #78716c;
+  --visual-shadow-wave-active: #e0a96d;
   --visual-shadow-wave-idle: #57534e;
-  --visual-tts-wave-active: #fbbf24;
+  --visual-tts-wave-active: #e0a96d;
   --visual-tts-wave-idle: #57534e;
-  --visual-pitch-trace: #fbbf24;
+  --visual-pitch-trace: #e0a96d;
   --visual-confetti-orange: #fb923c;
   --visual-confetti-orange-light: #fdba74;
-  --visual-confetti-amber: #fbbf24;
+  --visual-confetti-amber: #e0a96d;
   --visual-confetti-orange-deep: #f97316;
   --visual-confetti-rose: #fb7185;
   --visual-confetti-emerald: #34d399;
@@ -218,6 +219,50 @@
   animation: shine var(--motion-shine-duration) ease-in-out infinite;
 }
 
+/*
+ * Phase 1: Surface Elevation + Hairline system.
+ * 卡片只消费语义 token：底色走 --surface 系，边框走发丝线，
+ * 立体感靠实体微高光（外投影 + 内边缘 1px 反光），禁止高饱和黄实线框。
+ */
+@layer utilities {
+  .surface-elevated {
+    background-color: var(--surface);
+    border: 1px solid var(--line-hairline);
+    box-shadow:
+      0 1px 2px 0 rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .surface-card {
+    background-color: var(--surface-warm);
+    border: 1px solid var(--line-hairline);
+    box-shadow:
+      0 1px 2px 0 rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .surface-card-hover:hover {
+    border-color: var(--line-hairline-strong);
+    box-shadow:
+      0 4px 16px 0 rgba(0, 0, 0, 0.45),
+      0 0 24px 0 var(--line-glow-hover),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  }
+
+  /*
+   * Phase 4: 模态表面 — surface-elevated 的纵深版。
+   * 半透明由遮罩层提供，此处给实体底 + 折射内 rim + 环境深阴影。
+   */
+  .surface-modal {
+    background-color: var(--surface);
+    border: 1px solid var(--line-hairline);
+    box-shadow:
+      0 24px 64px -12px rgba(0, 0, 0, 0.55),
+      0 4px 16px 0 rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  }
+}
+
 @keyframes reply-char-bounce {
   0%,
   55%,
@@ -264,7 +309,20 @@
   }
 
   body {
-    font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Geist', 'Noto Sans JP', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .font-serif {
+    font-family: 'Newsreader', Georgia, 'Songti SC', 'Source Han Serif SC', serif;
+    letter-spacing: -0.015em;
+  }
+
+  .font-mono {
+    font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -532,6 +590,14 @@
 
   /* line（68 token，hits 259） */
   --line-accent: color-mix(in oklab, oklch(41.4% 0.112 45.904) 10%, transparent);
+  --line-hairline: color-mix(in oklab, oklch(21.6% 0.006 56.043) 8%, transparent);
+  --line-hairline-strong: color-mix(in oklab, oklch(21.6% 0.006 56.043) 12%, transparent);
+  --line-glow-hover: rgba(224, 169, 109, 0.2);
+  /* Phase 2: 精制古籍金（Refined Amber Gold），TSX 经 bg-/text-/border-gold-warm 消费，禁止字面量 */
+  --gold-warm: #e0a96d;
+  /* Phase 4: 控件微高光（旧塑料感终结者）；亮暗同值，TSX 经 shadow-inner-hi(-strong) 消费 */
+  --shadow-inner-hi: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  --shadow-inner-hi-strong: inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
   --line-amber-500o30: color-mix(in oklab, oklch(76.9% 0.188 70.08) 30%, transparent);
   --line: oklch(92.3% 0.003 48.717);
   --line-soft: oklch(92.3% 0.003 48.717);
@@ -750,27 +816,27 @@
   --worker-idle-dot: color-mix(in oklab, oklch(70.9% 0.01 56.259) 60%, transparent);
 }
 .dark {
-  /* paper */
-  --paper-soft: #1a1816;
+  /* paper — Phase 1 Surface Elevation Scale: Canvas #141312 / Surface #1e1c1a */
+  --paper-soft: #1e1c1a;
   --paper-cream-deep: #201d19;
   --paper-bright: #181615;
-  --paper-clean: #151311;
+  --paper-clean: #141312;
   --paper-mint: #151a16;
   --paper-cream-night: #1e1c19;
   --paper: #141312;
 
-  /* surface */
-  --surface: oklch(21.6% 0.006 56.043);
-  --surface-dim: oklch(26.8% 0.007 34.298);
+  /* surface — Canvas #121110 / Panel #171614 / Surface #211f1d / Raised #282623 */
+  --surface: #282623;
+  --surface-dim: #211f1d;
   --surface-warm: #211f1d;
-  --surface-coal: #131211;
-  --surface-abyss: oklch(14.7% 0.004 49.25);
+  --surface-coal: #171614;
+  --surface-abyss: #121110;
   --surface-stone-900-amber-600: oklch(66.6% 0.179 58.318);
   --surface-h1a1917o95: color-mix(in oklab, #1a1917 95%, transparent);
   --surface-stone-100-stone-900: oklch(21.6% 0.006 56.043);
-  --surface-dusk: #181614;
+  --surface-dusk: #211f1d;
   --surface-coal-fixed: #1c1a17;
-  --surface-ash: #151412;
+  --surface-ash: #171614;
   --surface-clay: #1f1d1a;
   --surface-stone-50-stone-900o60: color-mix(in oklab, oklch(21.6% 0.006 56.043) 60%, transparent);
   --surface-paper-coal: #1c1a17;
@@ -982,8 +1048,17 @@
   --tone-amber-500o80: color-mix(in oklab, oklch(76.9% 0.188 70.08) 80%, transparent);
   --tone-stone-800o80: color-mix(in oklab, oklch(26.8% 0.007 34.298) 80%, transparent);
 
-  /* line */
-  --line-accent: color-mix(in oklab, oklch(76.9% 0.188 70.08) 15%, transparent);
+  /* line — Phase 1 Hairline: 黑底禁用高饱和黄实线框，统一微透明白发丝线；
+     hover 提亮只允许 rgba(224, 169, 109, 0.2) 级漫射。 */
+  --line-accent: color-mix(in oklab, #ffffff 8%, transparent);
+  --line-hairline: color-mix(in oklab, #ffffff 8%, transparent);
+  --line-hairline-strong: color-mix(in oklab, #ffffff 12%, transparent);
+  --line-glow-hover: rgba(224, 169, 109, 0.2);
+  /* Phase 2: 精制古籍金（Refined Amber Gold），TSX 经 bg-/text-/border-gold-warm 消费，禁止字面量 */
+  --gold-warm: #e0a96d;
+  /* Phase 4: 控件微高光（旧塑料感终结者）；亮暗同值，TSX 经 shadow-inner-hi(-strong) 消费 */
+  --shadow-inner-hi: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  --shadow-inner-hi-strong: inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
   --line-amber-500o30: color-mix(in oklab, oklch(76.9% 0.188 70.08) 30%, transparent);
   --line: oklch(37.4% 0.01 67.558);
   --line-soft: oklch(26.8% 0.007 34.298);
@@ -1427,6 +1502,12 @@
   --color-tone-amber-500o80: var(--tone-amber-500o80);
   --color-tone-stone-800o80: var(--tone-stone-800o80);
   --color-line-accent: var(--line-accent);
+  --color-line-hairline: var(--line-hairline);
+  --color-line-hairline-strong: var(--line-hairline-strong);
+  --color-line-glow-hover: var(--line-glow-hover);
+  --color-gold-warm: var(--gold-warm);
+  --shadow-inner-hi: var(--shadow-inner-hi);
+  --shadow-inner-hi-strong: var(--shadow-inner-hi-strong);
   --color-line-amber-500o30: var(--line-amber-500o30);
   --color-line: var(--line);
   --color-line-soft: var(--line-soft);

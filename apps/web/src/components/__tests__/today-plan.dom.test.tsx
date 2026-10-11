@@ -39,7 +39,7 @@ it('daily tasks and route links focus words, kana, cards and grammar and clear s
     ] }),
   }));
   mock.module('../../queries/wordlists.js', () => ({ useWordlistsQuery: () => ({ data: [] }) }));
-  mock.module('../../queries/vocabulary.js', () => ({ useVocabularyQuery: () => ({ data: [] }) }));
+  mock.module('../../queries/vocabulary.js', () => ({ useVocabularyQuery: () => ({ data: [] }), selectVocabularyForCard: () => undefined }));
   mock.module('../../queries/lessons.js', () => ({ useLessonsQuery: () => ({ data: [] }) }));
   mock.module('../../queries/useAgentMutations.js', () => ({ useGenerateAdaptiveQuizMutation: inert }));
   mock.module('../daily-study/DailyWordStudyHub.js', () => ({ DailyWordStudyHub: ({ courseUnitId }: { courseUnitId?: string }) => <div data-study-unit={courseUnitId}>学词</div> }));

@@ -42,8 +42,9 @@ export function joinOrderIndices(chunks: string[], order: number[]): string {
  * 单题卡：输入与判分状态以后端保留为准，本地只做受控输入。
  * 作答态隐藏答案作答，复盘态按后端资格展示完整快照。
  */
-export function BankQuestionCard({ userId, taskId, paperId, item, reviewed, reviewQuestion, submissions, onSettled }: {
+export function BankQuestionCard({ userId, taskId, paperId, item, index = 0, reviewed, reviewQuestion, submissions, onSettled }: {
   userId: string; taskId: string; paperId: string; item: GenerationStudentItem;
+  index?: number | undefined;
   reviewed: boolean; reviewQuestion: Record<string, unknown> | null;
   submissions: BankSubmissionRecord[]; onSettled: () => void;
 }) {
@@ -117,10 +118,15 @@ export function BankQuestionCard({ userId, taskId, paperId, item, reviewed, revi
     ? stored : null;
 
   return (
-    <div className="space-y-3 rounded-xl border border-line bg-surface p-4" aria-label={`题目 ${item.prompt.slice(0, 12)}`}>
-      <p className="text-sm leading-6 text-ink">{item.prompt}</p>
+    <div className="surface-card rounded-xl p-4" aria-label={`题目 ${item.prompt.slice(0, 12)}`}>
+      <div className="flex gap-3">
+        <div aria-hidden className="font-mono text-[11px] font-bold text-ink-faint-soft pt-1 w-7 shrink-0">
+          {String(index + 1).padStart(2, '0')}
+        </div>
+        <div className="min-w-0 flex-1 space-y-3">
+      <p className="font-serif text-[15px] leading-7 text-ink">{item.prompt}</p>
       {material?.type === 'READING' && (
-        <div className="rounded-lg border border-line bg-surface p-3 text-sm leading-6 text-ink">
+        <div className="rounded-lg border border-line-hairline bg-surface-coal/60 p-3 text-sm leading-6 text-ink">
           <p className="text-xs font-semibold text-ink-muted">{material.title}</p>
           <p>{material.text}</p>
         </div>
@@ -131,19 +137,26 @@ export function BankQuestionCard({ userId, taskId, paperId, item, reviewed, revi
       {answerType === 'MULTIPLE_CHOICE' && !reviewed && (
         <div className="flex flex-wrap gap-2">
           {(item.answer.options ?? []).map(option => (
-            <Button key={option.key} variant={choice === option.key ? 'default' : 'outline'}
-              onClick={() => { setDirty(true); setChoice(option.key); }} disabled={busy} aria-label={`选项 ${option.key}`}>{option.text}</Button>
+            <span key={option.key} className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="font-serif text-xs font-bold text-ink-faint-soft w-4 text-center">
+                {option.key}
+              </span>
+              <Button variant={choice === option.key ? 'default' : 'outline'}
+                onClick={() => { setDirty(true); setChoice(option.key); }} disabled={busy} aria-label={`选项 ${option.key}`}>
+                {option.text}
+              </Button>
+            </span>
           ))}
         </div>
       )}
       {answerType === 'FILL_BLANK' && !reviewed && (
         <input aria-label="填空答案" value={text} onChange={event => { setDirty(true); setText(event.target.value); }} disabled={busy}
-          className="block w-full rounded-lg border border-line bg-surface p-2 text-ink" />
+          className="block w-full rounded-lg border border-line-hairline bg-surface-coal/60 p-2 text-ink" />
       )}
       {answerType === 'REORDER' && !reviewed && (
         <div className="space-y-2">
-          <div className="flex min-h-10 flex-wrap gap-2 rounded-lg border border-line p-2" aria-label="已选顺序">
-            {order.map((chunkIndex, position) => <span key={position} className="rounded-md bg-line px-2 py-1 text-xs text-ink">{chunks[chunkIndex]}</span>)}
+          <div className="flex min-h-10 flex-wrap gap-2 rounded-lg border border-line-hairline p-2" aria-label="已选顺序">
+            {order.map((chunkIndex, position) => <span key={position} className="rounded-md border border-line-hairline bg-surface-coal px-2 py-1 text-xs text-ink">{chunks[chunkIndex]}</span>)}
           </div>
           <div className="flex flex-wrap gap-2">
             {chunks.map((chunk, chunkIndex) => order.includes(chunkIndex) ? null : (
@@ -184,6 +197,8 @@ export function BankQuestionCard({ userId, taskId, paperId, item, reviewed, revi
         <BankGradeButton userId={userId} taskId={taskId} paperId={paperId} submission={stored} onSettled={onSettled} />
       )}
       {review && <ReviewDetail detail={review} />}
+        </div>
+      </div>
     </div>
   );
 }
@@ -192,7 +207,7 @@ function ReviewDetail({ detail }: { detail: Record<string, unknown> }) {
   const answer = detail['answer'] as Record<string, unknown> | undefined;
   const material = detail['material'] as Record<string, unknown> | null | undefined;
   return (
-    <div className="space-y-1 rounded-lg border border-line p-3 text-xs leading-5 text-ink">
+    <div className="space-y-1 rounded-lg border border-line-hairline p-3 text-xs leading-5 text-ink">
       <p>答案：{JSON.stringify(answer)}</p>
       <p>讲解：{String(detail['explanation'] ?? '')}</p>
       {material && material['type'] === 'READING' && <p>原文：{String(material['text'] ?? '')}</p>}

@@ -8,15 +8,15 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-tone-amber-500 text-tone-stone-950 font-bold shadow-xs hover:bg-tone-amber-600',
+          'bg-gold-warm text-tone-stone-950 font-bold shadow-inner-hi-strong hover:shadow-[0_0_18px_0_var(--line-glow-hover)]',
         destructive:
           'bg-tone-rose-500 text-tone-white shadow-xs hover:bg-ink-rose-600',
         outline:
-          'border border-line-soft bg-veil-whiteo80 dark:bg-surface-h1f1d1b hover:bg-line-stone-100-stone-800 hover:border-tone-amber-500o40 text-ink-mute',
+          'border border-line-hairline bg-transparent text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60 shadow-inner-hi',
         secondary:
-          'bg-tone-stone-200o80-stone-800 text-ink-soft hover:bg-line-stone-300o80-stone-700',
+          'bg-tone-stone-200o80-stone-800 text-ink-soft hover:bg-line-stone-300o80-stone-700 shadow-inner-hi',
         ghost:
-          'hover:bg-line-stone-100-stone-800 text-ink-faint',
+          'text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60',
         link:
           'text-accent-ink-warm underline-offset-4 hover:underline',
         amber:

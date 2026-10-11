@@ -34,32 +34,42 @@ export function BankPaperView({ userId, taskId, paperId }: { userId: string; tas
   if (paper.isError) return <p role="alert" className="text-xs text-ink-rose-600">{(paper.error as Error).message}</p>;
   if (!data) return null;
   const isReview = review && 'items' in data && data.items.length > 0 && typeof (data.items[0] as { reviewed?: unknown }).reviewed === 'boolean';
+  const itemCount = 'items' in data && Array.isArray((data as { items?: unknown }).items)
+    ? ((data as { items?: unknown }).items as unknown[]).length
+    : 0;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold text-ink">{data.title}</h3>
-        <Button variant="outline" onClick={() => setReview(r => !r)} aria-label="切换复盘">
-          {review ? '返回作答' : '查看复盘'}
-        </Button>
+      <div className="surface-card rounded-2xl p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] tracking-wider uppercase text-ink-faint-soft">
+              语言能力模拟卷 · 共 {itemCount} 题
+            </p>
+            <h3 className="text-base font-serif font-bold text-ink tracking-tight mt-0.5">{data.title}</h3>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setReview(r => !r)} aria-label="切换复盘">
+            {review ? '返回作答' : '查看复盘'}
+          </Button>
+        </div>
       </div>
       {submissions.isError && <p role="alert" className="text-xs text-ink-rose-600">{(submissions.error as Error).message}</p>}
       {isReview
-        ? (data as GenerationReviewPaper).items.map(entry => {
+        ? (data as GenerationReviewPaper).items.map((entry, index) => {
           const own = byQuestion.get(entry.id) ?? [];
           if (!entry.reviewed) {
             const question = entry.question as GenerationStudentPaper['items'][number];
             return <BankQuestionCard key={entry.id} userId={userId} taskId={taskId} paperId={paperId}
-              item={question} reviewed={false} reviewQuestion={null} submissions={own} onSettled={refresh} />;
+              item={question} index={index} reviewed={false} reviewQuestion={null} submissions={own} onSettled={refresh} />;
           }
           const full = entry.question as Record<string, unknown>;
           const fallback = full as unknown as GenerationStudentPaper['items'][number];
           return <BankQuestionCard key={entry.id} userId={userId} taskId={taskId} paperId={paperId}
-            item={fallback} reviewed reviewQuestion={full} submissions={own} onSettled={refresh} />;
+            item={fallback} index={index} reviewed reviewQuestion={full} submissions={own} onSettled={refresh} />;
         })
-        : (data as GenerationStudentPaper).items.map(item => (
+        : (data as GenerationStudentPaper).items.map((item, index) => (
           <BankQuestionCard key={item.id} userId={userId} taskId={taskId} paperId={paperId}
-            item={item} reviewed={false} reviewQuestion={null} submissions={byQuestion.get(item.id) ?? []} onSettled={refresh} />
+            item={item} index={index} reviewed={false} reviewQuestion={null} submissions={byQuestion.get(item.id) ?? []} onSettled={refresh} />
         ))}
     </div>
   );

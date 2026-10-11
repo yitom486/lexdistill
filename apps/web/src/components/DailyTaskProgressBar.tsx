@@ -35,7 +35,7 @@ export function DailyTaskProgressBar() {
       {/* 状态徽章图标 */}
       <div className="flex items-center gap-1.5 shrink-0">
         {isBurst ? (
-          <div className="flex items-center gap-1 text-tone-amber-500 animate-pulse font-bold text-xs">
+          <div className="flex items-center gap-1 text-tone-amber-500 font-bold text-xs">
             <Zap className="w-3.5 h-3.5 fill-tone-amber-500" />
             <span className="hidden xl:inline text-[11px]">超额连刷</span>
           </div>

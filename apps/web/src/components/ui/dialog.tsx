@@ -15,7 +15,7 @@ export const DialogOverlay = React.forwardRef<
   <BaseDialog.Backdrop
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-veil-blacko60 backdrop-blur-xs transition-opacity',
+      'fixed inset-0 z-50 bg-veil-blacko60 backdrop-blur-xl transition-opacity',
       className
     )}
     {...props}
@@ -35,14 +35,14 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       <BaseDialog.Popup
         ref={ref}
         className={cn(
-          'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-line-amber-900o15-amber-500o20 bg-paper-soft text-ink p-6 shadow-2xl rounded-3xl outline-none',
+          'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 surface-modal text-ink p-6 rounded-3xl outline-none',
           className
         )}
         {...props}
       >
         {children}
         {showCloseButton && (
-          <BaseDialog.Close className="absolute right-4 top-4 rounded-xl p-1 text-ink-stone-400 hover:text-ink hover:bg-veil-stone-200o50 dark:hover:bg-tone-stone-800 transition-colors focus:outline-none cursor-pointer">
+          <BaseDialog.Close className="absolute right-4 top-4 rounded-xl p-1 text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60 transition-colors focus:outline-none cursor-pointer">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </BaseDialog.Close>

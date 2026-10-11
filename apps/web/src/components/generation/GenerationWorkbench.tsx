@@ -20,7 +20,7 @@ export function GenerationWorkbench({ userId, track }: { userId: string; track: 
   return (
     <div className="space-y-4" aria-label="AI 出题">
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold text-ink">出题任务</h2>
+        <h2 className="font-mono text-[10px] tracking-wider uppercase text-ink-stone-400 font-semibold">出题任务 · Examination Tasks</h2>
         {tasks.isPending && <p className="text-xs text-ink-muted">任务列表加载中…</p>}
         {tasks.isError && <p role="alert" className="text-xs text-ink-rose-600">{(tasks.error as Error).message}</p>}
         {tasks.data && tasks.data.length > 0 && (

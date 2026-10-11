@@ -115,7 +115,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
     <header className="flex items-start justify-between gap-2 px-3 py-2.5 border-b border-line">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold tracking-tight">Agent</span>
+          <span className="text-sm font-semibold tracking-tight font-serif text-ink">{copy.trackName}导师</span>
           <span
             className={`inline-flex items-center gap-1 text-[10px] ${
               connected ? 'text-ink-emerald-700-emerald-400' : 'text-ink-ghost'
