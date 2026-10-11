@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useInView, useMotionValue, useSpring } from 'framer-motion';
+import { cn } from '../../lib/utils.js';
 
 interface NumberTickerProps {
   value: number;
@@ -19,7 +20,7 @@ export function NumberTicker({
   const ref = useRef<HTMLSpanElement>(null);
   const motionValue = useMotionValue(direction === 'down' ? value : 0);
   const springValue = useSpring(motionValue, {
-    damping: 30,
+    damping: 24,
     stiffness: 120,
   });
   const isInView = useInView(ref, { once: true, margin: '0px' });
@@ -42,8 +43,15 @@ export function NumberTicker({
   }, [springValue, decimalPlaces]);
 
   return (
-    <span className={className} ref={ref}>
+    <span
+      className={cn(
+        'inline-block font-mono tabular-nums select-none tracking-tight',
+        className
+      )}
+      ref={ref}
+    >
       {Number(value).toFixed(decimalPlaces)}
     </span>
   );
 }
+

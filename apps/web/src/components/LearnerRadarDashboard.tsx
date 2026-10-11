@@ -125,10 +125,10 @@ export function LearnerRadarDashboard({
       <EncounteredTermsHeat />
 
       {/* 掌握度细项雷达 */}
-      <div className="bg-paper-soft rounded-2xl p-5 border border-line-accent shadow-sm space-y-4">
+      <div className="surface-card rounded-2xl p-5 border border-line-hairline shadow-inner-hi space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-ink-mute flex items-center gap-2">
-            <Award className="w-4 h-4 text-accent-ink" />
+            <Award className="w-4 h-4 text-gold-warm" />
             {shell.trackName}技能画像 ({shell.copy.levelSchemeLabel})
           </h3>
           <Tabs
@@ -139,7 +139,7 @@ export function LearnerRadarDashboard({
             }}
           >
             <TabsList className="bg-transparent p-0 border-0 gap-1">
-              <TabsIndicator className="bg-tone-amber-500 shadow-sm" />
+              <TabsIndicator className="bg-gold-warm shadow-sm" />
               {[
                 { key: 'ALL', label: '全部' },
                 { key: 'GRAMMAR', label: '文法' },
@@ -168,7 +168,7 @@ export function LearnerRadarDashboard({
         </div>
 
         {visibleMetrics.length === 0 ? (
-          <div className="py-8 px-4 text-center rounded-xl bg-veil-stone-100o50-stone-900o30 border border-dashed border-line-soft">
+          <div className="py-8 px-4 text-center rounded-xl bg-veil-stone-100o50-stone-900o30 border border-dashed border-line-hairline">
             <p className="text-xs text-ink-ghost mb-2.5">
               {shell.copy.emptySkillsHint}
             </p>
@@ -193,14 +193,14 @@ export function LearnerRadarDashboard({
               return (
                 <div
                   key={metric.id}
-                  className="p-4 rounded-xl bg-veil-stone-100o70-stone-900o50 border border-tone-stone-200o80-stone-800 space-y-2"
+                  className="p-4 rounded-xl bg-veil-stone-100o70-stone-900o50 border border-line-hairline space-y-2"
                 >
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-ink-soft">
                       {metric.name}
                     </span>
                     <Badge
-                      variant={isStrong ? 'emerald' : isWeak ? 'destructive' : 'amber'}
+                      variant={isStrong ? 'emerald' : isWeak ? 'destructive' : 'gold'}
                       className="rounded font-mono"
                     >
                       {Math.round(metric.proficiency * 100)}%
@@ -210,11 +210,11 @@ export function LearnerRadarDashboard({
                   <Progress
                     value={metric.proficiency * 100}
                     indicatorClassName={
-                      isStrong ? 'bg-tone-emerald-500' : isWeak ? 'bg-tone-rose-500' : 'bg-tone-amber-500'
+                      isStrong ? 'bg-tone-emerald-500' : isWeak ? 'bg-tone-rose-500' : 'bg-gold-warm'
                     }
                   />
 
-                  <div className="flex justify-between items-center text-[11px] text-ink-stone-400 pt-1">
+                  <div className="flex justify-between items-center text-[11px] text-ink-faint pt-1">
                     <span>总练习 {metric.totalAttempts} 次 · 连续错误 {metric.consecutiveErrors} 次</span>
                     {isWeak && (
                       <Button
@@ -225,7 +225,7 @@ export function LearnerRadarDashboard({
                           setActiveTab('QUIZ');
                           toast.info(`已为您调取针对【${metric.name}】的加练题目！`);
                         }}
-                        className="h-auto p-0 text-[11px] font-bold"
+                        className="h-auto p-0 text-[11px] font-bold text-gold-warm hover:underline"
                       >
                         靶向加练 →
                       </Button>

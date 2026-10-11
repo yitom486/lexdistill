@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '../../lib/utils.js';
 
 interface ShimmerButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   shimmerColor?: string;
@@ -15,7 +16,10 @@ export function ShimmerButton({
   return (
     <button
       disabled={disabled}
-      className={`group relative overflow-hidden rounded-xl bg-tint-orange-500 hover:bg-tint-orange-600 px-6 py-2.5 font-medium text-sm text-tone-white shadow-xs hover:shadow-sm transition-all active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 cursor-pointer ${className}`}
+      className={cn(
+        'group relative overflow-hidden rounded-xl bg-gold-warm text-tone-stone-950 shadow-inner-hi-strong hover:bg-gold-warm/90 px-6 py-2.5 font-medium text-sm transition-all active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 cursor-pointer',
+        className
+      )}
       {...props}
     >
       <div
@@ -24,9 +28,10 @@ export function ShimmerButton({
           animationDuration: 'var(--motion-shimmer-button-duration)',
         }}
       />
-      <span className="relative z-10 flex items-center justify-center gap-2">
+      <span className="relative z-10 flex items-center justify-center gap-2 font-semibold">
         {children}
       </span>
     </button>
   );
 }
+
