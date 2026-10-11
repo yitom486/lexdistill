@@ -2,7 +2,7 @@
  * 业务与领域标准错误分类
  */
 export type ErrorCategory =
-  | 'AGENT_RUNTIME'     // 底层 AI / Codex 服务异常
+  | 'AGENT_RUNTIME'     // 底层 AI Agent 服务异常
   | 'TOOL_EXECUTION'    // 工具执行失败
   | 'VALIDATION'        // 参数或协议结构校验失败
   | 'LEARNER_STATE'     // 学习者数据冲突或未找到
@@ -31,7 +31,7 @@ export class BusinessError extends Error {
 const MAX_EXTRACTED_MESSAGE = 240;
 
 /**
- * 从 Error / JSON-RPC / Codex TurnError 等异构载荷里抽出可读文案。
+ * 从 Error / JSON-RPC / 引擎 TurnError 等异构载荷里抽出可读文案。
  * 禁止把普通对象落到 `[object Object]`。
  */
 export function extractErrorText(rawError: unknown, depth = 0): string {
@@ -168,7 +168,7 @@ export function translateToBusinessError(
     );
   }
 
-  // 6. 底层 Codex / AI 引擎异常翻译：保留原文，避免把对象/具体原因吞掉
+  // 6. 底层 AI 引擎异常翻译：保留原文，避免把对象/具体原因吞掉
   if (errMessage.toLowerCase().includes('codex') || errMessage.includes('app-server')) {
     const clipped =
       errMessage.length > MAX_EXTRACTED_MESSAGE
@@ -176,7 +176,7 @@ export function translateToBusinessError(
         : errMessage;
     return new BusinessError(
       'E_AGENT_ENGINE_ERROR',
-      `Codex 本轮未完成：${clipped}`,
+      `Agent 本轮未完成：${clipped}`,
       'AGENT_RUNTIME',
       true,
       { raw: errMessage, context: contextTag }

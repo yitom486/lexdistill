@@ -23,6 +23,7 @@ export const SubmitTextbookExerciseSchema = z.object({
   preview: ExerciseSnapshotSchema.optional(), answer: ExerciseAnswerSchema,
   previousAttemptId: z.string().min(1).optional(), retryAttemptId: z.string().min(1).optional(),
   model: z.string().trim().min(1).max(128).optional(), effort: z.string().max(32).optional(), timeSpentMs: z.number().int().nonnegative().optional(),
+  runtimeId: z.string().trim().min(1).max(60).optional(),
 }).strict();
 export const TextbookExerciseAttemptSchema = z.object({
   id: z.string(), itemId: z.string(), attemptNo: z.number().int().positive(), previousAttemptId: z.string().nullable(),

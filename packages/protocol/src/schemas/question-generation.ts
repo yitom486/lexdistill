@@ -10,6 +10,7 @@ export const GenerationScopeSchema = z.object({ documentId: id, chapterId: id })
 export const GenerationConfigSchema = z.object({
   language: z.enum(['ja', 'en', 'ko']), targetLevel: GenerationLevelSchema,
   modelId: id, promptVersion: id,
+  runtimeId: z.string().trim().min(1).max(60).optional(),
   maxQuestions: z.number().int().min(1).max(100),
   categoryLimits: z.record(BankCategorySchema, z.number().int().min(0).max(100)),
   allowedAnswerTypes: z.array(BankAnswerTypeSchema).min(1).max(6),
@@ -162,6 +163,7 @@ export const BankGradeSubmitSchema = z.object({
   submissionId: id, taskId: id, paperId: id,
   model: z.string().trim().min(1).max(128).optional(),
   effort: z.string().trim().min(1).max(32).optional(),
+  runtimeId: z.string().trim().min(1).max(60).optional(),
 }).strict();
 export type BankGradeSubmit = z.infer<typeof BankGradeSubmitSchema>;
 export const BankObjectiveAnswerResultSchema = z.object({

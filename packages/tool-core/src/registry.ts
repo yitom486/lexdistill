@@ -21,6 +21,14 @@ export class ToolRegistry {
     return this.tools.get(name);
   }
 
+  /**
+   * 注销按次注册的工具（如批改按轮次实例）。返回是否命中。
+   * 常驻工具禁止注销调用（调用方保证只注销自己注册的实例）。
+   */
+  public unregister(name: string): boolean {
+    return this.tools.delete(name);
+  }
+
   public list(): ToolDefinition[] {
     return Array.from(this.tools.values());
   }

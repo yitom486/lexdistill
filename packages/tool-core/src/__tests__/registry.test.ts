@@ -26,6 +26,15 @@ describe('Tool Core - ToolRegistry & Execution', () => {
     expect(registry.list().length).toBe(1);
   });
 
+  it('unregister 按次工具：命中返回 true 并消失；未知名返回 false', () => {
+    const registry = new ToolRegistry();
+    registry.register(dummyTool);
+    expect(registry.unregister('nope')).toBe(false);
+    expect(registry.unregister('dictionary.lookup')).toBe(true);
+    expect(registry.get('dictionary.lookup')).toBeUndefined();
+    expect(registry.list()).toHaveLength(0);
+  });
+
   it('should execute successfully with valid input', async () => {
     const registry = new ToolRegistry();
     registry.register(dummyTool);
