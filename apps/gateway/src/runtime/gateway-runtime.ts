@@ -5,7 +5,7 @@ import { SessionToolBridge } from './mcp/session-tool-bridge.js';
 import { AcpAdapterPool } from '../infrastructure/acp/acp-adapter-pool.js';
 import { resolveSessionAdapterId } from './router/runtime-catalog.js';
 import { checkProvenOptions } from './router/model-effort-guard.js';
-import { batchLane, isAcpBatchEnabled } from './acp-batch/acp-batch-support.js';
+import { batchLane } from './acp-batch/acp-batch-support.js';
 import {
   AcpConversationLedger,
   type AcpLedgerBackend,
@@ -91,14 +91,17 @@ export class GatewayServer {
   public readonly acpLedger: AcpConversationLedger;
 
   /**
-   * 批处理适配器选型（目录提炼/出题等）：`LINGUA_ACP_BATCH=1` 且指名 ACP 运行时才走池，
-   * 其余一律 Codex 原通路。返回 lane 命名（用户历史默认排除批 lane）。
+   * 批处理适配器选型（目录提炼等）：指名 ACP 运行时即走池，运行时选择即时生效；
+   * 空/未知 runtimeId 回落 Codex 原通路（旧前端兼容）。
+   * 历史门 `LINGUA_ACP_BATCH` 已退役：唯一调用方目录提炼 lane 已实测（codex-acp 全绿，
+   * opencode 单工具调用验证通过），不再需要 flag 门。
+   * 返回 lane 命名（用户历史默认排除批 lane）。
    */
   public resolveBatchAdapter(
     runtimeId: string | undefined,
     batchName: string,
   ): { adapter: CodexAdapter | AcpAdapter; batchLane: string | null } {
-    if (runtimeId && isAcpBatchEnabled() && resolveSessionAdapterId(runtimeId) === 'acp') {
+    if (runtimeId && resolveSessionAdapterId(runtimeId) === 'acp') {
       return { adapter: this.acpAdapterPool.get(runtimeId), batchLane: batchLane(batchName) };
     }
     return { adapter: this.agentAdapter, batchLane: null };

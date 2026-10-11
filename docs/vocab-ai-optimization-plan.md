@@ -61,6 +61,8 @@
 - 目录提炼 lane 已切（首个批 lane，flag 门后）：路由接受 `runtimeId`（两输入分支）→`resolveBatchAdapter` 选池（用户历史默认排除批 lane）→模型/档位发前证伪（400 大声拦，与聊天同一实现）→文字版内嵌页文字（原物理页分隔，`extractOriginalPageTexts` 逐页取字）→`library.propose_toc` 经桥直收（sessionId 对齐 take 键）；扫描版/无字版大声拦（无静默回落）。前端请求带所选运行时，目录 picker 运行时感知（探针级联档位）。79/0＋27/0＋typecheck 零错。
 - acp-client 对接收尾（本轮）：SDK 侧 `env` 透传＋图片 prompt 块已提交待发版（`cb14b00`，0.1.1，未 push）；网关侧 custom 探针改走 codex-acp＋自定义 env（与会话同链路，未配置不 spawn）＋旧 SDK（0.1.0）fail-fast（`E_ACP_CLIENT_OUTDATED` 可读错，不静默鉴权失败）；16/0＋typecheck 零错。
 - codex-acp 已翻转（spike 带 luna＋medium 建会话＋两轮工具＋resume 全绿）：已知残留差异——中断/steer 明确拒绝、collaborationMode 暂忽略、旧 codex thread 续接首轮失忆（均有声失败或注释）。
+- 固定工具任务运行时门禁已合入（用户故障破案：词语“生成讲解”在 agy/gemini-3.8-flash-high 上报 `ACP_PROTOCOL_ERROR: 请求超时: session/prompt`）。实机复现：agy 挂载会话 MCP 后无视网关工具、空转内置 run/view 命令至 prompt 超时（free-chat 同症状，100s 零输出）；同 prompt 切 codex-acp 40s 流式完成（工具实调＋落库）。修法：`supportsSessionTools` 进 capabilities（codex-acp true，其余 false，custom 同默认），`vocabulary.explain` 在探针/建会话前 fail-fast（实测 583ms 回指引，不烧模型轮次）；未动 free-chat（另案）。41/0＋typecheck 零错。
+- 运行时自由配置解绑（用户要求）：教材目录识别 `resolveBatchAdapter` 的 `LINGUA_ACP_BATCH=1` 总门已拆（唯一调用方即 toc lane）——指名 ACP 运行时即走池，`runtimeId` 不再被丢弃；opencode 经单工具＋先读后写两轮 MCP 调用实测通过，进入 `SESSION_TOOLS_VERIFIED`（codex-acp＋opencode），词汇讲解门禁同步放行；agy（无视 MCP 空转超时）与未验证运行时仍 fail-fast 明示。开关函数保留备查，注释标退役。
 - 能力开关已合入：模型/思考深度控件由后端 capabilities 驱动禁用（codex 全开保 luna，其余用 Agent 默认；零按 id 特例），`useSelectedRuntimeCaps` fail-open。
 - 桥记录铁证：首轮 `dictionary.lookup` 调用＋resume（`session restore ok`）后 `flashcards.due` 再调——resume 带工具成立，Codex 旧链路的死结解开。
 - 附带修通：更新包实形状映射、HTTP 必填 `headers`、Bun 长连接超时、SDK prompt 120s、本地 pin（`@agentclientprotocol/codex-acp ^2.1.1`，不再赌 bunx）、建连抖动重试、单 adapter 只连一次。

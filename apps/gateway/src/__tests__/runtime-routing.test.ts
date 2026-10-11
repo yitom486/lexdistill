@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { listAgentRuntimes, resolveSessionAdapterId } from '../runtime/router/runtime-catalog.js';
+import { listAgentRuntimes, resolveSessionAdapterId, runtimeSupportsSessionTools } from '../runtime/router/runtime-catalog.js';
 import { SessionToolBridge } from '../runtime/mcp/session-tool-bridge.js';
 import { AcpAdapterPool } from '../infrastructure/acp/acp-adapter-pool.js';
 import { ok } from '@study-studio/shared';
@@ -31,10 +31,23 @@ describe('listAgentRuntimes', () => {
     // 故模型/思考深度必须取探针；Codex 原生面板（Skills/MCP/用量）无 ACP 对应物，不开；
     // 历史/队列走网关台账。配额类全协议无对应物（额度芯片仅逃生口径保留）。
     expect(runtimes.find(entry => entry.id === 'codex-acp')?.capabilities)
-      .toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true });
-    for (const entry of runtimes.filter(item => item.id !== 'codex-acp')) {
-      expect(entry.capabilities).toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true });
+      .toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true, supportsSessionTools: true });
+    expect(runtimes.find(entry => entry.id === 'opencode')?.capabilities)
+      .toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true, supportsSessionTools: true });
+    for (const entry of runtimes.filter(item => item.id !== 'codex-acp' && item.id !== 'opencode')) {
+      expect(entry.capabilities).toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true, supportsSessionTools: false });
     }
+  });
+
+  it('固定工具任务门禁：codex-acp/opencode 放行；agy/未知/custom/缺席一律拦截', () => {
+    expect(runtimeSupportsSessionTools('codex-acp')).toBe(true);
+    expect(runtimeSupportsSessionTools('opencode')).toBe(true);
+    expect(runtimeSupportsSessionTools('agy')).toBe(false);
+    expect(runtimeSupportsSessionTools('claude')).toBe(false);
+    expect(runtimeSupportsSessionTools('custom')).toBe(false);
+    expect(runtimeSupportsSessionTools('nope')).toBe(false);
+    expect(runtimeSupportsSessionTools(undefined)).toBe(false);
+    expect(runtimeSupportsSessionTools('')).toBe(false);
   });
 });
 

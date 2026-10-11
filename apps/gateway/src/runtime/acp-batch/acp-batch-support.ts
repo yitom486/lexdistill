@@ -10,8 +10,9 @@
  * - 历史污染 → lane 统一 `batch:*`，用户历史默认只列 coach/learning；
  * - 模型/档位 → 沿用探针＋建会话同一套（调用方传 model/effort hints）。
  *
- * 开关：`LINGUA_ACP_BATCH=1` 才允许批调用方选用 ACP 适配器；缺席一律走 Codex 通路。
- * 逐 lane 验证后再翻默认（先目录提炼，后出题；教材管线最后）。
+ * 开关（已退役）：`LINGUA_ACP_BATCH` 曾用作批调用方选用 ACP 适配器的总门；
+ * 目录提炼 lane 实测后已默认放行（见 gateway-runtime.resolveBatchAdapter），
+ * 本函数保留仅供单测与未来新 lane 立项参考，不再被调用方咨询。
  */
 
 export const ACP_BATCH_LANE_PREFIX = 'batch:';

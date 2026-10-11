@@ -112,6 +112,35 @@ describe('getAgentRuntimeOptions 方言委托', () => {
     expect(result.efforts).toEqual(['xhigh', 'low']);
     expect(result.error).toBeUndefined();
   });
+
+  it('跨运行时模型防污染：请求不存在的模型时不抛异常、保留真实模型列表、档位走默认', async () => {
+    clearRuntimeOptionsCacheForTest();
+    const initial = [
+      { configId: 'model', category: 'model', currentValue: 'base-a', options: [{ value: 'base-a' }, { value: 'base-b' }] },
+      { configId: 'effort', category: 'thought_level', options: [{ value: 'medium' }] },
+    ];
+    let setConfigCalled = false;
+    const client = {
+      connect: async () => ({ ok: true as const, value: { status: 'connected', init: {} } }),
+      createSession: async () => ({
+        ok: true as const,
+        value: {
+          sessionId: 'probe',
+          configOptions: initial,
+          setConfigOption: async () => {
+            setConfigCalled = true;
+            return { ok: false as const, error: { message: 'unknown model' } };
+          },
+        },
+      }),
+      disconnect: async () => undefined,
+    } as unknown as AcpClient;
+    const result = await getAgentRuntimeOptions('opencode-probe', { createClient: () => client }, { model: 'gpt-6.1-sol' });
+    expect(setConfigCalled).toBe(false);
+    expect(result.models.map(m => m.value)).toEqual(['base-a', 'base-b']);
+    expect(result.efforts).toEqual(['medium']);
+    expect(result.error).toBeUndefined();
+  });
 });
 
 describe('acpClientHonorsCustomEnv', () => {  it('0.1.0 忽略 env→false；0.1.1 起→true；未知/非法版本不拦', () => {

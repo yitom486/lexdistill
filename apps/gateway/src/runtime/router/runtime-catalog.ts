@@ -33,6 +33,11 @@ export interface AgentRuntimeCapabilities {
    * ACP 运行时全开（台账以 ACP 会话 id 为键）；与 supportsThreads 正交。
    */
   supportsHistory: boolean;
+  /**
+   * 会话 MCP 工具实测可用（模型能经 MCP 调回网关桥工具并完成多轮调用）。
+   * 固定工具任务（vocabulary.explain）的唯一门禁，见下方 SESSION_TOOLS_VERIFIED。
+   */
+  supportsSessionTools: boolean;
 }
 
 /** codex-acp：会话走 ACP，模型/思考深度取 ACP 探针（与会话同口径）；
@@ -41,11 +46,30 @@ export interface AgentRuntimeCapabilities {
 const CODEX_ACP_CAPABILITIES: AgentRuntimeCapabilities = {
   supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false,
   supportsHistory: true,
+  // spike 带 luna＋medium 建会话＋两轮工具＋resume 全绿；词汇讲解端到端可用。
+  supportsSessionTools: true,
 };
 const AGENT_DEFAULT_CAPABILITIES: AgentRuntimeCapabilities = {
   supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false,
   supportsHistory: true,
+  // 未验证：agy 实测挂载 MCP 后无视网关工具、空转内置命令至 prompt 超时，先按不支持处理。
+  supportsSessionTools: false,
 };
+
+/**
+ * 会话 MCP 工具实测通过的运行时（网关唯一口径；固定工具任务门禁的事实源）：
+ * - codex-acp：spike 建会话＋两轮工具＋resume 全绿，词汇讲解端到端可用；
+ * - opencode：单工具＋先读后写两轮 MCP 调用实测通过；
+ * - agy：实测无视 MCP、空转内置命令至 prompt 超时，未通过；
+ * - 其余（含 custom）：未验证，按不支持处理（fail-fast 明示，不烧模型轮次）。
+ */
+const SESSION_TOOLS_VERIFIED: ReadonlySet<string> = new Set(['codex-acp', 'opencode']);
+
+/** 能力集选型（唯一口径：codex-acp 走实测集，其余走默认集；custom 同默认）。 */
+function capabilitiesFor(runtimeId: string): AgentRuntimeCapabilities {
+  const base = runtimeId === 'codex-acp' ? CODEX_ACP_CAPABILITIES : AGENT_DEFAULT_CAPABILITIES;
+  return { ...base, supportsSessionTools: SESSION_TOOLS_VERIFIED.has(runtimeId) };
+}
 
 function envConfigured(requiredEnvKeys: readonly string[] | undefined, runtimeId: string): boolean | null {
   if (runtimeId === 'agy') return true;
@@ -59,7 +83,7 @@ export function listAgentRuntimes(): AgentRuntimeStatus[] {
     label: entry.name,
     hint: entry.authHint || entry.description,
     configured: entry.id === 'codex-acp' ? probeCodexAuth().looksLoggedIn : envConfigured(entry.requiredEnvKeys, entry.id),
-    capabilities: entry.id === 'codex-acp' ? CODEX_ACP_CAPABILITIES : AGENT_DEFAULT_CAPABILITIES,
+    capabilities: capabilitiesFor(entry.id),
   }));
 }
 
@@ -73,6 +97,15 @@ export async function customRuntimeStatus(): Promise<AgentRuntimeStatus> {
     configured: status.configured,
     capabilities: AGENT_DEFAULT_CAPABILITIES,
   };
+}
+
+/**
+ * 固定工具任务的运行时门禁（网关唯一口径，供 turn-handlers 在建会话前 fail-fast）。
+ * 未验证的运行时不建会话、不烧模型轮次；调用方负责把 false 翻译为可读指引。
+ */
+export function runtimeSupportsSessionTools(runtimeId?: string | undefined): boolean {
+  if (!runtimeId) return false;
+  return capabilitiesFor(runtimeId).supportsSessionTools;
 }
 
 /**

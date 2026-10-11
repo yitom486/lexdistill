@@ -12,18 +12,28 @@ import { AGENT_RUNTIME_OPTIONS, agentRuntimeLabel } from '../config/agent-runtim
 import { useAgentRuntimesQuery } from '../queries/useAgentQueries.js';
 import { chatMenuItem, compactSelect } from './agent-chat/chat-shared.js';
 
-interface AgentRuntimeSelectProps {
-  disabled?: boolean;
-  onCustomApi?: () => void;
+export interface AgentRuntimeSelectProps {
+  value?: string | undefined;
+  onValueChange?: ((value: string) => void) | undefined;
+  disabled?: boolean | undefined;
+  onCustomApi?: (() => void) | undefined;
   /** 运行时真正切换时触发（custom 入口不触发）：调用方据此重置会话。 */
-  onRuntimeChange?: (previous: string, next: string) => void;
+  onRuntimeChange?: ((previous: string, next: string) => void) | undefined;
+  triggerClassName?: string | undefined;
 }
 
 /**
- * Agent 运行时下拉（自读写偏好）：ChatGPT 默认；自定义 API 默认进设置页（可被覆盖）。
+ * Agent 运行时下拉（支持受控模式或自读写偏好）：ChatGPT 默认；自定义 API 默认进设置页（可被覆盖）。
  * 模型 id 不跨运行时通用：切换时存档当前选择并恢复目标槽位（空=运行时默认），互不串味。
  */
-export function AgentRuntimeSelect({ disabled, onCustomApi, onRuntimeChange }: AgentRuntimeSelectProps) {
+export function AgentRuntimeSelect({
+  value: controlledValue,
+  onValueChange: controlledOnChange,
+  disabled,
+  onCustomApi,
+  onRuntimeChange,
+  triggerClassName,
+}: AgentRuntimeSelectProps) {
   const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
   const setAgentRuntimeId = usePreferencesStore(state => state.setAgentRuntimeId);
   const setActiveTab = useStudySessionStore(state => state.setActiveTab);
@@ -31,9 +41,16 @@ export function AgentRuntimeSelect({ disabled, onCustomApi, onRuntimeChange }: A
   const statusOf = (id: string) => statuses.find(entry => entry.id === id)?.configured ?? null;
   const goCustomApi = onCustomApi ?? (() => setActiveTab('SETTINGS'));
 
+  const currentRuntimeId = controlledValue !== undefined ? (controlledValue || 'codex-acp') : (agentRuntimeId || 'codex-acp');
+
   const switchRuntime = (value: string) => {
-    const prev = agentRuntimeId || 'codex-acp';
+    const prev = currentRuntimeId;
     if (!value || value === prev) return;
+    if (controlledOnChange) {
+      controlledOnChange(value);
+      onRuntimeChange?.(prev, value);
+      return;
+    }
     const state = usePreferencesStore.getState();
     state.setRuntimeModel(prev, state.coachModelId);
     state.setRuntimeEffort(prev, state.coachEffort);
@@ -42,13 +59,12 @@ export function AgentRuntimeSelect({ disabled, onCustomApi, onRuntimeChange }: A
     // 上下文用量是按会话的：切运行时即失效，不拿别家的数字充数。
     useAgentContextUsageStore.getState().setUsage(null);
     setAgentRuntimeId(value);
-    setAgentRuntimeId(value);
     onRuntimeChange?.(prev, value);
   };
 
   return (
     <Select
-      value={agentRuntimeId || 'codex-acp'}
+      value={currentRuntimeId}
       onValueChange={(value) => {
         if (value === '__custom__') {
           goCustomApi();
@@ -58,8 +74,8 @@ export function AgentRuntimeSelect({ disabled, onCustomApi, onRuntimeChange }: A
       }}
       {...(disabled ? { disabled: true as const } : {})}
     >
-      <SelectTrigger className={`${compactSelect} max-w-[10rem]`} aria-label="选择 Agent 运行时">
-        <SelectValue>{agentRuntimeLabel(agentRuntimeId)}</SelectValue>
+      <SelectTrigger className={triggerClassName || `${compactSelect} max-w-[10rem]`} aria-label="选择 Agent 运行时">
+        <SelectValue>{agentRuntimeLabel(currentRuntimeId)}</SelectValue>
       </SelectTrigger>
       <SelectContent className="border-line bg-paper-soft text-ink">
         <div className="px-2 py-1 text-[10px] text-ink-ghost">切换 Agent 运行时</div>

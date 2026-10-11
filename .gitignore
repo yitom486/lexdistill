@@ -71,3 +71,7 @@ coverage/
 .nyc_output/
 # PDF native E2E 测试拥有的运行时目录（pinned 构件 bootstrap，~90MB，不入库）
 apps/gateway/src/.test-runtime/
+
+# Scratch & temporary scripts
+scratch/
+apps/*/scratch/

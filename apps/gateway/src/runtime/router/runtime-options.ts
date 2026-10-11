@@ -62,11 +62,13 @@ export async function getAgentRuntimeOptions(
         value: option.value,
         label: option.name || option.value,
       }));
-    if (wantedModel) {
+    const canSetModel = wantedModel && (models.length === 0 || models.some(m => m.value === wantedModel));
+    if (canSetModel) {
       const setRes = await opened.value.setConfigOption(modelEntry0?.configId ?? 'model', wantedModel);
-      if (!setRes.ok) throw new Error(`模型 ${wantedModel} 设置失败：${setRes.error.message}`);
-      const refreshed = (setRes.value as { configOptions?: unknown } | null)?.configOptions;
-      if (refreshed !== undefined) liveConfigOptions = refreshed;
+      if (setRes.ok) {
+        const refreshed = (setRes.value as { configOptions?: unknown } | null)?.configOptions;
+        if (refreshed !== undefined) liveConfigOptions = refreshed;
+      }
     }
     const parsed = parseAcpConfigOptions(liveConfigOptions);
     const modelEntry = findModelConfigOption(parsed);
