@@ -156,7 +156,7 @@ export async function handleTurnSteer(
 /**
  * 客户端工具执行回执（`client.tool.result`）。
  *
- * 语义：Server 工具结果已由网关内联回填 Codex，无需前端参与；
+ * 语义：Server 工具结果已由网关内联回填 Agent，无需前端参与；
  * Client 工具（`ui.*`）由前端本地执行后回执确认。
  * 本处理仅做接收确认、永不报错——成功执行的工具绝不能再弹出 error toast。
  */

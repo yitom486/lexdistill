@@ -3,7 +3,7 @@
  *
  * 实现 agent-runtime 的 AgentPoolDriver 契约，把 npm `agentpools`
  *（API v2 + sharedProcess）的租约模型翻译过来：连续会话、协作取消、
- * 活动标记、effort/mcpServers 透传。codex 二进制缺省自动解析本机最新安装。
+ * 活动标记、effort/mcpServers 透传。Agent 一律走 ACP（运行时 id 缺席即默认）。
  */
 import type {
   AgentPoolActivityEvent,
@@ -12,7 +12,8 @@ import type {
   AgentPoolDriverOptions,
   AgentPoolLease,
 } from '@study-studio/agent-runtime';
-import { resolveCodexBinary, backgroundCodexArgs } from '@study-studio/agent-runtime';
+import { isOk } from '@study-studio/shared';
+import { resolveAcpPoolAgent } from './acp-pool-agent.js';
 
 interface AgentpoolsLeaseLike {
   readonly agentIndex: number;
@@ -53,10 +54,12 @@ async function loadAgentpools(): Promise<AgentpoolsModule> {  try {
 }
 
 export interface GatewayAgentpoolConfig extends AgentPoolDriverOptions {
-  /** codex 可执行文件；缺省自动解析本机最新安装。 */
-  readonly codexBinary?: string | undefined;
-  /** 透传给 codex 进程的固定启动参数（如 Windows 沙箱开关）。 */
-  readonly codexArgs?: readonly string[];
+  /**
+   * ACP 运行时 id（缺席即 codex-acp 默认）。启动信息按 acp-client 模板＋adapter
+   * 决议（program/args/env），各 Worker 共用同一决议。model 缺席用运行时默认。
+   * effort/sandbox/approvalPolicy 无 ACP 对应物，不携带（审批走 autoApprove）。
+   */
+  readonly acp?: { readonly runtimeId?: string | undefined; readonly model?: string | undefined } | undefined;
   /**
    * 按 Worker 下发 MCP 服务（每 Worker 只配自己的端点）。
    * 缺席时所有 Worker 共用 `mcpServers`。名称必须每 Worker 唯一，
@@ -78,31 +81,30 @@ export class GatewayAgentpoolDriver implements AgentPoolDriver {
 
   static async create(config: GatewayAgentpoolConfig): Promise<GatewayAgentpoolDriver> {
     const module = await loadAgentpools();
-    const program = config.program || resolveCodexBinary();
-    // 与自研 Codex 通道一致的启动参数：unelevated 沙箱 + stdio 监听。
-    const codexArgs = backgroundCodexArgs(
-      config.codexArgs?.length ? config.codexArgs : ['app-server', '--listen', 'stdio://'],
-    );
-    const driver = new GatewayAgentpoolDriver(module, { ...config, program });
+    const driver = new GatewayAgentpoolDriver(module, { ...config });
+    // 运行时 id 缺席即默认 codex-acp；决议失败大声抛，不建半吊子池。
+    const acp = await resolveAcpPoolAgent(config.acp?.runtimeId ?? 'codex-acp', {
+      cwd: config.cwd,
+      ...(config.acp?.model ?? config.model ? { model: config.acp?.model ?? config.model } : {}),
+    });
+    if (!isOk(acp)) throw acp.error;
     const pool = new module.AgentPool({
       apiVersion: 2,
       sharedProcess: config.sharedProcess ?? true,
       maxQueued: config.maxQueued ?? Math.max(8, config.poolSize * 2),
       agents: Array.from({ length: config.poolSize }, (_, workerIndex) => ({
-        runtime: 'codexAppServer',
-        program: driver.config.program,
-        args: [...codexArgs],
-        ...(driver.config.env ? { env: { ...driver.config.env } } : {}),
+        runtime: 'acp',
+        program: acp.value.program,
+        args: [...acp.value.args],
+        env: { ...acp.value.env },
         cwd: config.cwd,
-        ...(config.model ? { model: config.model } : {}),
-        ...(config.effort ? { effort: config.effort } : {}),
-        ...(config.approvalPolicy ? { approvalPolicy: config.approvalPolicy } : {}),
-        ...(config.sandbox ? { sandbox: config.sandbox } : {}),
+        ...(acp.value.model ? { model: acp.value.model } : {}),
         ...mcpServersFor(config, workerIndex),
         timeouts: {
           ...(config.handshakeMs ? { handshakeMs: config.handshakeMs } : {}),
           ...(config.promptMs ? { promptMs: config.promptMs } : {}),
         },
+        autoApprovePermissions: true,
         ephemeral: true,
       })),
     });

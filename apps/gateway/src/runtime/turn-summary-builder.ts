@@ -18,7 +18,7 @@ export function buildTurnExecutionSummary(params: {
   startedAt: number;
   source?: TurnExecutionSource;
   outcome?: TurnExecutionOutcome;
-  /** Codex 失败时的业务错误；会被翻译为结构化 failure，不泄漏原始栈 */
+  /** Agent 失败时的业务错误；会被翻译为结构化 failure，不泄漏原始栈 */
   failureError?: BusinessError | null | undefined;
   /** 显式失败类别（覆盖由 error.code 推断的类别） */
   failureCategory?: TurnFailureCategory | undefined;
@@ -27,7 +27,7 @@ export function buildTurnExecutionSummary(params: {
   threadId?: string | undefined;
   fromQueue?: boolean | undefined;
   model?: string | undefined;
-  /** 旧字段兼容：Codex 失败时的用户文案（无结构化 error 时兜底） */
+  /** 旧字段兼容：Agent 失败时的用户文案（无结构化 error 时兜底） */
   legacyFailureMessage?: string | undefined;
 }): TurnExecutionSummary {
   const {
@@ -48,7 +48,7 @@ export function buildTurnExecutionSummary(params: {
   const elapsedMs = Math.max(0, Date.now() - startedAt);
 
   let failure: TurnFailure | undefined;
-  // failure 出现条件：非 COMPLETED（中断/失败），或 COMPLETED 但发生 Codex 回退（fallback）
+  // failure 出现条件：非 COMPLETED（中断/失败），或 COMPLETED 但发生 Agent 回退（fallback）
   const hasFailureSignal = Boolean(failureError) || Boolean(legacyFailureMessage);
   if (status !== 'COMPLETED' || hasFailureSignal) {
     const category: TurnFailureCategory =
@@ -95,22 +95,14 @@ function inferCategoryFromError(error: BusinessError | null | undefined): TurnFa
   return 'UNKNOWN';
 }
 
-const CODEX_LOGIN_HINT_CODES = new Set([
-  'E_CODEX_UNAUTHORIZED',
-  'E_CODEX_NOT_CONNECTED',
-  'E_CODEX_SESSION_CREATE',
-  'E_NETWORK_DISCONNECTED',
-]);
-
-/** Codex 回退到本地提示时的脚注：只给真实原因，不误导检查已连通的 Gateway。 */
-export function formatCodexLocalFallbackNote(
+/** 回退到本地提示时的脚注：只给真实原因，不误导检查已连通的 Gateway。 */
+export function formatAgentLocalFallbackNote(
   reason: string,
-  error?: BusinessError | null
+  _error?: BusinessError | null
 ): string {
   const trimmed = reason.trim();
-  const loginRelated = Boolean(error && CODEX_LOGIN_HINT_CODES.has(error.code));
-  const nextStep = loginRelated
-    ? '可点击「重试 Codex」；若仍失败，请在本机执行 `codex login`。'
-    : '可点击「重试 Codex」。';
-  return `\n\n—\n（${trimmed} 已改用本地学习提示。${nextStep}）`;
+  return `\n\n—\n（${trimmed} 已改用本地学习提示。可点击「重试」后再试一次。）`;
 }
+
+/** @deprecated 用 formatAgentLocalFallbackNote（旧名别名，兼容未改的调用方） */
+export const formatCodexLocalFallbackNote = formatAgentLocalFallbackNote;

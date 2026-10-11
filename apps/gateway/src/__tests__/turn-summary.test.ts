@@ -3,10 +3,10 @@ import { GatewayServer } from '../runtime/gateway-runtime.js';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { WsEventTypes, type WsEnvelope, type TurnExecutionSummary } from '@study-studio/protocol';
 import { isOk, ok, err, BusinessError } from '@study-studio/shared';
-import { buildTurnExecutionSummary, formatCodexLocalFallbackNote } from '../runtime/turn-summary-builder.js';
+import { buildTurnExecutionSummary, formatAgentLocalFallbackNote } from '../runtime/turn-summary-builder.js';
 import type { AgentEvent, AgentSession } from '@study-studio/agent-runtime';
 import type { Result } from '@study-studio/shared';
-import { mapAppServerNotificationToEvents, type CodexAdapter } from '@study-studio/agent-runtime';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
 
 // ---------------------------------------------------------------------------
 // 纯函数 builder 单测：覆盖 4 种场景的结构化摘要构造
@@ -17,8 +17,8 @@ describe('buildTurnExecutionSummary (P3-C pure builder)', () => {
 
   it('建会话失败 → fallback + SESSION_CREATE 失败原因', () => {
     const failureError = new BusinessError(
-      'E_CODEX_SESSION_CREATE',
-      'Codex 登录态失效，请重新 login。',
+      'E_AGENT_SESSION_CREATE',
+      'Agent 会话创建失败，请重试。',
       'AGENT_RUNTIME',
       true
     );
@@ -33,8 +33,8 @@ describe('buildTurnExecutionSummary (P3-C pure builder)', () => {
     expect(summary.outcome).toBe('fallback');
     expect(summary.source).toBe('local');
     expect(summary.failure).toBeDefined();
-    expect(summary.failure?.code).toBe('E_CODEX_SESSION_CREATE');
-    expect(summary.failure?.userMessage).toBe('Codex 登录态失效，请重新 login。');
+    expect(summary.failure?.code).toBe('E_AGENT_SESSION_CREATE');
+    expect(summary.failure?.userMessage).toBe('Agent 会话创建失败，请重试。');
     expect(summary.failure?.category).toBe('SESSION_CREATE');
     expect(summary.failure?.retryable).toBe(true);
     expect(typeof summary.elapsedMs).toBe('number');
@@ -42,7 +42,7 @@ describe('buildTurnExecutionSummary (P3-C pure builder)', () => {
   });
 
   it('流中失败 → fallback + STREAM 失败原因（不泄漏错误栈）', () => {
-    const failureError = new BusinessError('E_CODEX_STREAM', '流式中断，请重试。', 'AGENT_RUNTIME');
+    const failureError = new BusinessError('E_AGENT_STREAM', '流式中断，请重试。', 'AGENT_RUNTIME');
     const summary = buildTurnExecutionSummary({
       status: 'COMPLETED',
       startedAt,
@@ -54,11 +54,11 @@ describe('buildTurnExecutionSummary (P3-C pure builder)', () => {
     expect(summary.failure?.category).toBe('STREAM');
     expect(summary.failure?.userMessage).toBe('流式中断，请重试。');
     expect(summary.failure?.userMessage).not.toContain('Error');
-    expect(summary.failure?.code).toBe('E_CODEX_STREAM');
+    expect(summary.failure?.code).toBe('E_AGENT_STREAM');
   });
 
   it('队列失败 → FAILED + QUEUE 失败原因', () => {
-    const failureError = new BusinessError('E_CODEX_QUEUE', '队列启动失败，请重试。', 'AGENT_RUNTIME', true);
+    const failureError = new BusinessError('E_AGENT_QUEUE', '队列启动失败，请重试。', 'AGENT_RUNTIME', true);
     const summary = buildTurnExecutionSummary({
       status: 'FAILED',
       startedAt,
@@ -91,18 +91,18 @@ describe('buildTurnExecutionSummary (P3-C pure builder)', () => {
     expect(summary.failure?.userMessage).toBe('本轮已中断。');
   });
 
-  it('Codex 真流式成功 → streamed，无 failure', () => {
+  it('Agent 真流式成功 → streamed，无 failure', () => {
     const summary = buildTurnExecutionSummary({
       status: 'COMPLETED',
       startedAt,
-      source: 'codex',
+      source: 'agent',
       outcome: 'streamed',
       threadId: 'thread_abc',
       lane: 'coach',
       model: 'gpt-5',
     });
     expect(summary.outcome).toBe('streamed');
-    expect(summary.source).toBe('codex');
+    expect(summary.source).toBe('agent');
     expect(summary.failure).toBeUndefined();
     expect(summary.threadId).toBe('thread_abc');
     expect(summary.model).toBe('gpt-5');
@@ -114,30 +114,29 @@ describe('buildTurnExecutionSummary (P3-C pure builder)', () => {
       startedAt,
       source: 'local',
       outcome: 'fallback',
-      legacyFailureMessage: 'Codex 服务暂时不可用。',
+      legacyFailureMessage: 'Agent 服务暂时不可用。',
     });
-    expect(summary.failure?.userMessage).toBe('Codex 服务暂时不可用。');
+    expect(summary.failure?.userMessage).toBe('Agent 服务暂时不可用。');
     expect(summary.failure?.category).toBe('UNKNOWN');
   });
 
   it('本地回退脚注带上真实原因，且默认不提 Gateway', () => {
-    const note = formatCodexLocalFallbackNote(
-      'Codex 本轮未完成：model stream aborted',
-      new BusinessError('E_CODEX_TURN', 'Codex 本轮未完成：model stream aborted', 'AGENT_RUNTIME', true)
+    const note = formatAgentLocalFallbackNote(
+      '本轮未完成：model stream aborted',
+      new BusinessError('E_AGENT_TURN', '本轮未完成：model stream aborted', 'AGENT_RUNTIME', true)
     );
     expect(note).toContain('model stream aborted');
-    expect(note).toContain('重试 Codex');
+    expect(note).toContain('重试');
     expect(note).not.toContain('Gateway');
     expect(note).not.toContain('一点小问题');
-    expect(note).not.toContain('codex login');
   });
 
-  it('仅登录/断连类错误才提示本机 codex login', () => {
-    const loginNote = formatCodexLocalFallbackNote(
-      '本机 Codex 登录已失效。请在终端执行 codex login 后重试。',
-      new BusinessError('E_CODEX_UNAUTHORIZED', '本机 Codex 登录已失效。', 'SECURITY', false)
+  it('回退脚注不拼装登录指引，一律给重试', () => {
+    const loginNote = formatAgentLocalFallbackNote(
+      '本轮未完成，请稍后重试。',
+      new BusinessError('E_AGENT_UNAUTHORIZED', '认证失效。', 'SECURITY', false)
     );
-    expect(loginNote).toContain('codex login');
+    expect(loginNote).toContain('重试');
     expect(loginNote).not.toContain('Gateway');
   });
 });
@@ -150,7 +149,7 @@ function makeMockAdapter(opts: {
   scenario: 'session-create-fail' | 'stream-error' | 'queue-error' | 'success' | 'interruptible';
   threadId?: string;
   streamError?: BusinessError;
-}): CodexAdapter {
+}): AgentAdapter {
   const threadId = opts.threadId ?? 'mock-thread-001';
   const okResult = <T>(value: T): Result<T, BusinessError> => ok(value);
 
@@ -166,7 +165,7 @@ function makeMockAdapter(opts: {
           type: 'ERROR',
           error:
             opts.streamError ??
-            new BusinessError('E_CODEX_STREAM', '流式中断，请重试。', 'AGENT_RUNTIME'),
+            new BusinessError('E_AGENT_STREAM', '流式中断，请重试。', 'AGENT_RUNTIME'),
         };
         return;
       }
@@ -184,7 +183,7 @@ function makeMockAdapter(opts: {
       if (opts.scenario === 'queue-error') {
         yield {
           type: 'ERROR',
-          error: new BusinessError('E_CODEX_QUEUE', '队列启动失败，请重试。', 'AGENT_RUNTIME', true),
+          error: new BusinessError('E_AGENT_QUEUE', '队列启动失败，请重试。', 'AGENT_RUNTIME', true),
         };
         return;
       }
@@ -215,8 +214,8 @@ function makeMockAdapter(opts: {
       if (opts.scenario === 'session-create-fail') {
         return err(
           new BusinessError(
-            'E_CODEX_SESSION_CREATE',
-            'Codex 登录态失效，请重新 login。',
+            'E_AGENT_SESSION_CREATE',
+            'Agent 会话创建失败，请重试。',
             'AGENT_RUNTIME',
             true
           )
@@ -232,7 +231,7 @@ function makeMockAdapter(opts: {
     },
   };
 
-  return adapter as unknown as CodexAdapter;
+  return adapter as unknown as AgentAdapter;
 }
 
 function getSummary(envelopes: WsEnvelope[]): TurnExecutionSummary | undefined {
@@ -268,7 +267,7 @@ function makeTurnEnvelope(sessionId: string, input = '请帮我讲解这个语�
       input,
       intent: 'FREE_COACH',
       contextSnapshot: { targetLanguage: 'ja' },
-      agentOptions: { preferCodex: true, lane: 'coach' },
+      agentOptions: { lane: 'coach' },
     },
     timestamp: Date.now(),
   };
@@ -292,7 +291,7 @@ describe('P3-C Gateway 回合执行摘要（4 场景端到端）', () => {
     repo = new DrizzleLearnerRepository(':memory:');
   });
 
-  it('场景1 建会话失败：Codex createSession 失败 → fallback + 结构化 failure', async () => {
+  it('场景1 建会话失败：Agent createSession 失败 → fallback + 结构化 failure', async () => {
     const server = new GatewayServer(repo, makeMockAdapter({ scenario: 'session-create-fail' }));
     const sessionId = createWsSession(server);
     const envelopes: WsEnvelope[] = [];
@@ -308,15 +307,16 @@ describe('P3-C Gateway 回合执行摘要（4 场景端到端）', () => {
     expect(summary?.source).toBe('local');
     expect(summary?.failure).toBeDefined();
     expect(summary?.failure?.category).toBe('SESSION_CREATE');
-    expect(summary?.failure?.code).toBe('E_CODEX_SESSION_CREATE');
-    expect(summary?.failure?.userMessage).toBe('Codex 登录态失效，请重新 login。');
+    expect(summary?.failure?.code).toBe('E_AGENT_SESSION_CREATE');
+    expect(summary?.failure?.userMessage).toBe('Agent 会话创建失败，请重试。');
     expect(summary?.failure?.retryable).toBe(true);
+    expect((summary as unknown as { agentOutcome?: unknown })?.agentOutcome).toBe('fallback');
     expect((summary as unknown as { codexOutcome?: unknown })?.codexOutcome).toBe('fallback');
     expect(typeof summary?.elapsedMs).toBe('number');
     expect(summary?.failure?.userMessage).not.toMatch(/ECONN|fetch failed|stack/i);
   });
 
-  it('场景2 流中失败：Codex 流式 ERROR → fallback + STREAM failure', async () => {
+  it('场景2 流中失败：Agent 流式 ERROR → fallback + STREAM failure', async () => {
     const server = new GatewayServer(repo, makeMockAdapter({ scenario: 'stream-error' }));
     const sessionId = createWsSession(server);
     const envelopes: WsEnvelope[] = [];
@@ -329,27 +329,21 @@ describe('P3-C Gateway 回合执行摘要（4 场景端到端）', () => {
     expect(summary?.status).toBe('COMPLETED');
     expect(summary?.outcome).toBe('fallback');
     expect(summary?.failure?.category).toBe('STREAM');
-    expect(summary?.failure?.code).toBe('E_CODEX_STREAM');
+    expect(summary?.failure?.code).toBe('E_AGENT_STREAM');
     expect(summary?.failure?.userMessage).toBe('流式中断，请重试。');
   });
 
-  it('对象 TurnError 经映射后回退文案带原文，且不误导检查 Gateway', async () => {
-    const mapped = mapAppServerNotificationToEvents('error', {
-      threadId: 't1',
-      turnId: 'turn_1',
-      willRetry: false,
-      error: {
-        message: 'model stream aborted after retry',
-        codexErrorInfo: null,
-        additionalDetails: 'upstream reset',
-      },
-    });
-    expect(mapped[0]?.type).toBe('ERROR');
-    if (mapped[0]?.type !== 'ERROR') throw new Error('expected ERROR event');
-
+  it('对象形 TurnError 回退文案带原文，且不误导检查 Gateway', async () => {
+    // 对象形错误直接构造（不再经 App Server 通知映射）：回退文案必须带原文、无 [object Object]。
+    const streamError = new BusinessError(
+      'E_AGENT_TURN',
+      'model stream aborted after retry (upstream reset)',
+      'AGENT_RUNTIME',
+      true
+    );
     const server = new GatewayServer(
       repo,
-      makeMockAdapter({ scenario: 'stream-error', streamError: mapped[0].error })
+      makeMockAdapter({ scenario: 'stream-error', streamError })
     );
     const sessionId = createWsSession(server);
     const envelopes: WsEnvelope[] = [];
@@ -361,10 +355,10 @@ describe('P3-C Gateway 回合执行摘要（4 场景端到端）', () => {
     const summary = getSummary(envelopes);
     const reply = collectStreamedText(envelopes);
     expect(summary?.outcome).toBe('fallback');
-    expect(summary?.failure?.code).toBe('E_CODEX_TURN');
+    expect(summary?.failure?.code).toBe('E_AGENT_TURN');
     expect(summary?.failure?.userMessage).toContain('model stream aborted after retry');
     expect(reply).toContain('model stream aborted after retry');
-    expect(reply).toContain('重试 Codex');
+    expect(reply).toContain('重试');
     expect(reply).not.toContain('Gateway');
     expect(reply).not.toContain('一点小问题');
     expect(reply).not.toContain('[object Object]');
@@ -391,7 +385,7 @@ describe('P3-C Gateway 回合执行摘要（4 场景端到端）', () => {
     expect(summary?.outcome).toBe('fallback');
     expect(summary?.fromQueue).toBe(true);
     expect(summary?.failure?.category).toBe('QUEUE');
-    expect(summary?.failure?.code).toBe('E_CODEX_QUEUE');
+    expect(summary?.failure?.code).toBe('E_AGENT_QUEUE');
     expect(summary?.failure?.userMessage).toBe('队列启动失败，请重试。');
     expect(summary?.failure?.retryable).toBe(true);
   });
@@ -453,7 +447,6 @@ describe('关键词模板已删除：触发词不再截获回合，一律经 Age
         intent: 'EXPLAIN',
         contextSnapshot: { targetLanguage: 'ja' },
         agentOptions: {
-          preferCodex: true,
           lane: 'learning',
         },
       },
@@ -461,7 +454,7 @@ describe('关键词模板已删除：触发词不再截获回合，一律经 Age
     };
   }
 
-  it('含“例句”脚手架的拼装 prompt 直达 Codex（streamed），不再被模板截获', async () => {
+  it('含“例句”脚手架的拼装 prompt 直达 Agent（streamed），不再被模板截获', async () => {
     const server = new GatewayServer(repo, makeMockAdapter({ scenario: 'success' }));
     const sessionId = createWsSession(server);
     const envelopes: WsEnvelope[] = [];
@@ -471,7 +464,7 @@ describe('关键词模板已删除：触发词不再截获回合，一律经 Age
     expect(isOk(res)).toBe(true);
     const summary = getSummary(envelopes);
     expect(summary?.outcome).toBe('streamed');
-    expect(summary?.source).toBe('codex');
+    expect(summary?.source).toBe('agent');
   });
 });
 

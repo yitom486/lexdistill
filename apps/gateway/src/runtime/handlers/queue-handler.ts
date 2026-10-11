@@ -48,7 +48,6 @@ export async function handleQueueStart(
 
   const abortController = new AbortController();
   server.activeStreamControllers.set(envelope.sessionId, abortController);
-  server.activeTurnEmit = emit;
   server.activeTurnLane.set(envelope.sessionId, lane);
   // P3-C：队列回合起始时间
   const turnStartedAt = Date.now();
@@ -59,13 +58,13 @@ export async function handleQueueStart(
       id: generateId('turn'),
       sessionId: envelope.sessionId,
       type: WsEventTypes.AGENT_TURN_START,
-      payload: { source: 'codex', fromQueue: true },
+      payload: { source: 'agent', fromQueue: true },
       timestamp: Date.now(),
     });
   }
 
   let reply = '';
-  let replySource: 'codex' | 'local' = 'codex';
+  let replySource: 'agent' | 'local' = 'agent';
   let streamed = false;
   // P3-C：队列失败时保留结构化业务错误
   let queueFailureError: BusinessError | undefined;
@@ -111,7 +110,7 @@ export async function handleQueueStart(
             id: generateId('delta'),
             sessionId: envelope.sessionId,
             type: WsEventTypes.AGENT_TEXT_DELTA,
-            payload: { delta: ev.delta, textDelta: ev.delta, source: 'codex' },
+            payload: { delta: ev.delta, textDelta: ev.delta, source: 'agent' },
             timestamp: Date.now(),
           });
         }
@@ -195,7 +194,6 @@ export async function handleQueueStart(
     queueFailureError = biz;
   } finally {
     server.activeStreamControllers.delete(envelope.sessionId);
-    server.activeTurnEmit = undefined;
     server.activeTurnLane.delete(envelope.sessionId);
   }
 
@@ -218,7 +216,7 @@ export async function handleQueueStart(
   const queueSummary = buildTurnExecutionSummary({
     status: queueStatus,
     startedAt: turnStartedAt,
-    source: replySource === 'codex' ? 'codex' : 'local',
+    source: replySource === 'agent' ? 'agent' : 'local',
     outcome: streamed ? 'streamed' : queueFailureError ? 'fallback' : 'not_requested',
     failureError: isInterrupted ? null : queueFailureError ?? null,
     failureCategory: isInterrupted ? 'INTERRUPTED' : 'QUEUE',

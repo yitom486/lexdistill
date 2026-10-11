@@ -42,7 +42,7 @@ function resolveLocalCodexAcpEntry(): string | null {
   }
 }
 
-function localCodexRuntime(): {
+export function localCodexRuntime(): {
   id: string; name: string; description: string; command: string; args: string[]; requiredEnvKeys: string[];
 } | null {
   const localEntry = resolveLocalCodexAcpEntry();

@@ -3,7 +3,7 @@ import { ContextBuilder } from './context/context-builder.js';
 import { ToolRouter } from './router/tool-router.js';
 import { SessionToolBridge } from './mcp/session-tool-bridge.js';
 import { AcpAdapterPool } from '../infrastructure/acp/acp-adapter-pool.js';
-import { resolveSessionAdapterId } from './router/runtime-catalog.js';
+import { resolveAgentRuntimeId } from './router/runtime-catalog.js';
 import { checkProvenOptions } from './router/model-effort-guard.js';
 import { batchLane } from './acp-batch/acp-batch-support.js';
 import {
@@ -11,9 +11,7 @@ import {
   type AcpLedgerBackend,
 } from './acp-history/acp-conversation-ledger.js';
 import { ToolRegistry } from '@study-studio/tool-core';
-import { CodexAdapter, type AcpAdapter } from '@study-studio/agent-runtime';
-import type { AgentAdapterFactory } from '../composition/agent-deps.js';
-import { createDefaultAgentAdapterFactory } from '../composition/agent-deps.js';
+import type { AcpAdapter, AgentAdapter } from '@study-studio/agent-runtime';
 import { ResponsesAdapter } from '@study-studio/agent-runtime';
 import {
   type WsEnvelope,
@@ -56,55 +54,41 @@ import {
   handleToolResult,
 } from './handlers/control-handlers.js';
 
-function normalizeAgentItemType(type: string): string {
-  switch (type) {
-    case 'userMessage':
-      return 'user_message';
-    case 'agentMessage':
-      return 'assistant_message';
-    case 'reasoning':
-      return 'reasoning';
-    case 'dynamicToolCall':
-    case 'mcpToolCall':
-    case 'commandExecution':
-      return 'tool_call';
-    default:
-      return 'other';
-  }
-}
-
 export class GatewayServer {
   public readonly sessionManager = new SessionManager();
   public readonly contextBuilder = new ContextBuilder();
   public readonly toolRegistry = new ToolRegistry();
   public readonly toolRouter = new ToolRouter(this.toolRegistry);
-  public readonly agentAdapter: CodexAdapter;
+  /** 默认 Agent 适配器（codex-acp 温复用池实例）。 */
+  public readonly agentAdapter: AgentAdapter;
   /** 会话级工具 MCP 桥（ACP 多运行时底座；基址由启动层 listen 后绑定）。 */
   public readonly sessionToolBridge = new SessionToolBridge({
     execute: (toolName, args, context) => this.toolRegistry.execute(toolName, args, context),
     resolveBaseUrl: () => this.mcpBaseUrl,
   });
   public mcpBaseUrl = 'http://127.0.0.1:8080';
-  /** ACP 适配器池（按 runtime 温复用；默认 Codex 通路不受影响）。 */
+  /** ACP 适配器池（按 runtime 温复用；默认适配器即 codex-acp 池实例）。 */
   public readonly acpAdapterPool = new AcpAdapterPool({ bridge: this.sessionToolBridge });
-  /** ACP 会话台账（历史/排队走 acp-client 的网关侧索引；Codex 通路不受影响）。 */
+  /** ACP 会话台账（历史/排队走 acp-client 的网关侧索引）。 */
   public readonly acpLedger: AcpConversationLedger;
 
   /**
-   * 批处理适配器选型（目录提炼等）：指名 ACP 运行时即走池，运行时选择即时生效；
-   * 空/未知 runtimeId 回落 Codex 原通路（旧前端兼容）。
-   * 历史门 `LINGUA_ACP_BATCH` 已退役：唯一调用方目录提炼 lane 已实测（codex-acp 全绿，
-   * opencode 单工具调用验证通过），不再需要 flag 门。
+   * 通用运行时选型：id 归一后一律走温复用池（未知 id 回落 codex-acp 默认）。
+   */
+  public resolveAgentAdapter(runtimeId?: string | undefined): AgentAdapter {
+    return this.acpAdapterPool.get(resolveAgentRuntimeId(runtimeId));
+  }
+
+  /**
+   * 批处理适配器选型（目录提炼等）：id 归一后一律走池，运行时选择即时生效。
    * 返回 lane 命名（用户历史默认排除批 lane）。
    */
   public resolveBatchAdapter(
     runtimeId: string | undefined,
     batchName: string,
-  ): { adapter: CodexAdapter | AcpAdapter; batchLane: string | null } {
-    if (runtimeId && resolveSessionAdapterId(runtimeId) === 'acp') {
-      return { adapter: this.acpAdapterPool.get(runtimeId), batchLane: batchLane(batchName) };
-    }
-    return { adapter: this.agentAdapter, batchLane: null };
+  ): { adapter: AgentAdapter; batchLane: string | null } {
+    const resolved = resolveAgentRuntimeId(runtimeId);
+    return { adapter: this.acpAdapterPool.get(resolved), batchLane: batchLane(batchName) };
   }
 
   /**
@@ -119,7 +103,19 @@ export class GatewayServer {
     const proven = await this.acpAdapterPool.getRuntimeOptions(runtimeId, model ? { model } : undefined);
     return checkProvenOptions(proven, model, effort);
   }
-  /** 轻量旁路：快问快答；学习闭环默认走 Codex App Server */
+
+  /**
+   * 建任务模型证伪（出题等冻结配置入口）：探针归一后的运行时目录。
+   * 调用方将 dropModel 翻译为 400 指引。
+   */
+  public async checkRunModelEffort(
+    runtimeId: string | undefined,
+    model?: string,
+  ): Promise<{ dropModel: boolean; warnings: string[] }> {
+    const checked = await this.checkBatchModelEffort(resolveAgentRuntimeId(runtimeId), model, undefined);
+    return { dropModel: checked.dropModel, warnings: checked.warnings };
+  }
+  /** 轻量旁路：快问快答（本地课程资产优先，未命中再走模型） */
   public readonly responsesAdapter = new ResponsesAdapter();
   public readonly learnerRepo: LearnerRepository;
   private readonly practiceWsDependencies: PracticeQuizSubmitWebSocketDependencies &
@@ -127,9 +123,6 @@ export class GatewayServer {
   private readonly learningProgressWsDependencies: LearningProgressWebSocketDependencies;
   /** @internal 供 runtime/handlers/turn-handlers.ts 使用 */
   public readonly activeStreamControllers = new Map<string, AbortController>();
-  /** 当前 Turn 的 WS 下发器：供 Codex dynamic tool 触发 Client Tools */
-  /** @internal 供 runtime/handlers/turn-handlers.ts 使用（回合内跨文件赋值，须保持可写） */
-  public activeTurnEmit: ((env: WsEnvelope) => void) | undefined;
   /** sessionId → 当前进行中的 Agent lane（steer / interrupt / approval） */
   /** @internal 供 runtime/handlers/turn-handlers.ts 使用 */
   public readonly activeTurnLane = new Map<string, AgentLane>();
@@ -141,10 +134,8 @@ export class GatewayServer {
 
   constructor(
     learnerRepo?: LearnerRepository,
-    /** @internal 测试注入 mock adapter；产品调用走装配根注入的工厂 */
-    adapterOverride?: CodexAdapter,
-    /** DI 工厂：缺席时用 composition 默认工厂；测试传 adapterOverride 可完全绕过 */
-    adapterFactory?: AgentAdapterFactory,
+    /** @internal 测试注入 mock adapter；产品使用 codex-acp 池默认 */
+    adapterOverride?: AgentAdapter,
     /** 台账持久化后端（缺席走文件；单测注入内存后端） */
     ledgerBackend?: AcpLedgerBackend
   ) {
@@ -160,17 +151,9 @@ export class GatewayServer {
     };
     this.learningProgressWsDependencies = { learnerRepo: repository };
 
-    // Agent 创建权在装配根（composition/agent-deps.ts + bootstrap/create-gateway.ts）：
-    // executeTool 闭包在调用时才读 toolRegistry，构造期创建无初始化顺序问题（原 P6-3 语义）。
-    this.agentAdapter =
-      adapterOverride ??
-      (adapterFactory ?? createDefaultAgentAdapterFactory())({
-        toolRegistry: this.toolRegistry,
-        getActiveTurnEmit: () => this.activeTurnEmit,
-        onNotification: (method, params) => {
-          this.handleCodexNotification(method, params);
-        },
-      });
+    // 默认适配器即 codex-acp 温复用池实例；各入口按 runtimeId 经
+    // resolveAgentAdapter/resolveBatchAdapter 取池。
+    this.agentAdapter = adapterOverride ?? this.acpAdapterPool.get('codex-acp');
 
     registerGatewayTools(this.toolRegistry, this.learnerRepo, this.agentAdapter);
   }
@@ -200,102 +183,14 @@ export class GatewayServer {
     );
   }
 
-  private handleCodexNotification(method: string, params: unknown): void {
-    const p = (params ?? {}) as Record<string, unknown>;
-    if (method === 'thread/queue/changed') {
-      const threadId = p.threadId != null ? String(p.threadId) : '';
-      if (!threadId) return;
-      this.emitToThreadSessions(threadId, {
-        type: WsEventTypes.AGENT_QUEUE_CHANGED,
-        payload: { sessionId: threadId },
-      });
-      return;
-    }
-    if (method === 'skills/changed') {
-      this.emitToAllSessions({
-        type: WsEventTypes.AGENT_SKILLS_CHANGED,
-        payload: {},
-      });
-      return;
-    }
-
-    // EXPERIMENTAL realtime 通知转发（音频/UI 管线未接，仅推送信封便于日后联调）
-    const realtimeMap: Record<string, string> = {
-      'thread/realtime/started': WsEventTypes.AGENT_REALTIME_STARTED,
-      'thread/realtime/closed': WsEventTypes.AGENT_REALTIME_CLOSED,
-      'thread/realtime/error': WsEventTypes.AGENT_REALTIME_ERROR,
-      'thread/realtime/transcript/delta': WsEventTypes.AGENT_REALTIME_TRANSCRIPT_DELTA,
-      'thread/realtime/transcript/done': WsEventTypes.AGENT_REALTIME_TRANSCRIPT_DONE,
-      'thread/realtime/outputAudio/delta': WsEventTypes.AGENT_REALTIME_AUDIO_DELTA,
-      'thread/realtime/sdp': WsEventTypes.AGENT_REALTIME_SDP,
-      'thread/realtime/itemAdded': WsEventTypes.AGENT_REALTIME_ITEM_ADDED,
-    };
-    const wsType = realtimeMap[method];
-    if (!wsType) return;
-    const threadId = p.threadId != null ? String(p.threadId) : '';
-    if (threadId) {
-      this.emitToThreadSessions(threadId, {
-        type: wsType,
-        payload: { ...p, experimental: true },
-      });
-    } else {
-      this.emitToAllSessions({
-        type: wsType,
-        payload: { ...p, experimental: true },
-      });
-    }
-  }
-
-  private emitToThreadSessions(
-    threadId: string,
-    partial: { type: string; payload: Record<string, unknown> }
-  ): void {
-    for (const [sessionId, emit] of this.sessionEmitters) {
-      const sess = this.sessionManager.getSession(sessionId);
-      if (!isOk(sess)) continue;
-      const lanes = sess.value.agentByLane;
-      const hit =
-        lanes.coach?.threadId === threadId || lanes.learning?.threadId === threadId;
-      if (!hit) continue;
-      emit({
-        version: '1.0',
-        id: generateId('note'),
-        sessionId,
-        type: partial.type as (typeof WsEventTypes)[keyof typeof WsEventTypes],
-        payload: partial.payload,
-        timestamp: Date.now(),
-      });
-    }
-  }
-
-  private emitToAllSessions(partial: {
-    type: string;
-    payload: Record<string, unknown>;
-  }): void {
-    for (const [sessionId, emit] of this.sessionEmitters) {
-      emit({
-        version: '1.0',
-        id: generateId('note'),
-        sessionId,
-        type: partial.type as (typeof WsEventTypes)[keyof typeof WsEventTypes],
-        payload: partial.payload,
-        timestamp: Date.now(),
-      });
-    }
-  }
-
   /** Provider-neutral runtime status for the public Agent API. */
   public async getAgentStatus() {
     // 网关自有就绪态：各运行时认证态由 /api/agent/runtimes 的 configured 承载，
-    // 回合失败大声报错；不再以 Codex 单账户登录态卡住全运行时查询门禁。
+    // 回合失败大声报错；不以单运行时登录态卡住全运行时查询门禁。
     return ok({
       available: true,
       message: 'Agent runtime is ready.',
     });
-  }
-
-  public async listAgentModels(includeHidden = false) {
-    return this.agentAdapter.listModels(includeHidden);
   }
 
   public async listAgentSessions(params?: {
@@ -313,33 +208,16 @@ export class GatewayServer {
     }>;
     nextCursor: string | null;
   }, BusinessError>> {
-    // ACP 会话拼进同一列表（台账索引在前，Codex 线程随后；前端零改动）。
-    const ledgerSessions = this.acpLedger.listConversations(params?.limit ?? 50).map(item => ({
+    // 会话历史唯一来源：网关台账（ACP 会话 id 为键）。
+    const sessions = this.acpLedger.listConversations(params?.limit ?? 50).map(item => ({
       id: item.id,
       preview: item.preview,
       name: item.name as string | null,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       ephemeral: item.ephemeral,
-    }));
-    const res = await this.agentAdapter.listThreads(params);
-    if (!isOk(res)) {
-      // Codex 侧失败但台账有货：照常返回 ACP 历史；两边都空才把错抛出去（不静默）。
-      if (ledgerSessions.length > 0) return ok({ sessions: ledgerSessions, nextCursor: null });
-      return err(res.error);
-    }
-    const sessions = [
-      ...ledgerSessions,
-      ...res.value.threads.map((thread) => ({
-        id: thread.id,
-        preview: thread.preview,
-        name: thread.name,
-        createdAt: thread.createdAt,
-        updatedAt: thread.updatedAt,
-        ephemeral: thread.ephemeral,
-      })),
-    ].sort((a, b) => b.updatedAt - a.updatedAt);
-    return ok({ sessions, nextCursor: res.value.nextCursor ?? null });
+    })).sort((a, b) => b.updatedAt - a.updatedAt);
+    return ok({ sessions, nextCursor: null });
   }
 
   public async listAgentSessionItems(params: { sessionId: string; limit?: number }): Promise<Result<{
@@ -353,53 +231,44 @@ export class GatewayServer {
     }>;
     nextCursor: string | null;
   }, BusinessError>> {
-    // 台账命中走 ACP transcript（session/load 只负责恢复上下文，不解析回放）。
-    if (this.acpLedger.has(params.sessionId)) {
-      const items = this.acpLedger.getTranscriptItems(params.sessionId, params.limit ?? 200);
-      return ok({ items: items ?? [], nextCursor: null });
+    // 会话回放唯一来源：网关台账 transcript；未知 id 报不存在。
+    const items = this.acpLedger.has(params.sessionId)
+      ? this.acpLedger.getTranscriptItems(params.sessionId, params.limit ?? 200)
+      : null;
+    if (!items) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
     }
-    const res = await this.agentAdapter.listThreadItems({
-      threadId: params.sessionId,
-      ...(params.limit !== undefined ? { limit: params.limit } : {}),
-    });
-    if (!isOk(res)) return res;
-    return ok({
-      items: res.value.items.map((item) => ({
-        ...item,
-        type: normalizeAgentItemType(item.type),
-      })),
-      nextCursor: res.value.nextCursor,
-    });
+    return ok({ items: items ?? [], nextCursor: null });
   }
 
   public async setAgentSessionName(sessionId: string, name: string) {
-    if (this.acpLedger.has(sessionId)) {
-      const renamed = this.acpLedger.rename(sessionId, name);
-      if (!renamed) {
-        return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
-      }
-      return ok(undefined);
+    if (!this.acpLedger.has(sessionId)) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
     }
-    return this.agentAdapter.setThreadName(sessionId, name);
+    const renamed = this.acpLedger.rename(sessionId, name);
+    if (!renamed) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
+    }
+    return ok(undefined);
   }
 
   public async archiveAgentSession(sessionId: string) {
-    if (this.acpLedger.has(sessionId)) {
-      const archived = this.acpLedger.archive(sessionId);
-      if (!archived) {
-        return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
-      }
-      return ok(undefined);
+    if (!this.acpLedger.has(sessionId)) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
     }
-    return this.agentAdapter.archiveThread(sessionId);
+    const archived = this.acpLedger.archive(sessionId);
+    if (!archived) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
+    }
+    return ok(undefined);
   }
 
   public async compactAgentSession(sessionId: string) {
     // ACP 无压缩原语：大声拒绝，不静默走错后端。
-    if (this.acpLedger.has(sessionId)) {
-      return err(new BusinessError('E_ACP_UNSUPPORTED', 'ACP 会话暂不支持压缩（显式拒绝）', 'AGENT_RUNTIME'));
+    if (!this.acpLedger.has(sessionId)) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
     }
-    return this.agentAdapter.compactThread(sessionId);
+    return err(new BusinessError('E_ACP_UNSUPPORTED', 'ACP 会话暂不支持压缩（显式拒绝）', 'AGENT_RUNTIME'));
   }
 
   public async forkAgentSession(params: {
@@ -408,16 +277,10 @@ export class GatewayServer {
     model?: string;
   }) {
     // ACP 无 fork 原语：大声拒绝，不静默走错后端。
-    if (this.acpLedger.has(params.sessionId)) {
-      return err(new BusinessError('E_ACP_UNSUPPORTED', 'ACP 会话暂不支持分支（显式拒绝）', 'AGENT_RUNTIME'));
+    if (!this.acpLedger.has(params.sessionId)) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
     }
-    const res = await this.agentAdapter.forkThread({
-      threadId: params.sessionId,
-      ...(params.ephemeral !== undefined ? { ephemeral: params.ephemeral } : {}),
-      ...(params.model ? { model: params.model } : {}),
-    });
-    if (!isOk(res)) return res;
-    return ok({ sessionId: res.value.threadId });
+    return err(new BusinessError('E_ACP_UNSUPPORTED', 'ACP 会话暂不支持分支（显式拒绝）', 'AGENT_RUNTIME'));
   }
 
   public async queueAgentAdd(params: {
@@ -425,59 +288,46 @@ export class GatewayServer {
     message: string;
     clientUserMessageId?: string;
   }) {
-    // 台账命中走网关侧 ACP 队列（Codex queue 只认自家 threadId，串过去必错）。
-    if (this.acpLedger.has(params.sessionId)) {
-      try {
-        const item = this.acpLedger.queueAdd(params.sessionId, params.message);
-        return ok({
-          id: item.id,
-          text: item.message,
-          clientUserMessageId: params.clientUserMessageId ?? '',
-        });
-      } catch (error) {
-        return err(error instanceof BusinessError ? error : new BusinessError('E_QUEUE_ADD', String(error), 'AGENT_RUNTIME'));
-      }
+    // 网关侧 ACP 队列（与旧 queue 同 DTO，前端零改动）。
+    if (!this.acpLedger.has(params.sessionId)) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
     }
-    return this.agentAdapter.queueAdd({
-      threadId: params.sessionId,
-      message: params.message,
-      ...(params.clientUserMessageId
-        ? { clientUserMessageId: params.clientUserMessageId }
-        : {}),
-    });
+    try {
+      const item = this.acpLedger.queueAdd(params.sessionId, params.message);
+      return ok({
+        id: item.id,
+        text: item.message,
+        clientUserMessageId: params.clientUserMessageId ?? '',
+      });
+    } catch (error) {
+      return err(error instanceof BusinessError ? error : new BusinessError('E_QUEUE_ADD', String(error), 'AGENT_RUNTIME'));
+    }
   }
 
   public async listAgentQueue(params: { sessionId: string; limit?: number }) {
-    // 台账命中走网关侧 ACP 队列（与 Codex queue 同 DTO，前端零改动）。
-    if (this.acpLedger.has(params.sessionId)) {
-      const items = this.acpLedger.queueList(params.sessionId, params.limit ?? 20).map(item => ({
-        id: item.id,
-        text: item.message,
-        clientUserMessageId: '',
-      }));
-      return ok({ items });
+    if (!this.acpLedger.has(params.sessionId)) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
     }
-    return this.agentAdapter.queueList({
-      threadId: params.sessionId,
-      ...(params.limit !== undefined ? { limit: params.limit } : {}),
-    });
+    const items = this.acpLedger.queueList(params.sessionId, params.limit ?? 20).map(item => ({
+      id: item.id,
+      text: item.message,
+      clientUserMessageId: '',
+    }));
+    return ok({ items });
   }
 
   public async deleteAgentQueueItem(params: {
     sessionId: string;
     queuedSubmissionId: string;
   }) {
-    if (this.acpLedger.has(params.sessionId)) {
-      const removed = this.acpLedger.queueRemove(params.sessionId, params.queuedSubmissionId);
-      if (!removed) {
-        return err(new BusinessError('E_QUEUE_NOT_FOUND', '队列项不存在（可能已被消费）', 'VALIDATION'));
-      }
-      return ok(undefined);
+    if (!this.acpLedger.has(params.sessionId)) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
     }
-    return this.agentAdapter.queueDelete({
-      threadId: params.sessionId,
-      queuedSubmissionId: params.queuedSubmissionId,
-    });
+    const removed = this.acpLedger.queueRemove(params.sessionId, params.queuedSubmissionId);
+    if (!removed) {
+      return err(new BusinessError('E_QUEUE_NOT_FOUND', '队列项不存在（可能已被消费）', 'VALIDATION'));
+    }
+    return ok(undefined);
   }
 
   public async startAgentQueue(params: {
@@ -486,90 +336,10 @@ export class GatewayServer {
   }) {
     // ACP 队列消费走 WS 流（handleQueueStart 的 ACP 分支，带流式回放）；
     // HTTP 启不动无 emit 的 turn，大声指路，不静默吞掉。
-    if (this.acpLedger.has(params.sessionId)) {
-      return err(new BusinessError('E_ACP_QUEUE_HTTP_UNSUPPORTED', 'ACP 队列请走工作区消息流消费（自动续跑），HTTP start 仅支持 Codex 通路', 'VALIDATION'));
+    if (!this.acpLedger.has(params.sessionId)) {
+      return err(new BusinessError('E_SESSION_NOT_FOUND', '会话不存在', 'VALIDATION'));
     }
-    return this.agentAdapter.queueStart({
-      threadId: params.sessionId,
-      ...(params.queuedSubmissionId
-        ? { queuedSubmissionId: params.queuedSubmissionId }
-        : {}),
-    });
-  }
-
-  public async listAgentSkills(params?: { forceReload?: boolean }) {
-    const res = await this.agentAdapter.listSkills(params);
-    if (!isOk(res)) return res;
-    return ok(res.value.map((skill) => ({
-      name: skill.name,
-      description: skill.description,
-      enabled: skill.enabled,
-      ...(skill.scope ? { scope: skill.scope } : {}),
-    })));
-  }
-
-  public async getAgentUsage() {
-    const res = await this.agentAdapter.getRateLimits();
-    if (!isOk(res)) return res;
-    return ok({
-      usedPercent: res.value.primaryUsedPercent,
-      resetsAt: res.value.primaryResetsAt,
-      label: null,
-    });
-  }
-
-  public async listMcpServers(params?: { cursor?: string; limit?: number }) {
-    const res = await this.agentAdapter.listMcpServerStatus(params);
-    if (!isOk(res)) return res;
-    return ok({
-      servers: res.value.servers.map((server) => ({
-        name: server.name,
-        status: server.authStatus,
-        toolCount: server.toolCount,
-      })),
-      nextCursor: res.value.nextCursor,
-    });
-  }
-
-  /** EXPERIMENTAL realtime — 预留接口，产品 UI 尚未接入 */
-  public async probeCodexRealtime() {
-    return this.agentAdapter.probeRealtimeCapability();
-  }
-
-  public async listCodexRealtimeVoices() {
-    return this.agentAdapter.listRealtimeVoices();
-  }
-
-  public async startCodexRealtime(
-    params: Parameters<CodexAdapter['startRealtime']>[0]
-  ) {
-    return this.agentAdapter.startRealtime(params);
-  }
-
-  public async stopCodexRealtime(threadId: string) {
-    return this.agentAdapter.stopRealtime(threadId);
-  }
-
-  public async appendCodexRealtimeText(
-    params: Parameters<CodexAdapter['appendRealtimeText']>[0]
-  ) {
-    return this.agentAdapter.appendRealtimeText(params);
-  }
-
-  public async appendCodexRealtimeSpeech(
-    params: Parameters<CodexAdapter['appendRealtimeSpeech']>[0]
-  ) {
-    return this.agentAdapter.appendRealtimeSpeech(params);
-  }
-
-  public async appendCodexRealtimeAudio(
-    params: Parameters<CodexAdapter['appendRealtimeAudio']>[0]
-  ) {
-    return this.agentAdapter.appendRealtimeAudio(params);
-  }
-
-  public async listAgentCollaborationModes() {
-    return this.agentAdapter.listCollaborationModes();
+    return err(new BusinessError('E_ACP_QUEUE_HTTP_UNSUPPORTED', 'ACP 队列请走工作区消息流消费（自动续跑）', 'VALIDATION'));
   }
 
   /**

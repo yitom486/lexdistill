@@ -10,13 +10,13 @@ describe('selectAgentRoute', () => {
     expect(selectAgentRoute({ userPrompt: '讲透这个考点' }).reason).toBe('content_or_quiz_intent');
   });
 
-  it('routes FREE_COACH to Codex learning-loop', () => {
+  it('routes FREE_COACH to Agent learning-loop', () => {
     expect(
       selectAgentRoute({ userPrompt: '你好，请问你是谁呢', intent: 'FREE_COACH' }).route
     ).toBe('learning-loop');
     expect(
       selectAgentRoute({ userPrompt: '你好，请问你是谁呢', intent: 'FREE_COACH' }).reason
-    ).toBe('free_coach_codex');
+    ).toBe('free_coach_agent');
   });
 
   it('routes pitch / particle hints to responses-lite', () => {
@@ -45,7 +45,7 @@ describe('selectAgentRoute', () => {
     ).toBe('responses-lite');
   });
 
-  it('routes open chat / short greetings to learning-loop (Codex)', () => {
+  it('routes open chat / short greetings to learning-loop (Agent)', () => {
     expect(selectAgentRoute({ userPrompt: '这是什么意思？' }).route).toBe('learning-loop');
     expect(selectAgentRoute({ userPrompt: '你好' }).route).toBe('learning-loop');
   });

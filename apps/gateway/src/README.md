@@ -125,7 +125,7 @@ infrastructure/drizzle-learner-repository.ts
 | `index.ts` | 生产入口和兼容导出；创建应用依赖并暴露 `startGatewayServer` 等入口。 |
 | `sidecar.ts` | 桌面端 sidecar 场景使用的启动入口。 |
 | `bootstrap/config.ts` | 读取 Gateway 配置，例如 `GATEWAY_PORT` 和 `STUDY_STUDIO_DB`；测试可以使用 `:memory:`。 |
-| `bootstrap/create-gateway.ts` | `createGateway()` 创建 Repository 和 GatewayServer，并执行启动期内容初始化；Agent Adapter 由装配根经 `composition/agent-deps.ts` 工厂显式注入，Tool Registry 由 GatewayServer 构造时装配。 |
+| `bootstrap/create-gateway.ts` | `createGateway()` 创建 Repository 和 GatewayServer，并执行启动期内容初始化；默认 Agent 适配器为 codex-acp 温复用池实例，Tool Registry 由 GatewayServer 构造时装配。 |
 | `bootstrap/start-gateway.ts` | 启动监听生命周期。通过 `Bun.serve` 承载 HTTP，并处理 `/ws` 升级；不放领域逻辑。 |
 
 `bootstrap/` 的依赖方向是单向的：它可以装配其他层，但领域代码和传输代码不应该反向依赖启动装配目录。
@@ -142,7 +142,7 @@ infrastructure/drizzle-learner-repository.ts
 |---|---|
 | `create-app.ts` | 创建 Hono 应用，配置 CORS、404、统一错误兜底，并挂载各域路由。导入它本身不会打开真实数据库。 |
 | `../composition/gateway-deps.ts` | 定义 HTTP 路由可使用的 `GatewayDeps`，是 repo、runtime/server 等依赖的统一来源（E4a 起家于此）。 |
-| `../composition/agent-deps.ts` | 定义 Agent 装配契约 `AgentAdapterFactory` 与生产默认工厂；Adapter 创建权收归装配根，各领域模块经 ToolRegistry 按工具名订阅，不持有 Adapter 实例。 |
+| `runtime/gateway-runtime.ts` | 网关服务：默认适配器为 codex-acp 池实例，各入口按运行时 id 经选型方法取池；各领域模块经 ToolRegistry 按名订阅，不持有 Adapter 实例。 |
 | `health-routes.ts` | 健康检查和运行状态接口。 |
 | `agent-routes.ts` | Agent Session/Turn 等 Agent 管理接口。 |
 | `learning-routes.ts` | 历史兼容入口；将跨域的 `learning.content`、`learning.assess` 请求委托给 Tool/领域能力。 |
@@ -208,7 +208,7 @@ sequenceDiagram
 | runtime/handlers/turn-handlers.ts | 处理 Turn 发送与流式输出。 |
 | runtime/handlers/queue-handler.ts | 消费 Agent 队列并汇总队列 Turn。 |
 | runtime/handlers/control-handlers.ts | 处理审批、打断、引导与客户端工具回执。 |
-| `runtime/responses-lite-coach.ts` | 轻量 Coach 旁路，适合快速问答；学习闭环默认仍由 Codex 主通路处理。 |
+| `runtime/responses-lite-coach.ts` | 轻量 Coach 旁路，适合快速问答；学习闭环默认仍由 Agent 主通路处理。 |
 | `runtime/turn-summary-builder.ts` | 生成 Turn 摘要、最终结果和失败时的用户友好回退文案。 |
 
 这里应该放“Agent 如何运行”的通用逻辑，不应该放“助词题如何判定”或“FSRS 如何计算”这样的领域规则。学习类 WebSocket 消息由 `modules/practice/websocket/` 和 `modules/learning-progress/websocket/` 适配；`GatewayRuntime` 按事件类型分发，并只经对应模块的 `public.ts` 调用。
@@ -224,7 +224,7 @@ sequenceDiagram
 - **Client Session**：客户端与 Gateway 的连接/学习会话。
 - **Agent Session**：Gateway 与具体 Agent Adapter 之间的模型会话。
 
-客户端不应该直接管理 Codex Thread；客户端只持有系统协议中的 session/turn 标识。
+客户端不应该直接管理 Agent 会话；客户端只持有系统协议中的 session/turn 标识。
 
 ### `runtime/context/`：构建不可变 `ContextSnapshot`
 
@@ -256,7 +256,7 @@ getActiveTab()
 
 | 文件 | 作用 |
 |---|---|
-| `runtime/router/agent-router.ts` | 根据路由策略选择 `codex`、Responses 或未来的其他 `AgentAdapter`。业务模块不直接选择厂商 SDK。 |
+| `runtime/router/agent-router.ts` | 根据路由策略选择 Agent 主通路、Responses 或未来的其他 `AgentAdapter`。业务模块不直接选择厂商 SDK。 |
 | `runtime/router/tool-catalog.ts` | Gateway 工具中央目录：基线/意图/提示词表 + 固定任务显式集 + `resolveSessionTools` 单一解析入口（选型唯一 owner，实现仍在各域）。 |
 | `runtime/router/turn-tools.ts` | 薄包装（对外签名不变，转发 tool-catalog；历史测试入口保留）。 |
 | `runtime/router/tool-router.ts` | 根据 Tool Registry 的定义执行 Server/Client/External Tool，检查权限，并把结果回传给 Agent。 |
@@ -537,7 +537,7 @@ sequenceDiagram
     Repo-->>Context: 返回学习摘要
     Context-->>Runtime: ContextSnapshot
     Runtime->>Router: 路由 Turn
-    Router->>Adapter: 启动 Turn（默认 Codex）
+    Router->>Adapter: 启动 Turn（默认 Agent）
     Adapter-->>Runtime: Agent 原生 tool_call
     Runtime->>Tools: 执行 Tool
     Tools->>Content: 调用 learning.content
@@ -616,7 +616,7 @@ flowchart TD
 
 ## 12. 需要始终遵守的架构规则
 
-1. **客户端只连接 Gateway**：不直连 SQLite、LLM、Codex 或 ACP 进程。
+1. **客户端只连接 Gateway**：不直连 SQLite、LLM 或 ACP 进程。
 2. **Provider 零泄漏**：Gateway 业务层只使用 `agent-runtime` 抽象；具体厂商实现封装在 Adapter 包内。
 3. **Context 优先**：客户端/Gateway 已知事实放入不可变 `ContextSnapshot`，不新增反向 Read Tool。
 4. **原生 Tool 优先**：学习域能力通过 Tool Registry + ToolRouter 执行；MCP 只用于外部异构系统。

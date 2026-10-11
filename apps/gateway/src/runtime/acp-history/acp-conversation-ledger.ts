@@ -285,7 +285,7 @@ export class AcpConversationLedger {
     return true;
   }
 
-  /** 历史列表（与 Codex threads 同 DTO，前端零改动；归档的不再列出）。
+  /** 历史列表（与旧 threads 同 DTO，前端零改动；归档的不再列出）。
    * 批处理 lane 默认排除（用户历史只看 coach/learning；批调用方传 lane='batch:*'）。 */
   public listConversations(limit = 50, opts?: { lanes?: readonly string[] }): Array<{
     id: string;
@@ -311,7 +311,7 @@ export class AcpConversationLedger {
       }));
   }
 
-  /** transcript（与 Codex items 同形状：user_message/assistant_message，复用前端折叠逻辑）。 */
+  /** transcript（与旧 items 同形状：user_message/assistant_message，复用前端折叠逻辑）。 */
   public getTranscriptItems(acpSessionId: string, limit = 200): Array<{
     turnId: string;
     type: string;

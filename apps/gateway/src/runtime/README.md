@@ -11,7 +11,7 @@
 | `router/agent-router.ts` | 根据路由策略选择符合契约的 Agent Adapter |
 | `router/tool-router.ts` | 检查 Tool 权限与位置，执行 Server/Client/External Tool 并回填结果 |
 | `router/turn-tools.ts` | 按本轮意图选取工具 allowlist，并约束专精会话可调用的工具 |
-| `responses-lite-coach.ts` | 轻量旁路教练（快问快答），学习闭环默认走 Codex |
+| `responses-lite-coach.ts` | 轻量旁路教练（快问快答），学习闭环默认走 Agent |
 | `turn-summary-builder.ts` | Turn 执行摘要与失败回退文案 |
 
 约束：领域模块不得（值）引用运行时协调器；`module-boundaries.test.ts` 强制执行。

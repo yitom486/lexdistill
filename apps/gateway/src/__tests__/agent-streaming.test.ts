@@ -4,7 +4,7 @@ import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repo
 import { WsEventTypes, type WsEnvelope } from '@study-studio/protocol';
 import { isOk, ok } from '@study-studio/shared';
 import type { AgentEvent, AgentSession } from '@study-studio/agent-runtime';
-import type { CodexAdapter } from '@study-studio/agent-runtime';
+import type { AgentAdapter } from '@study-studio/agent-runtime';
 import { LearningContentTool } from '../modules/learning-content/public.js';
 import { LearningAssessTool } from '../modules/practice/tools/learning-assess-tool.js';
 
@@ -12,7 +12,7 @@ import { LearningAssessTool } from '../modules/practice/tools/learning-assess-to
  * 确定性 mock adapter：模板短路删除后，流式回合必须走真实 adapter 通路；
  * 此处用 mock 保证不断网可测（此前两用例误用模板短路秒回）。
  */
-function makeStreamingMockAdapter(): CodexAdapter {
+function makeStreamingMockAdapter(): AgentAdapter {
   const session: AgentSession = {
     sessionId: 'mock-stream-sess',
     threadId: 'mock-thread-stream',
@@ -52,7 +52,7 @@ function makeStreamingMockAdapter(): CodexAdapter {
     async queueList() {
       return ok({ items: [] });
     },
-  } as unknown as CodexAdapter;
+  } as unknown as AgentAdapter;
 }
 
 describe('AI Native Agent Streaming & Parameterized Tools', () => {
@@ -111,7 +111,7 @@ describe('AI Native Agent Streaming & Parameterized Tools', () => {
       .join('');
     expect(accumulatedText).toContain('助词');
 
-    // 验证最终完成事件：模板短路删除后必须为 Codex streamed，不再是 not_requested
+    // 验证最终完成事件：模板短路删除后必须为 Agent streamed，不再是 not_requested
     const completeEvt = emittedEvents.find((e) => e.type === WsEventTypes.AGENT_TURN_COMPLETED);
     expect(completeEvt).toBeDefined();
     const completedPayload = (completeEvt?.payload ?? {}) as {
@@ -123,7 +123,7 @@ describe('AI Native Agent Streaming & Parameterized Tools', () => {
     expect(completedPayload.status).toBe('COMPLETED');
     expect(completedPayload.finalOutput).toBe(accumulatedText);
     expect(completedPayload.outcome).toBe('streamed');
-    expect(completedPayload.source).toBe('codex');
+    expect(completedPayload.source).toBe('agent');
   });
 
   it('should allow CLIENT_TURN_INTERRUPT to halt streaming generation', async () => {

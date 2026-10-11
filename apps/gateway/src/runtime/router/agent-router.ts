@@ -1,9 +1,9 @@
 /**
  * Agent 引擎选型（旁路）
- * - learning-loop：学习闭环主通路（Codex App Server + 原生工具）
+ * - learning-loop：学习闭环主通路（ACP 池＋原生工具）
  * - responses-lite：仅课程资产快查（发音/助词/五十音等）
  *
- * 自由教练 / 一般对话默认走 Codex；lite 不再截获寒暄与开放问答。
+ * 自由教练 / 一般对话默认走主通路；lite 不再截获寒暄与开放问答。
  */
 
 export type AgentRouteId = 'learning-loop' | 'responses-lite';
@@ -38,9 +38,9 @@ export function selectAgentRoute(input: AgentRouteInput): AgentRouteDecision {
   const intent = input.intent || '';
   const track = normalizeTrack(input.targetLanguage);
 
-  // 自由教练 / 主对话：强制 Codex 主通路
+  // 自由教练 / 主对话：强制主通路
   if (intent === 'FREE_COACH') {
-    return { route: 'learning-loop', reason: 'free_coach_codex' };
+    return { route: 'learning-loop', reason: 'free_coach_agent' };
   }
 
   if (
@@ -60,7 +60,7 @@ export function selectAgentRoute(input: AgentRouteInput): AgentRouteDecision {
     return { route: 'responses-lite', reason: 'drill_hangul_intent' };
   }
 
-  // 明确的发音/助词课程资产查询才走 lite；开放讲解交给 Codex
+  // 明确的发音/助词课程资产查询才走 lite；开放讲解交给主通路
   if (matchesLiteHint(prompt, track)) {
     return { route: 'responses-lite', reason: 'pronunciation_or_particle_lite' };
   }

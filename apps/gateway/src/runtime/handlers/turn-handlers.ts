@@ -20,11 +20,11 @@ import type { AgentLane } from '../session/session-manager.js';
 import { buildGenericCoachReply } from '../coach-language-policy.js';
 import { selectAgentRoute } from '../router/agent-router.js';
 import { resolveSessionTools, resolveTaskTools } from '../router/tool-catalog.js';
-import { resolveSessionAdapterId, runtimeSupportsSessionTools } from '../router/runtime-catalog.js';
+import { runtimeSupportsSessionTools } from '../router/runtime-catalog.js';
 import { checkProvenOptions } from '../router/model-effort-guard.js';
 import { needsSessionToolUpgrade, resolveResumeThreadId } from '../router/session-tools.js';
 import { resolveResponsesLiteCoach } from '../responses-lite-coach.js';
-import { buildTurnExecutionSummary, formatCodexLocalFallbackNote } from '../turn-summary-builder.js';
+import { buildTurnExecutionSummary, formatAgentLocalFallbackNote } from '../turn-summary-builder.js';
 
 function resolveAgentLane(
   intent: string,
@@ -34,35 +34,6 @@ function resolveAgentLane(
   // 聊天界面专用；出题/批改/题目讲解走 learning，与 coach thread 隔离
   if (intent === 'FREE_COACH') return 'coach';
   return 'learning';
-}
-
-/** 下发 Client Tool 调用（前端执行，Gateway 只做参数校验） */
-async function emitClientTool(
-  server: GatewayServer,
-  emit: ((env: WsEnvelope) => void) | undefined,
-  sessionId: string,
-  toolName: string,
-  args: Record<string, unknown>
-): Promise<void> {
-  const tool = server.toolRegistry.get(toolName);
-  if (!tool || !emit) return;
-  const res = await tool.execute(args, {
-    userId: 'system',
-    sessionId,
-  });
-  if (!isOk(res)) return;
-  emit({
-    version: '1.0',
-    id: generateId('tool'),
-    sessionId,
-    type: WsEventTypes.AGENT_TOOL_CALL,
-    payload: {
-      callId: generateId('call'),
-      toolName,
-      args: res.value,
-    },
-    timestamp: Date.now(),
-  });
 }
 
 export async function handleTurnSend(
@@ -77,7 +48,6 @@ export async function handleTurnSend(
     contextSnapshot?: Partial<ContextSnapshot>;
     agentOptions?: {
       model?: string;
-      preferCodex?: boolean;
       effort?: string;
       approvalPolicy?: string;
       threadId?: string;
@@ -87,7 +57,7 @@ export async function handleTurnSend(
       tools?: string[];
       /** 固定任务 id（命中中央目录 TASK_TOOL_PRESETS 直接采用；未知 id 回退 tools/提示词） */
       task?: string;
-      /** Agent 运行时 id（网关按 runtime 选适配器；缺席/未知沿用 Codex） */
+      /** Agent 运行时 id（网关按 runtime 选池适配器；缺席/未知走默认 codex-acp） */
       runtimeId?: string;
       /** coach=聊天；learning=出题/批改/题目导师 */
       lane?: string;
@@ -118,7 +88,8 @@ export async function handleTurnSend(
     payload.agentOptions.runtimeId.trim()
       ? payload.agentOptions.runtimeId.trim()
       : undefined;
-  const wantedAdapter = resolveSessionAdapterId(requestedRuntimeId);
+  // 全回合一律走 ACP 池：运行时 id 由池归一，缺席即 codex-acp。
+  const wantedAdapter = 'acp' as const;
   const preferredCollab =
     typeof payload.agentOptions?.collaborationMode === 'string' &&
     payload.agentOptions.collaborationMode.trim()
@@ -156,18 +127,17 @@ export async function handleTurnSend(
   // 3. 建立打断控制器
   const abortController = new AbortController();
   server.activeStreamControllers.set(envelope.sessionId, abortController);
-  server.activeTurnEmit = emit;
   server.activeTurnLane.set(envelope.sessionId, agentLane);
   // P3-C：记录回合起始时间，供执行摘要计算耗时
   const turnStartedAt = Date.now();
 
   let reply = '';
   let toolResults: unknown = undefined;
-  let replySource: 'codex' | 'lite' | 'local' = 'local';
-  let codexThreadId: string | undefined;
-  let codexFailureMessage: string | undefined;
-  // P3-C：保留 Codex 失败的结构化业务错误，供执行摘要翻译为用户友好状态（不泄漏栈）
-  let codexFailureError: BusinessError | undefined;
+  let replySource: 'agent' | 'lite' | 'local' = 'local';
+  let agentThreadId: string | undefined;
+  let agentFailureMessage: string | undefined;
+  // P3-C：保留 Agent 失败的结构化业务错误，供执行摘要翻译为用户友好状态（不泄漏栈）
+  let agentFailureError: BusinessError | undefined;
   // 请求的工具缺注册表实现时记名：回执透出，前端可直接提示用户重启网关，不让模型背锅。
   let toolWarnings: string[] = [];
   // ACP 上下文用量（send 循环内采集，会话对象出作用域后回执仍可用）。
@@ -177,7 +147,7 @@ export async function handleTurnSend(
 
   try {
     const track = normalizeTrackLanguage(snapshot.targetLanguage);
-    // 所有连网回合一律经 AgentRouter（含 Codex 主通路）：关键词模板短路已删除，
+    // 所有连网回合一律经 AgentRouter：关键词模板短路已删除，
     // 任何触发词不再截获回合；离线兜底走客户端，失败走结构化回退（徽章可辨）。
     if (!reply) {
       const decision = selectAgentRoute({
@@ -224,9 +194,9 @@ export async function handleTurnSend(
         }
       }
 
-      // learning-loop：优先真实 Codex App Server 流式（复用本机 login）
-      let streamedFromCodex = false;
-      let codexFailHint = '';
+      // learning-loop：ACP 池流式（按 lane 复用会话，运行时按需归一）
+      let streamedFromAgent = false;
+      let agentFailHint = '';
       if (!reply && decision.route === 'learning-loop') {
         // 固定任务显式工具集优先（task 命中中央目录 > 自带 tools 字面量）；未声明走中央目录的意图+提示词子集（只在建新会话时生效）。
         const preferredTools = Array.isArray(payload.agentOptions?.tools)
@@ -257,7 +227,7 @@ export async function handleTurnSend(
         // 固定工具任务运行时门禁：任务要求模型经会话 MCP 调回网关工具并多轮协作；
         // 未验证的运行时（如 agy）实测无视 MCP、空转内置工具至 session/prompt 超时。
         // 直接 fail-fast 明示切换，不探针、不建会话、不烧模型轮次。
-        if (!reply && fixedTaskTools && fixedTaskTools.length > 0 && wantedAdapter === 'acp'
+        if (!reply && fixedTaskTools && fixedTaskTools.length > 0
           && !runtimeSupportsSessionTools(requestedRuntimeId)) {
           const shownRuntime = requestedRuntimeId || '默认';
           reply = `当前 Agent 运行时（${shownRuntime}）暂不支持词汇 AI 讲解所需的工具调用（实测会在工具调用阶段超时无响应），请把 Agent 运行时切换为 ChatGPT（codex-acp）或 OpenCode 后，再点一次「生成讲解」。本次未发送模型请求。`;
@@ -267,7 +237,7 @@ export async function handleTurnSend(
         // 只在继续真实建会话时探针；已被 fail-fast 的回合不拉子进程。
         let dropModel = false;
         let dropEffort = false;
-        if (!reply && wantedAdapter === 'acp' && (preferredModel || preferredEffort)) {
+        if (!reply && (preferredModel || preferredEffort)) {
           // 按模型级联验证：档位表随模型变，用目标模型的档位表证伪才准确。
           const proven = await server.acpAdapterPool.getRuntimeOptions(
             requestedRuntimeId ?? 'codex-acp',
@@ -278,25 +248,13 @@ export async function handleTurnSend(
           dropEffort = checked.dropEffort;
           toolWarnings.push(...checked.warnings);
         }
-        // 按 lane 复用会话（coach 与 learning 互不共享）；换适配器必重建
-        //（跨协议 resume 无意义：Codex threadId 对 ACP 不是会话）。
+        // 按 lane 复用会话（coach 与 learning 互不共享；单适配器，无跨协议切换）。
         let agentSession =
           server.sessionManager.getAgentSession(envelope.sessionId, agentLane) ?? null;
-        let adapterSwitched = false;
-        if (agentSession) {
-          const currentAdapter = agentSession instanceof AcpAgentSession ? 'acp' : 'codex';
-          if (currentAdapter !== wantedAdapter) {
-            void agentSession.close();
-            server.sessionManager.detachAgentSession(envelope.sessionId, agentLane);
-            agentSession = null;
-            adapterSwitched = true;
-          }
-        }
 
         // 固定任务升级：复用会话缺本轮解析集即关旧建新；升级必换线程
         //（续接旧线程工具不变，换会话不换线程等于没升）。
         let resumeThreadId = resolveResumeThreadId(preferredThreadId, requestedTools);
-        if (adapterSwitched) resumeThreadId = undefined;
         const upgradeWanted = resolvedNames.filter((name) => server.toolRegistry.get(name));
         if (agentSession && upgradeWanted.length > 0) {
           const have = (agentSession.toolSpecs ?? []).map(spec => spec.businessName || spec.name);
@@ -330,7 +288,7 @@ export async function handleTurnSend(
             resumeThreadId?: string;
             ephemeral?: boolean;
           } = {
-            // 同一 Gateway WS session 下按 lane 分 key，避免 CodexAdapter 互相覆盖
+            // 同一 Gateway WS session 下按 lane 分 key，会话互不覆盖
             sessionId: `${envelope.sessionId}:${agentLane}`,
             userId,
             tools: learningTools,
@@ -342,8 +300,10 @@ export async function handleTurnSend(
           if (preferPersistent === true) sessionOpts.ephemeral = false;
           if (preferPersistent === false) sessionOpts.ephemeral = true;
 
-          const adapter = wantedAdapter === 'acp'
-            ? server.acpAdapterPool.get(requestedRuntimeId ?? 'codex-acp')
+          // 具名运行时走池；缺席走默认适配器（产品为 codex-acp 池实例，测试可覆盖）。
+          // 池按 runtime 记忆单例，默认实例与 codex-acp 池实例为同一对象。
+          const adapter = requestedRuntimeId
+            ? server.acpAdapterPool.get(requestedRuntimeId)
             : server.agentAdapter;
           const sessionRes = await adapter.createSession(sessionOpts);
           if (isOk(sessionRes)) {
@@ -357,9 +317,9 @@ export async function handleTurnSend(
             if (sessionRes.value instanceof AcpAgentSession) {
               toolWarnings.push(...sessionRes.value.drainSetupWarnings());
             }
-            // ACP 会话入台账（历史/队列的 id 索引；Codex 通路沿用 App Server，不动）。
+            // ACP 会话入台账（历史/队列的 id 索引）。
             // 返回值标记本会话首轮：首条消息前置导师身份（ACP 协议无建会话身份通道）。
-            if (wantedAdapter === 'acp' && sessionRes.value.threadId) {
+            if (sessionRes.value.threadId) {
               isNewAcpConversation = server.acpLedger.recordSessionCreated({
                 acpSessionId: sessionRes.value.threadId,
                 userId,
@@ -370,24 +330,24 @@ export async function handleTurnSend(
               });
             }
           } else {
-            codexFailHint =
-              sessionRes.error.userMessage || 'Codex 服务暂时不可用，请稍后重试。';
-            codexFailureMessage = codexFailHint;
-            codexFailureError = sessionRes.error;
+            agentFailHint =
+              sessionRes.error.userMessage || 'Agent 服务暂时不可用，请稍后重试。';
+            agentFailureMessage = agentFailHint;
+            agentFailureError = sessionRes.error;
             console.warn(
-              `[codex-session] ${sessionRes.error.code} ${codexFailHint}`
+              `[agent-session] ${sessionRes.error.code} ${agentFailHint}`
             );
           }
         }
 
         if (agentSession && !reply) {
-          if (agentSession.threadId) codexThreadId = agentSession.threadId;
+          if (agentSession.threadId) agentThreadId = agentSession.threadId;
           let acc = '';
           // 新 ACP 会话首条消息前置导师身份（常驻上下文靠会话 resume；重启失忆则用户重开话题即重建）。
           // 老会话（身份版本之前建档）由台账补一次：续跑的旧上下文借此纠正身份。
           const trackLabel = track === 'ja' ? '日语' : track === 'en' ? '英语' : track === 'ko' ? '韩语' : '外语';
-          const needsIdentity = wantedAdapter === 'acp'
-            && (isNewAcpConversation || (codexThreadId ? server.acpLedger.ensureIdentityApplied(codexThreadId) : false));
+          const needsIdentity = isNewAcpConversation
+            || (agentThreadId ? server.acpLedger.ensureIdentityApplied(agentThreadId) : false);
           const sendMessage = needsIdentity
             ? `你是 Lingua Studio（${trackLabel}学习应用）中的 AI 导师，只教${trackLabel}、只聊学习；直接用中文回答，正文前不加英文前缀、不自我介绍，直接讲内容。\n\n${userPrompt}`
             : userPrompt;
@@ -407,7 +367,7 @@ export async function handleTurnSend(
             }
             if (ev.type === 'TEXT_DELTA' && ev.delta) {
               acc += ev.delta;
-              streamedFromCodex = true;
+              streamedFromAgent = true;
               if (emit) {
                 emit({
                   version: '1.0',
@@ -417,7 +377,7 @@ export async function handleTurnSend(
                   payload: {
                     delta: ev.delta,
                     textDelta: ev.delta,
-                    source: 'codex',
+                    source: 'agent',
                     lane: agentLane,
                   },
                   timestamp: Date.now(),
@@ -488,14 +448,14 @@ export async function handleTurnSend(
             } else if (ev.type === 'COMPLETED' && ev.finalOutput) {
               if (!acc) acc = String(ev.finalOutput);
             } else if (ev.type === 'ERROR') {
-              streamedFromCodex = false;
+              streamedFromAgent = false;
               acc = '';
-              codexFailHint =
-                ev.error?.userMessage || 'Codex 服务暂时不可用，请稍后重试。';
-              codexFailureMessage = codexFailHint || undefined;
-              codexFailureError = ev.error;
+              agentFailHint =
+                ev.error?.userMessage || 'Agent 服务暂时不可用，请稍后重试。';
+              agentFailureMessage = agentFailHint || undefined;
+              agentFailureError = ev.error;
               console.warn(
-                `[codex-turn] ${ev.error?.code ?? 'E_CODEX_TURN'} ${codexFailHint}`
+                `[agent-turn] ${ev.error?.code ?? 'E_AGENT_TURN'} ${agentFailHint}`
               );
               // 出错时丢弃坏会话，下轮重建
               void agentSession.close();
@@ -505,8 +465,8 @@ export async function handleTurnSend(
           }
           if (acc) {
             reply = acc;
-            streamedFromCodex = true;
-            replySource = 'codex';
+            streamedFromAgent = true;
+            replySource = 'agent';
           }
           if (agentSession instanceof AcpAgentSession) {
             turnContextUsage = agentSession.getLastUsage();
@@ -521,13 +481,13 @@ export async function handleTurnSend(
           focusLabel: snapshot.focus?.skillTag || snapshot.focus?.surface,
         });
         replySource = 'local';
-        if (codexFailHint) {
-          reply += formatCodexLocalFallbackNote(codexFailHint, codexFailureError);
+        if (agentFailHint) {
+          reply += formatAgentLocalFallbackNote(agentFailHint, agentFailureError);
         }
       }
 
-      // 非 Codex 真流式时：本地文案假分块推流
-      if (!streamedFromCodex) {
+      // 非真流式时：本地文案假分块推流
+      if (!streamedFromAgent) {
         const chunkSize = 6;
         for (let i = 0; i < reply.length; i += chunkSize) {
           if (abortController.signal.aborted) {
@@ -548,26 +508,25 @@ export async function handleTurnSend(
       }
     }
   // ACP transcript 入台账（历史面板数据源；上下文恢复靠 session/load，不靠回放解析）。
-  if (wantedAdapter === 'acp' && codexThreadId && reply) {
-    server.acpLedger.recordTurn(codexThreadId, { user: userPrompt, agent: reply, source: replySource });
+  if (agentThreadId && reply) {
+    server.acpLedger.recordTurn(agentThreadId, { user: userPrompt, agent: reply, source: replySource });
   }
   } finally {
     server.activeStreamControllers.delete(envelope.sessionId);
-    server.activeTurnEmit = undefined;
     server.activeTurnLane.delete(envelope.sessionId);
   }
 
   const isInterrupted = abortController.signal.aborted;
   let queueRemaining = 0;
-  if (codexThreadId && !isInterrupted) {
-    const queued = await server.listAgentQueue({ sessionId: codexThreadId, limit: 20 });
+  if (agentThreadId && !isInterrupted) {
+    const queued = await server.listAgentQueue({ sessionId: agentThreadId, limit: 20 });
     if (isOk(queued)) queueRemaining = queued.value.items.length;
   }
   // P3-C：统一执行摘要（普通回合）
   const outcome: 'streamed' | 'fallback' | 'not_requested' =
-    replySource === 'codex'
+    replySource === 'agent'
       ? 'streamed'
-      : codexFailureMessage
+      : agentFailureMessage
         ? 'fallback'
         : 'not_requested';
   const summary = buildTurnExecutionSummary({
@@ -575,13 +534,13 @@ export async function handleTurnSend(
     startedAt: turnStartedAt,
     source: replySource,
     outcome,
-    failureError: isInterrupted ? null : codexFailureError ?? null,
-    failureCategory: isInterrupted ? 'INTERRUPTED' : codexFailureError ? undefined : undefined,
+    failureError: isInterrupted ? null : agentFailureError ?? null,
+    failureCategory: isInterrupted ? 'INTERRUPTED' : agentFailureError ? undefined : undefined,
     queueRemaining,
     lane: agentLane,
-    threadId: codexThreadId,
+    threadId: agentThreadId,
     model: preferredModel,
-    legacyFailureMessage: codexFailureMessage,
+    legacyFailureMessage: agentFailureMessage,
   });
   const completedEnvelope: WsEnvelope = {
     version: '1.0',
@@ -595,9 +554,11 @@ export async function handleTurnSend(
       ...summary,
       // ACP 上下文用量（usage_update 只读透传；配额类无 ACP 对应物，不编）。
       ...(turnContextUsage ? { contextUsage: turnContextUsage } : {}),
-      // 旧字段兼容（codexOutcome / codexFailureMessage）保留，便于过渡期前端旧逻辑
+      // 新字段（agentOutcome / agentFailureMessage）与旧字段（codexOutcome / codexFailureMessage）
+      // 同值双发：旧前端读旧字段，新前端读新字段。
+      agentOutcome: outcome,
       codexOutcome: outcome,
-      ...(codexFailureMessage ? { codexFailureMessage } : {}),
+      ...(agentFailureMessage ? { agentFailureMessage, codexFailureMessage: agentFailureMessage } : {}),
       ...(toolWarnings.length > 0 ? { toolWarnings } : {}),
       // 诊断回显：本轮实际服务的适配器与请求的运行时（排障时一眼定责）。
       adapter: wantedAdapter,

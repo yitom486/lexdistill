@@ -4,8 +4,7 @@ import { discoverThinking } from './model-thinking.js';
 /**
  * 运行时选项探测（模型/思考深度真实列表，非硬编码）。
  *
- * - codex 主链路模型仍走 `/api/agent/models`（App Server 体系，不动）；
- * - ACP 运行时经“建会话读 configOptions”拿真实选项：解析与方言兼容全部委托
+ * - 全运行时经“建会话读 configOptions”拿真实选项：解析与方言兼容全部委托
  *   acp-client（`parseAcpConfigOptions`＋`findModelConfigOption`：configId/id 双字段、
  *   category 定位、顶层 models 合成，由 SDK 在建会话时完成，网关不再手搓解析）；
  *   model / effort 的 value 直接回填 setConfigOption，来回一致；

@@ -6,7 +6,6 @@ import {
   ACP_BATCH_LANE_PREFIX,
   batchLane,
   buildAcpBatchFirstMessage,
-  isAcpBatchEnabled,
   isBatchLane,
 } from '../runtime/acp-batch/acp-batch-support.js';
 
@@ -30,12 +29,6 @@ describe('ACP 批支撑原语', () => {
     expect(isBatchLane('batch:toc')).toBe(true);
     expect(isBatchLane('coach')).toBe(false);
     expect(ACP_BATCH_LANE_PREFIX).toBe('batch:');
-  });
-
-  it('开关：仅 LINGUA_ACP_BATCH=1 开（缺席默认关，走 Codex）', () => {
-    expect(isAcpBatchEnabled({})).toBe(false);
-    expect(isAcpBatchEnabled({ LINGUA_ACP_BATCH: '0' })).toBe(false);
-    expect(isAcpBatchEnabled({ LINGUA_ACP_BATCH: '1' })).toBe(true);
   });
 
   it('首消息组装：systemPrompt 前置，空则原样', () => {

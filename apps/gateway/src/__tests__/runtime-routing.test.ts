@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'bun:test';
-import { listAgentRuntimes, resolveSessionAdapterId, runtimeSupportsSessionTools } from '../runtime/router/runtime-catalog.js';
+import { listAgentRuntimes, resolveAgentRuntimeId, runtimeSupportsSessionTools } from '../runtime/router/runtime-catalog.js';
 import { SessionToolBridge } from '../runtime/mcp/session-tool-bridge.js';
 import { AcpAdapterPool } from '../infrastructure/acp/acp-adapter-pool.js';
 import { ok } from '@study-studio/shared';
 
-describe('resolveSessionAdapterId', () => {
-  it('缺席/未知/留守 id 走 Codex；codex-acp 与已知运行时＋custom 走 ACP', () => {
-    expect(resolveSessionAdapterId(undefined)).toBe('codex');
-    expect(resolveSessionAdapterId('')).toBe('codex');
-    expect(resolveSessionAdapterId('nope')).toBe('codex');
-    expect(resolveSessionAdapterId('codex-appserver')).toBe('codex');
-    expect(resolveSessionAdapterId('codex-acp')).toBe('acp');
-    expect(resolveSessionAdapterId('deepseek')).toBe('acp');
-    expect(resolveSessionAdapterId('claude')).toBe('acp');
-    expect(resolveSessionAdapterId('custom')).toBe('acp');
+describe('resolveAgentRuntimeId', () => {
+  it('已知 id 原样；空/未知/留守 id 一律回落 codex-acp（无旧分支）', () => {
+    expect(resolveAgentRuntimeId(undefined)).toBe('codex-acp');
+    expect(resolveAgentRuntimeId('')).toBe('codex-acp');
+    expect(resolveAgentRuntimeId('nope')).toBe('codex-acp');
+    expect(resolveAgentRuntimeId('codex-appserver')).toBe('codex-acp');
+    expect(resolveAgentRuntimeId('codex-acp')).toBe('codex-acp');
+    expect(resolveAgentRuntimeId('deepseek')).toBe('deepseek');
+    expect(resolveAgentRuntimeId('claude')).toBe('claude');
+    expect(resolveAgentRuntimeId('custom')).toBe('custom');
   });
 });
 
@@ -25,11 +25,10 @@ describe('listAgentRuntimes', () => {
     expect(typeof runtimes.find(entry => entry.id === 'codex-acp')?.configured).toBe('boolean');
   });
 
-  it('能力开关：codex-acp 模型/思考深度走 ACP 探针（与会话同口径），其余 ACP 运行时全探针', () => {
+  it('能力开关：模型/思考深度一律走 ACP 探针（与会话同口径）', () => {
     const runtimes = listAgentRuntimes();
-    // codex-acp 会话跑在 ACP 上：App Server model/list 是另一套旧目录（曾漏 gpt-6.1-sol），
-    // 故模型/思考深度必须取探针；Codex 原生面板（Skills/MCP/用量）无 ACP 对应物，不开；
-    // 历史/队列走网关台账。配额类全协议无对应物（额度芯片仅逃生口径保留）。
+    // 模型/思考深度必须取探针；旧原生面板（Skills/MCP/用量）无 ACP 对应物，不开；
+    // 历史/队列走网关台账。配额类全协议无对应物，不开。
     expect(runtimes.find(entry => entry.id === 'codex-acp')?.capabilities)
       .toEqual({ supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true, supportsSessionTools: true });
     expect(runtimes.find(entry => entry.id === 'opencode')?.capabilities)

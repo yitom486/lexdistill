@@ -24,7 +24,6 @@ const ASSEMBLERS = new Set([
   'bootstrap/start-gateway.ts',
   'transport/http/create-app.ts',
   'composition/gateway-deps.ts',
-  'composition/agent-deps.ts',
   'transport/tools/register-tools.ts',
   'transport/websocket/websocket-handler.ts',
 ]);

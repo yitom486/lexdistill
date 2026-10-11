@@ -11,8 +11,8 @@ export interface ActiveSession {
   targetLanguage: TargetLanguage;
   targetLevel: string;
   /**
-   * 按 lane 隔离的 Agent/Codex 会话。
-   * 聊天与学习闭环可并行持有不同 thread，互不污染历史。
+   * 按 lane 隔离的 Agent 会话。
+   * 聊天与学习闭环可并行持有不同会话，互不污染历史。
    */
   agentByLane: Partial<Record<AgentLane, AgentSession>>;
   createdAt: number;
@@ -84,7 +84,7 @@ export class SessionManager {
     delete session.agentByLane[lane];
   }
 
-  /** 按 Codex threadId 反查所属 lane（旁路通知路由用） */
+  /** 按引擎会话 id 反查所属 lane（旁路通知路由用） */
   public findLaneByThreadId(
     sessionId: string,
     threadId: string

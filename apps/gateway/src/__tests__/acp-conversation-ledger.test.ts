@@ -3,52 +3,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GatewayServer } from '../runtime/gateway-runtime.js';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { isOk, ok } from '@study-studio/shared';
-import type { CodexAdapter } from '@study-studio/agent-runtime';
+import { isOk } from '@study-studio/shared';
 import {
   AcpConversationLedger,
   defaultAcpLedgerBackend,
   memoryAcpLedgerBackend,
 } from '../runtime/acp-history/acp-conversation-ledger.js';
 
-function codexOnlyAdapter(): CodexAdapter {
-  return {
-    id: 'mock-codex',
-    name: 'MockCodex',
-    async listThreads() {
-      return ok({
-        threads: [{
-          id: 'codex-t1',
-          preview: 'codex 旧线程',
-          name: 'codex 旧线程',
-          createdAt: 1,
-          updatedAt: 1,
-          ephemeral: false,
-        }],
-      });
-    },
-    async listThreadItems() {
-      return ok({ items: [{ turnId: 'c1', type: 'user_message', text: 'codex 问' }] });
-    },
-    async setThreadName() {
-      return ok({ threadId: 'codex-t1' });
-    },
-    async archiveThread() {
-      return ok({ threadId: 'codex-t1' });
-    },
-    async queueList() {
-      return ok({ items: [] });
-    },
-  } as unknown as CodexAdapter;
-}
-
 function ledgerServer(): GatewayServer {
   const repo = new DrizzleLearnerRepository(':memory:');
-  return new GatewayServer(repo, codexOnlyAdapter(), undefined, memoryAcpLedgerBackend());
+  return new GatewayServer(repo, undefined, memoryAcpLedgerBackend());
 }
 
 describe('AcpConversationLedger', () => {
-  it('建会话＋回合记录：列表/回放 DTO 与 Codex 同形', () => {
+  it('建会话＋回合记录：列表/回放 DTO 与旧 thread 同形', () => {
     const ledger = new AcpConversationLedger(memoryAcpLedgerBackend());
     const first = ledger.recordSessionCreated({
       acpSessionId: 'acp-1', userId: 'u1', lane: 'coach', runtimeId: 'codex-acp', model: 'gpt-6.1-sol',
@@ -136,7 +104,7 @@ describe('AcpConversationLedger', () => {
 });
 
 describe('GatewayServer ACP 归属路由', () => {
-  it('台账命中走台账，未命中走 Codex（历史列表合并）', async () => {
+  it('历史只走台账；未知 id（含旧 thread）报不存在', async () => {
     const server = ledgerServer();
     server.acpLedger.recordSessionCreated({
       acpSessionId: 'acp-9', userId: 'u', lane: 'coach', runtimeId: 'codex-acp',
@@ -144,10 +112,10 @@ describe('GatewayServer ACP 归属路由', () => {
     const listed = await server.listAgentSessions({});
     expect(isOk(listed)).toBe(true);
     if (isOk(listed)) {
-      expect(listed.value.sessions.map(item => item.id).sort()).toEqual(['acp-9', 'codex-t1']);
+      expect(listed.value.sessions.map(item => item.id).sort()).toEqual(['acp-9']);
     }
     const items = await server.listAgentSessionItems({ sessionId: 'codex-t1' });
-    expect(isOk(items)).toBe(true);
+    expect(isOk(items)).toBe(false);
   });
 
   it('回放/改名/归档按归属路由；compact/fork 对 ACP 大声拒绝', async () => {
@@ -174,7 +142,7 @@ describe('GatewayServer ACP 归属路由', () => {
     expect(server.acpLedger.listConversations()).toEqual([]);
   });
 
-  it('队列按归属路由：ACP 走网关队列（Codex DTO 同形）', async () => {
+  it('队列按归属路由：ACP 走网关队列（旧 DTO 同形）', async () => {
     const server = ledgerServer();
     server.acpLedger.recordSessionCreated({
       acpSessionId: 'acp-7', userId: 'u', lane: 'coach', runtimeId: 'codex-acp',
@@ -193,7 +161,7 @@ describe('GatewayServer ACP 归属路由', () => {
       expect(isOk(deleted)).toBe(true);
     }
     const codexQueue = await server.listAgentQueue({ sessionId: 'codex-t1' });
-    expect(isOk(codexQueue)).toBe(true);
+    expect(isOk(codexQueue)).toBe(false);
   });
 });
 

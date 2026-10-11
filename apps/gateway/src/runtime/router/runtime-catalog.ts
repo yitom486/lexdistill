@@ -16,16 +16,14 @@ export interface AgentRuntimeStatus {
 
 /**
  * 按运行时能力开关（单一事实源，前端据此选择模型/思考深度的数据源，禁止按 id 硬编码特例）。
- * codex-acp 的会话跑在 ACP 上（App Server 的 model/list 是另一套旧目录，两边曾不一致：
- * ACP 侧有 gpt-6.1-sol 而 App Server 侧没有），故模型/思考深度必须走 ACP 探针，
- * 与 setConfigOption 同一口径；线程/用量面板沿用旧链路查询，保持不动。
+ * 模型/思考深度一律走 ACP 探针（与 setConfigOption 同一口径）；历史/队列走网关台账。
  */
 export interface AgentRuntimeCapabilities {
-  /** true=模型下拉走 App Server model/list；false=走 ACP 探针（运行时真实目录）。 */
+  /** 旧 App Server 模型下拉已退役，一律 false（走 ACP 探针，运行时真实目录）。 */
   supportsModelPicker: boolean;
-  /** true=思考深度走前端常量；false=走 ACP 探针。 */
+  /** 前端常量思考深度已退役，一律 false（走 ACP 探针）。 */
   supportsEffort: boolean;
-  /** Codex thread 历史/压缩/队列/用量/技能/MCP 状态（ACP 会话无此体系）。 */
+  /** 旧 thread 历史/压缩/队列/用量/技能/MCP 面板（ACP 会话无此体系，一律 false）。 */
   supportsThreads: boolean;
   supportsUsage: boolean;
   /**
@@ -41,8 +39,8 @@ export interface AgentRuntimeCapabilities {
 }
 
 /** codex-acp：会话走 ACP，模型/思考深度取 ACP 探针（与会话同口径）；
- * 历史/队列走网关台账；Codex 原生面板（Skills/MCP/用量）无 ACP 对应物，不开。
- * 配额类（额度）全协议无对应物：用量芯片仅 codex-appserver 逃生口径保留。 */
+ * 历史/队列走网关台账；旧原生面板（Skills/MCP/用量）无 ACP 对应物，不开。
+ * 配额类（额度）全协议无对应物，不开。 */
 const CODEX_ACP_CAPABILITIES: AgentRuntimeCapabilities = {
   supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false,
   supportsHistory: true,
@@ -109,16 +107,12 @@ export function runtimeSupportsSessionTools(runtimeId?: string | undefined): boo
 }
 
 /**
- * 会话适配器选型：codex-acp 已走 ACP（模型 gpt-6-luna＋reasoning_effort 实跑验证通过，
- * resume 带工具亦证）；其余已知运行时走 ACP。
- * 空/未知 runtimeId 回落 codex（旧网关/旧前端兼容，绝不因拼写漂到新链路）。
+ * 运行时 id 归一（网关唯一口径）：已知 ACP 运行时（内置＋custom）原样，
+ * 空/未知/`codex-appserver` 一律回落默认 `codex-acp`
+ * （绝不因拼写或旧客户端漂到不可用的链路）。
  */
-const ACP_RUNTIME_IDS: ReadonlySet<string> = new Set(
-  [...BUILTIN_ACP_RUNTIMES.map(entry => entry.id), 'custom'].filter(id => id !== 'codex-appserver'),
-);
-
-export function resolveSessionAdapterId(runtimeId?: string | undefined): 'codex' | 'acp' {
-  if (!runtimeId) return 'codex';
-  if (runtimeId === 'codex-appserver') return 'codex';
-  return ACP_RUNTIME_IDS.has(runtimeId) ? 'acp' : 'codex';
+export function resolveAgentRuntimeId(runtimeId?: string | undefined): string {
+  if (runtimeId === 'custom') return 'custom';
+  if (runtimeId && BUILTIN_ACP_RUNTIMES.some(entry => entry.id === runtimeId)) return runtimeId;
+  return 'codex-acp';
 }
