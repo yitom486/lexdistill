@@ -52,14 +52,15 @@ async function setup(path = ':memory:') {
         if (hold) await hold;
         if (mode === 'error') { yield { type: 'ERROR', error: new BusinessError('E_TEST_MODEL', 'Controlled failure', 'AGENT_RUNTIME') }; return; }
         if (mode === 'prose') { yield { type: 'COMPLETED', finalOutput: '{"score":100,"isCorrect":true}' }; return; }
-        input.onTurnStarted?.('grade-turn');
-        expect(options.tools?.map(tool => tool.name)).toEqual(['learning.submit_grade']);
+        // 按次克隆唯一名（共享名不在会话上）；归属由实例隔离保证，无 turn 校验。
+        const mounted = (options.tools ?? []).map(tool => tool.name);
+        expect(mounted).toHaveLength(1);
+        expect(mounted[0]!.startsWith('learning.submit_grade.')).toBe(true);
+        expect(mounted).not.toContain('learning.submit_grade');
         expect(input.message).toContain('rubric');
         const tool = options.tools![0]!;
-        expect(isOk(await tool.execute({ score: 100, feedback: 'Forged', suggestions: [] },
-          { userId: options.userId, sessionId: options.sessionId, turnId: 'wrong-turn' }))).toBe(false);
         const result = await tool.execute({ score: mode === 'malformed' ? 101 : score, feedback: 'Controlled rubric feedback', suggestions: ['Improve clarity.'] },
-          { userId: options.userId, sessionId: options.sessionId, turnId: 'grade-turn' });
+          { userId: options.userId, sessionId: options.sessionId });
         expect(isOk(result)).toBe(mode !== 'malformed');
         yield { type: 'COMPLETED' };
       }, submitToolResult: async () => ok(undefined), submitApproval: async () => ok(undefined), steer: async () => ok(undefined),

@@ -30,17 +30,20 @@ it('desktop writing → actual Query/HTTP/native grade/SQLite → failure retry 
   const doc = await repo.getDocumentById('book'); if (!doc.ok) throw doc.error;
   const exercise = TextbookASTSchema.parse(JSON.parse(doc.value!.astJson!)).lessons[0]!.learningContent!.exercises[0]!;
   let calls = 0;
-  // 受控会话桩（非 AcpAgentSession → 走共享实例＋bindings 映射的原通路分支）。
+  // 受控会话桩（按次克隆分支：会话挂载唯一名工具，门面合成归属，无 turn 校验）。
   const adapter = {
     id: 'mock-grader',
     name: 'MockGrader',
     createSession: async (options: CreateSessionOptions) => {
     const session: AgentSession = { sessionId: options.sessionId,
       async *send(input) {
-        input.onTurnStarted?.('t'); calls++;
+        calls++;
         if (calls === 1) { yield { type: 'ERROR', error: new BusinessError('E_AGENT_QUOTA', '模型额度不足', 'AGENT_RUNTIME', true) }; return; }
         expect(input.message).toContain('Identity and a question'); expect(input.message).not.toContain('sourceRefs');
-        const result = await options.tools![0]!.execute({ score: calls === 2 ? 60 : 85, feedback: calls === 2 ? 'Add a question.' : 'A clear introduction and question.', suggestions: [] }, { userId: options.userId, sessionId: options.sessionId, turnId: 't' });
+        const mounted = (options.tools ?? []).map(tool => tool.name);
+        expect(mounted).toHaveLength(1);
+        expect(mounted[0]!.startsWith('learning.submit_grade.')).toBe(true);
+        const result = await options.tools![0]!.execute({ score: calls === 2 ? 60 : 85, feedback: calls === 2 ? 'Add a question.' : 'A clear introduction and question.', suggestions: [] }, { userId: options.userId, sessionId: options.sessionId });
         expect(result.ok).toBe(true); yield { type: 'COMPLETED' };
       }, submitToolResult: async () => ok(undefined), submitApproval: async () => ok(undefined), steer: async () => ok(undefined), interrupt: async () => ok(undefined), close: async () => ok(undefined) };
     return ok(session);

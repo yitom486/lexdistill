@@ -21,7 +21,7 @@ async function setup(handle: (options: CreateSessionOptions, input: AgentInput) 
   ] })).ok).toBe(true);
   await repo.writeTextbookContent({ userId: 'owner', documentId: 'book', chapterId: 'chapter' }, 'grammar', { items: [{ title: 'です', explanation: 'Polite identification' }] });
   const created: CreateSessionOptions[] = [];
-  // 受控会话桩（非 AcpAgentSession → 走共享实例＋bindings 映射的原通路分支）。
+  // 受控会话桩（按次克隆分支：会话挂载唯一名工具，门面合成归属，无 turn 校验）。
   const adapter = {
     id: 'mock-grader',
     name: 'MockGrader',
@@ -45,13 +45,17 @@ async function setup(handle: (options: CreateSessionOptions, input: AgentInput) 
 it('HTTP → frozen context → allowlisted native tool → committed SQLite → revision history; repeated receipts and independent repeats count correctly', async () => {
   const scores = [60,85,75]; let calls = 0;
   const env = await setup(async function* (options, input) {
-    expect(options.model).toBe('chosen-model'); expect(options.tools?.map(tool => tool.name)).toEqual(['learning.submit_grade']);
-    expect(input.turnOptions).toMatchObject({ model: 'chosen-model', effort: 'low' }); expect(input.attachments).toBeUndefined();
+    expect(options.model).toBe('chosen-model');
+    // 按次克隆唯一名（共享名不在会话上）；归属由实例隔离保证，无 turnOptions/onTurnStarted。
+    const mounted = (options.tools ?? []).map(tool => tool.name);
+    expect(mounted).toHaveLength(1);
+    expect(mounted[0]!.startsWith('learning.submit_grade.')).toBe(true);
+    expect(mounted).not.toContain('learning.submit_grade');
+    expect(input.attachments).toBeUndefined();
     expect(input.message).toContain('Identity, question and coherence'); expect(input.message).toContain('Polite identification'); expect(input.message).toContain('わたしは李です');
     expect(input.message).not.toContain('sourceRefs'); expect(input.message).not.toContain('exerciseId'); expect(input.message).not.toContain('inputSchema');
-    const turnId = `turn-${calls}`; input.onTurnStarted?.(turnId);
     const tool = options.tools![0]!;
-    const context = { userId: options.userId, sessionId: options.sessionId, turnId, callId: `call-${calls}` };
+    const context = { userId: options.userId, sessionId: options.sessionId };
     expect((await tool.execute({ score: 105, feedback: 'Invalid', suggestions: [] }, context)).ok).toBe(false);
     const saved = await tool.execute({ score: scores[calls++], feedback: 'Specific feedback', suggestions: ['Add a natural transition'], revisedAnswer: 'わたしは李です。よろしくお願いします。' }, context);
     expect(saved.ok).toBe(true);
@@ -81,8 +85,7 @@ it('HTTP → frozen context → allowlisted native tool → committed SQLite →
 
 it('growth separates models, prompt versions, unknown difficulty and failures; database commit failure cannot leave a successful grade', async () => {
   const env = await setup(async function* (options, input) {
-    input.onTurnStarted?.('t');
-    await options.tools![0]!.execute({ score: options.model === 'model-a' ? 40 : 95, feedback: 'Controlled feedback', suggestions: [] }, { userId: options.userId, sessionId: options.sessionId, turnId: 't' });
+    await options.tools![0]!.execute({ score: options.model === 'model-a' ? 40 : 95, feedback: 'Controlled feedback', suggestions: [] }, { userId: options.userId, sessionId: options.sessionId });
     yield { type: 'COMPLETED' };
   });
   const first = TextbookExerciseAttemptSchema.parse(await (await env.post({ ...env.input, model: 'model-a', timeSpentMs: 1000 })).json());
@@ -111,9 +114,8 @@ it('growth separates models, prompt versions, unknown difficulty and failures; d
 it('AI failure keeps frozen answer unscored; retry reuses attempt; temporary case and objective grading cannot pollute model/growth counts', async () => {
   let fail = true;
   const env = await setup(async function* (options, input) {
-    input.onTurnStarted?.('t');
     if (fail) { yield { type: 'ERROR', error: new BusinessError('E_AGENT_QUOTA', '模型额度不足', 'AGENT_RUNTIME', true) }; return; }
-    const result = await options.tools![0]!.execute({ score: 80, feedback: 'Improved expression', suggestions: [] }, { userId: options.userId, sessionId: options.sessionId, turnId: 't' });
+    const result = await options.tools![0]!.execute({ score: 80, feedback: 'Improved expression', suggestions: [] }, { userId: options.userId, sessionId: options.sessionId });
     expect(result.ok).toBe(true); yield { type: 'COMPLETED' };
   });
   const failed = TextbookExerciseAttemptSchema.parse(await (await env.post(env.input)).json());
@@ -136,12 +138,12 @@ it('timeout rejects a late native grade and retry records one effective result',
   let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; });
   let late: boolean | undefined;
   const env = await setup(async function* (options, input) {
-    input.onTurnStarted?.('late-turn'); await wait;
-    late = (await options.tools![0]!.execute({ score: 90, feedback: 'Late result', suggestions: [] }, { userId: options.userId, sessionId: options.sessionId, turnId: 'late-turn' })).ok;
+    await wait;
+    late = (await options.tools![0]!.execute({ score: 90, feedback: 'Late result', suggestions: [] }, { userId: options.userId, sessionId: options.sessionId })).ok;
     yield { type: 'COMPLETED' };
   });
   const tool = env.server.toolRegistry.get('learning.submit_grade'); expect(tool).toBeInstanceOf(SubmitExerciseGradeTool);
-  const service = new TextbookGrading({ repo: env.repo, adapter: env.adapter, tool: tool as SubmitExerciseGradeTool, firstResponseTimeoutMs: 15 });
+  const service = new TextbookGrading({ repo: env.repo, adapter: env.adapter, tool: tool as SubmitExerciseGradeTool, toolRegistry: env.server.toolRegistry, firstResponseTimeoutMs: 15 });
   const result = await service.submit('owner', env.input);
   expect(result.ok && result.value.status).toBe('GRADING_FAILED'); release(); await new Promise(resolve => setTimeout(resolve, 10));
   expect(late).toBe(false); expect(env.repo.getRawDb().query('SELECT count(*) AS n FROM quiz_attempts').get()).toEqual({ n: 0 });
@@ -152,7 +154,7 @@ it('timeout rejects a late native grade and retry records one effective result',
   expect(env.repo.getRawDb().query('SELECT count(*) AS n FROM quiz_attempts').get()).toEqual({ n: 1 });
 });
 
-it('ACP 通路：按次唯一名工具注册→桥按名执行→用完注销；身份前置，无 bindings 残留', async () => {
+it('按次唯一名工具注册→桥按名执行→用完注销；身份前置，共享实例不可直调', async () => {
   const env = await setup(async function* () { yield { type: 'COMPLETED' }; });
   const tool = new SubmitExerciseGradeTool();
   const registry = new ToolRegistry();
@@ -193,11 +195,11 @@ it('ACP 通路：按次唯一名工具注册→桥按名执行→用完注销；
   expect(result.value.status).toBe('GRADED');
   expect(result.value.grading?.score).toBe(88);
   expect(result.value.adapter).toBe('acp');
-  // 按次唯一名（非共享名），且已注销；共享实例 bindings 未被触碰
+  // 按次唯一名（非共享名），且已注销；共享实例直调大声拒绝
   expect(mounted.length).toBe(1);
   expect(mounted[0]!.name.startsWith('learning.submit_grade.')).toBe(true);
   expect(registry.get(mounted[0]!.name)).toBeUndefined();
-  expect(tool.bindings.size).toBe(0);
+  expect((await tool.execute({ score: 10, feedback: 'x', suggestions: [] }, { userId: 'owner', sessionId: 'no-run' })).ok).toBe(false);
   // 身份前置（真 AcpAgentSession），工具名即注册名
   expect(sentMessage).toContain('你是外语练习批改员');
   expect(sentMessage).toContain(mounted[0]!.name);

@@ -3,15 +3,15 @@ import { ToolLocations, ToolPermissions, type ToolDefinition, type ToolExecution
 import { BusinessError, err, type Result } from '@study-studio/shared';
 
 export interface GradeBinding {
-  userId: string; turnId?: string; active: boolean; repairs: number; repairLimit: number;
+  userId: string; active: boolean; repairs: number; repairLimit: number;
   result?: TextbookExerciseAttempt;
   save: (grade: ExerciseGrade) => Promise<Result<TextbookExerciseAttempt, BusinessError>>;
 }
 
 /**
  * 批改提交核心（校验＋保存＋修正计数），与调用通道无关：
- * - 直调分支经 execute()（先过轮次归属校验，单测 mock 适配器用）；
- * - ACP 分支经按次工具门面直接调用（实例按轮次独占，归属由实例隔离保证，无需复查）。
+ * - 按次克隆门面直接调用（实例按轮次独占，归属由实例隔离保证）；
+ * - 轮次结束后（binding.active=false）的迟到调用一律拒绝，不污染已终态的作答。
  */
 export async function submitGradeAttempt(
   tool: Pick<SubmitExerciseGradeTool, 'schema'>,
@@ -19,6 +19,7 @@ export async function submitGradeAttempt(
   raw: unknown,
 ): Promise<Result<TextbookExerciseAttempt, BusinessError>> {
   if (binding.result) return { ok: true, value: binding.result };
+  if (!binding.active) return err(new BusinessError('E_GRADING_SCOPE_INVALID', '该批改轮次已结束，作答已保留', 'VALIDATION'));
   if (binding.repairs > binding.repairLimit) return err(new BusinessError('E_GRADING_REPAIR_LIMIT', '本次批改修正次数已用尽，请重试批改', 'VALIDATION', true));
   const parsed = tool.schema.safeParse(raw);
   if (!parsed.success) {
@@ -36,10 +37,11 @@ export class SubmitExerciseGradeTool implements ToolDefinition<unknown, Textbook
   readonly schema = SubmitExerciseGradeSchema;
   readonly location = ToolLocations.SERVER;
   readonly permission = ToolPermissions.WRITE;
-  readonly bindings = new Map<string, GradeBinding>();
-  async execute(raw: unknown, context: ToolExecutionContext): Promise<Result<TextbookExerciseAttempt, BusinessError>> {
-    const binding = this.bindings.get(context.sessionId);
-    if (!binding?.active || binding.userId !== context.userId || !binding.turnId || binding.turnId !== context.turnId) return err(new BusinessError('E_GRADING_SCOPE_INVALID', '该调用不属于当前作答的批改轮次', 'VALIDATION'));
-    return submitGradeAttempt(this, binding, raw);
+  /**
+   * 共享实例永不直接接调用：批改只经按次克隆门面提交（归属由实例隔离保证）。
+   * 模型误调共享名时大声拒绝，不伪造成功、不落库。
+   */
+  async execute(_raw: unknown, _context: ToolExecutionContext): Promise<Result<TextbookExerciseAttempt, BusinessError>> {
+    return err(new BusinessError('E_GRADING_SCOPE_INVALID', '批改只经本轮按次工具提交，直接调用共享工具无效，作答已保留', 'VALIDATION'));
   }
 }
