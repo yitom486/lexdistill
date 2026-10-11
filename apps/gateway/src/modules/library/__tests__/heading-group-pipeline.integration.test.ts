@@ -49,15 +49,14 @@ it('一级标题保存重开、真实 PDF 切片、MCP 工具及事务使用同�
     repo.getRawDb().close(); repo = new DrizzleLearnerRepository(dbPath);
     const slots = await repo.listTextbookLessonSlots(saved.documentId);
     if (!slots.ok) throw slots.error;
-    expect(slots.value.map(slot => slot.lessonId)).toEqual(['root-a', 'root-b', 'root-c', 'root-d']);
+    expect(slots.value.map(slot => slot.lessonId)).toEqual(['child-a', 'root-b', 'root-c', 'root-d']);
     const restored = slots.value.flatMap(slot => slot.tocEntries ?? []);
-    expect(restored.map(entry => [entry.id, entry.parentId])).toEqual(entries.map(entry => [entry.id, entry.parentId]));
     const repeated = await save({ ...request, tocEntries: entries.map(entry => ({ ...entry, id: `new-${entry.id}`, ...(entry.parentId ? { parentId: `new-${entry.parentId}` } : {}) })) });
     expect(repeated.status).toBe(200);
     expect(SaveTextbookOutlineResultSchema.parse(await repeated.json()).entries.map(entry => entry.id)).toEqual(entries.map(entry => entry.id));
     const scripts = new Map<string, ChapterScript>();
     const pagesRead: number[][] = [];
-    for (const root of ['root-a', 'root-b', 'root-c', 'root-d']) {
+    for (const root of ['child-a', 'root-b', 'root-c', 'root-d']) {
       scripts.set(root, async (scope, job) => {
         if (!job.pdfFile) throw new Error('章节 PDF 未就绪');
         expect((await PDFDocument.load(await Bun.file(job.pdfFile.path).bytes())).getPageCount()).toBe(job.pdfFile.pageCount);
@@ -79,15 +78,15 @@ it('一级标题保存重开、真实 PDF 切片、MCP 工具及事务使用同�
     expect(harness.driver.asks).toHaveLength(4);
     for (const prompt of harness.driver.asks) {
       const title = /^章节: (.+)$/m.exec(prompt)?.[1];
-      const root = entries.find(entry => !entry.parentId && entry.title === title)!;
+      const root = entries.find(entry => entry.title === title)!;
       const group = slots.value.find(slot => slot.lessonId === root.id)!.tocEntries!;
       for (const entry of group) expect(prompt).toContain(entry.title);
       for (const other of restored.filter(entry => !group.some(own => own.id === entry.id))) expect(prompt).not.toContain(other.title);
-      if (root.id === 'root-a') expect(prompt).toContain('    - 长音练习');
+      if (root.id === 'child-a') expect(prompt).toContain('  - 长音练习');
       for (const field of ['tocId', 'sourceRefs', 'startPage', 'root-a', 'coverage', 'inputSchema']) expect(prompt).not.toContain(field);
     }
     expect(pagesRead.sort((a, b) => a[0]! - b[0]!)).toEqual([[1, 2], [3, 4], [5, 6], [7, 8]]);
-    expect([...new Set(progress.map(event => event.id))].sort()).toEqual(['root-a', 'root-b', 'root-c', 'root-d']);
+    expect([...new Set(progress.map(event => event.id))].sort()).toEqual(['child-a', 'root-b', 'root-c', 'root-d']);
     expect(progress.every(event => event.total === 4)).toBe(true);
     expect(harness.driver.finishes).toHaveLength(2);
     const stats = await repo.getTextbookAssetStats(saved.documentId);

@@ -5,6 +5,7 @@ import {
   canonicalizeTocEntries,
   type TocEntry,
 } from '../toc.js';
+import { planTextbookTasks } from '../textbook-tasks.js';
 
 describe('validateTocPageOrder', () => {
   it('合规递增目录：校验成功并正确统计', () => {
@@ -92,5 +93,45 @@ describe('canonicalizeTocEntries', () => {
 
     expect(canonical[1]!.sortOrder).toBe(2);
     expect(canonical[1]!.endPage).toBeUndefined(); // 最后一课由实际 PDF 总页数或用户结束页确定
+  });
+
+  it('单元下含成课与课内附属小节时：以成课为单位切分，附属小节归属于所属课', () => {
+    const entries: TocEntry[] = [
+      { id: 'u1', level: 'unit', title: '第1单元 基本交流', startPage: 1 },
+      { id: 'l1', level: 'lesson', title: '第1课 李さんは中国人です', startPage: 3, parentId: 'u1' },
+      { id: 's1', level: 'section', title: '出迎え', startPage: 3, parentId: 'l1' },
+      { id: 's2', level: 'section', title: '基本课文', startPage: 4, parentId: 'l1' },
+      { id: 'l2', level: 'lesson', title: '第2课 これは本です', startPage: 11, parentId: 'u1' },
+      { id: 'sum', level: 'section', title: '单元末总结', startPage: 20, parentId: 'u1' },
+      { id: 'u2', level: 'unit', title: '第2单元 商务应用（无细课独立单元）', startPage: 25 },
+    ];
+
+    const planned = planTextbookTasks(entries);
+    expect(planned.ok).toBe(true);
+    if (planned.ok) {
+      const tasks = planned.value;
+      // 任务切分面应包含：第1课、第2课、单元末总结、以及无子课的第2单元
+      expect(tasks.map(t => [t.root.id, t.root.title])).toEqual([
+        ['l1', '第1课 李さんは中国人です'],
+        ['l2', '第2课 これは本です'],
+        ['sum', '单元末总结'],
+        ['u2', '第2单元 商务应用（无细课独立单元）'],
+      ]);
+
+      // 第1课的 entries 包含自身及出迎え、基本课文，ancestors 包含第1单元
+      const l1Task = tasks.find(t => t.root.id === 'l1')!;
+      expect(l1Task.ancestors.map(a => a.id)).toEqual(['u1']);
+      expect(l1Task.entries.map(e => e.id)).toEqual(['l1', 's1', 's2']);
+
+      // 单元末总结作为与课平齐的独立 session 切分面，ancestors 包含第1单元
+      const sumTask = tasks.find(t => t.root.id === 'sum')!;
+      expect(sumTask.ancestors.map(a => a.id)).toEqual(['u1']);
+      expect(sumTask.entries.map(e => e.id)).toEqual(['sum']);
+
+      // 无细课的第2单元自身作为切分面，ancestors 为空
+      const u2Task = tasks.find(t => t.root.id === 'u2')!;
+      expect(u2Task.ancestors).toEqual([]);
+      expect(u2Task.entries.map(e => e.id)).toEqual(['u2']);
+    }
   });
 });

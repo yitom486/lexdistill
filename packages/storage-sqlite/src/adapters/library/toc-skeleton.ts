@@ -36,8 +36,8 @@ export async function seedTextbookTocSkeleton(deps: { db: DrizzleDb }, input: Se
       if (existing?.sourceFingerprint && input.sourceFingerprint && existing.sourceFingerprint !== input.sourceFingerprint) throw new BusinessError('E_SOURCE_FILE_CONFLICT', '所选文件与已保存教材不同', 'VALIDATION');
       const previous: ChapterManifest = existing?.chaptersJson ? ChapterManifestSchema.parse(JSON.parse(existing.chaptersJson)) : [];
       const manifest: ChapterManifest = planned.value.map((task, index) => ({ id: task.root.id, title: task.root.title, order: index + 1,
-        kind: task.root.level === 'lesson' ? 'lesson' : 'section', startPage: task.root.startPage ?? null, endPage: task.root.endPage ?? null,
-        tocEntries: task.entries.map(({ sortOrder: _order, ...entry }) => entry),
+        kind: task.root.level === 'lesson' || task.root.level === 'session' ? 'lesson' : 'section', startPage: task.root.startPage ?? null, endPage: task.root.endPage ?? null,
+        tocEntries: [...task.ancestors, ...task.entries].map(({ sortOrder: _order, ...entry }) => entry),
         status: !input.forceOverwrite ? previous.find(chapter => chapter.id === task.root.id)?.status ?? 'pending' : 'pending' }));
       if (!input.forceOverwrite && previous.some(chapter => chapter.status === 'ready' && !manifest.some(next => next.id === chapter.id))) throw new BusinessError('E_TOC_SLOT_CONFLICT', '新章节清单缺少已经保存的章节', 'VALIDATION');
       if (input.forceOverwrite) for (const table of [textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials]) tx.delete(table).where(eq(table.documentId, input.documentId)).run();
@@ -46,7 +46,7 @@ export async function seedTextbookTocSkeleton(deps: { db: DrizzleDb }, input: Se
         astJson: null, updatedAt: now }).where(eq(documents.id, input.documentId)).run();
       else tx.insert(documents).values({ id: input.documentId, userId: input.userId, title: input.title.trim(), language, sourceKind: 'user_import', content: '',
         chaptersJson: JSON.stringify(manifest), sourceFingerprint: input.sourceFingerprint ?? null, createdAt: now, updatedAt: now }).run();
-      return { documentId: input.documentId, title: input.title.trim(), lessonCount: manifest.filter(chapter => chapter.kind === 'lesson').length,
+      return { documentId: input.documentId, title: input.title.trim(), lessonCount: manifest.filter(chapter => chapter.kind === 'lesson').length || manifest.length,
         totalEntries: manifest.length, minPage: Math.min(...manifest.map(chapter => chapter.startPage ?? 0)), maxPage: Math.max(...manifest.map(chapter => chapter.endPage ?? chapter.startPage ?? 0)) };
     });
     return ok(result);

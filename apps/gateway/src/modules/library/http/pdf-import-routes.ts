@@ -208,8 +208,20 @@ export function createPdfImportRoutes(
         const materialized = await workspace.prepareImages(file.value, c.req.raw.signal);
         if (!materialized.ok) return reject(materialized.error);
         trace.record('request_accepted', { pdfPages: pages, source: 'local-pdf-file', model: input.value.model ?? 'default' });
-        // 批适配器选型：运行时可配（缺席/关 flag → Codex 原通路）；ACP 走文字内嵌＋桥工具。
-        const batch = deps.server.resolveBatchAdapter(input.value.runtimeId, 'toc');
+        const importTraceId = c.req.header('X-Textbook-Trace');
+        if (importTraceId) {
+          const preMonitor = new ImportMonitor(deps.repo, userId, importTraceId);
+          preMonitor.record('directory', 'pages_prepared', {
+            pageCount: pages.length,
+            startPage: pages[0],
+            endPage: pages.at(-1),
+            totalDocPages: workspace.pageCount,
+          });
+          void preMonitor.flush();
+        }
+        const batch = typeof deps.server.resolveBatchAdapter === 'function'
+          ? deps.server.resolveBatchAdapter(input.value.runtimeId, 'toc')
+          : { adapter: deps.server.agentAdapter, batchLane: false };
         let embeddedText: Array<{ originalPage: number; text: string }> | undefined;
         if (batch.batchLane) {
           const checked = await deps.server.checkBatchModelEffort(
@@ -223,7 +235,7 @@ export function createPdfImportRoutes(
           if (materialized.value.images.length > 0) {
             trace.finish('failed', { code: 'E_TOC_SCANNED_ACP' });
             return formatBusinessErrorResponse(c,
-              new BusinessError('E_TOC_SCANNED_ACP', '扫描版目录识别暂需 Codex 通道读图（ACP 暂不支持图片输入），请切换运行时或先做 OCR', 'VALIDATION'), '目录识别');
+              new BusinessError('E_TOC_SCANNED_ACP', '扫描版目录识别暂需多模态通道读图（ACP 暂不支持图片输入），请切换多模态运行时通道', 'VALIDATION'), '目录识别');
           }
           const texts = workspace.extractOriginalPageTexts(materialized.value.originalPages);
           const paired = materialized.value.originalPages.map((page, index) => ({
@@ -553,7 +565,7 @@ interface PdfRouteInput {
   effort?: string;
   /** 目标语种（空=服务端默认） */
   language?: string;
-  /** Agent 运行时 id（空=Codex 原通路；ACP 需 LINGUA_ACP_BATCH=1） */
+  /** Agent 运行时 id（空=Codex 原通路；指名 ACP 运行时即走该运行时池） */
   runtimeId?: string;
 }
 

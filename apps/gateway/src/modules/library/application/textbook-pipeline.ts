@@ -133,7 +133,7 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
         for (const [index, lesson] of pending.entries()) {
           if (controller.signal.aborted) throw new BusinessError('E_CANCELLED', '教材处理已取消', 'TOOL_EXECUTION');
           const task = tasks.find(task => task.root.id === lesson.id)!;
-          const base = { documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: [], text: '' };
+          const base = { documentId, lessonId: lesson.id, title: lesson.title, language: input.language ?? 'ja', allowAiExercises: config.allowAiExercises, tocEntries: task.entries, tocPath: task.ancestors, text: '' };
           if (workspace) {
             emit(lesson.id, 'preparing');
             const end = lesson.endPage ?? workspace.pageCount;

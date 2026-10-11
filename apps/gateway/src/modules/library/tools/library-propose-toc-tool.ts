@@ -9,12 +9,14 @@ import { BusinessError, err, ok, type Result } from '@study-studio/shared';
 import { TocLevelSchema, validateTocPageOrder, type TocEntry } from '@study-studio/document-model';
 
 export const ProposedTocEntrySchema = z.object({
-  parentIndex: z.number().int().nonnegative().optional().describe('父节点在 entries 中的从 0 开始的下标；无父节点则省略，不能凭 section 层级猜测父节点'),
+  parentIndex: z.number().int().nonnegative().optional().describe(
+    '父节点在 entries 中的从 0 开始的下标：lesson 指向所属 unit（若教材无单元外壳则省略）；section 指向所属直接主课；顶层单元省略'
+  ),
   title: z.string().trim().min(1).describe(
-    '目录中印刷的条目标题原文（保持原文，包括课次名称、课下次级句型/语法条目、对话会话主题、复习测试、入门发音准备等）'
+    '目录中印刷的条目标题原文（保持原文，包括课次名称、课下次级句型/语法条目、对话会话主题、复习测试等）'
   ),
   level: TocLevelSchema.describe(
-    '目录层级枚举：unit(单元/大篇章)、lesson(核心成课实体如 Lesson 1/第1课/Chapter 1)、section(课下次级条目，如句型/语法点、会话、复习、发音准备等)'
+    '目录语义类型枚举：unit(单元外壳)、lesson(核心成课或与课平齐的单元总结/独立学习切分面)、section(课内附属小节，如会话主题、语法点等)'
   ),
   startPage: z.number().int().positive().describe(
     '条目对应的教材印刷起始页码（正整数）。若课内次级条目与所属成课同页，填入同页页码。'

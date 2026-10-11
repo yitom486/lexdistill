@@ -28,7 +28,7 @@ export async function extractTocWithLlm(input: ExtractTocWithLlmInput): Promise<
   const embedded = input.fileAccess === 'embedded-text';
   if (!embedded && !input.adapter.supportsLocalFileInput?.()) return err(new BusinessError('E_AGENT_CAPABILITY', '当前模型通道不支持本机 PDF 读取，请切换模型通道', 'AGENT_RUNTIME'));
   if (embedded && (!input.embeddedText || input.embeddedText.length === 0)) {
-    return err(new BusinessError('E_TOC_NO_TEXT', '本轮无可内嵌文字（扫描版请走 Codex 通道读图，或先做 OCR）', 'VALIDATION'));
+    return err(new BusinessError('E_TOC_NO_TEXT', '本轮无可内嵌文字（扫描版请切换多模态运行时通道读图）', 'VALIDATION'));
   }
   const sessionId = input.traceId ?? generateId('toc_review'), attemptId = generateId('toc_attempt');
   const controller = new AbortController();

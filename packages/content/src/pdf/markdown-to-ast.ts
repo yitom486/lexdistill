@@ -458,7 +458,7 @@ export function markdownToAst(
   } = {}
 ): Result<TextbookAST, BusinessError> {
   if (!markdown || !markdown.trim()) {
-    return err(new BusinessError('E_CONTENT_EMPTY', 'PDF 未提取到任何文字（可能是纯图片扫描页且 OCR 无输出）', 'VALIDATION'));
+    return err(new BusinessError('E_CONTENT_EMPTY', 'PDF 未提取到任何文字（纯图片扫描页请使用多模态提炼）', 'VALIDATION'));
   }
   const capped = markdown.length > MAX_MARKDOWN_CHARS ? markdown.slice(0, MAX_MARKDOWN_CHARS) : markdown;
   const language = detectDocScript(capped);

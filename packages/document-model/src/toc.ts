@@ -9,12 +9,12 @@ import { planTextbookTasks } from './textbook-tasks.js';
  * - lesson: 课 / 主题单元 / Day（核心学习实体，承载生词与语法）
  * - section: 节 / 课内细分模块（如会话、语法讲义、课后练习）
  */
-export const TocLevelSchema = z.enum(['unit', 'chapter', 'lesson', 'section']);
+export const TocLevelSchema = z.enum(['unit', 'chapter', 'lesson', 'section', 'session']);
 export type TocLevel = z.infer<typeof TocLevelSchema>;
 
 export const TocEntrySchema = z.object({
   id: z.string().min(1).describe('条目唯一标识，如 l1, ch1, u1'),
-  level: TocLevelSchema.describe('目录层级：unit | chapter | lesson | section'),
+  level: TocLevelSchema.describe('目录层级：unit | chapter | lesson | section | session'),
   title: z.string().min(1).describe('章节标题（去除前后空格）'),
   startPage: z.number().int().positive().describe('教材真实起始页码（正整数）'),
   endPage: z.number().int().positive().optional().describe('教材真实结束页码（可选）'),
@@ -56,7 +56,7 @@ export interface TocValidationResult {
 
 /**
  * 目录页码单调递增自动校验器：
- * 1. 按父子关系提取一级标题（不按语义类型筛选）；
+ * 1. 按 session/任务切分面提取任务（课与平齐单元总结）；
  * 2. 强制校验 startPage 严格单调递增：Page_{i+1} >= Page_i；
  * 3. 校验 endPage 是否大于等于自身的 startPage；
  * 4. 若出现页码回退或倒错，返回友好的业务诊断错误 E_TOC_PAGE_ORDER_INVALID。
@@ -94,8 +94,6 @@ export function validateTocPageOrder(entries: readonly TocEntry[]): Result<TocVa
     }
   }
 
-  // 2. 独立部分也属于内容任务；课内小节不作为另一份独立任务检查。
-  const lessons = entries.filter((e) => e.level === 'lesson');
   const planned = planTextbookTasks(entries);
   if (!planned.ok) return planned;
   const roots = planned.value.map(task => task.root);
@@ -120,7 +118,7 @@ export function validateTocPageOrder(entries: readonly TocEntry[]): Result<TocVa
   const maxPage = Math.max(...allPages);
 
   return ok({
-    lessonCount: lessons.length,
+    lessonCount: planned.value.filter(task => task.root.level === 'lesson' || task.root.level === 'session').length || planned.value.length,
     totalEntries: entries.length,
     minPage,
     maxPage,
@@ -128,7 +126,7 @@ export function validateTocPageOrder(entries: readonly TocEntry[]): Result<TocVa
 }
 
 /**
- * 一级标题切到下一个一级标题之前；子标题仅在本章内推断范围，最后一章保留用户结束页。
+ * 推断各条目页码范围：任务切分面推断到下一个切分面起始页之前；课内子条目推断到下一个兄弟条目或本课结束。
  */
 export function canonicalizeTocEntries(entries: readonly TocEntry[]): Array<TocEntry & { sortOrder: number }> {
   const planned = planTextbookTasks(entries);
@@ -144,6 +142,18 @@ export function canonicalizeTocEntries(entries: readonly TocEntry[]): Array<TocE
       const nextSibling = entries.slice(index + 1).find(child => child.parentId === entry.parentId);
       const boundary = nextSibling?.startPage ?? nextRoot?.startPage;
       inferredEndPage = boundary === undefined ? task.root.endPage : Math.max(entry.startPage, boundary - 1);
+    } else if (!task && inferredEndPage === undefined) {
+      // 顶级容器节点（如包含子 session 的 unit）
+      const nextSibling = entries.slice(index + 1).find(child => child.parentId === entry.parentId);
+      if (nextSibling) {
+        inferredEndPage = Math.max(entry.startPage, nextSibling.startPage - 1);
+      } else {
+        const childTasks = tasks.filter(t => t.ancestors.some(a => a.id === entry.id));
+        const lastTask = childTasks[childTasks.length - 1];
+        if (lastTask?.root.endPage) {
+          inferredEndPage = Math.max(entry.startPage, lastTask.root.endPage);
+        }
+      }
     }
 
     return {

@@ -35,7 +35,7 @@ pinProcessToTestRuntime();
 const repos: DrizzleLearnerRepository[] = [];
 const sources: string[] = [];
 afterEach(async () => { for (const repo of repos.splice(0)) repo.getRawDb().close(); for(const path of sources.splice(0)) await unlink(path); });
-const entries = [{title:'入门单元',level:'unit',startPage:1},{title:'发音',level:'section',parentIndex:0,startPage:1},{title:'第一课',level:'lesson',parentIndex:0,startPage:2}];
+const entries = [{title:'入门课',level:'lesson',startPage:1},{title:'发音',level:'section',parentIndex:0,startPage:1},{title:'会话',level:'section',parentIndex:0,startPage:2}];
 function harness(proposal: unknown = {entries, tocEndPage:2, pageOffset:2}, supportsFiles = true) {
   const repo = new DrizzleLearnerRepository(':memory:'); repos.push(repo);
   const tool = new LibraryProposeTocTool(), toolRegistry = new ToolRegistry(); toolRegistry.register(tool);
