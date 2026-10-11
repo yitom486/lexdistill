@@ -22,12 +22,13 @@ export interface TextbookPipelineInput extends Partial<TextbookPipelineSettings>
   pdf?: Uint8Array | undefined;
   forceOverwrite?: boolean | undefined;
   model?: string | undefined; effort?: string | undefined;
+  /** ACP 运行时 id（缺席即 codex-acp 默认）。 */
+  runtimeId?: string | undefined;
   traceId?: string | undefined; jobId?: string | undefined;
   onProgress?: ((progress: BatchExtractionProgress) => void) | undefined; signal?: AbortSignal | undefined;
   /** agentpools 执行所需：MCP 注册表（与 HTTP 挂载共用实例）与网关自寻址。缺省即本轮不执行模型提炼。 */
   mcpRegistry?: TextbookMcpRegistry | undefined;
   gatewayBaseUrl?: string | undefined;
-  codexBinary?: string | undefined;
   /** 测试注入：池驱动与确定性 scope 脚本；生产不传。 */
   poolDriver?: AgentPoolDriver | undefined;
   onChapterScope?: (scope: McpChapterScope, job: LessonExtractionJob, attempt: number) => void | Promise<void>;
@@ -103,15 +104,10 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
           userId: input.userId,
           documentId,
           workingDirectory: poolCwd,
+          ...(input.runtimeId ? { runtimeId: input.runtimeId } : {}),
           ...(input.model ? { model: input.model } : {}),
           ...(input.effort ? { effort: input.effort } : {}),
-          ...(input.codexBinary ? { codexBinary: input.codexBinary } : {}),
-          // 教材正文执行：沙箱 workspace-write（线程级字段，官方三档之一），
-          // 否则沙箱写不进任务目录。审批保持默认 never，MCP 工具免问靠服务端
-          // 条目预授权（default_tools_approval_mode + 按工具覆盖，真机已验证）。
-          // 只作用于本任务 Worker，不改用户全局 Codex 配置。
-          codexArgs: ['app-server', '--listen', 'stdio://'],
-          sandbox: 'workspace-write',
+          // ACP 条目自动预授权（autoApprovePermissions），写入零问话。
           ...(input.poolDriver ? { driver: input.poolDriver } : {}),
         }, poolSize)
         : null;
@@ -179,9 +175,6 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
             poolSize: config.poolSize,
             ...(input.model ? { model: input.model } : {}),
             ...(input.effort ? { effort: input.effort } : {}),
-            ...(input.codexBinary ? { codexBinary: input.codexBinary } : {}),
-            codexArgs: ['app-server', '--listen', 'stdio://'],
-            sandbox: 'workspace-write',
             ...(input.onChapterScope ? { onChapterScope: input.onChapterScope } : {}),
             workingDirectory: workspace?.workingDirectory ?? process.cwd(),
             allowAiExercises: config.allowAiExercises,

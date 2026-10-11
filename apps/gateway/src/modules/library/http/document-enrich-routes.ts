@@ -25,13 +25,16 @@ export function createDocumentEnrichRoutes(deps: GatewayDeps) {
       const documentId = c.req.param('documentId');
       let lessonId: string | undefined;
       let proposeDrafts = true;
+      let runtimeId: string | undefined;
       try {
         const body = (await c.req.json().catch(() => null)) as {
           lessonId?: unknown;
           proposeDrafts?: unknown;
+          runtimeId?: unknown;
         } | null;
         if (typeof body?.lessonId === 'string' && body.lessonId) lessonId = body.lessonId;
         if (body?.proposeDrafts === false) proposeDrafts = false;
+        if (typeof body?.runtimeId === 'string' && body.runtimeId) runtimeId = body.runtimeId;
       } catch {
         // 无 body = 整本抽取
       }
@@ -62,7 +65,7 @@ export function createDocumentEnrichRoutes(deps: GatewayDeps) {
       const parsed = parseTextbookAST(astRaw);
       if (!parsed.ok) return formatBusinessErrorResponse(c, parsed.error);
       const enriched = await enrichBookLessons(
-        deps.server.agentAdapter,
+        deps.server.resolveAgentAdapter(runtimeId),
         parsed.value,
         lessonId ? [lessonId] : undefined
       );

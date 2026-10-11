@@ -30,10 +30,8 @@ export interface AgentpoolRunInput {
   poolSize: number;
   model?: string | undefined;
   effort?: string | undefined;
-  codexBinary?: string | undefined;
-  codexArgs?: readonly string[] | undefined;
-  approvalPolicy?: string | undefined;
-  sandbox?: string | undefined;
+  /** ACP 运行时 id（缺席即 codex-acp 默认）。 */
+  runtimeId?: string | undefined;
   workingDirectory: string;
   allowAiExercises: boolean;
   forceOverwrite?: boolean;
@@ -79,7 +77,7 @@ export interface AgentpoolBoot {
 
 type AgentpoolBootInput = Pick<AgentpoolRunInput,
   'registry' | 'gatewayBaseUrl' | 'userId' | 'documentId' | 'workingDirectory' |
-  'model' | 'effort' | 'codexBinary' | 'codexArgs' | 'approvalPolicy' | 'sandbox'> & {
+  'model' | 'effort' | 'runtimeId'> & {
   driver?: AgentPoolDriver;
 };
 
@@ -93,15 +91,10 @@ export async function bootAgentpoolChapters(input: AgentpoolBootInput, workerCou
     const driver = input.driver ?? (await GatewayAgentpoolDriver.create({
     program: '',
     cwd: input.workingDirectory,
+    ...(input.runtimeId ? { acp: { runtimeId: input.runtimeId } } : {}),
     ...(input.model ? { model: input.model } : {}),
-    ...(input.effort ? { effort: input.effort } : {}),
-    ...(input.codexBinary ? { codexBinary: input.codexBinary } : {}),
-    ...(input.codexArgs?.length ? { codexArgs: input.codexArgs } : {}),
-    ...(input.approvalPolicy ? { approvalPolicy: input.approvalPolicy } : {}),
-    ...(input.sandbox ? { sandbox: input.sandbox } : {}),
     // 每 Worker 只配自己的端点，形状与命名归 textbook-mcp-catalog 所有，后端按名入表不会串。
-    // 预授权：六个教材工具全部 approve（官方 default_tools_approval_mode +
-    // 按工具覆盖），真机已验证零问话、写入成功。approvalPolicy 保持默认 never。
+    // ACP 条目自动预授权（autoApprovePermissions），写入零问话。
     mcpServersForWorker: (_workerIndex: number) => {
       const path = workerPaths[_workerIndex];
       if (!path) return [];

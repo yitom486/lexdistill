@@ -8,16 +8,30 @@ import { TextbookGrading } from '../application/textbook-grading.js';
 import { SubmitExerciseGradeTool } from '../tools/submit-exercise-grade.js';
 
 export function createTextbookPracticeRoutes(deps: GatewayDeps) {
-  let grading: TextbookGrading | undefined;
+  // 按运行时缓存批改服务（running 去重表随实例，跨运行时互不干扰）。
+  // 无 runtimeId 走 server 默认适配器（产品为 codex-acp 池实例；测试可注入）。
+  const gradingByRuntime = new Map<string, TextbookGrading>();
+  const gradingFor = (runtimeId: string | undefined): TextbookGrading | undefined => {
+    const key = runtimeId ?? '';
+    const cached = gradingByRuntime.get(key);
+    if (cached) return cached;
+    const tool = deps.server.toolRegistry.get('learning.submit_grade');
+    if (!(tool instanceof SubmitExerciseGradeTool)) return undefined;
+    const grading = new TextbookGrading({
+      repo: deps.repo,
+      adapter: runtimeId ? deps.server.resolveAgentAdapter(runtimeId) : deps.server.agentAdapter,
+      tool,
+      toolRegistry: deps.server.toolRegistry,
+    });
+    gradingByRuntime.set(key, grading);
+    return grading;
+  };
   return new Hono()
     .post('/api/textbook-practice/:userId/submit', async c => {
       try {
         const parsed = SubmitTextbookExerciseSchema.safeParse(await c.req.json());
         if (!parsed.success) return formatBusinessErrorResponse(c, new BusinessError('E_INVALID_INPUT', '提交内容不完整或题目格式不正确', 'VALIDATION'));
-        if (!grading) {
-          const tool = deps.server.toolRegistry.get('learning.submit_grade');
-          if (tool instanceof SubmitExerciseGradeTool) grading = new TextbookGrading({ repo: deps.repo, adapter: deps.server.agentAdapter, tool });
-        }
+        const grading = gradingFor(parsed.data.runtimeId);
         if (!grading) return formatBusinessErrorResponse(c, new BusinessError('E_GRADING_UNAVAILABLE', '批改服务尚未就绪，请稍后重试', 'AGENT_RUNTIME', true));
         const result = await grading.submit(c.req.param('userId'), parsed.data);
         return result.ok ? c.json(result.value) : formatBusinessErrorResponse(c, result.error);

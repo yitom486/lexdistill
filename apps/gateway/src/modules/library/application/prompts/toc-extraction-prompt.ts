@@ -13,7 +13,7 @@ const CORE_LINES = [
   '使用 library_propose_toc 提交草稿；只依据当前文件，不新增工具未声明的字段。',
 ];
 
-/** Codex 通路：Agent 原生读文件（路径指令）。 */
+/** 原生读文件通路：Agent 直接读文件（路径指令）。 */
 export function buildTocExtractionPrompt(input: TocExtractionPromptInput): string {
   return [
     '读取当前 PDF，找到实际目录并按阅读顺序提交树状目录。文件可能还包含封面、前言和正文，不把这些都当目录。没有目录时明确说明，不猜目录。',
@@ -26,7 +26,7 @@ export function buildTocExtractionPrompt(input: TocExtractionPromptInput): strin
 
 /**
  * ACP 通路：无原生文件读取，文字内嵌（调用方按原物理页取字，空页已剔除）。
- * 页分隔标注原物理页，tocEndPage 照此对应；扫描版（images 非空）不得走此通路。
+ * 页分隔标注原物理页，tocEndPage 照此对应。
  */
 export function buildTocExtractionPromptForEmbeddedText(
   input: TocExtractionPromptInput,
@@ -39,5 +39,25 @@ export function buildTocExtractionPromptForEmbeddedText(
     ...(input.title ? [`教材：${input.title}`] : []),
     ...(input.language ? [`语种：${input.language}`] : []),
     `目录候选文字：\n${blocks}`,
+  ].join('\n\n');
+}
+
+/**
+ * ACP 通路（扫描版）：页面图随 prompt 直传模型，按 imageLabels 顺序与图片一一对应；
+ * 有可提取文字时一并内嵌作辅助。只依据图片（与辅助文字）找实际目录。
+ */
+export function buildTocExtractionPromptForEmbeddedImages(
+  input: TocExtractionPromptInput,
+  pageTexts: Array<{ originalPage: number; text: string }>,
+  imageLabels: string[],
+): string {
+  const order = imageLabels.map((label, index) => `第${index + 1}张图＝${label || '未标注页'}`).join('；');
+  const blocks = pageTexts.map(entry => `【原PDF第${entry.originalPage}页】\n${entry.text}`).join('\n\n');
+  return [
+    `下面是原 PDF 指定页的页面图片（共${imageLabels.length}张，按顺序对应：${order}。只依据这些图片找实际目录并按阅读顺序提交树状目录，看清排版缩进与视觉层级）。文件可能还包含封面、前言和正文，不把这些都当目录。没有目录时明确说明，不猜目录。`,
+    ...CORE_LINES,
+    ...(input.title ? [`教材：${input.title}`] : []),
+    ...(input.language ? [`语种：${input.language}`] : []),
+    ...(blocks ? [`目录候选文字（辅助，以图片为准）：\n${blocks}`] : []),
   ].join('\n\n');
 }

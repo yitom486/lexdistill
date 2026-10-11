@@ -1,4 +1,4 @@
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import { resolveAgentFirstMessage, type AgentAdapter } from '@study-studio/agent-runtime';
 import { BusinessError, err, isOk, logger, ok, translateToBusinessError, type Result } from '@study-studio/shared';
 import {
   TextbookGrammarSchema,
@@ -371,7 +371,7 @@ export async function enrichLessonVocab(
           ...(input.effort ? { effort: input.effort } : {}),
         }
       : undefined;
-  // 取消→中断本会话的在途轮次（CodexSession.interrupt 是 per-session 的，
+  // 取消→中断本会话的在途轮次（interrupt 是 per-session 的，
   // 只 abort 自己的控制器；finally 照常 close，会话不泄漏）。
   const onAbort = () => {
     void session.interrupt().catch(() => {});
@@ -406,7 +406,12 @@ export async function enrichLessonVocab(
   };
   try {
     const numbered = input.dialogueTexts.map((t, i) => `【句${i + 1}｜${input.language}】${t}`).join('\n');
-    const message = `课名：${input.lessonTitle}\n${numbered}\n\n请抽取本课生词与核心文法，只返回 JSON。`;
+    // ACP 无 systemPrompt 通道：身份随首消息前置；其他通路走原生通道，不加料。
+    const message = resolveAgentFirstMessage(
+      session,
+      ENRICH_SYSTEM_PROMPT,
+      `课名：${input.lessonTitle}\n${numbered}\n\n请抽取本课生词与核心文法，只返回 JSON。`
+    );
     const first = await ask(message);
     if (signal?.aborted) return err(enrichCancelledError());
     if (!first.ok) return err(first.error);

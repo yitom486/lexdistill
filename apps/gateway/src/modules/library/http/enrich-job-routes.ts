@@ -33,6 +33,7 @@ export function createEnrichJobRoutes(deps: GatewayDeps) {
         let concurrency: number | undefined;
         let model: string | undefined;
         let effort: string | undefined;
+        let runtimeId: string | undefined;
         try {
           const body = (await c.req.json().catch(() => null)) as {
             lessonIds?: unknown;
@@ -40,6 +41,7 @@ export function createEnrichJobRoutes(deps: GatewayDeps) {
             concurrency?: unknown;
             model?: unknown;
             effort?: unknown;
+            runtimeId?: unknown;
           } | null;
           if (Array.isArray(body?.lessonIds) && body.lessonIds.every((v) => typeof v === 'string')) {
             lessonIds = [...body.lessonIds];
@@ -55,13 +57,16 @@ export function createEnrichJobRoutes(deps: GatewayDeps) {
           if (typeof body?.effort === 'string' && body.effort.trim().length > 0 && body.effort.length <= 40) {
             effort = body.effort.trim();
           }
+          if (typeof body?.runtimeId === 'string' && body.runtimeId.trim().length > 0 && body.runtimeId.length <= 60) {
+            runtimeId = body.runtimeId.trim();
+          }
         } catch {
           // 无 body = 整本抽取
         }
         const started = deps.server.enrichJobs.start(
           {
             repo: deps.repo,
-            adapter: deps.server.agentAdapter,
+            adapter: deps.server.resolveAgentAdapter(runtimeId),
             emitToSession: (sid, type, payload) => deps.server.emitToSession(sid, type, payload),
           },
           {

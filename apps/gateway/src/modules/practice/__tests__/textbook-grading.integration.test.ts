@@ -1,6 +1,7 @@
 import { afterEach, expect, it } from 'bun:test';
-import { CodexAdapter, type AgentEvent, type CreateSessionOptions, type AgentSession, type AgentInput } from '@study-studio/agent-runtime';
-import { BusinessError, ok } from '@study-studio/shared';
+import { AcpAdapter, AcpAgentSession, type AgentAdapter, type AgentEvent, type CreateSessionOptions, type AgentSession, type AgentInput } from '@study-studio/agent-runtime';
+import { BusinessError, err, ok } from '@study-studio/shared';
+import { ToolRegistry } from '@study-studio/tool-core';
 import { TextbookExerciseAttemptSchema, TextbookExerciseHistorySchema, TextbookGrowthResponseSchema } from '@study-studio/protocol';
 import { haveSameGradingBasis, summarizeTextbookGrowth } from '@study-studio/learner-core';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
@@ -19,14 +20,19 @@ async function setup(handle: (options: CreateSessionOptions, input: AgentInput) 
     { type: 'CHOICE', prompt: 'Choose', options: ['a','b'], answer: 'a', difficultyTier: 1, difficultyReason: 'Simple recognition' },
   ] })).ok).toBe(true);
   await repo.writeTextbookContent({ userId: 'owner', documentId: 'book', chapterId: 'chapter' }, 'grammar', { items: [{ title: 'です', explanation: 'Polite identification' }] });
-  const adapter = new CodexAdapter(); const created: CreateSessionOptions[] = [];
-  // Controlled provider events; no external process, key or paid API call.
-  adapter.createSession = async options => {
-    created.push(options);
-    const session: AgentSession = { sessionId: options.sessionId, send: input => handle(options, input),
-      submitToolResult: async () => ok(undefined), submitApproval: async () => ok(undefined), steer: async () => ok(undefined), interrupt: async () => ok(undefined), close: async () => ok(undefined) };
-    return ok(session);
-  };
+  const created: CreateSessionOptions[] = [];
+  // 受控会话桩（非 AcpAgentSession → 走共享实例＋bindings 映射的原通路分支）。
+  const adapter = {
+    id: 'mock-grader',
+    name: 'MockGrader',
+    createSession: async (options: CreateSessionOptions) => {
+      created.push(options);
+      const session: AgentSession = { sessionId: options.sessionId, send: input => handle(options, input),
+        submitToolResult: async () => ok(undefined), submitApproval: async () => ok(undefined), steer: async () => ok(undefined), interrupt: async () => ok(undefined), close: async () => ok(undefined) };
+      return ok(session);
+    },
+    resumeSession: async () => err(new BusinessError('E_X', 'x', 'VALIDATION')),
+  } as unknown as AgentAdapter;
   const server = new GatewayServer(repo, adapter);
   const app = createTextbookPracticeRoutes({ repo, server, port: 0 });
   const ids = repo.getRawDb().query<{ id: string; type: string }, []>('SELECT id,type FROM textbook_exercise_items').all();
@@ -144,6 +150,57 @@ it('timeout rejects a late native grade and retry records one effective result',
   expect(retry.ok && retry.value.grading?.score).toBe(90);
   expect(env.repo.getRawDb().query('SELECT count(*) AS n FROM practice_item_attempts').get()).toEqual({ n: 1 });
   expect(env.repo.getRawDb().query('SELECT count(*) AS n FROM quiz_attempts').get()).toEqual({ n: 1 });
+});
+
+it('ACP 通路：按次唯一名工具注册→桥按名执行→用完注销；身份前置，无 bindings 残留', async () => {
+  const env = await setup(async function* () { yield { type: 'COMPLETED' }; });
+  const tool = new SubmitExerciseGradeTool();
+  const registry = new ToolRegistry();
+  registry.register(tool);
+  const adapter = new AcpAdapter({ createClient: () => { throw new Error('测试内不得建连'); }, buildMcpServers: () => [] });
+  let mounted: { name: string }[] = [];
+  let sentMessage = '';
+  (adapter as { createSession: unknown }).createSession = async (options: CreateSessionOptions) => {
+    mounted = (options.tools ?? []).map(tool => ({ name: tool.name }));
+    // 真 AcpAgentSession（走身份前置分支），send 伪造为“模型经桥调按次工具”。
+    const handle = { sessionId: 'acp-grade-1', prompt: async () => ({ ok: true as const, value: '' }) };
+    const session = new AcpAgentSession(String(options.sessionId), 'acp-grade-1', handle as never, [], undefined);
+    const inner = {
+      sessionId: session.sessionId,
+      send: (async function* (input: AgentInput) {
+        sentMessage = input.message;
+        // 模拟 MCP 桥：按名走注册表执行（与 SessionToolBridge 同语义）。
+        const target = mounted[0]!.name;
+        const called = await registry.execute(target,
+          { score: 88, feedback: 'ACP 批改反馈', suggestions: [] },
+          { userId: 'owner', sessionId: 'gateway-session' });
+        expect(called.ok).toBe(true);
+        yield { type: 'COMPLETED' as const };
+      }) as AgentSession['send'],
+      submitToolResult: async () => ok(undefined),
+      submitApproval: async () => ok(undefined),
+      steer: async () => ok(undefined),
+      interrupt: async () => ok(undefined),
+      close: async () => ok(undefined),
+    } satisfies AgentSession;
+    (session as { send: unknown }).send = inner.send;
+    return ok(session);
+  };
+  const service = new TextbookGrading({ repo: env.repo, adapter, tool, toolRegistry: registry, firstResponseTimeoutMs: 5000 });
+  const result = await service.submit('owner', env.input);
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(result.value.status).toBe('GRADED');
+  expect(result.value.grading?.score).toBe(88);
+  expect(result.value.adapter).toBe('acp');
+  // 按次唯一名（非共享名），且已注销；共享实例 bindings 未被触碰
+  expect(mounted.length).toBe(1);
+  expect(mounted[0]!.name.startsWith('learning.submit_grade.')).toBe(true);
+  expect(registry.get(mounted[0]!.name)).toBeUndefined();
+  expect(tool.bindings.size).toBe(0);
+  // 身份前置（真 AcpAgentSession），工具名即注册名
+  expect(sentMessage).toContain('你是外语练习批改员');
+  expect(sentMessage).toContain(mounted[0]!.name);
 });
 
 it('shared practice draft never overwrites graded history, never inherits a grade; repeated question in a different run survives finalization', async () => {

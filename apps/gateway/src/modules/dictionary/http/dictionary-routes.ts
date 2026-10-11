@@ -190,6 +190,26 @@ export function createDictionaryRoutes(deps: GatewayDeps) {
     }
   })
   // 本地词典优先；仅在日语本地未命中时提供 OJAD 外链，不代理或抓取 OJAD。
+  // 注意：静态路由必须注册在 /:language 参数路由之前，否则被其遮蔽。
+  .get('/api/dictionary/examples', async (c) => {
+    const meaningsRaw = c.req.query('meanings') || '';
+    const runtimeId = c.req.query('runtimeId') || undefined;
+    const res = await deps.repo.getTermExamples(
+      {
+        language: c.req.query('lang') || 'ja',
+        headword: c.req.query('headword') || '',
+        ...(c.req.query('reading') ? { reading: c.req.query('reading') as string } : {}),
+        meanings: meaningsRaw
+          .split('；')
+          .map((m) => m.trim())
+          .filter((m) => m)
+          .slice(0, 4),
+      },
+      deps.server.resolveAgentAdapter(runtimeId)
+    );
+    if (isOk(res)) return c.json({ examples: res.value });
+    return formatBusinessErrorResponse(c, res.error, 'termExamples');
+  })
   .get('/api/dictionary/:language', async (c) => {
     // P3-1 阅读上下文透传（可选 query param；Tool 名／权限不变）。
     const lookupDocumentId = c.req.query('documentId')?.trim() || undefined;
@@ -259,25 +279,6 @@ export function createDictionaryRoutes(deps: GatewayDeps) {
     );
     if (isOk(res)) return c.json(res.value);
     return formatBusinessErrorResponse(c, res.error);
-  })
-  // 词条例句（缓存优先；未命中且网关已连模型则生成入库，供讲透卡展示）。
-  .get('/api/dictionary/examples', async (c) => {
-    const meaningsRaw = c.req.query('meanings') || '';
-    const res = await deps.repo.getTermExamples(
-      {
-        language: c.req.query('lang') || 'ja',
-        headword: c.req.query('headword') || '',
-        ...(c.req.query('reading') ? { reading: c.req.query('reading') as string } : {}),
-        meanings: meaningsRaw
-          .split('；')
-          .map((m) => m.trim())
-          .filter((m) => m)
-          .slice(0, 4),
-      },
-      deps.server.agentAdapter
-    );
-    if (isOk(res)) return c.json({ examples: res.value });
-    return formatBusinessErrorResponse(c, res.error, 'termExamples');
   })
   // 1. 学习者全景画像与打卡进度
 ;

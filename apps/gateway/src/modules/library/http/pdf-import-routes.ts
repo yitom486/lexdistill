@@ -5,7 +5,7 @@ import { PDFDocument } from 'pdf-lib';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
 import { PdfTaskWorkspace, directoryWindow } from '../application/pdf-import/pdf-task-workspace.js';
-import { extractTocWithLlm } from '../application/toc-extractor.js';
+import { extractTocWithLlm, loadTocImageAttachments } from '../application/toc-extractor.js';
 import { beginTocVisionTrace, listTocVisionTraces } from '../application/toc-vision-diagnostics.js';
 import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
 import { type PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
@@ -13,7 +13,7 @@ import { TocEntrySchema, TextbookPipelineSettingsSchema, SaveTextbookOutlineRequ
 import { z } from 'zod';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import type { TextbookPipelineInput } from '../application/textbook-pipeline.js';
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import type { AgentAdapter, AgentImageAttachment } from '@study-studio/agent-runtime';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 import { inspectTextbookImport } from '../application/textbook-inspector.js';
 import { saveTextbookOutline } from '../application/textbook-outline.js';
@@ -32,6 +32,7 @@ const PipelineRequestSchema = TextbookPipelineSettingsSchema.extend({
   pdfBase64: z.string().optional(),
   model: z.string().optional(),
   effort: z.string().optional(),
+  runtimeId: z.string().trim().min(1).max(60).optional(),
   forceOverwrite: z.boolean().optional(),
   tocEntries: z.array(TocEntrySchema).min(1),
   lessonJobs: z.array(z.object({
@@ -223,6 +224,7 @@ export function createPdfImportRoutes(
           ? deps.server.resolveBatchAdapter(input.value.runtimeId, 'toc')
           : { adapter: deps.server.agentAdapter, batchLane: false };
         let embeddedText: Array<{ originalPage: number; text: string }> | undefined;
+        let attachments: AgentImageAttachment[] | undefined;
         if (batch.batchLane) {
           const checked = await deps.server.checkBatchModelEffort(
             input.value.runtimeId!, input.value.model, input.value.effort);
@@ -233,18 +235,22 @@ export function createPdfImportRoutes(
               new BusinessError('E_TOC_MODEL_MISMATCH', `${message}（请重选该运行时的模型/档位）`, 'VALIDATION'), '目录识别');
           }
           if (materialized.value.images.length > 0) {
-            trace.finish('failed', { code: 'E_TOC_SCANNED_ACP' });
-            return formatBusinessErrorResponse(c,
-              new BusinessError('E_TOC_SCANNED_ACP', '扫描版目录识别暂需多模态通道读图（ACP 暂不支持图片输入），请切换多模态运行时通道', 'VALIDATION'), '目录识别');
+            // 扫描版：页面图随 prompt 直传模型读图（附件预算见 loadTocImageAttachments）。
+            const loaded = await loadTocImageAttachments(materialized.value.images);
+            if (!loaded.ok) {
+              trace.finish('failed', { code: loaded.error.code });
+              return reject(loaded.error);
+            }
+            attachments = loaded.value;
           }
           const texts = workspace.extractOriginalPageTexts(materialized.value.originalPages);
           const paired = materialized.value.originalPages.map((page, index) => ({
             originalPage: page, text: (texts?.[index] ?? '').trim(),
           })).filter(entry => entry.text);
-          if (paired.length === 0) {
+          if (paired.length === 0 && !attachments?.length) {
             trace.finish('failed', { code: 'E_TOC_NO_TEXT' });
             return formatBusinessErrorResponse(c,
-              new BusinessError('E_TOC_NO_TEXT', '本轮取不到可内嵌文字（请更新 PDF 组件后重试，或走 Codex 通道）', 'TOOL_EXECUTION'), '目录识别');
+              new BusinessError('E_TOC_NO_TEXT', '本轮取不到可内嵌文字（请更新 PDF 组件后重试，或改用原生读文件方式）', 'TOOL_EXECUTION'), '目录识别');
           }
           embeddedText = paired;
         }
@@ -252,6 +258,7 @@ export function createPdfImportRoutes(
           pdfFile: materialized.value, adapter: pdfOverrides?.adapter ?? batch.adapter, proposalTool, traceId: trace.id, onDiagnostic: trace.record,
           signal: c.req.raw.signal,
           ...(embeddedText ? { fileAccess: 'embedded-text' as const, embeddedText } : {}),
+          ...(attachments?.length ? { fileAccess: 'embedded-text' as const, attachments } : {}),
           ...(c.req.header('X-Textbook-Trace') ? { monitor: new ImportMonitor(deps.repo, userId, c.req.header('X-Textbook-Trace')!) } : {}),
           ...(input.value.model ? { model: input.value.model } : {}), ...(input.value.effort ? { effort: input.value.effort } : {}),
         });
@@ -325,6 +332,7 @@ export function createPdfImportRoutes(
           ...(body.model ? { model: body.model } : {}),
           ...(body.poolSize ? { poolSize: body.poolSize } : {}),
           ...(body.effort ? { effort: body.effort } : {}),
+          ...(body.runtimeId ? { runtimeId: body.runtimeId } : {}),
           ...TextbookPipelineSettingsSchema.parse(body),
           mcpRegistry,
           gatewayBaseUrl: `http://127.0.0.1:${deps.port}`,
@@ -401,6 +409,7 @@ export function createPdfImportRoutes(
           ...(body.model ? { model: body.model } : {}),
           ...(body.poolSize ? { poolSize: body.poolSize } : {}),
           ...(body.effort ? { effort: body.effort } : {}),
+          ...(body.runtimeId ? { runtimeId: body.runtimeId } : {}),
           ...TextbookPipelineSettingsSchema.parse(body),
           mcpRegistry,
           gatewayBaseUrl: `http://127.0.0.1:${deps.port}`,
@@ -565,7 +574,7 @@ interface PdfRouteInput {
   effort?: string;
   /** 目标语种（空=服务端默认） */
   language?: string;
-  /** Agent 运行时 id（空=Codex 原通路；指名 ACP 运行时即走该运行时池） */
+  /** Agent 运行时 id（空=默认 codex-acp；指名即走该运行时池） */
   runtimeId?: string;
 }
 

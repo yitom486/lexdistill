@@ -1,4 +1,4 @@
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import { resolveAgentFirstMessage, type AgentAdapter } from '@study-studio/agent-runtime';
 import { buildAnalysisSnapshot as buildAnalysisSnapshotUseCase } from '@study-studio/learning';
 import { type LearnerRepository } from '@study-studio/learner-core';
 import type {
@@ -136,7 +136,9 @@ async function runAiAnalysis(
     const session = sessionRes.value;
     try {
       let text = '';
-      for await (const ev of session.send({ message: input.message })) {
+      // ACP 无 systemPrompt 通道：身份随首消息前置；其他通路走原生通道，不加料。
+      const sendMessage = resolveAgentFirstMessage(session, input.systemPrompt, input.message);
+      for await (const ev of session.send({ message: sendMessage })) {
         if (ev.type === 'TEXT_DELTA') {
           text += ev.delta;
         } else if (ev.type === 'ERROR') {

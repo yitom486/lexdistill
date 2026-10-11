@@ -54,6 +54,27 @@ describe('term-examples（例句生成+缓存）', () => {
     expect(res.value.every((e) => e.sentence.toLowerCase().includes('water'))).toBe(true);
   });
 
+  it('别名宽容：{ja, zh} / {japanese, chinese} 形状映射后同样接地 (muse-spark 实测形状)', async () => {
+    const shaped = JSON.stringify({
+      word: 'おはよう',
+      examples: [
+        { ja: 'おはよう、お母さん。', reading: 'おはよう、おかあさん。', zh: '早上好，妈妈。' },
+        { japanese: 'おはよう、元気？', reading: 'おはよう、げんき？', chinese: '早上好，你好吗？' },
+        { ja: ' unrelated sentence here.', zh: '无关。' },
+      ],
+    });
+    const res = await generateTermExamples(mockAdapter(shaped), {
+      language: 'ja',
+      headword: 'おはよう',
+      meanings: ['早上好'],
+    });
+    expect(isOk(res)).toBe(true);
+    if (!isOk(res)) return;
+    expect(res.value.length).toBe(2);
+    expect(res.value[0]).toMatchObject({ sentence: 'おはよう、お母さん。', translation: '早上好，妈妈。' });
+    expect(res.value[1]).toMatchObject({ sentence: 'おはよう、元気？', translation: '早上好，你好吗？' });
+  });
+
   it('无模型报错 E_EXAMPLES_NO_ADAPTER；非法输入拒绝', async () => {
     const noAdapter = await generateTermExamples(undefined, {
       language: 'en',

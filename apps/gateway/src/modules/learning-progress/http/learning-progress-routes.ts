@@ -109,8 +109,9 @@ export function createLearningProgressRoutes(deps: GatewayDeps) {
       const userId = c.req.param('userId');
       const forceRefresh = c.req.query('refresh') === '1';
       const model = c.req.query('model') || undefined;
+      const runtimeId = c.req.query('runtimeId') || undefined;
       const res = await runLearningAnalysis({
-        adapter: deps.server.agentAdapter,
+        adapter: deps.server.resolveAgentAdapter(runtimeId),
         repo: deps.repo,
         userId,
         forceRefresh,

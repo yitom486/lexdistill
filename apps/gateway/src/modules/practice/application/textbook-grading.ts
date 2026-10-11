@@ -1,9 +1,10 @@
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
+import { AcpAdapter, resolveAgentFirstMessage, type AgentAdapter, type AgentEvent, type AgentSession } from '@study-studio/agent-runtime';
 import type { LearnerRepository, TextbookPracticeRepository, TextbookGradeAudit } from '@study-studio/learner-core';
 import { TextbookExerciseAttemptSchema, type ExerciseAnswer, type ExerciseSnapshot, type SubmitTextbookExercise, type TextbookExerciseAttempt } from '@study-studio/protocol';
 import { DEFAULT_TEXTBOOK_PIPELINE_SETTINGS } from '@study-studio/document-model';
 import { BusinessError, err, ok, generateId, nowIso, translateToBusinessError, type Result } from '@study-studio/shared';
-import { SubmitExerciseGradeTool, type GradeBinding } from '../tools/submit-exercise-grade.js';
+import type { ToolDefinition } from '@study-studio/tool-core';
+import { SubmitExerciseGradeTool, submitGradeAttempt, type GradeBinding } from '../tools/submit-exercise-grade.js';
 
 export const isSubjectiveExercise = (type: string) => ['TRANSLATION','SHORT_ANSWER','WRITING'].includes(type);
 export function gradeTextbookObjective(snapshot: ExerciseSnapshot, answer: ExerciseAnswer) {
@@ -29,7 +30,27 @@ export function gradeTextbookObjective(snapshot: ExerciseSnapshot, answer: Exerc
 interface Dependencies {
   repo: TextbookPracticeRepository & Pick<LearnerRepository, 'getLearnerProfile'>;
   adapter: AgentAdapter; tool: SubmitExerciseGradeTool;
+  /** 按次工具注册表（MCP 桥按名执行用；单测 mock 适配器可缺席，走直调分支）。 */
+  toolRegistry?: { register(tool: ToolDefinition): void; unregister(name: string): boolean } | undefined;
   firstResponseTimeoutMs?: number; stallTimeoutMs?: number;
+}
+
+const GRADING_SYSTEM_PROMPT = '你是外语练习批改员。仅批改本次提供的作答，遵守本题评分要求，不调用其他工具。通过 learning_submit_grade 保存批改内容。';
+
+/**
+ * 按次批改工具门面：MCP 桥按名走注册表执行，无视传入实例，
+ * 故每轮克隆唯一名工具并注册，用完注销；闭包独占本轮 binding，
+ * 并发轮次互不串扰（非 ACP  mock 适配器走共享实例＋bindings 映射的兼容分支）。
+ */
+function gradeToolForRun(base: SubmitExerciseGradeTool, binding: GradeBinding, runToolName: string): ToolDefinition {
+  return {
+    name: runToolName,
+    description: base.description,
+    location: base.location,
+    permission: base.permission,
+    schema: base.schema,
+    execute: (raw: unknown) => submitGradeAttempt(base, binding, raw),
+  };
 }
 /** One frozen submission per native session; same request/retry never creates new evidence. */
 export class TextbookGrading {
@@ -46,6 +67,9 @@ export class TextbookGrading {
     let audit: TextbookGradeAudit | undefined;
     let session: AgentSession | undefined;
     let binding: GradeBinding | undefined;
+    let acpRun = false;
+    let runTool: ToolDefinition | undefined;
+    let sessionId = '';
     try {
       if (input.preview) {
         if (input.documentId || input.chapterId || input.exerciseId || input.previousAttemptId || input.retryAttemptId) return err(new BusinessError('E_PREVIEW_SCOPE_INVALID', '临时案例不能关联正式学习记录', 'VALIDATION'));
@@ -69,7 +93,12 @@ export class TextbookGrading {
       const context = { chapterTitle, language, learnerLevel: profile.value.overallLevel, question: {
         type: exercise.type, prompt: exercise.prompt, reference: exercise.answer ?? null, gradingNotes: exercise.gradingNotes ?? null,
         difficultyTier: exercise.difficultyTier, difficultyReason: exercise.difficultyReason }, knowledge, answer: attempt.answer };
-      const message = `请按本题要求批改这次作答，接受合理等价表达，参考表达不是唯一答案。给出具体反馈和可操作的改进建议。通过 learning_submit_grade 提交结果。\n${JSON.stringify(context)}`;
+      sessionId = generateId('grading');
+      // ACP 适配器走按次克隆（桥按名执行），用完注销；
+      // 非 ACP mock 适配器走共享实例＋bindings 映射的兼容分支（单测用）。
+      acpRun = this.deps.adapter instanceof AcpAdapter;
+      const submitToolName = acpRun ? `${this.deps.tool.name}.${sessionId}` : 'learning_submit_grade';
+      const message = `请按本题要求批改这次作答，接受合理等价表达，参考表达不是唯一答案。给出具体反馈和可操作的改进建议。通过 ${submitToolName} 提交结果。\n${JSON.stringify(context)}`;
       audit = { id: generateId('grade'), adapter: this.deps.adapter.id, model: input.model, inputSnapshot: message };
       if (!attempt.temporary) {
         const claim = await this.deps.repo.claimTextbookGrade(userId, attempt.id, audit.id); if (!claim.ok) return claim;
@@ -84,29 +113,38 @@ export class TextbookGrading {
           for (let retry = 0; !saved.ok && saved.error.category === 'DATABASE' && saved.error.retryable && retry < DEFAULT_TEXTBOOK_PIPELINE_SETTINGS.storageRetries; retry++) saved = await this.deps.repo.settleTextbookGrade(userId, frozen.id, runAudit, grade);
           return saved;
         } };
-      const sessionId = generateId('grading'); this.deps.tool.bindings.set(sessionId, binding);
-      const created = await this.deps.adapter.createSession({ sessionId, userId, model: input.model, ephemeral: true, approvalPolicy: 'never', tools: [this.deps.tool],
-        systemPrompt: '你是外语练习批改员。仅批改本次提供的作答，遵守本题评分要求，不调用其他工具。通过 learning_submit_grade 保存批改内容。' });
-      if (!created.ok) { this.deps.tool.bindings.delete(sessionId); throw created.error; }
+      if (acpRun) {
+        if (!this.deps.toolRegistry) throw new BusinessError('E_GRADING_TOOL_REGISTRY', '批改工具注册表未就绪', 'TOOL_EXECUTION');
+        runTool = gradeToolForRun(this.deps.tool, binding, submitToolName);
+        this.deps.toolRegistry.register(runTool);
+      } else {
+        this.deps.tool.bindings.set(sessionId, binding);
+      }
+      const created = await this.deps.adapter.createSession({ sessionId, userId, model: input.model,
+        ...(input.effort ? { effort: input.effort } : {}),
+        ephemeral: true, approvalPolicy: 'never', tools: acpRun && runTool ? [runTool] : [this.deps.tool],
+        systemPrompt: GRADING_SYSTEM_PROMPT });
+      if (!created.ok) {
+        if (acpRun && runTool) this.deps.toolRegistry?.unregister(runTool.name);
+        else this.deps.tool.bindings.delete(sessionId);
+        throw created.error;
+      }
       session = created.value;
-      const iterator = session.send({ message, contextSnapshot: { targetLanguage: language, learnerLevel: profile.value.overallLevel, userIntentHint: 'GRADE', metadata: context },
-        turnOptions: { model: input.model, ...(input.effort ? { effort: input.effort } : {}) }, onTurnStarted: turnId => { if (binding?.active) binding.turnId = turnId; } })[Symbol.asyncIterator]();
-      let received = false;
-      try {
-        while (true) {
-          const delay = received ? (this.deps.stallTimeoutMs ?? DEFAULT_TEXTBOOK_PIPELINE_SETTINGS.stallTimeoutMs) : (this.deps.firstResponseTimeoutMs ?? DEFAULT_TEXTBOOK_PIPELINE_SETTINGS.firstResponseTimeoutMs);
-          let timer: ReturnType<typeof setTimeout> | undefined;
-          const event = await Promise.race([iterator.next(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new BusinessError(received ? 'E_GRADING_STALL_TIMEOUT' : 'E_GRADING_FIRST_RESPONSE_TIMEOUT', '模型批改等待超时，答案已保留，可以重试批改', 'AGENT_RUNTIME', true)), delay); })]).finally(() => { if (timer) clearTimeout(timer); });
-          if (binding.result) return ok(binding.result);
-          if (event.done) break;
-          received = true;
-          if (binding.repairs > binding.repairLimit) throw new BusinessError('E_GRADING_REPAIR_LIMIT', '本次模型修正次数已用尽，答案已保留', 'VALIDATION', true);
-          if (event.value.type === 'ERROR') throw event.value.error;
-          if (event.value.type === 'COMPLETED') break;
-        }
-        if (binding.result) return ok(binding.result);
-        throw new BusinessError('E_GRADING_RESULT_MISSING', '模型没有提交有效批改结果，答案已保留', 'AGENT_RUNTIME', true);
-      } finally { binding.active = false; this.deps.tool.bindings.delete(sessionId); }
+      if (!acpRun) {
+        const iterator = session.send({ message, contextSnapshot: { targetLanguage: language, learnerLevel: profile.value.overallLevel, userIntentHint: 'GRADE', metadata: context },
+          turnOptions: { model: input.model, ...(input.effort ? { effort: input.effort } : {}) }, onTurnStarted: turnId => { if (binding?.active) binding.turnId = turnId; } })[Symbol.asyncIterator]();
+        await this.consumeGradingTurn(iterator, binding);
+      } else {
+        // ACP 无 systemPrompt 通道：身份随首消息前置；onTurnStarted 不同步，门面不校验轮次。
+        const iterator = session.send({
+          message: resolveAgentFirstMessage(session, GRADING_SYSTEM_PROMPT, message),
+          contextSnapshot: { targetLanguage: language, learnerLevel: profile.value.overallLevel, userIntentHint: 'GRADE', metadata: context },
+        })[Symbol.asyncIterator]();
+        await this.consumeGradingTurn(iterator, binding);
+      }
+      // consumeGradingTurn 只在 binding.result 落定后返回；防御性复核。
+      if (binding?.result) return ok(binding.result);
+      throw new BusinessError('E_GRADING_RESULT_MISSING', '模型没有提交有效批改结果，答案已保留', 'AGENT_RUNTIME', true);
     } catch (cause) {
       const error = cause instanceof BusinessError ? cause : translateToBusinessError(cause, { category: 'AGENT_RUNTIME', fallbackMessage: 'AI 批改暂时失败，答案已保留，请重试' });
       if (binding?.result) return ok(binding.result);
@@ -118,7 +156,30 @@ export class TextbookGrading {
       return err(error);
     } finally {
       if (binding) binding.active = false;
+      if (acpRun && runTool) this.deps.toolRegistry?.unregister(runTool.name);
+      else if (sessionId) this.deps.tool.bindings.delete(sessionId);
       if (session) { await session.interrupt(); await session.close(); }
     }
+  }
+
+  /** 批改轮次消费（双分支共用：成功以 binding.result 为准，不以模型结论为准）。 */
+  private async consumeGradingTurn(
+    iterator: AsyncIterator<AgentEvent>,
+    binding: GradeBinding,
+  ): Promise<void> {
+    let received = false;
+    while (true) {
+      const delay = received ? (this.deps.stallTimeoutMs ?? DEFAULT_TEXTBOOK_PIPELINE_SETTINGS.stallTimeoutMs) : (this.deps.firstResponseTimeoutMs ?? DEFAULT_TEXTBOOK_PIPELINE_SETTINGS.firstResponseTimeoutMs);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const event = await Promise.race([iterator.next(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new BusinessError(received ? 'E_GRADING_STALL_TIMEOUT' : 'E_GRADING_FIRST_RESPONSE_TIMEOUT', '模型批改等待超时，答案已保留，可以重试批改', 'AGENT_RUNTIME', true)), delay); })]).finally(() => { if (timer) clearTimeout(timer); });
+      if (binding.result) return;
+      if (event.done) break;
+      received = true;
+      if (binding.repairs > binding.repairLimit) throw new BusinessError('E_GRADING_REPAIR_LIMIT', '本次模型修正次数已用尽，答案已保留', 'VALIDATION', true);
+      if (event.value.type === 'ERROR') throw event.value.error;
+      if (event.value.type === 'COMPLETED') break;
+    }
+    if (binding.result) return;
+    throw new BusinessError('E_GRADING_RESULT_MISSING', '模型没有提交有效批改结果，答案已保留', 'AGENT_RUNTIME', true);
   }
 }

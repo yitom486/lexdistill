@@ -1,4 +1,4 @@
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import { resolveAgentFirstMessage, type AgentAdapter } from '@study-studio/agent-runtime';
 import {
   BusinessError,
   err,
@@ -45,7 +45,21 @@ function normalizeExamples(raw: unknown, headword: string): TermExample[] {
   const needle = headword.trim().toLowerCase();
   const out: TermExample[] = [];
   for (const item of list) {
-    const parsed = TermExampleSchema.safeParse(item);
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    // 别名宽容：部分运行时习惯返回 {ja, reading, zh} 或 {japanese, chinese} 等形状，
+    // 映射到 canonical 后再走同一套校验（接地＋去重＋上限），不因形状拒收。
+    const alias = {
+      sentence: typeof rec.sentence === 'string' ? rec.sentence
+        : typeof rec.ja === 'string' ? rec.ja
+        : typeof rec.japanese === 'string' ? rec.japanese
+        : typeof rec.text === 'string' ? rec.text : '',
+      translation: typeof rec.translation === 'string' ? rec.translation
+        : typeof rec.zh === 'string' ? rec.zh
+        : typeof rec.chinese === 'string' ? rec.chinese
+        : typeof rec.cn === 'string' ? rec.cn : '',
+    };
+    const parsed = TermExampleSchema.safeParse(alias);
     if (!parsed.success) continue;
     // 接地：例句必须包含目标词（防模型自由发挥写无关句子）
     if (!parsed.data.sentence.toLowerCase().includes(needle)) continue;
@@ -83,12 +97,17 @@ export async function generateTermExamples(
   const session = sessionRes.value;
   try {
     let text = '';
-    for await (const ev of session.send({
-      message:
-        `目标词：${headword}` +
+    // ACP 无 systemPrompt 通道：身份随首消息前置；其他通路走原生通道，不加料。
+    const sendMessage = resolveAgentFirstMessage(
+      session,
+      EXAMPLE_SYSTEM_PROMPT,
+      `目标词：${headword}` +
         (input.reading ? `（读音 ${input.reading}）` : '') +
         `\n释义：${input.meanings.slice(0, 4).join('；')}\n` +
-        `请给 2 个${LANG_NAME[language]}入门例句，只返回 JSON。`,
+        `请给 2 个${LANG_NAME[language]}入门例句，只返回 JSON。`
+    );
+    for await (const ev of session.send({
+      message: sendMessage,
     })) {
       if (ev.type === 'TEXT_DELTA') {
         text += ev.delta;
@@ -109,6 +128,8 @@ export async function generateTermExamples(
     }
     const kept = normalizeExamples(parsed, headword);
     if (kept.length === 0) {
+      // 取证：不同运行时 JSON 形状各异，记原文头便于补别名。
+      logger.warn('[term-examples] unparsable model output', { language, headword, head: text.slice(0, 300) });
       return err(
         new BusinessError('E_EXAMPLES_PARSE', '模型返回无法解析出可用例句', 'AGENT_RUNTIME')
       );
