@@ -55,7 +55,6 @@ export function pipelineModel(tool: TextbookContentTools, handle?: (turn: ModelT
           inputs.push({ sessionId: options.sessionId, input });
           const callId = `call:${inputs.length}`;
           const turnId = `turn:${inputs.length}`;
-          input.onTurnStarted?.(turnId);
           let toolCalls = 0;
           const submit = (raw: unknown, kind: import('@study-studio/document-model').TextbookContentKind = 'articles') => tool.tools.find(item => item.kind === kind)!.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId: ++toolCalls === 1 ? callId : `${callId}:${toolCalls}`, turnId });
           if (handle) await handle({ sessionId: options.sessionId, turnId, input, submit });

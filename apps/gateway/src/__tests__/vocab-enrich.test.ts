@@ -477,12 +477,13 @@ describe('enrichLessonVocab 模型分流', () => {
     language: 'JA' as const,
     dialogueTexts: LESSON_TEXT.split('\n'),
   };
-  it('model/effort 透传给两轮 send 的 turnOptions；不填则缺席', async () => {
-    const seen: unknown[] = [];
+  it('model/effort 经建会话生效；不填则缺席（turnOptions 通道已删除，无适配器读取）', async () => {
+    const seenInputs: unknown[] = [];
+    const seenOptions: unknown[] = [];
     const session: AgentSession = {
       sessionId: 's-turnopts',
       send: async function* (input: unknown) {
-        seen.push(input);
+        seenInputs.push(input);
         yield { type: 'TEXT_DELTA' as const, delta: AI_VOCAB_JSON };
         yield { type: 'COMPLETED' as const };
       },
@@ -495,7 +496,7 @@ describe('enrichLessonVocab 模型分流', () => {
     const adapter: AgentAdapter = {
       id: 'mock-turnopts',
       name: 'mock-turnopts',
-      createSession: async () => ok(session),
+      createSession: async (options) => { seenOptions.push(options); return ok(session); },
       resumeSession: async () => ok(session),
     };
     const withModel = await enrichLessonVocab(adapter, {
@@ -504,14 +505,18 @@ describe('enrichLessonVocab 模型分流', () => {
       effort: 'low',
     });
     expect(isOk(withModel)).toBe(true);
-    expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatchObject({
-      turnOptions: { model: 'mini-x', effort: 'low' },
-    });
-    seen.length = 0;
+    expect(seenInputs).toHaveLength(1);
+    expect(seenInputs[0]).not.toHaveProperty('turnOptions');
+    expect(seenOptions).toHaveLength(1);
+    expect(seenOptions[0]).toMatchObject({ model: 'mini-x', effort: 'low' });
+    seenInputs.length = 0;
+    seenOptions.length = 0;
     const withoutModel = await enrichLessonVocab(adapter, { ...shuntInput });
     expect(isOk(withoutModel)).toBe(true);
-    expect(seen).toHaveLength(1);
-    expect(seen[0]).not.toHaveProperty('turnOptions');
+    expect(seenInputs).toHaveLength(1);
+    expect(seenInputs[0]).not.toHaveProperty('turnOptions');
+    expect(seenOptions).toHaveLength(1);
+    expect(seenOptions[0]).not.toHaveProperty('model');
+    expect(seenOptions[0]).not.toHaveProperty('effort');
   });
 });

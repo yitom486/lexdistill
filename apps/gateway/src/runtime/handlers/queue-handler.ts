@@ -2,7 +2,7 @@ import { type WsEnvelope, WsEventTypes } from '@study-studio/protocol';
 import { ok, err, type Result, BusinessError, generateId, isOk } from '@study-studio/shared';
 import { AcpAgentSession } from '@study-studio/agent-runtime';
 import type { GatewayServer } from '../gateway-runtime.js';
-import type { AgentLane, SessionManager } from '../session/session-manager.js';
+import type { AgentLane } from '../session/session-manager.js';
 import { buildTurnExecutionSummary } from '../turn-summary-builder.js';
 
 export async function handleQueueStart(
@@ -19,24 +19,8 @@ export async function handleQueueStart(
     payload.lane === 'learning' || payload.lane === 'coach'
       ? payload.lane
       : server.activeTurnLane.get(envelope.sessionId) ?? 'coach';
-  const agentSession = server.sessionManager.getAgentSession(envelope.sessionId, lane) as
-    | (ReturnType<SessionManager['getAgentSession']> & {
-        sendQueued?: (opts?: {
-          queuedSubmissionId?: string;
-          approvalPolicy?: string;
-        }) => AsyncIterable<import('@study-studio/agent-runtime').AgentEvent>;
-      })
-    | undefined;
-  if (!agentSession) {
-    return err(
-      new BusinessError(
-        'E_SESSION_NOT_FOUND',
-        '当前没有可启动队列的 Agent 会话。',
-        'VALIDATION'
-      )
-    );
-  }
-  if (typeof agentSession.sendQueued !== 'function' && !agentSession.threadId) {
+  const agentSession = server.sessionManager.getAgentSession(envelope.sessionId, lane);
+  if (!agentSession?.threadId) {
     return err(
       new BusinessError(
         'E_SESSION_NOT_FOUND',
@@ -69,33 +53,21 @@ export async function handleQueueStart(
   // P3-C：队列失败时保留结构化业务错误
   let queueFailureError: BusinessError | undefined;
   const threadId = agentSession.threadId;
-  // ACP 会话没有 sendQueued：从网关侧台账队列取下一条，走标准 send（同一事件映射）。
+  // 网关侧台账队列：取下一条走标准 send（同一事件映射）。
   // 取数在 try 内：空队列抛 E_QUEUE_EMPTY，经外层统一收口为失败回执，不炸 WS。
   let queuedMessage: string | null = null;
 
   try {
-    const turnStream =
-      typeof agentSession.sendQueued === 'function'
-        ? agentSession.sendQueued({
-          ...(payload.queuedSubmissionId
-            ? { queuedSubmissionId: payload.queuedSubmissionId }
-            : {}),
-          ...(payload.approvalPolicy ? { approvalPolicy: payload.approvalPolicy } : {}),
-        })
-        : (() => {
-          const next = threadId
-            ? server.acpLedger.queueConsume(threadId, payload.queuedSubmissionId)
-            : null;
-          if (!next) {
-            throw new BusinessError(
-              'E_QUEUE_EMPTY',
-              'ACP 队列为空（可能已被消费或会话尚未入台账，先发一条消息再排队）。',
-              'VALIDATION'
-            );
-          }
-          queuedMessage = next.message;
-          return agentSession.send({ message: next.message });
-        })();
+    const next = server.acpLedger.queueConsume(threadId, payload.queuedSubmissionId);
+    if (!next) {
+      throw new BusinessError(
+        'E_QUEUE_EMPTY',
+        'ACP 队列为空（可能已被消费或会话尚未入台账，先发一条消息再排队）。',
+        'VALIDATION'
+      );
+    }
+    queuedMessage = next.message;
+    const turnStream = agentSession.send({ message: next.message });
     for await (const ev of turnStream) {
       if (abortController.signal.aborted) {
         await agentSession.interrupt();

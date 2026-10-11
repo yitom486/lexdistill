@@ -203,7 +203,6 @@ export async function bootDomBackend(): Promise<DomHarness> {
             yield { type: 'ERROR', error: new BusinessError('E_TEST_MODEL', 'Controlled failure', 'AGENT_RUNTIME') };
             return;
           }
-          input.onTurnStarted?.('grade-turn');
           const tool = options.tools![0]!;
           const result = await tool.execute(
             { score: gradeControl.score, feedback: 'Controlled feedback', suggestions: [] },

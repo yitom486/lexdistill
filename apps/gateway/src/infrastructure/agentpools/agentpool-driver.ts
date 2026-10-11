@@ -3,7 +3,8 @@
  *
  * 实现 agent-runtime 的 AgentPoolDriver 契约，把 npm `agentpools`
  *（API v2 + sharedProcess）的租约模型翻译过来：连续会话、协作取消、
- * 活动标记、effort/mcpServers 透传。Agent 一律走 ACP（运行时 id 缺席即默认）。
+ * 活动标记、mcpServers 透传。Agent 一律走 ACP（运行时 id 缺席即默认）。
+ * effort/sandbox/approvalPolicy 无 ACP 池对应物，传入即大声拒绝（见 create）。
  */
 import type {
   AgentPoolActivityEvent,
@@ -12,7 +13,7 @@ import type {
   AgentPoolDriverOptions,
   AgentPoolLease,
 } from '@study-studio/agent-runtime';
-import { isOk } from '@study-studio/shared';
+import { BusinessError, isOk } from '@study-studio/shared';
 import { resolveAcpPoolAgent } from './acp-pool-agent.js';
 
 interface AgentpoolsLeaseLike {
@@ -80,6 +81,21 @@ export class GatewayAgentpoolDriver implements AgentPoolDriver {
   ) {}
 
   static async create(config: GatewayAgentpoolConfig): Promise<GatewayAgentpoolDriver> {
+    // effort/sandbox/approvalPolicy 无 ACP 池对应物：传入即大声拒绝，不静默丢弃。
+    const unsupported = (
+      [
+        ['effort', '思考深度档位'],
+        ['sandbox', '沙箱'],
+        ['approvalPolicy', '审批策略'],
+      ] as const
+    ).find(([key]) => config[key] !== undefined);
+    if (unsupported) {
+      throw new BusinessError(
+        'E_AGENTPOOL_OPTION_UNSUPPORTED',
+        `池化运行暂不支持${unsupported[1]}（ACP 池无对应物），请清空后重试`,
+        'VALIDATION',
+      );
+    }
     const module = await loadAgentpools();
     const driver = new GatewayAgentpoolDriver(module, { ...config });
     // 运行时 id 缺席即默认 codex-acp；决议失败大声抛，不建半吊子池。

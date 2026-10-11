@@ -75,8 +75,8 @@ describe('目录裁剪 PDF HTTP 闭环',()=>{
   it('未指定范围裁剪前 30 页；只开放目录工具；不发图片附件；结束后删除文件',async()=>{
     const h=harness(),response=await h.post(35);expect(response.status).toBe(200);
     const value=await response.json();expect(value.tocEndPage).toBe(2);expect(value.pageOffset).toBe(2);expect(value.entries[1].parentId).toBe('toc-1');
-    expect(h.pageCount).toBe(30);expect(h.input?.attachments).toBeUndefined();expect(h.input?.turnOptions?.effort).toBe('low');
-    expect(h.options?.tools?.map(item=>item.name)).toEqual(['library.propose_toc']);expect(h.options?.model).toBe('test-small-model');expect(h.options?.sandboxMode).toBe('workspace-write');
+    expect(h.pageCount).toBe(30);expect(h.input?.attachments).toBeUndefined();expect(h.input).not.toHaveProperty('turnOptions');
+    expect(h.options?.tools?.map(item=>item.name)).toEqual(['library.propose_toc']);expect(h.options?.model).toBe('test-small-model');expect(h.options?.effort).toBe('low');expect(h.options).not.toHaveProperty('sandboxMode');expect(h.options).not.toHaveProperty('workingDirectory');
     expect(h.closed).toBe(1);expect(h.closedWhileFileExisted).toBe(true);expect(existsSync(h.filePath)).toBe(false);
   },30000);
   it('不足 30 页取实际页数；显式目录范围取指定页而非默认窗',async()=>{

@@ -7,6 +7,7 @@ import { buildTurnExecutionSummary, formatAgentLocalFallbackNote } from '../runt
 import type { AgentEvent, AgentSession } from '@study-studio/agent-runtime';
 import type { Result } from '@study-studio/shared';
 import type { AgentAdapter } from '@study-studio/agent-runtime';
+import { memoryAcpLedgerBackend } from '../runtime/acp-history/acp-conversation-ledger.js';
 
 // ---------------------------------------------------------------------------
 // 纯函数 builder 单测：覆盖 4 种场景的结构化摘要构造
@@ -146,16 +147,14 @@ describe('buildTurnExecutionSummary (P3-C pure builder)', () => {
 // ---------------------------------------------------------------------------
 
 function makeMockAdapter(opts: {
-  scenario: 'session-create-fail' | 'stream-error' | 'queue-error' | 'success' | 'interruptible';
+  scenario: 'session-create-fail' | 'stream-error' | 'success' | 'interruptible';
   threadId?: string;
   streamError?: BusinessError;
 }): AgentAdapter {
   const threadId = opts.threadId ?? 'mock-thread-001';
   const okResult = <T>(value: T): Result<T, BusinessError> => ok(value);
 
-  const session: AgentSession & {
-    sendQueued(opts?: { queuedSubmissionId?: string; approvalPolicy?: string }): AsyncIterable<AgentEvent>;
-  } = {
+  const session: AgentSession = {
     sessionId: 'mock-sess',
     threadId,
     async *send(_input): AsyncIterable<AgentEvent> {
@@ -178,17 +177,6 @@ function makeMockAdapter(opts: {
       }
       yield { type: 'TEXT_DELTA', delta: '你好，这是 mock 回复。' };
       yield { type: 'COMPLETED', finalOutput: '你好，这是 mock 回复。' };
-    },
-    async *sendQueued(_options: { queuedSubmissionId?: string; approvalPolicy?: string } = {}): AsyncIterable<AgentEvent> {
-      if (opts.scenario === 'queue-error') {
-        yield {
-          type: 'ERROR',
-          error: new BusinessError('E_AGENT_QUEUE', '队列启动失败，请重试。', 'AGENT_RUNTIME', true),
-        };
-        return;
-      }
-      yield { type: 'TEXT_DELTA', delta: '队列回复' };
-      yield { type: 'COMPLETED', finalOutput: '队列回复' };
     },
     async submitToolResult() {
       return okResult(undefined);
@@ -364,8 +352,8 @@ describe('P3-C Gateway 回合执行摘要（4 场景端到端）', () => {
     expect(reply).not.toContain('[object Object]');
   });
 
-  it('场景3 队列失败：sendQueued ERROR → FAILED + QUEUE failure', async () => {
-    const server = new GatewayServer(repo, makeMockAdapter({ scenario: 'queue-error' }));
+  it('场景3 队列消费：台账取队首走标准 send；空队列 → FAILED + QUEUE failure', async () => {
+    const server = new GatewayServer(repo, makeMockAdapter({ scenario: 'success' }), memoryAcpLedgerBackend());
     const sessionId = createWsSession(server);
     const envelopes: WsEnvelope[] = [];
     const turnRes = await server.handleClientMessage(makeTurnEnvelope(sessionId), (e) =>
@@ -374,20 +362,31 @@ describe('P3-C Gateway 回合执行摘要（4 场景端到端）', () => {
     expect(isOk(turnRes)).toBe(true);
     expect(getSummary(envelopes)?.outcome).toBe('streamed');
 
+    // 队首消费：台账排一条，队列启动走标准 send 完成。
     envelopes.length = 0;
+    server.acpLedger.queueAdd('mock-thread-001', '排队的问题');
     const qRes = await server.handleClientMessage(makeQueueStartEnvelope(sessionId), (e) =>
       envelopes.push(e)
     );
     expect(isOk(qRes)).toBe(true);
+    const consumed = getSummary(envelopes);
+    expect(consumed?.status).toBe('COMPLETED');
+    expect(consumed?.outcome).toBe('streamed');
+    expect(consumed?.fromQueue).toBe(true);
+    expect(consumed?.queueRemaining).toBe(0);
 
+    // 空队列：收口为失败回执，不炸 WS。
+    envelopes.length = 0;
+    const emptyRes = await server.handleClientMessage(makeQueueStartEnvelope(sessionId), (e) =>
+      envelopes.push(e)
+    );
+    expect(isOk(emptyRes)).toBe(true);
     const summary = getSummary(envelopes);
     expect(summary?.status).toBe('FAILED');
     expect(summary?.outcome).toBe('fallback');
     expect(summary?.fromQueue).toBe(true);
     expect(summary?.failure?.category).toBe('QUEUE');
-    expect(summary?.failure?.code).toBe('E_AGENT_QUEUE');
-    expect(summary?.failure?.userMessage).toBe('队列启动失败，请重试。');
-    expect(summary?.failure?.retryable).toBe(true);
+    expect(summary?.failure?.code).toBe('E_QUEUE_EMPTY');
   });
 
   it('场景4 用户中断：CLIENT_TURN_INTERRUPT → INTERRUPTED + INTERRUPTED failure', async () => {

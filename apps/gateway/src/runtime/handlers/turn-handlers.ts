@@ -52,7 +52,6 @@ export async function handleTurnSend(
       approvalPolicy?: string;
       threadId?: string;
       ephemeral?: boolean;
-      collaborationMode?: string;
       /** 显式工具 allowlist（业务名）：固定任务直接采用，不走关键词正则 */
       tools?: string[];
       /** 固定任务 id（命中中央目录 TASK_TOOL_PRESETS 直接采用；未知 id 回退 tools/提示词） */
@@ -90,11 +89,6 @@ export async function handleTurnSend(
       : undefined;
   // 全回合一律走 ACP 池：运行时 id 由池归一，缺席即 codex-acp。
   const wantedAdapter = 'acp' as const;
-  const preferredCollab =
-    typeof payload.agentOptions?.collaborationMode === 'string' &&
-    payload.agentOptions.collaborationMode.trim()
-      ? payload.agentOptions.collaborationMode.trim()
-      : undefined;
   const preferPersistent =
     payload.agentOptions?.ephemeral === false
       ? true
@@ -354,12 +348,6 @@ export async function handleTurnSend(
           for await (const ev of agentSession.send({
             message: sendMessage,
             contextSnapshot: snapshot,
-            turnOptions: {
-              ...(preferredModel ? { model: preferredModel } : {}),
-              ...(preferredEffort ? { effort: preferredEffort } : {}),
-              ...(preferredApproval ? { approvalPolicy: preferredApproval } : {}),
-              ...(preferredCollab ? { collaborationMode: preferredCollab } : {}),
-            },
           })) {
             if (abortController.signal.aborted) {
               await agentSession.interrupt();

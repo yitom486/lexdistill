@@ -360,17 +360,13 @@ export async function enrichLessonVocab(
     userId: 'pdf-enrich',
     systemPrompt: ENRICH_SYSTEM_PROMPT,
     tools: [],
+    // 模型分流经建会话生效（ACP 以 setConfigOption 落盘；旧 turnOptions 通道无适配器读取，已删除）。
+    ...(input.model ? { model: input.model } : {}),
+    ...(input.effort ? { effort: input.effort } : {}),
   });
   if (!isOk(sessionRes)) return err(sessionRes.error);
   const session = sessionRes.value;
   const signal = input.signal;
-  const turnOptions =
-    input.model || input.effort
-      ? {
-          ...(input.model ? { model: input.model } : {}),
-          ...(input.effort ? { effort: input.effort } : {}),
-        }
-      : undefined;
   // 取消→中断本会话的在途轮次（interrupt 是 per-session 的，
   // 只 abort 自己的控制器；finally 照常 close，会话不泄漏）。
   const onAbort = () => {
@@ -386,10 +382,7 @@ export async function enrichLessonVocab(
   const ask = async (message: string): Promise<Result<string, BusinessError>> => {
     try {
       let text = '';
-      for await (const ev of session.send({
-        message,
-        ...(turnOptions ? { turnOptions } : {}),
-      })) {
+      for await (const ev of session.send({ message })) {
         if (ev.type === 'TEXT_DELTA') {
           text += ev.delta;
         } else if (ev.type === 'ERROR') {

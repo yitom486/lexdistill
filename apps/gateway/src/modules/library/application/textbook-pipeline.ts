@@ -21,7 +21,13 @@ export interface TextbookPipelineInput extends Partial<TextbookPipelineSettings>
   lessonJobs?: Array<{ lessonId: string; text: string }> | undefined;
   pdf?: Uint8Array | undefined;
   forceOverwrite?: boolean | undefined;
-  model?: string | undefined; effort?: string | undefined;
+  model?: string | undefined;
+  /**
+   * 思考深度档位：池化批量提炼无 ACP 对应物（Worker 建池只接受 model），
+   * 传入即在起池前大声拒绝（E_TEXTBOOK_EFFORT_UNSUPPORTED），不静默丢弃。
+   * 前端档位 picker 的清理随 UI 统一处理，本处只保证不说谎。
+   */
+  effort?: string | undefined;
   /** ACP 运行时 id（缺席即 codex-acp 默认）。 */
   runtimeId?: string | undefined;
   traceId?: string | undefined; jobId?: string | undefined;
@@ -93,6 +99,10 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
     }
     if (pending.length) {
       const prepared: LessonExtractionJob[] = [];
+      // 池化运行时无思考深度对应物：有档位即大声拒绝，不静默按默认跑（说谎比失败更坏）。
+      if (input.effort) {
+        throw new BusinessError('E_TEXTBOOK_EFFORT_UNSUPPORTED', '教材批量提炼暂不支持思考深度档位（池化运行时无对应物），请清空档位后重试（模型选择不受影响）', 'VALIDATION');
+      }
       // 池子和装载/切分同时起：拉进程的几秒不再干等。Agent cwd 必须先存在。
       const poolCwd = input.pdf ? agentWorkspaceParent() : process.cwd();
       if (input.pdf) await mkdir(poolCwd, { recursive: true });
@@ -106,7 +116,6 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
           workingDirectory: poolCwd,
           ...(input.runtimeId ? { runtimeId: input.runtimeId } : {}),
           ...(input.model ? { model: input.model } : {}),
-          ...(input.effort ? { effort: input.effort } : {}),
           // ACP 条目自动预授权（autoApprovePermissions），写入零问话。
           ...(input.poolDriver ? { driver: input.poolDriver } : {}),
         }, poolSize)
@@ -174,7 +183,6 @@ export async function executeTextbookPipeline(repo: ContentRepository, input: Te
             jobs: prepared,
             poolSize: config.poolSize,
             ...(input.model ? { model: input.model } : {}),
-            ...(input.effort ? { effort: input.effort } : {}),
             ...(input.onChapterScope ? { onChapterScope: input.onChapterScope } : {}),
             workingDirectory: workspace?.workingDirectory ?? process.cwd(),
             allowAiExercises: config.allowAiExercises,

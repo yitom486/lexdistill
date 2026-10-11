@@ -2,7 +2,7 @@
  * agentpools 驱动的正文提炼执行（替代已删除的自研 ChapterSessionPool）。
  *
  * 每任务：建 MCP 任务（每 Worker 独立端点）→ 起池（sharedProcess，固定 cwd，
- * 用户模型/effort/MCP 注入）→ 各 Worker 不带序号领租约（池按需给空闲者，忙则排队），
+ * 用户模型/MCP 注入）→ 各 Worker 不带序号领租约（池按需给空闲者，忙则排队），
  * 从共享游标取下一章 → 每章建作用域→ask→暂存有效则整章事务保存 →
  * 收尾释放 lease、关池、撤销任务。章节不预分堆，空闲者多做；领不到租约且无人
  * 认领的章节逐项记失败，不丢不重跑。
@@ -29,7 +29,6 @@ export interface AgentpoolRunInput {
   jobs: LessonExtractionJob[];
   poolSize: number;
   model?: string | undefined;
-  effort?: string | undefined;
   /** ACP 运行时 id（缺席即 codex-acp 默认）。 */
   runtimeId?: string | undefined;
   workingDirectory: string;
@@ -77,7 +76,7 @@ export interface AgentpoolBoot {
 
 type AgentpoolBootInput = Pick<AgentpoolRunInput,
   'registry' | 'gatewayBaseUrl' | 'userId' | 'documentId' | 'workingDirectory' |
-  'model' | 'effort' | 'runtimeId'> & {
+  'model' | 'runtimeId'> & {
   driver?: AgentPoolDriver;
 };
 
@@ -285,7 +284,7 @@ async function runChapter(
     let firstActivityAt = 0;
     let lastActivityAt = startedAt;
     let settled = false;
-    input.monitor?.record('model', 'input', { message: prompt, model: input.model ?? null, effort: input.effort ?? null, chapterTitle: job.title, contextMode: 'pool-worker' },
+    input.monitor?.record('model', 'input', { message: prompt, model: input.model ?? null, effort: null, chapterTitle: job.title, contextMode: 'pool-worker' },
       { nodeId: job.lessonId, sessionId: `pool-worker-${workerIndex}`, attemptId: scope.assignment.assignmentId });
     const askPromise = driver.ask(lease, prompt).then(
       result => ({ ok: true as const, result }),

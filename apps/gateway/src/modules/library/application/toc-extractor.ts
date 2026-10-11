@@ -81,8 +81,11 @@ export async function extractTocWithLlm(input: ExtractTocWithLlmInput): Promise<
     // ACP 无 systemPrompt 通道（与聊天身份同款）：首消息前置；文字内嵌替代原生读文件。
     const promptHead = embedded ? `${systemPrompt}\n\n` : '';
     const created = await input.adapter.createSession({ sessionId, userId: input.userId, tools: [input.proposalTool], systemPrompt,
-      workingDirectory: input.pdfFile.workingDirectory, sandboxMode: 'workspace-write', approvalPolicy: 'on-request', ephemeral: true,
+      approvalPolicy: 'on-request', ephemeral: true,
       ...(input.model ? { model: input.model } : {}),
+      // 档位经建会话生效（ACP 以 setConfigOption 落盘；旧 turnOptions 通路无适配器读取，已删除）。
+      // sandboxMode/workingDirectory 无 ACP 对应物，不传：内嵌模式不需要，原生模式由能力门禁前置大声拒绝。
+      ...(input.effort ? { effort: input.effort } : {}),
     });
     if (!created.ok) return created;
     const session = created.value;
@@ -99,7 +102,6 @@ export async function extractTocWithLlm(input: ExtractTocWithLlmInput): Promise<
     const iterator = session.send({
       message,
       ...(input.attachments && input.attachments.length > 0 ? { attachments: input.attachments } : {}),
-      ...(input.effort ? { turnOptions: { effort: input.effort } } : {}),
     })[Symbol.asyncIterator]();
     const budgets = TextbookPipelineSettingsSchema.parse({});
     let first = true, completed = false, deadline = Date.now() + budgets.firstResponseTimeoutMs;

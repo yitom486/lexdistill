@@ -102,8 +102,6 @@ export interface AgentImageAttachment {
 
 export interface AgentInput {
   message: string;
-  /** 引擎开始本轮时绑定原生轮次身份；只用于执行侧路由，不发送给模型。 */
-  onTurnStarted?: (turnId: string) => void;
   contextSnapshot?: ContextSnapshot | undefined;
   /**
    * 内存态 PNG 附件（Gateway 已知事实，非 Tool，Agent 不得反向读取）。
@@ -111,15 +109,5 @@ export interface AgentInput {
    * 临时物化只许在支持图片的 Adapter 内进行，且限于本轮生命周期。
    */
   attachments?: AgentImageAttachment[] | undefined;
-  /** 本轮覆盖：模型 / 思考等级 / 审批策略 / 协作模式（由 Adapter 映射到引擎原生字段） */
-  turnOptions?:
-    | {
-        model?: string | undefined;
-        effort?: string | undefined;
-        approvalPolicy?: string | undefined;
-        /** collaborationMode.mode：default | plan */
-        collaborationMode?: string | undefined;
-      }
-    | undefined;
 }
 

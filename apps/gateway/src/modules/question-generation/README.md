@@ -50,9 +50,10 @@ the dedicated model runner and UI configuration, using these contracts unchanged
   return undefined and the audio step fails honestly with `E_AUDIO_UNAVAILABLE`.
   Keys never enter config, prompts, tool args or logs.
 - `runner.ts` (`runGenerationTask`) drives one isolated model session per task through the
-  public `AgentAdapter`/`AgentSession` interface: only the six generation tools, no
-  `workingDirectory`, `sandboxMode: 'read-only'`, `approvalPolicy: 'untrusted'` with every
-  approval request declined by the runner, `ephemeral: true`, and the frozen
+  public `AgentAdapter`/`AgentSession` interface: only the six generation tools (per-run
+  unique-name clones registered for the run, unregistered after), no `workingDirectory`,
+  `approvalPolicy: 'never'` (own pre-authorized tools run straight through; engine-native
+  actions have no ACP sandbox counterpart, see file header), `ephemeral: true`, and the frozen
   `config.modelId` (caller overrides are not accepted). Tool calls execute with the trusted
   host binding (engine session `gen:<taskId>` mapped by `userId`), non-whitelist names are
   rejected before touching the registry, and model rounds/failed repairs/wall time are bounded

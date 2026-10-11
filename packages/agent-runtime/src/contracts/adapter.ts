@@ -17,9 +17,6 @@ export interface CreateSessionOptions {
   resumeThreadId?: string;
   /** false=落盘持久化；默认 true（临时） */
   ephemeral?: boolean;
-  /** Local task workspace; materials live below it and are owned by Gateway. */
-  workingDirectory?: string;
-  sandboxMode?: 'read-only' | 'workspace-write';
 }
 
 export interface AgentAdapter {
