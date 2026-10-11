@@ -5,6 +5,7 @@ import { logger } from '@study-studio/shared';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
+import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { normalizeTrackLanguage } from '../learning/learning-shell.js';
 
 /** P1-2 拆分：画像 / 计划 / 分析组（自 useLearnerQueries.ts 逐行平移，仅改 import）。 */
@@ -168,7 +169,10 @@ export function useLearningAnalysisQuery(userId = DEFAULT_USER_ID, langOverride?
     queryKey: [...QUERY_KEYS.LEARNING_ANALYSIS, userId, targetLanguage],
     queryFn: async () => {
       try {
-        const res = await fetch(`${GATEWAY_BASE_URL}/api/learning/analysis/${userId}`);
+        // 分析走所选运行时（服务端缓存命中时本参数无影响）。
+        const runtimeId = usePreferencesStore.getState().agentRuntimeId;
+        const qs = runtimeId ? `?runtimeId=${encodeURIComponent(runtimeId)}` : '';
+        const res = await fetch(`${GATEWAY_BASE_URL}/api/learning/analysis/${userId}${qs}`);
         if (res.ok) {
           return (await res.json()) as LearningAnalysisReport;
         }
@@ -186,7 +190,8 @@ export function useRefreshLearningAnalysisMutation(userId = DEFAULT_USER_ID) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${GATEWAY_BASE_URL}/api/learning/analysis/${userId}?refresh=1`);
+      const runtimeId = usePreferencesStore.getState().agentRuntimeId;
+      const res = await fetch(`${GATEWAY_BASE_URL}/api/learning/analysis/${userId}?refresh=1${runtimeId ? `&runtimeId=${encodeURIComponent(runtimeId)}` : ''}`);
       if (!res.ok) throw new Error('刷新分析失败，请稍后重试。');
       return (await res.json()) as LearningAnalysisReport;
     },

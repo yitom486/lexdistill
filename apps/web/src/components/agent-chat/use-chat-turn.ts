@@ -74,11 +74,14 @@ export function useChatTurn(deps: ChatTurnDeps) {
     refetchAgentStatus,
   } = deps;
 
-  const recordCodexTurnCompletion = useCallback(
+  const recordAgentTurnCompletion = useCallback(
     (data: {
       status?: 'COMPLETED' | 'INTERRUPTED' | 'FAILED';
       source?: string;
-      // 旧字段（兼容）
+      // 新字段（优先）
+      agentOutcome?: 'streamed' | 'fallback' | 'not_requested';
+      agentFailureMessage?: string;
+      // 旧字段（兼容旧网关）
       codexOutcome?: 'streamed' | 'fallback' | 'not_requested';
       codexFailureMessage?: string;
       // P3-C 结构化字段（优先）
@@ -100,10 +103,10 @@ export function useChatTurn(deps: ChatTurnDeps) {
         return;
       }
       // P3-C：优先读结构化 outcome / failure，旧字段作为兜底
-      const outcome = data.outcome ?? data.codexOutcome;
+      const outcome = data.outcome ?? data.agentOutcome ?? data.codexOutcome;
       const failMessage =
-        data.failure?.userMessage || data.codexFailureMessage;
-      if (outcome === 'streamed' || data.source === 'codex') {
+        data.failure?.userMessage || data.agentFailureMessage || data.codexFailureMessage;
+      if (outcome === 'streamed' || data.source === 'agent' || data.source === 'codex') {
         setAgentTurnHealth({ state: 'healthy' });
         return;
       }
@@ -161,6 +164,8 @@ export function useChatTurn(deps: ChatTurnDeps) {
         contextUsage?: { used: number; size: number };
         status?: 'COMPLETED' | 'INTERRUPTED' | 'FAILED';
         outcome?: 'streamed' | 'fallback' | 'not_requested';
+        agentOutcome?: 'streamed' | 'fallback' | 'not_requested';
+        agentFailureMessage?: string;
         failure?: {
           code: string;
           userMessage: string;
@@ -170,7 +175,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
         fromQueue?: boolean;
       }) => {
         queueDrainRef.current = false;
-        recordCodexTurnCompletion(data);
+        recordAgentTurnCompletion(data);
         if (data.toolWarnings?.length) {
           toast.warning(data.toolWarnings.join('；'));
         }
@@ -288,7 +293,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
       setMessages,
       setBusy,
       setAgentTurnHealth,
-      recordCodexTurnCompletion,
+      recordAgentTurnCompletion,
       setCoachThreadId,
       queryClient,
       coachApprovalPolicy,
@@ -342,7 +347,6 @@ export function useChatTurn(deps: ChatTurnDeps) {
         intent: 'FREE_COACH',
         contextSnapshot: snapshot(),
         agentOptions: {
-          preferCodex: true,
           lane: 'coach',
           ephemeral: !coachPersistThread,
           ...(coachModelId ? { model: coachModelId } : {}),
@@ -417,7 +421,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
           );
         },
         onComplete: (data) => {
-          recordCodexTurnCompletion(data);
+          recordAgentTurnCompletion(data);
           if (data.threadId) {
             setCoachThreadId(data.threadId);
             void queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.SESSIONS });
@@ -474,7 +478,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
       setCoachThreadId,
       queryClient,
       startQueuedTurn,
-      recordCodexTurnCompletion,
+      recordAgentTurnCompletion,
       refetchAgentStatus,
     ]
   );
@@ -522,5 +526,5 @@ export function useChatTurn(deps: ChatTurnDeps) {
     );
   }, [queueDrainRef, gateway, setBusy, setAgentTurnHealth, setMessages]);
 
-  return { recordCodexTurnCompletion, startQueuedTurn, send, retryLastAgentTurn, respondApproval, interrupt };
+  return { recordAgentTurnCompletion, startQueuedTurn, send, retryLastAgentTurn, respondApproval, interrupt };
 }

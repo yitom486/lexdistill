@@ -4,19 +4,16 @@ import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 
 export const AGENT_QUERY_KEYS = {
   STATUS: ['agent', 'status'] as const,
-  MODELS: ['agent', 'models'] as const,
   SESSIONS: ['agent', 'sessions'] as const,
   SESSION_ITEMS: ['agent', 'sessionItems'] as const,
-  COLLAB_MODES: ['agent', 'collaborationModes'] as const,
   QUEUE: ['agent', 'queue'] as const,
-  SKILLS: ['agent', 'skills'] as const,
-  USAGE: ['agent', 'usage'] as const,
-  MCP_SERVERS: ['integrations', 'mcpServers'] as const,
+  RUNTIMES: ['agent', 'runtimes'] as const,
+  RUNTIME_OPTIONS: ['agent', 'runtime-options'] as const,
   PROVIDER: ['agent', 'provider'] as const,
 };
 
 type AgentInvalidateListener = (event: {
-  kind: 'queue' | 'skills';
+  kind: 'queue';
   sessionId?: string;
 }) => void;
 
@@ -24,7 +21,7 @@ const agentInvalidateListeners = new Set<AgentInvalidateListener>();
 
 /** GatewayClient 收到旁路通知时调用 */
 export function emitAgentInvalidate(event: {
-  kind: 'queue' | 'skills';
+  kind: 'queue';
   sessionId?: string;
 }): void {
   for (const listener of agentInvalidateListeners) {
@@ -32,7 +29,7 @@ export function emitAgentInvalidate(event: {
   }
 }
 
-/** 订阅 Agent 旁路失效（queue/changed、skills/changed） */
+/** 订阅 Agent 旁路失效（queue/changed） */
 export function useAgentRealtimeInvalidation(): void {
   const qc = useQueryClient();
   useEffect(() => {
@@ -47,9 +44,6 @@ export function useAgentRealtimeInvalidation(): void {
         }
         return;
       }
-      if (event.kind === 'skills') {
-        void qc.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.SKILLS });
-      }
     };
     agentInvalidateListeners.add(listener);
     return () => {
@@ -61,17 +55,6 @@ export function useAgentRealtimeInvalidation(): void {
 export interface AgentStatusDto {
   available: boolean;
   message: string;
-}
-
-export interface AgentModelDto {
-  id: string;
-  model: string;
-  displayName: string;
-  description?: string;
-  isDefault?: boolean;
-  hidden?: boolean;
-  supportedReasoningEfforts?: string[];
-  defaultReasoningEffort?: string;
 }
 
 export interface AgentSessionDto {
@@ -92,40 +75,11 @@ export interface AgentSessionItemDto {
   arguments?: Record<string, unknown>;
 }
 
-export interface AgentCollaborationModeDto {
-  name: string;
-  mode: string | null;
-  model: string | null;
-  reasoningEffort: string | null;
-}
-
 export interface AgentQueuedSubmissionDto {
   id: string;
   text: string;
   clientUserMessageId: string;
 }
-
-export interface AgentSkillDto {
-  name: string;
-  description: string;
-  enabled: boolean;
-  scope?: string;
-}
-
-export interface AgentUsageDto {
-  usedPercent: number | null;
-  resetsAt: number | null;
-  label: string | null;
-}
-
-export interface McpServerStatusDto {
-  name: string;
-  status: string;
-  toolCount: number;
-}
-
-/** EXPERIMENTAL — 本机 realtime 能力探测（无 UI） */
-
 
 /** Current runtime readiness exposed without provider-specific account details. */
 export function useAgentStatusQuery() {
@@ -145,22 +99,6 @@ export function useAgentStatusQuery() {
       return (await res.json()) as AgentStatusDto;
     },
     staleTime: 1000 * 30,
-    retry: 1,
-  });
-}
-
-/** 本机 Agent 可见模型列表 */
-export function useAgentModelsQuery(enabled = true) {
-  return useQuery<AgentModelDto[]>({
-    queryKey: AGENT_QUERY_KEYS.MODELS,
-    enabled,
-    queryFn: async () => {
-      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/models`);
-      if (!res.ok) return [];
-      const data = (await res.json()) as { models?: AgentModelDto[] };
-      return Array.isArray(data.models) ? data.models : [];
-    },
-    staleTime: 1000 * 60 * 5,
     retry: 1,
   });
 }
@@ -194,22 +132,6 @@ export function useAgentSessionItemsQuery(sessionId: string | null, enabled = tr
       return Array.isArray(data.items) ? data.items : [];
     },
     staleTime: 1000 * 10,
-    retry: 1,
-  });
-}
-
-/** collaborationMode/list */
-export function useAgentCollaborationModesQuery(enabled = true) {
-  return useQuery<AgentCollaborationModeDto[]>({
-    queryKey: AGENT_QUERY_KEYS.COLLAB_MODES,
-    enabled,
-    queryFn: async () => {
-      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/collaboration-modes`);
-      if (!res.ok) return [];
-      const data = (await res.json()) as { modes?: AgentCollaborationModeDto[] };
-      return Array.isArray(data.modes) ? data.modes : [];
-    },
-    staleTime: 1000 * 60 * 10,
     retry: 1,
   });
 }
@@ -348,50 +270,6 @@ export function useDeleteAgentQueueItemMutation() {
   });
 }
 
-export function useAgentSkillsQuery(enabled = true) {
-  return useQuery<AgentSkillDto[]>({
-    queryKey: AGENT_QUERY_KEYS.SKILLS,
-    enabled,
-    queryFn: async () => {
-      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/skills`);
-      if (!res.ok) return [];
-      const data = (await res.json()) as { skills?: AgentSkillDto[] };
-      return Array.isArray(data.skills) ? data.skills : [];
-    },
-    staleTime: 1000 * 60 * 5,
-    retry: 1,
-  });
-}
-
-export function useAgentUsageQuery(enabled = true) {
-  return useQuery<AgentUsageDto | null>({
-    queryKey: AGENT_QUERY_KEYS.USAGE,
-    enabled,
-    queryFn: async () => {
-      const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/usage`);
-      if (!res.ok) return null;
-      return (await res.json()) as AgentUsageDto;
-    },
-    staleTime: 1000 * 60,
-    retry: 1,
-  });
-}
-
-export function useMcpServersQuery(enabled = true) {
-  return useQuery<McpServerStatusDto[]>({
-    queryKey: AGENT_QUERY_KEYS.MCP_SERVERS,
-    enabled,
-    queryFn: async () => {
-      const res = await fetch(`${GATEWAY_BASE_URL}/api/integrations/mcp/servers`);
-      if (!res.ok) return [];
-      const data = (await res.json()) as { servers?: McpServerStatusDto[] };
-      return Array.isArray(data.servers) ? data.servers : [];
-    },
-    staleTime: 1000 * 60 * 5,
-    retry: 1,
-  });
-}
-
 export interface AgentRuntimeStatusDto {
   id: string;
   label: string;
@@ -407,7 +285,7 @@ export interface AgentRuntimeStatusDto {
 }
 
 export function useAgentRuntimesQuery(enabled = true) {  return useQuery<AgentRuntimeStatusDto[]>({
-    queryKey: [...AGENT_QUERY_KEYS.MCP_SERVERS, 'runtimes'] as const,
+    queryKey: [...AGENT_QUERY_KEYS.RUNTIMES] as const,
     enabled,
     queryFn: async () => {
       const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/runtimes`);
@@ -430,7 +308,7 @@ export interface AgentRuntimeOptionsDto {
 export function useAgentRuntimeOptionsQuery(runtimeId: string, enabled = true, model?: string) {
   const scopedModel = model?.trim() || '';
   return useQuery<AgentRuntimeOptionsDto>({
-    queryKey: [...AGENT_QUERY_KEYS.MCP_SERVERS, 'runtime-options', runtimeId, scopedModel] as const,
+    queryKey: [...AGENT_QUERY_KEYS.RUNTIME_OPTIONS, runtimeId, scopedModel] as const,
     enabled: enabled && !!runtimeId,
     queryFn: async () => {
       const url = `${GATEWAY_BASE_URL}/api/agent/runtimes/${encodeURIComponent(runtimeId)}/options${scopedModel ? `?model=${encodeURIComponent(scopedModel)}` : ''}`;

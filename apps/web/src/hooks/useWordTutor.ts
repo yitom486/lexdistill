@@ -81,7 +81,6 @@ export function useWordTutor(target: WordTutorTarget, options?: { onComplete?: (
       intent: 'EXPLAIN',
       contextSnapshot: snapshot,
       agentOptions: {
-        preferCodex: true,
         lane: 'learning',
         ephemeral: false,
         ...(threadId ? { threadId } : {}),

@@ -98,7 +98,6 @@ async function prepare(tocEndPage?: number, recognizedEntries?: TocEntry[]) {
   usePreferencesStore.setState({ pipelineModel: 'user-selected-model', pipelineEffort: 'low', pipelinePoolSize: '2' });
   globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-    if (url.endsWith('/api/agent/models')) return Response.json({ models: [] });
     if (url.endsWith('/map-pdf') && tocEndPage !== undefined) { mapCalls++; return Response.json({
       detectedTocRange: { startPage: tocEndPage - 2, endPage: tocEndPage, reason: '测试目录探测' },
     }); }

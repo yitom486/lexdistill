@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { BankSubmissionRecord, GenerationTaskSnapshot, GenerationTaskSummary } from '@study-studio/protocol';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
+import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { audioChunksToBlob, parsePcmRate } from '../lib/pcm-audio.js';
 
@@ -253,10 +254,12 @@ export function useGradeBankSubjectiveMutation(userId = DEFAULT_USER_ID) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { taskId: string; paperId: string; submissionId: string; model?: string }) => {
+      // 批改走所选运行时（缺席走默认 codex-acp）。
+      const runtimeId = usePreferencesStore.getState().agentRuntimeId;
       const res = await fetch(
         `${GATEWAY_BASE_URL}/api/generation/tasks/${encodeURIComponent(userId)}/${encodeURIComponent(input.taskId)}/papers/${encodeURIComponent(input.paperId)}/answers/subjective/${encodeURIComponent(input.submissionId)}/grade`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(input.model ? { model: input.model } : {}) });
+          body: JSON.stringify({ ...(input.model ? { model: input.model } : {}), ...(runtimeId ? { runtimeId } : {}) }) });
       const body = await res.json().catch(() => null);
       if (!res.ok) throw new Error(readErrorMessage(body, '批改失败'));
       return body as { status: string; isCorrect?: boolean; score?: number; gradingError?: string;

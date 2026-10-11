@@ -44,7 +44,7 @@ it('下拉默认选中 ChatGPT；切换写偏好', async () => {
   expect(usePreferencesStore.getState().agentRuntimeId).toBe('deepseek');
 });
 
-it('非 Codex 运行时：模型与思考深度禁用（能力开关驱动）', async () => {
+it('非默认运行时：模型与思考深度禁用（能力开关驱动）', async () => {
   const runtimes = [
     { id: 'codex-acp', label: 'ChatGPT', hint: '', configured: true,
       capabilities: { supportsModelPicker: true, supportsEffort: true } },
@@ -67,7 +67,7 @@ it('非 Codex 运行时：模型与思考深度禁用（能力开关驱动）', 
   client.clear();
 });
 
-it('非 Codex 运行时：模型标签显示运行时默认（不残留旧模型名）', async () => {
+it('非默认运行时：模型标签显示运行时默认（不残留旧模型名）', async () => {
   globalThis.fetch = (async () => Response.json({ runtimes: [
     { id: 'codex-acp', label: 'ChatGPT', hint: '', configured: true,
       capabilities: { supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true } },
@@ -134,10 +134,9 @@ it('ACP 运行时：下拉显示已选模型名，脚注写历史/队列走台�
       <ChatComposer
         input="" setInput={noop} send={noop} busy={false}
         composerSettingsOpen={false} setComposerSettingsOpen={noop} composerSettingsNonDefault={false}
-        coachCollaborationMode="" setCoachCollaborationMode={noop} collabModes={[]}
         coachApprovalPolicy="never" setCoachApprovalPolicy={noop}
-        coachEffort="" setCoachEffort={noop} effortOptions={[]}
-        coachModelId="gpt-6.1-sol" setCoachModelId={noop} modelLabel="运行时默认" models={[]}
+        coachEffort="" setCoachEffort={noop}
+        coachModelId="gpt-6.1-sol" setCoachModelId={noop}
         enqueueQueued={noop} interrupt={noop} queueMessage={{ isPending: false }}
         coachThreadId=""
       />

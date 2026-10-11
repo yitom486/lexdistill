@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useExtractTocWithLlmMutation } from '../../queries/useLearnerQueries.js';
-import { useAgentModelsQuery } from '../../queries/useAgentQueries.js';
-import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { nextManualKey } from '../../lib/toc-confirm-flow.js';
 import {
@@ -45,8 +43,6 @@ export function useTocRecognition({
   const extractLlm = useExtractTocWithLlmMutation(userId);
   const [lastExtractedCount, setLastExtractedCount] = useState<number | null>(null);
   const [extractionStartedAt, setExtractionStartedAt] = useState<number | null>(null);
-  const modelsQuery = useAgentModelsQuery();
-  const models = modelsQuery.data ?? [];
   const tocReviewRuntimeId = usePreferencesStore((s) => s.tocReviewRuntimeId);
   const setTocReviewRuntimeId = usePreferencesStore((s) => s.setTocReviewRuntimeId);
   const globalRuntimeId = usePreferencesStore((s) => s.agentRuntimeId);
@@ -71,18 +67,6 @@ export function useTocRecognition({
 
   const effectiveTocReviewModel = tocReviewModel || '__default__';
   const effectiveTocReviewEffort = tocReviewEffort || '__default__';
-  const runtimeCaps = useSelectedRuntimeCaps(effectiveRuntimeId);
-  const isKnownModel = models.some(
-    (m) => (m.id && m.id === tocReviewModel) || (m.model && m.model === tocReviewModel)
-  );
-
-  useEffect(() => {
-    // 仅 Codex 目录权威时自动清掉未知 id；ACP 探针归属以后端 400 为准，不在此误删有效选择。
-    if (!runtimeCaps.supportsModelPicker) return;
-    if (tocReviewModel && models.length > 0 && !isKnownModel) {
-      setTocReviewModel('');
-    }
-  }, [tocReviewModel, models.length, isKnownModel, setTocReviewModel, runtimeCaps.supportsModelPicker]);
 
   const hasInitial = Boolean(initialEntries && initialEntries.length > 0);
   const [start, setStart] = useState('');
@@ -150,7 +134,7 @@ export function useTocRecognition({
       ...(hasRange ? { startPage, endPage } : {}),
       ...(effectiveTocReviewModel !== '__default__' ? { model: effectiveTocReviewModel } : {}),
       ...(tocReviewEffort ? { effort: tocReviewEffort } : {}),
-      // 教材目录 lane 跟随所选运行时（缺席走 Codex 原通路）。
+      // 教材目录 lane 跟随所选运行时（缺席走默认 codex-acp）。
       ...(effectiveRuntimeId ? { runtimeId: effectiveRuntimeId } : {}),
     };
 
@@ -212,7 +196,7 @@ export function useTocRecognition({
     setEntries(previous => [...previous, { key: nextManualKey(previous), title: '', printedPage: '', kind: 'lesson', level: 1, confidence: null }]); invalidate();
   };
   return { start, end, setStart, setEnd, entries, scanned, confirmed, message, tocReviewEffort, setTocReviewEffort,
-    extractLlm, models, effectiveTocReviewModel, setTocReviewModel, hasSource, clearScan,
+    extractLlm, effectiveTocReviewModel, setTocReviewModel, hasSource, clearScan,
     useDefaultRange, handleLlmExtractToc, confirm, updateEntry, changeLevel, changeType, removeEntry, addEntry,
     userId, traceId, lastExtractedCount, extractionStartedAt, isExtracting: extractLlm.isPending,
     tocReviewRuntimeId: effectiveRuntimeId, setTocReviewRuntimeId };

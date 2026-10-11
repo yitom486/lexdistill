@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
+import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import type { HangulItem, HangulScriptType, KanaItem, ReadingPassageSet, NewsTopic } from '@study-studio/protocol';
 import { logger } from '@study-studio/shared';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
@@ -602,6 +603,9 @@ export function useTermExamplesQuery(
   const params = new URLSearchParams({ lang: language, headword: normalized });
   if (opts?.reading) params.set('reading', opts.reading);
   if (opts?.meanings?.length) params.set('meanings', opts.meanings.slice(0, 4).join('；'));
+  // 例句生成走所选运行时（缺席走默认 codex-acp；DB 缓存命中时本参数无影响）。
+  const runtimeId = usePreferencesStore.getState().agentRuntimeId;
+  if (runtimeId) params.set('runtimeId', runtimeId);
   return useQuery<TermExampleItem[] | null>({
     queryKey: [...QUERY_KEYS.DICTIONARY, 'examples', language, normalized, opts?.reading ?? ''],
     enabled: Boolean(normalized) && (opts?.enabled ?? true),

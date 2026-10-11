@@ -5,7 +5,6 @@ import {
   KeyRound,
   Minimize2,
   Plus,
-  Sparkles,
   Trash2,
   Wifi,
   WifiOff,
@@ -21,9 +20,6 @@ import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
 import { agentRuntimeLabel } from '../../config/agent-runtimes.js';
 import type {
   AgentStatusDto,
-  McpServerStatusDto,
-  AgentUsageDto,
-  AgentSkillDto,
   AgentSessionDto,
 } from '../../queries/useAgentQueries.js';
 import type { AgentTurnHealth } from './chat-shared.js';
@@ -38,7 +34,6 @@ interface ChatPanelHeaderProps {
   lastCoachPrompt: string | null;
   busy: boolean;
   retryLastAgentTurn: () => void;
-  usage?: AgentUsageDto | null | undefined;
   track: TrackLanguage;
   coachThreadId: string;
   historyOpen: boolean;
@@ -66,15 +61,11 @@ interface ChatPanelHeaderProps {
   archiveThread: {
     mutate: (id: string, opts?: { onSuccess?: () => void }) => void;
   };
-  skillsOpen: boolean;
-  setSkillsOpen: (open: boolean) => void;
-  skills: AgentSkillDto[];
-  mcpServers: McpServerStatusDto[];
   clearDisplay: () => void;
   onClose?: (() => void) | undefined;
 }
 
-/** P2-1 拆分：顶栏状态徽标 + 会话历史/Skills 弹层（纯搬运自 AgentChatPanel）。 */
+/** P2-1 拆分：顶栏状态徽标 + 会话历史弹层（纯搬运自 AgentChatPanel）。 */
 
 /** ACP 上下文用量徽标（usage_update 只读透传；配额见额度芯片，两者口径不同）。 */
 function ContextUsageChip() {
@@ -101,7 +92,6 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
     lastCoachPrompt,
     busy,
     retryLastAgentTurn,
-    usage,
     track,
     coachThreadId,
     historyOpen,
@@ -115,10 +105,6 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
     coachPersistThread,
     setCoachPersistThread,
     archiveThread,
-    skillsOpen,
-    setSkillsOpen,
-    skills,
-    mcpServers,
     clearDisplay,
     onClose,
   } = props;
@@ -202,24 +188,6 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             >
               重试
             </button>
-          ) : null}
-          {runtimeCaps.supportsUsage && typeof usage?.usedPercent === 'number' ? (
-            <span
-              className="inline-flex items-center gap-1 text-[10px] text-ink-ghost"
-              title={
-                [
-                  '这是当前 Agent 的额度占用，不是本轮生成进度。',
-                  usage.resetsAt
-                    ? `重置于 ${new Date(usage.resetsAt * 1000).toLocaleString()}`
-                    : usage.label || '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')
-              }
-            >
-              <Gauge className="size-3" />
-              额度已用 {Math.round(usage.usedPercent)}%
-            </span>
           ) : null}
           <ContextUsageChip />
         </div>
@@ -375,81 +343,8 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           </PopoverContent>
         </Popover>
         ) : (
-          <span className="inline-flex h-7 items-center px-1 text-[10px] text-ink-ghost" title="当前运行时无 Codex 会话体系">
+          <span className="inline-flex h-7 items-center px-1 text-[10px] text-ink-ghost" title="当前运行时无持久会话体系">
             无历史面板
-          </span>
-        )}
-        {runtimeCaps.supportsThreads ? (
-        <Popover open={skillsOpen} onOpenChange={setSkillsOpen}>
-          <PopoverTrigger
-            className="inline-flex size-7 items-center justify-center rounded-md text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
-            title="Skills"
-            onClick={() => sound.playClick()}
-          >
-            <Sparkles className="size-3.5" />
-          </PopoverTrigger>
-          <PopoverContent
-            align="end"
-            className="w-72 p-2 border-line bg-paper-soft text-ink"
-          >
-            <p className="px-1 pb-2 text-[11px] font-medium text-ink-soft">
-              Agent Skills（只读）
-            </p>
-            <div className="max-h-40 space-y-1 overflow-y-auto">
-              {skills.length === 0 ? (
-                <p className="px-2 py-3 text-[11px] text-ink-ghost">暂无 skill</p>
-              ) : (
-                skills.map((s) => (
-                  <div
-                    key={`${s.scope ?? 'x'}:${s.name}`}
-                    className="rounded-lg px-2 py-1.5 hover:bg-surface-stone-100-stone-900"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <p className="min-w-0 truncate text-[11px] text-ink">{s.name}</p>
-                      <span
-                        className={`shrink-0 text-[9px] ${
-                          s.enabled ? 'text-ink-emerald-700-emerald-400' : 'text-ink-ghost'
-                        }`}
-                      >
-                        {s.enabled ? 'on' : 'off'}
-                      </span>
-                    </div>
-                    {s.description ? (
-                      <p className="mt-0.5 line-clamp-2 text-[10px] text-ink-ghost">
-                        {s.description}
-                      </p>
-                    ) : null}
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="mt-2 border-t border-line px-1 pt-2">
-              <p className="pb-1 text-[10px] font-medium text-ink-ghost">
-                MCP 状态（观测，非学习工具总线）
-              </p>
-              <div className="max-h-28 space-y-1 overflow-y-auto">
-                {mcpServers.length === 0 ? (
-                  <p className="px-1 py-2 text-[10px] text-ink-ghost">未配置 MCP</p>
-                ) : (
-                  mcpServers.map((s) => (
-                    <div
-                      key={s.name}
-                      className="flex items-center justify-between gap-2 rounded px-1 py-0.5"
-                    >
-                      <span className="truncate text-[10px] text-ink-soft">{s.name}</span>
-                      <span className="shrink-0 text-[9px] text-ink-ghost">
-                        {s.status} · {s.toolCount} tools
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-        ) : (
-          <span className="inline-flex h-7 items-center px-1 text-[10px] text-ink-ghost" title="当前运行时无 Codex 技能体系">
-            无技能面板
           </span>
         )}
         <Button

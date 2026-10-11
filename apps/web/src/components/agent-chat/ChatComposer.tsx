@@ -14,8 +14,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
 import { sound } from '../../utils/audio.js';
 import type {
-  AgentCollaborationModeDto,
-  AgentModelDto,
   AgentStatusDto,
 } from '../../queries/useAgentQueries.js';
 import { APPROVAL_OPTIONS, chatMenuItem, compactSelect, effortLabel } from './chat-shared.js';
@@ -28,18 +26,12 @@ interface ChatComposerProps {
   composerSettingsOpen: boolean;
   setComposerSettingsOpen: (open: boolean) => void;
   composerSettingsNonDefault: boolean;
-  coachCollaborationMode: string;
-  setCoachCollaborationMode: (v: string) => void;
-  collabModes: AgentCollaborationModeDto[];
   coachApprovalPolicy: string;
   setCoachApprovalPolicy: (v: string) => void;
   coachEffort: string;
   setCoachEffort: (v: string) => void;
-  effortOptions: readonly string[];
   coachModelId: string;
   setCoachModelId: (v: string) => void;
-  modelLabel: string;
-  models: AgentModelDto[];
   enqueueQueued: () => void;
   interrupt: () => void;
   queueMessage: { isPending: boolean };
@@ -58,18 +50,12 @@ export function ChatComposer(props: ChatComposerProps) {
     composerSettingsOpen,
     setComposerSettingsOpen,
     composerSettingsNonDefault,
-    coachCollaborationMode,
-    setCoachCollaborationMode,
-    collabModes,
     coachApprovalPolicy,
     setCoachApprovalPolicy,
     coachEffort,
     setCoachEffort,
-    effortOptions,
     coachModelId,
     setCoachModelId,
-    modelLabel,
-    models,
     enqueueQueued,
     interrupt,
     queueMessage,
@@ -84,18 +70,15 @@ export function ChatComposer(props: ChatComposerProps) {
     !!agentRuntimeId,
     coachModelId || undefined,
   );
-  const modelChoices = runtimeCaps.supportsModelPicker
-    ? models.map(m => ({ value: m.id || m.model, label: m.displayName || m.model }))
-    : (runtimeOptions.data?.models ?? []);
+  // 模型/档位一律走运行时探针（旧目录已退役）。
+  const modelChoices = (runtimeOptions.data?.models ?? []);
   const modelValue = modelChoices.some(m => m.value === coachModelId) ? coachModelId : '__auto__';
   // 下拉显示用户真实选择（探针表命中才显示名）；探针失败时标题带错，不静默“默认”。
   const resolvedModelLabel = modelValue === '__auto__'
     ? '运行时默认'
-    : (modelChoices.find(m => m.value === coachModelId)?.label ?? modelLabel);
+    : (modelChoices.find(m => m.value === coachModelId)?.label ?? coachModelId);
   const probeError = runtimeOptions.data?.error;
-  const effortChoices = runtimeCaps.supportsEffort
-    ? [...effortOptions]
-    : (runtimeOptions.data?.efforts ?? []);
+  const effortChoices = (runtimeOptions.data?.efforts ?? []);
   const effortValue = effortChoices.includes(coachEffort) ? coachEffort : '__auto__';
   return (
     <footer className="shrink-0 p-3 pt-1.5">
@@ -143,46 +126,6 @@ export function ChatComposer(props: ChatComposerProps) {
               </div>
 
               <div className="space-y-2">
-                {/* Mode 系 Codex 线程原生概念（default/plan），ACP 会话无对应物：仅旧链路可见 */}
-                {runtimeCaps.supportsThreads && runtimeCaps.supportsModelPicker && (
-                <div className="space-y-0.5">
-                  <span className="block px-0.5 text-[10px] text-ink-ghost">Mode</span>
-                  <Select
-                    value={coachCollaborationMode || '__none__'}
-                    onValueChange={(v) =>
-                      setCoachCollaborationMode(v === '__none__' ? '' : String(v ?? ''))
-                    }
-                    disabled={busy}
-                  >
-                    <SelectTrigger className={compactSelect}>
-                      <SelectValue>{coachCollaborationMode || '默认'}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="border-line bg-paper-soft text-ink">
-                      <SelectItem value="__none__" className={chatMenuItem}>
-                        Mode（默认）
-                      </SelectItem>
-                      <SelectItem value="default" className={chatMenuItem}>
-                        default
-                      </SelectItem>
-                      <SelectItem value="plan" className={chatMenuItem}>
-                        plan
-                      </SelectItem>
-                      {collabModes
-                        .filter((m) => m.mode && m.mode !== 'default' && m.mode !== 'plan')
-                        .map((m) => (
-                          <SelectItem
-                            key={m.name}
-                            value={m.mode || m.name}
-                            className={chatMenuItem}
-                          >
-                            {m.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                )}
-
                 <div className="space-y-0.5">
                   <span className="block px-0.5 text-[10px] text-ink-ghost">审批</span>
                   <Select
@@ -208,22 +151,20 @@ export function ChatComposer(props: ChatComposerProps) {
 
                 <div className="space-y-0.5">
                   <span className="block px-0.5 text-[10px] text-ink-ghost">
-                    思考深度{!runtimeCaps.supportsEffort && effortChoices.length === 0 ? '（运行时默认）' : ''}
+                    思考深度{effortChoices.length === 0 ? '（运行时默认）' : ''}
                   </span>
                   <Select
                     value={effortValue}
                     onValueChange={(v) => v && setCoachEffort(v === '__auto__' ? '' : String(v))}
-                    disabled={busy || (!runtimeCaps.supportsEffort && effortChoices.length === 0)}
+                    disabled={busy || effortChoices.length === 0}
                   >
                     <SelectTrigger className={compactSelect}>
                       <SelectValue>{effortValue === '__auto__' ? '运行时默认' : effortLabel(effortValue)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent className="border-line bg-paper-soft text-ink">
-                      {!runtimeCaps.supportsEffort && (
-                        <SelectItem value="__auto__" className={chatMenuItem}>
-                          运行时默认
-                        </SelectItem>
-                      )}
+                      <SelectItem value="__auto__" className={chatMenuItem}>
+                        运行时默认
+                      </SelectItem>
                       {effortChoices.map((e) => (
                         <SelectItem key={e} value={e} className={chatMenuItem}>
                           {effortLabel(e)}
@@ -247,25 +188,18 @@ export function ChatComposer(props: ChatComposerProps) {
             <Select
               value={modelValue}
               onValueChange={(v) => setCoachModelId(v === '__auto__' ? '' : String(v ?? ''))}
-              disabled={busy || (!runtimeCaps.supportsModelPicker && modelChoices.length === 0)}
+              disabled={busy || modelChoices.length === 0}
             >
               <SelectTrigger
                 className={`${compactSelect} max-w-[14rem]`}
-                title={probeError || (!runtimeCaps.supportsModelPicker && modelChoices.length === 0 ? '当前运行时用自带默认模型' : undefined)}
+                title={probeError || (modelChoices.length === 0 ? '当前运行时用自带默认模型' : undefined)}
               >
                 <SelectValue placeholder="Model">{resolvedModelLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent className="border-line bg-paper-soft text-ink">
-                {!runtimeCaps.supportsModelPicker && (
-                  <SelectItem value="__auto__" className={chatMenuItem}>
-                    运行时默认
-                  </SelectItem>
-                )}
-                {runtimeCaps.supportsModelPicker && (
-                  <SelectItem value="__default__" className={chatMenuItem}>
-                    本机默认
-                  </SelectItem>
-                )}
+                <SelectItem value="__auto__" className={chatMenuItem}>
+                  运行时默认
+                </SelectItem>
                 {modelChoices.map((m) => (
                   <SelectItem
                     key={m.value}
@@ -327,11 +261,9 @@ export function ChatComposer(props: ChatComposerProps) {
         </div>
       </div>
       <p className="mt-1.5 px-1 text-[10px] text-ink-ghost">
-        {runtimeCaps.supportsThreads && runtimeCaps.supportsModelPicker
-          ? <>~/.codex · queue/changed · compact · rateLimits{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>
-          : runtimeCaps.supportsHistory
-            ? <>当前运行时：历史/队列走网关台账 · 用量面板不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>
-            : <>当前运行时：历史/队列/用量面板不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>}
+        {runtimeCaps.supportsHistory
+          ? <>当前运行时：历史/队列走网关台账 · 用量面板不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>
+          : <>当前运行时：历史/队列/用量面板不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>}
       </p>
     </footer>
   );

@@ -6,11 +6,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select.js';
-import { useAgentModelsQuery, useAgentRuntimeOptionsQuery } from '../queries/useAgentQueries.js';
+import { useAgentRuntimeOptionsQuery } from '../queries/useAgentQueries.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
-import { FALLBACK_EFFORTS, chatMenuItem, compactSelect, effortLabel } from './agent-chat/chat-shared.js';
+import { chatMenuItem, compactSelect, effortLabel } from './agent-chat/chat-shared.js';
 import { AgentRuntimeSelect } from './AgentRuntimeSelect.js';
-import { useSelectedRuntimeCaps } from '../hooks/useSelectedRuntimeCaps.js';
 
 /** 单词面板精简配置（折叠）：运行时＋模型＋思考深度，读写与主聊同一份偏好。 */
 export function WordChatConfig() {
@@ -20,21 +19,17 @@ export function WordChatConfig() {
   const coachEffort = usePreferencesStore(state => state.coachEffort);
   const setCoachEffort = usePreferencesStore(state => state.setCoachEffort);
   const setLearningThreadId = usePreferencesStore(state => state.setLearningThreadId);
-  const runtimeCaps = useSelectedRuntimeCaps();
   const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
-  const modelsQuery = useAgentModelsQuery(open && runtimeCaps.supportsModelPicker);
-  const models = modelsQuery.data ?? [];
   const runtimeOptions = useAgentRuntimeOptionsQuery(
     agentRuntimeId || 'codex-acp',
     open && !!agentRuntimeId,
     coachModelId || undefined,
   );
-  const modelChoices = runtimeCaps.supportsModelPicker
-    ? models.map(m => ({ value: m.id || m.model, label: m.displayName || m.model }))
-    : (runtimeOptions.data?.models ?? []);
+  // 模型/档位一律走运行时探针（旧 model/list 已退役）。
+  const modelChoices = (runtimeOptions.data?.models ?? []);
   const modelValue = modelChoices.some(m => m.value === coachModelId) ? coachModelId : '__auto__';
   const modelLabel = modelValue === '__auto__' ? '运行时默认' : (modelChoices.find(m => m.value === coachModelId)?.label || coachModelId || '本机默认');
-  const effortChoices = runtimeCaps.supportsEffort ? [...FALLBACK_EFFORTS] : (runtimeOptions.data?.efforts ?? []);
+  const effortChoices = (runtimeOptions.data?.efforts ?? []);
   const effortValue = effortChoices.includes(coachEffort) ? coachEffort : '__auto__';
   return (
     <div className="mb-2">

@@ -43,6 +43,12 @@ export function AgentRuntimeSelect({
 
   const currentRuntimeId = controlledValue !== undefined ? (controlledValue || 'codex-acp') : (agentRuntimeId || 'codex-acp');
 
+  // 选项以后端目录为准（源头是 acp-client 内置模板；加新 Agent 只改 acp-client 即同步）；
+  // 后端不可达时回退静态表，保证离线可渲染。
+  const options = statuses.length > 0
+    ? statuses.map(entry => ({ id: entry.id, label: entry.label, hint: entry.hint }))
+    : AGENT_RUNTIME_OPTIONS.map(option => ({ ...option }));
+
   const switchRuntime = (value: string) => {
     const prev = currentRuntimeId;
     if (!value || value === prev) return;
@@ -79,7 +85,7 @@ export function AgentRuntimeSelect({
       </SelectTrigger>
       <SelectContent className="border-line bg-paper-soft text-ink">
         <div className="px-2 py-1 text-[10px] text-ink-ghost">切换 Agent 运行时</div>
-        {AGENT_RUNTIME_OPTIONS.map(option => {
+        {options.map(option => {
           const configured = statusOf(option.id);
           return (
             <SelectItem key={option.id} value={option.id} className={chatMenuItem}>

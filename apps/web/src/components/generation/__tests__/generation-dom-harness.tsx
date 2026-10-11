@@ -2,9 +2,10 @@ import * as React from 'react';
 import { expect } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Hono } from 'hono';
-import type { AgentAdapter, AgentEvent, AgentSession, CodexAdapter, CreateSessionOptions } from '@study-studio/agent-runtime';
+import type { AgentAdapter, AgentEvent, AgentSession, CreateSessionOptions } from '@study-studio/agent-runtime';
 import type { ExternalToolExecutor } from '@study-studio/agent-runtime';
 import { BusinessError, isOk, ok, err, type Result } from '@study-studio/shared';
+import { ToolRegistry } from '@study-studio/tool-core';
 import type { BankPaperReceipt, BankSubmitReceipt } from '@study-studio/protocol';
 import { DrizzleLearnerRepository } from '../../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
 import { SqliteQuestionGenerationRepository } from '../../../../../../packages/storage-sqlite/src/adapters/practice/question-generation-repository.js';
@@ -19,13 +20,26 @@ import { act, setupDom } from '../../toc/__tests__/dom-setup.js';
 export type Script = (call: ExternalToolExecutor, ctx: { sessionId: string; userId: string }) => Promise<string>;
 
 export class FakeSession implements AgentSession {
-  readonly threadId = 'fake';
+  readonly threadId = 'fake-acp';
   private readonly abort = new AbortController();
   constructor(readonly sessionId: string, readonly userId: string,
-    private readonly exec: ExternalToolExecutor, private readonly script: Script) {}
+    private readonly registry: ToolRegistry, private readonly clones: string[],
+    private readonly script: Script) {}
+  private resolveClone(name: string): string {
+    const found = this.clones.find(n => n === name || n.startsWith(`${name}.`));
+    if (!found) throw new Error(`clone missing for ${name}`);
+    return found;
+  }
   async *send(input: { message: string }): AsyncIterable<AgentEvent> {
     try {
-      const out = await this.script(this.exec, { sessionId: this.sessionId, userId: this.userId });
+      const registry = this.registry;
+      const resolveClone = (name: string) => this.resolveClone(name);
+      const call: ExternalToolExecutor = async (name, args, ctx) => {
+        const res = await registry.execute(resolveClone(name), args, { userId: ctx.userId, sessionId: 'gateway-session' });
+        if (!res.ok) throw res.error;
+        return res.value;
+      };
+      const out = await this.script(call, { sessionId: this.sessionId, userId: this.userId });
       void input;
       yield { type: 'COMPLETED', finalOutput: out };
     } catch (raw) {
@@ -209,17 +223,23 @@ export async function bootDomBackend(): Promise<DomHarness> {
       return err(new BusinessError('E_X', 'x', 'VALIDATION'));
     },
   };
-  const server = new GatewayServer(repo, gradeAdapter as unknown as CodexAdapter);
+  const server = new GatewayServer(repo, gradeAdapter as unknown as AgentAdapter);
+  const toolRegistry = new ToolRegistry();
   const runs = new GenerationRunManager({ service, repository: bank,
-    createAdapter: (exec: ExternalToolExecutor): AgentAdapter => ({
-      id: 'fake', name: 'fake',
-      async createSession(options: CreateSessionOptions): Promise<Result<AgentSession, BusinessError>> {
-        return ok(new FakeSession(options.sessionId, options.userId, exec, script));
-      },
-      async resumeSession(): Promise<Result<AgentSession, BusinessError>> {
-        return err(new BusinessError('E_X', 'x', 'VALIDATION'));
-      },
+    resolveRunAdapter: () => ({
+      adapter: {
+        id: 'fake', name: 'fake',
+        async createSession(options: CreateSessionOptions): Promise<Result<AgentSession, BusinessError>> {
+          const clones = (options.tools ?? []).map(tool => tool.name);
+          return ok(new FakeSession(options.sessionId, options.userId, toolRegistry, clones, script));
+        },
+        async resumeSession(): Promise<Result<AgentSession, BusinessError>> {
+          return err(new BusinessError('E_X', 'x', 'VALIDATION'));
+        },
+      } as unknown as AgentAdapter,
+      acp: true,
     }),
+    toolRegistry,
     resolveAudio: () => ({ async render({ material }: { material: { mode: string } }) {
       return material.mode === 'PASSAGE'
         ? { bytes: new Uint8Array(48), mimeType: 'audio/L16;codec=pcm;rate=24000' }
@@ -227,16 +247,22 @@ export async function bootDomBackend(): Promise<DomHarness> {
     } }),
   });
   const app = new Hono()
-    .route('/', createGenerationRoutes({ repo, generation: { service, runs } } as unknown as GatewayDeps))
+    // 创建时模型证伪桩：不断言探针语义（探针由网关单测覆盖），只放行本脚手架的 test-model。
+    .route('/', createGenerationRoutes({ repo, generation: { service, runs },
+      server: { checkRunModelEffort: async () => ({ dropModel: false, warnings: [] }) } } as unknown as GatewayDeps))
     .route('/', createBankGradingRoutes({ repo, server, port: 0 } as unknown as GatewayDeps))
-    .get('/api/agent/models', c => c.json({ models: [{ id: 'test-model', model: 'test-model', displayName: 'Test' }] }))
+    .get('/api/agent/runtimes', c => c.json({ runtimes: [
+      { id: 'codex-acp', label: 'ChatGPT', hint: '', configured: true,
+        capabilities: { supportsModelPicker: false, supportsEffort: false, supportsThreads: false, supportsUsage: false, supportsHistory: true, supportsSessionTools: true } },
+    ] }))
+    .get('/api/agent/runtimes/:id/options', c => c.json({ models: [{ value: 'test-model', label: 'Test' }], efforts: [] }))
     .post('/api/task/activity/:userId', async c => {
       activities.push(await c.req.json().catch(() => ({})));
       return c.json({});
     });
   globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
-    if (url.includes('/api/generation/') || url.includes('/api/agent/models') || url.includes('/api/task/activity/')) {
+    if (url.includes('/api/generation/') || url.includes('/api/agent/runtimes') || url.includes('/api/task/activity/')) {
       if (url.includes('/audio/')) audioFetches.push(url);
       if (url.includes('/answers/') && (init?.method ?? 'GET') === 'POST' && !url.includes('/grade')) {
         answerPosts.push({ url, body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown> });

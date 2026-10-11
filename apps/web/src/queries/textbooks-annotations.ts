@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { logger } from '@study-studio/shared';
+import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { parseTextbookAST, TocEntrySchema, SaveTextbookOutlineResultSchema, type SaveTextbookOutlineRequest, type TextbookAST, type TextbookPipelineSettings } from '@study-studio/document-model';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
@@ -430,12 +431,17 @@ export function useEnrichLessonMutation(userId = DEFAULT_USER_ID) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (vars: { documentId: string; lessonId?: string }): Promise<EnrichLessonResult> => {
+      // 抽取走所选运行时（缺席走默认 codex-acp）。
+      const runtimeId = usePreferencesStore.getState().agentRuntimeId;
       const res = await fetch(
         `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${encodeURIComponent(vars.documentId)}/enrich`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(vars.lessonId ? { lessonId: vars.lessonId } : {}),
+          body: JSON.stringify({
+            ...(vars.lessonId ? { lessonId: vars.lessonId } : {}),
+            ...(runtimeId ? { runtimeId } : {}),
+          }),
         }
       );
       const payload: unknown = await res.json().catch(() => null);
@@ -962,7 +968,7 @@ export interface ExtractTocWithLlmVars {
   language?: string;
   model?: string;
   effort?: string;
-  /** Agent 运行时 id（缺席走 Codex 原通路；ACP 需网关开 flag） */
+  /** Agent 运行时 id（缺席走默认 codex-acp；指名即走该运行时池） */
   runtimeId?: string;
 }
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAgentGateway } from '../hooks/useAgentGateway.js';
 import { useSelectedRuntimeCaps } from '../hooks/useSelectedRuntimeCaps.js';
@@ -20,12 +20,7 @@ import { normalizeTrackLanguage } from '../learning/learning-shell.js';
 import {
   useArchiveAgentSessionMutation,
   useCompactAgentSessionMutation,
-  useAgentCollaborationModesQuery,
-  useAgentModelsQuery,
   useAgentQueueQuery,
-  useAgentSkillsQuery,
-  useAgentUsageQuery,
-  useMcpServersQuery,
   useAgentStatusQuery,
   useAgentSessionItemsQuery,
   useAgentSessionsQuery,
@@ -88,16 +83,10 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   const agentQueriesReady =
     Boolean(gateway.isConnected) && agentStatus?.available === true;
   const runtimeCaps = useSelectedRuntimeCaps();
-  const { data: models = [], isFetching: modelsLoading } = useAgentModelsQuery(
-    agentQueriesReady && runtimeCaps.supportsModelPicker
-  );
   const { data: sessionsData, refetch: refetchThreads } = useAgentSessionsQuery(
     agentQueriesReady && (runtimeCaps.supportsThreads || runtimeCaps.supportsHistory)
   );
   const sessions = sessionsData?.sessions ?? [];
-  const { data: collabModes = [] } = useAgentCollaborationModesQuery(
-    agentQueriesReady && runtimeCaps.supportsThreads && runtimeCaps.supportsModelPicker
-  );
   const { data: threadItems = [], isFetched: threadItemsFetched } = useAgentSessionItemsQuery(
     coachThreadId || null,
     Boolean(coachThreadId) && agentQueriesReady && (runtimeCaps.supportsThreads || runtimeCaps.supportsHistory)
@@ -112,26 +101,14 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
     coachThreadId || null,
     Boolean(coachThreadId) && agentQueriesReady && (runtimeCaps.supportsThreads || runtimeCaps.supportsHistory)
   );
-  const { data: skills = [] } = useAgentSkillsQuery(agentQueriesReady && runtimeCaps.supportsThreads);
-  const { data: usage } = useAgentUsageQuery(agentQueriesReady && runtimeCaps.supportsUsage);
-  const { data: mcpServers = [] } = useMcpServersQuery(agentQueriesReady && runtimeCaps.supportsThreads);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [skillsOpen, setSkillsOpen] = useState(false);
   const [composerSettingsOpen, setComposerSettingsOpen] = useState(false);
   const [agentTurnHealth, setAgentTurnHealth] = useState<AgentTurnHealth>({ state: 'idle' });
   const lastCoachPromptRef = useRef<string | null>(null);
   const queueDrainRef = useRef(false);
 
-  const selectedModel = useMemo(
-    () => models.find((m) => m.id === coachModelId || m.model === coachModelId),
-    [models, coachModelId]
-  );
-
-  const effortOptions = useMemo(() => {
-    const fromModel = selectedModel?.supportedReasoningEfforts?.filter(Boolean);
-    if (fromModel?.length) return fromModel;
-    return [...FALLBACK_EFFORTS];
-  }, [selectedModel]);
+  // 档位回退常量（探针无档位时用；模型/档位选择一律走运行时探针）。
+  const effortOptions: readonly string[] = [...FALLBACK_EFFORTS];
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -171,19 +148,10 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   }, [track]);
 
   useEffect(() => {
-    if (!coachModelId && models.length) {
-      const def = models.find((m) => m.isDefault) || models[0];
-      if (def) setCoachModelId(def.id || def.model);
-    }
-  }, [coachModelId, models, setCoachModelId]);
-
-  useEffect(() => {
-    if (selectedModel?.defaultReasoningEffort && !effortOptions.includes(coachEffort)) {
-      setCoachEffort(selectedModel.defaultReasoningEffort);
-    } else if (effortOptions.length && !effortOptions.includes(coachEffort)) {
+    if (effortOptions.length && !effortOptions.includes(coachEffort)) {
       setCoachEffort(effortOptions.includes('medium') ? 'medium' : effortOptions[0]!);
     }
-  }, [selectedModel, effortOptions, coachEffort, setCoachEffort]);
+  }, [effortOptions, coachEffort, setCoachEffort]);
 
   // P3-3：标量订阅（稳定引用，防重渲染循环）；仅阅读页 store 非空才附 focus。
   const readingDocumentId = useReadingFocusStore((s) => s.documentId);
@@ -320,9 +288,6 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   });
   const connected = gateway.isConnected;
   const agentAvailable = Boolean(agentStatus?.available);
-  const modelLabel = !runtimeCaps.supportsModelPicker
-    ? '运行时默认'
-    : selectedModel?.displayName || coachModelId || (modelsLoading ? '加载中…' : '本机默认');
 
   const composerSettingsNonDefault = Boolean(
     Boolean(coachCollaborationMode) ||
@@ -342,7 +307,6 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
           lastCoachPrompt={lastCoachPromptRef.current}
           busy={busy}
           retryLastAgentTurn={retryLastAgentTurn}
-          usage={usage}
           track={track}
           coachThreadId={coachThreadId}
           historyOpen={historyOpen}
@@ -356,10 +320,6 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
           coachPersistThread={coachPersistThread}
           setCoachPersistThread={setCoachPersistThread}
           archiveThread={archiveThread}
-          skillsOpen={skillsOpen}
-          setSkillsOpen={setSkillsOpen}
-          skills={skills}
-          mcpServers={mcpServers}
           clearDisplay={clearDisplay}
           onClose={onClose}
         />
@@ -385,18 +345,12 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
           composerSettingsOpen={composerSettingsOpen}
           setComposerSettingsOpen={setComposerSettingsOpen}
           composerSettingsNonDefault={composerSettingsNonDefault}
-          coachCollaborationMode={coachCollaborationMode}
-          setCoachCollaborationMode={setCoachCollaborationMode}
-          collabModes={collabModes}
           coachApprovalPolicy={coachApprovalPolicy}
           setCoachApprovalPolicy={setCoachApprovalPolicy}
           coachEffort={coachEffort}
           setCoachEffort={setCoachEffort}
-          effortOptions={effortOptions}
           coachModelId={coachModelId}
           setCoachModelId={setCoachModelId}
-          modelLabel={modelLabel}
-          models={models}
           onRuntimeChange={() => startNewChat()}
           enqueueQueued={enqueueQueued}
           interrupt={interrupt}

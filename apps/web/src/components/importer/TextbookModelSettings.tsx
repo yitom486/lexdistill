@@ -1,6 +1,5 @@
-import { useAgentModelsQuery, useAgentRuntimeOptionsQuery } from '../../queries/useAgentQueries.js';
+import { useAgentRuntimeOptionsQuery } from '../../queries/useAgentQueries.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
-import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
 import { AgentRuntimeSelect } from '../AgentRuntimeSelect.js';
 import { ImportOptions } from './ImportOptions.js';
@@ -28,20 +27,13 @@ export function TextbookModelSettings({
 }: TextbookModelSettingsProps) {
   const globalRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
   const effectiveRuntimeId = runtimeId || globalRuntimeId || 'codex-acp';
-  const runtimeCaps = useSelectedRuntimeCaps(effectiveRuntimeId);
 
-  // Codex 通路沿用 App Server 目录；ACP 通路走运行时探针（与聊天下拉同一口径，档位按模型级联）。
-  const useProbe = !!effectiveRuntimeId && !runtimeCaps.supportsModelPicker;
-  const models = useAgentModelsQuery(!useProbe);
-  const probe = useAgentRuntimeOptionsQuery(effectiveRuntimeId, useProbe, model || undefined);
-  const choices = useProbe
-    ? (probe.data?.models ?? []).map(item => ({ id: item.value, model: item.value, displayName: item.label }))
-    : (models.data ?? []);
+  // 模型/档位一律走运行时探针（旧 model/list 已退役）。
+  const probe = useAgentRuntimeOptionsQuery(effectiveRuntimeId, true, model || undefined);
+  const choices = (probe.data?.models ?? []).map(item => ({ id: item.value, model: item.value, displayName: item.label }));
   const selected = choices.find(item => (item.id || item.model) === model);
-  const efforts = useProbe
-    ? (probe.data?.efforts ?? [])
-    : (selected as { supportedReasoningEfforts?: string[] } | undefined)?.supportedReasoningEfforts ?? [];
-  const listError = useProbe ? probe.data?.error : (models.isError ? 'error' : undefined);
+  const efforts = (probe.data?.efforts ?? []);
+  const listError = probe.data?.error;
 
   const handleRuntimeChange = (nextRuntime: string) => {
     onRuntime?.(nextRuntime);

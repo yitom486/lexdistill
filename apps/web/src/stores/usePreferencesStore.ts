@@ -25,7 +25,7 @@ export interface PreferencesState {
   } | null;
   /** 题目导师抽屉宽度（px） */
   tutorPanelWidthPx: number;
-  /** Study Coach 选用的 Codex 模型 id；空=本机默认 */
+  /** Study Coach 选用的 Agent 模型 id；空=运行时默认 */
   coachModelId: string;
   /** Agent 运行时 id（codex-acp 默认；与 acp-client 内置运行时对齐） */
   agentRuntimeId: string;
@@ -36,9 +36,9 @@ export interface PreferencesState {
   coachEffort: string;
   /** 审批策略：never | on-request | untrusted */
   coachApprovalPolicy: string;
-  /** 恢复的 Codex thread id；空=新建 */
+  /** 恢复的 Agent 会话 id；空=新建 */
   coachThreadId: string;
-  /** 学习闭环（题目导师 / 出题批改）Codex thread；与聊天隔离 */
+  /** 学习闭环（题目导师 / 出题批改）Agent 会话；与聊天隔离 */
   learningThreadId: string;
   /** false=ephemeral 临时；true=落盘持久化 */
   coachPersistThread: boolean;
@@ -54,7 +54,7 @@ export interface PreferencesState {
   tocReviewEffort: string;
   /** 教材正文提炼专属 Agent 运行时；空=跟随全局 agentRuntimeId */
   pipelineRuntimeId: string;
-  /** 教材正文提炼专职模型 id；空=使用本机 Codex 默认配置 */
+  /** 教材正文提炼专职模型 id；空=使用运行时默认配置 */
   pipelineModel: string;
   pipelineEffort: string;
   /** 教材提炼 Worker 并发度；默认 '3' */

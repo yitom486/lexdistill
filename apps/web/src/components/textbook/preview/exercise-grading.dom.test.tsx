@@ -2,8 +2,8 @@ import { afterEach, expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TextbookASTSchema } from '@study-studio/document-model';
-import { CodexAdapter, type AgentSession } from '@study-studio/agent-runtime';
-import { BusinessError, ok } from '@study-studio/shared';
+import type { AgentAdapter, AgentSession, CreateSessionOptions } from '@study-studio/agent-runtime';
+import { BusinessError, err, ok } from '@study-studio/shared';
 import { DrizzleLearnerRepository } from '../../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../../../../../gateway/src/runtime/gateway-runtime.js';
 import { createTextbookPracticeRoutes } from '../../../../../gateway/src/modules/practice/http/textbook-practice-routes.js';
@@ -30,8 +30,11 @@ it('desktop writing → actual Query/HTTP/native grade/SQLite → failure retry 
   const doc = await repo.getDocumentById('book'); if (!doc.ok) throw doc.error;
   const exercise = TextbookASTSchema.parse(JSON.parse(doc.value!.astJson!)).lessons[0]!.learningContent!.exercises[0]!;
   let calls = 0;
-  const adapter = new CodexAdapter();
-  adapter.createSession = async options => {
+  // 受控会话桩（非 AcpAgentSession → 走共享实例＋bindings 映射的原通路分支）。
+  const adapter = {
+    id: 'mock-grader',
+    name: 'MockGrader',
+    createSession: async (options: CreateSessionOptions) => {
     const session: AgentSession = { sessionId: options.sessionId,
       async *send(input) {
         input.onTurnStarted?.('t'); calls++;
@@ -41,12 +44,13 @@ it('desktop writing → actual Query/HTTP/native grade/SQLite → failure retry 
         expect(result.ok).toBe(true); yield { type: 'COMPLETED' };
       }, submitToolResult: async () => ok(undefined), submitApproval: async () => ok(undefined), steer: async () => ok(undefined), interrupt: async () => ok(undefined), close: async () => ok(undefined) };
     return ok(session);
-  };
+  },
+    resumeSession: async () => err(new BusinessError('E_X', 'x', 'VALIDATION')),
+  } as unknown as AgentAdapter;
   const server = new GatewayServer(repo, adapter), app = createTextbookPracticeRoutes({ repo, server, port: 0 });
   let disconnected = true;
   globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
-    if (url.pathname === '/api/agent/models') return Response.json({ models: [{ id: 'chosen-model', model: 'chosen-model', displayName: 'Chosen model', supportedReasoningEfforts: ['low'] }] });
     if (disconnected && init?.method === 'POST') { disconnected = false; throw new Error('fetch failed'); }
     return app.request(url.pathname + url.search, init);
   }, { preconnect: originalFetch.preconnect });

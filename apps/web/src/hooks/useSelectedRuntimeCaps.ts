@@ -3,7 +3,7 @@ import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 
 /**
  * 当前选中运行时的能力开关（模型/思考深度控件据此禁用，禁止按 id 硬编码特例）。
- * 后端未返回或查询未就绪时全开（= 当前 Codex 默认行为，fail-open）。
+ * 后端未返回或查询未就绪时全开（= 当前默认运行时行为，fail-open）。
  */
 export function useSelectedRuntimeCaps(runtimeId?: string): {
   supportsModelPicker: boolean; supportsEffort: boolean; supportsThreads: boolean; supportsUsage: boolean; supportsHistory: boolean;

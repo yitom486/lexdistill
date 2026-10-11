@@ -138,7 +138,6 @@ export function AiTutorDrawer({
         intent,
         contextSnapshot: buildSnapshot(),
         agentOptions: {
-          preferCodex: true,
           lane: 'learning',
           ephemeral: false,
           ...(threadId ? { threadId } : {}),
@@ -179,7 +178,7 @@ export function AiTutorDrawer({
           setIsTyping(false);
           activeStreamMsgIdRef.current = null;
           if (data.threadId) setLearningThreadId(data.threadId);
-          const outcome = data.outcome ?? data.codexOutcome;
+          const outcome = data.outcome ?? data.agentOutcome ?? data.codexOutcome;
           const source =
             outcome === 'streamed'
               ? ('streamed' as const)

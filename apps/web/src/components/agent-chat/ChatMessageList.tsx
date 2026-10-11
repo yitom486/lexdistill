@@ -251,7 +251,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
             )}
             {!m.streaming && m.source ? (
               <div className="mt-1.5 text-[10px] text-ink-ghost">
-                via {m.source === 'codex' ? 'Agent' : m.source}
+                via {m.source === 'agent' || m.source === 'codex' ? 'Agent' : m.source}
               </div>
             ) : null}
           </div>

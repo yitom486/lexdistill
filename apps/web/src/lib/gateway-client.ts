@@ -28,7 +28,6 @@ export interface StreamTurnOptions {
   contextSnapshot?: unknown;
   agentOptions?: {
     model?: string;
-    preferCodex?: boolean;
     effort?: string;
     approvalPolicy?: string;
     threadId?: string;
@@ -38,7 +37,7 @@ export interface StreamTurnOptions {
     tools?: string[];
     /** 固定任务 id（网关按中央目录解析；旧网关忽略本字段，仍用 tools） */
     task?: string;
-    /** Agent 运行时 id（网关按 runtime 选适配器；旧网关忽略，沿用 Codex） */
+    /** Agent 运行时 id（网关按 runtime 选池适配器） */
     runtimeId?: string;
     /** coach=聊天界面；learning=出题/批改/题目导师（与聊天隔离） */
     lane?: 'coach' | 'learning';
@@ -68,16 +67,20 @@ export interface StreamTurnOptions {
     finalOutput: string;
     toolResults?: unknown;
     source?: string;
-    /** 本轮是否由 Agent 流式完成，或因 Agent 失败回退。 */
+    /** 本轮是否由 Agent 流式完成，或因 Agent 失败回退（新字段）。 */
+    agentOutcome?: 'streamed' | 'fallback' | 'not_requested';
+    /** 仅在 Agent 回退时提供的面向用户的错误说明（新字段）。 */
+    agentFailureMessage?: string;
+    /** @deprecated 旧字段别名（与 agentOutcome 同值），兼容旧网关 */
     codexOutcome?: 'streamed' | 'fallback' | 'not_requested';
-    /** 仅在 Agent 回退时提供的面向用户的错误说明。 */
+    /** @deprecated 旧字段别名（与 agentFailureMessage 同值），兼容旧网关 */
     codexFailureMessage?: string;
     model?: string;
     threadId?: string;
     queueRemaining?: number;
     fromQueue?: boolean;
     // P3-C 结构化执行摘要字段（统一普通回合与队列回合）
-    /** Agent 通路本轮结果（与 codexOutcome 等价，统一字段名） */
+    /** Agent 通路本轮结果（与 agentOutcome 等价，统一字段名） */
     outcome?: 'streamed' | 'fallback' | 'not_requested';
     /** 结构化失败原因；仅含用户可读信息，不含底层错误栈 */
     failure?: {
@@ -611,8 +614,6 @@ export class GatewayClient {
           kind: 'queue',
           ...(sessionId ? { sessionId } : {}),
         });
-      } else if (envelope.type === WsEventTypes.AGENT_SKILLS_CHANGED) {
-        emitAgentInvalidate({ kind: 'skills' });
       } else if (envelope.type === WsEventTypes.AGENT_APPROVAL_REQUEST) {
         const p = envelope.payload as {
           approvalId?: string;

@@ -3,6 +3,7 @@ import { TextbookExerciseAttemptSchema, TextbookExerciseHistorySchema, TextbookG
 import { BusinessError, translateToBusinessError } from '@study-studio/shared';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
+import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { DEFAULT_USER_ID } from './query-keys.js';
 
 async function readResponse(response: Response): Promise<unknown> {
@@ -21,7 +22,9 @@ export function useTextbookExerciseMutation(documentId: string, chapterId: strin
   return useMutation({
     mutationFn: async (input: SubmitTextbookExercise) => {
       try {
-        const response = await fetch(`${GATEWAY_BASE_URL}/api/textbook-practice/${encodeURIComponent(userId)}/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+        // 批改走所选运行时（缺席走默认 codex-acp）。
+        const runtimeId = usePreferencesStore.getState().agentRuntimeId;
+        const response = await fetch(`${GATEWAY_BASE_URL}/api/textbook-practice/${encodeURIComponent(userId)}/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...input, ...(runtimeId ? { runtimeId } : {}) }) });
         return TextbookExerciseAttemptSchema.parse(await readResponse(response));
       } catch (cause) { throw translateToBusinessError(cause, 'submitTextbookExercise'); }
     },

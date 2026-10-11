@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Button } from '../ui/button.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
-import { useAgentModelsQuery } from '../../queries/useAgentQueries.js';
+import { AgentRuntimeSelect } from '../AgentRuntimeSelect.js';
+import { useAgentRuntimeOptionsQuery } from '../../queries/useAgentQueries.js';
+import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { useTtsStore } from '../../stores/useTtsStore.js';
 import { PresetAdjustPanel } from './PresetAdjustPanel.js';
 import { useCreateGenerationTaskMutation, useGenerationPresetsQuery, useGenerationSuggestionQuery,
@@ -38,8 +40,13 @@ export function TaskSetupPanel({ userId, track, onStarted }: {
   const [modes, setModes] = useState<Record<string, number> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [suggestionApplied, setSuggestionApplied] = useState(false);
-  const modelsQuery = useAgentModelsQuery();
-  const models = useMemo(() => modelsQuery.data ?? [], [modelsQuery.data]);
+  // 出题运行时：默认跟随全局选择；模型一律走该运行时的探针目录。
+  const globalRuntimeId = usePreferencesStore((s) => s.agentRuntimeId);
+  const [runtimeId, setRuntimeId] = useState('');
+  const effectiveRuntimeId = runtimeId || globalRuntimeId || 'codex-acp';
+  const runtimeOptions = useAgentRuntimeOptionsQuery(effectiveRuntimeId, true);
+  const models = useMemo(() => runtimeOptions.data?.models ?? [], [runtimeOptions.data]);
+  const modelsLoading = runtimeOptions.isPending;
   const suggestion = useGenerationSuggestionQuery(userId, track);
   const preferredService = useTtsStore(s => s.preferredService);
   const ttsModelId = useTtsStore(s => s.modelId);
@@ -60,8 +67,8 @@ export function TaskSetupPanel({ userId, track, onStarted }: {
   const start = async () => {
     setError(null);
     try {
-      const chosenModel = model || models[0]?.id || models[0]?.model || '';
-      if (!chosenModel) throw new Error('暂无可用出题模型，请检查本机模型配置。');
+      const chosenModel = model || models[0]?.value || '';
+      if (!chosenModel) throw new Error('暂无可用出题模型，请检查所选运行时的模型配置。');
       if (!voicesReady) throw new Error('听力需要语音偏好中的服务、模型与男女声：请先在语音设置中配置。');
       const resolved = await resolvePreset.mutateAsync({
         presetId, language: track, targetLevel: level, modelId: chosenModel,
@@ -71,7 +78,8 @@ export function TaskSetupPanel({ userId, track, onStarted }: {
       });
       const { sessionId, turnId } = newHostTurn();
       const created = await createTask.mutateAsync({ sessionId, turnId,
-        config: resolved.config, blueprint: resolved.blueprint, objective: resolved.objective });
+        config: { ...resolved.config, modelId: chosenModel, runtimeId: effectiveRuntimeId },
+        blueprint: resolved.blueprint, objective: resolved.objective });
       await startRun.mutateAsync(created.taskId);
       onStarted(created.taskId);
     } catch (cause) {
@@ -95,7 +103,14 @@ export function TaskSetupPanel({ userId, track, onStarted }: {
           }}>应用建议</Button>
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="space-y-2 text-sm text-ink">Agent 运行时
+          <AgentRuntimeSelect
+            value={runtimeId}
+            onValueChange={(value) => { if (value) { setRuntimeId(value); setModel(''); } }}
+            disabled={busy}
+          />
+        </label>
         <label className="space-y-2 text-sm text-ink">预设
           <Select value={presetId} onValueChange={value => { if (value) { setPresetId(value); setCounts(null); setModes(null); } }} disabled={busy}>
             <SelectTrigger aria-label="出题预设"><SelectValue>{preset?.name ?? presetId}</SelectValue></SelectTrigger>
@@ -109,10 +124,10 @@ export function TaskSetupPanel({ userId, track, onStarted }: {
           </Select>
         </label>
         <label className="space-y-2 text-sm text-ink">出题模型
-          <Select value={model || '__default__'} onValueChange={value => value && setModel(value === '__default__' ? '' : value)} disabled={busy || modelsQuery.isPending}>
-            <SelectTrigger aria-label="出题模型"><SelectValue>{model || models[0]?.displayName || models[0]?.model || '选择模型'}</SelectValue></SelectTrigger>
+          <Select value={model || '__default__'} onValueChange={value => value && setModel(value === '__default__' ? '' : value)} disabled={busy || modelsLoading}>
+            <SelectTrigger aria-label="出题模型"><SelectValue>{model || models[0]?.label || '选择模型'}</SelectValue></SelectTrigger>
             <SelectContent><SelectItem value="__default__">自动选择</SelectItem>
-              {models.map(item => <SelectItem key={item.id || item.model} value={item.id || item.model}>{item.displayName || item.model}</SelectItem>)}
+              {models.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
             </SelectContent>
           </Select>
         </label>
@@ -131,8 +146,8 @@ export function TaskSetupPanel({ userId, track, onStarted }: {
         </p>
       )}
       {presetsQuery.isError && <p role="alert" className="text-xs text-ink-rose-600">{presetsQuery.error.message}</p>}
-      <Button onClick={() => void start()} disabled={busy || modelsQuery.isPending || !preset} aria-label="开始出题">
-        {busy ? '正在启动…' : modelsQuery.isPending ? '模型加载中…' : '开始出题'}
+      <Button onClick={() => void start()} disabled={busy || modelsLoading || !preset} aria-label="开始出题">
+        {busy ? '正在启动…' : modelsLoading ? '模型加载中…' : '开始出题'}
       </Button>
     </div>
   );

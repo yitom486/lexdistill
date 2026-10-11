@@ -8,6 +8,7 @@ import {
 } from '@study-studio/protocol';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { gatewayClient } from '../lib/gateway-client.js';
+import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 
 const enrichJobKey = (userId: string, documentId: string, jobId: string) =>
@@ -41,6 +42,8 @@ export function useStartEnrichJobMutation(userId = DEFAULT_USER_ID) {
       concurrency?: number;
     }): Promise<EnrichJobSnapshot> => {
       const sessionId = gatewayClient.getSessionId();
+      // 抽取走所选运行时（缺席走默认 codex-acp）。
+      const runtimeId = usePreferencesStore.getState().agentRuntimeId;
       const res = await fetch(
         `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${encodeURIComponent(vars.documentId)}/enrich-jobs`,
         {
@@ -50,6 +53,7 @@ export function useStartEnrichJobMutation(userId = DEFAULT_USER_ID) {
             ...(vars.lessonIds ? { lessonIds: vars.lessonIds } : {}),
             ...(sessionId ? { sessionId } : {}),
             ...(vars.concurrency !== undefined ? { concurrency: vars.concurrency } : {}),
+            ...(runtimeId ? { runtimeId } : {}),
           }),
         }
       );
