@@ -20,7 +20,7 @@ packages/
 ├── speech                 # [语音能力] TTS 引擎抽象、Azure 实现与音色匹配
 ├── ai-content             # [内容规则] AI 宽容解析、结构化题包与确定性规则兜底
 ├── tool-core              # [Agent 核心] Tool 契约定义、权限体系与注册中心
-└── agent-runtime          # [Agent 核心] 统一 Agent 抽象契约与 Codex/Responses 适配器
+└── agent-runtime          # [Agent 核心] 统一 Agent 抽象契约与 Responses/ACP 适配器
 ```
 
 ---
@@ -32,7 +32,7 @@ packages/
 | 层级 | 包含的 Package | 核心职责 |
 |---|---|---|
 | **6. 终端与网关** | `apps/gateway`, `apps/web` | 服务装配、HTTP/WS 路由、UI 呈现与状态管理 |
-| **5. Agent 运行时** | `agent-runtime`, `tool-core` | Agent 契约抽象、厂商协议适配（Codex/Responses）、工具注册与调度 |
+| **5. Agent 运行时** | `agent-runtime`, `tool-core` | Agent 契约抽象、引擎协议适配（ACP/Responses）、工具注册与调度 |
 | **4. 垂直业务领域** | `learner-core`, `learning`, `flashcards`, `lexicon`, `content`, `speech`, `ai-content` | 学习闭环、语言形态学、闪卡制作、教材解析、发音与内容提炼 |
 | **3. 核心算法层** | `learning-algorithms` | 纯数学与统计调度（FSRS v1 等），无 IO、无平台绑定 |
 | **2. 契约与持久化** | `protocol`, `document-model`, `storage-sqlite` | 通信协议（WS 信封/事件）、文档模型 AST、SQLite 存储与 Drizzle Schema |
@@ -69,7 +69,7 @@ flowchart TD
 
     subgraph L5_AgentSystem["5. Agent 运行时层"]
         ToolCore["tool-core<br/>(工具契约/权限/注册)"]
-        AgentRuntime["agent-runtime<br/>(统一契约 + Codex/Responses 适配器)"]
+        AgentRuntime["agent-runtime<br/>(统一契约 + ACP/Responses 适配器)"]
     end
 
     subgraph L6_Applications["6. 应用层"]
@@ -136,7 +136,7 @@ flowchart TD
 | **生词卡片渲染与 Anki 导出** | `flashcards` → `learner-core` | 卡片模板语法、APKG 二进制结构与 AnkiConnect 协议 |
 | **分词与词典导入** | `lexicon` → `archive` | 形态学还原（deinflect）、词条索引、纯内存安全解压 |
 | **新增 Agent 工具 (Native Tool)** | `tool-core` → `apps/gateway/src/modules/*/tools/` | 声明权限级别与 Zod Schema，在 Gateway ToolRouter 中完成进程内注册 |
-| **调整 Codex / LLM 适配** | `agent-runtime` (`contracts` / `adapters/codex`) | 遵守零厂商泄漏原则，维护流式事件和 Dynamic Tools 双向桥接 |
+| **调整 Agent 引擎适配** | `agent-runtime` (`contracts` / `adapters/acp`) | 遵守零厂商泄漏原则，维护 ACP 会话与工具桥接 |
 | **调整语音发音与 TTS 播放** | `speech` | Azure 引擎、Web 语音插件与发音音色自动匹配 |
 
 ---
@@ -266,7 +266,7 @@ flowchart TD
 - **设计原则**：**严格的零厂商泄漏（Zero Provider Leak）**。
 - **核心模块**：
   - `contracts/`：抽象端口（`AgentAdapter`, `AgentSession`, `AgentEvent`, `ContextSnapshot`）。
-  - `adapters/codex/`：Codex App Server 原生协议适配器（支持多轮对话、本地图片附件、Dynamic Tools 双向桥接、权限确认）。
+  - `adapters/acp/`：ACP 协议适配器（多轮会话、图片附件、MCP 工具桥接、权限确认）。
   - `adapters/responses/`：基于轻量单次响应模式的旁路适配器。
 
 ---
