@@ -221,7 +221,7 @@ export function fingerprintAnchors(anchors: LocalAnchor[]): string {
 export interface PreviewEntryInput {
   title: string;
   printedPage: string;
-  level: 1 | 2;
+  level: number;
   kind: 'lesson' | 'section';
 }
 

@@ -46,10 +46,14 @@ export interface PreferencesState {
   coachCollaborationMode: string;
   /** 复习页卡片模板 id（默认 study-basic；持久化偏好） */
   reviewCardFormatId: string;
+  /** 目录识别专属 Agent 运行时；空=跟随全局 agentRuntimeId */
+  tocReviewRuntimeId: string;
   /** 目录 AI 审核模型 id；空=使用默认（环境变量 > 适配器默认） */
   tocReviewModel: string;
   /** 目录 AI 审核思考等级；空=使用默认 */
   tocReviewEffort: string;
+  /** 教材正文提炼专属 Agent 运行时；空=跟随全局 agentRuntimeId */
+  pipelineRuntimeId: string;
   /** 教材正文提炼专职模型 id；空=使用本机 Codex 默认配置 */
   pipelineModel: string;
   pipelineEffort: string;
@@ -87,8 +91,10 @@ export interface PreferencesState {
   setCoachPersistThread: (persist: boolean) => void;
   setCoachCollaborationMode: (mode: string) => void;
   setReviewCardFormatId: (formatId: string) => void;
+  setTocReviewRuntimeId: (runtimeId: string) => void;
   setTocReviewModel: (model: string) => void;
   setTocReviewEffort: (effort: string) => void;
+  setPipelineRuntimeId: (runtimeId: string) => void;
   setPipelineModel: (model: string) => void;
   setPipelineEffort: (effort: string) => void;
   setPipelinePoolSize: (poolSize: string) => void;
@@ -157,8 +163,10 @@ export const usePreferencesStore = create<PreferencesState>()(
       coachPersistThread: true,
       coachCollaborationMode: '',
       reviewCardFormatId: 'study-basic',
+      tocReviewRuntimeId: '',
       tocReviewModel: '',
       tocReviewEffort: '',
+      pipelineRuntimeId: '',
       pipelineModel: '',
       pipelineEffort: '',
       pipelinePoolSize: String(DEFAULT_TEXTBOOK_PIPELINE_SETTINGS.poolSize),
@@ -219,10 +227,44 @@ export const usePreferencesStore = create<PreferencesState>()(
       setCoachCollaborationMode: (coachCollaborationMode: string) =>
         set({ coachCollaborationMode }),
       setReviewCardFormatId: (reviewCardFormatId: string) => set({ reviewCardFormatId }),
-      setTocReviewModel: (tocReviewModel: string) => set({ tocReviewModel }),
-      setTocReviewEffort: (tocReviewEffort: string) => set({ tocReviewEffort }),
-      setPipelineModel: (pipelineModel: string) => set({ pipelineModel }),
-      setPipelineEffort: (pipelineEffort: string) => set({ pipelineEffort }),
+      setTocReviewRuntimeId: (tocReviewRuntimeId: string) => set((state) => {
+        const model = state.runtimeModels[tocReviewRuntimeId] ?? '';
+        const effort = state.runtimeEfforts[tocReviewRuntimeId] ?? '';
+        return { tocReviewRuntimeId, tocReviewModel: model, tocReviewEffort: effort };
+      }),
+      setTocReviewModel: (tocReviewModel: string) => set((state) => {
+        const currentRuntime = state.tocReviewRuntimeId || state.agentRuntimeId || 'codex-acp';
+        return {
+          tocReviewModel,
+          runtimeModels: { ...state.runtimeModels, [currentRuntime]: tocReviewModel },
+        };
+      }),
+      setTocReviewEffort: (tocReviewEffort: string) => set((state) => {
+        const currentRuntime = state.tocReviewRuntimeId || state.agentRuntimeId || 'codex-acp';
+        return {
+          tocReviewEffort,
+          runtimeEfforts: { ...state.runtimeEfforts, [currentRuntime]: tocReviewEffort },
+        };
+      }),
+      setPipelineRuntimeId: (pipelineRuntimeId: string) => set((state) => {
+        const model = state.runtimeModels[pipelineRuntimeId] ?? '';
+        const effort = state.runtimeEfforts[pipelineRuntimeId] ?? '';
+        return { pipelineRuntimeId, pipelineModel: model, pipelineEffort: effort };
+      }),
+      setPipelineModel: (pipelineModel: string) => set((state) => {
+        const currentRuntime = state.pipelineRuntimeId || state.agentRuntimeId || 'codex-acp';
+        return {
+          pipelineModel,
+          runtimeModels: { ...state.runtimeModels, [currentRuntime]: pipelineModel },
+        };
+      }),
+      setPipelineEffort: (pipelineEffort: string) => set((state) => {
+        const currentRuntime = state.pipelineRuntimeId || state.agentRuntimeId || 'codex-acp';
+        return {
+          pipelineEffort,
+          runtimeEfforts: { ...state.runtimeEfforts, [currentRuntime]: pipelineEffort },
+        };
+      }),
       setPipelinePoolSize: (pipelinePoolSize: string) => set({ pipelinePoolSize }),
       setPipelineSettings: (settings) => set((state) => ({ pipelineSettings: { ...state.pipelineSettings, ...settings } })),
       setPipelineLanguage: (pipelineLanguage) => set({ pipelineLanguage }),

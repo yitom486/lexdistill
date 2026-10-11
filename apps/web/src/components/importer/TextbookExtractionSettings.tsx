@@ -7,6 +7,8 @@ import { ImportOptions } from './ImportOptions.js';
 import { TextbookModelSettings } from './TextbookModelSettings.js';
 import { TextbookRunSettings } from './TextbookRunSettings.js';
 
+import { agentRuntimeLabel } from '../../config/agent-runtimes.js';
+
 interface Props {
   forceOverwrite: boolean;
   onForceOverwrite: (value: boolean) => void;
@@ -15,10 +17,25 @@ interface Props {
 }
 
 export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, pending, onStart }: Props) {
-  const model = usePreferencesStore(s => s.pipelineModel);
+  const runtimeId = usePreferencesStore(s => s.pipelineRuntimeId);
+  const setRuntimeId = usePreferencesStore(s => s.setPipelineRuntimeId);
+  const globalRuntimeId = usePreferencesStore(s => s.agentRuntimeId);
+  const effectiveRuntimeId = runtimeId || globalRuntimeId || 'codex-acp';
+  const runtimeModels = usePreferencesStore(s => s.runtimeModels);
+  const runtimeEfforts = usePreferencesStore(s => s.runtimeEfforts);
+  const rawModel = usePreferencesStore(s => s.pipelineModel);
   const setModel = usePreferencesStore(s => s.setPipelineModel);
-  const effort = usePreferencesStore(s => s.pipelineEffort);
+  const rawEffort = usePreferencesStore(s => s.pipelineEffort);
   const setEffort = usePreferencesStore(s => s.setPipelineEffort);
+
+  const scopedModel = runtimeModels[effectiveRuntimeId];
+  const model = scopedModel !== undefined
+    ? scopedModel
+    : (effectiveRuntimeId === 'codex-acp' ? rawModel : '');
+  const scopedEffort = runtimeEfforts[effectiveRuntimeId];
+  const effort = scopedEffort !== undefined
+    ? scopedEffort
+    : (effectiveRuntimeId === 'codex-acp' ? rawEffort : '');
   const poolSize = usePreferencesStore(s => s.pipelinePoolSize);
   const setPoolSize = usePreferencesStore(s => s.setPipelinePoolSize);
   const settings = usePreferencesStore(s => s.pipelineSettings);
@@ -35,8 +52,17 @@ export function TextbookExtractionSettings({ forceOverwrite, onForceOverwrite, p
         <SelectContent><SelectItem value="ja">日语</SelectItem><SelectItem value="en">英语</SelectItem><SelectItem value="ko">韩语</SelectItem></SelectContent>
       </Select>
     </label>
-    <ImportOptions title="模型与并发" summary={`${model || '跟随本机模型'} · ${effort || '默认思考等级'} · ${poolSize} 个 Worker`}>
-      <TextbookModelSettings model={model} effort={effort} onModel={setModel} onEffort={setEffort} pending={pending} />
+    <ImportOptions title="模型与并发" summary={`${agentRuntimeLabel(runtimeId)} · ${model || '跟随本机模型'} · ${effort || '默认思考等级'} · ${poolSize} 个 Worker`}>
+      <TextbookModelSettings
+        purpose="教材提炼"
+        runtimeId={runtimeId}
+        onRuntime={setRuntimeId}
+        model={model}
+        effort={effort}
+        onModel={setModel}
+        onEffort={setEffort}
+        pending={pending}
+      />
       <label className="flex items-center justify-between gap-3">并发 Worker 数量
         <input aria-label="教材提取并发数量" type="number" min="1" step="1" value={poolSize} onChange={event => setPoolSize(event.target.value)} disabled={pending} className="w-24 rounded-lg border border-line bg-surface p-2 text-ink" />
       </label>

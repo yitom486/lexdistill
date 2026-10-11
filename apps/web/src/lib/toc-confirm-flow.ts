@@ -498,7 +498,7 @@ export interface EditableTocEntry {
   key: string;
   title: string;
   printedPage: string;
-  level: 1 | 2;
+  level: number;
   kind: TocBaselineEntryKind;
   confidence: TocDraftConfidence | null;
 }
@@ -755,7 +755,7 @@ export function blankEditableEntry(key: string): EditableTocEntry {
 }
 
 /** 下一个手动行 key（纯函数）：扫描现有 toc-manual-N 取 max+1，不依赖外部计数。 */
-export function nextManualKey(entries: EditableTocEntry[]): string {
+export function nextManualKey(entries: readonly { key: string }[]): string {
   let max = -1;
   for (const entry of entries) {
     const match = /^toc-manual-(\d+)$/.exec(entry.key);

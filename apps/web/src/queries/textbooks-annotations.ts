@@ -295,7 +295,7 @@ export interface ImportPdfResult {
  * PDF 上传导入：multipart 发网关 /api/documents/:userId/import-pdf，
  * 网关做分类/提取/结构化后返回 TextbookAST（协议层已验），前端复用既有
  * 确认导入链路（parseTextbookAST → onImportBook → useImportTextbookMutation）入库。
- * 注意：扫描版无文字层时请改用章节模型读取 PDF；此接口不执行 OCR。
+ * 注意：扫描版无文字层时请改用章节流水线模型读取 PDF。
  */
 export function useImportPdfMutation(userId = DEFAULT_USER_ID) {
   return useMutation({
@@ -1112,7 +1112,8 @@ export function useTextbookLessonSlotsQuery(documentId: string | undefined, user
 
 /** 将已入库教材槽位转换为目录候选（可直接复用，免去大模型重复抽取） */
 export function lessonSlotsToTocCandidates(slots: TextbookLessonSlotItem[]): TocRecognitionCandidate[] {
-  return slots.flatMap((s, idx): TocRecognitionCandidate[] => s.tocEntries
+  const seen = new Set<string>();
+  const raw = slots.flatMap((s, idx): TocRecognitionCandidate[] => s.tocEntries
     ? tocCandidatesFromEntries(s.tocEntries, 'physical')
     : [{
     key: s.lessonId || `slot-${idx + 1}`,
@@ -1128,6 +1129,12 @@ export function lessonSlotsToTocCandidates(slots: TextbookLessonSlotItem[]): Toc
     ...(s.endPage !== null ? { endPage: s.endPage } : {}),
     ...(s.parentId ? { parentId: s.parentId } : {}),
   }]);
+
+  return raw.filter(item => {
+    if (seen.has(item.key)) return false;
+    seen.add(item.key);
+    return true;
+  });
 }
 
 /**

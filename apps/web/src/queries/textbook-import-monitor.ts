@@ -27,7 +27,7 @@ export async function requestImportMonitor(userId: string, traceId: string): Pro
 }
 export function useImportMonitorQuery(userId: string, traceId: string, enabled: boolean) {
   const client = useQueryClient();
-  const query = useQuery({ queryKey: monitorKey(userId, traceId), queryFn: () => requestImportMonitor(userId, traceId), enabled, staleTime: 0 });
+  const query = useQuery({ queryKey: monitorKey(userId, traceId), queryFn: () => requestImportMonitor(userId, traceId), enabled, staleTime: 0, refetchInterval: enabled ? 1000 : false });
   const ready = query.isSuccess;
   useEffect(() => {
     if (!enabled || !ready || typeof EventSource === 'undefined') return;

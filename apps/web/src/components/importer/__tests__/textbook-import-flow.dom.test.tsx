@@ -131,8 +131,8 @@ async function prepare(tocEndPage?: number, recognizedEntries?: TocEntry[]) {
       if (failSlots) return Response.json({ error: { userMessage: '目录暂时无法读取' } }, { status: 503 });
       if (savedOutline) {
         const tasks = planTextbookTasks(savedOutline.tocEntries); if (!tasks.ok) throw tasks.error;
-        return Response.json({ slots: tasks.value.map(({ root: entry, entries }, index) => ({
-        documentId: 'stored-book', lessonId: entry.id, lessonNumber: index + 1, title: entry.title, sortOrder: index + 1, tocEntries: entries,
+        return Response.json({ slots: tasks.value.map(({ root: entry, entries, ancestors }, index) => ({
+        documentId: 'stored-book', lessonId: entry.id, lessonNumber: index + 1, title: entry.title, sortOrder: index + 1, tocEntries: [...ancestors, ...entries],
         kind: entry.level === 'lesson' ? 'lesson' : 'section', parentId: null, startPage: entry.startPage, endPage: entry.endPage ?? null,
         status: 'pending', hasPassage: false, hasPreview: false, hasSummary: false,
       })) }); }
@@ -220,20 +220,20 @@ describe('Tauri 教材导入交互集成：真实 Hook、Query 与检测/页码�
     await tickUntil(() => Boolean(document.querySelector('[aria-label="目录层级列表"]')));
     expect(document.querySelector('[aria-label="目录标题 1"]')).toBeNull();
     await click('编辑目录');
-    await tickUntil(() => Boolean(document.querySelector('[aria-label="目录层级 4"]')));
+    await tickUntil(() => Boolean(document.querySelector('[aria-label="目录类型 4"]')));
     expect(document.querySelector('[aria-label="目录类型 1"]')?.textContent).toContain('单元');
-    expect(document.querySelector('[aria-label="目录层级 1"]')?.textContent).toContain('一级');
-    expect(document.querySelector('[aria-label="目录层级 2"]')?.textContent).toContain('子标题');
-    // 将原三级标题改为一级，实际 parentId 必须一并移除。
+    expect(document.querySelector('[aria-label="目录类型 2"]')?.textContent).toContain('课');
+    expect(document.querySelector('[aria-label="目录类型 3"]')?.textContent).toContain('小节');
+    // 将原课内小节改为单元，实际 parentId 必须一并移除。
     await act(async () => {
-      const trigger = document.querySelector('[aria-label="目录层级 3"]') as HTMLButtonElement;
+      const trigger = document.querySelector('[aria-label="目录类型 3"]') as HTMLButtonElement;
       trigger.focus(); trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     });
-    await tickUntil(() => Boolean([...document.querySelectorAll('[role="option"]')].find(option => option.textContent?.includes('一级'))));
-    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent?.includes('一级'))!;
+    await tickUntil(() => Boolean([...document.querySelectorAll('[role="option"]')].find(option => option.textContent?.includes('单元'))));
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent?.includes('单元'))!;
     await act(async () => option.focus());
     await act(async () => option.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-    await tickUntil(() => document.querySelector('[aria-label="目录层级 3"]')?.textContent?.includes('一级') === true);
+    await tickUntil(() => document.querySelector('[aria-label="目录类型 3"]')?.textContent?.includes('单元') === true);
     await click('确认目录草稿');
     await tickUntil(() => currentFlow?.step === 3);
     expect(savedOutline?.tocEntries.map(entry => [entry.id, entry.parentId])).toEqual([

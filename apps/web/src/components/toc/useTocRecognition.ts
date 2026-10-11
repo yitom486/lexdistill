@@ -9,12 +9,15 @@ import {
   validateTocCandidates,
   tocCandidatesFromEntries,
   changeTocCandidateLevel,
+  changeTocCandidateType,
   type TocRecognitionCandidate,
 } from '../../lib/toc-recognition.js';
 import { sound } from '../../utils/audio.js';
+import { DEFAULT_USER_ID } from '../../queries/query-keys.js';
 
 export interface TocRecognitionPanelProps {
-  traceId?: string;
+  userId?: string | undefined;
+  traceId?: string | undefined;
   file: File | null;
   filePath: string;
   initialEntries?: TocRecognitionCandidate[] | undefined;
@@ -29,6 +32,7 @@ export interface TocRecognitionPanelProps {
 }
 
 export function useTocRecognition({
+  userId = DEFAULT_USER_ID,
   traceId,
   file,
   filePath,
@@ -38,19 +42,39 @@ export function useTocRecognition({
   confirmPending = false,
   onTocInvalidated,
 }: TocRecognitionPanelProps) {
-  const extractLlm = useExtractTocWithLlmMutation();
+  const extractLlm = useExtractTocWithLlmMutation(userId);
+  const [lastExtractedCount, setLastExtractedCount] = useState<number | null>(null);
+  const [extractionStartedAt, setExtractionStartedAt] = useState<number | null>(null);
   const modelsQuery = useAgentModelsQuery();
   const models = modelsQuery.data ?? [];
-  const runtimeCaps = useSelectedRuntimeCaps();
-  const tocReviewModel = usePreferencesStore((s) => s.tocReviewModel);
+  const tocReviewRuntimeId = usePreferencesStore((s) => s.tocReviewRuntimeId);
+  const setTocReviewRuntimeId = usePreferencesStore((s) => s.setTocReviewRuntimeId);
+  const globalRuntimeId = usePreferencesStore((s) => s.agentRuntimeId);
+  const effectiveRuntimeId = tocReviewRuntimeId || globalRuntimeId || 'codex-acp';
+  const runtimeModels = usePreferencesStore((s) => s.runtimeModels);
+  const runtimeEfforts = usePreferencesStore((s) => s.runtimeEfforts);
+  const rawTocReviewModel = usePreferencesStore((s) => s.tocReviewModel);
   const setTocReviewModel = usePreferencesStore((s) => s.setTocReviewModel);
-  const tocReviewEffort = usePreferencesStore((s) => s.tocReviewEffort);
+  const rawTocReviewEffort = usePreferencesStore((s) => s.tocReviewEffort);
   const setTocReviewEffort = usePreferencesStore((s) => s.setTocReviewEffort);
 
+  // 跨运行时模型隔离：若当前运行时在 preferences 字典中有记录则以该记录为准；
+  // 若无记录且当前非 codex-acp，杜绝将历史残留的 codex-acp 模型（如 gpt-6.1-sol）跨运行时错误下发。
+  const scopedModel = runtimeModels[effectiveRuntimeId];
+  const tocReviewModel = scopedModel !== undefined
+    ? scopedModel
+    : (effectiveRuntimeId === 'codex-acp' ? rawTocReviewModel : '');
+  const scopedEffort = runtimeEfforts[effectiveRuntimeId];
+  const tocReviewEffort = scopedEffort !== undefined
+    ? scopedEffort
+    : (effectiveRuntimeId === 'codex-acp' ? rawTocReviewEffort : '');
+
+  const effectiveTocReviewModel = tocReviewModel || '__default__';
+  const effectiveTocReviewEffort = tocReviewEffort || '__default__';
+  const runtimeCaps = useSelectedRuntimeCaps(effectiveRuntimeId);
   const isKnownModel = models.some(
     (m) => (m.id && m.id === tocReviewModel) || (m.model && m.model === tocReviewModel)
   );
-  const effectiveTocReviewModel = isKnownModel ? tocReviewModel : '__default__';
 
   useEffect(() => {
     // 仅 Codex 目录权威时自动清掉未知 id；ACP 探针归属以后端 400 为准，不在此误删有效选择。
@@ -117,6 +141,8 @@ export function useTocRecognition({
 
     sound.playClick();
     clearScan();
+    setLastExtractedCount(null);
+    setExtractionStartedAt(Date.now());
 
     const vars = {
       ...(file ? { file } : { filePath: filePath.trim() }),
@@ -125,9 +151,7 @@ export function useTocRecognition({
       ...(effectiveTocReviewModel !== '__default__' ? { model: effectiveTocReviewModel } : {}),
       ...(tocReviewEffort ? { effort: tocReviewEffort } : {}),
       // 教材目录 lane 跟随所选运行时（缺席走 Codex 原通路）。
-      ...(usePreferencesStore.getState().agentRuntimeId
-        ? { runtimeId: usePreferencesStore.getState().agentRuntimeId }
-        : {}),
+      ...(effectiveRuntimeId ? { runtimeId: effectiveRuntimeId } : {}),
     };
 
     extractLlm.mutate(vars, {
@@ -144,6 +168,7 @@ export function useTocRecognition({
 
         setEntries(candidates);
         setScanned(true);
+        setLastExtractedCount(candidates.length);
         toast.success(`大模型成功识别出 ${candidates.length} 条规范课次大纲！`);
       },
       onError: (err) => {
@@ -176,8 +201,11 @@ export function useTocRecognition({
     }
   };
 
-  const changeLevel = (key: string, level: 1 | 2) => {
+  const changeLevel = (key: string, level: number) => {
     setEntries(previous => changeTocCandidateLevel(previous, key, level)); invalidate();
+  };
+  const changeType = (key: string, type: 'unit' | 'lesson' | 'section') => {
+    setEntries(previous => changeTocCandidateType(previous, key, type)); invalidate();
   };
   const removeEntry = (key: string) => { setEntries(previous => previous.filter(entry => entry.key !== key)); invalidate(); };
   const addEntry = () => {
@@ -185,5 +213,7 @@ export function useTocRecognition({
   };
   return { start, end, setStart, setEnd, entries, scanned, confirmed, message, tocReviewEffort, setTocReviewEffort,
     extractLlm, models, effectiveTocReviewModel, setTocReviewModel, hasSource, clearScan,
-    useDefaultRange, handleLlmExtractToc, confirm, updateEntry, changeLevel, removeEntry, addEntry };
+    useDefaultRange, handleLlmExtractToc, confirm, updateEntry, changeLevel, changeType, removeEntry, addEntry,
+    userId, traceId, lastExtractedCount, extractionStartedAt, isExtracting: extractLlm.isPending,
+    tocReviewRuntimeId: effectiveRuntimeId, setTocReviewRuntimeId };
 }

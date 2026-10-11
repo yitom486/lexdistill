@@ -50,8 +50,22 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
   const outlineMutation = useSaveTextbookOutlineMutation();
   const documentMutation = useImportDocumentMutation();
   const queryClient = useQueryClient();
-  const pipelineModel = usePreferencesStore((s) => s.pipelineModel);
-  const pipelineEffort = usePreferencesStore((s) => s.pipelineEffort);
+  const pipelineRuntimeId = usePreferencesStore((s) => s.pipelineRuntimeId);
+  const globalRuntimeId = usePreferencesStore((s) => s.agentRuntimeId);
+  const effectivePipelineRuntimeId = pipelineRuntimeId || globalRuntimeId || 'codex-acp';
+  const runtimeModels = usePreferencesStore((s) => s.runtimeModels);
+  const runtimeEfforts = usePreferencesStore((s) => s.runtimeEfforts);
+  const rawPipelineModel = usePreferencesStore((s) => s.pipelineModel);
+  const rawPipelineEffort = usePreferencesStore((s) => s.pipelineEffort);
+
+  const scopedPipelineModel = runtimeModels[effectivePipelineRuntimeId];
+  const pipelineModel = scopedPipelineModel !== undefined
+    ? scopedPipelineModel
+    : (effectivePipelineRuntimeId === 'codex-acp' ? rawPipelineModel : '');
+  const scopedPipelineEffort = runtimeEfforts[effectivePipelineRuntimeId];
+  const pipelineEffort = scopedPipelineEffort !== undefined
+    ? scopedPipelineEffort
+    : (effectivePipelineRuntimeId === 'codex-acp' ? rawPipelineEffort : '');
   const pipelinePoolSize = usePreferencesStore((s) => s.pipelinePoolSize);
   const pipelineSettings = usePreferencesStore((s) => s.pipelineSettings);
   const pipelineLanguage = usePreferencesStore((s) => s.pipelineLanguage);
@@ -133,6 +147,7 @@ export function useTextbookImportFlow(source: TextbookImportSource) {
       title: targetDocument?.title ?? filename.replace(/\.[^/.]+$/, ''),
       filePath: path, tocEntries, forceOverwrite, language: pipelineLanguage, ...config.data, ...(pipelineModel ? { model: pipelineModel } : {}),
       ...(pipelineEffort ? { effort: pipelineEffort } : {}),
+      ...(pipelineRuntimeId ? { runtimeId: pipelineRuntimeId } : {}),
     }, {
       onSuccess: () => { setStep(3); toast.success('教材提炼已启动，已完成课次会保留'); },
       onError: (error) => source.setParseError(error.message),
