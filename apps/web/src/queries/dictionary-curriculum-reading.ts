@@ -122,20 +122,26 @@ export function useCurriculumHangulQuery(type?: string) {
   return useQuery<HangulItem[]>({
     queryKey: [...QUERY_KEYS.HANGUL, type ?? 'ALL'],
     queryFn: async () => {
+      // R09c：失败直接抛出（调用方区分加载中/读取失败/成功空）；key/重试/staleTime 不变
+      let res: { ok: boolean; status: number; json: () => Promise<unknown> };
       try {
-        const res = await apiClient.api.curriculum.hangul.$get({
+        res = await apiClient.api.curriculum.hangul.$get({
           query: type ? { type } : {},
         });
-        if (res.ok) {
-          const list = await res.json();
-          if (Array.isArray(list) && list.length > 0) {
-            return list as HangulItem[];
-          }
-        }
       } catch (e) {
-        logger.debug('[useCurriculumHangulQuery] Hono RPC fallback to local memory', e);
+        logger.debug('[useCurriculumHangulQuery] failed to load hangul', e);
+        throw new Error('谚文底座读取失败，请重试。');
       }
-      return [];
+      if (!res.ok) {
+        logger.debug('[useCurriculumHangulQuery] hangul request failed', res.status);
+        throw new Error('谚文底座读取失败，请重试。');
+      }
+      const list = await res.json();
+      if (!Array.isArray(list)) {
+        logger.debug('[useCurriculumHangulQuery] unexpected hangul payload');
+        throw new Error('谚文底座读取失败，请重试。');
+      }
+      return list as HangulItem[];
     },
     staleTime: 1000 * 60 * 30,
   });
@@ -151,8 +157,10 @@ export function useHangulPracticeMutation(userId = DEFAULT_USER_ID) {
       isCorrect: boolean;
       scriptType?: HangulScriptType;
     }) => {
+      // R09c：回写失败直接抛出，不伪装成功；调用方统计失败并在战报中如实说明
+      let res: { ok: boolean; status: number; json: () => Promise<unknown> };
       try {
-        const res = await apiClient.api.curriculum.hangul.practice[':userId'].$post({
+        res = await apiClient.api.curriculum.hangul.practice[':userId'].$post({
           param: { userId },
           json: {
             hangulId: payload.hangulId,
@@ -160,13 +168,15 @@ export function useHangulPracticeMutation(userId = DEFAULT_USER_ID) {
             scriptType: payload.scriptType || 'CONSONANT',
           },
         });
-        if (res.ok) {
-          return await res.json();
-        }
       } catch (e) {
         logger.debug('[useHangulPracticeMutation] Failed to post hangul practice', e);
+        throw new Error('练习成绩回写失败，请检查网关后重试。');
       }
-      return { success: true };
+      if (!res.ok) {
+        logger.debug('[useHangulPracticeMutation] practice request failed', res.status);
+        throw new Error('练习成绩回写失败，请检查网关后重试。');
+      }
+      return (await res.json()) as { success: boolean };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PROFILE });
@@ -183,24 +193,30 @@ export function useReadingSetsQuery(
   return useQuery<ReadingPassageSet[]>({
     queryKey: [...QUERY_KEYS.READING, userId, origin ?? 'ALL', lang ?? 'ALL'],
     queryFn: async () => {
+      // R09b：失败直接抛出（调用方区分加载中/读取失败/成功空）；key/重试/staleTime 不变
+      let res: { ok: boolean; status: number; json: () => Promise<unknown> };
       try {
         const query: Record<string, string> = {};
         if (origin) query.origin = origin;
         if (lang) query.lang = lang;
-        const res = await apiClient.api.reading.sets[':userId'].$get({
+        res = await apiClient.api.reading.sets[':userId'].$get({
           param: { userId },
           query,
         });
-        if (res.ok) {
-          const sets = await res.json();
-          if (Array.isArray(sets) && sets.length > 0) {
-            return sets as ReadingPassageSet[];
-          }
-        }
       } catch (e) {
-        logger.debug('[useReadingSetsQuery] Hono RPC fallback', e);
+        logger.debug('[useReadingSetsQuery] failed to load sets', e);
+        throw new Error('阅读篇目读取失败，请重试。');
       }
-      return [];
+      if (!res.ok) {
+        logger.debug('[useReadingSetsQuery] sets request failed', res.status);
+        throw new Error('阅读篇目读取失败，请重试。');
+      }
+      const sets = await res.json();
+      if (!Array.isArray(sets)) {
+        logger.debug('[useReadingSetsQuery] unexpected sets payload');
+        throw new Error('阅读篇目读取失败，请重试。');
+      }
+      return sets as ReadingPassageSet[];
     },
     staleTime: 1000 * 60 * 5, // 5 分钟缓存
   });
@@ -527,12 +543,17 @@ export function useEncounteredTermsQuery(language: 'ja' | 'en' | 'ko', limit = 5
   return useQuery<EncounteredTermItem[]>({
     queryKey: [...QUERY_KEYS.DICTIONARY, 'encountered', language, profileUserId],
     queryFn: async () => {
+      // R06：失败直接抛出（调用方区分成功空与读取失败）；其余不变
       const response = await fetch(
         `${GATEWAY_BASE_URL}/api/encountered-terms/${encodeURIComponent(profileUserId)}?lang=${language}&limit=${limit}`
       );
-      if (!response.ok) return [];
+      if (!response.ok) {
+        throw new Error('相遇词读取失败，请重试。');
+      }
       const data: unknown = await response.json().catch(() => null);
-      if (!Array.isArray(data)) return [];
+      if (!Array.isArray(data)) {
+        throw new Error('相遇词读取失败，请重试。');
+      }
       return (data as Array<Record<string, unknown>>)
         .filter((r) => typeof r.headword === 'string' && typeof r.termKey === 'string')
         .map((r): EncounteredTermItem => ({
@@ -858,7 +879,7 @@ export function useGenerateHangulWordsMutation(userId = DEFAULT_USER_ID) {
       });
       if (!res.ok) throw new Error('生成韩语单词失败');
       const data = (await res.json()) as { hangulWords?: HangulWordItem[] };
-      if (!data.hangulWords?.length) throw new Error('韩语单词为空');
+      if (!Array.isArray(data.hangulWords)) throw new Error('韩语单词内容无法读取，请重试。');
       return data.hangulWords;
     },
   });
@@ -923,6 +944,14 @@ export function useCardFormatsQuery(enabled = true) {
   });
 }
 
+function cacheReturnedCardFormat(queryClient: ReturnType<typeof useQueryClient>, format: AnkiCardFormatInfo) {
+  queryClient.setQueryData<{ formats: AnkiCardFormatInfo[] }>([...QUERY_KEYS.DICTIONARY, 'card-formats'], (old) => ({
+    formats: old?.formats.some((item) => item.id === format.id)
+      ? old.formats.map((item) => item.id === format.id ? format : item)
+      : [...(old?.formats ?? []), format],
+  }));
+  void queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.DICTIONARY, 'card-formats'] });
+}
 /** 保存模板（新建或覆盖；网关校验不通过时抛中文错）。 */
 export function useSaveCardFormatMutation() {
   const queryClient = useQueryClient();
@@ -940,9 +969,7 @@ export function useSaveCardFormatMutation() {
       }
       return (await response.json()) as { format: AnkiCardFormatInfo };
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.DICTIONARY, 'card-formats'] });
-    },
+    onSuccess: ({ format }) => cacheReturnedCardFormat(queryClient, format),
   });
 }
 
@@ -963,9 +990,7 @@ export function useResetCardFormatMutation() {
       }
       return (await response.json()) as { format: AnkiCardFormatInfo };
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.DICTIONARY, 'card-formats'] });
-    },
+    onSuccess: ({ format }) => cacheReturnedCardFormat(queryClient, format),
   });
 }
 

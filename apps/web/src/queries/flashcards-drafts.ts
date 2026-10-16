@@ -70,7 +70,7 @@ export function useCardDraftsQuery(userIdOverride?: string, langOverride?: strin
         const res = await fetch(
           `${GATEWAY_BASE_URL}/api/flashcards/drafts/${encodeURIComponent(userId)}?lang=${language}`
         );
-        if (!res.ok) return [];
+        if (!res.ok) throw new Error('生词草稿读取失败，请重试。');
         const payload: unknown = await res.json().catch(() => null);
         const list =
           typeof payload === 'object' && payload !== null && 'drafts' in payload
@@ -85,7 +85,7 @@ export function useCardDraftsQuery(userIdOverride?: string, langOverride?: strin
         return out;
       } catch (e) {
         logger.debug('[useCardDraftsQuery] failed to load drafts', e);
-        return [];
+        throw e instanceof Error ? e : new Error('生词草稿读取失败，请重试。');
       }
     },
     staleTime: 1000 * 30,

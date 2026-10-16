@@ -10,6 +10,19 @@ import { buildAudioCacheKey, getAudioCache, saveAudioCache, updateAudioCacheLast
 import { audioChunksToBlob, isRawPcmMime, PcmStreamPlayer } from '../lib/pcm-audio.js';
 import { buildTtsStreamBody, fetchTtsStream, matchTtsRequest, TtsStreamError, type TtsRequestDescriptor } from '../lib/tts-stream.js';
 import { detectSpeakerGender } from '../components/textbook/preview/dialogue-parser.js';
+import { usePreferencesStore } from '../stores/usePreferencesStore.js';
+
+/**
+ * R10：界面音效总开关（用户偏好，Zustand persist）。关闭时 click/success/
+ * mistake/fanfare 等短音一律静默；学习朗读（speechStudio）与录音不受影响。
+ */
+function soundEffectsAllowed(): boolean {
+  try {
+    return usePreferencesStore.getState().soundEffectsEnabled !== false;
+  } catch {
+    return true;
+  }
+}
 
 export type { TtsRequestDescriptor };
 
@@ -49,6 +62,29 @@ function resolveTrackLanguageTag(track?: SupportedLanguage): string | undefined 
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
+  private voices = new Map<OscillatorNode, GainNode>();
+
+  private track(osc: OscillatorNode, gain: GainNode): void {
+    this.voices.set(osc, gain);
+    osc.onended = () => {
+      this.voices.delete(osc);
+      osc.disconnect();
+      gain.disconnect();
+    };
+  }
+
+  public stopEffects(): void {
+    for (const [osc, gain] of this.voices) {
+      osc.onended = null;
+      try { osc.stop(); } catch {}
+      osc.disconnect();
+      gain.disconnect();
+    }
+    this.voices.clear();
+    const context = this.ctx;
+    this.ctx = null;
+    if (context) void context.close().catch(() => {});
+  }
 
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -68,6 +104,7 @@ class SoundEngine {
 
   // 1. 温暖柔和的按键微触感 (类似木质/机械键盘微触)
   public playClick() {
+    if (!soundEffectsAllowed()) return;
     const ctx = this.getContext();
     if (!ctx) return;
 
@@ -85,6 +122,7 @@ class SoundEngine {
       osc.connect(gain);
       gain.connect(ctx.destination);
 
+      this.track(osc, gain);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.04);
     } catch {}
@@ -92,6 +130,7 @@ class SoundEngine {
 
   // 2. 答对 / 记忆掌握时的温润和弦 (类似木琴 / 卡林巴琴声)
   public playSuccess() {
+    if (!soundEffectsAllowed()) return;
     const ctx = this.getContext();
     if (!ctx) return;
 
@@ -110,6 +149,7 @@ class SoundEngine {
         osc.connect(gain);
         gain.connect(ctx.destination);
 
+        this.track(osc, gain);
         osc.start(ctx.currentTime + idx * 0.06);
         osc.stop(ctx.currentTime + idx * 0.06 + 0.28);
       });
@@ -122,6 +162,7 @@ class SoundEngine {
 
   // 3. 做错时的安抚低音 (不刺耳、非报警声，而是温和的木质提醒)
   public playMistake() {
+    if (!soundEffectsAllowed()) return;
     const ctx = this.getContext();
     if (!ctx) return;
 
@@ -139,6 +180,7 @@ class SoundEngine {
       osc.connect(gain);
       gain.connect(ctx.destination);
 
+      this.track(osc, gain);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.14);
     } catch {}
@@ -150,6 +192,7 @@ class SoundEngine {
 
   // 4. 每日打卡达成 / 连击突破时的庆祝和弦 (Fanfare)
   public playFanfare() {
+    if (!soundEffectsAllowed()) return;
     const ctx = this.getContext();
     if (!ctx) return;
 
@@ -168,6 +211,7 @@ class SoundEngine {
         osc.connect(gain);
         gain.connect(ctx.destination);
 
+        this.track(osc, gain);
         osc.start(ctx.currentTime + idx * 0.08);
         osc.stop(ctx.currentTime + idx * 0.08 + 0.45);
       });
@@ -175,7 +219,15 @@ class SoundEngine {
   }
 }
 
-export const sound = new SoundEngine();
+const soundEngine = new SoundEngine();
+export const sound = soundEngine;
+const unsubscribeSound = usePreferencesStore.subscribe((state, previous) => {
+  if (!state.soundEffectsEnabled && previous.soundEffectsEnabled) soundEngine.stopEffects();
+});
+if (import.meta.hot) import.meta.hot.dispose(() => {
+  unsubscribeSound();
+  soundEngine.stopEffects();
+});
 
 /** 流式语音引擎：唯一合成通道为网关 SSE，首包即播，无一次性兜底。 */
 class SpeechStudioEngine {

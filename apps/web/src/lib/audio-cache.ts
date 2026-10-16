@@ -173,24 +173,64 @@ export async function deleteAudioCache(id: string): Promise<boolean> {
   }
 }
 
-export async function clearAllAudioCache(): Promise<void> {
-  memoryStore.clear();
-  if (!hasIndexedDB()) return;
+export async function clearAllAudioCache(requirePersistent = false): Promise<void> {
+  if (!requirePersistent) memoryStore.clear();
+  if (!hasIndexedDB()) {
+    if (requirePersistent) throw new Error('无法访问持久音频缓存。');
+    return;
+  }
+  let ownedDb: IDBDatabase | undefined;
   try {
     const db = await openDatabase();
+    ownedDb = db;
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const req = store.clear();
-      req.onsuccess = () => resolve();
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error || new Error('清空缓存已中断。'));
+      tx.onerror = () => reject(tx.error || new Error('清空缓存失败。'));
       req.onerror = () => reject(req.error || new Error('Failed to clear audio cache'));
     });
+    if (requirePersistent) memoryStore.clear();
   } catch (error) {
+    if (requirePersistent) throw error;
     console.warn('[AudioCache] Failed to clear IndexedDB:', error);
+  } finally {
+    ownedDb?.close();
   }
 }
 
-export async function listAudioCache(limit = 200): Promise<CachedAudioRecord[]> {
+/** 管理视图必须读到持久库；播放入口继续使用原有内存回退。 */
+async function readPersistentAudioRecords(): Promise<CachedAudioRecord[]> {
+  const db = await openDatabase();
+  try {
+    return await new Promise<CachedAudioRecord[]>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const items: CachedAudioRecord[] = [];
+      const req = tx.objectStore(STORE_NAME).openCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (cursor) {
+          items.push(cursor.value as CachedAudioRecord);
+          cursor.continue();
+        }
+      };
+      req.onerror = () => reject(req.error || new Error('音频缓存读取失败。'));
+      tx.onabort = () => reject(tx.error || new Error('音频缓存读取已中断。'));
+      tx.onerror = () => reject(tx.error || new Error('音频缓存读取失败。'));
+      tx.oncomplete = () => resolve(items);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function listAudioCache(limit = 200, requirePersistent = false): Promise<CachedAudioRecord[]> {
+  if (requirePersistent) {
+    const records = await readPersistentAudioRecords();
+    return records.sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
+  }
   if (!hasIndexedDB()) {
     return Array.from(memoryStore.values())
       .sort((a, b) => b.createdAt - a.createdAt)
@@ -221,7 +261,11 @@ export async function listAudioCache(limit = 200): Promise<CachedAudioRecord[]> 
   }
 }
 
-export async function getAudioCacheStats(): Promise<AudioCacheStats> {
+export async function getAudioCacheStats(requirePersistent = false): Promise<AudioCacheStats> {
+  if (requirePersistent) {
+    const records = await readPersistentAudioRecords();
+    return { count: records.length, totalBytes: records.reduce((sum, item) => sum + (item.sizeBytes || 0), 0) };
+  }
   if (!hasIndexedDB()) {
     let totalBytes = 0;
     for (const item of memoryStore.values()) {

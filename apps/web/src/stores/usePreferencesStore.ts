@@ -46,6 +46,8 @@ export interface PreferencesState {
   coachCollaborationMode: string;
   /** 复习页卡片模板 id（默认 study-basic；持久化偏好） */
   reviewCardFormatId: string;
+  /** 界面音效开关（click/success 等短音；关闭时不发声，不影响学习朗读/录音） */
+  soundEffectsEnabled: boolean;
   /** 目录识别专属 Agent 运行时；空=跟随全局 agentRuntimeId */
   tocReviewRuntimeId: string;
   /** 目录 AI 审核模型 id；空=使用默认（环境变量 > 适配器默认） */
@@ -91,6 +93,7 @@ export interface PreferencesState {
   setCoachPersistThread: (persist: boolean) => void;
   setCoachCollaborationMode: (mode: string) => void;
   setReviewCardFormatId: (formatId: string) => void;
+  setSoundEffectsEnabled: (enabled: boolean) => void;
   setTocReviewRuntimeId: (runtimeId: string) => void;
   setTocReviewModel: (model: string) => void;
   setTocReviewEffort: (effort: string) => void;
@@ -163,6 +166,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       coachPersistThread: true,
       coachCollaborationMode: '',
       reviewCardFormatId: 'study-basic',
+      soundEffectsEnabled: true,
       tocReviewRuntimeId: '',
       tocReviewModel: '',
       tocReviewEffort: '',
@@ -227,6 +231,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       setCoachCollaborationMode: (coachCollaborationMode: string) =>
         set({ coachCollaborationMode }),
       setReviewCardFormatId: (reviewCardFormatId: string) => set({ reviewCardFormatId }),
+      setSoundEffectsEnabled: (soundEffectsEnabled: boolean) => set({ soundEffectsEnabled }),
       setTocReviewRuntimeId: (tocReviewRuntimeId: string) => set((state) => {
         const model = state.runtimeModels[tocReviewRuntimeId] ?? '';
         const effort = state.runtimeEfforts[tocReviewRuntimeId] ?? '';

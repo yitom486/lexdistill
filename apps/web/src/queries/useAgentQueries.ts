@@ -356,8 +356,17 @@ export function useAgentProviderQuery(enabled = true) {
     enabled,
     queryFn: async () => {
       const res = await fetch(`${GATEWAY_BASE_URL}/api/agent/provider`);
-      if (!res.ok) return { configured: false, hasApiKey: false };
-      return readProviderResponse(res);
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as {
+          error?: { userMessage?: string };
+        } | null;
+        throw new Error(payload?.error?.userMessage ?? '暂时无法读取供应商配置。');
+      }
+      const data = (await res.json().catch(() => ({}))) as {
+        provider?: AgentProviderStatusDto;
+      };
+      if (!data.provider) throw new Error('供应商配置返回格式异常。');
+      return data.provider;
     },
     staleTime: 1000 * 60 * 5,
     retry: 1,

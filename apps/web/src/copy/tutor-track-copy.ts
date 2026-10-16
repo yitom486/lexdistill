@@ -52,7 +52,7 @@ export const TUTOR_TRACK_COPY: Record<TrackLanguage, TutorTrackCopy> = {
   ko: {
     trackName: '韩语',
     levelScheme: 'TOPIK',
-    headerHint: '韩语轨道 · TOPIK interim 骨架',
+    headerHint: '韩语轨道 · TOPIK 语法与词尾',
     quickPrompts: [
       '该语法对应的终结词尾是什么？',
       '请提供 3 个韩语生活例句',
@@ -92,7 +92,7 @@ export function buildTutorFreeGreeting(track: TrackLanguage): string {
   const copy = getTutorTrackCopy(track);
   return (
     `你好！我是你的${copy.trackName}专属 AI 导师（${copy.levelScheme}）。` +
-    `可以直接问语法辨析、例句造句或备考建议——回复经 Gateway 流式推送。`
+    `可以直接问语法辨析、例句造句或备考建议。`
   );
 }
 
@@ -102,12 +102,12 @@ export function buildTutorOpeningGreeting(
   offline: boolean
 ): string {
   const copy = getTutorTrackCopy(track);
-  const offlineNote = offline ? '\n\n（Gateway 未连通，可先离线追问；回复将按当前轨道给出骨架示例。）' : '';
+  const offlineNote = offline ? '\n\n（当前未连接，可先离线追问；连接恢复后可点击重发获取 AI 作答。）' : '';
   return (
     `你好！我是你的${copy.trackName}专属 AI 导师（${copy.levelScheme}）。` +
     `针对「${ctx.skillTag}」：\n\n` +
-    `📌 **题目**：\n${ctx.questionText}\n\n` +
-    `💡 **标准解析**：\n${ctx.explanation}\n\n` +
+    `**题目**：\n${ctx.questionText}\n\n` +
+    `**标准解析**：\n${ctx.explanation}\n\n` +
     `你可以直接点击下方快捷追问，或输入你的疑问！` +
     offlineNote
   );

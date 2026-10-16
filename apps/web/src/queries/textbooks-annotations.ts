@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { logger } from '@study-studio/shared';
+import { SavedStructureSchema } from '../lib/document-structure.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { parseTextbookAST, TocEntrySchema, SaveTextbookOutlineResultSchema, type SaveTextbookOutlineRequest, type TextbookAST, type TextbookPipelineSettings } from '@study-studio/document-model';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
@@ -40,8 +41,8 @@ import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 /** P1-2 拆分：教材 / 批注组（自 useLearnerQueries.ts 逐行平移，仅改 import）。 */
 
 /**
- * 教材知识树查询（Gateway documents 为 SSOT；空库 / 失败时返回空数组，
- * 由 UI 显式提示导入或等待内置课程种子，不再回退到前端内置教材内容）。
+ * 教材知识树查询（Gateway documents 为 SSOT；成功空库返回空数组，
+ * 读取失败交给 Query 保留缓存并暴露错误，不把失败伪装为空库）。
  *
  * QueryKey 豁免说明（G2）：本键不带 track——documents 按 userId 隔离，
  * 教材 Tab 仅在 ja 轨道开放（见 learning-shell allowedTabs），无跨语种串扰；
@@ -53,6 +54,12 @@ export function useTextbooksQuery(userId = DEFAULT_USER_ID) {
     queryFn: async () => {
       try {
         const res = await apiClient.api.documents[':userId'].$get({ param: { userId } });
+        if (!res.ok) {
+          const payload: unknown = await res.json().catch(() => null);
+          throw new GatewayRequestError(readGatewayUserMessage(payload, '暂时无法读取已保存教材。'), {
+            code: readGatewayErrorCode(payload),
+          });
+        }
         if (res.ok) {
           const docs = await res.json();
           if (Array.isArray(docs) && docs.length > 0) {
@@ -72,6 +79,7 @@ export function useTextbooksQuery(userId = DEFAULT_USER_ID) {
         }
       } catch (e) {
         logger.debug('[useTextbooksQuery] failed to load documents from gateway', e);
+        throw e instanceof GatewayRequestError ? e : new GatewayRequestError('暂时无法读取已保存教材。');
       }
       return [];
     },
@@ -123,14 +131,14 @@ export function useAnnotationsQuery(documentId: string, userId = DEFAULT_USER_ID
         const res = await apiClient.api.annotations[':userId'][':documentId'].$get({
           param: { userId, documentId },
         });
-        if (res.ok) {
-          const list = await res.json();
-          if (Array.isArray(list)) return list;
-        }
+        if (!res.ok) throw new Error('批注读取失败，请重试。');
+        const list = await res.json();
+        if (!Array.isArray(list)) throw new Error('批注内容无法读取，请重试。');
+        return list;
       } catch (e) {
         logger.debug('[useAnnotationsQuery] Hono RPC failed to load annotations', e);
+        throw e instanceof Error ? e : new Error('批注读取失败，请重试。');
       }
-      return [];
     },
     enabled: Boolean(documentId),
     staleTime: 1000 * 60 * 2,
@@ -183,7 +191,7 @@ export function useReadingPositionQuery(documentId?: string, userId = DEFAULT_US
         const res = await fetch(
           `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${encodeURIComponent(documentId)}/position`
         );
-        if (!res.ok) return null;
+        if (!res.ok) throw new Error('阅读位置读取失败，请重试。');
         const payload: unknown = await res.json().catch(() => null);
         const position =
           typeof payload === 'object' && payload !== null && 'position' in payload
@@ -200,7 +208,7 @@ export function useReadingPositionQuery(documentId?: string, userId = DEFAULT_US
         return out;
       } catch (e) {
         logger.debug('[useReadingPositionQuery] failed', e);
-        return null;
+        throw e instanceof Error ? e : new Error('阅读位置读取失败，请重试。');
       }
     },
     enabled: Boolean(documentId),
@@ -820,10 +828,13 @@ export function useDocumentStructureQuery(documentId: string | undefined, userId
       const res = await fetch(
         `${GATEWAY_BASE_URL}/api/documents/${encodeURIComponent(userId)}/${encodeURIComponent(documentId)}/structure`
       );
-      if (!res.ok) return null;
-      const payload: unknown = await res.json().catch(() => null);
-      if (!payload || typeof payload !== 'object') return null;
-      return payload as SavedStructure;
+      if (!res.ok) throw new Error('教材结构存档读取失败，请重试。');
+      const payload: unknown = await res.json();
+      if (payload === null) return null;
+      const parsed = SavedStructureSchema.safeParse(payload);
+      if (!parsed.success) throw new Error('教材结构存档格式不完整，请重试。');
+      if (parsed.data.documentId !== documentId) throw new Error('教材结构存档与当前教材不匹配。');
+      return parsed.data;
     },
     staleTime: 1000 * 60 * 5,
   });

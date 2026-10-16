@@ -44,13 +44,22 @@ export function useCardsQuery(userIdOverride?: string, langOverride?: string) {
   return useQuery<StudyCardItem[]>({
     queryKey: [...QUERY_KEYS.CARDS, userId, targetLanguage],
     queryFn: async () => {
+      // R06：失败直接抛出（调用方区分成功空与读取失败）；key/重试/staleTime 不变
+      const url = `${GATEWAY_BASE_URL}/api/cards/${userId}?lang=${targetLanguage}`;
+      let res: Response;
       try {
-        const url = `${GATEWAY_BASE_URL}/api/cards/${userId}?lang=${targetLanguage}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const list = (await res.json()) as unknown;
-          if (Array.isArray(list)) {
-            return (list as Array<Record<string, unknown>>).map((c) => {
+        res = await fetch(url);
+      } catch (e) {
+        logger.debug('[useCardsQuery] failed to load cards', e);
+        throw new Error('生词闪卡读取失败，请重试。');
+      }
+      if (!res.ok) {
+        logger.debug('[useCardsQuery] cards request failed', res.status);
+        throw new Error('生词闪卡读取失败，请重试。');
+      }
+      const list = (await res.json()) as unknown;
+      if (Array.isArray(list)) {
+        return (list as Array<Record<string, unknown>>).map((c) => {
               const fsrs = (c.fsrs ?? {}) as Record<string, unknown>;
               const fsrsState = rowStr(fsrs, 'state');
               return {
@@ -90,14 +99,11 @@ export function useCardsQuery(userIdOverride?: string, langOverride?: string) {
               };
             });
           }
-        }
-      } catch (e) {
-        logger.debug('[useCardsQuery] failed to load cards', e);
-      }
-      return [];
-    },
-    staleTime: 1000 * 60 * 5,
-  });
+          logger.debug('[useCardsQuery] unexpected cards payload');
+          throw new Error('生词闪卡读取失败，请重试。');
+        },
+        staleTime: 1000 * 60 * 5,
+      });
 }
 
 /** 追加 / 批量追加闪卡并经由 Hono RPC 持久化到 Gateway */
@@ -209,11 +215,11 @@ export function useUpdateCardMutation(userIdOverride?: string) {
 
 /** 教材生词 → StudyCardItem */
 export function vocabToStudyCard(
-  vocab: { front: string; back: string; category: string; prompt: string },
+  vocab: { id?: string; front: string; back: string; category: string; prompt: string },
   idx = 0
 ): StudyCardItem {
   return {
-    id: `card_tb_${Date.now()}_${idx}`,
+    id: vocab.id ?? `card_tb_${Date.now()}_${idx}`,
     type: 'VOCAB',
     frontWord: vocab.front,
     reading: '',
@@ -238,13 +244,25 @@ export function useMistakesQuery(userId = DEFAULT_USER_ID, langOverride?: string
   return useQuery<MistakeNotebookItem[]>({
     queryKey: [...QUERY_KEYS.MISTAKES, userId, targetLanguage],
     queryFn: async () => {
+      // R06：失败直接抛出（调用方区分成功空与读取失败）；key/重试/staleTime 不变
+      const url = `${GATEWAY_BASE_URL}/api/mistakes/${userId}?lang=${targetLanguage}`;
+      let res: Response;
       try {
-        const url = `${GATEWAY_BASE_URL}/api/mistakes/${userId}?lang=${targetLanguage}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const list = (await res.json()) as unknown;
-          if (Array.isArray(list)) {
-            return (list as Array<Record<string, unknown>>).map((m) => {
+        res = await fetch(url);
+      } catch (e) {
+        logger.debug('[useMistakesQuery] failed to load mistakes', e);
+        throw new Error('错题本读取失败，请重试。');
+      }
+      if (!res.ok) {
+        logger.debug('[useMistakesQuery] mistakes request failed', res.status);
+        throw new Error('错题本读取失败，请重试。');
+      }
+      const list = (await res.json()) as unknown;
+      if (!Array.isArray(list)) {
+        logger.debug('[useMistakesQuery] unexpected mistakes payload');
+        throw new Error('错题本读取失败，请重试。');
+      }
+      return (list as Array<Record<string, unknown>>).map((m) => {
               const question = (m.question ?? {}) as Record<string, unknown>;
               const grading = (m.lastGrading ?? {}) as Record<string, unknown>;
               return {
@@ -260,12 +278,6 @@ export function useMistakesQuery(userId = DEFAULT_USER_ID, langOverride?: string
                 isResolved: Boolean(m.isResolved),
               };
             });
-          }
-        }
-      } catch (e) {
-        logger.debug('[useMistakesQuery] failed to load mistakes', e);
-      }
-      return [];
     },
     staleTime: 1000 * 60 * 1,
   });

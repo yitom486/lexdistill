@@ -20,19 +20,18 @@ export function useLearnerProfileQuery(userId = DEFAULT_USER_ID, langOverride?: 
   return useQuery<SkillMetric[]>({
     queryKey: [...QUERY_KEYS.PROFILE, userId, targetLanguage],
     queryFn: async () => {
-      try {
-        const url = `${GATEWAY_BASE_URL}/api/profile/${userId}?lang=${targetLanguage}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if ('allMetrics' in data && Array.isArray(data.allMetrics)) {
-            return data.allMetrics as SkillMetric[];
-          }
-        }
-      } catch (e) {
-        logger.debug('[useLearnerProfileQuery] failed to load profile', e);
+      // R06：失败直接抛出（调用方区分成功空与读取失败）；key/重试/staleTime 不变
+      const url = `${GATEWAY_BASE_URL}/api/profile/${userId}?lang=${targetLanguage}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        logger.debug('[useLearnerProfileQuery] profile request failed', res.status);
+        throw new Error('学情画像读取失败，请重试。');
       }
-      return [];
+      const data = await res.json();
+      if (data && typeof data === 'object' && Array.isArray(data.allMetrics)) {
+        return data.allMetrics as SkillMetric[];
+      }
+      throw new Error('学情画像数据无效，请重试。');
     },
     staleTime: 1000 * 60 * 2,
   });
@@ -213,19 +212,21 @@ export function useActivityHistoryQuery(
   return useQuery<DailyTaskProgress[]>({
     queryKey: [...QUERY_KEYS.ACTIVITY_HISTORY, userId, days, targetLanguage ?? 'all'],
     queryFn: async () => {
-      try {
-        const url = new URL(`${GATEWAY_BASE_URL}/api/task/history/${userId}`);
-        url.searchParams.set('days', String(days));
-        if (targetLanguage) url.searchParams.set('lang', targetLanguage);
-        const res = await fetch(url.toString());
-        if (res.ok) {
-          const list = (await res.json()) as DailyTaskProgress[];
-          if (Array.isArray(list)) return list;
-        }
-      } catch (e) {
-        logger.debug('[useActivityHistoryQuery] Failed to load activity history', e);
+      // R06：失败直接抛出（热力图区分成功空与读取失败）；其余不变
+      const url = new URL(`${GATEWAY_BASE_URL}/api/task/history/${userId}`);
+      url.searchParams.set('days', String(days));
+      if (targetLanguage) url.searchParams.set('lang', targetLanguage);
+      const res = await fetch(url.toString());
+      if (!res.ok) {
+        logger.debug('[useActivityHistoryQuery] history request failed', res.status);
+        throw new Error('学习足迹读取失败，请重试。');
       }
-      return [];
+      const list = (await res.json()) as DailyTaskProgress[];
+      if (!Array.isArray(list)) {
+        logger.debug('[useActivityHistoryQuery] unexpected history payload');
+        throw new Error('学习足迹读取失败，请重试。');
+      }
+      return list;
     },
     staleTime: 1000 * 30,
   });
@@ -294,7 +295,7 @@ export function useLevelInfoQuery(userId = DEFAULT_USER_ID, langOverride?: strin
         const res = await fetch(
           `${GATEWAY_BASE_URL}/api/level/${encodeURIComponent(userId)}?lang=${targetLanguage}`
         );
-        if (!res.ok) return null;
+        if (!res.ok) throw new Error('定级信息读取失败，请重试。');
         const data: unknown = await res.json().catch(() => null);
         const rec = (typeof data === 'object' && data !== null ? data : {}) as Record<string, unknown>;
         if (
@@ -308,8 +309,9 @@ export function useLevelInfoQuery(userId = DEFAULT_USER_ID, langOverride?: strin
         }
       } catch (e) {
         logger.debug('[useLevelInfoQuery] Failed to load level info', e);
+        throw new Error('定级信息读取失败，请重试。');
       }
-      return null;
+      throw new Error('定级信息数据无效，请重试。');
     },
     staleTime: 1000 * 30,
   });
