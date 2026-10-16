@@ -65,7 +65,7 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
       setEditing(null);
       setProposal({ suggestedName: p.suggestedName, blocks: p.blocks });
       setEditorOpen(true);
-      toast.success('已生成智能建议草案，可在编辑器中调整后保存');
+      toast.success('已生成 AI 建议草案，可在编辑器中调整后保存');
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -130,7 +130,7 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
             setEditorOpen(true);
           }}><Plus className="mr-1 h-3 w-3" />综合学习</Button>
           <Button size="sm" variant="outline" onClick={handlePropose} disabled={proposeMutation.isPending}>
-            <Sparkles className="mr-1 h-3 w-3" />智能建议
+            <Sparkles className="mr-1 h-3 w-3" />AI 建议
           </Button>
           <Button size="sm" onClick={openNew}>
             <Plus className="mr-1 h-3 w-3" />新建
@@ -161,7 +161,7 @@ export function PracticePlanPanel({ userId, language }: PracticePlanPanelProps) 
                   {tpl.name}
                 </span>
                 {isDueToday(tpl) && (
-                  <Badge variant="default" className="text-[10px] px-1.5 py-0">今日适用</Badge>
+                  <Badge variant="default" className="text-xs px-1.5 py-0">今日适用</Badge>
                 )}
                 <Badge variant="secondary">revision {tpl.revision}</Badge>
               </div>

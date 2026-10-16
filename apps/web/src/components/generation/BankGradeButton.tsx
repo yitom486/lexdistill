@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { BankSubmissionRecord } from '@study-studio/protocol';
 import { Button } from '../ui/button.js';
 import { useGradeBankSubjectiveMutation } from '../../queries/generation.js';
@@ -13,6 +13,15 @@ export function BankGradeButton({ userId, taskId, paperId, submission, onSettled
 }) {
   const grade = useGradeBankSubjectiveMutation(userId);
   const [error, setError] = useState<string | null>(null);
+  // 同步批改锁：与 disabled 双重保护同 tick 连击
+  const gradingRef = useRef(false);
+  const mounted = useRef(false);
+  const liveSubmission = useRef('');
+  liveSubmission.current = submission.submissionId;
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   if (submission.status === 'GRADED') {
     const percent = submission.score !== null ? Math.round(submission.score * 100) : null;
@@ -26,11 +35,20 @@ export function BankGradeButton({ userId, taskId, paperId, submission, onSettled
 
   const run = async () => {
     setError(null);
+    if (grade.isPending || gradingRef.current) return;
+    gradingRef.current = true;
+    const submissionId = submission.submissionId;
+    const isCurrent = () => mounted.current && submissionId === liveSubmission.current;
     try {
       await grade.mutateAsync({ taskId, paperId, submissionId: submission.submissionId });
-      onSettled();
     } catch (cause) {
+      if (!isCurrent()) return;
       setError(cause instanceof Error ? cause.message : '批改失败');
+    } finally {
+      gradingRef.current = false;
+      if (isCurrent()) {
+        onSettled();
+      }
     }
   };
 

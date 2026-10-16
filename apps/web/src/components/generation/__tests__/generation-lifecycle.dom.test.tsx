@@ -16,7 +16,12 @@ async function flow() {
     await h.waitFor(() => Boolean(h.doc.querySelector('button[aria-label="开始出题"]')));
     h.flags.failNext = true;
     await h.click('开始出题');
-    await h.waitFor(() => h.doc.body.textContent?.includes('后台出题失败') === true);
+    try {
+      await h.waitFor(() => h.doc.body.textContent?.includes('后台出题失败') === true);
+    } catch (cause) {
+      console.error('Failure-state DOM:', h.doc.body.textContent);
+      throw cause;
+    }
 
     // 取消进行中任务并确认状态。
     await h.click('新建任务');

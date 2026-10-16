@@ -48,7 +48,7 @@ function useLevelUpWatcher(level: LevelInfo['level'] | undefined) {
 export function LevelCard() {
   const shell = useLearningShell();
   const profileUserId = useUserProfileStore((s) => s.profile.userId || DEFAULT_USER_ID);
-  const { data: info } = useLevelInfoQuery(undefined, shell.track);
+  const { data: info, isLoading, isError, refetch } = useLevelInfoQuery(undefined, shell.track);
   useLevelUpWatcher(info?.level);
   const startExam = useStartPlacementMutation();
   const finishExam = useFinishPlacementMutation();
@@ -84,28 +84,28 @@ export function LevelCard() {
                   {g.label}：{g.correct}/{g.graded}（线 {g.minCorrect}）
                 </span>
                 {g.thin ? (
-                  <Badge variant="amber" className="text-[10px]">
+                  <Badge variant="amber" className="text-xs">
                     题量不足·仅供参考
                   </Badge>
                 ) : g.met ? (
-                  <Badge variant="emerald" className="text-[10px]">
+                  <Badge variant="emerald" className="text-xs">
                     达标
                   </Badge>
                 ) : (
-                  <Badge variant="destructive" className="text-[10px]">
+                  <Badge variant="destructive" className="text-xs">
                     未达标
                   </Badge>
                 )}
               </div>
             ))}
             {(result.uncoveredGroups ?? []).length > 0 && (
-              <p className="text-[11px] text-ink-stone-400">
+              <p className="text-xs text-ink-stone-400">
                 部分考点题库不足未覆盖，本次不计入判定（待题库扩充）。
               </p>
             )}
           </div>
         )}
-        <p className="text-[11px] text-ink-stone-500">
+        <p className="text-xs text-ink-stone-500">
           {result.passed
             ? `已定为${LEVEL_LABELS[result.level]}。`
             : result.failReasons?.length
@@ -170,6 +170,25 @@ export function LevelCard() {
   const current = info?.level ?? 'NOVICE';
   const higher = LEVEL_ORDER.filter((l) => LEVEL_ORDER.indexOf(l) > LEVEL_ORDER.indexOf(current));
 
+  // 首读中与无数据失败不伪装成已定档；无错误记录时沿用 NOVICE 默认
+  if (isLoading && !info) {
+    return (
+      <section className="rounded-2xl border border-line-accent bg-paper-soft p-4 shadow-sm" aria-label="当前档位">
+        <p className="text-xs text-ink-faint-soft">正在读取定级信息…</p>
+      </section>
+    );
+  }
+  if (isError && !info) {
+    return (
+      <section className="rounded-2xl border border-line-rose-500o20 bg-wash-rose-500o5 p-4 space-y-2" aria-label="当前档位">
+        <p className="text-xs text-ink-rose-600-rose-400">定级信息读取失败，档位未知。</p>
+        <Button size="sm" variant="ghost" onClick={() => void refetch()}>
+          重试
+        </Button>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-2xl border border-line-accent bg-paper-soft p-4 shadow-sm space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -211,6 +230,7 @@ export function LevelCard() {
         {info?.hint ? info.hint : `通过${higher[0] ? LEVEL_LABELS[higher[0]] : ''}阶段测评后升级`}
         <span className="text-ink-stone-400 ml-1.5">（日常失误不降级 · 收藏数量不计入晋级）</span>
       </p>
+      {isError && info && <p className="text-xs text-ink-faint-soft">档位可能不是最新。<Button size="sm" variant="ghost" onClick={() => void refetch()}>重试</Button></p>}
     </section>
   );
 }

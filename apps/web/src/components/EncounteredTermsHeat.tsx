@@ -11,7 +11,8 @@ import { useEncounteredTermsQuery, useBackfillEncounteredTermsMutation } from '.
 export function EncounteredTermsHeat() {
   const shell = useLearningShell();
   const setActiveTab = useStudySessionStore((s) => s.setActiveTab);
-  const { data: terms = [], isLoading } = useEncounteredTermsQuery(shell.track, 50);
+  const { data, isLoading, isError, refetch } = useEncounteredTermsQuery(shell.track, 50);
+  const terms = data ?? [];
   const backfill = useBackfillEncounteredTermsMutation(shell.track);
   const [showAll, setShowAll] = useState(false);
 
@@ -20,15 +21,23 @@ export function EncounteredTermsHeat() {
 
   return (
     <div className="bg-paper-soft rounded-2xl p-5 border border-line-accent shadow-sm space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-ink-mute flex items-center gap-2">
           <Flame className="w-4 h-4 text-accent-ink" />
-          相遇词热力（{terms.length}）
+          相遇词热力（{data === undefined ? '—' : terms.length}）
         </h3>
-        <span className="text-[11px] text-ink-stone-400">查过/收过的词，见得越多越热 · 点词去生词本</span>
+        <span className="text-xs text-ink-stone-400">查过/收过的词，见得越多越热 · 点词去生词本</span>
       </div>
-      {isLoading ? (
+      {isError && data !== undefined && <p className="text-xs text-ink-faint-soft">相遇词可能不是最新。<Button size="sm" variant="ghost" onClick={() => void refetch()}>重试</Button></p>}
+      {isLoading && terms.length === 0 ? (
         <p className="text-xs text-ink-stone-400">加载中…</p>
+      ) : isError && data === undefined ? (
+        <div className="py-4 px-4 text-center rounded-xl bg-veil-stone-100o50-stone-900o30 border border-dashed border-line-soft space-y-2">
+          <p className="text-xs text-ink-rose-600-rose-400">相遇词读取失败。</p>
+          <Button size="sm" variant="ghost" onClick={() => void refetch()}>
+            重试
+          </Button>
+        </div>
       ) : terms.length === 0 ? (
         <div className="py-4 px-4 text-center rounded-xl bg-veil-stone-100o50-stone-900o30 border border-dashed border-line-soft space-y-2">
           <p className="text-xs text-ink-ghost">
@@ -77,14 +86,15 @@ export function EncounteredTermsHeat() {
                 key={t.termKey}
                 type="button"
                 title={`${t.headword}${t.reading ? `（${t.reading}）` : ''} · 相遇 ${t.exposureCount} 次 · ${t.status === 'collected' ? '已收藏' : '见过'}`}
+                aria-label={`${t.headword}，相遇 ${t.exposureCount} 次，${t.status === 'collected' ? '已收藏' : '仅见过'}，前往生词本`}
                 onClick={() => {
                   sound.playClick();
                   setActiveTab('CARDS');
                 }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-semibold cursor-pointer transition-colors border-line-amber-500o30 bg-wash-amber-500o5 hover:bg-wash-amber-500o15 text-ink-mute-deep"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-semibold cursor-pointer transition-colors border-line-amber-500o30 bg-wash-amber-500o5 hover:bg-wash-amber-500o15 text-ink-mute-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
               >
                 <span>{t.headword}</span>
-                <span className="font-mono text-[10px] text-accent-ink">
+                <span className="font-mono text-xs text-accent-ink">
                   ×{t.exposureCount}
                 </span>
                 {t.status === 'collected' && (
@@ -102,7 +112,8 @@ export function EncounteredTermsHeat() {
                   sound.playClick();
                   setShowAll((v) => !v);
                 }}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent-ink hover:underline cursor-pointer"
+                aria-expanded={showAll}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-accent-ink hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
               >
                 <span>{showAll ? '收起部分' : `展开全部 ${terms.length} 个词`}</span>
                 {showAll ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}

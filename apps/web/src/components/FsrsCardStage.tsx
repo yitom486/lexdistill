@@ -23,6 +23,8 @@ interface FsrsCardStageProps {
   onOpenDict?: () => void;
   onToggleDeepStudy?: () => void;
   isDeepStudyOpen?: boolean;
+  active?: boolean;
+  reviewPending?: boolean;
 }
 
 /**
@@ -40,6 +42,8 @@ export function FsrsCardStage({
   onOpenDict,
   onToggleDeepStudy,
   isDeepStudyOpen,
+  active = true,
+  reviewPending = false,
 }: FsrsCardStageProps) {
   const isCustomFormat = Boolean(reviewFormat && reviewFormat.id !== 'study-basic');
   const renderedReview = useMemo(() => {
@@ -53,9 +57,13 @@ export function FsrsCardStage({
   }, [card, reviewFormat, isCustomFormat]);
 
   useEffect(() => {
+    if (!active || reviewPending) return;
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
-      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return;
+      if (typeof target?.closest === 'function' && target.closest('input,textarea,button,a,select,[role="dialog"],[role="combobox"],[contenteditable="true"]')) return;
+      // 卡片自身聚焦时走元素级处理（Enter/Space），避免与全局翻卡重复触发
+      if (typeof target?.closest === 'function' && target.closest('.fsrs-card-stage')) return;
       if (e.code === 'Space') {
         e.preventDefault();
         onFlip();
@@ -71,14 +79,33 @@ export function FsrsCardStage({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cardFlipped, onFlip, onReview]);
+  }, [active, reviewPending, cardFlipped, onFlip, onReview]);
+
+  const handleStageKeyDown = (e: React.KeyboardEvent) => {
+    if (!active || reviewPending || e.target !== e.currentTarget || e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onFlip();
+      return;
+    }
+    // 聚焦卡片时数字键同样评级（全局监听会跳过卡片内部目标，此处补上）
+    if (cardFlipped) {
+      const ratingMap: Record<string, CardReviewRating> = { '1': 'AGAIN', '2': 'HARD', '3': 'GOOD', '4': 'EASY' };
+      if (ratingMap[e.key]) {
+        e.preventDefault();
+        onReview(ratingMap[e.key]!);
+      }
+    }
+  };
 
   return (
     <div
       onClick={onFlip}
-      className="fsrs-card-stage min-h-115 cursor-pointer select-none"
+      onKeyDown={handleStageKeyDown}
+      tabIndex={0}
+      className="fsrs-card-stage min-h-115 cursor-pointer select-none rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
       role="region"
-      aria-label="闪卡卡片"
+      aria-label="闪卡卡片（聚焦后按回车或空格翻卡）"
     >
       <div className="fsrs-card-viewport surface-card relative min-h-115 w-full overflow-hidden rounded-3xl transition-colors">
         <div
@@ -93,6 +120,7 @@ export function FsrsCardStage({
           {/* 正面 */}
           <div
             aria-hidden={cardFlipped}
+            inert={cardFlipped}
             className={cn(
               'fsrs-card-face shadow-inner-hi absolute inset-0 overflow-y-auto rounded-3xl p-7',
               cardFlipped ? 'pointer-events-none' : 'pointer-events-auto'
@@ -109,7 +137,7 @@ export function FsrsCardStage({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="h-6 px-2 text-[11px] gap-1 text-ink-ghost hover:text-ink"
+                      className="h-6 px-2 text-xs gap-1 text-ink-ghost hover:text-ink"
                       onClick={onOpenDict}
                       title="查完整离线词典条目"
                     >
@@ -122,7 +150,7 @@ export function FsrsCardStage({
                       type="button"
                       size="sm"
                       variant="secondary"
-                      className="h-6 px-2 text-[11px] gap-1"
+                      className="h-6 px-2 text-xs gap-1"
                       onClick={onAskAi}
                       title="呼出 AI 导师讲透用法"
                     >
@@ -130,7 +158,7 @@ export function FsrsCardStage({
                       问 AI 讲透
                     </Button>
                   )}
-                  <span className="text-[11px] text-ink-stone-400 font-mono">
+                  <span className="text-xs text-ink-stone-400 font-mono">
                     {card.stability}d · {card.reps}次
                   </span>
                 </div>
@@ -197,6 +225,7 @@ export function FsrsCardStage({
             onOpenDict={onOpenDict}
             onToggleDeepStudy={onToggleDeepStudy}
             isDeepStudyOpen={isDeepStudyOpen}
+            reviewPending={reviewPending}
           />
         </div>
       </div>

@@ -1,5 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useMotionPreference } from '../hooks/useMotionPreference.js';
+import { readCssDurationSeconds } from '../lib/css-tokens.js';
 import { toast } from 'sonner';
 import { Brain, RefreshCw, Lightbulb, Target, BookOpen, Sparkles } from 'lucide-react';
 import type { LearningAnalysisReport, LearningSuggestion } from '@study-studio/protocol';
@@ -31,6 +33,8 @@ const KIND_ICON: Record<LearningSuggestion['kind'], React.ReactNode> = {
 export function LearningAnalysisPanel({ userId }: { userId?: string }) {
   const { data, isLoading, isError } = useLearningAnalysisQuery(userId);
   const refresh = useRefreshLearningAnalysisMutation(userId);
+  // R10：减少动态效果时级联延迟归零，列表直接呈现终态
+  const reduceMotion = useMotionPreference();
 
   const report = data ?? null;
   const source = report?.source ?? 'local-rules';
@@ -76,9 +80,9 @@ export function LearningAnalysisPanel({ userId }: { userId?: string }) {
             {report.suggestions.map((s, idx) => (
               <motion.li
                 key={`${s.kind}-${idx}`}
-                initial={{ opacity: 0, y: 4 }}
+                initial={reduceMotion ? false : { opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.04 }}
+                transition={{ delay: reduceMotion ? 0 : idx * readCssDurationSeconds('--motion-analysis-stagger'), duration: readCssDurationSeconds('--motion-layout-enter-duration') }}
                 className="flex gap-2 rounded-lg border bg-background/60 p-2.5"
               >
                 <span className="mt-0.5 shrink-0">{KIND_ICON[s.kind]}</span>

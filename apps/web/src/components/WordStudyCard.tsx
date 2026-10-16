@@ -122,7 +122,7 @@ export function WordStudyCard({
       </ol>
       {examples.data !== undefined && examples.data !== null && examples.data.length > 0 && (
         <div className="space-y-1.5 rounded-xl bg-surface-stone-50-stone-900o60 p-3">
-          <p className="text-[11px] font-bold text-ink-ghost">例句</p>
+          <p className="text-xs font-bold text-ink-ghost">例句</p>
           {examples.data.map((e, i) => (
             <div key={i} className="space-y-0.5">
               <p className="text-sm text-ink-deep">{e.sentence}</p>
@@ -132,7 +132,10 @@ export function WordStudyCard({
         </div>
       )}
       {examples.isFetching && (
-        <p className="text-[11px] text-ink-stone-400">例句生成中…</p>
+        <p className="text-xs text-ink-stone-400">例句生成中…</p>
+      )}
+      {examples.isError && (
+        <p className="text-xs text-ink-stone-400">例句暂不可用，可点“问 AI 讲透”获取例句。</p>
       )}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <Button type="button" size="sm" className="gap-1.5" onClick={handleAskAi} title="让 AI 讲用法和例句">
@@ -172,7 +175,7 @@ export function WordStudyCard({
           <Check className="h-3.5 w-3.5" />
           {studyPending ? '入库中…' : '学透了，入库开练'}
         </Button>
-        <span className="text-[11px] text-ink-stone-400">只收不标的不进练习池——别裸考。</span>
+        <span className="text-xs text-ink-stone-400">只收不标的不进练习池——别裸考。</span>
       </div>
       <DictionaryEntryDialog
         open={dictOpen}

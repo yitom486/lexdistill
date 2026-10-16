@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { toast } from 'sonner';
-import { Award, Layers, AlertTriangle } from 'lucide-react';
-import { BentoGrid, BentoCard, NumberTicker } from './magicui/index.js';
+import { Award } from 'lucide-react';
 import { StudyStreakHeatmap } from './StudyStreakHeatmap.js';
 import { LevelCard } from './LevelCard.js';
 import { EncounteredTermsHeat } from './EncounteredTermsHeat.js';
@@ -11,30 +9,53 @@ import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { useLearningShell } from '../hooks/useLearningShell.js';
 import { summarizeLearningEvidence, type SkillMetric } from '@study-studio/learner-core';
+import type { StudyCardItem, MistakeNotebookItem } from '../models/learning.js';
 import { Tabs, TabsList, TabsTrigger, TabsIndicator } from './ui/tabs.js';
 import { Button } from './ui/button.js';
 import { Progress } from './ui/progress.js';
 import { Badge } from './ui/badge.js';
+import { NextStepStrip, type NextStep } from './learner-dashboard/NextStepStrip.js';
+import { EvidenceOverview } from './learner-dashboard/EvidenceOverview.js';
+import { sourceKind } from './learner-dashboard/source-view.js';
+
+/** 查询快照：App 透传同 queryKey 的真实查询结果，展示层只读状态派生视图。 */
+export interface RadarQuerySnapshot<T> {
+  data: T | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  refetch: () => void;
+}
 
 interface LearnerRadarDashboardProps {
-  metrics: SkillMetric[];
-  activeCardsCount: number;
-  unresolvedMistakesCount: number;
+  cardsQuery: RadarQuerySnapshot<StudyCardItem[]>;
+  mistakesQuery: RadarQuerySnapshot<MistakeNotebookItem[]>;
+  metricsQuery: RadarQuerySnapshot<SkillMetric[]>;
 }
 
 export function LearnerRadarDashboard({
-  metrics,
-  activeCardsCount,
-  unresolvedMistakesCount,
+  cardsQuery,
+  mistakesQuery,
+  metricsQuery,
 }: LearnerRadarDashboardProps) {
   const [metricDimension, setMetricDimension] = useState<string>('ALL');
   const setActiveTab = useStudySessionStore((s) => s.setActiveTab);
   const profile = useUserProfileStore((s) => s.profile);
   const shell = useLearningShell();
 
+  const cards = cardsQuery.data;
+  const mistakes = mistakesQuery.data;
+  const metrics = metricsQuery.data;
+  const cardsView = sourceKind(cards, cardsQuery.isLoading, cardsQuery.isError);
+  const mistakesView = sourceKind(mistakes, mistakesQuery.isLoading, mistakesQuery.isError);
+  const metricsView = sourceKind(metrics, metricsQuery.isLoading, metricsQuery.isError);
+  const cardsStale = cardsQuery.isError && cards !== undefined;
+  const mistakesStale = mistakesQuery.isError && mistakes !== undefined;
+  const metricsStale = metricsQuery.isError && metrics !== undefined;
+
   // 前端防御层：严禁非日语轨道混入 jp.* 日语技能，反之亦然
   const displayMetrics = useMemo<SkillMetric[]>(() => {
-    return metrics.filter((m: SkillMetric) => {
+    return (metrics ?? []).filter((m: SkillMetric) => {
       if (shell.track !== 'ja' && m.id.startsWith('jp.')) return false;
       if (shell.track !== 'en' && m.id.startsWith('en.')) return false;
       if (shell.track !== 'ko' && m.id.startsWith('ko.')) return false;
@@ -44,7 +65,25 @@ export function LearnerRadarDashboard({
 
   const evidence = summarizeLearningEvidence(displayMetrics, shell.track);
   const practicePercent = evidence.accuracy === null ? null : Math.round(evidence.accuracy * 100);
-  const retentionPercent = Math.round((profile.retentionRate || 0) * 100);
+  const unresolved = (mistakes ?? []).filter((m) => !m.isResolved).length;
+  const nowIso = new Date().toISOString();
+  const dueCards = (cards ?? []).filter((c) => !c.dueAt || c.dueAt <= nowIso).length;
+
+  // 下一步：只用已就绪来源的真实计数排优先级，无依据时不渲染
+  let nextStep: NextStep | null = null;
+  if (mistakesView === 'ready' && unresolved > 0) {
+    nextStep = { text: `错题本还有 ${unresolved} 道待攻克`, cta: '去清错题', tab: 'MISTAKES' };
+  } else if (cardsView === 'ready' && dueCards > 0) {
+    nextStep = { text: `${dueCards} 张闪卡到期待复习`, cta: '去复习闪卡', tab: 'CARDS' };
+  } else if ((metricsView === 'ready' || metricsView === 'empty') && evidence.status === 'unassessed') {
+    nextStep = { text: '从一次自适应做题开始建立画像', cta: '去做题', tab: 'QUIZ' };
+  } else if (metricsView === 'ready' && cardsView === 'ready' && mistakesView === 'ready') {
+    nextStep = { text: '保持节奏，今日复习见今日计划', cta: '去今日学习', tab: 'TODAY' };
+  }
+  if (nextStep && ((nextStep.tab === 'MISTAKES' && mistakesStale) ||
+    (nextStep.tab === 'CARDS' && cardsStale) || (nextStep.tab === 'QUIZ' && metricsStale))) {
+    nextStep = { ...nextStep, text: `按上次记录：${nextStep.text}` };
+  }
 
   const dimensionCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: displayMetrics.length };
@@ -67,56 +106,28 @@ export function LearnerRadarDashboard({
       {/* 档位状态机：当前档 + 升级提示 + 定级考 */}
       <LevelCard />
 
-      {/* Magic UI BentoGrid 核心概览指标 */}
-      <BentoGrid className="auto-rows-fr md:grid-cols-3 gap-4">
-        <BentoCard
-          name="已练内容正确率"
-          Icon={Award}
-          className="p-5 min-h-[10.5rem]"
-          description={evidence.attempts > 0 ? `${evidence.correct}/${evidence.attempts} 次答对 · ${evidence.observedSkillCount} 个已练技能；不代表整体水平` : '尚无有效练习记录，未测能力保持未知'}
-        >
-          <div className="flex items-baseline gap-2 pt-2">
-            <span className="text-3xl font-bold font-mono text-accent-ink leading-none">
-              {practicePercent === null ? '待评测' : <><NumberTicker value={practicePercent} />%</>}
-            </span>
-            <span className="text-xs text-ink-emerald-600-emerald-400 font-semibold">
-              累计记录
-            </span>
-          </div>
-        </BentoCard>
+      {/* 下一步：真实证据支撑的单个动作 */}
+      <NextStepStrip step={nextStep} />
 
-        <BentoCard
-          name="FSRS 记忆卡片库"
-          Icon={Layers}
-          className="p-5 min-h-[10.5rem]"
-          description="4 级抗遗忘间隔重复智能调度"
-        >
-          <div className="flex items-baseline gap-2 pt-2">
-            <span className="text-3xl font-bold font-mono text-accent-ink leading-none">
-              <NumberTicker value={activeCardsCount} />
-            </span>
-            <span className="text-xs text-ink-ghost">
-              {profile.totalCardsReviewed > 0
-                ? `张活跃卡片 · 稳固率 ${retentionPercent}%`
-                : '张卡片 · 待开始复习'}
-            </span>
-          </div>
-        </BentoCard>
-
-        <BentoCard
-          name="待攻克疑难痛点"
-          Icon={AlertTriangle}
-          className="p-5 min-h-[10.5rem]"
-          description={shell.copy.targetWeaknessLabel}
-        >
-          <div className="flex items-baseline gap-2 pt-2">
-            <span className="text-3xl font-bold font-mono text-ink-rose-600-rose-400 leading-none">
-              <NumberTicker value={unresolvedMistakesCount} />
-            </span>
-            <span className="text-xs text-ink-ghost">项弱点待清零</span>
-          </div>
-        </BentoCard>
-      </BentoGrid>
+      {/* 学情证据：正确率主卡 + 闪卡/错题独立状态 */}
+      <EvidenceOverview
+        metricsView={metricsView}
+        metricsStale={metricsStale}
+        practiceSummary={metrics === undefined ? '练习记录尚未读取，未测能力保持未知' : evidence.attempts > 0 ? `${evidence.correct}/${evidence.attempts} 次答对 · ${evidence.observedSkillCount} 个已练技能；不代表整体水平` : '尚无有效练习记录，未测能力保持未知'}
+        practicePercent={practicePercent}
+        observedSkillCount={evidence.observedSkillCount}
+        onRefetchMetrics={() => void metricsQuery.refetch()}
+        cardsView={cardsView}
+        cardsStale={cardsStale}
+        cardCount={cards?.length ?? 0}
+        retentionLine={profile.totalCardsReviewed > 0 ? ` · 本地累计复习 ${profile.totalCardsReviewed} 次` : ' · 本地尚无复习记录'}
+        onRefetchCards={() => void cardsQuery.refetch()}
+        mistakesView={mistakesView}
+        mistakesStale={mistakesStale}
+        unresolved={unresolved}
+        mistakesLine={unresolved === 0 && (mistakes?.length ?? 0) > 0 ? '项 · 已全部攻克' : '项待清零'}
+        onRefetchMistakes={() => void mistakesQuery.refetch()}
+      />
 
       {/* 连续学习与 28 天热力图组件 */}
       <StudyStreakHeatmap />
@@ -126,7 +137,7 @@ export function LearnerRadarDashboard({
 
       {/* 掌握度细项雷达 */}
       <div className="surface-card rounded-2xl p-5 border border-line-hairline shadow-inner-hi space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-bold text-ink-mute flex items-center gap-2">
             <Award className="w-4 h-4 text-gold-warm" />
             {shell.trackName}技能画像 ({shell.copy.levelSchemeLabel})
@@ -143,9 +154,9 @@ export function LearnerRadarDashboard({
               {[
                 { key: 'ALL', label: '全部' },
                 { key: 'GRAMMAR', label: '文法' },
-                { key: 'VOCAB', label: '词汇' },
+                { key: 'VOCABULARY', label: '词汇' },
                 { key: 'LISTENING', label: '听力' },
-                { key: 'NUANCE', label: '语感' },
+                { key: 'NUANCE_PRAGMATIC', label: '语感' },
               ].map(({ key, label }) => {
                 const count = dimensionCounts[key] ?? 0;
                 return (
@@ -156,7 +167,7 @@ export function LearnerRadarDashboard({
                   >
                     {label}
                     {count > 0 && (
-                      <span className="ml-1 font-mono text-[10px] opacity-75">
+                      <span className="ml-1 font-mono text-xs opacity-75">
                         {count}
                       </span>
                     )}
@@ -167,7 +178,18 @@ export function LearnerRadarDashboard({
           </Tabs>
         </div>
 
-        {visibleMetrics.length === 0 ? (
+        {metricsView === 'loading' && (
+          <p className="text-xs text-ink-faint-soft">正在读取技能画像…</p>
+        )}
+        {metricsView === 'error' && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line-rose-500o20 bg-wash-rose-500o5 p-4">
+            <p className="text-xs text-ink-rose-600-rose-400">技能画像读取失败。</p>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => void metricsQuery.refetch()}>
+              重试
+            </Button>
+          </div>
+        )}
+        {(metricsView === 'ready' || metricsView === 'empty') && visibleMetrics.length === 0 ? (
           <div className="py-8 px-4 text-center rounded-xl bg-veil-stone-100o50-stone-900o30 border border-dashed border-line-hairline">
             <p className="text-xs text-ink-ghost mb-2.5">
               {shell.copy.emptySkillsHint}
@@ -184,11 +206,12 @@ export function LearnerRadarDashboard({
               前往自适应做题 →
             </Button>
           </div>
-        ) : (
+        ) : (metricsView === 'ready' || metricsView === 'empty') && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {visibleMetrics.map((metric: SkillMetric) => {
-              const isWeak = metric.proficiency < 0.6;
-              const isStrong = metric.proficiency >= 0.85;
+              const isAssessed = metric.totalAttempts > 0;
+              const isWeak = isAssessed && metric.proficiency < 0.6;
+              const isStrong = isAssessed && metric.proficiency >= 0.85;
 
               return (
                 <div
@@ -203,18 +226,18 @@ export function LearnerRadarDashboard({
                       variant={isStrong ? 'emerald' : isWeak ? 'destructive' : 'gold'}
                       className="rounded font-mono"
                     >
-                      {Math.round(metric.proficiency * 100)}%
+                      {isAssessed ? `${Math.round(metric.proficiency * 100)}%` : '待练习'}
                     </Badge>
                   </div>
 
-                  <Progress
+                  {isAssessed && <Progress
                     value={metric.proficiency * 100}
                     indicatorClassName={
                       isStrong ? 'bg-tone-emerald-500' : isWeak ? 'bg-tone-rose-500' : 'bg-gold-warm'
                     }
-                  />
+                  />}
 
-                  <div className="flex justify-between items-center text-[11px] text-ink-faint pt-1">
+                  <div className="flex justify-between items-center text-xs text-ink-faint pt-1">
                     <span>总练习 {metric.totalAttempts} 次 · 连续错误 {metric.consecutiveErrors} 次</span>
                     {isWeak && (
                       <Button
@@ -223,11 +246,10 @@ export function LearnerRadarDashboard({
                         onClick={() => {
                           sound.playClick();
                           setActiveTab('QUIZ');
-                          toast.info(`已为您调取针对【${metric.name}】的加练题目！`);
                         }}
-                        className="h-auto p-0 text-[11px] font-bold text-gold-warm hover:underline"
+                        className="h-auto p-0 text-xs font-bold text-gold-warm hover:underline"
                       >
-                        靶向加练 →
+                        去做题 →
                       </Button>
                     )}
                   </div>

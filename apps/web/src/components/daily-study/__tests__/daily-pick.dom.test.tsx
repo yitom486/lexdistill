@@ -172,7 +172,7 @@ describe('DailyWordStudyHub 后端门控抽取与锁库回归', () => {
     await tickUntil(() => document.body.textContent?.includes('JLPT N5 核心词库') ?? false);
 
     // 点击开启学习按钮
-    await clickByText('开启今日 10 词精学之旅');
+    await clickByText('开始学习今日 10 词');
 
     // 验证发出 POST daily-pick 请求
     await tickUntil(() => interceptedRequests.length > 0);
@@ -215,7 +215,7 @@ describe('DailyWordStudyHub 后端门控抽取与锁库回归', () => {
     await clickByText('JLPT N4 进阶词库');
 
     // 点击启动学习
-    await clickByText('开启今日 10 词精学之旅');
+    await clickByText('开始学习今日 10 词');
 
     // 等待 409 响应和锁定横幅渲染
     await tickUntil(() => document.body.textContent?.includes('该词库需 N4 掌握率 80% 解锁，当前 35%') ?? false);
@@ -228,7 +228,7 @@ describe('DailyWordStudyHub 后端门控抽取与锁库回归', () => {
 
     // 验证 CTA 按钮被置灰禁用
     const ctaBtn = [...document.querySelectorAll('button')].find((b) =>
-      b.textContent?.includes('开启今日 10 词精学之旅')
+      b.textContent?.includes('开始学习今日 10 词')
     );
     expect(ctaBtn).toBeDefined();
     expect(ctaBtn?.disabled).toBe(true);

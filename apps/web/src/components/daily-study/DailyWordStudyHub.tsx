@@ -222,6 +222,8 @@ export function DailyWordStudyHub({ language, onGoToReview, courseUnitId }: Dail
       onStart={handleStart}
       isLoading={wordlistsQuery.isLoading || dailyPickMutation.isPending}
       lockMessage={lockMessage}
+      sourcesError={wordlistsQuery.isError}
+      onRetrySources={() => void wordlistsQuery.refetch()}
     />
   );
 }

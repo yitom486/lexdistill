@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, BookOpen, Layers, Dices, ArrowRight, Lock } from 'lucide-react';
+import { Sparkles, Dices, ArrowRight, Lock, Rocket } from 'lucide-react';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { sound } from '../../utils/audio.js';
@@ -25,6 +25,9 @@ interface DailyStudySetupProps {
   isLoading: boolean;
   lockMessage?: string | null | undefined;
   unitWordCount?: number | undefined;
+  /** 词库目录读取失败（与加载中/空列表独立展示，不静默空网格）。 */
+  sourcesError: boolean;
+  onRetrySources: () => void;
 }
 
 export function DailyStudySetup({
@@ -39,6 +42,8 @@ export function DailyStudySetup({
   isLoading,
   lockMessage,
   unitWordCount,
+  sourcesError,
+  onRetrySources,
 }: DailyStudySetupProps) {
   const activeSource = sources.find((s) => s.id === selectedSourceId) || sources[0];
 
@@ -50,12 +55,12 @@ export function DailyStudySetup({
             <Sparkles className="h-4 w-4" />
           </div>
           <h2 className="text-base font-bold text-ink">今日生词精学</h2>
-          <Badge variant="amber" className="text-[10px]">
-            AI 讲透 · 情境对话 · 随堂小测
+          <Badge variant="amber" className="text-xs">
+            词义 · 例句 · 用法
           </Badge>
         </div>
         <p className="text-xs text-ink-ghost leading-relaxed">
-          {unitWordCount !== undefined ? '按当前路线单元学习指定词汇，完成学习后继续进行闪卡复习。' : '每日抽取 10–20 个词，结合多角色真实对话、避坑指南与互动小测深度理解，学习后纳入 FSRS 科学记忆曲线。'}
+          {unitWordCount !== undefined ? '按当前路线单元学习指定词汇，完成学习后继续进行闪卡复习。' : '选择词库与数量，阅读词义、例句和已有学习内容，再决定加入复习。'}
         </p>
       </header>
 
@@ -63,8 +68,20 @@ export function DailyStudySetup({
       <div className="space-y-2">
         <label className="text-xs font-semibold text-ink flex items-center justify-between">
           <span>选择词库来源</span>
-          <span className="text-[11px] text-ink-ghost">包含零基础至进阶考级核心包</span>
+          <span className="text-xs text-ink-ghost">以实际可用词库为准</span>
         </label>
+        {isLoading && !sources.length ? <p role="status" className="text-xs text-ink-ghost">正在读取词库目录…</p> : sourcesError ? (
+          <div role="alert" className="rounded-2xl border border-line p-3.5 text-xs text-ink-ghost space-y-2">
+            <p>词库目录读取失败，请检查网关后重试。</p>
+            <Button type="button" size="sm" variant="outline" onClick={onRetrySources} className="gap-1 text-xs">
+              重新读取
+            </Button>
+          </div>
+        ) : sources.length === 0 && !isLoading ? (
+          <p className="rounded-2xl border border-line p-3.5 text-xs text-ink-ghost">
+            暂无可用词库。可先去词典收藏生词，或检查网关词库目录。
+          </p>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {sources.map((src) => {
             const isSelected = src.id === selectedSourceId;
@@ -86,13 +103,13 @@ export function DailyStudySetup({
                 <div>
                   <div className="flex items-center justify-between gap-1.5">
                     <span className="text-sm font-bold text-ink">{src.title}</span>
-                    <Badge variant={isSelected ? 'amber' : 'outline'} className="text-[10px]">
+                    <Badge variant={isSelected ? 'amber' : 'outline'} className="text-xs">
                       {src.total} 词
                     </Badge>
                   </div>
                   <p className="mt-1 text-xs text-ink-ghost line-clamp-1">{src.subtitle}</p>
                 </div>
-                <div className="mt-3 flex items-center justify-between text-[11px] text-ink-stone-400 border-t border-line pt-2">
+                <div className="mt-3 flex items-center justify-between text-xs text-ink-stone-400 border-t border-line pt-2">
                   <span>已学透 {src.studied} / {src.total}</span>
                   <span className="font-mono font-medium">{percent}%</span>
                 </div>
@@ -100,6 +117,7 @@ export function DailyStudySetup({
             );
           })}
         </div>
+        )}
       </div>
 
       {/* 学习参数配置 */}
@@ -119,7 +137,7 @@ export function DailyStudySetup({
                   onSelectBatchSize(size);
                 }}
               >
-                {size} 词 {size === 10 ? '（推荐 · 约 10 分钟）' : '（强化）'}
+                {size} 词
               </Button>
             ))}
           </div>
@@ -139,9 +157,9 @@ export function DailyStudySetup({
           >
             <span className="flex items-center gap-1.5">
               <Dices className="h-3.5 w-3.5 text-accent-ink-warm" />
-              {isRandom ? '随机乱序抽取（打破次序定势）' : '按大纲推荐顺序（由浅入深）'}
+              {isRandom ? '随机抽取' : '按词库顺序'}
             </span>
-            <span className="text-[10px] text-ink-ghost">切换</span>
+            <span className="text-xs text-ink-ghost">切换</span>
           </Button>
         </div>
       </div>
@@ -153,13 +171,16 @@ export function DailyStudySetup({
           type="button"
           size="default"
           className="w-full gap-2 text-sm font-semibold h-11"
-          disabled={isLoading || !activeSource || Boolean(lockMessage)}
+          disabled={isLoading || sourcesError || !activeSource || Boolean(lockMessage)}
           onClick={() => {
             sound.playClick();
             onStart();
           }}
         >
-          <span>{unitWordCount !== undefined ? `开始学习本单元 ${unitWordCount} 词` : `🚀 开启今日 ${batchSize} 词精学之旅`}</span>
+          <span className="flex items-center gap-1.5">
+            <Rocket className="h-4 w-4" />
+            {unitWordCount !== undefined ? `开始学习本单元 ${unitWordCount} 词` : `开始学习今日 ${batchSize} 词`}
+          </span>
           <ArrowRight className="h-4 w-4" />
         </Button>
 

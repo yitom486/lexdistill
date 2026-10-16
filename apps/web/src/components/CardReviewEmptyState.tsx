@@ -35,7 +35,7 @@ export function CardReviewEmptyState({
         <div className="space-y-1.5 max-w-md">
           <h3 className="text-base font-semibold text-ink">当前分类下暂无待复习闪卡</h3>
           <p className="text-xs text-ink-ghost">
-            该分类的卡片今日尚未到期，您可以切换到其他分类或查看全部待复习卡片。
+            当前列表中没有符合此分类的卡片，可以切换分类或查看全部卡片。
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={onResetFilter} className="gap-1.5 text-xs">
@@ -56,9 +56,9 @@ export function CardReviewEmptyState({
       </div>
 
       <div className="space-y-2 max-w-md">
-        <h3 className="text-lg font-bold text-ink tracking-tight">今日闪卡已全部复习完毕！🎉</h3>
+        <h3 className="text-lg font-bold text-ink tracking-tight">{totalCards === 0 ? '生词本暂无卡片' : '当前没有待复习卡片'}</h3>
         <p className="text-xs text-ink-ghost leading-relaxed">
-          记忆状态良好，今天的 FSRS 间隔复习目标已达成。您可以前往词汇库挑选新词加入复习，或通过词典收藏生词。
+          可以前往词汇库选择需要记忆的词，或通过词典收藏生词。复习安排以实际保存的卡片状态为准。
         </p>
       </div>
 
@@ -66,7 +66,7 @@ export function CardReviewEmptyState({
         {onGoToStudy && (
           <Button size="sm" onClick={onGoToStudy} className="gap-1.5 text-xs">
             <Sparkles className="h-3.5 w-3.5 text-accent-ink-warm" />
-            抽取今日新词精学（N5 / 假名）
+            抽取今日新词精学
           </Button>
         )}
         <Button size="sm" variant={onGoToStudy ? 'outline' : 'default'} onClick={onGoToLibrary} className="gap-1.5 text-xs">

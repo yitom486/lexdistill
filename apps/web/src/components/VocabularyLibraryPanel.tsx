@@ -16,20 +16,20 @@ export function VocabularyLibraryPanel({ language }: { language: string }) {
   const visible = words.filter(word => (!search || `${word.word} ${word.reading} ${word.meaning}`.includes(search))
     && (bookId === 'ALL' || word.sources.some(source => source.documentId === bookId && (chapterId === 'ALL' || source.chapterId === chapterId))));
   return <section aria-label="词汇库" className="space-y-4 rounded-2xl border border-line bg-paper-soft p-5">
-    <header><h2 className="font-semibold">词汇库 <span className="text-sm text-ink-muted">{words.length} 个词</span></h2><p className="mt-1 text-sm text-ink-muted">这里汇总教材词汇、词典收藏和接受的生词草稿，选择需要记忆的词加入复习。</p></header>
+    <header><h2 className="font-semibold">词汇库 <span className="text-sm text-ink-muted">{query.data === undefined ? '—' : words.length} 个词</span></h2><p className="mt-1 text-sm text-ink-muted">这里汇总教材词汇、词典收藏和接受的生词草稿，选择需要记忆的词加入复习。</p></header>
     <div className="flex flex-wrap gap-2">
-      <input aria-label="搜索词汇" placeholder="搜索单词、读音或词义" className="min-w-48 flex-1 rounded-md border border-line bg-paper px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={search} onChange={event => setSearch(event.target.value)} />
-      <Select value={bookId} onValueChange={value => { setBookId(value ?? 'ALL'); setChapterId('ALL'); }}><SelectTrigger aria-label="筛选词汇教材"><SelectValue>{bookId === 'ALL' ? '全部教材与来源' : books.get(bookId)}</SelectValue></SelectTrigger><SelectContent><SelectItem value="ALL">全部教材与来源</SelectItem>{[...books].map(([id, title]) => <SelectItem key={id} value={id}>{title}</SelectItem>)}</SelectContent></Select>
+      <input aria-label="搜索词汇" placeholder="搜索单词、读音或词义" className="min-w-48 flex-1 rounded-md border border-line bg-paper px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring" value={search} onChange={event => setSearch(event.target.value)} />
+      <Select value={bookId} onValueChange={value => { setBookId(value ?? 'ALL'); setChapterId('ALL'); }}><SelectTrigger aria-label="筛选词汇教材"><SelectValue>{bookId === 'ALL' ? '全部教材与来源' : (books.get(bookId) ?? '未知来源')}</SelectValue></SelectTrigger><SelectContent><SelectItem value="ALL">全部教材与来源</SelectItem>{[...books].map(([id, title]) => <SelectItem key={id} value={id}>{title}</SelectItem>)}</SelectContent></Select>
       {bookId !== 'ALL' && <Select value={chapterId} onValueChange={value => setChapterId(value ?? 'ALL')}><SelectTrigger aria-label="筛选词汇章节"><SelectValue>{chapterId === 'ALL' ? '全部章节' : chapters.get(chapterId)}</SelectValue></SelectTrigger><SelectContent><SelectItem value="ALL">全部章节</SelectItem>{[...chapters].map(([id, title]) => <SelectItem key={id} value={id}>{title}</SelectItem>)}</SelectContent></Select>}
     </div>
     {query.isPending && <p className="text-sm text-ink-muted">正在读取词汇…</p>}
-    {query.isError && <div role="alert"><p>{query.error.message}</p><Button variant="outline" onClick={() => { void query.refetch(); }}>重试加载</Button></div>}
+    {query.isError && <div role="alert"><p title={query.error.message}>词汇读取失败，请检查连接后重试。</p>{query.data !== undefined && <p className="text-xs text-ink-muted">显示上次读取的词汇，可能不是最新。</p>}<Button variant="outline" onClick={() => { void query.refetch(); }}>重试加载</Button></div>}
     {!query.isPending && !query.isError && !visible.length && <p className="text-sm text-ink-muted">{words.length ? '没有符合筛选条件的词汇。' : '暂无词汇。导入教材后会在这里显示，也可以从词典收藏。'}</p>}
     <div className="max-h-96 space-y-3 overflow-y-auto">{visible.map(word => {
       const source = word.sources.find(item => (bookId === 'ALL' || item.documentId === bookId) && (chapterId === 'ALL' || item.chapterId === chapterId));
       return <article key={word.id} className="rounded-xl border border-line p-3">
         <div className="flex items-center justify-between gap-3"><div>
-          <button type="button" aria-label={`学习单词：${word.word}`} aria-expanded={expandedId === word.id} onClick={() => setExpandedId(current => current === word.id ? null : word.id)} className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <button type="button" aria-label={`学习单词：${word.word}`} aria-expanded={expandedId === word.id} onClick={() => setExpandedId(current => current === word.id ? null : word.id)} className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">
             <strong>{word.word}</strong>{word.reading && <span className="ml-2 text-sm text-ink-muted">{word.reading}</span>}{word.level && <Badge variant="outline" className="ml-2">{word.level}</Badge>}
           </button></div>
           <Button size="sm" variant="outline" disabled={word.collected || collect.isPending} onClick={() => collect.mutate({ vocabularyId: word.id, ...(source ? { documentId: source.documentId, chapterId: source.chapterId } : {}) }, {

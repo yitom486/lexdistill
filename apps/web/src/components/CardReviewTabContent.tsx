@@ -15,6 +15,9 @@ interface CardReviewTabContentProps {
   practiceCollectionsCount: number;
   onGoToQueue: () => void;
   filteredCards: StudyCardItem[];
+  cardsLoading: boolean;
+  cardsError: boolean;
+  onRetryCards: () => void;
   currentCardIndex: number;
   cardFilter: string;
   onFilterChange: (val: string) => void;
@@ -34,12 +37,17 @@ interface CardReviewTabContentProps {
   onGoToLibrary: () => void;
   onGoToDictionary: () => void;
   onOpenAnkiImport: () => void;
+  active?: boolean;
+  reviewPending?: boolean;
 }
 
 export function CardReviewTabContent({
   practiceCollectionsCount,
   onGoToQueue,
   filteredCards,
+  cardsLoading,
+  cardsError,
+  onRetryCards,
   currentCardIndex,
   cardFilter,
   onFilterChange,
@@ -59,6 +67,8 @@ export function CardReviewTabContent({
   onGoToLibrary,
   onGoToDictionary,
   onOpenAnkiImport,
+  active = true,
+  reviewPending = false,
 }: CardReviewTabContentProps) {
   const activeCard: StudyCardItem | undefined = filteredCards[currentCardIndex] || filteredCards[0];
 
@@ -66,8 +76,9 @@ export function CardReviewTabContent({
     <div className="space-y-4">
       {practiceCollectionsCount > 0 && (
         <div className="flex items-center justify-between rounded-2xl border border-line-amber-900o10 bg-wash-amber-500o5 px-3.5 py-2 text-xs">
-          <span className="text-ink-ghost">
-            💡 检测到 {practiceCollectionsCount} 组做题条目可转入复习卡片
+          <span className="flex items-center gap-1.5 text-ink-ghost">
+            <Lightbulb className="h-3.5 w-3.5 text-accent-ink-warm" />
+            检测到 {practiceCollectionsCount} 组做题条目可转入复习卡片
           </span>
           <Button
             type="button"
@@ -83,7 +94,7 @@ export function CardReviewTabContent({
 
       <div className="flex items-center justify-between text-xs text-ink-ghost gap-3">
         <span className="font-mono text-ink-stone-400">
-          当前卡片: {filteredCards.length ? currentCardIndex + 1 : 0} / {filteredCards.length}
+          {cardsLoading || (cardsError && !activeCard) ? '当前卡片：—' : `当前卡片: ${filteredCards.length ? currentCardIndex + 1 : 0} / ${filteredCards.length}`}
         </span>
 
         <Tabs
@@ -112,8 +123,23 @@ export function CardReviewTabContent({
         </Tabs>
       </div>
 
-      {activeCard ? (
+      {cardsLoading ? (
+        <p role="status" className="py-10 text-center text-sm text-ink-ghost">
+          正在读取复习卡片…
+        </p>
+      ) : cardsError && !activeCard ? (
+        <div role="alert" className="py-10 text-center text-sm text-ink-ghost space-y-2">
+          <p>复习卡片读取失败，请检查网关后重试。</p>
+          <Button type="button" size="sm" variant="outline" onClick={onRetryCards} className="gap-1 text-xs">
+            重新读取
+          </Button>
+        </div>
+      ) : activeCard ? (
         <div className="space-y-4">
+          {cardsError && <p role="alert" className="text-xs text-ink-ghost">
+            刷新失败，显示上次读取的卡片，可能不是最新。
+            <Button type="button" size="sm" variant="link" onClick={onRetryCards}>重新读取</Button>
+          </p>}
           <FsrsCardStage
             card={activeCard}
             cardSpeechLang={cardSpeechLang}
@@ -125,6 +151,8 @@ export function CardReviewTabContent({
             onOpenDict={() => onOpenDict(activeCard.frontWord)}
             onToggleDeepStudy={onToggleDeepStudy}
             isDeepStudyOpen={deepStudyOpen}
+            active={active}
+            reviewPending={reviewPending}
           />
 
           {deepStudyOpen && matchingVocab && (

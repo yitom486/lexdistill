@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { UpdateAvailableDot } from './app-header/UpdateAvailableDot.js';
 import {
   BookOpen,
   Search,
@@ -13,7 +14,6 @@ import {
 import { toast } from 'sonner';
 import { sound } from '../utils/audio.js';
 import { cn } from '../lib/utils.js';
-import { readCssDurationSeconds } from '../lib/css-tokens.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { UserProfileModal } from './UserProfileModal.js';
@@ -107,7 +107,7 @@ function GhostIconButton({
         onClick();
       }}
       className={cn(
-        'relative h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-lg transition-colors cursor-pointer select-none active:scale-[0.96]',
+        'relative h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-lg transition-colors cursor-pointer select-none active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
         active
           ? 'text-ink bg-surface-warm/60'
           : 'text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60'
@@ -135,6 +135,14 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
       return false;
     }
   }, []);
+  // 快捷键绑定同时支持 ⌘K（macOS）与 Ctrl+K（Windows/Linux），显示必须与平台一致。
+  const isMacLike = React.useMemo(() => {
+    try {
+      return /mac/i.test(getPlatform().getUserAgent());
+    } catch {
+      return false;
+    }
+  }, []);
   const { updateChecking, updateAvailable, handleCheckForUpdate } = useAppUpdateSignal(isDesktop);
 
   return (
@@ -144,7 +152,7 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <button
             type="button"
-            className="md:hidden shrink-0 h-8 w-8 flex items-center justify-center rounded-lg text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60 transition-colors cursor-pointer"
+            className="md:hidden shrink-0 h-8 w-8 flex items-center justify-center rounded-lg text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             aria-label="打开导航"
             onClick={() => {
               sound.playClick();
@@ -155,21 +163,24 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
           </button>
 
           <div className="flex items-center gap-2.5 shrink-0">
-            <motion.div
+            <motion.button
+              type="button"
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.96 }}
-              onClick={() => sound.playClick()}
-              className="w-8 h-8 rounded-lg border border-line-hairline bg-surface-coal text-gold-warm flex items-center justify-center shadow-xs cursor-pointer shrink-0 transition-colors"
+              onClick={() => {
+                sound.playClick();
+                setActiveTab('TODAY');
+              }}
+              aria-label="回到今日学习"
+              title="回到今日学习"
+              className="w-8 h-8 rounded-lg border border-line-hairline bg-surface-coal text-gold-warm flex items-center justify-center shadow-xs cursor-pointer shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             >
               <BookOpen className="w-4 h-4" />
-            </motion.div>
+            </motion.button>
 
             <div className="flex items-baseline gap-2">
               <span className="font-serif font-semibold text-base sm:text-lg text-ink tracking-tight truncate">
                 Lingua Studio
-              </span>
-              <span className="hidden xl:inline text-[9px] font-mono tracking-widest px-1.5 py-px rounded bg-wash-amber-500o15 text-ink-amber-900-amber-300 border border-line-amber-500o30 uppercase font-semibold">
-                STUDIO
               </span>
             </div>
 
@@ -198,14 +209,14 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
               sound.playClick();
               setIsCommandOpen(true);
             }}
-            className="w-full flex items-center justify-between gap-3 px-3 py-1.5 rounded-xl bg-surface-coal/80 border border-line-hairline shadow-2xs hover:border-gold-warm/30 text-ink-faint-soft text-xs transition-all cursor-pointer active:scale-[0.99] group"
+            className="w-full flex items-center justify-between gap-3 px-3 py-1.5 rounded-xl bg-surface-coal/80 border border-line-hairline shadow-2xs hover:border-gold-warm/30 text-ink-faint-soft text-xs transition-all cursor-pointer active:scale-[0.99] group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
             <span className="flex items-center gap-2 truncate">
               <Search className="w-3.5 h-3.5 text-ink-stone-400 group-hover:text-gold-warm transition-colors shrink-0" />
               <span className="truncate">搜索题库、课文、指令...</span>
             </span>
-            <kbd className="text-[10px] font-mono px-1.5 py-px rounded bg-surface-dim border border-line-hairline text-ink-faint-soft shrink-0">
-              ⌘K
+            <kbd className="text-xs font-mono px-1.5 py-px rounded bg-surface-dim border border-line-hairline text-ink-faint-soft shrink-0">
+              {isMacLike ? '⌘K' : 'Ctrl+K'}
             </kbd>
           </button>
         </div>
@@ -215,7 +226,7 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
           {/* 移动端快捷搜索图标 */}
           <button
             type="button"
-            className="sm:hidden h-8 w-8 flex items-center justify-center rounded-lg text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60 transition-colors cursor-pointer"
+            className="sm:hidden h-8 w-8 flex items-center justify-center rounded-lg text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             aria-label="快捷搜索"
             onClick={() => {
               sound.playClick();
@@ -232,7 +243,7 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
               sound.playClick();
               openTutor(null);
             }}
-            className="surface-elevated flex items-center gap-1.5 h-8 sm:h-9 px-2.5 sm:px-3 text-xs font-medium text-ink rounded-xl transition-all cursor-pointer select-none active:scale-[0.98] hover:shadow-[0_0_16px_0_var(--line-glow-hover)]"
+            className="surface-elevated flex items-center gap-1.5 h-8 sm:h-9 px-2.5 sm:px-3 text-xs font-medium text-ink rounded-xl transition-all cursor-pointer select-none active:scale-[0.98] hover:shadow-[0_0_16px_0_var(--line-glow-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             title="唤起语言助教"
           >
             <Compass className="w-3.5 h-3.5 text-gold-warm shrink-0" />
@@ -256,16 +267,7 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
               onClick={() => void handleCheckForUpdate()}
               dot={
                 updateAvailable && !updateChecking ? (
-                  <motion.span
-                    aria-hidden
-                    className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full bg-gold-warm"
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{
-                      duration: readCssDurationSeconds('--motion-shine-duration'),
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
-                  />
+                  <UpdateAvailableDot />
                 ) : undefined
               }
             >

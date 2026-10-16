@@ -46,11 +46,11 @@ export function DailyStudyStage({
             <span className="font-mono font-bold text-ink">
               第 {currentIndex + 1} / {totalCount} 词
             </span>
-            <Badge variant="amber" className="text-[10px]">
+            <Badge variant="amber" className="text-xs">
               {sourceTitle}
             </Badge>
             {isStudied && (
-              <Badge variant="emerald" className="text-[10px]">
+              <Badge variant="emerald" className="text-xs">
                 已学透
               </Badge>
             )}
@@ -100,11 +100,11 @@ export function DailyStudyStage({
         <div className="flex items-center gap-2 text-xs text-ink-ghost">
           <span>当前状态：</span>
           {isCollected ? (
-            <Badge variant="secondary" className="text-[10px]">
+            <Badge variant="secondary" className="text-xs">
               已在生词本
             </Badge>
           ) : (
-            <span className="text-[11px] text-ink-stone-400">尚未入库</span>
+            <span className="text-xs text-ink-stone-400">尚未入库</span>
           )}
         </div>
 
@@ -139,7 +139,7 @@ export function DailyStudyStage({
             {isProcessing
               ? '入库中…'
               : isLast
-                ? '学透本词，完成今日精学 🎉'
+                ? '学透本词，完成今日精学'
                 : '学透了，加入复习并学下一词 →'}
           </Button>
         </div>

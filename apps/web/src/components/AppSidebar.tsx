@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
 import { Button } from './ui/button.js';
+import { Sheet, SheetContent, SheetTitle } from './ui/sheet.js';
 import { cn } from '../lib/utils.js';
 import { sound } from '../utils/audio.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
@@ -178,27 +179,38 @@ export function AppSidebar({
   const collapsed = usePreferencesStore((s) => s.sidebarCollapsed);
   const questionIndex = useStudySessionStore((s) => s.questionIndex);
 
-  const { data: questions = [] } = useQuestionsQuery();
-  const { data: cards = [] } = useCardsQuery();
-  const { data: mistakes = [] } = useMistakesQuery();
+  const { data: questions } = useQuestionsQuery();
+  const { data: cards } = useCardsQuery();
+  const { data: mistakes } = useMistakesQuery();
   const { data: dailyPlan } = useDailyPlanQuery();
 
   const nowIso = new Date().toISOString();
-  const dueCardCount = cards.filter((c) => !c.dueAt || c.dueAt <= nowIso).length;
+  // 未知留白：加载中/读取失败不断言 0 或 1/1，角标无计数时留白（R11 矩阵项）
+  const dueCardCount = cards ? cards.filter((c) => !c.dueAt || c.dueAt <= nowIso).length : undefined;
   const unresolvedMistakeCount =
-    mistakeCountProp ?? mistakes.filter((m) => !m.isResolved).length;
+    mistakeCountProp ?? (mistakes ? mistakes.filter((m) => !m.isResolved).length : undefined);
   const quizProgress =
     quizProgressProp ??
-    `${Math.min(questionIndex + 1, questions.length)}/${questions.length || 1}`;
+    (questions ? `${Math.min(questionIndex + 1, questions.length)}/${questions.length}` : undefined);
   const cardCount = cardCountProp ?? dueCardCount;
   const planProgress = dailyPlan
-    ? `${dailyPlan.completedCount}/${dailyPlan.totalCount || 1}`
+    ? `${dailyPlan.completedCount}/${dailyPlan.totalCount}`
     : undefined;
 
   const navigate = (tab: NavigationTab) => {
     useStudySessionStore.getState().setActiveTab(tab);
     onMobileOpenChange?.(false);
   };
+
+  // 窄窗口抽屉关闭后把焦点还给汉堡菜单（若仍在视口内），保证键盘用户不丢失位置。
+  const prevMobileOpen = useRef(mobileOpen);
+  useEffect(() => {
+    if (prevMobileOpen.current && !mobileOpen) {
+      const trigger = document.querySelector<HTMLButtonElement>('[aria-label="打开导航"]');
+      trigger?.focus({ preventScroll: true });
+    }
+    prevMobileOpen.current = mobileOpen;
+  }, [mobileOpen]);
 
   return (
     <>
@@ -214,26 +226,25 @@ export function AppSidebar({
         />
       </div>
 
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
-          <button
-            type="button"
-            className="absolute inset-0 bg-veil-stone-950o50 backdrop-blur-sm cursor-pointer border-0"
-            aria-label="关闭菜单"
-            onClick={() => onMobileOpenChange?.(false)}
+      {/* 窄窗口导航抽屉：Base UI Sheet 提供 Focus Trap 与 Escape，替代裸遮罩拼装 */}
+      <Sheet open={mobileOpen} onOpenChange={(open) => { if (!open) onMobileOpenChange?.(false); }}>
+        <SheetContent
+          side="left"
+          showClose={false}
+          className="w-[16.5rem] max-w-[85vw] p-0 gap-0 border-0 bg-surface-coal dark:bg-surface-coal"
+          aria-label="导航菜单"
+        >
+          <SheetTitle className="sr-only">导航菜单</SheetTitle>
+          <SidebarBody
+            collapsed={false}
+            quizProgress={quizProgress}
+            cardCount={cardCount}
+            unresolvedMistakeCount={unresolvedMistakeCount}
+            planProgress={planProgress}
+            onNavigate={navigate}
           />
-          <div className="relative z-10 h-full shadow-2xl">
-            <SidebarBody
-              collapsed={false}
-              quizProgress={quizProgress}
-              cardCount={cardCount}
-              unresolvedMistakeCount={unresolvedMistakeCount}
-              planProgress={planProgress}
-              onNavigate={navigate}
-            />
-          </div>
-        </div>
-      )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

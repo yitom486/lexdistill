@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BankSubmissionRecord } from '@study-studio/protocol';
 import { Button } from '../ui/button.js';
 import { Textarea } from '../ui/textarea.js';
@@ -82,27 +82,45 @@ export function BankQuestionCard({ userId, taskId, paperId, item, index = 0, rev
   const [subjective, setSubjective] = useState<SubjectiveFeedback | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = submitObjective.isPending || submitSubjective.isPending;
+  // 同步提交锁：与 disabled 双重保护同 tick 连击（R09a 评级先例）
+  const submittingRef = useRef(false);
+  const mounted = useRef(false);
+  const liveQuestion = useRef('');
+  liveQuestion.current = `${taskId}:${paperId}:${item.id}`;
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   const answerType = item.answer.type;
   const isObjective = answerType === 'MULTIPLE_CHOICE' || answerType === 'FILL_BLANK' || answerType === 'REORDER';
   const chunks = useMemo(() => (item.answer.chunks ?? []).filter(c => c.trim()), [item.answer]);
 
   const submit = async () => {
     setError(null);
+    if (busy || submittingRef.current) return;
     const userAnswer = answerType === 'MULTIPLE_CHOICE' ? choice ?? '' : answerType === 'REORDER' ? joinOrderIndices(chunks, order) : text;
     if (!userAnswer.trim()) { setError('请先作答再提交。'); return; }
+    submittingRef.current = true;
+    const questionKey = liveQuestion.current;
+    const isCurrent = () => mounted.current && questionKey === liveQuestion.current;
     const id = identity.identify(userAnswer);
     try {
       const base = { taskId, paperId, questionId: item.id, submissionId: id.submissionId, userAnswer, timeSpentMs: id.timeSpentMs };
       if (isObjective) {
         const result = await submitObjective.mutateAsync(base);
+        if (!isCurrent()) return;
         setObjective({ isCorrect: result.isCorrect, correctAnswer: result.correctAnswer, explanation: result.explanation });
       } else {
         const result = await submitSubjective.mutateAsync(base);
+        if (!isCurrent()) return;
         setSubjective({ status: result.status });
       }
       onSettled();
     } catch (cause) {
+      if (!isCurrent()) return;
       setError(cause instanceof Error ? cause.message : '提交失败');
+    } finally {
+      submittingRef.current = false;
     }
   };
 
@@ -120,7 +138,7 @@ export function BankQuestionCard({ userId, taskId, paperId, item, index = 0, rev
   return (
     <div className="surface-card rounded-xl p-4" aria-label={`题目 ${item.prompt.slice(0, 12)}`}>
       <div className="flex gap-3">
-        <div aria-hidden className="font-mono text-[11px] font-bold text-ink-faint-soft pt-1 w-7 shrink-0">
+        <div aria-hidden className="font-mono text-xs font-bold text-ink-faint-soft pt-1 w-7 shrink-0">
           {String(index + 1).padStart(2, '0')}
         </div>
         <div className="min-w-0 flex-1 space-y-3">

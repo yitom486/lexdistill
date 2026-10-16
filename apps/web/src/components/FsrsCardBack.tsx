@@ -17,6 +17,7 @@ interface FsrsCardBackProps {
   onOpenDict?: (() => void) | undefined;
   onToggleDeepStudy?: (() => void) | undefined;
   isDeepStudyOpen?: boolean | undefined;
+  reviewPending?: boolean | undefined;
 }
 
 /** 卡片背面：中文释义、用法搭配、场景例句与 4 档评级。 */
@@ -30,10 +31,12 @@ export function FsrsCardBack({
   onOpenDict,
   onToggleDeepStudy,
   isDeepStudyOpen,
+  reviewPending,
 }: FsrsCardBackProps) {
   return (
     <div
       aria-hidden={!cardFlipped}
+      inert={!cardFlipped}
       className={cn(
         'fsrs-card-face fsrs-card-back shadow-inner-hi absolute inset-0 overflow-y-auto rounded-3xl p-7',
         cardFlipped ? 'pointer-events-auto' : 'pointer-events-none'
@@ -51,7 +54,7 @@ export function FsrsCardBack({
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-6 px-2 text-[11px] gap-1"
+                  className="h-6 px-2 text-xs gap-1"
                   onClick={onToggleDeepStudy}
                 >
                   <Lightbulb className="w-3 h-3 text-accent-ink-warm" />
@@ -63,7 +66,7 @@ export function FsrsCardBack({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-6 px-2 text-[11px] gap-1 text-ink-ghost hover:text-ink"
+                  className="h-6 px-2 text-xs gap-1 text-ink-ghost hover:text-ink"
                   onClick={onOpenDict}
                 >
                   <BookOpen className="w-3 h-3" />
@@ -75,7 +78,7 @@ export function FsrsCardBack({
                   type="button"
                   size="sm"
                   variant="secondary"
-                  className="h-6 px-2 text-[11px] gap-1"
+                  className="h-6 px-2 text-xs gap-1"
                   onClick={onAskAi}
                 >
                   <Sparkles className="w-3 h-3 text-accent-ink-warm" />
@@ -139,7 +142,7 @@ export function FsrsCardBack({
         </div>
 
         {/* 4 档 FSRS 评级按钮 */}
-        <FsrsRatingButtons onReview={onReview} />
+        <FsrsRatingButtons onReview={onReview} disabled={reviewPending} />
       </div>
     </div>
   );

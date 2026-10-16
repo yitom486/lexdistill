@@ -28,13 +28,15 @@ export function NavButton({ item, active, collapsed, onSelect }: NavButtonProps)
     <button
       type="button"
       title={item.label}
+      aria-current={active ? 'page' : undefined}
       onClick={() => {
         sound.playClick();
         onSelect();
       }}
       className={cn(
-        'relative w-full flex items-center gap-2.5 rounded-xl text-left text-xs font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98]',
-        collapsed ? 'justify-center px-2 py-2.5' : 'px-2.5 py-2',
+        // 无数字时长：回落到主题默认过渡（亮暗 200ms / reduced-motion 1ms）
+        'relative w-full flex items-center gap-2.5 rounded-xl text-left text-[13px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+        collapsed ? 'justify-center px-2 py-2.5' : 'px-2.5 py-2.5',
         active
           ? 'surface-card text-ink font-semibold'
           : 'text-ink-faint-soft hover:text-ink hover:bg-surface-coal/60 border border-transparent'

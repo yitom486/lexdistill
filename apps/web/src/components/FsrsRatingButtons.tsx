@@ -4,6 +4,7 @@ import { cn } from '../lib/utils.js';
 
 interface FsrsRatingButtonsProps {
   onReview: (rating: CardReviewRating) => void;
+  disabled?: boolean | undefined;
 }
 
 interface RatingDef {
@@ -56,7 +57,7 @@ const RATINGS: RatingDef[] = [
   },
 ];
 
-export function FsrsRatingButtons({ onReview }: FsrsRatingButtonsProps) {
+export function FsrsRatingButtons({ onReview, disabled }: FsrsRatingButtonsProps) {
   return (
     <div
       className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2"
@@ -68,22 +69,26 @@ export function FsrsRatingButtons({ onReview }: FsrsRatingButtonsProps) {
         <button
           key={def.rating}
           type="button"
+          disabled={disabled}
           onClick={() => onReview(def.rating)}
           title={`按快捷键 ${def.keyHint}`}
           className={cn(
             'group rounded-xl border border-line-hairline bg-surface-warm/80 shadow-inner-hi',
             'px-3 py-2 flex items-center justify-between gap-2 cursor-pointer select-none',
-            'transition-all duration-150 hover:border-line-hairline-strong',
+            'transition-all duration-[var(--motion-rating-hover-duration)] hover:border-line-hairline-strong',
             'active:translate-y-px active:scale-[0.99]',
             def.glow
           )}
         >
           <span className="text-xs font-semibold text-ink">
             {def.label}
-            <span className="ml-1 font-mono text-[10px] text-ink-faint-soft">({def.keyHint})</span>
+            <span className="ml-1 font-mono text-xs text-ink-faint-soft">({def.keyHint})</span>
           </span>
-          <span className={cn('font-mono text-[11px] text-ink-faint-soft transition-colors', def.intervalHover)}>
-            {def.interval}
+          <span
+            className={cn('font-mono text-xs text-ink-faint-soft transition-colors', def.intervalHover)}
+            title="示例间隔，仅供参考；真实下次复习时间由 FSRS 按你的记忆状态计算"
+          >
+            示例 {def.interval}
           </span>
         </button>
       ))}

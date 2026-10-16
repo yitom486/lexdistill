@@ -20,9 +20,14 @@ export function GenerationWorkbench({ userId, track }: { userId: string; track: 
   return (
     <div className="space-y-4" aria-label="AI 出题">
       <div className="space-y-2">
-        <h2 className="font-mono text-[10px] tracking-wider uppercase text-ink-stone-400 font-semibold">出题任务 · Examination Tasks</h2>
+        <h2 className="font-mono text-xs tracking-wider uppercase text-ink-stone-400 font-semibold">出题任务 · Examination Tasks</h2>
         {tasks.isPending && <p className="text-xs text-ink-muted">任务列表加载中…</p>}
-        {tasks.isError && <p role="alert" className="text-xs text-ink-rose-600">{(tasks.error as Error).message}</p>}
+        {tasks.isError && (
+          <div className="flex flex-wrap items-center gap-2" role="alert">
+            <p className="text-xs text-ink-rose-600">{(tasks.error as Error).message}</p>
+            <Button size="sm" variant="outline" onClick={() => void tasks.refetch()}>重试</Button>
+          </div>
+        )}
         {tasks.data && tasks.data.length > 0 && (
           <ul className="flex flex-wrap gap-2">
             {tasks.data.map(entry => (

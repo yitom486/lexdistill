@@ -148,9 +148,9 @@ it('ACP 运行时：下拉显示已选模型名，脚注写历史/队列走台�
   }
   // 下拉显示用户真实选择，而非一律“运行时默认”
   expect(doc.body.textContent).toContain('6.1 Sol');
-  // 脚注如实：历史/队列走台账，仅用量不可用
-  expect(doc.body.textContent).toContain('历史/队列走网关台账');
-  expect(doc.body.textContent).toContain('用量面板不可用');
+  // 脚注如实：历史与排队需在线，用量暂不可用（R07 去“网关台账”内部术语）
+  expect(doc.body.textContent).toContain('历史与排队需要在线连接');
+  expect(doc.body.textContent).toContain('用量暂不可用');
   client.clear();
   usePreferencesStore.setState({ coachModelId: '', coachEffort: '' });
 });

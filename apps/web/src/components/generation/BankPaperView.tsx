@@ -43,7 +43,7 @@ export function BankPaperView({ userId, taskId, paperId }: { userId: string; tas
       <div className="surface-card rounded-2xl p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <p className="font-mono text-[10px] tracking-wider uppercase text-ink-faint-soft">
+            <p className="font-mono text-xs tracking-wider uppercase text-ink-faint-soft">
               语言能力模拟卷 · 共 {itemCount} 题
             </p>
             <h3 className="text-base font-serif font-bold text-ink tracking-tight mt-0.5">{data.title}</h3>

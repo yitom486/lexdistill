@@ -51,11 +51,12 @@ export function SidebarGroups({
             {!collapsed && (
               <button
                 type="button"
+                aria-expanded={expanded}
                 onClick={() => {
                   sound.playClick();
                   onToggleGroup(group.id);
                 }}
-                className="w-full flex items-center gap-1 px-2 py-1.5 font-mono text-[10px] tracking-wider uppercase text-ink-stone-400 font-semibold hover:text-ink cursor-pointer transition-colors"
+                className="w-full flex items-center gap-1 px-2 py-1.5 text-xs text-ink-faint-soft font-semibold tracking-wide hover:text-ink cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded-lg"
               >
                 {expanded ? (
                   <ChevronDown className="w-3 h-3 shrink-0" />
@@ -85,7 +86,7 @@ export function SidebarGroups({
       {comingSoon.length > 0 && (
         <div>
           {!collapsed && (
-            <div className="px-2 py-1.5 font-mono text-[10px] tracking-wider uppercase text-ink-stone-400 font-semibold">
+            <div className="px-2 py-1.5 text-xs text-ink-faint-soft font-semibold tracking-wide">
               即将推出 · {trackName}
             </div>
           )}
@@ -114,7 +115,7 @@ export function SidebarGroups({
                   {!collapsed && (
                     <>
                       <span className="truncate flex-1 text-left">{mod.label}</span>
-                      <span className="font-mono text-[9px] px-1 py-px rounded border border-line-hairline text-ink-faint-soft shrink-0">
+                      <span className="text-[10px] px-1 py-px rounded border border-line-hairline text-ink-faint-soft shrink-0">
                         即将
                       </span>
                     </>

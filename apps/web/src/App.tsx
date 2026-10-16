@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
-import { motion } from 'framer-motion';
+import { motion, MotionConfig } from 'framer-motion';
 import { readCssDurationSeconds } from './lib/css-tokens.js';
+import { useMotionPreference } from './hooks/useMotionPreference.js';
 import { toast, Toaster } from 'sonner';
 import { DotPattern } from './components/magicui/index.js';
 import { CommandPalette } from './components/CommandPalette.js';
 import { AiTutorDrawer } from './components/AiTutorDrawer.js';
+import { useTutorPanelFocus } from './components/ai-tutor/useTutorPanelFocus.js';
 import { OnboardingDialog } from './components/OnboardingDialog.js';
 import { LessonDialog } from './components/LessonDialog.js';
 import { SelectionLookupPopup } from './components/SelectionLookupPopup.js';
@@ -65,7 +67,6 @@ import {
   useMistakesQuery,
   useLearnerProfileQuery,
   useAddCardsMutation,
-  useAddMistakeMutation,
   vocabToStudyCard,
 } from './queries/useLearnerQueries.js';
 import { sound } from './utils/audio.js';
@@ -78,6 +79,7 @@ const COACH_WIDTH_MIN = 320;
 const COACH_WIDTH_MAX = 960;
 
 export function App() {
+  const reducedMotion = useMotionPreference();
   const panelEnterDuration = readCssDurationSeconds('--motion-layout-enter-duration');
   useEnsureGateway();
   usePipelineJobSubscription();
@@ -233,20 +235,24 @@ export function App() {
     }
   }, []);
 
-  const { data: cards = [] } = useCardsQuery();
-  const { data: mistakes = [] } = useMistakesQuery();
-  const { data: metrics = [] } = useLearnerProfileQuery();
+  const cardsQuery = useCardsQuery();
+  const mistakesQuery = useMistakesQuery();
+  const metricsQuery = useLearnerProfileQuery();
+  const cards = cardsQuery.data ?? [];
+  const mistakes = mistakesQuery.data ?? [];
   const addCards = useAddCardsMutation();
-  const addMistake = useAddMistakeMutation();
   const startLessonQuiz = useStartLessonQuiz();
 
   const unresolvedMistakesCount = mistakes.filter((m) => !m.isResolved).length;
   const commandActions = useCommandActions(unresolvedMistakesCount);
 
   const freeCoachVisible = isTutorOpen && tutorSurface === 'free';
+  const freeCoachEverOpened = useRef(false);
+  if (freeCoachVisible) freeCoachEverOpened.current = true;
   // 关闭仅隐藏；有 thread / 曾打开偏好时 keep-alive，避免丢本地气泡与断会话感知
   const freeCoachMounted =
-    freeCoachVisible || coachPanelOpen || Boolean(coachThreadId);
+    freeCoachEverOpened.current || coachPanelOpen || Boolean(coachThreadId);
+  const freeCoachPanelRef = useTutorPanelFocus(freeCoachVisible, freeCoachMounted, true);
 
   const questionTutorVisible =
     isTutorOpen && tutorSurface === 'question' && Boolean(tutorContext);
@@ -258,6 +264,9 @@ export function App() {
     Boolean(tutorContextSnapshot);
 
   return (
+    // R10：跟随系统“减少动态效果”设置；全部 framer 位移/弹簧动效在 reduce 下
+    // 直接到达终态，业务交互（焦点、按键、提交锁、回执）不受影响。
+    <MotionConfig reducedMotion={reducedMotion ? 'always' : 'never'} transition={reducedMotion ? { duration: readCssDurationSeconds('--motion-reduced-duration') } : {}}>
     <div
       className="h-[100dvh] bg-paper text-ink-deep transition-colors flex font-sans relative overflow-hidden"
     >
@@ -291,11 +300,17 @@ export function App() {
       {/* 自由教练：关闭=隐藏不卸载；宽度可拖；Gateway 不断连 */}
       {freeCoachMounted ? (
         <div
+          ref={freeCoachPanelRef}
+          role="dialog"
+          aria-label="学习导师"
+          tabIndex={-1}
+          inert={!freeCoachVisible}
           className={cn(
-            'fixed inset-y-3 right-3 z-50 flex shadow-2xl',
+            'fixed inset-y-3 right-3 z-50 flex shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
             !freeCoachVisible && 'invisible pointer-events-none'
           )}
           style={{
+            display: freeCoachVisible ? 'flex' : 'none',
             width: `min(100vw - 1.5rem, ${coachPanelWidthPx}px)`,
           }}
           aria-hidden={!freeCoachVisible}
@@ -321,7 +336,7 @@ export function App() {
             }}
           />
           <div className="min-w-0 flex-1 overflow-hidden rounded-r-xl">
-            <AgentChatPanel className="h-full" onClose={closeTutor} />
+            <AgentChatPanel className="h-full" visible={freeCoachVisible} onClose={closeTutor} />
           </div>
         </div>
       ) : null}
@@ -415,9 +430,9 @@ export function App() {
               >
                 <TextbookCurriculum
                   onStartLessonQuiz={startLessonQuiz}
-                  onAddCardFromTextbook={(vocab) => addCards.mutate([vocabToStudyCard(vocab)])}
+                  onAddCardFromTextbook={(vocab) => addCards.mutateAsync([vocabToStudyCard(vocab)])}
                   onAddCardsBatch={(list) =>
-                    addCards.mutate(list.map((v, i) => vocabToStudyCard(v, i)))
+                    addCards.mutateAsync(list.map((v, i) => vocabToStudyCard(v, i)))
                   }
                   onAskAiTutor={(selectedText, contextPrompt) => {
                     sound.playClick();
@@ -443,7 +458,6 @@ export function App() {
                     sound.playClick();
                     openTutor(ctx);
                   }}
-                  onAddMistake={(item) => addMistake.mutate(item)}
                 />
               </motion.div>
             )}
@@ -510,9 +524,9 @@ export function App() {
 
             {activeTab === 'RADAR' && (
               <LearnerRadarDashboard
-                metrics={metrics}
-                activeCardsCount={cards.length}
-                unresolvedMistakesCount={unresolvedMistakesCount}
+                cardsQuery={cardsQuery}
+                mistakesQuery={mistakesQuery}
+                metricsQuery={metricsQuery}
               />
             )}
             </Suspense>
@@ -524,5 +538,6 @@ export function App() {
         <GlobalPipelineTaskWidget />
       </div>
     </div>
+    </MotionConfig>
   );
 }

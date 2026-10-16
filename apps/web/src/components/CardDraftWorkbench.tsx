@@ -99,6 +99,7 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
             <input
               value={headword}
               onChange={(e) => setHeadword(e.target.value)}
+              aria-label="草稿词头"
               className="w-32 h-7 px-2 rounded-lg border border-line bg-surface outline-none focus:border-tone-amber-500 text-sm font-bold"
             />
           ) : (
@@ -110,6 +111,7 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
             value={reading}
             onChange={(e) => setReading(e.target.value)}
             placeholder="读音"
+            aria-label="草稿读音"
             className="w-28 h-7 px-2 rounded-lg border border-line bg-surface outline-none focus:border-tone-amber-500 text-xs"
           />
         ) : (
@@ -118,7 +120,7 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
           )
         )}
         {draft.partOfSpeech && <Badge variant="secondary">{draft.partOfSpeech}</Badge>}
-        <Badge variant="outline">{SOURCE_LABEL[draft.source] ?? draft.source}</Badge>
+        <Badge variant="outline">{SOURCE_LABEL[draft.source] ?? '其他来源'}</Badge>
         {draft.kind === 'sentence' && (
           <Badge variant="amber" title="句子草稿：接受后建成句子卡，不记相遇词">
             句子
@@ -131,15 +133,15 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
         )}
         <span className="flex-1" />
         {!editing && (
-          <Button variant="ghost" size="sm" onClick={() => setEditing(true)} title="逐字段修改">
+          <Button variant="ghost" size="sm" onClick={() => setEditing(true)} title="逐字段修改" aria-label="修改草稿">
             <Pencil className="w-3.5 h-3.5" />
           </Button>
         )}
-        <Button variant="ghost" size="sm" onClick={handleAccept} disabled={accept.isPending} title="接受并入库成卡">
+        <Button variant="ghost" size="sm" onClick={handleAccept} disabled={accept.isPending} title="接受并入库成卡" aria-label={`接受草稿并入库：${draft.headword}`}>
           <Check className="w-3.5 h-3.5 text-tone-emerald-600" />
           入库
         </Button>
-        <Button variant="ghost" size="sm" onClick={handleDismiss} disabled={dismiss.isPending} title="不要这条">
+        <Button variant="ghost" size="sm" onClick={handleDismiss} disabled={dismiss.isPending} title="不要这条" aria-label={`丢弃草稿：${draft.headword}`}>
           <X className="w-3.5 h-3.5 text-ink-stone-400" />
         </Button>
       </div>
@@ -149,6 +151,7 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
             value={meaningsText}
             onChange={(e) => setMeaningsText(e.target.value)}
             placeholder={draft.kind === 'sentence' ? '译文' : '释义，用 ； 分隔'}
+            aria-label={draft.kind === 'sentence' ? '草稿译文' : '草稿释义'}
             className="flex-1 h-7 px-2 rounded-lg border border-line bg-surface outline-none focus:border-tone-amber-500 text-xs"
           />
           <Button size="sm" disabled={!dirty || update.isPending} onClick={handleSave}>
@@ -183,8 +186,19 @@ function DraftRow({ draft }: { draft: CardDraftItem }) {
  */
 export function CardDraftWorkbench() {
   const shell = useLearningShell();
-  const { data: drafts = [], isLoading } = useCardDraftsQuery(undefined, shell.track);
-  if (isLoading || drafts.length === 0) return null;
+  const { data: drafts = [], isLoading, isError, refetch } = useCardDraftsQuery(undefined, shell.track);
+  // 加载中与空草稿不占位，保持复习页干净；读取失败必须可见（不可静默吞掉待确认草稿）。
+  if (isLoading || (!isError && drafts.length === 0)) return null;
+  if (isError) {
+    return (
+      <section className="mb-4 p-4 rounded-2xl border border-dashed border-line space-y-2">
+        <p className="text-xs text-ink-ghost">生词草稿读取失败，待确认的候选暂不可见。</p>
+        <Button variant="outline" size="sm" onClick={() => void refetch()} className="gap-1 text-xs">
+          重新读取
+        </Button>
+      </section>
+    );
+  }
   return (
     <section className="mb-4 p-4 rounded-2xl border border-dashed border-tone-amber-500o40 bg-wash-amber-500o5 space-y-2">
       <div className="flex items-center gap-2">
@@ -192,7 +206,7 @@ export function CardDraftWorkbench() {
         <h3 className="text-sm font-bold text-ink">
           待确认生词（{drafts.length}）
         </h3>
-        <span className="text-[11px] text-ink-ghost">
+        <span className="text-xs text-ink-ghost">
           AI 抽词/助手整理的候选，接受才入库成卡
         </span>
       </div>

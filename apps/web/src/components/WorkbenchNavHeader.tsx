@@ -83,7 +83,7 @@ export function WorkbenchNavHeader({
             type="button"
             size="sm"
             variant="ghost"
-            className="h-7 px-2 text-[11px]"
+            className="h-7 px-2 text-xs"
             onClick={onOpenApkg}
           >
             从 Anki 搬家
@@ -92,7 +92,7 @@ export function WorkbenchNavHeader({
             type="button"
             size="sm"
             variant="ghost"
-            className="h-7 px-2 text-[11px]"
+            className="h-7 px-2 text-xs"
             disabled={isExporting}
             title="导出当前语种生词本为 .apkg（传到手机导入 Anki）"
             onClick={onExportApkg}
@@ -109,8 +109,8 @@ export function WorkbenchNavHeader({
                 }
               }}
             >
-              <SelectTrigger className="h-7 w-28 text-[11px]" title="复习卡片模板">
-                <SelectValue />
+              <SelectTrigger className="h-7 w-28 text-xs" title="复习卡片模板">
+                <SelectValue>{formats.find((format) => format.id === reviewFormatId)?.name ?? '已保存模板（待确认）'}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {formats.map((f) => (
