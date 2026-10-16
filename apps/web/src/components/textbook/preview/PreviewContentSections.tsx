@@ -18,7 +18,7 @@ const panel = 'rounded-2xl border border-line-soft bg-paper-soft p-6';
 function Disclosure({ label, children }: { label: ReactNode; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return <Collapsible open={open} onOpenChange={setOpen} className="mt-4 border-t border-line-soft pt-3">
-    <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg py-1 text-left text-sm font-medium text-accent-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{label}<ChevronDown className={`ml-auto h-4 w-4 ${open ? 'rotate-180' : ''}`} /></CollapsibleTrigger>
+    <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg py-1 text-left text-sm font-medium text-accent-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">{label}<ChevronDown className={`ml-auto h-4 w-4 ${open ? 'rotate-180' : ''}`} /></CollapsibleTrigger>
     <CollapsibleContent className="mt-3 text-sm leading-7 text-ink-muted">{children}</CollapsibleContent>
   </Collapsible>;
 }
@@ -59,10 +59,10 @@ export function PreviewGrammar({ content, showTranslation, language, ask }: Prop
 }
 
 export function PreviewSentences({ content, showTranslation, language, explain }: Props) {
-  return <div className="space-y-4">{content.sentences.map((sentence, index) => <article key={sentence.id} className={panel}>
-    <div className="flex items-center gap-3"><span className="text-sm tabular-nums text-accent-ink">{String(index + 1).padStart(2, '0')}</span><p className="text-xl leading-9">{sentence.speaker && `${sentence.speaker}：`}{sentence.text}</p></div>
-    <div className="mt-3 flex flex-wrap gap-2"><UnifiedTtsPlayer text={sentence.text} lang={trackToSpeechLang(language)} label="听读 / 跟读" />{explain({ title: '句子讲解', text: sentence.text, ...(sentence.translation ? { translation: sentence.translation } : {}), ...(sentence.explanation ? { explanation: sentence.explanation } : {}) }, '讲解')}</div>
-    {showTranslation && sentence.translation && <p className="mt-2 pl-7 text-sm text-ink-muted">{sentence.translation}</p>}
-    {(sentence.explanation || (!showTranslation && sentence.translation)) && <Disclosure label="查看译文与用法">{!showTranslation && sentence.translation && <p>{sentence.translation}</p>}{sentence.explanation && <div className="mt-2"><MarkdownText text={sentence.explanation} /></div>}</Disclosure>}
+  return <div className="divide-y divide-line-soft border-t border-line-soft">{content.sentences.map((sentence, index) => <article key={sentence.id} className="py-4">
+    <div className="flex items-baseline gap-3"><span className="text-sm tabular-nums text-accent-ink shrink-0">{String(index + 1).padStart(2, '0')}</span><p className="text-xl leading-9 max-w-[75ch]">{sentence.speaker && `${sentence.speaker}：`}{sentence.text}</p></div>
+    <div className="mt-3 flex flex-wrap gap-2 pl-8"><UnifiedTtsPlayer text={sentence.text} lang={trackToSpeechLang(language)} label="听读 / 跟读" />{explain({ title: '句子讲解', text: sentence.text, ...(sentence.translation ? { translation: sentence.translation } : {}), ...(sentence.explanation ? { explanation: sentence.explanation } : {}) }, '讲解')}</div>
+    {showTranslation && sentence.translation && <p className="mt-2 pl-8 text-sm text-ink-muted max-w-[75ch]">{sentence.translation}</p>}
+    {(sentence.explanation || (!showTranslation && sentence.translation)) && <div className="pl-8"><Disclosure label="查看译文与用法">{!showTranslation && sentence.translation && <p>{sentence.translation}</p>}{sentence.explanation && <div className="mt-2"><MarkdownText text={sentence.explanation} /></div>}</Disclosure></div>}
   </article>)}</div>;
 }
