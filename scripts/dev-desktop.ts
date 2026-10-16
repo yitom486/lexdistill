@@ -35,42 +35,124 @@ function cleanupStaleDesktopProcesses(): void {
 }
 
 /**
- * 桌面端开发环境启动器（自动完成端口 3000 预检与孤儿清理，防端口占用报错）。
+ * 寻找第一个可用的前端 Web 端口（支持在 3000-3010 范围内自动感知与顺延对齐）。
+ */
+function resolveAvailableWebPort(): number | null {
+  const WEB_PORT_BASE = 3000;
+  const WEB_PORT_MAX = 3010;
+  const listeners = listWatchedListeners();
+  const infos = procInfos(listeners.map((l) => l.pid));
+
+  for (let port = WEB_PORT_BASE; port <= WEB_PORT_MAX; port++) {
+    const holders = listeners.filter((l) => l.port === port);
+    if (holders.length === 0) {
+      return port;
+    }
+
+    // 检查占用者是否为本项目的残留 dev 进程
+    let allKilled = true;
+    for (const h of holders) {
+      const info = infos.get(h.pid);
+      if (info && isDevProcess(info.cmd)) {
+        console.log(`[dev-desktop] 发现端口 ${port} 残留 dev 进程 (PID ${h.pid}，${shortCmd(info.cmd)})，自动清理以复用端口...`);
+        killPid(h.pid);
+      } else {
+        allKilled = false;
+        console.log(`[dev-desktop] 端口 ${port} 被非 dev 进程占用 (PID ${h.pid}${info ? ` ${shortCmd(info.cmd)}` : ''})，顺延探测下一个端口...`);
+        break;
+      }
+    }
+
+    if (allKilled) {
+      // 再次核验该端口是否已完全释放
+      const remaining = listWatchedListeners().filter((l) => l.port === port);
+      if (remaining.length === 0) {
+        return port;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 桌面端开发环境启动器（自动完成端口协调顺延、devUrl 同步与孤儿清理）。
  */
 async function main(): Promise<number> {
   cleanupStaleDesktopProcesses();
 
-  const holders = listWatchedListeners().filter((l) => l.port === WEB_PORT);
-  if (holders.length > 0) {
-    const infos = procInfos(holders.map((h) => h.pid));
-    for (const h of holders) {
-      const info = infos.get(h.pid);
-      if (info && isDevProcess(info.cmd)) {
-        console.log(`[dev-desktop] 发现 3000 端口残留 dev 进程 (PID ${h.pid}，${shortCmd(info.cmd)})，自动清理以避免端口冲突...`);
-        killPid(h.pid);
-      } else {
-        console.error(`[dev-desktop] 端口 3000 被非 dev 进程占用 (PID ${h.pid})，请人工核对后重试。`);
-        return 1;
-      }
-    }
-
-    // 再次核验
-    const remaining = listWatchedListeners().filter((l) => l.port === WEB_PORT);
-    if (remaining.length > 0) {
-      console.error('[dev-desktop] 端口 3000 清理后依然被占用，拒绝启动。');
-      return 1;
-    }
+  const chosenPort = resolveAvailableWebPort();
+  if (chosenPort === null) {
+    console.error('[dev-desktop] 端口 3000-3010 均被占用，无法找到可用端口，请人工核对后重试。');
+    return 1;
   }
 
-  console.log('[dev-desktop] 端口 3000 核对通过，拉起 Tauri 桌面开发环境…');
-  const child = spawn('bun', ['--filter', '@study-studio/desktop', 'dev'], {
+  const isDefaultPort = chosenPort === WEB_PORT;
+  if (isDefaultPort) {
+    console.log(`[dev-desktop] 端口 ${chosenPort} 核对通过，拉起 Tauri 桌面开发环境…`);
+  } else {
+    console.log(`[dev-desktop] 端口 ${WEB_PORT} 忙碌，自动顺延对齐至端口 ${chosenPort}（Tauri devUrl 与 Vite 自动同步）…`);
+  }
+
+  const tempConfigFile = join(ROOT, 'apps', 'desktop', '.dev-port-override.json');
+  const cleanupTempConfig = () => {
+    try {
+      if (existsSync(tempConfigFile)) {
+        unlinkSync(tempConfigFile);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  if (!isDefaultPort) {
+    writeFileSync(
+      tempConfigFile,
+      JSON.stringify(
+        {
+          build: {
+            devUrl: `http://localhost:${chosenPort}`,
+          },
+        },
+        null,
+        2
+      )
+    );
+  }
+
+  const tauriArgs = ['--filter', '@study-studio/desktop', 'dev'];
+  if (!isDefaultPort) {
+    tauriArgs.push('--', '-c', '.dev-port-override.json');
+  }
+
+  const child = spawn('bun', tauriArgs, {
     cwd: ROOT,
     stdio: 'inherit',
     shell: true,
+    env: {
+      ...process.env,
+      VITE_PORT: String(chosenPort),
+      PORT: String(chosenPort),
+    },
+  });
+
+  process.on('SIGINT', () => {
+    cleanupTempConfig();
+    process.exit(130);
+  });
+  process.on('SIGTERM', () => {
+    cleanupTempConfig();
+    process.exit(143);
+  });
+  process.on('exit', () => {
+    cleanupTempConfig();
   });
 
   return new Promise((resolve) => {
-    child.on('exit', (code) => resolve(code ?? 0));
+    child.on('exit', (code) => {
+      cleanupTempConfig();
+      resolve(code ?? 0);
+    });
   });
 }
 

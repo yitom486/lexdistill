@@ -15,9 +15,9 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
-    // §7.1 红线：禁止静默漂移端口。冲突必须大声失败（旧实例未退出的信号），
-    // 绝不自动往后挪——漂移会掩盖僵尸进程，让页面绑错服务器。
+    port: Number(process.env.VITE_PORT || process.env.PORT || 3000),
+    // 严格绑定指定端口：端口由外部启动器（如 dev-desktop / dev-run）集中协调，
+    // Vite 本身禁止未知的二次静默漂移。
     strictPort: true,
     // §7.2 纵深防御：构建产物不进 chokidar（dev 期间跑 build 也不应惊动 dev server）。
     // 注：网关侧已探针验证 bun --watch 只跟 import graph；Vite 侧保留此忽略为保险。
