@@ -245,7 +245,7 @@ export async function fetchRssItems(
       redirect: 'follow',
       headers: {
         Accept: 'application/rss+xml, application/xml, text/xml, */*',
-        'User-Agent': 'LinguaStudio/0.1 (language-learning; personal study use)',
+        'User-Agent': 'LexDistill/0.1 (language-learning; personal study use)',
       },
     });
     if (!res.ok) {

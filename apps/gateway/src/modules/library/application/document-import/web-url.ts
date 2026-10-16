@@ -137,7 +137,7 @@ export async function fetchPublicWebText(
         redirect: 'manual',
         headers: {
           Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
-          'User-Agent': 'LinguaStudio/0.1 (language-learning reader; personal study)',
+          'User-Agent': 'LexDistill/0.1 (language-learning reader; personal study)',
         },
       });
       if (res.status >= 300 && res.status < 400) {

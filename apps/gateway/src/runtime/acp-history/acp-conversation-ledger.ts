@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { BusinessError } from '@lexdistill/shared';
 import { getDefaultAgentDataDir } from '@yitom/acp-client';
@@ -75,9 +75,12 @@ function previewOf(userText: string, agentText: string): string {
 
 /** 默认文件后端：随应用数据目录走，路径可用 env 覆盖（测试/排障）。 */
 export function defaultAcpLedgerBackend(): AcpLedgerBackend {
+  const defaultPath = join(getDefaultAgentDataDir(), 'lexdistill-acp-conversations.json');
+  const legacyPath = join(getDefaultAgentDataDir(), 'lingua-acp-conversations.json');
   const filePath =
+    process.env.LEXDISTILL_ACP_LEDGER_PATH?.trim() ||
     process.env.LINGUA_ACP_LEDGER_PATH?.trim() ||
-    join(getDefaultAgentDataDir(), 'lingua-acp-conversations.json');
+    defaultPath;
   let warned = false;
   const warnOnce = (error: unknown) => {
     if (warned) return;
@@ -87,7 +90,11 @@ export function defaultAcpLedgerBackend(): AcpLedgerBackend {
   return {
     load(): AcpLedgerData | null {
       try {
-        const raw = readFileSync(filePath, 'utf8');
+        let target = filePath;
+        if (filePath === defaultPath && !existsSync(defaultPath) && existsSync(legacyPath)) {
+          target = legacyPath;
+        }
+        const raw = readFileSync(target, 'utf8');
         const parsed = JSON.parse(raw) as Partial<AcpLedgerData>;
         if (parsed?.version !== 1 || !Array.isArray(parsed.conversations)) return null;
         return { version: 1, conversations: parsed.conversations };

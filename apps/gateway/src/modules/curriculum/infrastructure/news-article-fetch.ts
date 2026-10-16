@@ -75,7 +75,7 @@ export async function fetchNewsArticleFullText(
         headers: {
           Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
           'User-Agent':
-            'LinguaStudio/0.1 (language-learning reader; personal study; +https://localhost)',
+            'LexDistill/0.1 (language-learning reader; personal study; +https://localhost)',
           'Accept-Language': 'en-US,en;q=0.8,ja;q=0.5,zh-CN;q=0.3',
         },
       });

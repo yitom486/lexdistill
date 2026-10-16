@@ -75,7 +75,7 @@ export class TextbookMcpRegistry {
     const workers: WorkerEndpoint[] = [];
     const workerPaths: string[] = [];
     for (let index = 0; index < workerCount; index++) {
-      const server = new McpServer({ name: 'lingua-textbook', version: '1.0.0' });
+      const server = new McpServer({ name: 'lexdistill-textbook', version: '1.0.0' });
       // 有状态会话：同一 Worker 的多次 MCP 请求共用一个 transport，必须启用
       // sessionIdGenerator，否则无状态复用会导致消息 ID 碰撞，客户端建连后
       // 拿不到稳定会话，tools/list 永远到不了。

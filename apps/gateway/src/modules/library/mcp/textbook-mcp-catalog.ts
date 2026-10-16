@@ -48,7 +48,7 @@ export function buildTextbookWorkerMcpServer(
   const tools = {} as Record<TextbookMcpWriteToolName, { approval_mode: 'approve' }>;
   for (const name of TEXTBOOK_MCP_WRITE_TOOLS) tools[name] = { approval_mode: 'approve' };
   return {
-    name: `lingua-textbook-w${workerIndex}`,
+    name: `lexdistill-textbook-w${workerIndex}`,
     type: 'http',
     url: `${gatewayBaseUrl.replace(/\/$/, '')}${taskPath}`,
     default_tools_approval_mode: 'approve',

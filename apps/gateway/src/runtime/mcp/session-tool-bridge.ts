@@ -88,7 +88,7 @@ export class SessionToolBridge {
 
   public create(userId: string, sessionId: string, tools: ToolDefinition[]): { token: string; spec: SessionMcpServerSpec } {
     const token = `st-${randomUUID()}`;
-    const server = new McpServer({ name: 'lingua-session-tools', version: '1.0.0' });
+    const server = new McpServer({ name: 'lexdistill-session-tools', version: '1.0.0' });
     const context: SessionToolCallContext = { userId, sessionId };
     for (const tool of tools) {
       server.registerTool(
@@ -123,7 +123,7 @@ export class SessionToolBridge {
     return {
       token,
       spec: {
-        name: 'lingua-session',
+        name: 'lexdistill-session',
         type: 'http',
         url: `${this.deps.resolveBaseUrl().replace(/\/$/, '')}/mcp/session/${token}`,
         headers: [],

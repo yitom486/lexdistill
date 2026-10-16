@@ -31,7 +31,7 @@ export async function startSpikeToolBridge(
   tools: ToolDefinition[],
   onCall: (call: SpikeBridgeCall) => void,
 ): Promise<{ mcpServer: { name: string; type: 'http'; url: string; headers: Array<{ name: string; value: string }> }; close: () => Promise<void> }> {
-  const server = new McpServer({ name: 'lingua-spike-tools', version: '0.0.0' });
+  const server = new McpServer({ name: 'lexdistill-spike-tools', version: '0.0.0' });
   for (const tool of tools) {
     server.registerTool(
       tool.name,
@@ -62,7 +62,7 @@ export async function startSpikeToolBridge(
   } });
   return {
     // codex-acp 的 new/load/resume 全接受 mcpServers；HTTP 形态必填 headers（缺失会被静默跳过，无错）。
-    mcpServer: { name: 'lingua-spike', type: 'http', url: `http://127.0.0.1:${http.port}/mcp`, headers: [] as Array<{ name: string; value: string }> },
+    mcpServer: { name: 'lexdistill-spike', type: 'http', url: `http://127.0.0.1:${http.port}/mcp`, headers: [] as Array<{ name: string; value: string }> },
     close: async () => {
       http.stop(true);
       await transport.close();

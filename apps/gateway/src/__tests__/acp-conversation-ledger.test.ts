@@ -87,8 +87,8 @@ describe('AcpConversationLedger', () => {
   });
 
   it('文件后端往返：索引＋transcript 落盘可读回', () => {
-    const filePath = join(tmpdir(), `lingua-ledger-test-${Date.now()}.json`);
-    process.env.LINGUA_ACP_LEDGER_PATH = filePath;
+    const filePath = join(tmpdir(), `lexdistill-ledger-test-${Date.now()}.json`);
+    process.env.LEXDISTILL_ACP_LEDGER_PATH = filePath;
     try {
       const writer = new AcpConversationLedger(defaultAcpLedgerBackend());
       writer.recordSessionCreated({ acpSessionId: 'acp-f', userId: 'u', lane: 'learning', runtimeId: 'custom' });
@@ -98,6 +98,7 @@ describe('AcpConversationLedger', () => {
       expect(reader.listConversations()[0]).toMatchObject({ id: 'acp-f' });
       expect(reader.getTranscriptItems('acp-f')?.length).toBe(2);
     } finally {
+      delete process.env.LEXDISTILL_ACP_LEDGER_PATH;
       delete process.env.LINGUA_ACP_LEDGER_PATH;
     }
   });

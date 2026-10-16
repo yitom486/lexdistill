@@ -49,7 +49,7 @@ describe('ACP resume spike (manual, LINGUA_ACP_SPIKE=1)', () => {
           requiredEnvKeys: [],
         },
         workspaceRoot: tmp,
-        clientInfo: { name: 'lingua-spike', version: '0.0.0' },
+        clientInfo: { name: 'lexdistill-spike', version: '0.0.0' },
         callbacks: {
           onSessionUpdate: callbacks.onSessionUpdate,
           onLog: callbacks.onLog,
