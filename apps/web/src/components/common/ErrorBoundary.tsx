@@ -4,6 +4,7 @@ import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { toast } from 'sonner';
 import { getPlatform } from '../../platform/capabilities.js';
+import { DesktopWindowControls } from '../DesktopWindowControls.js';
 import { logger } from '@study-studio/shared';
 
 export interface ErrorBoundaryProps {
@@ -100,14 +101,43 @@ UserAgent: ${getPlatform().getUserAgent()}
     }
 
     const isFullscreen = variant === 'fullscreen';
+    const isDesktop = (() => {
+      try {
+        return getPlatform().isDesktop();
+      } catch {
+        return false;
+      }
+    })();
 
     return (
       <div
         role="alert"
         aria-live="assertive"
-        className={`flex items-center justify-center p-6 transition-colors ${ isFullscreen ? 'min-h-screen w-full bg-surface-paper-fixed dark:bg-ink-h141312 text-ink-soft' : 'min-h-[22rem] w-full rounded-2xl border border-line-rose-200o80 dark:border-line-rose-900o40 bg-veil-whiteo80 dark:bg-veil-stone-900o60 backdrop-blur-md shadow-sm' }`}
+        className={`flex items-center justify-center p-6 transition-colors relative ${ isFullscreen ? 'min-h-screen w-full bg-surface-paper-fixed dark:bg-ink-h141312 text-ink-soft' : 'min-h-[22rem] w-full rounded-2xl border border-line-rose-200o80 dark:border-line-rose-900o40 bg-veil-whiteo80 dark:bg-veil-stone-900o60 backdrop-blur-md shadow-sm' }`}
       >
-        <div className="max-w-lg w-full text-center space-y-4">
+        {isFullscreen && isDesktop && (
+          <header
+            data-tauri-drag-region
+            className="fixed top-0 left-0 right-0 h-14 px-4 sm:px-6 flex items-center justify-between z-50 border-b border-line-hairline bg-surface-coal/85 backdrop-blur-md select-none"
+          >
+            <div data-tauri-drag-region className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg border border-line-hairline bg-surface-coal text-tone-rose-500 flex items-center justify-center shadow-xs">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="font-serif font-semibold text-base text-ink tracking-tight">
+                  Lingua Studio
+                </span>
+                <Badge variant="destructive" className="text-[10px]">
+                  系统容灾模式
+                </Badge>
+              </div>
+            </div>
+            <DesktopWindowControls showDivider={false} />
+          </header>
+        )}
+
+        <div className={`max-w-lg w-full text-center space-y-4 ${isFullscreen && isDesktop ? 'pt-14' : ''}`}>
           {/* 异常警示徽章图标 */}
           <div className="inline-flex p-3 rounded-2xl bg-wash-rose-500o10-rose-500o15 border border-line-rose-500o20 text-ink-rose-600-rose-400">
             <AlertTriangle className="w-8 h-8" />

@@ -20,7 +20,6 @@ import { UserProfileModal } from './UserProfileModal.js';
 import { useGatewayStore } from '../stores/useGatewayStore.js';
 import { getPlatform } from '../platform/capabilities.js';
 import { checkForAppUpdate, logUpdaterFailure } from '../platform/app-updater.js';
-import { DesktopWindowControls } from './DesktopWindowControls.js';
 
 interface AppHeaderProps {
   onOpenMobileNav?: () => void;
@@ -288,7 +287,13 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
               <Sun className="w-4 h-4" />
             )}
           </GhostIconButton>
-          {isDesktop && <DesktopWindowControls />}
+          {/* 桌面端右侧窗体控制位占位：实际控制按钮由全局置顶的 DesktopWindowChrome 渲染 */}
+          {isDesktop && (
+            <div
+              aria-hidden="true"
+              className="w-[101px] sm:w-[113px] shrink-0 pointer-events-none select-none"
+            />
+          )}
         </div>
       </div>
 

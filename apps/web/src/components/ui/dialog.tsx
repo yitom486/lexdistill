@@ -11,7 +11,7 @@ export const DialogClose = BaseDialog.Close;
 export const DialogOverlay = React.forwardRef<
   HTMLDivElement,
   React.ComponentPropsWithoutRef<typeof BaseDialog.Backdrop>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <BaseDialog.Backdrop
     ref={ref}
     className={cn(
@@ -19,7 +19,14 @@ export const DialogOverlay = React.forwardRef<
       className
     )}
     {...props}
-  />
+  >
+    {/* 弹窗遮罩激活时的顶部拖拽区：避开右上角窗口控制按钮（留出 9rem 空间） */}
+    <div
+      data-tauri-drag-region
+      className="absolute top-0 left-0 right-36 h-14 pointer-events-auto select-none"
+    />
+    {children}
+  </BaseDialog.Backdrop>
 ));
 DialogOverlay.displayName = 'DialogOverlay';
 

@@ -12,6 +12,7 @@ import { LessonDialog } from './components/LessonDialog.js';
 import { SelectionLookupPopup } from './components/SelectionLookupPopup.js';
 import { AgentChatPanel } from './components/AgentChatPanel.js';
 import { AppHeader } from './components/AppHeader.js';
+import { DesktopWindowChrome } from './components/DesktopWindowChrome.js';
 import { SystemSettingsPage } from './components/SystemSettingsPage.js';
 import { AppSidebar } from './components/AppSidebar.js';
 import { TodayPlanWorkbench } from './components/TodayPlanWorkbench.js';
@@ -271,6 +272,7 @@ export function App() {
       className="h-[100dvh] bg-paper text-ink-deep transition-colors flex font-sans relative overflow-hidden"
     >
       <Toaster position="top-center" richColors />
+      <DesktopWindowChrome />
       <SelectionLookupPopup />
       <DotPattern
         width={26}

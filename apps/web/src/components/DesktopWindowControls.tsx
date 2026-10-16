@@ -6,9 +6,18 @@ import {
   closeDesktopWindow,
   isDesktopWindowMaximized,
 } from '../platform/tauri-capabilities.js';
+import { cn } from '../lib/utils.js';
 import { sound } from '../utils/audio.js';
 
-export function DesktopWindowControls() {
+export interface DesktopWindowControlsProps {
+  showDivider?: boolean | undefined;
+  className?: string | undefined;
+}
+
+export function DesktopWindowControls({
+  showDivider = true,
+  className,
+}: DesktopWindowControlsProps = {}) {
   const [isMaximized, setIsMaximized] = React.useState(false);
 
   React.useEffect(() => {
@@ -53,11 +62,11 @@ export function DesktopWindowControls() {
 
   return (
     <div
-      className="flex items-center gap-0.5 ml-1 select-none"
+      className={cn('flex items-center gap-0.5 ml-1 select-none', className)}
       data-tauri-drag-region="false"
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="h-3.5 w-px bg-line mx-1 opacity-70" />
+      {showDivider && <div className="h-3.5 w-px bg-line mx-1 opacity-70" />}
 
       <button
         type="button"
