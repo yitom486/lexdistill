@@ -308,7 +308,7 @@ export function App() {
           tabIndex={-1}
           inert={!freeCoachVisible}
           className={cn(
-            'fixed inset-y-3 right-3 z-50 flex shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+            'fixed top-16 sm:top-17 bottom-3 right-3 z-50 flex shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
             !freeCoachVisible && 'invisible pointer-events-none'
           )}
           style={{

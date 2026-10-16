@@ -14,7 +14,7 @@ export function useDragPanel(defaultWidthPx: number) {
     const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
     const current = panelPos ?? {
       right: 16,
-      top: Math.max(8, vh * 0.11),
+      top: Math.max(64, vh * 0.11),
     };
     dragState.current = {
       startX: e.clientX,
@@ -32,7 +32,7 @@ export function useDragPanel(defaultWidthPx: number) {
     const vh = window.innerHeight;
     const w = Math.min(vw, defaultWidthPx);
     const right = Math.min(Math.max(drag.origRight - (e.clientX - drag.startX), -(w - 120)), vw - 120);
-    const top = Math.min(Math.max(drag.origTop + (e.clientY - drag.startY), 0), vh - 60);
+    const top = Math.min(Math.max(drag.origTop + (e.clientY - drag.startY), 64), vh - 60);
     setPanelPos({ right, top });
   };
 

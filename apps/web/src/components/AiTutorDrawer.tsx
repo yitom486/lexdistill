@@ -237,7 +237,7 @@ export function AiTutorDrawer({
       aria-hidden={!isOpen}
       inert={!isOpen}
       className="fixed z-50 flex flex-col rounded-2xl border border-line-amber-900o15-amber-500o20 bg-paper-soft shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-      style={{ right, top, width: panelWidth, height: '78vh', display: isOpen ? 'flex' : 'none' }}
+      style={{ right, top: Math.max(top, 64), width: panelWidth, height: 'calc(100dvh - 5.5rem)', display: isOpen ? 'flex' : 'none' }}
     >
         <div
           role="separator"

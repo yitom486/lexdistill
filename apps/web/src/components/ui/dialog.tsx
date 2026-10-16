@@ -15,16 +15,11 @@ export const DialogOverlay = React.forwardRef<
   <BaseDialog.Backdrop
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-veil-blacko60 backdrop-blur-xl transition-opacity',
+      'fixed inset-x-0 bottom-0 top-14 sm:top-15 z-50 bg-veil-blacko30 backdrop-blur-sm transition-opacity',
       className
     )}
     {...props}
   >
-    {/* 弹窗遮罩激活时的顶部拖拽区：避开右上角窗口控制按钮（留出 9rem 空间） */}
-    <div
-      data-tauri-drag-region
-      className="absolute top-0 left-0 right-36 h-14 pointer-events-auto select-none"
-    />
     {children}
   </BaseDialog.Backdrop>
 ));
@@ -42,7 +37,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       <BaseDialog.Popup
         ref={ref}
         className={cn(
-          'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 surface-modal text-ink p-6 rounded-3xl outline-none',
+          'fixed left-[50%] top-[calc(50%+1.75rem)] sm:top-[calc(50%+1.875rem)] z-50 grid w-full max-w-lg max-h-[calc(100dvh-4.5rem)] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 surface-modal text-ink p-6 rounded-3xl outline-none shadow-2xl',
           className
         )}
         {...props}

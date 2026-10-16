@@ -84,3 +84,38 @@ it('ErrorBoundary: 全屏容灾在桌面端内置窗体控制条与系统容灾�
   expect(doc.querySelector('[data-tauri-drag-region]')).not.toBeNull();
   expect(doc.querySelector('[aria-label="关闭应用"]')).not.toBeNull();
 });
+
+it('Sovereign Titlebar: DialogOverlay 与 SheetOverlay 严格位于顶栏下方，绝不侵入 top-14 / sm:top-15 顶栏主权区域', async () => {
+  const { Dialog, DialogOverlay, DialogPortal } = await import('../ui/dialog.js');
+  const { Sheet, SheetOverlay, SheetPortal } = await import('../ui/sheet.js');
+
+  await act(async () => {
+    dom!.root.render(
+      <div>
+        <Dialog open={true}>
+          <DialogPortal container={dom!.dom.window.document.body}>
+            <DialogOverlay data-testid="dialog-overlay" />
+          </DialogPortal>
+        </Dialog>
+        <Sheet open={true}>
+          <SheetPortal container={dom!.dom.window.document.body}>
+            <SheetOverlay data-testid="sheet-overlay" />
+          </SheetPortal>
+        </Sheet>
+      </div>
+    );
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  const doc = dom!.dom.window.document;
+  const dialogOverlay = doc.querySelector('[data-testid="dialog-overlay"]');
+  expect(dialogOverlay?.className).toContain('top-14');
+  expect(dialogOverlay?.className).toContain('sm:top-15');
+  expect(dialogOverlay?.className).not.toContain('fixed inset-0');
+
+  const sheetOverlay = doc.querySelector('[data-testid="sheet-overlay"]');
+  expect(sheetOverlay?.className).toContain('top-14');
+  expect(sheetOverlay?.className).toContain('sm:top-15');
+  expect(sheetOverlay?.className).not.toContain('fixed inset-0');
+});
+

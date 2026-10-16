@@ -71,7 +71,7 @@ export function DesktopWindowControls({
       <button
         type="button"
         onClick={handleMinimize}
-        className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-lg text-ink-ghost hover:text-ink hover:bg-surface-stone-100-stone-900 transition-colors"
+        className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-lg text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60 transition-colors"
         title="最小化"
         aria-label="最小化窗口"
       >
@@ -81,7 +81,7 @@ export function DesktopWindowControls({
       <button
         type="button"
         onClick={handleToggleMaximize}
-        className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-lg text-ink-ghost hover:text-ink hover:bg-surface-stone-100-stone-900 transition-colors"
+        className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-lg text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60 transition-colors"
         title={isMaximized ? '还原' : '最大化'}
         aria-label={isMaximized ? '还原窗口' : '最大化窗口'}
       >
@@ -95,7 +95,7 @@ export function DesktopWindowControls({
       <button
         type="button"
         onClick={handleClose}
-        className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-lg text-ink-ghost hover:text-surface hover:bg-tone-rose-500 transition-colors"
+        className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-lg text-ink-faint-soft hover:text-surface hover:bg-tone-rose-500 transition-colors"
         title="关闭"
         aria-label="关闭应用"
       >

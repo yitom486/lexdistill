@@ -15,16 +15,11 @@ export const SheetOverlay = React.forwardRef<
   <BaseDialog.Backdrop
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-veil-stone-950o50 backdrop-blur-sm transition-opacity',
+      'fixed inset-x-0 bottom-0 top-14 sm:top-15 z-50 bg-veil-blacko30 backdrop-blur-sm transition-opacity',
       className
     )}
     {...props}
   >
-    {/* 抽屉激活时的顶部拖拽区：避开右上角窗口控制按钮 */}
-    <div
-      data-tauri-drag-region
-      className="absolute top-0 left-0 right-36 h-14 pointer-events-auto select-none"
-    />
     {children}
   </BaseDialog.Backdrop>
 ));
@@ -43,9 +38,9 @@ export const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
       <BaseDialog.Popup
         ref={ref}
         className={cn(
-          'fixed z-50 flex h-full w-full max-w-lg flex-col border border-line-hairline bg-surface-hfaf9f6 shadow-2xl outline-none transition-colors dark:border-line-hairline dark:bg-surface-h1a1816',
-          side === 'right' && 'inset-y-0 right-0 border-l',
-          side === 'left' && 'inset-y-0 left-0 border-r',
+          'fixed z-50 flex flex-col border border-line-hairline bg-surface-hfaf9f6 shadow-2xl outline-none transition-colors dark:border-line-hairline dark:bg-surface-h1a1816 top-14 sm:top-15 bottom-0 h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-3.75rem)] w-full max-w-lg',
+          side === 'right' && 'right-0 border-l',
+          side === 'left' && 'left-0 border-r',
           className
         )}
         {...props}
