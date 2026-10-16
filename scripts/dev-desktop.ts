@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
 import {
   isDevProcess,
   killPid,
