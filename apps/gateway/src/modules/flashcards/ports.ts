@@ -1,21 +1,21 @@
-import type { Result, BusinessError } from '@study-studio/shared';
-import type { AnkiCardFormat } from '@study-studio/flashcards';
+import type { Result, BusinessError } from '@lexdistill/shared';
+import type { AnkiCardFormat } from '@lexdistill/flashcards';
 import type {
   CardDraft,
   CardDraftStatus,
   ProposeCardDraftInput,
   UpdateCardDraftPatch,
 } from './persistence/card-drafts.js';
-import type { SaveCardFormatInput } from '@study-studio/storage-sqlite';
+import type { SaveCardFormatInput } from '@lexdistill/storage-sqlite';
 import type { PreviewCardRequest, PreviewCardResult } from './application/card-preview.js';
-import type { AnkiPushSettings } from '@study-studio/storage-sqlite';
+import type { AnkiPushSettings } from '@lexdistill/storage-sqlite';
 import type { AnkiPushRequest, AnkiPushResult } from './application/anki-push.js';
 import type {
   ApkgImportNotesOptions,
   ApkgImportNotesResult,
 } from './application/apkg-import.js';
 import type { ApkgExportOptions, ApkgExportResult } from './application/apkg-export.js';
-import type { StoredMedia } from '@study-studio/storage-sqlite';
+import type { StoredMedia } from '@lexdistill/storage-sqlite';
 
 /**
  * M1-2 卡片（flashcards）领域仓储能力契约。

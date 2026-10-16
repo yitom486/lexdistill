@@ -8,7 +8,7 @@ import {
   generateId,
   nowIso,
   isOk,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type {
   PracticePlanTemplate,
   PracticePlanRun,
@@ -16,13 +16,13 @@ import type {
   PracticeBlockSpec,
   PracticeRunStatus,
   GeneratedQuestion,
-} from '@study-studio/protocol';
-import { PracticePlanScheduleSchema } from '@study-studio/protocol';
+} from '@lexdistill/protocol';
+import { PracticePlanScheduleSchema } from '@lexdistill/protocol';
 import {
   validatePracticePlanTemplate,
   freezeRunFromTemplate,
   parsePracticeBlockSpecs,
-} from '@study-studio/learning';
+} from '@lexdistill/learning';
 import {
   practicePlanTemplates,
   practicePlanRuns,
@@ -32,7 +32,7 @@ import {
   quizAttempts,
 } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
-import { safeJsonParse } from '@study-studio/shared';
+import { safeJsonParse } from '@lexdistill/shared';
 
 /**
  * D3 起家在 storage-sqlite（前身 gateway modules/practice/persistence/practice-plan.ts，

@@ -1,7 +1,7 @@
 import type { MapPdfResult } from '../queries/useLearnerQueries.js';
 import { buildPreviewEntries } from './toc-anchor-flow.js';
 import type { EditableTocEntry } from './toc-confirm-flow.js';
-import { planTextbookTasks, type TocEntry, type TocLevel } from '@study-studio/document-model';
+import { planTextbookTasks, type TocEntry, type TocLevel } from '@lexdistill/document-model';
 
 export interface TocRecognitionCandidate extends EditableTocEntry {
   /** 目录层级深度：1=一级(如单元), 2=二级(如课或单元末), 3=三级(如课内小节) */

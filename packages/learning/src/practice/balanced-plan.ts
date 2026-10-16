@@ -1,4 +1,4 @@
-import type { PracticeBlockSpec } from '@study-studio/protocol';
+import type { PracticeBlockSpec } from '@lexdistill/protocol';
 
 export function buildBalancedPracticeBlocks(language: 'en' | 'ja' | 'ko'): PracticeBlockSpec[] {
   const prefix = language === 'ja' ? 'jp' : language;

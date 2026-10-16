@@ -1,5 +1,5 @@
 {
-  "name": "@study-studio/shared",
+  "name": "@lexdistill/shared",
   "version": "0.1.2",
   "type": "module",
   "main": "./src/index.ts",

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { LessonContentSchema, ExerciseTypeSchema, lessonContentIssues } from './lesson-content.js';
 import { TextbookLearningContentSchema } from './textbook-learning-content.js';
 import { projectLessonContent } from './lesson-projection.js';
-import { ok, err, Result, BusinessError } from '@study-studio/shared';
+import { ok, err, Result, BusinessError } from '@lexdistill/shared';
 
 /** M8-1 自 protocol 迁入 document-model（字节一致，行为不变）。 */
 

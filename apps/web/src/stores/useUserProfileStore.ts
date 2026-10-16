@@ -1,13 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { createMigratedStorage } from './store-storage.js';
 import type {
   LearnerProfile,
   DailyTaskProgress,
   StudyGoal,
   LearnerLevel,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import { sound } from '../utils/audio.js';
-import { logger } from '@study-studio/shared';
+import { logger } from '@lexdistill/shared';
 import { fireTaskCompletedConfetti, fireGoldenBurstConfetti } from '../utils/confetti.js';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 
@@ -239,7 +240,8 @@ export const useUserProfileStore = create<UserProfileState>()(
       },
     }),
     {
-      name: 'study_studio_user_profile',
+      name: 'lexdistill_user_profile',
+      storage: createMigratedStorage(['study_studio_user_profile']),
       partialize: (state) => ({
         profile: state.profile,
         dailyTask: state.dailyTask,

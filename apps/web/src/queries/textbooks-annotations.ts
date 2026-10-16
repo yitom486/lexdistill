@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { logger } from '@study-studio/shared';
+import { logger } from '@lexdistill/shared';
 import { SavedStructureSchema } from '../lib/document-structure.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
-import { parseTextbookAST, TocEntrySchema, SaveTextbookOutlineResultSchema, type SaveTextbookOutlineRequest, type TextbookAST, type TextbookPipelineSettings } from '@study-studio/document-model';
+import { parseTextbookAST, TocEntrySchema, SaveTextbookOutlineResultSchema, type SaveTextbookOutlineRequest, type TextbookAST, type TextbookPipelineSettings } from '@lexdistill/document-model';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,
@@ -32,7 +32,7 @@ async function fetchPdfGateway(input: string, init?: RequestInit): Promise<Respo
 import type { TextbookBook } from '../models/textbook.js';
 import { convertAstToTextbookBook } from '../components/importer/textbook-converter.js';
 import { tocCandidatesFromEntries, type TocRecognitionCandidate } from '../lib/toc-recognition.js';
-import { TextbookInspectionResultSchema, type TextbookInspectionResult, type TextbookInspectionDocSummary } from '@study-studio/protocol';
+import { TextbookInspectionResultSchema, type TextbookInspectionResult, type TextbookInspectionDocSummary } from '@lexdistill/protocol';
 export type { TextbookInspectionResult, TextbookInspectionDocSummary };
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 
@@ -1073,7 +1073,7 @@ export interface TextbookLessonSlotItem {
   hasPassage: boolean;
   hasPreview: boolean;
   hasSummary: boolean;
-  tocEntries?: import('@study-studio/document-model').TocEntry[];
+  tocEntries?: import('@lexdistill/document-model').TocEntry[];
 }
 
 /** 查询全部原始文档（包含未完成 AST 结构化仅有骨架大纲的文档） */

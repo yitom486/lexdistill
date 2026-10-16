@@ -1,5 +1,5 @@
 /**
- * 轻量分级日志门面（@study-studio/shared，运行中立：Web / Gateway / Adapter 通用）。
+ * 轻量分级日志门面（@lexdistill/shared，运行中立：Web / Gateway / Adapter 通用）。
  *
  * 约定（配合 AGENTS.md §2 错误链）：
  * - 面向用户的失败一律走 `BusinessError.userMessage`（toast / 空状态），不得依赖控制台。

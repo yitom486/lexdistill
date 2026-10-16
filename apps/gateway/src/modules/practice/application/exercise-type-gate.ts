@@ -1,4 +1,4 @@
-import type { LearnerLevel } from '@study-studio/protocol';
+import type { LearnerLevel } from '@lexdistill/protocol';
 
 /**
  * 能力-题型门（纯函数）：学习者等级 × 教材原生题型 → 允许题型集。

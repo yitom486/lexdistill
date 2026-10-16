@@ -1,4 +1,4 @@
-name: Publish Lingua Studio
+name: Publish LexDistill
 
 on:
   workflow_dispatch:
@@ -79,7 +79,7 @@ jobs:
         with:
           projectPath: apps/desktop
           tagName: v__VERSION__
-          releaseName: Lingua Studio v__VERSION__
+          releaseName: LexDistill v__VERSION__
           releaseBody: ${{ steps.release-notes.outputs.body }}
           releaseDraft: false
           prerelease: false

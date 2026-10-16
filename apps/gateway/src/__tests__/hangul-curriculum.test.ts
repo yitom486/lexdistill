@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { app } from '../index.js';
-import { isOk } from '@study-studio/shared';
-import type { HangulItem } from '@study-studio/protocol';
+import { isOk } from '@lexdistill/shared';
+import type { HangulItem } from '@lexdistill/protocol';
 
 describe('Curriculum Hangul Repository & Seeds (Companion Integration)', () => {
   let repo: DrizzleLearnerRepository;

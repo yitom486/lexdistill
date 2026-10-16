@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { VocabularyScopeSchema, DailyPickRequestSchema } from '@study-studio/protocol';
-import { isOk, BusinessError } from '@study-studio/shared';
+import { VocabularyScopeSchema, DailyPickRequestSchema } from '@lexdistill/protocol';
+import { isOk, BusinessError } from '@lexdistill/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { pickDailyWords, formatLockedPayload } from '../application/daily-pick.js';
 import {

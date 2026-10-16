@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { fileURLToPath } from 'node:url';
-import { SaveTextbookOutlineResultSchema } from '@study-studio/document-model';
+import { SaveTextbookOutlineResultSchema } from '@lexdistill/document-model';
 import { createApp } from '../../../../gateway/src/transport/http/create-app.js';
 import { DrizzleLearnerRepository } from '../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
 import {

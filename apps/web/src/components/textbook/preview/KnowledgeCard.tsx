@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { TextbookLearningContent } from '@study-studio/document-model';
+import type { TextbookLearningContent } from '@lexdistill/document-model';
 import { ChevronDown, Sparkles } from 'lucide-react';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';

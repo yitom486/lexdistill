@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { GeneratedQuestion } from '@study-studio/protocol';
-import { PracticeBlockSpecSchema } from '@study-studio/protocol';
+import type { GeneratedQuestion } from '@lexdistill/protocol';
+import { PracticeBlockSpecSchema } from '@lexdistill/protocol';
 
 export interface KanaWord {
   id: string;

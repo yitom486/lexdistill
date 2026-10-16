@@ -1,12 +1,12 @@
 {
-  "name": "@study-studio/protocol",
+  "name": "@lexdistill/protocol",
   "version": "0.1.2",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
-    "@study-studio/document-model": "workspace:*",
-    "@study-studio/shared": "workspace:*",
+    "@lexdistill/document-model": "workspace:*",
+    "@lexdistill/shared": "workspace:*",
     "zod": "^3.24.1"
   },
   "scripts": {

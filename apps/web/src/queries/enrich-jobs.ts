@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { logger } from '@study-studio/shared';
+import { logger } from '@lexdistill/shared';
 import {
   EnrichJobSnapshotSchema,
   WsEventTypes,
   type EnrichJobSnapshot,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { gatewayClient } from '../lib/gateway-client.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';

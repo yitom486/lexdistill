@@ -1,5 +1,5 @@
-import { BusinessError, err, ok, generateId, nowIso, type Result } from '@study-studio/shared';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
+import { BusinessError, err, ok, generateId, nowIso, type Result } from '@lexdistill/shared';
+import { parseTextbookAST, type TextbookAST } from '@lexdistill/document-model';
 import { and, eq, sql } from 'drizzle-orm';
 import { documents, globalVocabulary, textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';

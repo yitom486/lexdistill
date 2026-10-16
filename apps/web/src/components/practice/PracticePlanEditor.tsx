@@ -20,8 +20,8 @@ import { BLOCK_KINDS, BLOCK_KIND_LABELS, VOCAB_KINDS } from './practice-plan-edi
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { useSavePracticeTemplateMutation } from '../../queries/useLearnerQueries.js';
-import type { PracticePlanTemplate, PracticeBlockSpec, PracticeBlockKind, GradingMode, PracticePlanSchedule } from '@study-studio/protocol';
-import { generateId } from '@study-studio/shared';
+import type { PracticePlanTemplate, PracticeBlockSpec, PracticeBlockKind, GradingMode, PracticePlanSchedule } from '@lexdistill/protocol';
+import { generateId } from '@lexdistill/shared';
 
 /** P5：练习计划编辑器。配置有序练习块（1–8），预览题量/AI 批改次数/时长，保存为模板。 */
 

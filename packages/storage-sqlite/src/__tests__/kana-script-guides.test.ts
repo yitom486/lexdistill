@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { KanaItemSchema, KanaLearningGuideSchema } from '@study-studio/protocol';
+import { KanaItemSchema, KanaLearningGuideSchema } from '@lexdistill/protocol';
 import { KANA_SEEDS } from '../seeds/kana-seed.js';
 import { initSchema } from '../ddl.js';
 import { seedInitialData } from '../seed-bootstrap.js';

@@ -145,7 +145,7 @@ async function main(): Promise<number> {
   // dist/tsbuildinfo/db 从未被 import，仍不在监视内；且无 --filter 就无
   // --elide-lines 省略，日志天然全量。web 仍走 --filter（Vite 自带监视）。
   const specs: Array<{ name: string; argv: string[] }> = [];
-  if (only !== 'gateway') specs.push({ name: 'web', argv: ['run', '--elide-lines=0', '--filter', '@study-studio/web', 'dev'] });
+  if (only !== 'gateway') specs.push({ name: 'web', argv: ['run', '--elide-lines=0', '--filter', '@lexdistill/web', 'dev'] });
   if (only !== 'web') specs.push({ name: 'gateway', argv: ['--watch', 'apps/gateway/src/index.ts'] });
   const children = new Map<ChildProcess, string>();
   for (const spec of specs) {

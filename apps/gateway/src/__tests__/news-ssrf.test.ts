@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { fetchNewsArticleFullText } from '../modules/curriculum/infrastructure/news-article-fetch.js';
 import { fetchRssItems } from '../modules/curriculum/infrastructure/news-rss.js';
 

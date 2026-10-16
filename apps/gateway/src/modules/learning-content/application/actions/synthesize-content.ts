@@ -1,5 +1,5 @@
-import type { PracticeBlockSpec } from '@study-studio/protocol';
-import { err, isOk, ok, type Result, BusinessError } from '@study-studio/shared';
+import type { PracticeBlockSpec } from '@lexdistill/protocol';
+import { err, isOk, ok, type Result, BusinessError } from '@lexdistill/shared';
 import type { LearningContentInput, LearningContentOutput, LearningContentContext } from '../../contracts.js';
 
 /**

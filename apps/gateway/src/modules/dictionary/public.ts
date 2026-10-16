@@ -5,5 +5,5 @@
  * 本文件只转出已查证的跨域消费符号 + 本域仓储契约，不搬业务实现。
  */
 export type { DictionaryEntryCollection } from './persistence/dictionary.js';
-export { buildTermKey, recordTermExposure } from '@study-studio/storage-sqlite';
+export { buildTermKey, recordTermExposure } from '@lexdistill/storage-sqlite';
 export type { LexiconRepository } from './ports.js';

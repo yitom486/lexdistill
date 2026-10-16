@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Lingua Studio 桌面壳默认能力：平台命令 + opener/clipboard/dialog 插件权限。",
+  "description": "LexDistill 桌面壳默认能力：平台命令 + opener/clipboard/dialog 插件权限。",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -12,7 +12,7 @@
       "identifier": "shell:allow-spawn",
       "allow": [
         {
-          "name": "study-studio-gateway",
+          "name": "lexdistill-gateway",
           "sidecar": true,
           "args": true
         }

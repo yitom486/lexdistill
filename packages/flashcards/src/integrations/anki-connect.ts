@@ -3,7 +3,7 @@ import {
   err,
   type Result,
   BusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { resolveAnkiEndpoint } from './anki-endpoint.js';
 
 /**

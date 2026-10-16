@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { gzipSync } from 'node:zlib';
-import { extractTarGz } from '@study-studio/archive';
+import { extractTarGz } from '@lexdistill/archive';
 
 /** 最小 tar 包（含一个 fake.pdb + 一个 keep.dll），再 gzip。 */
 function makeTarGz(): Uint8Array {

@@ -6,7 +6,7 @@ import {
 import { useGatewayStore } from '../stores/useGatewayStore.js';
 import { QUERY_KEYS } from './useLearnerQueries.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
-import { ObjectiveAnswerResultSchema, type ObjectiveAnswerInput } from '@study-studio/protocol';
+import { ObjectiveAnswerResultSchema, type ObjectiveAnswerInput } from '@lexdistill/protocol';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 
 function assertConnected(): void {

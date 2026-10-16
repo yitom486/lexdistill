@@ -1,6 +1,6 @@
 export type TargetLanguage = 'ja' | 'en' | 'ko';
 
-import type { JlptLevel } from '@study-studio/protocol';
+import type { JlptLevel } from '@lexdistill/protocol';
 export type { JlptLevel };
 
 export type StudyGoal =

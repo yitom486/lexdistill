@@ -1,9 +1,9 @@
-import { isOk, type Result, type BusinessError } from '@study-studio/shared';
+import { isOk, type Result, type BusinessError } from '@lexdistill/shared';
 import type {
   GeneratedQuestion,
   PracticeBlockSpec,
   ReadingPassageSet,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 
 /**
  * M7-17 自 Gateway `practice/application/practice-assembly.ts` 迁入

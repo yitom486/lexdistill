@@ -1,7 +1,7 @@
 ﻿import { afterEach, describe, expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TextbookASTSchema } from '@study-studio/document-model';
+import { TextbookASTSchema } from '@lexdistill/document-model';
 import { convertAstToTextbookBook } from '../../textbook-converter.js';
 import { DrizzleLearnerRepository } from '../../../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
 import { TextbookContentTools } from '../../../../../../gateway/src/modules/library/tools/textbook-content-tools.js';

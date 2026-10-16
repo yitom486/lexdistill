@@ -1,7 +1,7 @@
-import type { GeneratedQuestion } from '@study-studio/protocol';
-import type { TextbookLesson } from '@study-studio/document-model';
-import { type Result, type BusinessError } from '@study-studio/shared';
-import { buildTextbookLessonQuestions as buildTextbookLessonQuestionsCore } from '@study-studio/learning';
+import type { GeneratedQuestion } from '@lexdistill/protocol';
+import type { TextbookLesson } from '@lexdistill/document-model';
+import { type Result, type BusinessError } from '@lexdistill/shared';
+import { buildTextbookLessonQuestions as buildTextbookLessonQuestionsCore } from '@lexdistill/learning';
 
 /** 文档访问判定（自有文档或公共课程资产可出题；别人的私档不行）。 */
 export function canQuizDocument(

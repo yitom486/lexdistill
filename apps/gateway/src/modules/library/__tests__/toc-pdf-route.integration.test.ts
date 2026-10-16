@@ -3,9 +3,9 @@ import { existsSync } from 'node:fs';
 import { writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PDFDocument } from 'pdf-lib';
-import type { AgentAdapter, AgentInput, AgentSession, CreateSessionOptions } from '@study-studio/agent-runtime';
-import { BusinessError, err, ok } from '@study-studio/shared';
-import { ToolRegistry } from '@study-studio/tool-core';
+import type { AgentAdapter, AgentInput, AgentSession, CreateSessionOptions } from '@lexdistill/agent-runtime';
+import { BusinessError, err, ok } from '@lexdistill/shared';
+import { ToolRegistry } from '@lexdistill/tool-core';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';
 import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
@@ -29,7 +29,7 @@ async function scopeArticleDefault(scope: McpChapterScope) {
   await submitScope(scope, 'articles', { items: [{ text: '单元正文' }] });
 }
 import { pinProcessToTestRuntime, testRuntimeDir } from './pdf-test-runtime.js';
-import { SaveTextbookOutlineResultSchema } from '@study-studio/document-model';
+import { SaveTextbookOutlineResultSchema } from '@lexdistill/document-model';
 
 pinProcessToTestRuntime();
 const repos: DrizzleLearnerRepository[] = [];

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 import { ensurePdfRuntime, type PdfInspectorLike, type PdfRuntimePaths } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 
 /**
@@ -51,7 +51,7 @@ export function ensurePdfTestRuntime(): Promise<{ inspector: PdfInspectorLike; p
         const code = e instanceof BusinessError ? e.code : 'E_RUNTIME_UNKNOWN';
         throw new Error(
           `[pdf-test-runtime] 测试运行时 bootstrap 失败（${code}，目录=${dir}）：` +
-            '先运行 bun run --filter @study-studio/gateway pdf:prepare:test 准备组件。测试期间不联网补装，绝不静默跳过 native 用例。'
+            '先运行 bun run --filter @lexdistill/gateway pdf:prepare:test 准备组件。测试期间不联网补装，绝不静默跳过 native 用例。'
         );
       }
     })();

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
-import { BusinessError, err, nowIso, ok, translateToBusinessError, type Result } from '@study-studio/shared';
-import { canonicalizeTocEntries, planTextbookTasks, validateTocPageOrder, type TocEntry } from '@study-studio/document-model';
+import { BusinessError, err, nowIso, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
+import { canonicalizeTocEntries, planTextbookTasks, validateTocPageOrder, type TocEntry } from '@lexdistill/document-model';
 import { documents, textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
 import { ChapterManifestSchema, type ChapterManifest } from './textbook-content.js';

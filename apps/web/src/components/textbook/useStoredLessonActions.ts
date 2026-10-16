@@ -8,7 +8,7 @@ import {
 } from '../../queries/useLearnerQueries.js';
 import { useCollectVocabularyMutation } from '../../queries/vocabulary.js';
 import { useStudySessionStore } from '../../stores/useStudySessionStore.js';
-import { toUiQuizType } from '@study-studio/protocol';
+import { toUiQuizType } from '@lexdistill/protocol';
 import type { QuizQuestionItem } from '../../models/learning.js';
 import type {
   FuriganaWord,
@@ -16,7 +16,7 @@ import type {
   TextbookLesson,
   TextbookVocabulary,
 } from '../../models/textbook.js';
-import type { VocabularyEntry } from '@study-studio/protocol';
+import type { VocabularyEntry } from '@lexdistill/protocol';
 
 interface LessonActionsInput {
   currentBook: TextbookBook | undefined;

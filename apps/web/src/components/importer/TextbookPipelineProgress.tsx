@@ -1,6 +1,6 @@
 import { usePipelineProgress, stageLabels } from './usePipelineProgress.js';
 import { useState } from 'react';
-import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
+import type { TextbookPipelineJobSnapshot } from '@lexdistill/protocol';
 import { 
   Bot, 
   Cpu, 

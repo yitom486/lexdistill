@@ -1,4 +1,4 @@
-import { BusinessError, err, ok, type Result } from '@study-studio/shared';
+import { BusinessError, err, ok, type Result } from '@lexdistill/shared';
 
 export interface TextbookTaskNode {
   id: string;

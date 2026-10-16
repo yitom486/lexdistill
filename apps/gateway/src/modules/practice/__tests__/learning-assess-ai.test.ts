@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { ok, err, isOk, BusinessError } from '@study-studio/shared';
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
-import type { LearnerRepository } from '@study-studio/learner-core';
+import { ok, err, isOk, BusinessError } from '@lexdistill/shared';
+import type { AgentAdapter, AgentSession } from '@lexdistill/agent-runtime';
+import type { LearnerRepository } from '@lexdistill/learner-core';
 import type { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import {
   LearningAssessTool,

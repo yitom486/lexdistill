@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { usePipelineJobStore } from '../usePipelineJobStore.js';
-import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
+import type { TextbookPipelineJobSnapshot } from '@lexdistill/protocol';
 
 if (typeof globalThis.localStorage === 'undefined') {
   const store = new Map<string, string>();

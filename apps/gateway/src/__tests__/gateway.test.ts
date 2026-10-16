@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { GatewayServer } from '../runtime/gateway-runtime.js';
-import { WsEventTypes, type WsEnvelope } from '@study-studio/protocol';
-import { isOk, isErr } from '@study-studio/shared';
+import { WsEventTypes, type WsEnvelope } from '@lexdistill/protocol';
+import { isOk, isErr } from '@lexdistill/shared';
 
 describe('Gateway Server - Pipeline & Session', () => {
   it('should initialize session on client.session.init', async () => {

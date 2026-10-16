@@ -4,9 +4,9 @@ import {
   FSRS_ALGORITHM_VERSION,
   type FsrsState,
   type SchedulerOutput,
-} from '@study-studio/learning-algorithms';
-import type { CardReviewRating } from '@study-studio/protocol';
-import { type Result, type BusinessError } from '@study-studio/shared';
+} from '@lexdistill/learning-algorithms';
+import type { CardReviewRating } from '@lexdistill/protocol';
+import { type Result, type BusinessError } from '@lexdistill/shared';
 
 /**
  * M6-1 版本化复习排程应用入口（FSRS v1，自 learner-core 迁入；C6 起归属 learning/src/scheduling，行为不变）。

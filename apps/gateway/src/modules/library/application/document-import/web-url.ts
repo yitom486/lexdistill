@@ -1,5 +1,5 @@
 import { lookup } from 'node:dns/promises';
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 
 /**
  * 公网 URL 安全读取（AI 可调用的 URL 导入专用）。

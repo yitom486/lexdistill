@@ -1,4 +1,4 @@
-import type { TocEntry, TextbookLessonStage, TextbookModelActivity } from '@study-studio/document-model';
+import type { TocEntry, TextbookLessonStage, TextbookModelActivity } from '@lexdistill/document-model';
 import type { CommitLessonKnowledgeOutput } from '../ports.js';
 import type { PdfTaskFile } from './pdf-import/pdf-task-workspace.js';
 

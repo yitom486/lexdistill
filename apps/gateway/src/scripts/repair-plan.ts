@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { Database } from 'bun:sqlite';
-import { buildRepairPlan, formatRepairPlan } from '@study-studio/storage-sqlite';
+import { buildRepairPlan, formatRepairPlan } from '@lexdistill/storage-sqlite';
 
 /**
  * repair-plan dry-run CLI：只读输出历史修复候选，不写库、无 apply。
@@ -10,7 +10,7 @@ import { buildRepairPlan, formatRepairPlan } from '@study-studio/storage-sqlite'
 const target =
   process.argv[2] ??
   process.env.STUDY_STUDIO_DB ??
-  path.resolve(import.meta.dir, '../../../..', 'study-studio.db');
+  path.resolve(import.meta.dir, '../../../..', 'lexdistill.db');
 const db = new Database(target, { readonly: true });
 try {
   console.log(formatRepairPlan(buildRepairPlan(db)));

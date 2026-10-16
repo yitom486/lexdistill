@@ -3,9 +3,9 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import type { LearnerRepository } from '@study-studio/learner-core';
-import { err, type Result, BusinessError } from '@study-studio/shared';
+} from '@lexdistill/tool-core';
+import type { LearnerRepository } from '@lexdistill/learner-core';
+import { err, type Result, BusinessError } from '@lexdistill/shared';
 import { LearningContentInputSchema, type LearningContentInput, type LearningContentOutput } from '../contracts.js';
 import { executeLearningContent } from '../application/execute-learning-content.js';
 import { MSG } from '../application/actions/shared.js';

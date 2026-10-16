@@ -1,6 +1,6 @@
-import type { BankGradeSubmit, BankSubjectiveAnswerResult, ExerciseGrade } from '@study-studio/protocol';
-import { BankGradeSubmitSchema, ExerciseSnapshotSchema } from '@study-studio/protocol';
-import { BusinessError, err, isOk, ok, translateToBusinessError, type Result } from '@study-studio/shared';
+import type { BankGradeSubmit, BankSubjectiveAnswerResult, ExerciseGrade } from '@lexdistill/protocol';
+import { BankGradeSubmitSchema, ExerciseSnapshotSchema } from '@lexdistill/protocol';
+import { BusinessError, err, isOk, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
 import type { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { bankReference, bankSubjectiveResult } from '../persistence/bank-submission.js';
 import { validateBankWriting } from '../persistence/bank-grade.js';

@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import type { BankSubmissionRecord } from '@study-studio/protocol';
+import type { BankSubmissionRecord } from '@lexdistill/protocol';
 
 export interface SubmissionIdentity { submissionId: string; timeSpentMs: number }
 

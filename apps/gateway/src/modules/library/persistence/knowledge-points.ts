@@ -1,10 +1,10 @@
-import type { Result, BusinessError } from '@study-studio/shared';
+import type { Result, BusinessError } from '@lexdistill/shared';
 import {
   saveKnowledgePoints as saveKnowledgePointsStorage,
   listKnowledgePoints as listKnowledgePointsStorage,
   type SaveKnowledgePointInput,
   type KnowledgePoint,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 /**

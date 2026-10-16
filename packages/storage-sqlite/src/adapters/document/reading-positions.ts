@@ -5,7 +5,7 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { and, eq } from 'drizzle-orm';
 import { readingPositions } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';

@@ -1,5 +1,5 @@
-import type { ToolDefinition } from '@study-studio/tool-core';
-import { BusinessError, err, ok, type Result } from '@study-studio/shared';
+import type { ToolDefinition } from '@lexdistill/tool-core';
+import { BusinessError, err, ok, type Result } from '@lexdistill/shared';
 import type { AgentAdapter, CreateSessionOptions } from '../../contracts/adapter.js';
 import type { AgentSession } from '../../contracts/session.js';
 import type { AgentEvent } from '../../contracts/event.js';

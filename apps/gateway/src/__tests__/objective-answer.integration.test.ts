@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { BusinessError, err, isErr, isOk } from '@study-studio/shared';
-import type { ObjectiveAnswerInput } from '@study-studio/protocol';
+import { BusinessError, err, isErr, isOk } from '@lexdistill/shared';
+import type { ObjectiveAnswerInput } from '@lexdistill/protocol';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { LearningContentTool } from '../modules/learning-content/public.js';
 import { assemblePracticeRun } from '../modules/practice/application/practice-assembly.js';
-import { buildBalancedPracticeBlocks } from '@study-studio/learning';
+import { buildBalancedPracticeBlocks } from '@lexdistill/learning';
 
 describe('objective answers and integrated practice records', () => {
   let repo: DrizzleLearnerRepository;

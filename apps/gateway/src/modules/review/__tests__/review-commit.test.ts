@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
-import { scheduleFsrsReviewV1, type FsrsState } from '@study-studio/learning';
+import { isOk } from '@lexdistill/shared';
+import { scheduleFsrsReviewV1, type FsrsState } from '@lexdistill/learning';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import type { Flashcard } from '@study-studio/protocol';
+import type { Flashcard } from '@lexdistill/protocol';
 
 /**
  * M4-2 复习提交原子命令集成测试（真 :memory: 库）。

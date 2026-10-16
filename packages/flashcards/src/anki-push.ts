@@ -5,7 +5,7 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   buildCardContext,
   renderCard,
@@ -182,8 +182,8 @@ export async function pushCardToAnki(
     const rendered = renderCard(format, ctx);
     const fields: Record<string, string> = { ...rendered.fields };
 
-    const deckName = request.deckName ?? format.deckName ?? 'Lingua Studio';
-    const modelName = format.modelName ?? 'Lingua Basic';
+    const deckName = request.deckName ?? format.deckName ?? 'LexDistill';
+    const modelName = format.modelName ?? 'LexDistill Basic';
     const client = createAnkiClient(settings.endpoint, fetchImpl);
     const version = await getAnkiVersion(client);
     if (!isOk(version)) return version;
@@ -236,7 +236,7 @@ export async function pushCardToAnki(
       }
     }
 
-    const tags = ['lingua-studio', ...(sourceLabel ? [sourceLabel] : [])];
+    const tags = ['lexdistill', ...(sourceLabel ? [sourceLabel] : [])];
     const added = await addAnkiNote(client, { deckName, modelName, fields, tags });
     if (!isOk(added)) return added;
     const result: AnkiPushResult = {

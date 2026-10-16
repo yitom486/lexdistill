@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { SubmitTextbookExerciseSchema } from '@study-studio/protocol';
-import { summarizeTextbookGrowth } from '@study-studio/learner-core';
-import { BusinessError } from '@study-studio/shared';
+import { SubmitTextbookExerciseSchema } from '@lexdistill/protocol';
+import { summarizeTextbookGrowth } from '@lexdistill/learner-core';
+import { BusinessError } from '@lexdistill/shared';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { TextbookGrading } from '../application/textbook-grading.js';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk, isErr } from '@study-studio/shared';
-import type { PracticeBlockSpec, PracticePlanTemplate } from '@study-studio/protocol';
+import { isOk, isErr } from '@lexdistill/shared';
+import type { PracticeBlockSpec, PracticePlanTemplate } from '@lexdistill/protocol';
 import {
   validateBlockSpec,
   validatePracticePlanTemplate,

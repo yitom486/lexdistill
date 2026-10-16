@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { initSchema, SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
-import { BusinessError, ok, err, type Result } from '@study-studio/shared';
-import { ToolRegistry } from '@study-studio/tool-core';
-import type { AgentAdapter, AgentEvent, AgentInput, AgentSession, CreateSessionOptions } from '@study-studio/agent-runtime';
-import type { ExternalToolExecutor } from '@study-studio/agent-runtime';
-import type { BankPaperReceipt, BankSubmitReceipt } from '@study-studio/protocol';
+import { initSchema, SqliteQuestionGenerationRepository } from '@lexdistill/storage-sqlite';
+import { BusinessError, ok, err, type Result } from '@lexdistill/shared';
+import { ToolRegistry } from '@lexdistill/tool-core';
+import type { AgentAdapter, AgentEvent, AgentInput, AgentSession, CreateSessionOptions } from '@lexdistill/agent-runtime';
+import type { ExternalToolExecutor } from '@lexdistill/agent-runtime';
+import type { BankPaperReceipt, BankSubmitReceipt } from '@lexdistill/protocol';
 import { GENERATION_TOOL_NAMES, createQuestionGenerationTools } from '../modules/question-generation/public.js';
 import { GenerationTaskService } from '../modules/question-generation/service.js';
 import { GenerationRunManager } from '../modules/question-generation/run-manager.js';

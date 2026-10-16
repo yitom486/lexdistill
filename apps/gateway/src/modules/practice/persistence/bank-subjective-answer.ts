@@ -1,6 +1,6 @@
-import type { BankAnswerSubmit, BankSubjectiveAnswerResult } from '@study-studio/protocol';
-import { BankAnswerSubmitSchema } from '@study-studio/protocol';
-import { BusinessError, err, isOk, ok, translateToBusinessError, type Result } from '@study-studio/shared';
+import type { BankAnswerSubmit, BankSubjectiveAnswerResult } from '@lexdistill/protocol';
+import { BankAnswerSubmitSchema } from '@lexdistill/protocol';
+import { BusinessError, err, isOk, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { serializePracticeWrite } from './serialized-write.js';
 import { bankReference, bankSubjectiveResult, checkBankSkill, gradeBankSubjective, prepareBankSubmission, type BankAnswerDeps } from './bank-submission.js';

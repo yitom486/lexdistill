@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { FlashcardSchema } from './card.js';
-import { VocabularyLearningContentSchema } from '@study-studio/document-model';
+import { VocabularyLearningContentSchema } from '@lexdistill/document-model';
 import { JlptLevelSchema } from './profile.js';
 
 export const VocabularyScopeSchema = z.object({

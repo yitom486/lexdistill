@@ -1,5 +1,5 @@
 /**
- * `@study-studio/archive` 唯一公共出口（白名单制）。
+ * `@lexdistill/archive` 唯一公共出口（白名单制）。
  *
  * 最小纯 TS 解包器（tar.gz/zip 子集＋300MB 防炸弹；只读内存，不写盘）。
  * E2b 起家于 gateway（前身 modules/library/application/pdf-import/archive.ts）。

@@ -1,14 +1,14 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
-import { ok, err, isOk, type Result, BusinessError } from '@study-studio/shared';
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
-import type { LearnerRepository, LearnerProfileSnapshot } from '@study-studio/learner-core';
-import type { Flashcard } from '@study-studio/protocol';
+import { ok, err, isOk, type Result, BusinessError } from '@lexdistill/shared';
+import type { AgentAdapter, AgentSession } from '@lexdistill/agent-runtime';
+import type { LearnerRepository, LearnerProfileSnapshot } from '@lexdistill/learner-core';
+import type { Flashcard } from '@lexdistill/protocol';
 import {
   runLearningAnalysis,
   buildAnalysisSnapshot,
   __resetAnalysisCacheForTest,
 } from '../modules/learning-progress/application/learning-analysis.js';
-import { ANALYSIS_SYSTEM_PROMPT } from '@study-studio/ai-content';
+import { ANALYSIS_SYSTEM_PROMPT } from '@lexdistill/ai-content';
 
 // ---------- mock repo ----------
 function makeMockRepo(opts: {

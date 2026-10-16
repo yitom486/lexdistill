@@ -9,13 +9,13 @@ import {
   generateId,
   nowIso,
   logger,
-} from '@study-studio/shared';
-import type { Flashcard } from '@study-studio/protocol';
-import { localDictionaryEntries, flashcards, dictionarySearchHistory, dictionarySources, dictionaryTermMeta, collectVocabularyCardInTx } from '@study-studio/storage-sqlite';
+} from '@lexdistill/shared';
+import type { Flashcard } from '@lexdistill/protocol';
+import { localDictionaryEntries, flashcards, dictionarySearchHistory, dictionarySources, dictionaryTermMeta, collectVocabularyCardInTx } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '@study-studio/shared';
-import { normalizeTrackLanguage } from '@study-studio/shared';
-import { recordTermExposure, buildTermKey } from '@study-studio/storage-sqlite';
+import type { TrackLanguage } from '@lexdistill/shared';
+import { normalizeTrackLanguage } from '@lexdistill/shared';
+import { recordTermExposure, buildTermKey } from '@lexdistill/storage-sqlite';
 
 /**
  * 词典域（由 DrizzleLearnerRepository 搬迁而来，行为不变）。
@@ -80,8 +80,8 @@ type LocalDictionaryRow = typeof localDictionaryEntries.$inferSelect;
   return entry;
 }
 
-import { getMorphAnalyzer, type MorphCandidate } from '@study-studio/lexicon';
-import { coarsePosOfLabel, coarsePosName } from '@study-studio/lexicon';
+import { getMorphAnalyzer, type MorphCandidate } from '@lexdistill/lexicon';
+import { coarsePosOfLabel, coarsePosName } from '@lexdistill/lexicon';
 
 /**
  * 查询本地、可再分发的词典资产。第三方词典只可作为外链兜底，绝不在此抓取。

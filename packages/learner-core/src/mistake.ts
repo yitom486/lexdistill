@@ -1,5 +1,5 @@
-import type { GeneratedQuestion, QuizGradingResult } from '@study-studio/protocol';
-import { generateId, nowIso } from '@study-studio/shared';
+import type { GeneratedQuestion, QuizGradingResult } from '@lexdistill/protocol';
+import { generateId, nowIso } from '@lexdistill/shared';
 
 export interface MistakeEntry {
   id: string;

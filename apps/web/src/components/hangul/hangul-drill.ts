@@ -1,4 +1,4 @@
-import type { HangulItem } from '@study-studio/protocol';
+import type { HangulItem } from '@lexdistill/protocol';
 
 export type MatrixTab = 'CONSONANT' | 'VOWEL' | 'ADVANCED';
 export type DrillMode = 'AUDIO_TO_JAMO' | 'JAMO_TO_ROMA' | 'MIXED' | 'WORD_DICTATION' | 'WORD_MEANING';

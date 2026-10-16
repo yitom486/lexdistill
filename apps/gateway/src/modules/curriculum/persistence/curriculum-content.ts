@@ -6,24 +6,24 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   selectAdaptiveKanaIds,
   type AdaptiveKanaQueueOptions,
-} from '@study-studio/learner-core';
-import type { KanaItem, ReadingPassageSet, KanaLearningGuide } from '@study-studio/protocol';
-import { KanaLearningGuideSchema, KanaTypeSchema, type KanaType } from '@study-studio/protocol';
-import type { HangulItem } from '@study-studio/protocol';
-import { HangulTypeSchema, type HangulType } from '@study-studio/protocol';
+} from '@lexdistill/learner-core';
+import type { KanaItem, ReadingPassageSet, KanaLearningGuide } from '@lexdistill/protocol';
+import { KanaLearningGuideSchema, KanaTypeSchema, type KanaType } from '@lexdistill/protocol';
+import type { HangulItem } from '@lexdistill/protocol';
+import { HangulTypeSchema, type HangulType } from '@lexdistill/protocol';
 import {
   curriculumKana,
   curriculumHangul,
   learningContentTemplates,
   documents,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { readKanaPracticeMemories } from '@study-studio/storage-sqlite';
-import { normalizeTrackLanguage } from '@study-studio/shared';
+import { readKanaPracticeMemories } from '@lexdistill/storage-sqlite';
+import { normalizeTrackLanguage } from '@lexdistill/shared';
 
 /**
  * 课程域持久化：假名底座、内容模板、阅读篇目读写（G4：由 repository/domains/curriculum-reading.ts

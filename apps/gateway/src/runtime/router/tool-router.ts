@@ -1,13 +1,13 @@
 import {
   type ToolRegistry,
   type ToolExecutionContext,
-} from '@study-studio/tool-core';
+} from '@lexdistill/tool-core';
 import {
   ok,
   err,
   type Result,
   BusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 
 export interface ClientToolDispatcher {
   dispatchClientTool(callId: string, toolName: string, args: unknown): Promise<Result<unknown, BusinessError>>;

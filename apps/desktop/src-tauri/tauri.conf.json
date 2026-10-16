@@ -4,9 +4,9 @@
   "version": "0.1.2",
   "identifier": "com.lexdistill.desktop",
   "build": {
-    "beforeDevCommand": "bun run --filter @study-studio/gateway pdf:prepare && bun run --filter @study-studio/web dev",
+    "beforeDevCommand": "bun run --filter @lexdistill/gateway pdf:prepare && bun run --filter @lexdistill/web dev",
     "devUrl": "http://localhost:3000",
-    "beforeBuildCommand": "bun run build:sidecar && bun run --filter @study-studio/web build",
+    "beforeBuildCommand": "bun run build:sidecar && bun run --filter @lexdistill/web build",
     "frontendDist": "../../web/dist"
   },
   "app": {
@@ -38,7 +38,7 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "binaries/study-studio-gateway"
+      "binaries/lexdistill-gateway"
     ],
     "resources": {
       "resources/pdf-runtime/": "pdf-runtime/"
@@ -48,7 +48,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY3MzZFRDUxQzhFNTU3RDkKUldUWlYrWElVZTAyWjNtMmliS3c0akkvVnhaQ2lXWXJvN0pXOXVJMFFCb1VKS2ZsUGxwTm5wclQK",
       "endpoints": [
-        "https://github.com/yitom486/lingua-studio/releases/latest/download/latest.json"
+        "https://github.com/yitom486/lexdistill/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

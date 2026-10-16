@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { resolveAcpPoolAgent } from '../acp-pool-agent.js';
 
 describe('resolveAcpPoolAgent（只读 acp-client 决议，不分支厂商）', () => {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { isOk, type BusinessError, type Result } from '@study-studio/shared';
-import type { BankSubmitReceipt, BankPaperReceipt, BankQuestionRecord } from '@study-studio/protocol';
+import { isOk, type BusinessError, type Result } from '@lexdistill/shared';
+import type { BankSubmitReceipt, BankPaperReceipt, BankQuestionRecord } from '@lexdistill/protocol';
 import { GENERATION_TOOL_NAMES } from '../modules/question-generation/public.js';
 import { binding, config, fixture, listening, question, sixFormats } from './question-generation.fixtures.js';
 

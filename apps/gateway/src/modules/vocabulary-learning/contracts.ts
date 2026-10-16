@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { VocabularyLearningContentSchema } from '@study-studio/document-model';
+import { VocabularyLearningContentSchema } from '@lexdistill/document-model';
 
 const text = () => z.string().trim().min(1);
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import type { BankSubmissionRecord, GenerationTaskSnapshot, GenerationTaskSummary } from '@study-studio/protocol';
+import type { BankSubmissionRecord, GenerationTaskSnapshot, GenerationTaskSummary } from '@lexdistill/protocol';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';

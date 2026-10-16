@@ -135,7 +135,7 @@ the dedicated model runner and UI configuration, using these contracts unchanged
   run executes `generation.audio` with a configured provider key.
 - Migrations v044–v048 verified contiguous on a memory DB (`max schema_migrations = 48`);
   no real learner DB was touched. Desktop bundle contract (`apps/desktop/src-tauri/tauri.conf.json`,
-  Lingua Studio 0.1.2, gateway sidecar + web dist) is present; on-device run, small-quota
+  LexDistill 0.1.2, gateway sidecar + web dist) is present; on-device run, small-quota
   real model/TTS, and clean-install delivery remain **unverified** pending the user's
   service selection, explicit quota authorization, and backup path confirmation
   (`docs/db-backup-recovery.md`). Controlled tests, real-service runs, desktop checks and

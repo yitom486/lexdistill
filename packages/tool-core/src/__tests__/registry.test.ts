@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 import { ToolRegistry } from '../registry.js';
 import type { ToolDefinition } from '../tool.js';
-import { ok, isOk, isErr } from '@study-studio/shared';
+import { ok, isOk, isErr } from '@lexdistill/shared';
 
 describe('Tool Core - ToolRegistry & Execution', () => {
   const dummyTool: ToolDefinition<{ word: string }, { definition: string }> = {

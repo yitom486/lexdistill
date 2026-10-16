@@ -1,5 +1,5 @@
 import type { TTSProvider } from 'gemini-tts-studio/server';
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 import type { GenerationAudioRenderer } from '../ports.js';
 
 /** Provider and credentials are selected by the host, never supplied by a model tool call. */

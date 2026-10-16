@@ -1,6 +1,6 @@
 # `apps/gateway/src` — Agent Gateway 源码阅读指南
 
-> 这里是 Lingua Studio 的后端中枢：客户端唯一连接的 HTTP + WebSocket Gateway。
+> 这里是 LexDistill 的后端中枢：客户端唯一连接的 HTTP + WebSocket Gateway。
 >
 > Web 客户端（`apps/web`）和桌面端（`apps/desktop`）只通过 Gateway 使用服务端能力。Gateway 的文件负责串接请求与领域用例；通用学习算法、协议契约、存储适配和 Agent 适配器由 `packages/*` 提供。梳理业务流程时先读本目录，遇到具体能力实现再追到对应 package。
 
@@ -8,7 +8,7 @@
 
 ## 1. 先理解 Gateway 在系统中的位置
 
-Lingua Studio 采用**模块化单体（Modular Monolith）**，不是把每个学习功能拆成独立服务。Gateway 在一个进程内组合以下能力：
+LexDistill 采用**模块化单体（Modular Monolith）**，不是把每个学习功能拆成独立服务。Gateway 在一个进程内组合以下能力：
 
 ```mermaid
 flowchart TD
@@ -420,7 +420,7 @@ FSRS 算法由 `packages/learner-core` 掌握，本模块只调用领域契约�
 
 基础设施层不拥有学习业务含义，只负责把领域契约落到具体技术上。
 
-### `@study-studio/storage-sqlite`（M4/D2 起，前身 `infrastructure/db/`）
+### `@lexdistill/storage-sqlite`（M4/D2 起，前身 `infrastructure/db/`）
 
 | 路径 | 作用 |
 |---|---|
@@ -480,7 +480,7 @@ fetch failed
 Unexpected token < in JSON
 ```
 
-而应该转换成稳定的业务错误和可理解的提示。业务日志统一使用 `@study-studio/shared` 的 `logger`，不要在业务代码中散落 `console.*`。
+而应该转换成稳定的业务错误和可理解的提示。业务日志统一使用 `@lexdistill/shared` 的 `logger`，不要在业务代码中散落 `console.*`。
 
 ---
 

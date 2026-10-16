@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import {
   DOCUMENT_SOURCE_KINDS,
   guessSourceKind,
   type DocumentSourceKind,
-} from '@study-studio/content';
+} from '@lexdistill/content';
 import { readDocumentFileBytes } from '../application/document-import/document-import-service.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 

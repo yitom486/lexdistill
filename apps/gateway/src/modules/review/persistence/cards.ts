@@ -6,17 +6,17 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
-import { type Flashcard } from '@study-studio/protocol';
+} from '@lexdistill/shared';
+import { type Flashcard } from '@lexdistill/protocol';
 import {
   flashcards,
   globalVocabulary,
   flashcardFromRow,
   INITIAL_CARD_SEEDS,
   INITIAL_EN_CARD_SEEDS,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { normalizeTrackLanguage } from '@study-studio/shared';
+import { normalizeTrackLanguage } from '@lexdistill/shared';
 import { resolveActiveLanguage } from '../../learning-progress/public.js';
 
 /**

@@ -1,4 +1,4 @@
-import type { TextbookLearningContent } from '@study-studio/document-model';
+import type { TextbookLearningContent } from '@lexdistill/document-model';
 import type { TextbookBook } from '../../../models/textbook.js';
 
 export interface LearningLibraryBook {

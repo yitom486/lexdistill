@@ -4,11 +4,11 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, err, isOk, type Result, BusinessError } from '@study-studio/shared';
+} from '@lexdistill/tool-core';
+import { ok, err, isOk, type Result, BusinessError } from '@lexdistill/shared';
 import type { ContentRepository } from '../ports.js';
 import { readDocumentFileBytes } from '../application/document-import/document-import-service.js';
-import type { ImportTask } from '@study-studio/storage-sqlite';
+import type { ImportTask } from '@lexdistill/storage-sqlite';
 
 export const LibraryImportInputSchema = z.object({
   userId: z.string().min(1).max(64),

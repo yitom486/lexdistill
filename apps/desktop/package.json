@@ -1,8 +1,8 @@
 {
-  "name": "@study-studio/desktop",
+  "name": "@lexdistill/desktop",
   "version": "0.1.2",
   "private": true,
-  "description": "Tauri v2 desktop container for Lingua Studio",
+  "description": "Tauri v2 desktop container for LexDistill",
   "scripts": {
     "dev": "tauri dev",
     "icon": "tauri icon",

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
+import { createMigratedStorage } from './store-storage.js';
+import type { TextbookPipelineJobSnapshot } from '@lexdistill/protocol';
 
 export interface PipelineJobState {
   /** 当前选定或正在跟踪的任务 ID */
@@ -46,7 +47,8 @@ export const usePipelineJobStore = create<PipelineJobState>()(
       clearActiveJob: () => set({ activeJobId: null, activeJob: null }),
     }),
     {
-      name: 'study_studio_pipeline_job_state',
+      name: 'lexdistill_pipeline_job_state',
+      storage: createMigratedStorage(['study_studio_pipeline_job_state']),
       // 仅持久化 jobId 与最小化偏好；具体内存快照在重连时由 SSE 或接口恢复
       partialize: (state) => ({
         activeJobId: state.activeJobId,

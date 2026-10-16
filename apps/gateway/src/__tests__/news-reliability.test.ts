@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { generateNewsPassage } from '../modules/curriculum/application/generate-news-passage.js';
 import { fetchRssItems, fetchRssItemsWithFallback } from '../modules/curriculum/infrastructure/news-rss.js';
 import { fetchNewsArticleFullText } from '../modules/curriculum/infrastructure/news-article-fetch.js';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 
 /**
  * P3-B 确定性单测：用注入的 fetcher 模拟网络，覆盖验收标准要求的 4 个失败场景，

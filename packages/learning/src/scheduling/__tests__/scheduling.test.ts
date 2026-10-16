@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
-import { updateKanaPracticeMemory } from '@study-studio/learner-core';
+import { isOk } from '@lexdistill/shared';
+import { updateKanaPracticeMemory } from '@lexdistill/learner-core';
 import { scheduleFsrsReviewV1 } from '../index.js';
 
 /**

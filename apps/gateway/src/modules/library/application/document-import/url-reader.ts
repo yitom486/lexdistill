@@ -1,4 +1,4 @@
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 // 跨模块复用（G5 登记）：Readability+启发式正文抽取纯函数；抓取层自备 SSRF 防护（web-url.ts）。
 import { extractReadablePlainText } from '../../../curriculum/infrastructure/news-article-fetch.js';
 import { fetchPublicWebText, type WebFetchImpl } from './web-url.js';

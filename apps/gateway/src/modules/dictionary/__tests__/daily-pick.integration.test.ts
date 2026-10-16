@@ -4,7 +4,7 @@ import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learne
 import { GatewayServer } from '../../../runtime/gateway-runtime.js';
 import { createDictionaryRoutes } from '../http/dictionary-routes.js';
 import { pickDailyWords, formatLockedPayload } from '../application/daily-pick.js';
-import { DailyPickResponseSchema, DailyPickLockedResponseSchema } from '@study-studio/protocol';
+import { DailyPickResponseSchema, DailyPickLockedResponseSchema } from '@lexdistill/protocol';
 
 const N4_BANK = {
   id: 'ja-n4-core',

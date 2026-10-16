@@ -4,9 +4,9 @@ import {
   type ToolExecutionContext,
   ToolLocations,
   ToolPermissions,
-} from '@study-studio/tool-core';
-import { BusinessError, err, ok, type Result } from '@study-studio/shared';
-import { TocLevelSchema, validateTocPageOrder, type TocEntry } from '@study-studio/document-model';
+} from '@lexdistill/tool-core';
+import { BusinessError, err, ok, type Result } from '@lexdistill/shared';
+import { TocLevelSchema, validateTocPageOrder, type TocEntry } from '@lexdistill/document-model';
 
 export const ProposedTocEntrySchema = z.object({
   parentIndex: z.number().int().nonnegative().optional().describe(

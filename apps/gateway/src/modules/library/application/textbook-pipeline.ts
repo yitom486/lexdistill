@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
-import type { AgentAdapter, AgentPoolDriver } from '@study-studio/agent-runtime';
-import { canonicalizeTocEntries, planTextbookTasks, validateTocPageOrder, TextbookPipelineSettingsSchema, type TextbookPipelineSettings, type TocEntry, type TextbookModelActivity } from '@study-studio/document-model';
-import { BusinessError, ok, err, generateId, translateToBusinessError, logger, type Result } from '@study-studio/shared';
-import type { ImportTask } from '@study-studio/storage-sqlite';
+import type { AgentAdapter, AgentPoolDriver } from '@lexdistill/agent-runtime';
+import { canonicalizeTocEntries, planTextbookTasks, validateTocPageOrder, TextbookPipelineSettingsSchema, type TextbookPipelineSettings, type TocEntry, type TextbookModelActivity } from '@lexdistill/document-model';
+import { BusinessError, ok, err, generateId, translateToBusinessError, logger, type Result } from '@lexdistill/shared';
+import type { ImportTask } from '@lexdistill/storage-sqlite';
 import type { ContentRepository } from '../ports.js';
 import type { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { type BatchExtractionProgress, type LessonStage } from './lesson-batch-extractor.js';

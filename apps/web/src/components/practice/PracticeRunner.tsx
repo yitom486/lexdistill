@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge.js';
 import { Progress } from '../ui/progress.js';
 import { QuestionRenderer } from './QuestionRenderer.js';
 import { usePracticeRunner, type PracticeRunnerItem } from '../../hooks/usePracticeRunner.js';
-import type { PracticeItemAttempt, GeneratedQuestion } from '@study-studio/protocol';
+import type { PracticeItemAttempt, GeneratedQuestion } from '@lexdistill/protocol';
 
 export type { PracticeRunnerItem };
 

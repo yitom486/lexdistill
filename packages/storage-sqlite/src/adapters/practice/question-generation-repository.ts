@@ -1,11 +1,11 @@
 import type { Database } from 'bun:sqlite';
 import { MIMEType } from 'node:util';
-import { BusinessError, generateId } from '@study-studio/shared';
+import { BusinessError, generateId } from '@lexdistill/shared';
 import { GenerationConfigSchema, SubmitBankQuestionsSchema, QueryBankSchema, ReadGenerationTextbookSchema, AssembleBankPaperSchema,
   BankMaterialSchema, GenerationBlueprintSchema, GenerationRunLimitsSchema,
   type GenerationBinding, type GenerationConfig, type BankAudioReceipt, type SubmitBankQuestions,
   type QueryBank, type ReadGenerationTextbook, type AssembleBankPaper, type GenerationBlueprint, type GenerationRunLimits,
-  type GenerationTaskSnapshot, type GenerationPaperDetail, type BankSubmissionRecord, type GenerationTaskSummary } from '@study-studio/protocol';
+  type GenerationTaskSnapshot, type GenerationPaperDetail, type BankSubmissionRecord, type GenerationTaskSummary } from '@lexdistill/protocol';
 import { canonicalJson } from '../../canonical-fingerprint.js';
 import { assertChapter, countAudio, countQuestions, loadContext, readTextbook, reject, type GenerationContext } from './generation-context.js';
 import { assemblePaper, queryQuestions, submitQuestions } from './generation-questions.js';

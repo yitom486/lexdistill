@@ -2,21 +2,21 @@ import { describe, expect, it, beforeEach } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promises as fsp } from 'node:fs';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { decodeTextBytes } from '@study-studio/content';
+import { decodeTextBytes } from '@lexdistill/content';
 import {
   xhtmlToMarkdown,
   extractEpubText,
   parseNcxToc,
   parseNavToc,
-} from '@study-studio/content/document';
+} from '@lexdistill/content/document';
 import {
   guessSourceKind,
   DOCUMENT_SOURCE_KINDS,
-} from '@study-studio/content';
+} from '@lexdistill/content';
 import { LibraryImportTool } from '../modules/library/tools/library-import-tool.js';
-import { extractMobiText } from '@study-studio/content';
+import { extractMobiText } from '@lexdistill/content';
 import {
   assertPublicWebUrl,
   fetchPublicWebText,

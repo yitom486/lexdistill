@@ -1,4 +1,4 @@
-import type { TrackLanguage } from '@study-studio/shared';
+import type { TrackLanguage } from '@lexdistill/shared';
 
 function trackDisplayNameZh(track: TrackLanguage): string {
   return track === 'en' ? '英语' : track === 'ko' ? '韩语' : '日语';

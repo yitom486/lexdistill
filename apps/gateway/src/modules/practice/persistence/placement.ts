@@ -9,12 +9,12 @@ import {
   generateId,
   nowIso,
   logger,
-} from '@study-studio/shared';
-import type { LearnerLevel } from '@study-studio/protocol';
-import type { PracticeBlockSpec } from '@study-studio/protocol';
-import { learnerLanguageProfiles } from '@study-studio/storage-sqlite';
+} from '@lexdistill/shared';
+import type { LearnerLevel } from '@lexdistill/protocol';
+import type { PracticeBlockSpec } from '@lexdistill/protocol';
+import { learnerLanguageProfiles } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '@study-studio/shared';
+import type { TrackLanguage } from '@lexdistill/shared';
 import {
   setTrackLevel,
 } from '../../learning-progress/public.js';
@@ -23,16 +23,16 @@ import {
   listPracticeItemAttempts,
   getPracticePlanRun,
   getPracticeRunItems,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import { finalizePracticePlanRun } from './practice-plan.js';
-import { LEVEL_THRESHOLDS } from '@study-studio/learner-core';
+import { LEVEL_THRESHOLDS } from '@lexdistill/learner-core';
 import {
   blueprintFor,
   attributeGroup,
   evaluateExamVerdict,
   type AssessmentBlueprint,
   type GroupSubscore,
-} from '@study-studio/learning';
+} from '@lexdistill/learning';
 
 const LEVEL_SET: LearnerLevel[] = ['NOVICE', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 const EXAM_MIN_GRADED = LEVEL_THRESHOLDS.examVocabQuestions;

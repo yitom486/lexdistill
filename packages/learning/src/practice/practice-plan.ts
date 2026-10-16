@@ -1,4 +1,4 @@
-import { ok, err, isOk, type Result, BusinessError } from '@study-studio/shared';
+import { ok, err, isOk, type Result, BusinessError } from '@lexdistill/shared';
 import type {
   PracticeBlockSpec,
   PracticeBlockKind,
@@ -6,7 +6,7 @@ import type {
   PracticePlanTemplate,
   PracticePlanRun,
   PracticeItemAttempt,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 
 /**
  * M6-2 自 learner-core 迁入（C6 起归属 learning/src/practice；字节一致，行为不变）。

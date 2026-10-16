@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { buildRomajiMap, romajiToKana, toHiragana } from '../kana-input.js';
-import type { KanaItem } from '@study-studio/protocol';
+import type { KanaItem } from '@lexdistill/protocol';
 
 function makeKana(hiragana: string, katakana: string, romaji: string): KanaItem {
   return {

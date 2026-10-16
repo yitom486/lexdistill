@@ -44,12 +44,12 @@ function starterSpec(language: 'ja' | 'ko' | 'en'): SeedSourceSpec {
     entryIds: new Set(
       STARTER_WORD_SEEDS.filter((w) => w.language === language).map((w) => w.id)
     ),
-    provider: 'Lingua Studio',
+    provider: 'LexDistill',
     version: 'v1',
-    sourceUrl: 'https://study-studio.local/curriculum/starter-words',
+    sourceUrl: 'https://lexdistill.local/curriculum/starter-words',
     licenseName: STARTER_LICENSE,
-    licenseUrl: 'https://study-studio.local/licenses',
-    attribution: 'Lingua Studio starter vocabulary with original Chinese glosses.',
+    licenseUrl: 'https://lexdistill.local/licenses',
+    attribution: 'LexDistill starter vocabulary with original Chinese glosses.',
   };
 }
 
@@ -57,12 +57,12 @@ const n5Spec: SeedSourceSpec = {
   rowId: seedSourceRowId(N5_SOURCE_ID, 'ja'),
   language: 'ja',
   entryIds: new Set(N5_WORD_SEEDS.map((w) => w.id)),
-  provider: 'Lingua Studio',
+  provider: 'LexDistill',
   version: 'v1',
-  sourceUrl: 'https://study-studio.local/curriculum/n5-words',
+  sourceUrl: 'https://lexdistill.local/curriculum/n5-words',
   licenseName: N5_LICENSE,
-  licenseUrl: 'https://study-studio.local/licenses',
-  attribution: 'Lingua Studio N5 core vocabulary with original Chinese glosses.',
+  licenseUrl: 'https://lexdistill.local/licenses',
+  attribution: 'LexDistill N5 core vocabulary with original Chinese glosses.',
 };
 
 export function seedSourceSpecs(): SeedSourceSpec[] {

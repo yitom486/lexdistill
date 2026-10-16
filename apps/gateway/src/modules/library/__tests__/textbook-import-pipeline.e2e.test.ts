@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import * as schema from '@study-studio/storage-sqlite';
+import * as schema from '@lexdistill/storage-sqlite';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { harnessInjection, type ChapterScript } from './agentpool-pipeline-harness.js';
 import { TextbookMcpRegistry } from '../mcp/textbook-mcp-server.js';

@@ -1,10 +1,10 @@
 import { eq, and } from 'drizzle-orm';
-import { nowIso } from '@study-studio/shared';
+import { nowIso } from '@lexdistill/shared';
 import { learnerProfiles, learnerLanguageProfiles } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
-import type { TrackLanguage } from '@study-studio/shared';
-import { normalizeTrackLanguage } from '@study-studio/shared';
-import { defaultLanguageProfileSeed } from '@study-studio/shared';
+import type { TrackLanguage } from '@lexdistill/shared';
+import { normalizeTrackLanguage } from '@lexdistill/shared';
+import { defaultLanguageProfileSeed } from '@lexdistill/shared';
 
 /**
  * 画像域内部 helpers（由 DrizzleLearnerRepository 私有方法搬迁而来，行为不变）。

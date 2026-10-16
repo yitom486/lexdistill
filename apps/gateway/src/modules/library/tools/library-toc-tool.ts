@@ -4,10 +4,10 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, type Result, BusinessError } from '@study-studio/shared';
+} from '@lexdistill/tool-core';
+import { ok, type Result, BusinessError } from '@lexdistill/shared';
 import type { ContentRepository } from '../ports.js';
-import { TocLevelSchema } from '@study-studio/document-model';
+import { TocLevelSchema } from '@lexdistill/document-model';
 
 export const LibrarySubmitTocInputSchema = z.object({
   documentId: z.string().min(1).describe('所属教材文档ID'),

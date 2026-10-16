@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { initSchema, runMigrations, SCHEMA_MIGRATIONS } from '../ddl.js';
 import {
   projectContentSegments,

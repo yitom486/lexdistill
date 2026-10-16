@@ -1,4 +1,4 @@
-import type { HangulItem } from '@study-studio/protocol';
+import type { HangulItem } from '@lexdistill/protocol';
 
 /**
  * 谚文字母底座（二期：子音 14 + 基本母音 10 + y 系母音 4 + 复合母音 7 + 收音代表音 7 = 42）。

@@ -1,15 +1,15 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
-import { isOk, BusinessError, generateId, logger } from '@study-studio/shared';
+import { isOk, BusinessError, generateId, logger } from '@lexdistill/shared';
 import {
   AnnotationKindSchema,
   DocumentSourceKindSchema,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
-import { reconcileLessons, summarizeReconciliation, type ReconLessonInput } from '@study-studio/storage-sqlite';
-import { tryParseTextbookAst } from '@study-studio/storage-sqlite';
+import { parseTextbookAST, type TextbookAST } from '@lexdistill/document-model';
+import { reconcileLessons, summarizeReconciliation, type ReconLessonInput } from '@lexdistill/storage-sqlite';
+import { tryParseTextbookAst } from '@lexdistill/storage-sqlite';
 
 /** 文库域路由：文档与批注（G2 迁移，行为不变）。 */
 

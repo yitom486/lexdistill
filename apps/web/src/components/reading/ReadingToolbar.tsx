@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '../ui/select.js';
 import { sound } from '../../utils/audio.js';
-import type { NewsTopic } from '@study-studio/protocol';
+import type { NewsTopic } from '@lexdistill/protocol';
 import type { ReadingSession } from './useReadingSession.js';
 
 interface ReadingToolbarProps {

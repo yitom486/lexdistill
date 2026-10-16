@@ -2,7 +2,7 @@
  * 罗马字 → 假名运行时转换（听写输入用）。
  * 映射表由课程假名种子在运行时构建，不设静态表；非法输入返回 ''（判错，不臆造）。
  */
-import type { KanaItem } from '@study-studio/protocol';
+import type { KanaItem } from '@lexdistill/protocol';
 
 export type KanaScript = 'HIRAGANA' | 'KATAKANA';
 

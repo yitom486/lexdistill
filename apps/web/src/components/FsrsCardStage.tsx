@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { Sparkles, BookOpen, Lightbulb } from 'lucide-react';
-import type { CardReviewRating } from '@study-studio/protocol';
-import { buildCardContext, renderCard } from '@study-studio/learner-core';
+import type { CardReviewRating } from '@lexdistill/protocol';
+import { buildCardContext, renderCard } from '@lexdistill/learner-core';
 import type { AnkiCardFormatInfo } from '../queries/useLearnerQueries.js';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';

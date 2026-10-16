@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { readLocalPdfFile, stripLocalPdfPathQuotes } from '../application/pdf-import/local-file.js';
 
 describe('stripLocalPdfPathQuotes（网关入口剥引号）', () => {

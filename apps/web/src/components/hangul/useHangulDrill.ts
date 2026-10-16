@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { sound, speechStudio } from '../../utils/audio.js';
 import { fireSuccessConfetti } from '../magicui/index.js';
-import type { HangulItem } from '@study-studio/protocol';
+import type { HangulItem } from '@lexdistill/protocol';
 import {
   useHangulPracticeMutation,
   useGenerateHangulWordsMutation,

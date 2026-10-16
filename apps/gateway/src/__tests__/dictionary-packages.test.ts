@@ -11,8 +11,8 @@ import {
   parseJmdictXml,
 } from '../modules/dictionary/application/dictionary-packages.js';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { isOk, generateId } from '@study-studio/shared';
-import type { Flashcard } from '@study-studio/protocol';
+import { isOk, generateId } from '@lexdistill/shared';
+import type { Flashcard } from '@lexdistill/protocol';
 
 // 构造一份足够大的 mock Kengdic TSV（≥ minEntryCount=50_000）以通过完整性校验
 function makeMockKengdicTsv(rows = 50_001): string {

@@ -1,6 +1,6 @@
-import { generateId } from '@study-studio/shared';
+import { generateId } from '@lexdistill/shared';
 import { BankQuestionDraftSchema, type BankAnswerType, type BankQuestionRecord, type SubmitBankQuestions,
-  type BankSubmitReceipt, type QueryBank, type AssembleBankPaper, type BankPaperReceipt } from '@study-studio/protocol';
+  type BankSubmitReceipt, type QueryBank, type AssembleBankPaper, type BankPaperReceipt } from '@lexdistill/protocol';
 import { fingerprintCanonical } from '../../canonical-fingerprint.js';
 import { assertAllowedChapter, countQuestions, receipt, reject, saveReceipt, type GenerationContext } from './generation-context.js';
 

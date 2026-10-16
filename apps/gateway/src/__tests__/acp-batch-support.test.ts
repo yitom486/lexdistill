@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
-import { ok, err, BusinessError } from '@study-studio/shared';
+import { ok, err, BusinessError } from '@lexdistill/shared';
 import { SessionToolBridge } from '../runtime/mcp/session-tool-bridge.js';
 import {
   ACP_BATCH_LANE_PREFIX,

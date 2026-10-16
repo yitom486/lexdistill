@@ -1,5 +1,5 @@
-import { type WsEnvelope, WsEventTypes } from '@study-studio/protocol';
-import { ok, err, type Result, BusinessError, generateId, isOk } from '@study-studio/shared';
+import { type WsEnvelope, WsEventTypes } from '@lexdistill/protocol';
+import { ok, err, type Result, BusinessError, generateId, isOk } from '@lexdistill/shared';
 import type { GatewayServer } from '../gateway-runtime.js';
 import type { AgentLane } from '../session/session-manager.js';
 

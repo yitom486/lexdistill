@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { app } from '../index.js';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 
 describe('Beginner Trail (learning-progress domain)', () => {
   let repo: DrizzleLearnerRepository;

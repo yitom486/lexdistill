@@ -17,14 +17,14 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@study-studio/gateway": ["../gateway/src/index.ts"],
-      "@study-studio/shared": ["../../packages/shared/src/index.ts"],
-      "@study-studio/document-model": ["../../packages/document-model/src/index.ts"],
-      "@study-studio/protocol": ["../../packages/protocol/src/index.ts"],
-      "@study-studio/learner-core": ["../../packages/learner-core/src/index.ts"],
-      "@study-studio/speech": ["../../packages/speech/src/index.ts"],
-      "@study-studio/agent-runtime": ["../../packages/agent-runtime/src/index.ts"],
-      "@study-studio/learning": ["../../packages/learning/src/index.ts"]
+      "@lexdistill/gateway": ["../gateway/src/index.ts"],
+      "@lexdistill/shared": ["../../packages/shared/src/index.ts"],
+      "@lexdistill/document-model": ["../../packages/document-model/src/index.ts"],
+      "@lexdistill/protocol": ["../../packages/protocol/src/index.ts"],
+      "@lexdistill/learner-core": ["../../packages/learner-core/src/index.ts"],
+      "@lexdistill/speech": ["../../packages/speech/src/index.ts"],
+      "@lexdistill/agent-runtime": ["../../packages/agent-runtime/src/index.ts"],
+      "@lexdistill/learning": ["../../packages/learning/src/index.ts"]
     }
   },
   "references": [

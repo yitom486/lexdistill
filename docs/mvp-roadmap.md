@@ -1,4 +1,4 @@
-# Lingua Studio - 渐进式里程碑路线图 (MVP Roadmap)
+# LexDistill - 渐进式里程碑路线图 (MVP Roadmap)
 
 > **文档版本**：v1.2（2026-09-23：M0–M5 + P6-1/2/3 已交付；明确桌面优先与 Android 轻量伴随端策略）
 > **维护责任人**：首席架构师 / 技术负责人

@@ -1,5 +1,5 @@
 import { gunzipSync, inflateRawSync, inflateSync } from 'node:zlib';
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 
 /**
  * 最小归档解包器（纯 TS，无系统依赖）。

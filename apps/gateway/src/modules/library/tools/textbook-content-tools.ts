@@ -1,6 +1,6 @@
-import { TextbookContentOperationSchemas, JlptLevelSchema, type TextbookContentKind } from '@study-studio/document-model';
-import { BusinessError, err, ok, translateToBusinessError, type Result } from '@study-studio/shared';
-import { ToolLocations, ToolPermissions, type ToolDefinition, type ToolExecutionContext } from '@study-studio/tool-core';
+import { TextbookContentOperationSchemas, JlptLevelSchema, type TextbookContentKind } from '@lexdistill/document-model';
+import { BusinessError, err, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
+import { ToolLocations, ToolPermissions, type ToolDefinition, type ToolExecutionContext } from '@lexdistill/tool-core';
 import type { ContentRepository, CommitLessonKnowledgeOutput } from '../ports.js';
 import type { ImportMonitor } from '../application/import-monitor.js';
 import { LessonContentBuffer, type BufferedContentReceipt } from './lesson-content-buffer.js';

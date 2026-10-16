@@ -1,4 +1,4 @@
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import {
   fetchRssItemsWithFallback,
   resolveNewsFeedCandidates,

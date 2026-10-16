@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { ObjectiveAnswerInputSchema } from '@study-studio/protocol';
-import { BusinessError, isOk } from '@study-studio/shared';
+import { ObjectiveAnswerInputSchema } from '@lexdistill/protocol';
+import { BusinessError, isOk } from '@lexdistill/shared';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 

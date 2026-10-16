@@ -1,4 +1,4 @@
-import type { LessonContent, TextbookLearningContent, TextbookAST, ContentDirectoryNode } from '@study-studio/document-model';
+import type { LessonContent, TextbookLearningContent, TextbookAST, ContentDirectoryNode } from '@lexdistill/document-model';
 /**
  * 教材前端类型契约。
  * 教材内容 SSOT 在 Gateway SQLite（documents.ast_json），

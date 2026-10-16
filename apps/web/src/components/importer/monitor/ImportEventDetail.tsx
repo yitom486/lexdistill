@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LessonSubmissionSchema, type ImportEvent, type ContentDirectoryNode } from '@study-studio/document-model';
+import { LessonSubmissionSchema, type ImportEvent, type ContentDirectoryNode } from '@lexdistill/document-model';
 import { useImportEventDetail } from '../../../queries/textbook-import-monitor.js';
 import { ContentResultView } from './ContentResultView.js';
 import { PdfMaterialView } from './PdfMaterialView.js';

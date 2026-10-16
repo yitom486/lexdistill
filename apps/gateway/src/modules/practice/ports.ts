@@ -1,4 +1,4 @@
-import type { Result, BusinessError } from '@study-studio/shared';
+import type { Result, BusinessError } from '@lexdistill/shared';
 import type {
   GeneratedQuestion,
   LearnerLevel,
@@ -6,9 +6,9 @@ import type {
   PracticeItem,
   Flashcard,
   CardReviewRating,
-} from '@study-studio/protocol';
-import type { FsrsState, SchedulerOutput } from '@study-studio/learning-algorithms';
-import type { MistakeEntry, TargetLanguage } from '@study-studio/learner-core';
+} from '@lexdistill/protocol';
+import type { FsrsState, SchedulerOutput } from '@lexdistill/learning-algorithms';
+import type { MistakeEntry, TargetLanguage } from '@lexdistill/learner-core';
 import type { PersistableQuestion } from './persistence/questions.js';
 import type { PlacementExam, PlacementFinishResult } from './persistence/placement.js';
 

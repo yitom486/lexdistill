@@ -10,14 +10,14 @@ import {
   AcpConversationLedger,
   type AcpLedgerBackend,
 } from './acp-history/acp-conversation-ledger.js';
-import { ToolRegistry } from '@study-studio/tool-core';
-import type { AcpAdapter, AgentAdapter } from '@study-studio/agent-runtime';
-import { ResponsesAdapter } from '@study-studio/agent-runtime';
+import { ToolRegistry } from '@lexdistill/tool-core';
+import type { AcpAdapter, AgentAdapter } from '@lexdistill/agent-runtime';
+import { ResponsesAdapter } from '@lexdistill/agent-runtime';
 import {
   type WsEnvelope,
   type EnrichJobSnapshot,
   WsEventTypes,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import {
   ok,
   err,
@@ -25,8 +25,8 @@ import {
   BusinessError,
   generateId,
   isOk,
-} from '@study-studio/shared';
-import { type LearnerRepository } from '@study-studio/learner-core';
+} from '@lexdistill/shared';
+import { type LearnerRepository } from '@lexdistill/learner-core';
 import {
   handleQuizGenerate,
   handleQuizGradeSubjective,

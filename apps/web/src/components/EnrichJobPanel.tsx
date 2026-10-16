@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Loader2, XCircle, RotateCcw, Sparkles, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import type { EnrichJobSnapshot } from '@study-studio/protocol';
+import type { EnrichJobSnapshot } from '@lexdistill/protocol';
 import { sound } from '../utils/audio.js';
 import { Button } from './ui/button.js';
 import { Progress } from './ui/progress.js';

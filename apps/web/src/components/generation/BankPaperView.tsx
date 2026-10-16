@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { BankSubmissionRecord } from '@study-studio/protocol';
+import type { BankSubmissionRecord } from '@lexdistill/protocol';
 import { Button } from '../ui/button.js';
 import { BankQuestionCard } from './BankQuestionCard.js';
 import { QUERY_KEYS } from '../../queries/query-keys.js';

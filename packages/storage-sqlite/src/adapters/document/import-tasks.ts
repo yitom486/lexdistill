@@ -7,16 +7,16 @@ import {
   translateToBusinessError,
   generateId,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { documentImports } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
-import { DOCUMENT_SOURCE_KINDS, type DocumentSourceKind } from '@study-studio/content';
+import { DOCUMENT_SOURCE_KINDS, type DocumentSourceKind } from '@lexdistill/content';
 
 /**
  * 文档导入任务持久化（状态机 processing → done/failed；读侧永不抛）。
  *
  * 方案 A 起家在 storage-sqlite（前身 gateway modules/library/persistence/import-tasks.ts，
- * 逻辑不变）。参数收窄为 `{ db }`；文档种类值＋类型取自 `@study-studio/content`
+ * 逻辑不变）。参数收窄为 `{ db }`；文档种类值＋类型取自 `@lexdistill/content`
  * 纯表面（commander 特批例外，见包 README 依赖策略；禁引 content 其他符号）。
  */
 

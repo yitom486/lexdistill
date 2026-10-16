@@ -18,7 +18,7 @@ import { useGenerateAdaptiveQuizMutation } from '../queries/useAgentMutations.js
 import { usePrependQuestionMutation } from '../queries/useLearnerQueries.js';
 import { useGatewayStore } from '../stores/useGatewayStore.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
-import { toUiQuizType } from '@study-studio/protocol';
+import { toUiQuizType } from '@lexdistill/protocol';
 import type { QuizQuestionItem } from '../models/learning.js';
 
 /**

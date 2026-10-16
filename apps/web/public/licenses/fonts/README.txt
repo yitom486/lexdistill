@@ -1,4 +1,4 @@
-Lingua Studio bundled font notices
+LexDistill bundled font notices
 
 These unchanged font assets are bundled from the exact npm package versions
 listed below. Their copyright notices and complete SIL Open Font License 1.1

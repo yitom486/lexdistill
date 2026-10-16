@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 import { defaultRuntimeDir } from '../persistence/app-paths.js';
 import {
   PDF_INSPECTOR_VERSION,
@@ -250,7 +250,7 @@ export function ensurePdfRuntime(
 
 /** PDF 安装资源与用户媒体/任务临时目录分开；桌面壳传入真实安装位置。 */
 export function defaultPdfRuntimeDir(): string {
-  const installed = process.env.STUDY_STUDIO_PDF_RUNTIME_DIR?.trim();
+  const installed = (process.env.LEXDISTILL_PDF_RUNTIME_DIR || process.env.STUDY_STUDIO_PDF_RUNTIME_DIR)?.trim();
   return installed || fileURLToPath(new URL('../../../../desktop/src-tauri/resources/pdf-runtime/', import.meta.url));
 }
 

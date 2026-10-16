@@ -1,6 +1,6 @@
 import React from 'react';
 import { BookOpen } from 'lucide-react';
-import type { KanaItem } from '@study-studio/protocol';
+import type { KanaItem } from '@lexdistill/protocol';
 import { cn } from '../../../lib/utils.js';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';

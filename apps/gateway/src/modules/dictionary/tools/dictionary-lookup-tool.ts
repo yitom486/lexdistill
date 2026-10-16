@@ -4,11 +4,11 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, type Result, BusinessError, isOk } from '@study-studio/shared';
+} from '@lexdistill/tool-core';
+import { ok, type Result, BusinessError, isOk } from '@lexdistill/shared';
 import type { LexiconRepository } from '../ports.js';
 import type { LocalDictionaryEntry } from '../persistence/dictionary.js';
-import type { TargetLanguage } from '@study-studio/learner-core';
+import type { TargetLanguage } from '@lexdistill/learner-core';
 import { buildOjadSearchUrl } from '../application/dictionary-external-links.js';
 
 export const DictionaryLookupInputSchema = z.object({

@@ -4,8 +4,8 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, isOk, type Result, type BusinessError } from '@study-studio/shared';
+} from '@lexdistill/tool-core';
+import { ok, isOk, type Result, type BusinessError } from '@lexdistill/shared';
 import {
   readApkgFileBytes,
   analyzeApkg,

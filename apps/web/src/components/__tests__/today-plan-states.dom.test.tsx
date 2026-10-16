@@ -1,8 +1,8 @@
 import { expect, it, mock } from 'bun:test';
 import React from 'react';
-import { COURSE_UNITS, courseUnitPlanStep } from '@study-studio/learner-core';
+import { COURSE_UNITS, courseUnitPlanStep } from '@lexdistill/learner-core';
 import { act, setupDom } from '../toc/__tests__/dom-setup.js';
-import type { DailyStudyPlan } from '@study-studio/learner-core';
+import type { DailyStudyPlan } from '@lexdistill/learner-core';
 
 /**
  * UI-R03 今日计划状态矩阵：首读 / 无数据失败 / 成功为空 / 真实零值 /

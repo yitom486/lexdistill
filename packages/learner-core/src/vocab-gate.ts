@@ -1,4 +1,4 @@
-import type { LearnerLevel, JlptLevel } from '@study-studio/protocol';
+import type { LearnerLevel, JlptLevel } from '@lexdistill/protocol';
 import { GATE_LEVEL_ORDER } from './skill-gate.js';
 
 /**

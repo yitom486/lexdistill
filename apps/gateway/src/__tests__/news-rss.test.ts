@@ -10,8 +10,8 @@ import { DEFAULT_CONTENT_LANGUAGE } from '../modules/curriculum/application/cont
 
 describe('news RSS integration', () => {
   // 真网 live 用例：默认隔离，CI/常规 bun test 不跑；
-  // 本地手动验证：STUDY_STUDIO_LIVE_NEWS=1 bun test src/__tests__/news-rss.test.ts
-  const liveIt = process.env.STUDY_STUDIO_LIVE_NEWS === '1' ? it : it.skip;
+  // 本地手动验证：LEXDISTILL_LIVE_NEWS=1 bun test src/__tests__/news-rss.test.ts
+  const liveIt = process.env.LEXDISTILL_LIVE_NEWS === '1' ? it : it.skip;
   it('defaults product language policy to English', () => {
     expect(DEFAULT_CONTENT_LANGUAGE).toBe('EN');
   });

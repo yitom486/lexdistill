@@ -1,7 +1,7 @@
-import { ok, err, type Result, BusinessError, translateToBusinessError, nowIso, isOk } from '@study-studio/shared';
-import type { PracticePlanRun } from '@study-studio/protocol';
+import { ok, err, type Result, BusinessError, translateToBusinessError, nowIso, isOk } from '@lexdistill/shared';
+import type { PracticePlanRun } from '@lexdistill/protocol';
 import { eq } from 'drizzle-orm';
-import { quizAttempts, practicePlanRuns } from '@study-studio/storage-sqlite';
+import { quizAttempts, practicePlanRuns } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { submitPracticeAttempt } from '../domain/record-practice-attempt.js';
 import { serializePracticeWrite } from './serialized-write.js';

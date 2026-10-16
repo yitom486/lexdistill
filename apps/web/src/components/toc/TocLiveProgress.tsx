@@ -4,7 +4,7 @@ import { BorderBeam } from '../magicui/BorderBeam.js';
 import { Progress } from '../ui/progress.js';
 import { useImportMonitorQuery } from '../../queries/textbook-import-monitor.js';
 import { DEFAULT_USER_ID } from '../../queries/query-keys.js';
-import type { ImportEvent } from '@study-studio/document-model';
+import type { ImportEvent } from '@lexdistill/document-model';
 
 export interface TocLiveProgressProps {
   userId?: string | undefined;

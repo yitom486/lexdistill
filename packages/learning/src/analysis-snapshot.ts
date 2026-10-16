@@ -1,9 +1,9 @@
-import { ok, isOk, type Result, type BusinessError } from '@study-studio/shared';
+import { ok, isOk, type Result, type BusinessError } from '@lexdistill/shared';
 import {
   summarizeLearningEvidence,
   type LearnerProfileSnapshot,
   type TargetLanguage,
-} from '@study-studio/learner-core';
+} from '@lexdistill/learner-core';
 
 /**
  * M7-10 自 Gateway `learning-progress/application/learning-analysis.ts` 与

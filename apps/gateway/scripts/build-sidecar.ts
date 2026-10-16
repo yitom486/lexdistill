@@ -1,8 +1,8 @@
 /**
  * 编译 Gateway 为 Tauri sidecar 独立二进制。
  * 运行：bun scripts/build-sidecar.ts
- * 产物：apps/desktop/src-tauri/binaries/study-studio-gateway-<target-triple>[.exe]
- * （与 tauri.conf.json `bundle.externalBin` 的 `binaries/study-studio-gateway` 对应；
+ * 产物：apps/desktop/src-tauri/binaries/lexdistill-gateway-<target-triple>[.exe]
+ * （与 tauri.conf.json `bundle.externalBin` 的 `binaries/lexdistill-gateway` 对应；
  * 运行时由桌面壳经 STUDY_STUDIO_DB / GATEWAY_PORT 环境变量指定库路径与端口）。
  */
 import { dirname, join } from 'node:path';
@@ -25,7 +25,7 @@ if (!triple) {
 
 const ext = process.platform === 'win32' ? '.exe' : '';
 const outfile = Bun.fileURLToPath(
-  new URL(`../../desktop/src-tauri/binaries/study-studio-gateway-${triple}${ext}`, import.meta.url)
+  new URL(`../../desktop/src-tauri/binaries/lexdistill-gateway-${triple}${ext}`, import.meta.url)
 );
 
 
@@ -126,4 +126,4 @@ if (!result.success) {
   for (const log of result.logs) console.error(log);
   process.exit(1);
 }
-console.log(`study-studio-gateway sidecar built: ${outfile}`);
+console.log(`lexdistill-gateway sidecar built: ${outfile}`);

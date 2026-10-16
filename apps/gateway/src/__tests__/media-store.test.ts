@@ -2,9 +2,9 @@ import { describe, expect, it, beforeEach } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promises as fsp } from 'node:fs';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { detectMediaType } from '@study-studio/storage-sqlite';
+import { detectMediaType } from '@lexdistill/storage-sqlite';
 
 describe('detectMediaType', () => {
   it('魔数优先：jpeg/png/mp3/wav/ogg', () => {

@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite';
 import { mkdtemp, rm, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { createDrizzleDb } from '../connection.js';
 import { exportDatabaseSnapshot } from '../adapters/maintenance/db-backup.js';
 

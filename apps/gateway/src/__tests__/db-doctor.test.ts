@@ -1,6 +1,6 @@
 import {expect,it} from 'bun:test';
 import {Database} from 'bun:sqlite';
-import {initSchema,runDoctor} from '@study-studio/storage-sqlite';
+import {initSchema,runDoctor} from '@lexdistill/storage-sqlite';
 it('doctor checks current chapter membership, content order and audit references without writing',()=>{
  const db=new Database(':memory:');try {
   initSchema(db);expect(runDoctor(db).errors).toEqual([]);

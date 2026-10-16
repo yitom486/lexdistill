@@ -1,6 +1,6 @@
-import { ToolRegistry } from '@study-studio/tool-core';
-import type { LearnerRepository } from '@study-studio/learner-core';
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import { ToolRegistry } from '@lexdistill/tool-core';
+import type { LearnerRepository } from '@lexdistill/learner-core';
+import type { AgentAdapter } from '@lexdistill/agent-runtime';
 import { DrizzleLearnerRepository } from '../../infrastructure/drizzle-learner-repository.js';
 import { registerPracticeTools } from '../../modules/practice/tools/register-practice-tools.js';
 import { registerLearningProgressTools } from '../../modules/learning-progress/tools/register-learning-progress-tools.js';

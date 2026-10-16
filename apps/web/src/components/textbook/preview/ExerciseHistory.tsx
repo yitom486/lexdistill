@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { ExerciseAnswer, TextbookExerciseAttempt, TextbookGrowth } from '@study-studio/protocol';
-import { haveSameGradingBasis } from '@study-studio/learner-core';
+import type { ExerciseAnswer, TextbookExerciseAttempt, TextbookGrowth } from '@lexdistill/protocol';
+import { haveSameGradingBasis } from '@lexdistill/learner-core';
 import { ChevronDown, History } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible.js';
 import { Badge } from '../../ui/badge.js';

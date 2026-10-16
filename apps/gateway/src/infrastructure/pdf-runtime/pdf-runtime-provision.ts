@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
-import { BusinessError, ok, err, type Result } from '@study-studio/shared';
-import { extractTarGz, type ArchiveEntry } from '@study-studio/archive';
+import { BusinessError, ok, err, type Result } from '@lexdistill/shared';
+import { extractTarGz, type ArchiveEntry } from '@lexdistill/archive';
 import { PDF_INSPECTOR_MAIN, PDF_INSPECTOR_VERSION, PLATFORM_ARTIFACTS, assertArtifactUrlAllowed, currentRuntimePlatform, type PdfRuntimePlatform } from './pdf-artifacts.js';
 import { ensurePdfRuntime, napiDirName, readManifest } from './pdf-runtime.js';
 

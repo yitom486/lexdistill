@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
-import { isOk, BusinessError, generateId } from '@study-studio/shared';
-import type { PracticeBlockSpec } from '@study-studio/protocol';
-import { isQuestionAllowed, resolveStudyGate } from '@study-studio/learner-core';
+import { isOk, BusinessError, generateId } from '@lexdistill/shared';
+import type { PracticeBlockSpec } from '@lexdistill/protocol';
+import { isQuestionAllowed, resolveStudyGate } from '@lexdistill/learner-core';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { assemblePracticeRun } from '../application/practice-assembly.js';
 import { submitObjectiveItem } from '../application/submit-objective-item.js';

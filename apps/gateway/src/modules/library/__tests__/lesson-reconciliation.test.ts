@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   reconcileLessons,
   type ReconLessonInput,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 
 /**
  * P1-C0.5 reconciliation fixture matrix（纯函数，原型未接生产）。

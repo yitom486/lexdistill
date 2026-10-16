@@ -1,7 +1,7 @@
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 import { GenerationBlueprintSchema, GenerationConfigSchema,
   type BankAnswerType, type BankCategory, type GenerationBlueprint, type GenerationConfig,
-  type GenerationListeningMode } from '@study-studio/protocol';
+  type GenerationListeningMode } from '@lexdistill/protocol';
 import { buildQuickPracticePreset } from './preset.js';
 
 export interface PresetDefinition {

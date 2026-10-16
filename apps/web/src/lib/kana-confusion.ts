@@ -3,7 +3,7 @@
  * 保留少量高价值近邻，再从同段与跨行候选中随机补齐，避免选项退化为固定的相邻三格。
  * 候选一律取自题池现存字面，绝不臆造选项。
  */
-import type { KanaItem } from '@study-studio/protocol';
+import type { KanaItem } from '@lexdistill/protocol';
 
 export type KanaScript = 'HIRAGANA' | 'KATAKANA';
 

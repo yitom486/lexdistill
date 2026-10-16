@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import {
   TOC_SEGMENT_CHUNK_PAGES,
   previewTocSegments,

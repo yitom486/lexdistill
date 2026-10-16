@@ -4,7 +4,7 @@
  * 分层说明：
  * - 本包只组合纯/版本化领域 API（./scheduling 排程入口、./practice 组卷与
  *   练习规则），一律具名重导出（不用 `export *`，避免命名冲突与语义漂移）；
- * - `@study-studio/learner-core` 仍是学习者状态、Repository 与用户学习资产的
+ * - `@lexdistill/learner-core` 仍是学习者状态、Repository 与用户学习资产的
  *   唯一事实源：状态类 API 暂不经本包转出，Gateway 现有 learner-core 消费保持不动，
  *   后续迁移再按需扩展；
  * - 规范源唯一：蓝图/计划类名字只从 ./practice 出，排程只从 ./scheduling 出，
@@ -16,7 +16,7 @@
 export { scheduleFsrsReviewV1, type FsrsReviewInput } from './scheduling/index.js';
 
 /** 排程调用所需的公共状态类型（规范源 learning-algorithms）。 */
-export { type FsrsState } from '@study-studio/learning-algorithms';
+export { type FsrsState } from '@lexdistill/learning-algorithms';
 
 /** 阶段测评蓝图与晋级判定（纯规则）。 */
 export {
@@ -82,7 +82,7 @@ export {
   type SkillMetric,
   type TargetLanguage,
   type LearnerProfileSnapshot,
-} from '@study-studio/learner-core';
+} from '@lexdistill/learner-core';
 
 /** 学习分析快照组装（最小读取 port + 确定性映射；不读时钟）。 */
 export {

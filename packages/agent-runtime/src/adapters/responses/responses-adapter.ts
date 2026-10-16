@@ -13,7 +13,7 @@ import {
   type Result,
   type BusinessError,
   translateToBusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 
 /**
  * 轻量单次问答会话：无外部厂商 SDK。

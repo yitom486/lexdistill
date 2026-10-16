@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { BusinessError, isOk, logger } from '@study-studio/shared';
+import { BusinessError, isOk, logger } from '@lexdistill/shared';
 import { PDFDocument } from 'pdf-lib';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { convertPdfToAst, appendPdfToDocument, mapPdfPages, MAX_PDF_BYTES } from '../application/pdf-import/pdf-import-service.js';
@@ -9,11 +9,11 @@ import { extractTocWithLlm, loadTocImageAttachments } from '../application/toc-e
 import { beginTocVisionTrace, listTocVisionTraces } from '../application/toc-vision-diagnostics.js';
 import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
 import { type PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
-import { TocEntrySchema, TextbookPipelineSettingsSchema, SaveTextbookOutlineRequestSchema } from '@study-studio/document-model';
+import { TocEntrySchema, TextbookPipelineSettingsSchema, SaveTextbookOutlineRequestSchema } from '@lexdistill/document-model';
 import { z } from 'zod';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import type { TextbookPipelineInput } from '../application/textbook-pipeline.js';
-import type { AgentAdapter, AgentImageAttachment } from '@study-studio/agent-runtime';
+import type { AgentAdapter, AgentImageAttachment } from '@lexdistill/agent-runtime';
 import { readLocalPdfFile } from '../application/pdf-import/local-file.js';
 import { inspectTextbookImport } from '../application/textbook-inspector.js';
 import { saveTextbookOutline } from '../application/textbook-outline.js';

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { err, ok, BusinessError } from '@study-studio/shared';
+import { err, ok, BusinessError } from '@lexdistill/shared';
 import type {
   LearnerProfileSnapshot,
   MistakeEntry,
   SkillMetric,
-} from '@study-studio/learner-core';
+} from '@lexdistill/learner-core';
 import {
   submitPracticeAttempt,
   type PracticeSubmissionRepository,

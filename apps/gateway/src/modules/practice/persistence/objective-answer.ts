@@ -1,8 +1,8 @@
 import { and, eq, or } from 'drizzle-orm';
-import { quizAttempts, quizQuestions } from '@study-studio/storage-sqlite';
-import type { ObjectiveAnswerInput, ObjectiveAnswerResult } from '@study-studio/protocol';
-import { BusinessError, err, isOk, ok, inferLanguageFromSkillId, translateToBusinessError, type Result } from '@study-studio/shared';
-import { gradeObjectiveAnswer, mapQuestionType } from '@study-studio/learning';
+import { quizAttempts, quizQuestions } from '@lexdistill/storage-sqlite';
+import type { ObjectiveAnswerInput, ObjectiveAnswerResult } from '@lexdistill/protocol';
+import { BusinessError, err, isOk, ok, inferLanguageFromSkillId, translateToBusinessError, type Result } from '@lexdistill/shared';
+import { gradeObjectiveAnswer, mapQuestionType } from '@lexdistill/learning';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { submitPracticeAttempt } from '../domain/record-practice-attempt.js';
 import { serializePracticeWrite } from './serialized-write.js';

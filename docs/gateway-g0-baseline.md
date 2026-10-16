@@ -135,9 +135,9 @@
   `bun src/scripts/import-oewn.ts`（`dictionary:import:oewn`）。
 - 端口：`GATEWAY_PORT`，默认 **8080**（注：8999 仅为 `gateway-websocket.test.ts` 的测试端口；
   纠正：`apps/gateway/src/README.md` 曾误写默认 8999，需同步修正）。
-- 环境变量：`GATEWAY_PORT`、`STUDY_STUDIO_DB`（默认 `<repo>/study-studio.db`，
-  由 `path.resolve(import.meta.dir, '../../..', 'study-studio.db')` 解析；import-oewn 无变量时默认
-  `./study-studio.db`）、`NODE_ENV`/`BUN_ENV=test`（测试内存库）。
+- 环境变量：`GATEWAY_PORT`、`STUDY_STUDIO_DB`（默认 `<repo>/lexdistill.db`，
+  由 `path.resolve(import.meta.dir, '../../..', 'lexdistill.db')` 解析；import-oewn 无变量时默认
+  `./lexdistill.db`）、`NODE_ENV`/`BUN_ENV=test`（测试内存库）。
 - 单例注意：`index.ts` 模块加载即 `new DrizzleLearnerRepository(dbPath)` +
   `new GatewayServer(...)`；迁移提取时兼容导出不得重复创建实例或重复监听。
 

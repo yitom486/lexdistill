@@ -12,8 +12,8 @@ import {
   Database,
   FileText
 } from 'lucide-react';
-import type { ImportEvent } from '@study-studio/document-model';
-import type { TextbookModelActivity } from '@study-studio/document-model';
+import type { ImportEvent } from '@lexdistill/document-model';
+import type { TextbookModelActivity } from '@lexdistill/document-model';
 
 export interface WorkerStatusInfo {
   workerIndex: number;

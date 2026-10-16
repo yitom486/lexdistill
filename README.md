@@ -1,8 +1,8 @@
-# Lingua Studio
+# LexDistill
 
 > AI-native adaptive language learning studio for Japanese, English, and Korean.
 
-Lingua Studio 是一个面向多语种学习的自适应学习工作室：提供 FSRS 闪卡、靶向自适应出题、主观题多维批改、
+LexDistill 是一个面向多语种学习的自适应学习工作室：提供 FSRS 闪卡、靶向自适应出题、主观题多维批改、
 错题本攻克流转、学情画像雷达。客户端只连接自研 Agent Gateway（HTTP + WebSocket），
 学习资产以 SQLite（`learner-core` Repository）为唯一事实源，可整体换模型而不丢失。
 
@@ -42,7 +42,7 @@ bun run dev:desktop   # Tauri 桌面壳（自动拉起 Gateway sidecar）
 ```bash
 bun run typecheck   # 全仓严格类型检查（tsc -b），提交前必须零报错
 bun run test:all    # 唯一正式门禁：全 workspace 测试（122 文件级，含 PDF native 38 E2E；显式排除 dist，见下）
-bun --filter @study-studio/web build   # Web 生产构建
+bun --filter @lexdistill/web build   # Web 生产构建
 bun run build:sidecar                  # 编译 Tauri Gateway sidecar
 bun run release:sync -- 0.1.0          # 同步所有包、Tauri、Cargo 与 Changelog 版本
 bun run release -- 0.1.0               # 校验、提交、打 tag 并推送，触发 GitHub 多平台发布
@@ -63,7 +63,7 @@ bun run release -- 0.1.0               # 校验、提交、打 tag 并推送，�
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `GATEWAY_PORT` | `8080` | Gateway 监听端口 |
-| `STUDY_STUDIO_DB` | 仓库根 `study-studio.db` | SQLite 库路径（桌面端由壳指向应用数据目录） |
+| `STUDY_STUDIO_DB` | 仓库根 `lexdistill.db` | SQLite 库路径（桌面端由壳指向应用数据目录） |
 
 ## 脚本说明
 
@@ -73,7 +73,7 @@ bun run release -- 0.1.0               # 校验、提交、打 tag 并推送，�
 | --- | --- | --- |
 | `sidecar:build` | `apps/gateway/scripts/build-sidecar.ts` | `Bun.build compile` 产出桌面端 Sidecar 到 `apps/desktop/src-tauri/binaries/`（gitignored；当前 Windows x64 文件约 111 MB，含 `bun:sqlite`；Android 不在现有构建目标内） |
 | `dictionary:import:oewn` | `apps/gateway/src/scripts/import-oewn.ts` | Open English WordNet 离线导入（默认 dry-run，`--apply` 才写库） |
-| live 私人教材验收 | `apps/gateway/src/scripts/live-corpus-map.ts` + `docs/pdf-live-corpus-playbook.md` | 本机 PDF 只读结构预览（需 `STUDY_STUDIO_LIVE_PDF`，不写库；未设变量只打印用法） |
+| live 私人教材验收 | `apps/gateway/src/scripts/live-corpus-map.ts` + `docs/pdf-live-corpus-playbook.md` | 本机 PDF 只读结构预览（需 `LEXDISTILL_LIVE_PDF`，不写库；未设变量只打印用法） |
 
 ## 文档索引
 
@@ -87,7 +87,7 @@ bun run release -- 0.1.0               # 校验、提交、打 tag 并推送，�
 
 ## About
 
-Lingua Studio 将学习者模型、课程资产和 Agent 能力组合成一个可扩展的学习闭环：
+LexDistill 将学习者模型、课程资产和 Agent 能力组合成一个可扩展的学习闭环：
 
 - **Adaptive practice**：根据技能熟练度和近期错误动态安排练习；
 - **Spaced repetition**：使用 FSRS 管理词汇、语法和混淆句型卡片；

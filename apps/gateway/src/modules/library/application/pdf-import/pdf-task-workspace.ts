@@ -1,8 +1,8 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { PDFDocument } from 'pdf-lib';
-import { BusinessError, err, logger, ok, translateToBusinessError, type Result } from '@study-studio/shared';
-import { classifyEmbeddedOutline } from '@study-studio/content';
+import { BusinessError, err, logger, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
+import { classifyEmbeddedOutline } from '@lexdistill/content';
 import { defaultRuntimeDir, ensurePdfRuntime, type PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
 
 /** Agent 工作区稳定父目录：池子 cwd 与任务临时目录都落在这下面，备料前可先建。 */

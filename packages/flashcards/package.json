@@ -1,5 +1,5 @@
 {
-  "name": "@study-studio/flashcards",
+  "name": "@lexdistill/flashcards",
   "version": "0.1.2",
   "type": "module",
   "main": "./src/index.ts",
@@ -10,7 +10,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@study-studio/shared": "workspace:*"
+    "@lexdistill/shared": "workspace:*"
   },
   "scripts": {
     "test": "bun test"

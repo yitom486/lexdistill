@@ -4,7 +4,7 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   buildCardContext,
   renderCard,

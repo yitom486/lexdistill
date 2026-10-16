@@ -4,11 +4,11 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
+} from '@lexdistill/tool-core';
 import {
   type GeneratedQuestion,
   GeneratedQuestionSchema,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import {
   ok,
   err,
@@ -16,8 +16,8 @@ import {
   BusinessError,
   generateId,
   isOk,
-} from '@study-studio/shared';
-import type { LearnerRepository } from '@study-studio/learner-core';
+} from '@lexdistill/shared';
+import type { LearnerRepository } from '@lexdistill/learner-core';
 import {
   filterQuestionsByLevel,
   isLessonLocked,
@@ -25,7 +25,7 @@ import {
   isSkillAllowedForLevel,
   NOVICE_SAFE_SKILL,
   resolveStudyGate,
-} from '@study-studio/learner-core';
+} from '@lexdistill/learner-core';
 
 export const GenerateAdaptiveQuizInputSchema = z.object({
   targetLanguage: z.enum(['ja', 'en', 'ko']),

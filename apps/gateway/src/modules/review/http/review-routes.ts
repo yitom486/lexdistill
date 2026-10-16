@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
-import { isOk, BusinessError } from '@study-studio/shared';
-import { scheduleFsrsReviewV1 } from '@study-studio/learning';
-import { FlashcardSchema } from '@study-studio/protocol';
+import { isOk, BusinessError } from '@lexdistill/shared';
+import { scheduleFsrsReviewV1 } from '@lexdistill/learning';
+import { FlashcardSchema } from '@lexdistill/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 

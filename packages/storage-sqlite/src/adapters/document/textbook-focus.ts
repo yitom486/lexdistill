@@ -4,8 +4,8 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
-} from '@study-studio/shared';
-import { parseTextbookAST } from '@study-studio/document-model';
+} from '@lexdistill/shared';
+import { parseTextbookAST } from '@lexdistill/document-model';
 import { and, desc, eq, isNotNull, or } from 'drizzle-orm';
 import {
   documents,
@@ -15,7 +15,7 @@ import type { DrizzleDb } from '../../connection.js';
 import {
   normalizeTrackLanguage,
   type TrackLanguage,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { normalizeLessonDisplayTitle } from './lesson-display-title.js';
 
 /**

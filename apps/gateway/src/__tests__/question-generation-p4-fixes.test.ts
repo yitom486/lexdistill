@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { Hono } from 'hono';
-import { BusinessError, err } from '@study-studio/shared';
+import { BusinessError, err } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import type { GatewayDeps } from '../composition/gateway-deps.js';
 import { createGenerationRoutes } from '../modules/question-generation/http/generation-routes.js';

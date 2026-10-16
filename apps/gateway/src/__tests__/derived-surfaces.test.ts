@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
-import { isOk, isErr } from '@study-studio/shared';
-import type { TextbookAST } from '@study-studio/document-model';
-import { runDoctor } from '@study-studio/storage-sqlite';
-import { validateTocEntries } from '@study-studio/content';
+import { isOk, isErr } from '@lexdistill/shared';
+import type { TextbookAST } from '@lexdistill/document-model';
+import { runDoctor } from '@lexdistill/storage-sqlite';
+import { validateTocEntries } from '@lexdistill/content';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 
 /**

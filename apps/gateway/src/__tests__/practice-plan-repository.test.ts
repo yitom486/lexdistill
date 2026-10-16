@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { isOk, isErr } from '@study-studio/shared';
+import { isOk, isErr } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import type {
   PracticePlanTemplate,
   PracticeBlockSpec,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 
 describe('DrizzleLearnerRepository P5 practice plan', () => {
   let repo: DrizzleLearnerRepository;

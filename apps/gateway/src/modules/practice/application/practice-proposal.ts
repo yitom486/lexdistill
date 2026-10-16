@@ -1,7 +1,7 @@
-import { ok, err, type Result, BusinessError, generateId } from '@study-studio/shared';
-import type { PracticeBlockSpec } from '@study-studio/protocol';
+import { ok, err, type Result, BusinessError, generateId } from '@lexdistill/shared';
+import type { PracticeBlockSpec } from '@lexdistill/protocol';
 import type { AnalysisSnapshot } from '../../learning-progress/public.js';
-import { proposeTemplateFromSnapshot } from '@study-studio/learning';
+import { proposeTemplateFromSnapshot } from '@lexdistill/learning';
 
 /**
  * P5-PhaseD：AI 计划建议（propose）+ 用户确认式 apply。
@@ -35,7 +35,7 @@ interface StoredProposal extends PracticeProposal {
 const proposalStore = new Map<string, StoredProposal>();
 
 /** 从学习者快照确定性生成练习计划建议草案（M7-20：实现已迁入 learning，此处兼容重出）。 */
-export { proposeTemplateFromSnapshot } from '@study-studio/learning';
+export { proposeTemplateFromSnapshot } from '@lexdistill/learning';
 
 /** 创建建议草案并签发一次性令牌。 */
 export function createProposal(

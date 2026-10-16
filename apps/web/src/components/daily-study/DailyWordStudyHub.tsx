@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import type { VocabularyEntry } from '@study-studio/protocol';
-import { unitsForTrack, selectCourseWords } from '@study-studio/learner-core';
+import type { VocabularyEntry } from '@lexdistill/protocol';
+import { unitsForTrack, selectCourseWords } from '@lexdistill/learner-core';
 import { useUserProfileStore } from '../../stores/useUserProfileStore.js';
 import { useWordlistsQuery, type WordlistWord } from '../../queries/wordlists.js';
 import { useVocabularyQuery, useDailyPickMutation, BankLockedError } from '../../queries/vocabulary.js';

@@ -1,6 +1,6 @@
-import { BusinessError, err, nowIso, ok, type Result } from '@study-studio/shared';
-import type { VocabularyEntry } from '@study-studio/protocol';
-import type { VocabularyLearningTarget } from '@study-studio/storage-sqlite';
+import { BusinessError, err, nowIso, ok, type Result } from '@lexdistill/shared';
+import type { VocabularyEntry } from '@lexdistill/protocol';
+import type { VocabularyLearningTarget } from '@lexdistill/storage-sqlite';
 import type { VocabularyLearningContextInput, VocabularyLearningSubmitInput, VocabularyLearningSubmitOutput } from '../contracts.js';
 import { createLearningTask, getLearningTask, consumeLearningTask, TASK_TTL_MS } from './learning-tasks.js';
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { ok, err, isOk, BusinessError } from '@study-studio/shared';
+import { ok, err, isOk, BusinessError } from '@lexdistill/shared';
 import { LibrarySubmitTocTool } from '../library-toc-tool.js';
 import type { ContentRepository } from '../../ports.js';
-import type { ToolExecutionContext } from '@study-studio/tool-core';
+import type { ToolExecutionContext } from '@lexdistill/tool-core';
 
 const dummyContext: ToolExecutionContext = {
   userId: 'user_01',

@@ -5,7 +5,7 @@ import { harnessInjection, stubPoolDriver, type ChapterScript } from './agentpoo
 import { requiredContent } from './textbook-pipeline-fixtures.js';
 import type { McpChapterScope } from '../mcp/textbook-mcp-scope.js';
 import type { LessonExtractionJob } from '../application/lesson-batch-extractor.js';
-import type { BusinessError } from '@study-studio/shared';
+import type { BusinessError } from '@lexdistill/shared';
 
 const repos: DrizzleLearnerRepository[] = [];
 afterEach(() => { for (const repo of repos.splice(0)) repo.getRawDb().close(); });

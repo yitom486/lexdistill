@@ -1,13 +1,13 @@
-import { BusinessError, err, generateId, isOk, logger, ok, type Result } from '@study-studio/shared';
-import { StructureClassSchema, type DocumentItem, type StructureClass } from '@study-studio/protocol';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
+import { BusinessError, err, generateId, isOk, logger, ok, type Result } from '@lexdistill/shared';
+import { StructureClassSchema, type DocumentItem, type StructureClass } from '@lexdistill/protocol';
+import { parseTextbookAST, type TextbookAST } from '@lexdistill/document-model';
 import { ensurePdfRuntime, type PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
-import { classifyEmbeddedOutline, type EmbeddedOutlineEntry } from '@study-studio/content';
-import { markdownToAst, promoteLessonHeadings } from '@study-studio/content';
-import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from '@study-studio/content';
+import { classifyEmbeddedOutline, type EmbeddedOutlineEntry } from '@lexdistill/content';
+import { markdownToAst, promoteLessonHeadings } from '@lexdistill/content';
+import { extractHeadingsFromMarkdown, extractTocEntries, type PageHeading, type TocEntry } from '@lexdistill/content';
 import { collectLayoutCandidates } from './layout-headings.js';
 import { fireLinesProjection, type LinesProjectionHook } from '../lines-projection-hook.js';
-import { mergeHeadingCandidates } from '@study-studio/content';
+import { mergeHeadingCandidates } from '@lexdistill/content';
 export const MAX_PDF_BYTES = 200 * 1024 * 1024;
 export const MAX_PDF_PAGES = 400;
 export const MAX_MAP_PAGES = 30;
@@ -106,7 +106,7 @@ export interface PdfMapOutput {
 }
 
 /** 校验后的单条原生目录（M8-5 起由 canonical 出口定义，此处仅兼容重导出）。 */
-export type { EmbeddedOutlineEntry } from '@study-studio/content';
+export type { EmbeddedOutlineEntry } from '@lexdistill/content';
 
 /**
  * CMD-LINGUA-P2.2：旧内置目录读取已收归 `embedded-outline-quality.ts` 的

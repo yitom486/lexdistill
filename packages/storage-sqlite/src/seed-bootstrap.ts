@@ -494,14 +494,14 @@ export function seedInitialData(sqlite: Database): void {
             id, language, provider, version, source_url, license_name, license_url, attribution, entry_count, imported_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
-          'study-studio-curriculum-v1',
+          'lexdistill-curriculum-v1',
           'ja',
-          'Lingua Studio',
+          'LexDistill',
           'v1',
-          'https://study-studio.local/curriculum/pitch',
+          'https://lexdistill.local/curriculum/pitch',
           'Project-authored curriculum data',
-          'https://study-studio.local/licenses',
-          'Lingua Studio curriculum demonstration data.',
+          'https://lexdistill.local/licenses',
+          'LexDistill curriculum demonstration data.',
           PITCH_LEXICON.length,
           now
         );
@@ -522,8 +522,8 @@ export function seedInitialData(sqlite: Database): void {
               contrastPair: entry.contrastPair ?? null,
             }),
             null,
-            'study-studio-curriculum-v1',
-            'Lingua Studio curriculum seed',
+            'lexdistill-curriculum-v1',
+            'LexDistill curriculum seed',
             'Project-authored curriculum demonstration data; not sourced from OJAD.',
             now
           );

@@ -1,6 +1,6 @@
 import { and, count, eq } from 'drizzle-orm';
-import { StringListSchema, TextbookExampleSchema, LanguageCodeSchema, ExerciseTypeSchema, TextbookLearningContentSchema, type TextbookAST } from '@study-studio/document-model';
-import { BusinessError, err, nowIso, ok, translateToBusinessError, type Result } from '@study-studio/shared';
+import { StringListSchema, TextbookExampleSchema, LanguageCodeSchema, ExerciseTypeSchema, TextbookLearningContentSchema, type TextbookAST } from '@lexdistill/document-model';
+import { BusinessError, err, nowIso, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
 import type { DrizzleDb } from '../../connection.js';
 import { documents, globalVocabulary, textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials } from '../../schema.js';
 import { ChapterManifestSchema, getBoundChapter, type TextbookScope } from './textbook-content.js';

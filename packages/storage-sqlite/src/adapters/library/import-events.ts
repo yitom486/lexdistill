@@ -1,6 +1,6 @@
 import { and, asc, eq, gt } from 'drizzle-orm';
-import { ImportEventSchema, type ImportEvent, type ImportEventInput, type ImportEventQuery } from '@study-studio/document-model';
-import { ok, err, nowIso, translateToBusinessError, type BusinessError, type Result } from '@study-studio/shared';
+import { ImportEventSchema, type ImportEvent, type ImportEventInput, type ImportEventQuery } from '@lexdistill/document-model';
+import { ok, err, nowIso, translateToBusinessError, type BusinessError, type Result } from '@lexdistill/shared';
 import { textbookImportEvents } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
 

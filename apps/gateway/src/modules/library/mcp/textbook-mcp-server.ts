@@ -15,8 +15,8 @@ import { z } from 'zod';
 import {
   TextbookContentOperationSchemas,
   type TextbookContentKind,
-} from '@study-studio/document-model';
-import { BusinessError, err, translateToBusinessError, type Result } from '@study-studio/shared';
+} from '@lexdistill/document-model';
+import { BusinessError, err, translateToBusinessError, type Result } from '@lexdistill/shared';
 import type { BufferedContentReceipt } from '../tools/lesson-content-buffer.js';
 import { McpChapterScope, type McpChapterAssignment } from './textbook-mcp-scope.js';
 import type { ContentRepository } from '../ports.js';

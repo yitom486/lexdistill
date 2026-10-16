@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { TextbookContentOperationSchemas, type TextbookContentChange, type TextbookContentKind, type TextbookLearningContent } from '@study-studio/document-model';
-import { BusinessError, generateId } from '@study-studio/shared';
+import { TextbookContentOperationSchemas, type TextbookContentChange, type TextbookContentKind, type TextbookLearningContent } from '@lexdistill/document-model';
+import { BusinessError, generateId } from '@lexdistill/shared';
 
 interface DraftRow { ref: string; id: string; content: Record<string, unknown>; source?: 'TEXTBOOK' | 'AI' }
 export interface BufferedContentReceipt { status: 'staged' | 'view'; kind: TextbookContentKind; items: Array<Record<string, unknown>> }

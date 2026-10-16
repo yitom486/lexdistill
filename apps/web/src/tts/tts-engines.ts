@@ -6,8 +6,8 @@ import {
   type TtsEngine,
   type TtsSpeakHandle,
   type TtsSpeakRequest,
-} from '@study-studio/speech';
-import { BusinessError, err, ok, type Result } from '@study-studio/shared';
+} from '@lexdistill/speech';
+import { BusinessError, err, ok, type Result } from '@lexdistill/shared';
 import { speechStudio, type SupportedLanguage } from '../utils/audio.js';
 
 function supportedFromBcp47(bcp47: string): SupportedLanguage {

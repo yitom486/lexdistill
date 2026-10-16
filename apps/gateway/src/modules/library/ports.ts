@@ -1,5 +1,5 @@
-import type { Result, BusinessError } from '@study-studio/shared';
-import type { AdaptiveKanaQueueOptions } from '@study-studio/learner-core';
+import type { Result, BusinessError } from '@lexdistill/shared';
+import type { AdaptiveKanaQueueOptions } from '@lexdistill/learner-core';
 import type {
   DocumentItem,
   Flashcard,
@@ -9,19 +9,19 @@ import type {
   HangulScriptType,
   ReadingPassageSet,
   SubmitReadingPractice,
-} from '@study-studio/protocol';
-import type { TextbookAST, ImportEvent, ImportEventInput, ImportEventQuery } from '@study-studio/document-model';
-import type { TextbookScope } from '@study-studio/storage-sqlite';
-import type { TextbookLearningContent, TextbookContentChange } from '@study-studio/document-model';
-import type { ImportTask, ImportTaskStatus } from '@study-studio/storage-sqlite';
+} from '@lexdistill/protocol';
+import type { TextbookAST, ImportEvent, ImportEventInput, ImportEventQuery } from '@lexdistill/document-model';
+import type { TextbookScope } from '@lexdistill/storage-sqlite';
+import type { TextbookLearningContent, TextbookContentChange } from '@lexdistill/document-model';
+import type { ImportTask, ImportTaskStatus } from '@lexdistill/storage-sqlite';
 import type {
   DocumentImportInput,
   DocumentImportOutput,
   DocumentImportDeps,
 } from './application/document-import/document-import-service.js';
 import type { SavedDocumentStructure } from './persistence/document-structure.js';
-import type { ShredStats } from '@study-studio/storage-sqlite';
-import type { ReadingPosition } from '@study-studio/storage-sqlite';
+import type { ShredStats } from '@lexdistill/storage-sqlite';
+import type { ReadingPosition } from '@lexdistill/storage-sqlite';
 import type {
   SaveKnowledgePointInput,
   KnowledgePoint,
@@ -30,7 +30,7 @@ import type {
   CommitLessonKnowledgeOutput,
   TextbookLessonSlotItem,
   TextbookAssetStats,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import type {
   TextbookPipelineInput,
   TextbookPipelineOutput,

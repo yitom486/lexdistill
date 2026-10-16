@@ -1,11 +1,11 @@
-import type { HeadingCandidate } from '@study-studio/protocol';
+import type { HeadingCandidate } from '@lexdistill/protocol';
 import type { PdfInspectorLike } from '../../../../infrastructure/pdf-runtime/pdf-runtime.js';
-import { layoutItemsToCandidates } from '@study-studio/content';
-import type { LayoutStructRole, LayoutTextItem } from '@study-studio/content';
+import { layoutItemsToCandidates } from '@lexdistill/content';
+import type { LayoutStructRole, LayoutTextItem } from '@lexdistill/content';
 
 /**
  * E2g 清扫后：本文件仅保留防御性采集运行时实现（collectLayoutCandidates：
- * 版式接口缺席/异常/空信号一律降级为空数组）；纯规则已迁 `@study-studio/content`，
+ * 版式接口缺席/异常/空信号一律降级为空数组）；纯规则已迁 `@lexdistill/content`，
  * 旧具名重导出块已删除，消费者直引 canonical 出口。
  */
 

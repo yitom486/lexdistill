@@ -6,7 +6,7 @@
  */
 import type { StarterWordSeed } from './starter-words-seed.js';
 
-export const N5_SOURCE_ID = 'study-studio-n5-ja-v1';
+export const N5_SOURCE_ID = 'lexdistill-n5-ja-v1';
 export const N5_SOURCE_LABEL = 'N5 核心词';
 export const N5_LICENSE = 'Project-authored N5 core vocabulary';
 

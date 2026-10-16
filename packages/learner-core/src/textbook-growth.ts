@@ -1,4 +1,4 @@
-import type { TextbookExerciseAttempt, TextbookGrowth } from '@study-studio/protocol';
+import type { TextbookExerciseAttempt, TextbookGrowth } from '@lexdistill/protocol';
 
 /** Only comparable, validated scores contribute; retries have no separate attempt identity. */
 export function summarizeTextbookGrowth(attempts: readonly TextbookExerciseAttempt[]): TextbookGrowth {

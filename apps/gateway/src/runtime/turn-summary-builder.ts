@@ -5,8 +5,8 @@ import {
   type TurnExecutionOutcome,
   type TurnFailure,
   type TurnFailureCategory,
-} from '@study-studio/protocol';
-import type { BusinessError } from '@study-studio/shared';
+} from '@lexdistill/protocol';
+import type { BusinessError } from '@lexdistill/shared';
 
 /**
  * P3-C：构造回合执行摘要的纯函数。

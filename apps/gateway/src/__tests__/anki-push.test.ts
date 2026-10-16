@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { FlashcardsAnkiPushTool } from '../modules/flashcards/tools/flashcards-anki-push-tool.js';
 
@@ -146,8 +146,8 @@ describe('pushCardToAnki end-to-end (stub AnkiConnect over loopback HTTP)', () =
     expect(isOk(res)).toBe(true);
     if (!isOk(res)) return;
     expect(res.value.noteId).toBe(42);
-    expect(res.value.deckName).toBe('Lingua Studio');
-    expect(res.value.modelName).toBe('Lingua Basic');
+    expect(res.value.deckName).toBe('LexDistill');
+    expect(res.value.modelName).toBe('LexDistill Basic');
     expect(res.value.audioStored).toBe(false);
     expect(res.value.audioSkippedReason).toContain('TTS');
     expect(calls).toContain('anki:createDeck');

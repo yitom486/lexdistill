@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { startGatewayServer } from '../index.js';
-import { WsEventTypes, type WsEnvelope } from '@study-studio/protocol';
-import { generateId } from '@study-studio/shared';
+import { WsEventTypes, type WsEnvelope } from '@lexdistill/protocol';
+import { generateId } from '@lexdistill/shared';
 
 describe('Gateway WebSocket Server E2E', () => {
   const TEST_PORT = 8999;
@@ -30,7 +30,7 @@ describe('Gateway WebSocket Server E2E', () => {
       version?: unknown;
     };
     expect(body.status).toBe('ok');
-    expect(body.service).toBe('Lingua Studio Agent Gateway');
+    expect(body.service).toBe('LexDistill Agent Gateway');
     // AGENTS §7.3 身份握手：bootId + 启动时间 + 版本号；同一进程两次握手 bootId 稳定。
     expect(typeof body.bootId).toBe('string');
     expect((body.bootId as string).length).toBeGreaterThan(0);

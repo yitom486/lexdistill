@@ -6,8 +6,8 @@ import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learne
 import { harnessInjection, stubPoolDriver, type ChapterScript } from './agentpool-pipeline-harness.js';
 import { requiredContent } from './textbook-pipeline-fixtures.js';
 import type { McpChapterScope } from '../mcp/textbook-mcp-scope.js';
-import type { AgentPoolLease } from '@study-studio/agent-runtime';
-import * as schema from '@study-studio/storage-sqlite';
+import type { AgentPoolLease } from '@lexdistill/agent-runtime';
+import * as schema from '@lexdistill/storage-sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { pinProcessToTestRuntime } from './pdf-test-runtime.js';
 

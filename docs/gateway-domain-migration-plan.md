@@ -136,7 +136,7 @@ apps/gateway/src/
 | `services/news-reading.ts` | `modules/curriculum/application/news-reading.ts` | M |
 | `services/news-rss.ts`、`services/news-article-fetch.ts` | `modules/curriculum/infrastructure/` 下同名文件 | M；外部采集是模块专属 IO |
 | `services/responses-lite-coach.ts`、`services/turn-summary-builder.ts` | `runtime/` 下同名文件 | M；保留 seed 引用，后续单独评估动态化 |
-| `services/learning-language-policy.ts` | 已完成：`modules/curriculum/application/content-language-policy.ts` + `runtime/coach-language-policy.ts`；轨道语种归一复用 `@study-studio/shared` | E；课程模板与教练 fallback 分属各自边界，静态策略已更新登记 |
+| `services/learning-language-policy.ts` | 已完成：`modules/curriculum/application/content-language-policy.ts` + `runtime/coach-language-policy.ts`；轨道语种归一复用 `@lexdistill/shared` | E；课程模板与教练 fallback 分属各自边界，静态策略已更新登记 |
 
 ### 4.2 Tools
 
@@ -280,7 +280,7 @@ persistence 实现 → DB + 核心契约
 
 - 移动 `index.ts` 中基于 `import.meta.dir` 的 DB 路径逻辑时，保持解析后的实际路径相同。
 - 检查 `new URL(..., import.meta.url)`、动态 import、seed/词典文件路径、构建配置和测试相对路径。
-- `@study-studio/gateway` 的 `main` 当前指向 `src/index.ts`，start/dev 也使用它；保持兼容后再单独决定是否更换入口。
+- `@lexdistill/gateway` 的 `main` 当前指向 `src/index.ts`，start/dev 也使用它；保持兼容后再单独决定是否更换入口。
 - 兼容导出不得再次创建 Repo/Adapter 或重复监听；同进程只装配一次生产实例。
 
 ### 状态与事务

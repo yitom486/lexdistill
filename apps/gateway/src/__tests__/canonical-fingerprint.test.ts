@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { canonicalJson, fingerprintCanonical } from '@study-studio/storage-sqlite';
+import { canonicalJson, fingerprintCanonical } from '@lexdistill/storage-sqlite';
 
 /**
  * P1-D0 Task 6：canonical fingerprint 原型（纯函数，未接生产）。

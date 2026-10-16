@@ -1,6 +1,6 @@
-import { BusinessError } from '@study-studio/shared';
-// zip 安全解包（炸弹/加密守卫）走 @study-studio/archive 唯一实现；只读内存，不写盘。
-import { extractZip, normalizeZipEntryPaths } from '@study-studio/archive';
+import { BusinessError } from '@lexdistill/shared';
+// zip 安全解包（炸弹/加密守卫）走 @lexdistill/archive 唯一实现；只读内存，不写盘。
+import { extractZip, normalizeZipEntryPaths } from '@lexdistill/archive';
 
 /**
  * EPUB 文本提取（clean-room，自研解析）。

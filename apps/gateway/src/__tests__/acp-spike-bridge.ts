@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import type { ToolDefinition } from '@study-studio/tool-core';
+import type { ToolDefinition } from '@lexdistill/tool-core';
 
 /**
  * Phase 0 spike 专用 MCP 桥（不进生产装配、不导出）。

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { narrowSaveCardFormatInput } from '@study-studio/storage-sqlite';
+import { narrowSaveCardFormatInput } from '@lexdistill/storage-sqlite';
 import { FlashcardsRenderTool } from '../modules/flashcards/tools/flashcards-render-tool.js';
 
 let repo: DrizzleLearnerRepository;
@@ -44,7 +44,7 @@ describe('card formats persistence', () => {
     if (!isOk(res)) return;
     const builtin = res.value.find((f) => f.id === 'study-basic');
     expect(builtin?.templateVersion).toBe(4);
-    expect(builtin?.name).toBe('Lingua Studio 基础');
+    expect(builtin?.name).toBe('LexDistill 基础');
     expect(builtin?.fields['Pitch']).toContain('{pitch-graph}');
     const mine = res.value.find((f) => f.id === 'my-own');
     expect(mine?.name).toBe('我的');
@@ -91,7 +91,7 @@ describe('card formats persistence', () => {
     const reset = await repo.resetCardFormat('study-basic');
     expect(isOk(reset)).toBe(true);
     if (!isOk(reset)) return;
-    expect(reset.value.name).toBe('Lingua Studio 基础');
+    expect(reset.value.name).toBe('LexDistill 基础');
     expect(reset.value.userModified).toBe(false);
     const customReset = await repo.resetCardFormat('custom-basic');
     expect(isOk(customReset)).toBe(false);

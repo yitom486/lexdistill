@@ -1,4 +1,4 @@
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 import type { CreatedApp } from '../transport/http/create-app.js';
 import type { GatewayServer } from '../runtime/gateway-runtime.js';
 import { createWebsocketHandlers } from '../transport/websocket/websocket-handler.js';
@@ -51,7 +51,7 @@ export function startGateway(app: CreatedApp, server: GatewayServer, port = PORT
     throw e;
   }
 
-  console.log(`🚀 Lingua Studio Agent Gateway (Hono + Bun WS) listening on http://localhost:${started.port}`);
+  console.log(`🚀 LexDistill Agent Gateway (Hono + Bun WS) listening on http://localhost:${started.port}`);
   server.mcpBaseUrl = `http://127.0.0.1:${started.port}`;
   return started;
 }

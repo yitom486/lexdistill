@@ -6,7 +6,7 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   analyzeParsedApkg,
   importParsedApkgNotes,
@@ -14,16 +14,16 @@ import {
   type ParsedApkg,
   type ApkgAnalysis,
   type ApkgImportNotesResult,
-} from '@study-studio/flashcards';
+} from '@lexdistill/flashcards';
 
 /** 分析类型兼容出口：定义已迁入 flashcards，此处重出以保持 Tool/测试链路不动。 */
-export type { ApkgModelDraft, ApkgDeckSummary, ApkgAnalysis, ApkgImportNotesResult } from '@study-studio/flashcards';
+export type { ApkgModelDraft, ApkgDeckSummary, ApkgAnalysis, ApkgImportNotesResult } from '@lexdistill/flashcards';
 // 跨模块复用（G5 已登记）：zip 安全解包（炸弹/加密守卫），不写盘、无路径穿越面。
-import { extractZip, normalizeZipEntryPaths } from '@study-studio/archive';
-import { flashcards } from '@study-studio/storage-sqlite';
+import { extractZip, normalizeZipEntryPaths } from '@lexdistill/archive';
+import { flashcards } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { storeMedia } from '@study-studio/storage-sqlite';
-import type { TrackLanguage } from '@study-studio/shared';
+import { storeMedia } from '@lexdistill/storage-sqlite';
+import type { TrackLanguage } from '@lexdistill/shared';
 
 /**
  * `.apkg` 导入（Boltzmann 搬家 + 网上模板提取）。

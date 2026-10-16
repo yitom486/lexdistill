@@ -8,10 +8,10 @@ import {
   generateId,
   nowIso,
   logger,
-} from '@study-studio/shared';
-import type { DocumentItem } from '@study-studio/protocol';
-import type { TextbookAST } from '@study-studio/document-model';
-import { markdownToAst } from '@study-studio/content';
+} from '@lexdistill/shared';
+import type { DocumentItem } from '@lexdistill/protocol';
+import type { TextbookAST } from '@lexdistill/document-model';
+import { markdownToAst } from '@lexdistill/content';
 import { convertPdfToAst } from '../pdf-import/pdf-import-service.js';
 import type { PdfImportServiceDeps } from '../pdf-import/pdf-import-service.js';
 import {
@@ -19,10 +19,10 @@ import {
   guessSourceKind,
   type DocumentSourceKind,
   type DocumentImporter,
-} from '@study-studio/content';
-import { decodeTextBytes } from '@study-studio/content';
-import { extractEpubText } from '@study-studio/content/document';
-import { extractMobiText } from '@study-studio/content';
+} from '@lexdistill/content';
+import { decodeTextBytes } from '@lexdistill/content';
+import { extractEpubText } from '@lexdistill/content/document';
+import { extractMobiText } from '@lexdistill/content';
 import { extractWebArticle } from './url-reader.js';
 import {
   createImportTask,
@@ -31,7 +31,7 @@ import {
   projectContentSegments,
   isProjectionEligible,
   type ImportTask,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import { saveCanonicalAst } from '../../persistence/documents-annotations.js';
 import type { RepoDeps } from '../../../../infrastructure/persistence/repo-context.js';
 

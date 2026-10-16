@@ -4,12 +4,12 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type { Database } from 'bun:sqlite';
 import {
   normalizeTrackLanguage,
   type TrackLanguage,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 
 /**
  * D3 起家在 storage-sqlite（前身 gateway modules/dictionary/persistence/wordlists.ts，

@@ -9,19 +9,19 @@ import {
   generateId,
   nowIso,
   logger,
-} from '@study-studio/shared';
-import type { DocumentItem, AnnotationItem, Flashcard } from '@study-studio/protocol';
-import type { TextbookAST } from '@study-studio/document-model';
-import { parseTextbookAST } from '@study-studio/document-model';
+} from '@lexdistill/shared';
+import type { DocumentItem, AnnotationItem, Flashcard } from '@lexdistill/protocol';
+import type { TextbookAST } from '@lexdistill/document-model';
+import { parseTextbookAST } from '@lexdistill/document-model';
 import {
   AnnotationKindSchema,
   type AnnotationKind,
   DocumentSourceKindSchema,
   type DocumentSourceKind,
-} from '@study-studio/protocol';
-import { documents, annotations, textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials, textbookViewInTx, knowledgePoints, documentStructures, readingPositions, captureSelectionContext } from '@study-studio/storage-sqlite';
+} from '@lexdistill/protocol';
+import { documents, annotations, textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials, textbookViewInTx, knowledgePoints, documentStructures, readingPositions, captureSelectionContext } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { shredIntoTransaction } from '@study-studio/storage-sqlite';
+import { shredIntoTransaction } from '@lexdistill/storage-sqlite';
 import { recordTermExposure } from '../../dictionary/public.js';
 
 /**

@@ -1,4 +1,4 @@
-import type { PracticeBlockKind, GradingMode } from '@study-studio/protocol';
+import type { PracticeBlockKind, GradingMode } from '@lexdistill/protocol';
 
 export const BLOCK_KINDS: PracticeBlockKind[] = [
   'VOCAB_REVIEW',

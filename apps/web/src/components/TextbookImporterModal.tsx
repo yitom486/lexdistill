@@ -10,7 +10,7 @@ import {
   Minimize2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { TextbookAST } from '@study-studio/document-model';
+import type { TextbookAST } from '@lexdistill/document-model';
 import { sound } from '../utils/audio.js';
 import type { TextbookBook } from '../models/textbook.js';
 import {
@@ -26,7 +26,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs.js';
 import { TextbookJsonImporterTab } from './importer/TextbookJsonImporterTab.js';
 import { TextbookPipelineImporterTab } from './importer/TextbookPipelineImporterTab.js';
 import { useJsonImportAction } from './importer/useJsonImportAction.js';
-import { parseTextbookAST } from '@study-studio/document-model';
+import { parseTextbookAST } from '@lexdistill/document-model';
 
 interface TextbookImporterModalProps {
   isOpen: boolean;

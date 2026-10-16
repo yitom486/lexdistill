@@ -4,7 +4,7 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { sanitizeRssText, stripHtml } from './news-rss.js';

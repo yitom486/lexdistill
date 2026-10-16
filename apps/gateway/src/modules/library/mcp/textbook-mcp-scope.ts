@@ -11,10 +11,10 @@
  */
 import {
   type TextbookContentKind,
-} from '@study-studio/document-model';
+} from '@lexdistill/document-model';
 import { LessonContentBuffer, type BufferedContentReceipt } from '../tools/lesson-content-buffer.js';
 import type { ContentRepository, CommitLessonKnowledgeOutput } from '../ports.js';
-import { BusinessError, err, ok, translateToBusinessError, type Result } from '@study-studio/shared';
+import { BusinessError, err, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
 import type { ImportMonitor } from '../application/import-monitor.js';
 
 export interface McpChapterAssignment {

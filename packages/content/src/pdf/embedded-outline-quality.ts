@@ -29,7 +29,7 @@
  * 输出只允许状态、reason code、计数；日志调用方只许打这三类，严禁标题
  * 正文、路径、文件名、用户标识（本模块不记任何日志）。
  *
- * 纯解析层：零 import（连 @study-studio/shared 都不需要），不依赖 Gateway、
+ * 纯解析层：零 import（连 @lexdistill/shared 都不需要），不依赖 Gateway、
  * SQLite/Drizzle、learner-core、Agent、Web、网络或 PDF runtime。
  * Gateway 的 PdfInspectorLike / EmbeddedOutlineResult 只需结构兼容
  * （见下方最小契约），无需 adapter 映射即可直接传入。

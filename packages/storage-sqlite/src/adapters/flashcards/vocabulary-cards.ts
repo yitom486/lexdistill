@@ -1,8 +1,8 @@
 import { and, eq, or, sql } from 'drizzle-orm';
-import { initFsrsState } from '@study-studio/learning-algorithms';
-import { CardTypeSchema, FlashcardSchema, type Flashcard, type VocabularyCollection, type VocabularyEntry, type VocabularyScope } from '@study-studio/protocol';
-import { ChapterManifestSchema, VocabularyLearningContentSchema, type VocabularyLearningContent } from '@study-studio/document-model';
-import { BusinessError, generateId, nowIso, normalizeTrackLanguage } from '@study-studio/shared';
+import { initFsrsState } from '@lexdistill/learning-algorithms';
+import { CardTypeSchema, FlashcardSchema, type Flashcard, type VocabularyCollection, type VocabularyEntry, type VocabularyScope } from '@lexdistill/protocol';
+import { ChapterManifestSchema, VocabularyLearningContentSchema, type VocabularyLearningContent } from '@lexdistill/document-model';
+import { BusinessError, generateId, nowIso, normalizeTrackLanguage } from '@lexdistill/shared';
 import type { DrizzleDb } from '../../connection.js';
 import { documents, flashcards, globalVocabulary, textbookVocabulary } from '../../schema.js';
 

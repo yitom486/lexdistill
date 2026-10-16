@@ -16,7 +16,7 @@ import {
   ArrowRight,
   Database
 } from 'lucide-react';
-import type { ImportEvent, ContentDirectoryNode } from '@study-studio/document-model';
+import type { ImportEvent, ContentDirectoryNode } from '@lexdistill/document-model';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../ui/sheet.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs.js';
 import { Button } from '../../ui/button.js';

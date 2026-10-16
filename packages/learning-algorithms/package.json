@@ -1,12 +1,12 @@
 {
-  "name": "@study-studio/learning-algorithms",
+  "name": "@lexdistill/learning-algorithms",
   "version": "0.1.2",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
-    "@study-studio/shared": "workspace:*",
-    "@study-studio/protocol": "workspace:*"
+    "@lexdistill/shared": "workspace:*",
+    "@lexdistill/protocol": "workspace:*"
   },
   "scripts": {
     "test": "bun test"

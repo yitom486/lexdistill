@@ -1,4 +1,4 @@
-import type { GenerationConfig } from '@study-studio/protocol';
+import type { GenerationConfig } from '@lexdistill/protocol';
 
 export type SuggestionBasis = 'user-selection' | 'user-profile' | 'authorized-textbooks' | 'recent-mistakes' | 'visible-default';
 

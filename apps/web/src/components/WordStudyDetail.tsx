@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { VocabularyEntry } from '@study-studio/protocol';
+import type { VocabularyEntry } from '@lexdistill/protocol';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { WordAiPanel } from './WordAiPanel.js';

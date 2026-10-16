@@ -1,4 +1,4 @@
-import type { LearnerLevel } from '@study-studio/protocol';
+import type { LearnerLevel } from '@lexdistill/protocol';
 
 export const LEVEL_ORDER: LearnerLevel[] = ['NOVICE', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 

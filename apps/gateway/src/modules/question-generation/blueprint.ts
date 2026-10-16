@@ -1,5 +1,5 @@
-import { BusinessError } from '@study-studio/shared';
-import type { BankCategory, GenerationBlueprint, GenerationConfig, GenerationPaperDetail } from '@study-studio/protocol';
+import { BusinessError } from '@lexdistill/shared';
+import type { BankCategory, GenerationBlueprint, GenerationConfig, GenerationPaperDetail } from '@lexdistill/protocol';
 
 function fail(code: string, message: string): never {
   throw new BusinessError(code, message, 'VALIDATION');

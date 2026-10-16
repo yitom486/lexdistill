@@ -6,13 +6,13 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
-import type { MistakeEntry } from '@study-studio/learner-core';
-import type { GeneratedQuestion } from '@study-studio/protocol';
-import { mistakes } from '@study-studio/storage-sqlite';
+} from '@lexdistill/shared';
+import type { MistakeEntry } from '@lexdistill/learner-core';
+import type { GeneratedQuestion } from '@lexdistill/protocol';
+import { mistakes } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { normalizeTrackLanguage, inferLanguageFromSkillId } from '@study-studio/shared';
-import { resolveActiveLanguage } from '@study-studio/storage-sqlite';
+import { normalizeTrackLanguage, inferLanguageFromSkillId } from '@lexdistill/shared';
+import { resolveActiveLanguage } from '@lexdistill/storage-sqlite';
 
 /**
  * 错题域（由 DrizzleLearnerRepository 搬迁而来，行为不变）。

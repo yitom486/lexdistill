@@ -1,5 +1,5 @@
 import type { SkillMetric, SkillStatus, LearnerProfileSnapshot, TargetLanguage } from './types.js';
-import { nowIso } from '@study-studio/shared';
+import { nowIso } from '@lexdistill/shared';
 
 /**
  * 根据最新一次练习表现更新技能指标

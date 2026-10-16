@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
-import { initSchema, listContentSegments } from '@study-studio/storage-sqlite';
+import { isOk } from '@lexdistill/shared';
+import { initSchema, listContentSegments } from '@lexdistill/storage-sqlite';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 
 /**

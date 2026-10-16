@@ -5,11 +5,11 @@ import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { BLOCK_KIND_LABELS } from './practice-plan-editor-options.js';
 import { Switch } from '../ui/switch.js';
-import { isTemplateDueOn, buildBalancedPracticeBlocks } from '@study-studio/learning';
+import { isTemplateDueOn, buildBalancedPracticeBlocks } from '@lexdistill/learning';
 import { usePracticeTemplatesQuery, useDeletePracticeTemplateMutation, useStartPracticeRunMutation, useProposeTemplateMutation, useTogglePracticeTemplateMutation, useCopyPracticeTemplateMutation } from '../../queries/useLearnerQueries.js';
 import { PracticePlanEditor } from './PracticePlanEditor.js';
 import { PracticeRunWorkbench } from './PracticeRunWorkbench.js';
-import type { PracticePlanTemplate, PracticeBlockSpec } from '@study-studio/protocol';
+import type { PracticePlanTemplate, PracticeBlockSpec } from '@lexdistill/protocol';
 
 /** 本地日期 YYYY-MM-DD（排程到期判定用用户时区） */
 function todayLocalDate(): string {

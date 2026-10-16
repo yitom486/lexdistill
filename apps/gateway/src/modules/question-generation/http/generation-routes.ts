@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { validator } from 'hono/validator';
-import { BusinessError, isOk } from '@study-studio/shared';
-import { BankAnswerSubmitSchema, CreateGenerationTaskSchema } from '@study-studio/protocol';
+import { BusinessError, isOk } from '@lexdistill/shared';
+import { BankAnswerSubmitSchema, CreateGenerationTaskSchema } from '@lexdistill/protocol';
 import { listPresets, resolvePreset } from '../presets.js';
 import type { GenerationTaskService } from '../service.js';
 import type { GenerationRunManager } from '../run-manager.js';

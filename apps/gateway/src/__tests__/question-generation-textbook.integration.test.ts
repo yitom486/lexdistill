@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import type { Database } from 'bun:sqlite';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { binding, fixture, question } from './question-generation.fixtures.js';
 
 function prepare(sqlite: Database) {

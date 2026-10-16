@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { LessonContent } from '@study-studio/document-model';
+import type { LessonContent } from '@lexdistill/document-model';
 import { WordTutorPanel } from '../WordTutorPanel.js';
 import { QUERY_KEYS } from '../../queries/query-keys.js';
 

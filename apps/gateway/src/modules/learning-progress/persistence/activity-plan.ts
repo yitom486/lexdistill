@@ -8,13 +8,13 @@ import {
   generateId,
   nowIso,
   isOk,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type {
   DailyTaskProgress,
   DailyStudyPlan,
   DailyPlanStepTemplate,
   CourseRouteSnapshot,
-} from '@study-studio/learner-core';
+} from '@lexdistill/learner-core';
 import {
   buildDailyPlanStepTemplates,
   parseCompletedStepIds,
@@ -23,8 +23,8 @@ import {
   appendPracticePlanStep,
   PRACTICE_PLAN_STEP_ID,
   courseUnitPlanStep,
-} from '@study-studio/learner-core';
-import { parsePracticeBlockSpecs } from '@study-studio/learning';
+} from '@lexdistill/learner-core';
+import { parsePracticeBlockSpecs } from '@lexdistill/learning';
 import {
   studyActivityLogs,
   learnerLanguageProfiles,
@@ -33,15 +33,15 @@ import {
   practiceItemAttempts,
   quizAttempts,
   skillMetrics,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '@study-studio/shared';
-import { normalizeTrackLanguage } from '@study-studio/shared';
+import type { TrackLanguage } from '@lexdistill/shared';
+import { normalizeTrackLanguage } from '@lexdistill/shared';
 import {
   ensureLanguageProfile,
   mirrorLanguageProfileToMain,
-} from '@study-studio/storage-sqlite';
-import { getTodayString, getYesterdayString, safeJsonParse } from '@study-studio/shared';
+} from '@lexdistill/storage-sqlite';
+import { getTodayString, getYesterdayString, safeJsonParse } from '@lexdistill/shared';
 
 /**
  * 足迹/计划域（由 DrizzleLearnerRepository 搬迁而来，行为不变）。

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { PracticeBlockSpec, PracticeItemAttempt, PracticePlanRun, PracticePlanTemplate } from '@study-studio/protocol';
+import type { PracticeBlockSpec, PracticeItemAttempt, PracticePlanRun, PracticePlanTemplate } from '@lexdistill/protocol';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
@@ -357,7 +357,7 @@ export interface PracticeRunnerItemDTO {
   itemId: string;
   blockId: string;
   gradingMode: 'AUTO_IMMEDIATE' | 'AI_IMMEDIATE' | 'AI_BATCH';
-  question: import('@study-studio/protocol').GeneratedQuestion;
+  question: import('@lexdistill/protocol').GeneratedQuestion;
 }
 export function usePracticeRunItemsQuery(runId: string | null, userId = DEFAULT_USER_ID) {
   return useQuery<PracticeRunnerItemDTO[]>({

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { isOk } from '@study-studio/shared';
-import { extractZip } from '@study-studio/archive';
+import { isOk } from '@lexdistill/shared';
+import { extractZip } from '@lexdistill/archive';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { analyzeApkg } from '../modules/flashcards/application/apkg-import.js';
 import { buildStoredZip } from '../modules/flashcards/application/apkg-export.js';
@@ -42,8 +42,8 @@ describe('apkg export', () => {
     if (!isOk(back)) return;
     expect(back.value.noteCount).toBe(2);
     expect(back.value.cardCount).toBe(2);
-    expect(back.value.models[0]?.modelName).toBe('Lingua Basic');
-    expect(back.value.decks).toEqual([{ name: 'Lingua Studio', noteCount: 2 }]);
+    expect(back.value.models[0]?.modelName).toBe('LexDistill Basic');
+    expect(back.value.decks).toEqual([{ name: 'LexDistill', noteCount: 2 }]);
 
     const collectionEntry = extractZip(res.value.bytes).find((entry) => entry.path === 'collection.anki2');
     expect(collectionEntry).toBeDefined();

@@ -1,5 +1,5 @@
-import type { BusinessError, Result } from '@study-studio/shared';
-import type { ExerciseGrade, SubmitTextbookExercise, TextbookExerciseAttempt } from '@study-studio/protocol';
+import type { BusinessError, Result } from '@lexdistill/shared';
+import type { ExerciseGrade, SubmitTextbookExercise, TextbookExerciseAttempt } from '@lexdistill/protocol';
 
 export interface TextbookGradeAudit { id: string; adapter: string; model: string; inputSnapshot: string }
 /** Commands are reusable outside the textbook UI. No UI state or provider protocol here. */

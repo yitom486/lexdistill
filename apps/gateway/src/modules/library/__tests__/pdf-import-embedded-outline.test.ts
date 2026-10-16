@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { mapPdfPages } from '../application/pdf-import/pdf-import-service.js';
 import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-runtime.js';
 

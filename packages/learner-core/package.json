@@ -1,14 +1,14 @@
 {
-  "name": "@study-studio/learner-core",
+  "name": "@lexdistill/learner-core",
   "version": "0.1.2",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
-    "@study-studio/flashcards": "workspace:*",
-    "@study-studio/learning-algorithms": "workspace:*",
-    "@study-studio/protocol": "workspace:*",
-    "@study-studio/shared": "workspace:*"
+    "@lexdistill/flashcards": "workspace:*",
+    "@lexdistill/learning-algorithms": "workspace:*",
+    "@lexdistill/protocol": "workspace:*",
+    "@lexdistill/shared": "workspace:*"
   },
   "scripts": {
     "test": "bun test"

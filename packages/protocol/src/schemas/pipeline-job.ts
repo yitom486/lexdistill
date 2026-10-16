@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TextbookLessonStageSchema, TextbookModelActivitySchema } from '@study-studio/document-model';
+import { TextbookLessonStageSchema, TextbookModelActivitySchema } from '@lexdistill/document-model';
 
 /**
  * 整书 AI 流水线并发提炼后台任务状态契约（HTTP 轮询 + SSE 流式推送同源）。

@@ -9,7 +9,7 @@ import type { StudyContentProps } from './study-view.js';
 import { KnowledgeCard } from './KnowledgeCard.js';
 import { MarkdownText } from '../../common/MarkdownText.js';
 import { toast } from 'sonner';
-import type { VocabularyScope } from '@study-studio/protocol';
+import type { VocabularyScope } from '@lexdistill/protocol';
 import { useVocabularyQuery, useCollectVocabularyMutation } from '../../../queries/vocabulary.js';
 
 type Props = StudyContentProps;

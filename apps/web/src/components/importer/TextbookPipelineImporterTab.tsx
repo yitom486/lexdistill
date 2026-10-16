@@ -2,7 +2,7 @@ import { ArrowRight, ArrowLeft, Check, Sparkles, BookOpen, Layers, Bot } from 'l
 import { useState } from 'react';
 import { TextbookImportMonitor } from './monitor/TextbookImportMonitor.js';
 import { DEFAULT_USER_ID } from '../../queries/query-keys.js';
-import type { TextbookAST } from '@study-studio/document-model';
+import type { TextbookAST } from '@lexdistill/document-model';
 import { Button } from '../ui/button.js';
 import { TextbookFileStep } from './TextbookFileStep.js';
 import { TextbookTocStep } from './TextbookTocStep.js';

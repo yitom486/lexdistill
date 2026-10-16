@@ -4,8 +4,8 @@ import {
   isOk,
   type Result,
   BusinessError,
-} from '@study-studio/shared';
-import type { LearningAnalysisReport } from '@study-studio/protocol';
+} from '@lexdistill/shared';
+import type { LearningAnalysisReport } from '@lexdistill/protocol';
 import {
   parseAnalysisJson,
   type AnalysisSnapshot,
@@ -26,7 +26,7 @@ import {
  * - 建议最多 5 条，模型字段透传，返回形状不变。
  */
 
-export const ANALYSIS_SYSTEM_PROMPT = `你是 Lingua Studio 的学习分析助手。
+export const ANALYSIS_SYSTEM_PROMPT = `你是 LexDistill 的学习分析助手。
 基于提供的学习快照，给出可解释、可执行的学习建议。
 严格只返回一个 JSON 对象，不要任何额外文字、不要 markdown 代码块：
 {

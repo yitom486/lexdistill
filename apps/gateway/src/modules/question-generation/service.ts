@@ -1,6 +1,6 @@
-import { BusinessError, generateId } from '@study-studio/shared';
+import { BusinessError, generateId } from '@lexdistill/shared';
 import { CreateGenerationTaskSchema, GenerationRunLimitsSchema,
-  type CreateGenerationTask, type GenerationBinding, type GenerationTaskSnapshot, type GenerationTaskSummary } from '@study-studio/protocol';
+  type CreateGenerationTask, type GenerationBinding, type GenerationTaskSnapshot, type GenerationTaskSummary } from '@lexdistill/protocol';
 import { assertBlueprintFitsConfig } from './blueprint.js';
 import type { GenerationAudioRenderer, QuestionGenerationRepository } from './ports.js';
 import { toStudentPaper, toReviewPaper } from './student-view.js';

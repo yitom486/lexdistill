@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { VocabularyLearningTarget } from '@study-studio/storage-sqlite';
+import type { VocabularyLearningTarget } from '@lexdistill/storage-sqlite';
 
 export interface VocabularyLearningTask {
   id: string;

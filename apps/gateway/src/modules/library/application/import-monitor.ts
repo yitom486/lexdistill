@@ -1,6 +1,6 @@
-import type { AgentEvent, AgentSession } from '@study-studio/agent-runtime';
-import type { ImportEventInput } from '@study-studio/document-model';
-import { logger, nowIso } from '@study-studio/shared';
+import type { AgentEvent, AgentSession } from '@lexdistill/agent-runtime';
+import type { ImportEventInput } from '@lexdistill/document-model';
+import { logger, nowIso } from '@lexdistill/shared';
 import type { ContentRepository } from '../ports.js';
 
 type EventScope = Partial<Pick<ImportEventInput, 'documentId' | 'jobId' | 'nodeId' | 'sessionId' | 'threadId' | 'attemptId' | 'callId'>>;

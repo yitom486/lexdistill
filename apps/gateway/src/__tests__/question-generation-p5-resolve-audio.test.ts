@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { GenerationConfig } from '@study-studio/protocol';
+import type { GenerationConfig } from '@lexdistill/protocol';
 import { resolveGenerationAudio } from '../modules/question-generation/infrastructure/resolve-audio.js';
 
 function configWith(providerId: string): GenerationConfig {

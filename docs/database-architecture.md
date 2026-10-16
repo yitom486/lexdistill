@@ -2,7 +2,7 @@
 
 > 生成方式：逐表对照 `packages/storage-sqlite/src/ddl.ts`（建表 SSOT）、
 > `packages/storage-sqlite/src/schema.ts`（drizzle 类型）、`modules/*/persistence/*.ts`（writer/reader），
-> 行数为例行线上库（`study-studio.db`）快照。
+> 行数为例行线上库（`lexdistill.db`）快照。
 > 旧事实地图不作为当前教材表规范。v37 的新教材内容表有文档及全局词汇外键，当前完整字段与生命周期见 [教材学习内容表](textbook-learning-tables.md)。
 > 详见专题规范：[教材导入架构与数据表设计说明](./textbook-import-architecture.md)。
 > 教材组的旧 AST/派生行说明已被 v37 内容表设计替代；其他章节仍是历史事实地图，行数不代表当前数据库快照。

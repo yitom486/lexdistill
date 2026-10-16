@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { toDetachedArrayBuffer } from './response-bytes.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';

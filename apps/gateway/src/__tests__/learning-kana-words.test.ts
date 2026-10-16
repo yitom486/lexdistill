@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { LearningContentTool } from '../modules/learning-content/public.js';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 
 function seedWord(
   repo: DrizzleLearnerRepository,

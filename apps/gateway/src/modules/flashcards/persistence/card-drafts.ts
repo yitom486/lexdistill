@@ -8,15 +8,15 @@ import {
   generateId,
   nowIso,
   logger,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import {
   buildTermKey,
   recordTermExposure,
 } from '../../dictionary/public.js';
-import { CardTypeSchema, type CardType } from '@study-studio/protocol';
-import { initFsrsState } from '@study-studio/learning-algorithms';
-import { getVisibleDocument, flashcards, collectVocabularyCardInTx } from '@study-studio/storage-sqlite';
+import { CardTypeSchema, type CardType } from '@lexdistill/protocol';
+import { initFsrsState } from '@lexdistill/learning-algorithms';
+import { getVisibleDocument, flashcards, collectVocabularyCardInTx } from '@lexdistill/storage-sqlite';
 
 /**
  * 生词草稿（CardDraft）域：AI/导入提议 → 用户逐字段确认 → 入库成卡。

@@ -5,7 +5,7 @@
  *   调用方只认 `getActiveTtsEngine()`，不对具体引擎产生任何感知（Zero Provider Leak）。
  * - `StubTtsEngine` 另见 `./stub.js`，仅供单测。
  */
-import type { Result, BusinessError } from '@study-studio/shared';
+import type { Result, BusinessError } from '@lexdistill/shared';
 import type { TtsSpeakHandle, TtsSpeakRequest, TtsVoiceDescriptor, TtsTrackLanguage } from './types.js';
 
 export interface TtsEngine {

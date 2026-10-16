@@ -607,7 +607,7 @@ it('韩语轮次：成功空词表不重复拉取，停止后迟到词表隔离�
     return Response.json({});
   }).fetchFn;
   const client = makeClient();
-  const pool = [hangulRow(), hangulRow({ id: 'h2', jamo: 'ㄴ', romanization: 'n', sortOrder: 2 })] as import('@study-studio/protocol').HangulItem[];
+  const pool = [hangulRow(), hangulRow({ id: 'h2', jamo: 'ㄴ', romanization: 'n', sortOrder: 2 })] as import('@lexdistill/protocol').HangulItem[];
   function Harness({ nextPool }: { nextPool: typeof pool }) { hook = useHangulDrill({ pool: nextPool, allHangul: nextPool }); return <p>harness</p>; }
   const render = async (nextPool: typeof pool) => act(async () => { dom!.root.render(<QueryClientProvider client={client}><Harness nextPool={nextPool} /></QueryClientProvider>); });
   try {

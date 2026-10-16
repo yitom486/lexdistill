@@ -1,4 +1,4 @@
-# Lingua Studio - 学习者领域模型规格说明书 (Learner Model Specification)
+# LexDistill - 学习者领域模型规格说明书 (Learner Model Specification)
 
 > **文档版本**：v1.0  
 > **所属包定义**：`packages/learner-core`  

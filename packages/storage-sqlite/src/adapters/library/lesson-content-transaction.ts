@@ -1,6 +1,6 @@
 import { and, eq, max } from 'drizzle-orm';
-import { TextbookLearningContentSchema, type TextbookContentChange, type TextbookLearningContent } from '@study-studio/document-model';
-import { BusinessError, err, ok, translateToBusinessError, type Result } from '@study-studio/shared';
+import { TextbookLearningContentSchema, type TextbookContentChange, type TextbookLearningContent } from '@lexdistill/document-model';
+import { BusinessError, err, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
 import type { DrizzleDb } from '../../connection.js';
 import { textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials } from '../../schema.js';
 import { getBoundChapter, writeTextbookContentInTx, type TextbookScope } from './textbook-content.js';

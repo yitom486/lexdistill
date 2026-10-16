@@ -6,13 +6,13 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { ankiSettings } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
 import {
   ANKI_CONNECT_DEFAULT_ENDPOINT,
   resolveAnkiEndpoint,
-} from '@study-studio/flashcards';
+} from '@lexdistill/flashcards';
 
 /**
  * AnkiConnect 推送开关持久化（默认关闭；读侧永不抛，损坏行回退默认）。

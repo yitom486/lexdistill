@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Bot, Eye, GitCompareArrows, Lightbulb, Mic2, Volume2 } from 'lucide-react';
-import type { KanaExampleWord, KanaItem } from '@study-studio/protocol';
+import type { KanaExampleWord, KanaItem } from '@lexdistill/protocol';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../ui/dialog.js';

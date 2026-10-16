@@ -8,7 +8,7 @@ import {
   useGradeSingleMutation,
   useFinalizePracticeRunMutation,
 } from '../queries/useLearnerQueries.js';
-import type { PracticeItemAttempt, GeneratedQuestion } from '@study-studio/protocol';
+import type { PracticeItemAttempt, GeneratedQuestion } from '@lexdistill/protocol';
 
 export interface PracticeRunnerItem {
   itemId: string;

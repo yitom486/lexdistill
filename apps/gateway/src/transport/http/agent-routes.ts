@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
-import { isOk, BusinessError } from '@study-studio/shared';
+import { isOk, BusinessError } from '@lexdistill/shared';
 import { clearAcpProvider, getAcpProviderStatus, saveAcpProvider } from '@yitom/acp-client';
 import { formatBusinessErrorResponse } from '../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../composition/gateway-deps.js';

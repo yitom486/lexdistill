@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { listProviders } from 'gemini-tts-studio/server';
-import { TTS_PREVIEW_TEXTS } from '@study-studio/speech';
+import { TTS_PREVIEW_TEXTS } from '@lexdistill/speech';
 
 /**
  * TTS 前端配置 SSOT 出口：默认服务取包注册表首项（包变更顺序/增减厂商，

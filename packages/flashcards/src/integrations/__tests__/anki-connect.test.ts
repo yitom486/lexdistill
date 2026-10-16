@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import {
   createAnkiClient,
   getAnkiVersion,
@@ -93,7 +93,7 @@ describe('anki-connect transport', () => {
     const log: string[] = [];
     let createdModel: unknown;
     const stub = makeStub(log, {
-      deckNames: () => ['Lingua Studio'],
+      deckNames: () => ['LexDistill'],
       modelNames: () => [],
       createModel: (p) => {
         createdModel = p;
@@ -101,11 +101,11 @@ describe('anki-connect transport', () => {
       },
     });
     const client = createAnkiClient(undefined, stub);
-    const d = await ensureAnkiDeck(client, 'Lingua Studio');
+    const d = await ensureAnkiDeck(client, 'LexDistill');
     expect(isOk(d)).toBe(true);
     expect(log.includes('anki:createDeck')).toBe(false);
     const m = await ensureAnkiModel(client, {
-      modelName: 'Lingua Basic',
+      modelName: 'LexDistill Basic',
       fields: ['Expression', 'Meaning'],
       css: '.card {}',
       front: 'F',

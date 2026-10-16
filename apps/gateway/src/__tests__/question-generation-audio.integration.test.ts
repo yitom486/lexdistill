@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
-import type { BankSubmitReceipt } from '@study-studio/protocol';
+import { isOk } from '@lexdistill/shared';
+import type { BankSubmitReceipt } from '@lexdistill/protocol';
 import type { TTSGenerateRequest, TTSProvider } from 'gemini-tts-studio/server';
 import { createGenerationTtsRenderer } from '../modules/question-generation/public.js';
 import { binding, config, fixture, listening } from './question-generation.fixtures.js';

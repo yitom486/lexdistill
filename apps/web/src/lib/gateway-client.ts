@@ -4,8 +4,8 @@ import {
   type WsEventType,
   type WsEnvelope,
   type GeneratedQuestion,
-} from '@study-studio/protocol';
-import { generateId } from '@study-studio/shared';
+} from '@lexdistill/protocol';
+import { generateId } from '@lexdistill/shared';
 import { useGatewayStore } from '../stores/useGatewayStore.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';

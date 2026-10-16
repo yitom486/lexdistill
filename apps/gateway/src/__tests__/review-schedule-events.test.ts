@@ -3,9 +3,9 @@ import { Database } from 'bun:sqlite';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { initSchema, runMigrations } from '@study-studio/storage-sqlite';
-import { SCHEMA_MIGRATIONS } from '@study-studio/storage-sqlite';
-import { reviewScheduleEvents } from '@study-studio/storage-sqlite';
+import { initSchema, runMigrations } from '@lexdistill/storage-sqlite';
+import { SCHEMA_MIGRATIONS } from '@lexdistill/storage-sqlite';
+import { reviewScheduleEvents } from '@lexdistill/storage-sqlite';
 
 const dbs: Database[] = [];
 afterEach(() => {

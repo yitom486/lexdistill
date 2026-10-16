@@ -1,4 +1,4 @@
-import { toUiQuizType, type GeneratedQuestion } from '@study-studio/protocol';
+import { toUiQuizType, type GeneratedQuestion } from '@lexdistill/protocol';
 import type { QuizQuestionItem } from '../models/learning.js';
 
 export function toQuizQuestionItem(question: GeneratedQuestion): QuizQuestionItem {

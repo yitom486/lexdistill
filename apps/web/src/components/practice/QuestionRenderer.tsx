@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '../ui/button.js';
 import { ReadingPassagePanel } from './ReadingPassagePanel.js';
 import { DictationAnswer } from './DictationAnswer.js';
-import type { GeneratedQuestion } from '@study-studio/protocol';
+import type { GeneratedQuestion } from '@lexdistill/protocol';
 
 type GradingMode = 'AUTO_IMMEDIATE' | 'AI_IMMEDIATE' | 'AI_BATCH';
 interface Props {

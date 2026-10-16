@@ -2,7 +2,7 @@ import {
   type WsEnvelope,
   WsEventTypes,
   UpdateLearnerProfileSchema,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import {
   ok,
   err,
@@ -10,8 +10,8 @@ import {
   BusinessError,
   generateId,
   isOk,
-} from '@study-studio/shared';
-import type { LearnerRepository } from '@study-studio/learner-core';
+} from '@lexdistill/shared';
+import type { LearnerRepository } from '@lexdistill/learner-core';
 
 export type LearningProgressWebSocketRepository = Pick<
   LearnerRepository,

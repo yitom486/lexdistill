@@ -2,7 +2,7 @@
  * 教材导入器示例 AST（新编日语样例）。
  * 仅用于「载入样例 / 下载模版」；真实导入走用户 JSON + parseTextbookAST。
  */
-import type { TextbookAST } from '@study-studio/document-model';
+import type { TextbookAST } from '@lexdistill/document-model';
 
 export const SAMPLE_TEXTBOOK_JSON: TextbookAST = {
   id: 'shinpen-nihongo-1',

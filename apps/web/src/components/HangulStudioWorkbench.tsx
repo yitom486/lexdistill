@@ -4,7 +4,7 @@ import { sound } from '../utils/audio.js';
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
 import { useCurriculumHangulQuery } from '../queries/useLearnerQueries.js';
-import type { HangulItem } from '@study-studio/protocol';
+import type { HangulItem } from '@lexdistill/protocol';
 import type { AiTutorContext } from './AiTutorDrawer.js';
 import { useHangulDrill } from './hangul/useHangulDrill.js';
 import { HangulMatrix } from './hangul/HangulMatrix.js';

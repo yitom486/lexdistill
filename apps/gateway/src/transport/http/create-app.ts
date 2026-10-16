@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { createTtsRoutes } from './tts-routes.js';
 import { cors } from 'hono/cors';
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 import { formatBusinessErrorResponse } from '../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../composition/gateway-deps.js';
 import { createHealthRoutes } from './health-routes.js';

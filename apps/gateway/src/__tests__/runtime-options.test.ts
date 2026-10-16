@@ -3,7 +3,7 @@ import type { AcpClient } from '@yitom/acp-client';
 import { clearRuntimeOptionsCacheForTest, getAgentRuntimeOptions } from '../runtime/router/runtime-options.js';
 import { SessionToolBridge } from '../runtime/mcp/session-tool-bridge.js';
 import { AcpAdapterPool, acpClientHonorsCustomEnv } from '../infrastructure/acp/acp-adapter-pool.js';
-import { ok } from '@study-studio/shared';
+import { ok } from '@lexdistill/shared';
 
 describe('getAgentRuntimeOptions', () => {
   it('未知运行时如实返回空＋error，不抛；二次命中缓存', async () => {

@@ -1,5 +1,5 @@
 import { GenerationBlueprintSchema, GenerationConfigSchema,
-  type BankCategory, type GenerationBlueprint, type GenerationConfig, type GenerationListeningMode } from '@study-studio/protocol';
+  type BankCategory, type GenerationBlueprint, type GenerationConfig, type GenerationListeningMode } from '@lexdistill/protocol';
 
 /**
  * P3 单一快速预设“综合练习”（P4 再扩展版本化预设族）。

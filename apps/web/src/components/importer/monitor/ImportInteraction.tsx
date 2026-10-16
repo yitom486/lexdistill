@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ImportEvent, ContentDirectoryNode } from '@study-studio/document-model';
+import type { ImportEvent, ContentDirectoryNode } from '@lexdistill/document-model';
 import { ImportEventDetail } from './ImportEventDetail.js';
 import { ImportToolCall } from './ImportToolCall.js';
 

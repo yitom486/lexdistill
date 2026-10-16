@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
-import type { PracticeBlockSpec, PracticeBlockKind, GradingMode } from '@study-studio/protocol';
+import type { PracticeBlockSpec, PracticeBlockKind, GradingMode } from '@lexdistill/protocol';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select.js';
 import { Slider } from '../ui/slider.js';
 import { Button } from '../ui/button.js';

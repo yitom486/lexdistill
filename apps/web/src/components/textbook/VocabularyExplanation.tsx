@@ -1,4 +1,4 @@
-import type { LessonContent } from '@study-studio/document-model';
+import type { LessonContent } from '@lexdistill/document-model';
 import { ContentExamples } from './ContentExamples.js';
 import { ContentSource } from './ContentSource.js';
 

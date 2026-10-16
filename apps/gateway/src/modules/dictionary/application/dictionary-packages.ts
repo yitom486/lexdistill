@@ -5,11 +5,11 @@ import {
   ok,
   type Result,
   translateToBusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   parseOewnXml,
   type ParsedEntry,
-} from '@study-studio/lexicon';
+} from '@lexdistill/lexicon';
 
 // ---------------------------------------------------------------------------
 // P3-A：词典包 manifest/catalog（受类型约束的包元数据目录）

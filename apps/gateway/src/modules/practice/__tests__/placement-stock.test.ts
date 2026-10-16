@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { blueprintFor } from '@study-studio/learning';
+import { blueprintFor } from '@lexdistill/learning';
 
 /**
  * 蓝图库存覆盖：每个目标档的每组，去重可用题数必须 ≥ 应考题数。

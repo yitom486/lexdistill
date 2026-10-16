@@ -1,5 +1,5 @@
-import type { BusinessError, Result } from '@study-studio/shared';
-import type { StudyGateSource } from '@study-studio/learner-core';
+import type { BusinessError, Result } from '@lexdistill/shared';
+import type { StudyGateSource } from '@lexdistill/learner-core';
 import type { ContentRepository } from '../library/ports.js';
 import type { LexiconRepository } from '../dictionary/ports.js';
 import type { LearningRepository } from '../practice/ports.js';

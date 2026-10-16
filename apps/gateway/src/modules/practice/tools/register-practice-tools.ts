@@ -1,6 +1,6 @@
-import type { ToolRegistry } from '@study-studio/tool-core';
-import type { LearnerRepository } from '@study-studio/learner-core';
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import type { ToolRegistry } from '@lexdistill/tool-core';
+import type { LearnerRepository } from '@lexdistill/learner-core';
+import type { AgentAdapter } from '@lexdistill/agent-runtime';
 import { GenerateAdaptiveQuizTool } from './generate-adaptive-quiz.js';
 import { GradeSubjectiveQuizTool } from './grade-subjective-quiz.js';
 import { LearningAssessTool } from './learning-assess-tool.js';

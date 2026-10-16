@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Hono } from 'hono';
-import { isOk } from '@study-studio/shared';
-import type { DocumentItem } from '@study-studio/protocol';
+import { isOk } from '@lexdistill/shared';
+import type { DocumentItem } from '@lexdistill/protocol';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { createLibraryRoutes, classifyDocumentAstJson } from '../modules/library/http/library-routes.js';
 

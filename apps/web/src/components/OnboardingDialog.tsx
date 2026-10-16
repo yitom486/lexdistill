@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from './ui/dialog.js';
 import { Button } from './ui/button.js';
-import type { LearnerLevel } from '@study-studio/protocol';
+import type { LearnerLevel } from '@lexdistill/protocol';
 
 type Track = 'ja' | 'en' | 'ko';
 

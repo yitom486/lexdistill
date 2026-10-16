@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ContentDirectoryNodeSchema, TextbookPipelineSettingsSchema, type ImportEvent } from '@study-studio/document-model';
+import { ContentDirectoryNodeSchema, TextbookPipelineSettingsSchema, type ImportEvent } from '@lexdistill/document-model';
 import { useImportEventDetail } from '../../../queries/textbook-import-monitor.js';
 
 const snapshotSchema = z.object({ directory: z.array(ContentDirectoryNodeSchema), settings: TextbookPipelineSettingsSchema });

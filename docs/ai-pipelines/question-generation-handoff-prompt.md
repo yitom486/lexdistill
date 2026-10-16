@@ -4,7 +4,7 @@
 
 ---
 
-你正在维护 Lingua Studio，工作区为 `D:\project\rust\tauri\study-studio`，产品只交付 Tauri 桌面端。
+你正在维护 LexDistill，工作区为 `D:\project\rust\tauri\study-studio`，产品只交付 Tauri 桌面端。
 
 用户决定的顺序是：先完成受程序约束的固定基础，再接通出题、作答与记录闭环，最后开放题型组合、主题、难度建议和提示词实验。不要从大量模板、复杂用户画像或新框架开始。
 

@@ -6,7 +6,7 @@ import {
   translateToBusinessError,
   generateId,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type { Database } from 'bun:sqlite';
 import { getVisibleDocument } from '../library/document-visibility.js';
 

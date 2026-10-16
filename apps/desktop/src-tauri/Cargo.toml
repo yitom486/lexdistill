@@ -1,11 +1,11 @@
 [package]
-name = "study-studio-desktop"
+name = "lexdistill-desktop"
 version = "0.1.2"
-description = "Lingua Studio Desktop Shell"
+description = "LexDistill Desktop Shell"
 edition = "2021"
 
 [lib]
-name = "study_studio_desktop_lib"
+name = "lexdistill_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

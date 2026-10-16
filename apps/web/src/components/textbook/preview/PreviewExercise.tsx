@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
-import type { ExerciseSnapshot, ExerciseAnswer, SubmitTextbookExercise, TextbookExerciseAttempt } from '@study-studio/protocol';
-import type { TextbookLearningContent } from '@study-studio/document-model';
-import { translateToBusinessError } from '@study-studio/shared';
+import type { ExerciseSnapshot, ExerciseAnswer, SubmitTextbookExercise, TextbookExerciseAttempt } from '@lexdistill/protocol';
+import type { TextbookLearningContent } from '@lexdistill/document-model';
+import { translateToBusinessError } from '@lexdistill/shared';
 import { Check, RotateCcw } from 'lucide-react';
 import { Button } from '../../ui/button.js';
 import { Badge } from '../../ui/badge.js';

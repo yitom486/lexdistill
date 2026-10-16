@@ -1,4 +1,4 @@
-import type { Flashcard, GeneratedQuestion, PracticeBlockSpec } from '@study-studio/protocol';
+import type { Flashcard, GeneratedQuestion, PracticeBlockSpec } from '@lexdistill/protocol';
 
 /**
  * M7-16 自 Gateway `practice/application/practice-assembly.ts` 迁入

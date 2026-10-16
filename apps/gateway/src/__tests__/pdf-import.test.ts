@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { gzipSync } from 'node:zlib';
-import { detectDocScript, markdownToAst } from '@study-studio/content';
+import { detectDocScript, markdownToAst } from '@lexdistill/content';
 import {
   extractHeadingsFromMarkdown,
   extractTocEntries,
-} from '@study-studio/content';
+} from '@lexdistill/content';
 import {
   appendPdfToDocument,
   convertPdfToAst,
@@ -12,12 +12,12 @@ import {
   mapPdfPages,
 } from '../modules/library/application/pdf-import/pdf-import-service.js';
 import { readLocalPdfFile } from '../modules/library/application/pdf-import/local-file.js';
-import type { DocumentItem } from '@study-studio/protocol';
-import { extractTarGz, extractZip } from '@study-studio/archive';
+import type { DocumentItem } from '@lexdistill/protocol';
+import { extractTarGz, extractZip } from '@lexdistill/archive';
 import { assertArtifactUrlAllowed, currentRuntimePlatform } from '../infrastructure/pdf-runtime/pdf-artifacts.js';
 import { napiDirName } from '../infrastructure/pdf-runtime/pdf-runtime.js';
 import { fetchRuntimeArtifact } from '../infrastructure/pdf-runtime/pdf-runtime-provision.js';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 
 const JA_MD = `# 第 1 课
 李さん：はじめまして。李です。
@@ -308,20 +308,20 @@ describe('importPdfDocument', () => {
       {
         saveDocument: async (doc) => {
           saved.push(doc);
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok(doc);
         },
         // 显式 atomic fake（import 必经 canonical 写入口）
         saveCanonicalAst: async (docBase, book) => {
           const full = { ...docBase, astJson: JSON.stringify(book) };
           saved.push(full);
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok(full);
         },
         // P2-2a recorder：断言提交后显式调用（成功与否不挡导入由服务保证）。
         projectLinesSegments: async (userId: string, documentId: string) => {
           projected.push({ userId, documentId });
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ inserted: 1, skipped: 0 });
         },
         loadInspector: stubInspector({ pdfType: 'TextBased', pageCount: 1, markdown: JA_MD }),
@@ -368,20 +368,20 @@ describe('appendPdfToDocument（接力）', () => {
   };
   const deps = {
     saveDocument: async (doc: typeof baseDoc) => {
-      const { ok } = await import('@study-studio/shared');
+      const { ok } = await import('@lexdistill/shared');
       return ok(doc);
     },
     // 显式 atomic fake（append 必经 canonical 写入口，不退化）
     saveCanonicalAst: async (docBase: Omit<typeof baseDoc, 'astJson'>, book: unknown) => {
-      const { ok } = await import('@study-studio/shared');
+      const { ok } = await import('@lexdistill/shared');
       return ok({ ...docBase, astJson: JSON.stringify(book) });
     },
     getDocument: async () => {
-      const { ok } = await import('@study-studio/shared');
+      const { ok } = await import('@lexdistill/shared');
       return ok({ ...baseDoc });
     },
     projectLinesSegments: async (_userId: string, _documentId: string) => {
-      const { ok } = await import('@study-studio/shared');
+      const { ok } = await import('@lexdistill/shared');
       return ok({ inserted: 0, skipped: 0 });
     },
     loadInspector: stubInspector({ pdfType: 'TextBased', pageCount: 2, markdown: '李さん：はじめまして。' }),
@@ -406,7 +406,7 @@ describe('appendPdfToDocument（接力）', () => {
   test('别人的文档 / 无 AST 接力拒绝', async () => {
     const other = await appendPdfToDocument(
       { ...deps, getDocument: async () => {
-        const { ok } = await import('@study-studio/shared');
+        const { ok } = await import('@lexdistill/shared');
         return ok({ ...baseDoc, userId: 'someone' });
       } },
       { userId: 'u1', documentId: 'doc1', filename: 'p.pdf', bytes: PDF_HEAD }
@@ -414,7 +414,7 @@ describe('appendPdfToDocument（接力）', () => {
     expect(other.ok).toBe(false);
     const noAst = await appendPdfToDocument(
       { ...deps, getDocument: async () => {
-        const { ok } = await import('@study-studio/shared');
+        const { ok } = await import('@lexdistill/shared');
         const { astJson: _drop, ...rest } = baseDoc;
         void _drop;
         return ok(rest);

@@ -1,4 +1,4 @@
-import { resolveAgentFirstMessage, type AgentAdapter } from '@study-studio/agent-runtime';
+import { resolveAgentFirstMessage, type AgentAdapter } from '@lexdistill/agent-runtime';
 import {
   BusinessError,
   err,
@@ -9,10 +9,10 @@ import {
   generateId,
   nowIso,
   type Result,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { z } from 'zod';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { buildTermKey } from '@study-studio/storage-sqlite';
+import { buildTermKey } from '@lexdistill/storage-sqlite';
 
 /**
  * 词条例句库（AI 按需生成 + 永久缓存，供讲透卡/练习复用）。

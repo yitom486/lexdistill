@@ -11,7 +11,7 @@ import {
   readStoredAcpProvider,
 } from '@yitom/acp-client';
 import { join } from 'node:path';
-import { BusinessError, err, ok, type Result } from '@study-studio/shared';
+import { BusinessError, err, ok, type Result } from '@lexdistill/shared';
 import { localCodexRuntime } from '../acp/acp-adapter-pool.js';
 
 export interface AcpPoolAgentSpec {

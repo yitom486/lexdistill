@@ -4,10 +4,10 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, type Result, BusinessError } from '@study-studio/shared';
+} from '@lexdistill/tool-core';
+import { ok, type Result, BusinessError } from '@lexdistill/shared';
 import type { ContentRepository } from '../ports.js';
-import { KNOWLEDGE_POINT_KINDS } from '@study-studio/storage-sqlite';
+import { KNOWLEDGE_POINT_KINDS } from '@lexdistill/storage-sqlite';
 
 export const LibraryKnowledgePointSchema = z.object({
   concept: z.string().min(1).max(200).describe('知识点概念（归一后的术语或规则名，如“に vs で”）'),

@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
-import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
-import { planTextbookTasks } from '@study-studio/document-model';
+import type { TextbookPipelineJobSnapshot } from '@lexdistill/protocol';
+import { planTextbookTasks } from '@lexdistill/document-model';
 import { useTextbookLessonSlotsQuery } from '../../queries/textbooks-annotations.js';
 import { useCancelPipelineJobMutation } from '../../queries/pipeline-jobs.js';
 import { useImportMonitorQuery } from '../../queries/textbook-import-monitor.js';

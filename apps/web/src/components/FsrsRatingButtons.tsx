@@ -1,5 +1,5 @@
 import React from 'react';
-import type { CardReviewRating } from '@study-studio/protocol';
+import type { CardReviewRating } from '@lexdistill/protocol';
 import { cn } from '../lib/utils.js';
 
 interface FsrsRatingButtonsProps {

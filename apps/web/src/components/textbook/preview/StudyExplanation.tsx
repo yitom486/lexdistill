@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import type { TextbookLearningContent } from '@study-studio/document-model';
+import type { TextbookLearningContent } from '@lexdistill/document-model';
 import { Lightbulb, Sparkles, X } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible.js';
 import { Button, buttonVariants } from '../../ui/button.js';

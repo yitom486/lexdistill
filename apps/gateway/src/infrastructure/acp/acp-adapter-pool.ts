@@ -11,9 +11,9 @@ import {
   readStoredAcpProvider,
 } from '@yitom/acp-client';
 import { discoverThinking, resolveThinkingModelId } from '../../runtime/router/model-thinking.js';
-import { BusinessError } from '@study-studio/shared';
-import { AcpAdapter } from '@study-studio/agent-runtime';
-import type { AcpAdapterOptions } from '@study-studio/agent-runtime';
+import { BusinessError } from '@lexdistill/shared';
+import { AcpAdapter } from '@lexdistill/agent-runtime';
+import type { AcpAdapterOptions } from '@lexdistill/agent-runtime';
 import type { SessionToolBridge } from '../../runtime/mcp/session-tool-bridge.js';
 import { getAgentRuntimeOptions, type AgentRuntimeOptions } from '../../runtime/router/runtime-options.js';
 
@@ -114,7 +114,7 @@ export class AcpAdapterPool {
       createClient: (id) => new AcpClient({
         runtime: id,
         workspaceRoot: this.deps.workspaceRoot ?? process.cwd(),
-        clientInfo: { name: 'lingua-studio-gateway-probe', version: '1.0.0' },
+        clientInfo: { name: 'lexdistill-gateway-probe', version: '1.0.0' },
         callbacks: {},
       }),
     }, opts?.model ? { model: opts.model } : undefined);
@@ -147,7 +147,7 @@ export class AcpAdapterPool {
       createClient: () => new AcpClient({
         runtime: (local ?? 'codex-acp') as never,
         workspaceRoot,
-        clientInfo: { name: 'lingua-studio-gateway-probe', version: '1.0.0' },
+        clientInfo: { name: 'lexdistill-gateway-probe', version: '1.0.0' },
         env,
         callbacks: {},
       }),
@@ -198,7 +198,7 @@ export class AcpAdapterPool {
     return new AcpAdapter(this.baseOptions((callbacks) => new AcpClient({
       runtime: (local ?? runtimeId) as never,
       workspaceRoot: this.deps.workspaceRoot ?? process.cwd(),
-      clientInfo: { name: 'lingua-studio-gateway', version: '1.0.0' },
+      clientInfo: { name: 'lexdistill-gateway', version: '1.0.0' },
       callbacks: acpCallbacks(callbacks),
     })));
   }
@@ -219,7 +219,7 @@ export class AcpAdapterPool {
       return new AcpClient({
         runtime: (local ?? 'codex-acp') as never,
         workspaceRoot: this.deps.workspaceRoot ?? process.cwd(),
-        clientInfo: { name: 'lingua-studio-gateway', version: '1.0.0' },
+        clientInfo: { name: 'lexdistill-gateway', version: '1.0.0' },
         env: buildCustomProviderSpawnEnv(stored, stored.apiKey, codexHome),
         callbacks: acpCallbacks(callbacks),
       });

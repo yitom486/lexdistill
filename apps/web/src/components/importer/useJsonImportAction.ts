@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import type { TextbookAST } from '@study-studio/document-model';
+import type { TextbookAST } from '@lexdistill/document-model';
 import type { TextbookBook } from '../../models/textbook.js';
 import { convertAstToTextbookBook, extractFsrsCardsFromAst } from './textbook-converter.js';
 type Card = { id?: string; front: string; back: string; category: string; prompt: string };

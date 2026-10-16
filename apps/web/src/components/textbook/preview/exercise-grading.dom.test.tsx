@@ -1,9 +1,9 @@
 import { afterEach, expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TextbookASTSchema } from '@study-studio/document-model';
-import type { AgentAdapter, AgentSession, CreateSessionOptions } from '@study-studio/agent-runtime';
-import { BusinessError, err, ok } from '@study-studio/shared';
+import { TextbookASTSchema } from '@lexdistill/document-model';
+import type { AgentAdapter, AgentSession, CreateSessionOptions } from '@lexdistill/agent-runtime';
+import { BusinessError, err, ok } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../../../../../gateway/src/runtime/gateway-runtime.js';
 import { createTextbookPracticeRoutes } from '../../../../../gateway/src/modules/practice/http/textbook-practice-routes.js';

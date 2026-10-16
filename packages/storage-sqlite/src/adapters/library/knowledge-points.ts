@@ -7,7 +7,7 @@ import {
   translateToBusinessError,
   generateId,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 
 /**
  * 目录挂载蒸馏点（v30 knowledge_points）。

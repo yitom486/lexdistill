@@ -1,18 +1,18 @@
 import { eq } from 'drizzle-orm';
-import { localDictionaryEntries, dictionaryTermMeta } from '@study-studio/storage-sqlite';
+import { localDictionaryEntries, dictionaryTermMeta } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import {
   resolveCardSource as resolveCardSourceUseCase,
   type ResolvableCard as ResolvableCardIn,
   type ResolvedCardSource as ResolvedCardSourceOut,
-} from '@study-studio/flashcards';
+} from '@lexdistill/flashcards';
 
 /**
- * M7-11 生词卡来源薄 adapter：业务映射已迁入 `@study-studio/flashcards`，
+ * M7-11 生词卡来源薄 adapter：业务映射已迁入 `@lexdistill/flashcards`，
  * 此处只做 Drizzle 查询及结构化映射，再调用包内用例。
  * 保留既有公开签名，`anki-push` 与 `apkg-export` 无需修改。
  */
-export type { ResolvableCard, ResolvedCardSource } from '@study-studio/flashcards';
+export type { ResolvableCard, ResolvedCardSource } from '@lexdistill/flashcards';
 
 export async function resolveCardSourceEntry(
   deps: RepoDeps,

@@ -4,15 +4,15 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, err, isOk, type Result, BusinessError } from '@study-studio/shared';
-import type { LearnerRepository } from '@study-studio/learner-core';
+} from '@lexdistill/tool-core';
+import { ok, err, isOk, type Result, BusinessError } from '@lexdistill/shared';
+import type { LearnerRepository } from '@lexdistill/learner-core';
 import type {
   PracticePlanRun,
   PracticeItemAttempt,
   PracticeBlockSpec,
-} from '@study-studio/protocol';
-import { PracticeBlockSpecSchema } from '@study-studio/protocol';
+} from '@lexdistill/protocol';
+import { PracticeBlockSpecSchema } from '@lexdistill/protocol';
 import { summarizePracticeRun, type RunSummaryReport } from '../application/practice-summary.js';
 import { submitObjectiveItem } from '../application/submit-objective-item.js';
 

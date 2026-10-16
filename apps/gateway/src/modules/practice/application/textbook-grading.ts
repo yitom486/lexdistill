@@ -1,9 +1,9 @@
-import { resolveAgentFirstMessage, type AgentAdapter, type AgentEvent, type AgentSession } from '@study-studio/agent-runtime';
-import type { LearnerRepository, TextbookPracticeRepository, TextbookGradeAudit } from '@study-studio/learner-core';
-import { TextbookExerciseAttemptSchema, type ExerciseAnswer, type ExerciseSnapshot, type SubmitTextbookExercise, type TextbookExerciseAttempt } from '@study-studio/protocol';
-import { DEFAULT_TEXTBOOK_PIPELINE_SETTINGS } from '@study-studio/document-model';
-import { BusinessError, err, ok, generateId, nowIso, translateToBusinessError, type Result } from '@study-studio/shared';
-import type { ToolDefinition } from '@study-studio/tool-core';
+import { resolveAgentFirstMessage, type AgentAdapter, type AgentEvent, type AgentSession } from '@lexdistill/agent-runtime';
+import type { LearnerRepository, TextbookPracticeRepository, TextbookGradeAudit } from '@lexdistill/learner-core';
+import { TextbookExerciseAttemptSchema, type ExerciseAnswer, type ExerciseSnapshot, type SubmitTextbookExercise, type TextbookExerciseAttempt } from '@lexdistill/protocol';
+import { DEFAULT_TEXTBOOK_PIPELINE_SETTINGS } from '@lexdistill/document-model';
+import { BusinessError, err, ok, generateId, nowIso, translateToBusinessError, type Result } from '@lexdistill/shared';
+import type { ToolDefinition } from '@lexdistill/tool-core';
 import { SubmitExerciseGradeTool, submitGradeAttempt, type GradeBinding } from '../tools/submit-exercise-grade.js';
 
 export const isSubjectiveExercise = (type: string) => ['TRANSLATION','SHORT_ANSWER','WRITING'].includes(type);

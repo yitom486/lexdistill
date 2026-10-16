@@ -1,18 +1,18 @@
 {
-  "name": "@study-studio/storage-sqlite",
+  "name": "@lexdistill/storage-sqlite",
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
-    "@study-studio/content": "workspace:*",
-    "@study-studio/document-model": "workspace:*",
-    "@study-studio/flashcards": "workspace:*",
-    "@study-studio/learner-core": "workspace:*",
-    "@study-studio/learning": "workspace:*",
-    "@study-studio/learning-algorithms": "workspace:*",
-    "@study-studio/protocol": "workspace:*",
-    "@study-studio/shared": "workspace:*",
+    "@lexdistill/content": "workspace:*",
+    "@lexdistill/document-model": "workspace:*",
+    "@lexdistill/flashcards": "workspace:*",
+    "@lexdistill/learner-core": "workspace:*",
+    "@lexdistill/learning": "workspace:*",
+    "@lexdistill/learning-algorithms": "workspace:*",
+    "@lexdistill/protocol": "workspace:*",
+    "@lexdistill/shared": "workspace:*",
     "drizzle-orm": "^0.45.2"
   },
   "scripts": {

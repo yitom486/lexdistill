@@ -1,7 +1,7 @@
 import React from 'react';
 import { Upload, Download, FileText, CheckCircle2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseTextbookAST, type TextbookAST } from '@study-studio/document-model';
+import { parseTextbookAST, type TextbookAST } from '@lexdistill/document-model';
 import { SAMPLE_TEXTBOOK_JSON } from '../../fixtures/textbook-sample-ast.js';
 import { getPlatform } from '../../platform/capabilities.js';
 import { sound } from '../../utils/audio.js';
@@ -35,7 +35,7 @@ export function TextbookJsonImporterTab({
     sound.playClick();
     getPlatform()
       .downloadFile({
-        filename: 'study-studio-textbook-template.json',
+        filename: 'lexdistill-textbook-template.json',
         content: JSON.stringify(SAMPLE_TEXTBOOK_JSON, null, 2),
         mimeType: 'application/json',
       })

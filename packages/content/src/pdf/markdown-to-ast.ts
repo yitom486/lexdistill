@@ -1,6 +1,6 @@
-import { ok, err, BusinessError, type Result } from '@study-studio/shared';
-import type { StructureClass } from '@study-studio/protocol';
-import type { TextbookAST } from '@study-studio/document-model';
+import { ok, err, BusinessError, type Result } from '@lexdistill/shared';
+import type { StructureClass } from '@lexdistill/protocol';
+import type { TextbookAST } from '@lexdistill/document-model';
 import type { PageHeading, TocEntry } from './extract-headings.js';
 
 /** M5.1 起家在 content/src/pdf（前身 M8-3 纯规则抽取；行为不变，ID 生成口径保留）。 */

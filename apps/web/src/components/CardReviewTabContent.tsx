@@ -1,6 +1,6 @@
 import React from 'react';
 import { Lightbulb } from 'lucide-react';
-import type { CardReviewRating, VocabularyEntry } from '@study-studio/protocol';
+import type { CardReviewRating, VocabularyEntry } from '@lexdistill/protocol';
 import type { AnkiCardFormatInfo } from '../queries/useLearnerQueries.js';
 import type { SupportedLanguage } from '../utils/audio.js';
 import type { StudyCardItem } from '../models/learning.js';

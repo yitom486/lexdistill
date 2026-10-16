@@ -7,13 +7,13 @@ import {
   generateId,
   nowIso,
   inferLanguageFromSkillId,
-} from '@study-studio/shared';
-import { recordSkillAttempt } from '@study-studio/learning';
-import type { QuizGradingResult, QuizQuestionType } from '@study-studio/protocol';
+} from '@lexdistill/shared';
+import { recordSkillAttempt } from '@lexdistill/learning';
+import type { QuizGradingResult, QuizQuestionType } from '@lexdistill/protocol';
 import {
   createMistakeEntry,
   type LearnerRepository,
-} from '@study-studio/learner-core';
+} from '@lexdistill/learner-core';
 
 export interface SubmitPracticeAttemptInput {
   attemptId?: string;

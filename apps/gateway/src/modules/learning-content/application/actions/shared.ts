@@ -1,10 +1,10 @@
-import type { GeneratedQuestion } from '@study-studio/protocol';
-import { ok, isOk, nowIso, type Result, type BusinessError } from '@study-studio/shared';
+import type { GeneratedQuestion } from '@lexdistill/protocol';
+import { ok, isOk, nowIso, type Result, type BusinessError } from '@lexdistill/shared';
 import type { LearningContentCollectionRepository, LearningContentRepository, TemplateRow } from '../../ports.js';
 import {
   inferLanguageFromSkillId,
   normalizeTrackLanguage,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type { LearningContentInput, LearningContentOutput, LearningContentContext } from '../../contracts.js';
 
 /** Learner-facing Chinese copy kept as unicode escapes to avoid editor encoding corruption. */

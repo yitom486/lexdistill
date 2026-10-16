@@ -1,18 +1,18 @@
-import { resolveAgentFirstMessage, type AgentAdapter } from '@study-studio/agent-runtime';
-import { buildAnalysisSnapshot as buildAnalysisSnapshotUseCase } from '@study-studio/learning';
-import { type LearnerRepository } from '@study-studio/learner-core';
+import { resolveAgentFirstMessage, type AgentAdapter } from '@lexdistill/agent-runtime';
+import { buildAnalysisSnapshot as buildAnalysisSnapshotUseCase } from '@lexdistill/learning';
+import { type LearnerRepository } from '@lexdistill/learner-core';
 import type {
   LearningAnalysisReport,
-} from '@study-studio/protocol';
-import { ok, err, isOk, type Result, BusinessError, translateToBusinessError, generateId } from '@study-studio/shared';
+} from '@lexdistill/protocol';
+import { ok, err, isOk, type Result, BusinessError, translateToBusinessError, generateId } from '@lexdistill/shared';
 import {
   buildLocalRuleReport,
   generateLearningAnalysisReport,
   type AnalysisSnapshot,
-} from '@study-studio/ai-content';
+} from '@lexdistill/ai-content';
 
 /** 快照类型兼容出口：定义已迁入 ai-content，此处重出以保持 public.ts 链路不动。 */
-export type { AnalysisSnapshot } from '@study-studio/ai-content';
+export type { AnalysisSnapshot } from '@lexdistill/ai-content';
 
 /**
  * P4-C：AI 学习分析能力产品化。
@@ -43,7 +43,7 @@ export interface RunLearningAnalysisOptions {
 
 /**
  * M7-10 组装不可变学习快照（兼容签名：供分析与本地规则回退共用）。
- * 映射逻辑已迁入 `@study-studio/learning`；此处只做 port 配接（Repository 调用）、
+ * 映射逻辑已迁入 `@lexdistill/learning`；此处只做 port 配接（Repository 调用）、
  * 时间注入与底层异常翻译。容错语义不变：profile 失败原样返回，
  * 到期卡/错题失败计数为 0。
  */

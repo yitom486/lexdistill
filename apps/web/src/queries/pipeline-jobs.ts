@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { logger } from '@study-studio/shared';
-import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
-import type { TextbookPipelineSettings, TocEntry } from '@study-studio/document-model';
+import { logger } from '@lexdistill/shared';
+import type { TextbookPipelineJobSnapshot } from '@lexdistill/protocol';
+import type { TextbookPipelineSettings, TocEntry } from '@lexdistill/document-model';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import {
   GatewayRequestError,

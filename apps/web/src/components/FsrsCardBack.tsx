@@ -5,7 +5,7 @@ import { FsrsRatingButtons } from './FsrsRatingButtons.js';
 import { cn } from '../lib/utils.js';
 import type { SupportedLanguage } from '../utils/audio.js';
 import type { StudyCardItem } from '../models/learning.js';
-import type { CardReviewRating } from '@study-studio/protocol';
+import type { CardReviewRating } from '@lexdistill/protocol';
 
 interface FsrsCardBackProps {
   card: StudyCardItem;

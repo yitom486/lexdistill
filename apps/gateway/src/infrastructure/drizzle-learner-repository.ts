@@ -4,14 +4,14 @@ import { submitBankObjectiveAnswer } from '../modules/practice/persistence/bank-
 import { submitBankSubjectiveAnswer } from '../modules/practice/persistence/bank-subjective-answer.js';
 import { readBankGradingContext, settleBankSubjectiveGrade } from '../modules/practice/persistence/bank-grade.js';
 import { suggestPreset } from '../modules/question-generation/suggest.js';
-import { SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
-import type { BankAnswerSubmit, BankGradeSubmit, ObjectiveAnswerInput } from '@study-studio/protocol';
-import { prepareTextbookAttempt, getTextbookAttempt, claimTextbookGrade, settleTextbookGrade, textbookExerciseHistory } from '@study-studio/storage-sqlite';
-import type { ExerciseGrade, SubmitTextbookExercise } from '@study-studio/protocol';
-import type { TextbookGradeAudit, TextbookPracticeRepository } from '@study-studio/learner-core';
-import { MASTERED_STABILITY_DAYS } from '@study-studio/learner-core';
+import { SqliteQuestionGenerationRepository } from '@lexdistill/storage-sqlite';
+import type { BankAnswerSubmit, BankGradeSubmit, ObjectiveAnswerInput } from '@lexdistill/protocol';
+import { prepareTextbookAttempt, getTextbookAttempt, claimTextbookGrade, settleTextbookGrade, textbookExerciseHistory } from '@lexdistill/storage-sqlite';
+import type { ExerciseGrade, SubmitTextbookExercise } from '@lexdistill/protocol';
+import type { TextbookGradeAudit, TextbookPracticeRepository } from '@lexdistill/learner-core';
+import { MASTERED_STABILITY_DAYS } from '@lexdistill/learner-core';
 import { eq } from 'drizzle-orm';
-import { isOk, ok, err, type Result, BusinessError, translateToBusinessError } from '@study-studio/shared';
+import { isOk, ok, err, type Result, BusinessError, translateToBusinessError } from '@lexdistill/shared';
 import type {
   LearnerRepository,
   QuizAttemptRecord,
@@ -23,7 +23,7 @@ import type {
   DailyStudyPlan,
   DailyPlanStepTemplate,
   AdaptiveKanaQueueOptions,
-} from '@study-studio/learner-core';
+} from '@lexdistill/learner-core';
 import type {
   Flashcard,
   DocumentItem,
@@ -37,8 +37,8 @@ import type {
   PracticeItem,
   GeneratedQuestion,
   CardReviewRating,
-} from '@study-studio/protocol';
-import { createDrizzleDb, type DrizzleDb, learnerLanguageProfiles, learnerProfiles } from '@study-studio/storage-sqlite';
+} from '@lexdistill/protocol';
+import { createDrizzleDb, type DrizzleDb, learnerLanguageProfiles, learnerProfiles } from '@lexdistill/storage-sqlite';
 import type {
   PracticePlanTemplate,
   PracticePlanRun,
@@ -46,13 +46,13 @@ import type {
   PracticeBlockSpec,
   PracticeRunStatus,
   LearnerLevel,
-} from '@study-studio/protocol';
-import type { TextbookAST } from '@study-studio/document-model';
+} from '@lexdistill/protocol';
+import type { TextbookAST } from '@lexdistill/document-model';
 
 // P0-1 拆分：语种 / 词典 / 通用工具已下沉 domains；本地 import 供剩余方法使用，
 // 底部 export 保持对外契约不变（index.ts 经 export * 转出）。
-import type { TrackLanguage } from '@study-studio/shared';
-import { normalizeTrackLanguage, inferLanguageFromSkillId } from '@study-studio/shared';
+import type { TrackLanguage } from '@lexdistill/shared';
+import { normalizeTrackLanguage, inferLanguageFromSkillId } from '@lexdistill/shared';
 import type {
   LocalDictionaryEntry,
   DictionaryEntryCollection,
@@ -74,9 +74,9 @@ import {
   type EncounteredTerm,
   type RecordTermExposureInput,
   type RecordReadingExposuresInput,
-} from '@study-studio/storage-sqlite';
-import type { AgentAdapter } from '@study-studio/agent-runtime';
-import type { FsrsState, SchedulerOutput } from '@study-studio/learning-algorithms';
+} from '@lexdistill/storage-sqlite';
+import type { AgentAdapter } from '@lexdistill/agent-runtime';
+import type { FsrsState, SchedulerOutput } from '@lexdistill/learning-algorithms';
 import type { ContentRepository } from '../modules/library/ports.js';
 import type { LexiconRepository } from '../modules/dictionary/ports.js';
 import type { LearningRepository } from '../modules/practice/ports.js';
@@ -115,36 +115,36 @@ import {
   getReadingPosition as getReadingPositionDomain,
   listDocumentLessonRefs as listDocumentLessonRefsDomain,
   type ReadingPosition,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   exportDatabaseSnapshot as exportDatabaseSnapshotDomain,
   type DatabaseSnapshotInfo,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   listCardFormats as listCardFormatsDomain,
   saveCardFormat as saveCardFormatDomain,
   resetCardFormat as resetCardFormatDomain,
   type SaveCardFormatInput,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   listLessons as listLessonsDomain,
   completeLesson as completeLessonDomain,
   listCompletedLessonSkills as listCompletedLessonSkillsDomain,
   listLessonSkills as listLessonSkillsDomain,
   type Lesson,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   getTextbookFocus as getTextbookFocusDomain,
   type TextbookFocus,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   getCourseRoute as getCourseRouteDomain,
-} from '@study-studio/storage-sqlite';
-import type { CourseRouteSnapshot } from '@study-studio/learner-core';
+} from '@lexdistill/storage-sqlite';
+import type { CourseRouteSnapshot } from '@lexdistill/learner-core';
 import {
   listWordlists as listWordlistsDomain,
   type WordlistGroup,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   saveDocumentStructure as saveDocumentStructureDomain,
   getDocumentStructure as getDocumentStructureDomain,
@@ -165,7 +165,7 @@ import {
   type ListAiArtifactRunsInput,
   type AiArtifactRun,
   type ShredStats,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   saveKnowledgePoints as saveKnowledgePointsDomain,
   listKnowledgePoints as listKnowledgePointsDomain,
@@ -173,8 +173,8 @@ import {
 import type {
   SaveKnowledgePointInput,
   KnowledgePoint,
-} from '@study-studio/storage-sqlite';
-import type { StudyGateSnapshot } from '@study-studio/learner-core';
+} from '@lexdistill/storage-sqlite';
+import type { StudyGateSnapshot } from '@lexdistill/learner-core';
 import {
   previewCard as previewCardDomain,
   type PreviewCardRequest,
@@ -184,7 +184,7 @@ import {
   getAnkiSettings as getAnkiSettingsDomain,
   saveAnkiSettings as saveAnkiSettingsDomain,
   type AnkiPushSettings,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   pushCardToAnki as pushCardToAnkiDomain,
   type AnkiPushRequest,
@@ -202,15 +202,15 @@ import {
 } from '../modules/flashcards/application/apkg-export.js';
 import {
   readMediaBytes as readMediaBytesDomain,
-} from '@study-studio/storage-sqlite';
-import { storeMedia as storeMediaDomain } from '@study-studio/storage-sqlite';
-import type { StoredMedia } from '@study-studio/storage-sqlite';
-import type { AnkiCardFormat } from '@study-studio/learner-core';
+} from '@lexdistill/storage-sqlite';
+import { storeMedia as storeMediaDomain } from '@lexdistill/storage-sqlite';
+import type { StoredMedia } from '@lexdistill/storage-sqlite';
+import type { AnkiCardFormat } from '@lexdistill/learner-core';
 import {
   resolveActiveLanguage as resolveActiveLanguageDomain,
   ensureLanguageProfile as ensureLanguageProfileDomain,
   mirrorLanguageProfileToMain as mirrorLanguageProfileToMainDomain,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   getLearnerProfile as getLearnerProfileDomain,
   updateLearnerProfile as updateLearnerProfileDomain,
@@ -265,7 +265,7 @@ import {
   getImportTask as getImportTaskDomain,
   type ImportTask,
   type ImportTaskStatus,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   seedTextbookTocSkeleton as seedTextbookTocSkeletonDomain,
   writeTextbookContent, readTextbookMaterial, completeTextbookChapter, readTextbookChapter, commitTextbookLesson, type TextbookScope,
@@ -277,7 +277,7 @@ import {
   type CommitLessonKnowledgeOutput,
   type TextbookLessonSlotItem,
   type TextbookAssetStats,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import {
   executeTextbookPipeline as executeTextbookPipelineDomain,
   type TextbookPipelineInput,
@@ -326,18 +326,18 @@ import {
   submitPracticeItem as submitPracticeItemDomain,
   listPracticeItemAttempts as listPracticeItemAttemptsDomain,
   getPracticeRunItems as getPracticeRunItemsDomain,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import { finalizePracticePlanRun as finalizePracticePlanRunDomain } from '../modules/practice/persistence/practice-plan.js';
 import {
   getTodayString,
   getYesterdayString,
   safeJsonParse,
   defaultLanguageProfileSeed,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type { RepoDeps } from './persistence/repo-context.js';
-import { collectGlobalVocabulary, listVocabulary, getVocabularyEntry, saveVocabularyLearning as saveVocabularyLearningDomain, getVocabularyMasteryByJlpt } from '@study-studio/storage-sqlite';
-import type { SaveVocabularyLearningInput } from '@study-studio/storage-sqlite';
-import type { VocabularyScope } from '@study-studio/protocol';
+import { collectGlobalVocabulary, listVocabulary, getVocabularyEntry, saveVocabularyLearning as saveVocabularyLearningDomain, getVocabularyMasteryByJlpt } from '@lexdistill/storage-sqlite';
+import type { SaveVocabularyLearningInput } from '@lexdistill/storage-sqlite';
+import type { VocabularyScope } from '@lexdistill/protocol';
 
 export type {
   TrackLanguage,
@@ -655,13 +655,13 @@ export class DrizzleLearnerRepository
   ): Promise<Result<SavedTocSkeleton, BusinessError>> {
     return seedTextbookTocSkeletonDomain(this.deps, input);
   }
-  public writeTextbookContent(scope: TextbookScope, kind: import('@study-studio/document-model').TextbookContentKind, input: unknown) {
+  public writeTextbookContent(scope: TextbookScope, kind: import('@lexdistill/document-model').TextbookContentKind, input: unknown) {
     return writeTextbookContent(this.deps, scope, kind, input);
   }
   public readTextbookMaterial(scope: TextbookScope) { return readTextbookMaterial(this.deps, scope); }
   public completeTextbookChapter(scope: TextbookScope) { return completeTextbookChapter(this.deps, scope); }
   public readTextbookChapter(scope: TextbookScope) { return readTextbookChapter(this.deps, scope); }
-  public commitTextbookLesson(scope: TextbookScope, changes: readonly import('@study-studio/document-model').TextbookContentChange[]) { return commitTextbookLesson(this.deps, scope, changes); }
+  public commitTextbookLesson(scope: TextbookScope, changes: readonly import('@lexdistill/document-model').TextbookContentChange[]) { return commitTextbookLesson(this.deps, scope, changes); }
 
   public appendImportEvent(input: Parameters<typeof appendImportEvent>[1]) { return appendImportEvent(this.deps, input); }
   public listImportEvents(query: Parameters<typeof listImportEvents>[1]) { return listImportEvents(this.deps, query); }

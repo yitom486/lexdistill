@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
-import { initSchema, SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
-import type { BankQuestionDraft, GenerationBinding, GenerationConfig } from '@study-studio/protocol';
+import { initSchema, SqliteQuestionGenerationRepository } from '@lexdistill/storage-sqlite';
+import type { BankQuestionDraft, GenerationBinding, GenerationConfig } from '@lexdistill/protocol';
 import { createQuestionGenerationTools, type GenerationAudioRenderer } from '../modules/question-generation/public.js';
 
 export const binding: GenerationBinding = { taskId: 'generation_test', userId: 'generator_user', sessionId: 'session', turnId: 'turn' };

@@ -1,4 +1,4 @@
-import type { ContentDirectoryNode, LessonContent } from '@study-studio/document-model';
+import type { ContentDirectoryNode, LessonContent } from '@lexdistill/document-model';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs.js';
 import { StructuredLessonPanel } from '../../textbook/StructuredLessonPanel.js';
 import { StructuredVocabularyList } from '../../textbook/StructuredVocabularyList.js';

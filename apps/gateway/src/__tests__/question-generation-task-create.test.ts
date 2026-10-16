@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { Hono } from 'hono';
-import { SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
+import { SqliteQuestionGenerationRepository } from '@lexdistill/storage-sqlite';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import type { GatewayDeps } from '../composition/gateway-deps.js';
 import { createGenerationRoutes } from '../modules/question-generation/http/generation-routes.js';

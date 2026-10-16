@@ -1,17 +1,17 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Hono } from 'hono';
-import { isOk, getLogLevel } from '@study-studio/shared';
-import { logger } from '@study-studio/shared';
+import { isOk, getLogLevel } from '@lexdistill/shared';
+import { logger } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import {
   createLibraryRoutes,
   shadowReconcile,
   SHADOW_OBSERVE_CONSTANTS,
 } from '../modules/library/http/library-routes.js';
-import { summarizeReconciliation, reconcileLessons } from '@study-studio/storage-sqlite';
-import { markdownToAst } from '@study-studio/content';
+import { summarizeReconciliation, reconcileLessons } from '@lexdistill/storage-sqlite';
+import { markdownToAst } from '@lexdistill/content';
 import { appendPdfToDocument } from '../modules/library/application/pdf-import/pdf-import-service.js';
-import type { TextbookAST } from '@study-studio/document-model';
+import type { TextbookAST } from '@lexdistill/document-model';
 
 /**
  * P1-C0.8：ownership 边界 + authorized replacement shadow（只观察）。

@@ -8,22 +8,22 @@ import {
   translateToBusinessError,
   nowIso,
   logger,
-} from '@study-studio/shared';
-import type { LearnerLevel } from '@study-studio/protocol';
+} from '@lexdistill/shared';
+import type { LearnerLevel } from '@lexdistill/protocol';
 import {
   evaluateLevelTransition,
   levelProgressHint,
   type LevelQuizDay,
-} from '@study-studio/learner-core';
-import { flashcards, learnerLanguageProfiles } from '@study-studio/storage-sqlite';
+} from '@lexdistill/learner-core';
+import { flashcards, learnerLanguageProfiles } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '@study-studio/shared';
-import { getTodayString } from '@study-studio/shared';
+import type { TrackLanguage } from '@lexdistill/shared';
+import { getTodayString } from '@lexdistill/shared';
 import {
   ensureLanguageProfile,
   mirrorLanguageProfileToMain,
   resolveActiveLanguage,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 
 /**
  * 等级状态机（网关侧）：

@@ -6,7 +6,7 @@ import {
   recordMistakeRetry,
   type SkillMetric,
 } from '../index.js';
-import type { GeneratedQuestion, QuizGradingResult } from '@study-studio/protocol';
+import type { GeneratedQuestion, QuizGradingResult } from '@lexdistill/protocol';
 
 describe('Learner Core - Profile & Mistake Logic', () => {
   const sampleMetric: SkillMetric = {

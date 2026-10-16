@@ -1,4 +1,4 @@
-# Lingua Studio - 客户端与网关通信协议规范 (Protocol Specification)
+# LexDistill - 客户端与网关通信协议规范 (Protocol Specification)
 
 > **文档版本**：v1.0  
 > **通信介质**：WebSocket (主实时双向通道) + HTTP/JSON (基础资源与静态数据)  

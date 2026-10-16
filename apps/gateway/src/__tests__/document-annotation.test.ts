@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { app } from '../index.js';
-import { isOk, isErr } from '@study-studio/shared';
-import type { DocumentItem, AnnotationItem } from '@study-studio/protocol';
+import { isOk, isErr } from '@lexdistill/shared';
+import type { DocumentItem, AnnotationItem } from '@lexdistill/protocol';
 import type { StandardErrorPayload } from '../errors/http-error-handler.js';
 
 describe('Document & Annotation Repository (Companion Integration)', () => {
@@ -361,7 +361,7 @@ describe('deleteDocument 生命周期（P0.5）', () => {
   }
 
   it('删除清掉 shred/FTS/位置/批注/结构，doctor 无孤儿', async () => {
-    const { runDoctor } = await import('@study-studio/storage-sqlite');
+    const { runDoctor } = await import('@lexdistill/storage-sqlite');
     await seedFullDoc('doc_life_01');
     expect(countFor('doc_life_01', 'textbook_vocabulary')).toBe(1);
     expect(countFor('doc_life_01', 'textbook_fts')).toBe(2);

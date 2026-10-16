@@ -126,7 +126,7 @@ describe('Protocol Package Schemas', () => {
       title: '测试日语教材',
       shortTitle: '测日',
       level: 'N5',
-      publisher: 'Lingua Studio Press',
+      publisher: 'LexDistill Press',
       totalLessons: 1,
       lessons: [
         {

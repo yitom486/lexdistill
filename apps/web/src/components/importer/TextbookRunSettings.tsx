@@ -1,4 +1,4 @@
-import { TextbookPipelineSettingsSchema, type TextbookPipelineSettings } from '@study-studio/document-model';
+import { TextbookPipelineSettingsSchema, type TextbookPipelineSettings } from '@lexdistill/document-model';
 
 type NumericSetting = { [K in keyof TextbookPipelineSettings]: TextbookPipelineSettings[K] extends number ? K : never }[keyof TextbookPipelineSettings];
 

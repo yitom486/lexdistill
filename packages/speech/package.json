@@ -1,11 +1,11 @@
 {
-  "name": "@study-studio/speech",
+  "name": "@lexdistill/speech",
   "version": "0.1.2",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
-    "@study-studio/shared": "workspace:*"
+    "@lexdistill/shared": "workspace:*"
   },
   "scripts": {
     "test": "bun test"

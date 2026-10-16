@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { promises as fsp } from 'node:fs';
+import { promises as fsp, existsSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import {
   ok,
@@ -11,7 +11,7 @@ import {
   translateToBusinessError,
   generateId,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { dictionaryMedia } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
 
@@ -42,11 +42,11 @@ const MEDIA_EXTENSIONS: Record<string, string> = {
 
 /** 默认媒体根（内联自 app-paths，见文件头注记；E2 重逢后改回引用）。 */
 function resolveDefaultMediaDir(): string {
-  const override = process.env.STUDY_STUDIO_RUNTIME_DIR;
-  const runtime =
-    override && override.trim()
-      ? override.trim()
-      : path.join(homedir(), '.study-studio', 'runtime');
+  const override = process.env.LEXDISTILL_RUNTIME_DIR || process.env.STUDY_STUDIO_RUNTIME_DIR;
+  const legacyDir = path.join(homedir(), '.study-studio', 'runtime');
+  const newDir = path.join(homedir(), '.lexdistill', 'runtime');
+  const baseDir = (!existsSync(newDir) && existsSync(legacyDir)) ? legacyDir : newDir;
+  const runtime = override && override.trim() ? override.trim() : baseDir;
   return path.join(runtime, 'media');
 }
 

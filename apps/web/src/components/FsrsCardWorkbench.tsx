@@ -24,8 +24,8 @@ import { WorkbenchNavHeader, type WorkbenchTab } from './WorkbenchNavHeader.js';
 import { DailyWordStudyHub } from './daily-study/DailyWordStudyHub.js';
 import { useReviewActions } from './review/useReviewActions.js';
 import type { StudyCardItem } from '../models/learning.js';
-import type { VocabularyEntry } from '@study-studio/protocol';
-import { unitsForTrack, selectCourseWords } from '@study-studio/learner-core';
+import type { VocabularyEntry } from '@lexdistill/protocol';
+import { unitsForTrack, selectCourseWords } from '@lexdistill/learner-core';
 import { useWordlistsQuery } from '../queries/wordlists.js';
 
 export function FsrsCardWorkbench() {

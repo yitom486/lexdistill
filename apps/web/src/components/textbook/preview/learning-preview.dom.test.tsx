@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'bun:test';
 import * as React from 'react';
-import { TextbookLearningContentSchema, TextbookASTSchema } from '@study-studio/document-model';
+import { TextbookLearningContentSchema, TextbookASTSchema } from '@lexdistill/document-model';
 import { previewLesson, previewBooks } from '../../../fixtures/textbook-learning-preview.js';
 import { exercisePreviewBook } from '../../../fixtures/textbook-exercise-preview.js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -251,11 +251,11 @@ it('教材主页：Query已保存教材与演示列表 → 选书选章 → 学�
   expect(tab('练习')?.getAttribute('aria-selected')).toBe('true');
 
   // Reload navigation from persisted preferences; preserve location, not learner records.
-  const preferences = dom.dom.window.localStorage.getItem('lingua-textbook-navigation');
+  const preferences = dom.dom.window.localStorage.getItem('lexdistill_textbook_navigation');
   expect(preferences).toContain(previewLesson.chapterId);
   await act(async () => { dom!.root.render(null); });
   navigation.setState({ view: 'LIBRARY', selectedBookId: null, chaptersByBook: {}, sectionsByChapter: {} });
-  dom.dom.window.localStorage.setItem('lingua-textbook-navigation', preferences!);
+  dom.dom.window.localStorage.setItem('lexdistill_textbook_navigation', preferences!);
   await navigation.persist.rehydrate();
   await act(async () => { dom!.root.render(renderLibrary()); });
   await settle();

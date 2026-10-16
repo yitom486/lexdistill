@@ -1,5 +1,5 @@
 {
-  "name": "@study-studio/content",
+  "name": "@lexdistill/content",
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.ts",
@@ -10,10 +10,10 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@study-studio/archive": "workspace:*",
-    "@study-studio/document-model": "workspace:*",
-    "@study-studio/protocol": "workspace:*",
-    "@study-studio/shared": "workspace:*"
+    "@lexdistill/archive": "workspace:*",
+    "@lexdistill/document-model": "workspace:*",
+    "@lexdistill/protocol": "workspace:*",
+    "@lexdistill/shared": "workspace:*"
   },
   "scripts": {
     "test": "bun test"

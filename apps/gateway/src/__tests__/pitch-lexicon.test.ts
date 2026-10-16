@@ -4,12 +4,12 @@ import {
   extractPitchQueryTokens,
   lookupPitchEntries,
   tryPitchLexiconCoachReply,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import { buildOjadSearchUrl } from '../modules/dictionary/application/dictionary-external-links.js';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { DictionaryLookupTool } from '../modules/dictionary/tools/dictionary-lookup-tool.js';
 import { app } from '../index.js';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 
 describe('pitch lexicon coach', () => {
   it('has at least 10 benchmark entries', () => {
@@ -47,7 +47,7 @@ describe('pitch lexicon coach', () => {
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
     expect(result.value[0]?.headword).toBe('雨');
-    expect(result.value[0]?.sourceLabel).toBe('Lingua Studio curriculum seed');
+    expect(result.value[0]?.sourceLabel).toBe('LexDistill curriculum seed');
   });
 
   it('seeds dictionary glosses without circular headword echo', async () => {
@@ -55,7 +55,7 @@ describe('pitch lexicon coach', () => {
     const result = await repo.searchLocalDictionary('ja', '学生');
     expect(isOk(result)).toBe(true);
     if (!isOk(result)) return;
-    const seedEntry = result.value.find((e) => e.sourceLabel === 'Lingua Studio curriculum seed');
+    const seedEntry = result.value.find((e) => e.sourceLabel === 'LexDistill curriculum seed');
     expect(seedEntry).toBeDefined();
     // 「学生 (Student)」标签入库时取英文 gloss，避免头词循环定义
     expect(seedEntry?.meanings).toEqual(['Student']);

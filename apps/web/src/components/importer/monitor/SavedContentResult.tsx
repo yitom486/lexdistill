@@ -1,5 +1,5 @@
 import { LearningContentPanel } from '../../textbook/LearningContentPanel.js';
-import type { SavedTextbookContent } from '@study-studio/document-model';
+import type { SavedTextbookContent } from '@lexdistill/document-model';
 import { ContentResultView } from './ContentResultView.js';
 const statusLabels = { pending: '正文待提取', ready: '已保存', failed: '未完成' };
 export function SavedContentResult({ result }: { result: SavedTextbookContent }) {

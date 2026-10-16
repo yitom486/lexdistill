@@ -12,34 +12,34 @@
       },
     },
     "apps/desktop": {
-      "name": "@study-studio/desktop",
+      "name": "@lexdistill/desktop",
       "version": "0.1.2",
       "devDependencies": {
         "@tauri-apps/cli": "^2.1.4",
       },
     },
     "apps/gateway": {
-      "name": "@study-studio/gateway",
+      "name": "@lexdistill/gateway",
       "version": "0.1.2",
       "dependencies": {
         "@agentclientprotocol/codex-acp": "^2.1.1",
+        "@lexdistill/agent-runtime": "workspace:*",
+        "@lexdistill/ai-content": "workspace:*",
+        "@lexdistill/archive": "workspace:*",
+        "@lexdistill/content": "workspace:*",
+        "@lexdistill/document-model": "workspace:*",
+        "@lexdistill/flashcards": "workspace:*",
+        "@lexdistill/learner-core": "workspace:*",
+        "@lexdistill/learning": "workspace:*",
+        "@lexdistill/learning-algorithms": "workspace:*",
+        "@lexdistill/lexicon": "workspace:*",
+        "@lexdistill/protocol": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
+        "@lexdistill/speech": "workspace:*",
+        "@lexdistill/storage-sqlite": "workspace:*",
+        "@lexdistill/tool-core": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.32.0",
         "@mozilla/readability": "^0.6.0",
-        "@study-studio/agent-runtime": "workspace:*",
-        "@study-studio/ai-content": "workspace:*",
-        "@study-studio/archive": "workspace:*",
-        "@study-studio/content": "workspace:*",
-        "@study-studio/document-model": "workspace:*",
-        "@study-studio/flashcards": "workspace:*",
-        "@study-studio/learner-core": "workspace:*",
-        "@study-studio/learning": "workspace:*",
-        "@study-studio/learning-algorithms": "workspace:*",
-        "@study-studio/lexicon": "workspace:*",
-        "@study-studio/protocol": "workspace:*",
-        "@study-studio/shared": "workspace:*",
-        "@study-studio/speech": "workspace:*",
-        "@study-studio/storage-sqlite": "workspace:*",
-        "@study-studio/tool-core": "workspace:*",
         "@yitom/acp-client": "^0.1.2",
         "agentpools": "^0.1.9",
         "drizzle-orm": "^0.45.2",
@@ -54,7 +54,7 @@
       },
     },
     "apps/web": {
-      "name": "@study-studio/web",
+      "name": "@lexdistill/web",
       "version": "0.1.2",
       "dependencies": {
         "@base-ui-components/react": "^1.0.0-rc.0",
@@ -63,15 +63,15 @@
         "@fontsource/newsreader": "5.3.0",
         "@fontsource/noto-sans-jp": "5.3.1",
         "@fontsource/noto-sans-kr": "5.3.1",
-        "@study-studio/agent-runtime": "workspace:*",
-        "@study-studio/document-model": "workspace:*",
-        "@study-studio/gateway": "workspace:*",
-        "@study-studio/learner-core": "workspace:*",
-        "@study-studio/learning": "workspace:*",
-        "@study-studio/protocol": "workspace:*",
-        "@study-studio/shared": "workspace:*",
-        "@study-studio/speech": "workspace:*",
-        "@study-studio/tool-core": "workspace:*",
+        "@lexdistill/agent-runtime": "workspace:*",
+        "@lexdistill/document-model": "workspace:*",
+        "@lexdistill/gateway": "workspace:*",
+        "@lexdistill/learner-core": "workspace:*",
+        "@lexdistill/learning": "workspace:*",
+        "@lexdistill/protocol": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
+        "@lexdistill/speech": "workspace:*",
+        "@lexdistill/tool-core": "workspace:*",
         "@tanstack/react-query": "^5.102.8",
         "@tauri-apps/plugin-process": "^2.3.1",
         "@tauri-apps/plugin-updater": "^2.10.1",
@@ -103,132 +103,132 @@
       },
     },
     "packages/agent-runtime": {
-      "name": "@study-studio/agent-runtime",
+      "name": "@lexdistill/agent-runtime",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/shared": "workspace:*",
-        "@study-studio/tool-core": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
+        "@lexdistill/tool-core": "workspace:*",
         "zod": "^3.24.1",
       },
     },
     "packages/ai-content": {
-      "name": "@study-studio/ai-content",
+      "name": "@lexdistill/ai-content",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/learning": "workspace:*",
-        "@study-studio/protocol": "workspace:*",
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/learning": "workspace:*",
+        "@lexdistill/protocol": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
       },
     },
     "packages/archive": {
-      "name": "@study-studio/archive",
+      "name": "@lexdistill/archive",
       "version": "0.1.0",
       "dependencies": {
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
       },
     },
     "packages/content": {
-      "name": "@study-studio/content",
+      "name": "@lexdistill/content",
       "version": "0.1.0",
       "dependencies": {
-        "@study-studio/archive": "workspace:*",
-        "@study-studio/document-model": "workspace:*",
-        "@study-studio/protocol": "workspace:*",
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/archive": "workspace:*",
+        "@lexdistill/document-model": "workspace:*",
+        "@lexdistill/protocol": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
       },
     },
     "packages/document-model": {
-      "name": "@study-studio/document-model",
+      "name": "@lexdistill/document-model",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
         "zod": "^3.24.1",
       },
     },
     "packages/flashcards": {
-      "name": "@study-studio/flashcards",
+      "name": "@lexdistill/flashcards",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
       },
     },
     "packages/learner-core": {
-      "name": "@study-studio/learner-core",
+      "name": "@lexdistill/learner-core",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/flashcards": "workspace:*",
-        "@study-studio/learning-algorithms": "workspace:*",
-        "@study-studio/protocol": "workspace:*",
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/flashcards": "workspace:*",
+        "@lexdistill/learning-algorithms": "workspace:*",
+        "@lexdistill/protocol": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
       },
     },
     "packages/learning": {
-      "name": "@study-studio/learning",
+      "name": "@lexdistill/learning",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/document-model": "workspace:*",
-        "@study-studio/learner-core": "workspace:*",
-        "@study-studio/learning-algorithms": "workspace:*",
-        "@study-studio/protocol": "workspace:*",
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/document-model": "workspace:*",
+        "@lexdistill/learner-core": "workspace:*",
+        "@lexdistill/learning-algorithms": "workspace:*",
+        "@lexdistill/protocol": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
       },
     },
     "packages/learning-algorithms": {
-      "name": "@study-studio/learning-algorithms",
+      "name": "@lexdistill/learning-algorithms",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/protocol": "workspace:*",
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/protocol": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
       },
     },
     "packages/lexicon": {
-      "name": "@study-studio/lexicon",
+      "name": "@lexdistill/lexicon",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
       },
     },
     "packages/protocol": {
-      "name": "@study-studio/protocol",
+      "name": "@lexdistill/protocol",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/document-model": "workspace:*",
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/document-model": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
         "zod": "^3.24.1",
       },
     },
     "packages/shared": {
-      "name": "@study-studio/shared",
+      "name": "@lexdistill/shared",
       "version": "0.1.2",
     },
     "packages/speech": {
-      "name": "@study-studio/speech",
+      "name": "@lexdistill/speech",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
       },
     },
     "packages/storage-sqlite": {
-      "name": "@study-studio/storage-sqlite",
+      "name": "@lexdistill/storage-sqlite",
       "version": "0.1.0",
       "dependencies": {
-        "@study-studio/content": "workspace:*",
-        "@study-studio/document-model": "workspace:*",
-        "@study-studio/flashcards": "workspace:*",
-        "@study-studio/learner-core": "workspace:*",
-        "@study-studio/learning": "workspace:*",
-        "@study-studio/learning-algorithms": "workspace:*",
-        "@study-studio/protocol": "workspace:*",
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/content": "workspace:*",
+        "@lexdistill/document-model": "workspace:*",
+        "@lexdistill/flashcards": "workspace:*",
+        "@lexdistill/learner-core": "workspace:*",
+        "@lexdistill/learning": "workspace:*",
+        "@lexdistill/learning-algorithms": "workspace:*",
+        "@lexdistill/protocol": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
         "drizzle-orm": "^0.45.2",
       },
     },
     "packages/tool-core": {
-      "name": "@study-studio/tool-core",
+      "name": "@lexdistill/tool-core",
       "version": "0.1.2",
       "dependencies": {
-        "@study-studio/protocol": "workspace:*",
-        "@study-studio/shared": "workspace:*",
+        "@lexdistill/protocol": "workspace:*",
+        "@lexdistill/shared": "workspace:*",
         "zod": "^3.24.1",
       },
     },
@@ -386,6 +386,42 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
+    "@lexdistill/agent-runtime": ["@lexdistill/agent-runtime@workspace:packages/agent-runtime"],
+
+    "@lexdistill/ai-content": ["@lexdistill/ai-content@workspace:packages/ai-content"],
+
+    "@lexdistill/archive": ["@lexdistill/archive@workspace:packages/archive"],
+
+    "@lexdistill/content": ["@lexdistill/content@workspace:packages/content"],
+
+    "@lexdistill/desktop": ["@lexdistill/desktop@workspace:apps/desktop"],
+
+    "@lexdistill/document-model": ["@lexdistill/document-model@workspace:packages/document-model"],
+
+    "@lexdistill/flashcards": ["@lexdistill/flashcards@workspace:packages/flashcards"],
+
+    "@lexdistill/gateway": ["@lexdistill/gateway@workspace:apps/gateway"],
+
+    "@lexdistill/learner-core": ["@lexdistill/learner-core@workspace:packages/learner-core"],
+
+    "@lexdistill/learning": ["@lexdistill/learning@workspace:packages/learning"],
+
+    "@lexdistill/learning-algorithms": ["@lexdistill/learning-algorithms@workspace:packages/learning-algorithms"],
+
+    "@lexdistill/lexicon": ["@lexdistill/lexicon@workspace:packages/lexicon"],
+
+    "@lexdistill/protocol": ["@lexdistill/protocol@workspace:packages/protocol"],
+
+    "@lexdistill/shared": ["@lexdistill/shared@workspace:packages/shared"],
+
+    "@lexdistill/speech": ["@lexdistill/speech@workspace:packages/speech"],
+
+    "@lexdistill/storage-sqlite": ["@lexdistill/storage-sqlite@workspace:packages/storage-sqlite"],
+
+    "@lexdistill/tool-core": ["@lexdistill/tool-core@workspace:packages/tool-core"],
+
+    "@lexdistill/web": ["@lexdistill/web@workspace:apps/web"],
+
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.32.0", "", { "dependencies": { "@hono/node-server": "^1.19.9 || ^2.0.5", "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.2.1", "express-rate-limit": "^8.2.1", "hono": "^4.11.4", "jose": "^6.1.3", "json-schema-typed": "^8.0.2", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.1" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-8BviX/hK4Gd2eL1KdTwm0gfl4d3wdoErW0Jd00h6nomUAtk6IJk5vwQJc6kfWtJTzN5OEV/lgIiJKI8fiDGAlA=="],
 
     "@mozilla/readability": ["@mozilla/readability@0.6.0", "", {}, "sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsIj1OPceCifL3cpfteP3pDT9/QQ=="],
@@ -479,42 +515,6 @@
     "@rollup/rollup-win32-x64-gnu": ["@rollup/rollup-win32-x64-gnu@4.63.1", "", { "os": "win32", "cpu": "x64" }, "sha512-RgroPfMmKlD1RzSDxvwgcPiy2HNQKoYV7OmwIXDsk73uKW5t6B/V8KIy27SMv/FNXFo/oSBtWc9J0X7t91ezZg=="],
 
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.63.1", "", { "os": "win32", "cpu": "x64" }, "sha512-at8QVep6S3h5Y6gSbdGU06bRY5WJkf6WUduM9YtvYMbYhB1MOFfUgc6kehitQXzOtMSaT70q7f9ydPhpqu821w=="],
-
-    "@study-studio/agent-runtime": ["@study-studio/agent-runtime@workspace:packages/agent-runtime"],
-
-    "@study-studio/ai-content": ["@study-studio/ai-content@workspace:packages/ai-content"],
-
-    "@study-studio/archive": ["@study-studio/archive@workspace:packages/archive"],
-
-    "@study-studio/content": ["@study-studio/content@workspace:packages/content"],
-
-    "@study-studio/desktop": ["@study-studio/desktop@workspace:apps/desktop"],
-
-    "@study-studio/document-model": ["@study-studio/document-model@workspace:packages/document-model"],
-
-    "@study-studio/flashcards": ["@study-studio/flashcards@workspace:packages/flashcards"],
-
-    "@study-studio/gateway": ["@study-studio/gateway@workspace:apps/gateway"],
-
-    "@study-studio/learner-core": ["@study-studio/learner-core@workspace:packages/learner-core"],
-
-    "@study-studio/learning": ["@study-studio/learning@workspace:packages/learning"],
-
-    "@study-studio/learning-algorithms": ["@study-studio/learning-algorithms@workspace:packages/learning-algorithms"],
-
-    "@study-studio/lexicon": ["@study-studio/lexicon@workspace:packages/lexicon"],
-
-    "@study-studio/protocol": ["@study-studio/protocol@workspace:packages/protocol"],
-
-    "@study-studio/shared": ["@study-studio/shared@workspace:packages/shared"],
-
-    "@study-studio/speech": ["@study-studio/speech@workspace:packages/speech"],
-
-    "@study-studio/storage-sqlite": ["@study-studio/storage-sqlite@workspace:packages/storage-sqlite"],
-
-    "@study-studio/tool-core": ["@study-studio/tool-core@workspace:packages/tool-core"],
-
-    "@study-studio/web": ["@study-studio/web@workspace:apps/web"],
 
     "@swc/helpers": ["@swc/helpers@0.3.17", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-tb7Iu+oZ+zWJZ3HJqwx8oNwSDIU440hmVMDPhpACWQWnrZHK99Bxs70gT1L2dnr5Hg50ZRWEFkQCAnOVVV0z1Q=="],
 

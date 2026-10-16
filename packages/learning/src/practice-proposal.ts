@@ -1,4 +1,4 @@
-import type { PracticeBlockSpec } from '@study-studio/protocol';
+import type { PracticeBlockSpec } from '@lexdistill/protocol';
 import type { AnalysisSnapshot } from './analysis-snapshot.js';
 
 /**

@@ -1,4 +1,4 @@
-import type { KanaExampleWord, KanaItem, KanaScriptLearningGuide } from '@study-studio/protocol';
+import type { KanaExampleWord, KanaItem, KanaScriptLearningGuide } from '@lexdistill/protocol';
 import { HIRAGANA_SHAPES } from './kana-shape-hiragana.js';
 import { KATAKANA_SHAPES } from './kana-shape-katakana.js';
 import type { KanaShapeEntry } from './kana-shape-types.js';

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import {
   markdownToAst,
   promoteLessonHeadings,
-} from '@study-studio/content';
+} from '@lexdistill/content';
 import { convertPdfToAst } from '../application/pdf-import/pdf-import-service.js';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 

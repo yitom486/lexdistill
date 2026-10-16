@@ -11,10 +11,10 @@ import { dirname, join, resolve } from 'node:path';
  * 输出 snapshot 路径 + 大小 + SHA-256 + 双方 integrity_check。
  * 默认值均为相对/系统路径，不含机器专属绝对路径。
  */
-const src = process.argv[2] ?? resolve(process.cwd(), 'study-studio.db');
-const outDir = process.argv[3] ?? join(tmpdir(), 'study-studio-snapshots');
+const src = process.argv[2] ?? resolve(process.cwd(), 'lexdistill.db');
+const outDir = process.argv[3] ?? join(tmpdir(), 'lexdistill-snapshots');
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-const dest = `${outDir}/study-studio-r1-${stamp}.db`;
+const dest = `${outDir}/lexdistill-r1-${stamp}.db`;
 mkdirSync(dirname(dest), { recursive: true });
 
 const srcDb = new Database(src, { readonly: true });

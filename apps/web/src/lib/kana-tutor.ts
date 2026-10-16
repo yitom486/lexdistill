@@ -4,7 +4,7 @@
  * 即可拿到可直接灌入导师抽屉的 AiTutorContext；基础记忆引导语来自可审校的课程讲义资产，
  * 讲义有明确对照时使用课程内容，旧数据才从题池补充；个性化追问交给 AI。
  */
-import type { KanaItem } from '@study-studio/protocol';
+import type { KanaItem } from '@lexdistill/protocol';
 import type { AiTutorContext } from '../stores/tutor-context.js';
 import { confusionDistractors, type KanaScript } from './kana-confusion.js';
 

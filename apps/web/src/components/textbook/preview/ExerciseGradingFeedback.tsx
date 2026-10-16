@@ -1,4 +1,4 @@
-import type { TextbookExerciseAttempt } from '@study-studio/protocol';
+import type { TextbookExerciseAttempt } from '@lexdistill/protocol';
 import { Button } from '../../ui/button.js';
 
 export function ExerciseGradingFeedback({ result, onRetry }: { result: TextbookExerciseAttempt; onRetry: () => void }) {

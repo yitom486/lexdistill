@@ -8,10 +8,10 @@
  * 认领的章节逐项记失败，不丢不重跑。
  * 取消/超时可达实际活动请求；首响应与 stall 判定只依据真实活动标记。
  */
-import { BusinessError, generateId, translateToBusinessError, type Result } from '@study-studio/shared';
-import type { AgentPoolLease } from '@study-studio/agent-runtime';
-import type { TextbookLessonStage, TextbookModelActivity } from '@study-studio/document-model';
-import type { AgentPoolDriver } from '@study-studio/agent-runtime';
+import { BusinessError, generateId, translateToBusinessError, type Result } from '@lexdistill/shared';
+import type { AgentPoolLease } from '@lexdistill/agent-runtime';
+import type { TextbookLessonStage, TextbookModelActivity } from '@lexdistill/document-model';
+import type { AgentPoolDriver } from '@lexdistill/agent-runtime';
 import { GatewayAgentpoolDriver } from '../../../infrastructure/agentpools/agentpool-driver.js';
 import { TextbookMcpRegistry } from '../mcp/textbook-mcp-server.js';
 import { buildTextbookWorkerMcpServer } from '../mcp/textbook-mcp-catalog.js';

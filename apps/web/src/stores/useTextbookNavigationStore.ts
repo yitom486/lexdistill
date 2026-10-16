@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { TextbookLearningContent } from '@study-studio/document-model';
+import { createMigratedStorage } from './store-storage.js';
+import type { TextbookLearningContent } from '@lexdistill/document-model';
 
 export type LearningSection = Exclude<keyof TextbookLearningContent, 'material'> | 'overview' | 'summary';
 interface TextbookNavigation {
@@ -22,6 +23,7 @@ export const useTextbookNavigationStore = create<TextbookNavigation>()(persist(s
   selectSection: (chapterId, section) => set(state => ({ sectionsByChapter: { ...state.sectionsByChapter, [chapterId]: section } })),
   backToLibrary: () => set({ view: 'LIBRARY' }), setShowTranslation: showTranslation => set({ showTranslation }),
 }), {
-  name: 'lingua-textbook-navigation',
+  name: 'lexdistill_textbook_navigation',
+  storage: createMigratedStorage(['lingua-textbook-navigation']),
   partialize: state => ({ view: state.view, selectedBookId: state.selectedBookId, chaptersByBook: state.chaptersByBook, sectionsByChapter: state.sectionsByChapter, showTranslation: state.showTranslation }),
 }));

@@ -4,10 +4,10 @@ import {
   deriveRecentErrorTags,
   sanitizeSnapshotReading,
 } from '../runtime/context/context-builder.js';
-import type { ContextSnapshot } from '@study-studio/agent-runtime';
-import type { LearnerRepository, LearnerProfile, LearnerProfileSnapshot } from '@study-studio/learner-core';
-import type { Flashcard } from '@study-studio/protocol';
-import { ok, err, BusinessError } from '@study-studio/shared';
+import type { ContextSnapshot } from '@lexdistill/agent-runtime';
+import type { LearnerRepository, LearnerProfile, LearnerProfileSnapshot } from '@lexdistill/learner-core';
+import type { Flashcard } from '@lexdistill/protocol';
+import { ok, err, BusinessError } from '@lexdistill/shared';
 
 function mockRepo(overrides: {
   targetLanguage?: 'ja' | 'en' | 'ko';

@@ -5,17 +5,17 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   resolveCourseRoute,
   type CourseRouteSnapshot,
   type UnitEvidence,
-} from '@study-studio/learner-core';
+} from '@lexdistill/learner-core';
 import type { Database } from 'bun:sqlite';
 import {
   normalizeTrackLanguage,
   type TrackLanguage,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 
 /**
  * D3 起家在 storage-sqlite（前身 gateway modules/learning-progress/persistence/course-route.ts，

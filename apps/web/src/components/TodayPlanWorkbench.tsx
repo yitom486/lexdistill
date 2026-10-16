@@ -14,7 +14,7 @@ import {
   ClipboardList,
   AudioLines,
 } from 'lucide-react';
-import type { DailyPlanStep, DailyPlanStepKind } from '@study-studio/learner-core';
+import type { DailyPlanStep, DailyPlanStepKind } from '@lexdistill/learner-core';
 import { NumberTicker } from './magicui/index.js';
 import { CourseRouteBanner } from './CourseRouteBanner.js';
 import { PlanSyncNote } from './today-plan/PlanSyncNote.js';

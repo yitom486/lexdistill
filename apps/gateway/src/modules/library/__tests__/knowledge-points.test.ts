@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
-import { isOk, isErr } from '@study-studio/shared';
+import { isOk, isErr } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import {
   LibraryKnowledgeSaveTool,

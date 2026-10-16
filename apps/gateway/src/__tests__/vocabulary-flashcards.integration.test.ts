@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Hono } from 'hono';
-import { VocabularyCollectionSchema, VocabularyEntrySchema, FlashcardSchema } from '@study-studio/protocol';
+import { VocabularyCollectionSchema, VocabularyEntrySchema, FlashcardSchema } from '@lexdistill/protocol';
 import { z } from 'zod';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../runtime/gateway-runtime.js';

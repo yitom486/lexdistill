@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { buildRepairPlan } from '@study-studio/storage-sqlite';
+import { buildRepairPlan } from '@lexdistill/storage-sqlite';
 
 /** repair-plan dry-run：只读计划，无 apply。测试断言计划内容 + 库未被修改。 */
 const open: Database[] = [];

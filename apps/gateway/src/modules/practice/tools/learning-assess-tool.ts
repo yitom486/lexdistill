@@ -4,7 +4,7 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
+} from '@lexdistill/tool-core';
 import {
   ok,
   err,
@@ -14,12 +14,12 @@ import {
   extractErrorText,
   generateId,
   translateToBusinessError,
-} from '@study-studio/shared';
-import type { LearnerRepository } from '@study-studio/learner-core';
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+} from '@lexdistill/shared';
+import type { LearnerRepository } from '@lexdistill/learner-core';
+import type { AgentAdapter } from '@lexdistill/agent-runtime';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { artifactInputHash } from '@study-studio/storage-sqlite';
-import { logger } from '@study-studio/shared';
+import { artifactInputHash } from '@lexdistill/storage-sqlite';
+import { logger } from '@lexdistill/shared';
 
 export const LearningAssessInputSchema = z.object({
   action: z.enum(['grade', 'diagnose', 'grade_batch']).optional(),

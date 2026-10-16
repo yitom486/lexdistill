@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import type { TextbookLearningContent } from '@study-studio/document-model';
+import type { TextbookLearningContent } from '@lexdistill/document-model';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.js';
 import { exerciseNames, PreviewExercise } from './PreviewExercise.js';
 import { ExerciseModelSettings } from './ExerciseModelSettings.js';
-import type { ExerciseSnapshot } from '@study-studio/protocol';
+import type { ExerciseSnapshot } from '@lexdistill/protocol';
 import { ExerciseHistory } from './ExerciseHistory.js';
 
 export function PreviewExercises({ exercises, scope, temporary = true }: { exercises: TextbookLearningContent['exercises']; scope?: Omit<ExerciseSnapshot, 'exercise'> | undefined; temporary?: boolean }) {

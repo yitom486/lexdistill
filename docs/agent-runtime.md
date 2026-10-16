@@ -1,4 +1,4 @@
-# Lingua Studio - Agent 运行时架构规格说明书 (Agent Runtime Specification)
+# LexDistill - Agent 运行时架构规格说明书 (Agent Runtime Specification)
 
 > **文档版本**：v1.0  
 > **所属包定义**：`packages/agent-runtime`（`src/contracts` 接口抽象 ＋ `src/adapters` Codex/Responses 适配器）
@@ -105,7 +105,7 @@ export type AgentEvent =
 
 ```
 ┌──────────────────────────────────────┐          ┌──────────────────────────────────────┐
-│        Codex App Server 原生机制      │          │       Lingua Studio 统一抽象          │
+│        Codex App Server 原生机制      │          │       LexDistill 统一抽象          │
 ├──────────────────────────────────────┤          ├──────────────────────────────────────┤
 │ Thread                               │ ◄──────► │ AgentSession                         │
 │ Turn                                 │ ◄──────► │ 单次 send() 轮次周期                  │

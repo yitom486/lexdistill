@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { ok, err, isOk, isErr, BusinessError } from '@study-studio/shared';
+import { ok, err, isOk, isErr, BusinessError } from '@lexdistill/shared';
 import {
   buildAnalysisSnapshot,
   type AnalysisSnapshotPorts,
 } from '../index.js';
-import type { LearnerProfileSnapshot } from '@study-studio/learner-core';
+import type { LearnerProfileSnapshot } from '@lexdistill/learner-core';
 
 /** M7-10 快照组装用例测试（port 桩，不碰 Repository/时钟）。 */
 const ASSEMBLED_AT = '2026-09-07T12:00:00.000Z';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { StructuredExercise, ContentDirectoryNode } from '@study-studio/document-model';
+import type { StructuredExercise, ContentDirectoryNode } from '@lexdistill/document-model';
 import { DirectoryGroups } from './DirectoryGroups.js';
 import { Button } from '../ui/button.js';
 import { ContentSource } from './ContentSource.js';

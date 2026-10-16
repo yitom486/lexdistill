@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { Hono } from 'hono';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
+import { SqliteQuestionGenerationRepository } from '@lexdistill/storage-sqlite';
 import { GenerationTaskService } from '../modules/question-generation/service.js';
 import { GenerationRunManager } from '../modules/question-generation/run-manager.js';
-import { ToolRegistry } from '@study-studio/tool-core';
+import { ToolRegistry } from '@lexdistill/tool-core';
 import { createGenerationRoutes } from '../modules/question-generation/http/generation-routes.js';
 import type { GatewayDeps } from '../composition/gateway-deps.js';
 import { listPresets, resolvePreset } from '../modules/question-generation/presets.js';
@@ -47,7 +47,7 @@ describe('P4 presets resolve server-side with the same gates', () => {
       .toMatchObject({ language: 'en', languageBasis: 'visible-default', presetId: 'comprehensive', presetBasis: 'visible-default' });
   });
   it('suggests listening focus from unresolved listening mistakes', async () => {
-    const { createMistakeEntry } = await import('@study-studio/learner-core');
+    const { createMistakeEntry } = await import('@lexdistill/learner-core');
     const repo = new DrizzleLearnerRepository(':memory:');
     try {
       const userId = 'p4_mistakes';

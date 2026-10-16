@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { logger } from '@study-studio/shared';
+import { logger } from '@lexdistill/shared';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { normalizeTrackLanguage } from '../learning/learning-shell.js';

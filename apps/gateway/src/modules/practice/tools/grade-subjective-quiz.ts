@@ -4,12 +4,12 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
+} from '@lexdistill/tool-core';
 import {
   type QuizGradingResult,
   QuizGradingResultSchema,
   type ErrorDiagnosis,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import {
   ok,
   err,
@@ -17,11 +17,11 @@ import {
   BusinessError,
   generateId,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   type LearnerRepository,
   createMistakeEntry,
-} from '@study-studio/learner-core';
+} from '@lexdistill/learner-core';
 
 export const GradeSubjectiveQuizInputSchema = z.object({
   questionId: z.string(),

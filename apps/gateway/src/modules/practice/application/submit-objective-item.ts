@@ -1,6 +1,6 @@
-import { BusinessError, err, isOk, type Result } from '@study-studio/shared';
-import type { LearnerRepository } from '@study-studio/learner-core';
-import type { PracticeItemAttempt } from '@study-studio/protocol';
+import { BusinessError, err, isOk, type Result } from '@lexdistill/shared';
+import type { LearnerRepository } from '@lexdistill/learner-core';
+import type { PracticeItemAttempt } from '@lexdistill/protocol';
 import { gradeObjectiveAnswer } from './practice-grading.js';
 
 type Repository = Pick<LearnerRepository, 'getPracticeRunItems' | 'getPracticePlanRun' | 'submitPracticeItem'>;

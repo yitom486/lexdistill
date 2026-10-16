@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { ok, err, BusinessError } from '@study-studio/shared';
-import type { PracticeBlockSpec, ReadingPassageSet } from '@study-studio/protocol';
+import { ok, err, BusinessError } from '@lexdistill/shared';
+import type { PracticeBlockSpec, ReadingPassageSet } from '@lexdistill/protocol';
 import {
   buildReadingQuestions,
   type ReadingQuestionPorts,

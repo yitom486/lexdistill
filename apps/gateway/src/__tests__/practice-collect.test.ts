@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { LearningContentTool } from '../modules/learning-content/public.js';
 import { maybeCollect } from '../modules/learning-content/application/actions/shared.js';
-import type { GeneratedQuestion } from '@study-studio/protocol';
-import { isOk } from '@study-studio/shared';
+import type { GeneratedQuestion } from '@lexdistill/protocol';
+import { isOk } from '@lexdistill/shared';
 import { app } from '../index.js';
 
 describe('practice collections / collect', () => {

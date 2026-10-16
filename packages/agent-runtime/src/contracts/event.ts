@@ -1,4 +1,4 @@
-import type { BusinessError, ErrorCategory } from '@study-studio/shared';
+import type { BusinessError, ErrorCategory } from '@lexdistill/shared';
 
 /**
  * 业务层标准规范化的 Agent 内部事件流

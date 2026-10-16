@@ -1,4 +1,4 @@
-import { BusinessError, err, ok, type Result } from '@study-studio/shared';
+import { BusinessError, err, ok, type Result } from '@lexdistill/shared';
 import {
   MASTERY_UNLOCK_RATIO,
   isVocabularyAllowed,
@@ -8,9 +8,9 @@ import {
   type VocabMastery,
   unitsForTrack,
   selectCourseWords,
-} from '@study-studio/learner-core';
-import type { DailyPickOrder, DailyPickResponse, JlptLevel } from '@study-studio/protocol';
-import { bankJlptLevel, type WordlistGroup } from '@study-studio/storage-sqlite';
+} from '@lexdistill/learner-core';
+import type { DailyPickOrder, DailyPickResponse, JlptLevel } from '@lexdistill/protocol';
+import { bankJlptLevel, type WordlistGroup } from '@lexdistill/storage-sqlite';
 
 export interface DailyPickDeps {
   getLearnerProfile(userId: string): Promise<Result<{ learnerLevel: LearnerLevel; dailyGoalNewWords: number; wordLevelFilter: string[] | null }, BusinessError>>;

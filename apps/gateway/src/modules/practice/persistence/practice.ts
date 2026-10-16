@@ -8,15 +8,15 @@ import {
   generateId,
   nowIso,
   isOk,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type {
   PracticeCollection,
   PracticeItem,
   GeneratedQuestion,
   Flashcard,
-} from '@study-studio/protocol';
-import { practiceCollections, practiceItems } from '@study-studio/storage-sqlite';
-import { initFsrsState } from '@study-studio/learning-algorithms';
+} from '@lexdistill/protocol';
+import { practiceCollections, practiceItems } from '@lexdistill/storage-sqlite';
+import { initFsrsState } from '@lexdistill/learning-algorithms';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { resolveActiveLanguage } from '../../learning-progress/public.js';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { ok, err, isOk, BusinessError } from '@study-studio/shared';
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
+import { ok, err, isOk, BusinessError } from '@lexdistill/shared';
+import type { AgentAdapter, AgentSession } from '@lexdistill/agent-runtime';
 import {
   enrichBookLessons,
   enrichLessonVocab,

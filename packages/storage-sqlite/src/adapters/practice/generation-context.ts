@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
-import { ChapterManifestSchema } from '@study-studio/document-model';
-import { BusinessError } from '@study-studio/shared';
-import { GenerationConfigSchema, type GenerationBinding, type GenerationConfig, type ReadGenerationTextbook } from '@study-studio/protocol';
+import { ChapterManifestSchema } from '@lexdistill/document-model';
+import { BusinessError } from '@lexdistill/shared';
+import { GenerationConfigSchema, type GenerationBinding, type GenerationConfig, type ReadGenerationTextbook } from '@lexdistill/protocol';
 import { fingerprintCanonical } from '../../canonical-fingerprint.js';
 
 export interface GenerationContext { sqlite: Database; binding: GenerationBinding; config: GenerationConfig }

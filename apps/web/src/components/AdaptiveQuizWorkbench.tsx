@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { Sparkles, Loader2 } from 'lucide-react';
-import { inferLanguageFromSkillId } from '@study-studio/shared';
-import { GeneratedQuestionSchema } from '@study-studio/protocol';
+import { inferLanguageFromSkillId } from '@lexdistill/shared';
+import { GeneratedQuestionSchema } from '@lexdistill/protocol';
 import { Button } from './ui/button.js';
 import { Tabs, TabsList, TabsTrigger, TabsIndicator } from './ui/tabs.js';
 import { SubjectiveWritingWorkbench } from './SubjectiveWritingWorkbench.js';

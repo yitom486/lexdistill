@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { BusinessError, err } from '@study-studio/shared';
+import { BusinessError, err } from '@lexdistill/shared';
 import { harnessInjection, stubPoolDriver, type ChapterScript } from './agentpool-pipeline-harness.js';
 import { requiredContent } from './textbook-pipeline-fixtures.js';
 import type { McpChapterScope } from '../mcp/textbook-mcp-scope.js';

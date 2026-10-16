@@ -2,8 +2,8 @@ import type {
   LearningAnalysisReport,
   LearningSuggestion,
   LearningSuggestionKind,
-} from '@study-studio/protocol';
-import type { AnalysisSnapshot } from '@study-studio/learning';
+} from '@lexdistill/protocol';
+import type { AnalysisSnapshot } from '@lexdistill/learning';
 
 /**
  * M7-8 自 Gateway `learning-progress/application/learning-analysis.ts` 迁入
@@ -11,12 +11,12 @@ import type { AnalysisSnapshot } from '@study-studio/learning';
  * 本包不读当前时间，单测完全确定性）。
  *
  * 学习分析中的确定性内容规则：模型 JSON 宽容解析、本地规则回退。
- * 快照类型正典自 M7-10 起归 `@study-studio/learning`（此处重出不断链）；
+ * 快照类型正典自 M7-10 起归 `@lexdistill/learning`（此处重出不断链）；
  * 快照组装、缓存、Agent 会话、模型调用、错误翻译仍归 Gateway。
  */
 
 /** 快照类型正典（learning）；重出以保持既有消费链路不动。 */
-export type { AnalysisSnapshot } from '@study-studio/learning';
+export type { AnalysisSnapshot } from '@lexdistill/learning';
 
 export interface ParsedAnalysis {
   summary: string;

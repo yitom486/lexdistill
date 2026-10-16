@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
-import { BusinessError, isOk, ok, err } from '@study-studio/shared';
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
+import { BusinessError, isOk, ok, err } from '@lexdistill/shared';
+import type { AgentAdapter, AgentSession } from '@lexdistill/agent-runtime';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import {
   generateTermExamples,

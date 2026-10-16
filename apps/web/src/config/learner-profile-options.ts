@@ -2,8 +2,8 @@
  * 学情画像：备考赛道与能力梯度配置。
  * 按目标语种大类分组；组件内只做列表渲染。
  */
-import type { StudyGoal, LearnerLevel } from '@study-studio/protocol';
-import type { TargetLanguage } from '@study-studio/learner-core';
+import type { StudyGoal, LearnerLevel } from '@lexdistill/protocol';
+import type { TargetLanguage } from '@lexdistill/learner-core';
 
 export interface StudyGoalOption {
   id: StudyGoal;

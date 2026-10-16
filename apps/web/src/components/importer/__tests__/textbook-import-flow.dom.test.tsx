@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { planTextbookTasks, type SaveTextbookOutlineRequest, type TocEntry } from '@study-studio/document-model';
-import type { TextbookInspectionResult, TextbookInspectionDocSummary } from '@study-studio/protocol';
+import { planTextbookTasks, type SaveTextbookOutlineRequest, type TocEntry } from '@lexdistill/document-model';
+import type { TextbookInspectionResult, TextbookInspectionDocSummary } from '@lexdistill/protocol';
 import { useTextbookImportFlow } from '../useTextbookImportFlow.js';
 import { TextbookImportInspection } from '../TextbookImportInspection.js';
 import { TextbookPageMapping } from '../TextbookPageMapping.js';

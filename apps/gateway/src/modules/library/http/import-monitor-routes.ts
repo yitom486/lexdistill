@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
-import { TextbookASTSchema, planTextbookTasks, SavedTextbookContentSchema } from '@study-studio/document-model';
-import { BusinessError } from '@study-studio/shared';
+import { TextbookASTSchema, planTextbookTasks, SavedTextbookContentSchema } from '@lexdistill/document-model';
+import { BusinessError } from '@lexdistill/shared';
 import type { ContentRepository } from '../ports.js';
 import { getImportMonitorWarning, IMPORT_MONITOR_REFRESH_MS } from '../application/import-monitor.js';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';

@@ -12,7 +12,7 @@ export * from './runtime/session/session-manager.js';
 export * from './runtime/context/context-builder.js';
 export * from './runtime/router/tool-router.js';
 export * from './runtime/router/agent-router.js';
-export * from '@study-studio/storage-sqlite';
+export * from '@lexdistill/storage-sqlite';
 export * from './infrastructure/drizzle-learner-repository.js';
 export * from './errors/http-error-handler.js';
 

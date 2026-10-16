@@ -4,8 +4,8 @@ import {
   type ToolRegistry,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { err, ok, type Result, type BusinessError } from '@study-studio/shared';
+} from '@lexdistill/tool-core';
+import { err, ok, type Result, type BusinessError } from '@lexdistill/shared';
 import {
   VocabularyLearningContextInputSchema,
   type VocabularyLearningContextInput,

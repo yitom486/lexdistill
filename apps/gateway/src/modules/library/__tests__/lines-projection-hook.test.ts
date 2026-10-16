@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, afterAll } from 'bun:test';
-import { err, ok, BusinessError } from '@study-studio/shared';
+import { err, ok, BusinessError } from '@lexdistill/shared';
 import { fireLinesProjection } from '../application/lines-projection-hook.js';
 
 /**

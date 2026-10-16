@@ -1,5 +1,5 @@
 import { hc } from 'hono/client';
-import type { GatewayAppType } from '@study-studio/gateway';
+import type { GatewayAppType } from '@lexdistill/gateway';
 
 export const DEFAULT_GATEWAY_BASE_URL = 'http://localhost:8080';
 

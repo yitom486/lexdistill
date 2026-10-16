@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import type { ContextSnapshot } from '@study-studio/agent-runtime';
+import type { ContextSnapshot } from '@lexdistill/agent-runtime';
 import type { useAgentGateway } from '../../hooks/useAgentGateway.js';
 import { sound } from '../../utils/audio.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';

@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
 import { and, eq, max } from 'drizzle-orm';
-import { TextbookWriteSchemas, ChapterManifestSchema, type ChapterManifest, type TextbookContentKind } from '@study-studio/document-model';
-import { BusinessError, err, generateId, nowIso, ok, translateToBusinessError, type Result } from '@study-studio/shared';
+import { TextbookWriteSchemas, ChapterManifestSchema, type ChapterManifest, type TextbookContentKind } from '@lexdistill/document-model';
+import { BusinessError, err, generateId, nowIso, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
 import { rebuildTextbookSearchInTx } from './textbook-search-index.js';
 import type { DrizzleDb } from '../../connection.js';
 import { documents, globalVocabulary, textbookVocabulary, textbookKnowledge, textbookArticles, textbookSentences, textbookExerciseItems, textbookMaterials } from '../../schema.js';
 
-export { ChapterManifestSchema, type ChapterManifest } from '@study-studio/document-model';
+export { ChapterManifestSchema, type ChapterManifest } from '@lexdistill/document-model';
 export interface TextbookScope { userId: string; documentId: string; chapterId: string }
 export interface ContentWriteReceipt { kind: TextbookContentKind; saved: number; vocabularyAdded: number }
 type Tx = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];

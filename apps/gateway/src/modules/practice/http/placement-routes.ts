@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
-import { BusinessError, isOk } from '@study-studio/shared';
-import type { LearnerLevel } from '@study-studio/protocol';
+import { BusinessError, isOk } from '@lexdistill/shared';
+import type { LearnerLevel } from '@lexdistill/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 

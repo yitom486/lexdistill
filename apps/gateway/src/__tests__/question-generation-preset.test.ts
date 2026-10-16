@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { initSchema, SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
+import { initSchema, SqliteQuestionGenerationRepository } from '@lexdistill/storage-sqlite';
 import { GenerationTaskService } from '../modules/question-generation/service.js';
 import { buildQuickPracticePreset } from '../modules/question-generation/preset.js';
 import { binding, config } from './question-generation.fixtures.js';

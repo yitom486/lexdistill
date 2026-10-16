@@ -1,5 +1,5 @@
 {
-  "name": "study-studio-monorepo",
+  "name": "lexdistill-monorepo",
   "version": "0.1.2",
   "private": true,
   "workspaces": [
@@ -8,12 +8,12 @@
   ],
   "scripts": {
     "dev:web": "bun scripts/dev-run.ts",
-    "dev:web:parallel": "bun --parallel --filter @study-studio/web --filter @study-studio/gateway dev",
+    "dev:web:parallel": "bun --parallel --filter @lexdistill/web --filter @lexdistill/gateway dev",
     "dev:clean": "bun scripts/dev-clean.ts",
-    "dev:gateway": "bun --filter @study-studio/gateway dev",
+    "dev:gateway": "bun --filter @lexdistill/gateway dev",
     "dev:desktop": "bun scripts/dev-desktop.ts",
     "build": "bun --filter \"*\" build",
-    "build:sidecar": "bun run --filter @study-studio/gateway sidecar:build",
+    "build:sidecar": "bun run --filter @lexdistill/gateway sidecar:build",
     "typecheck": "tsc -b --force",
     "test:all": "bun test --path-ignore-patterns \"**/dist/**\"",
     "test": "bun run test:all",

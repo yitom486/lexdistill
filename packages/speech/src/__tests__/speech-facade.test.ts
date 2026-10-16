@@ -13,8 +13,8 @@ import {
   mapAzureVoiceList,
   normalizeTtsTrackLanguage,
   openAiSpeechHeaders,
-} from '@study-studio/speech';
-import type { AzureVoiceOption, TtsTrackLanguage } from '@study-studio/speech';
+} from '@lexdistill/speech';
+import type { AzureVoiceOption, TtsTrackLanguage } from '@lexdistill/speech';
 
 /**
  * C1 Speech 自检（所属包内断言，无反向边）。
@@ -75,7 +75,7 @@ describe('C1 speech 入口', () => {
       throw new Error('apps/gateway/package.json missing dependencies');
     }
     const table = deps as Record<string, unknown>;
-    expect(table['@study-studio/speech']).toBe('workspace:*');
+    expect(table['@lexdistill/speech']).toBe('workspace:*');
   });
 
   it('apps/web 引用的 workspace 包必须现存（删包即断链；悬挂引用零容忍）', async () => {
@@ -86,15 +86,15 @@ describe('C1 speech 入口', () => {
     const bad: string[] = [];
     const collect = (text: string, full: string): void => {
       const patterns = [
-        /from\s+['"]@study-studio\/([^/'"]+)(?:\/[^'"]*)?['"]/g,
-        /import\(\s*['"]@study-studio\/([^/'"]+)(?:\/[^'"]*)?['"]/g,
+        /from\s+['"]@lexdistill\/([^/'"]+)(?:\/[^'"]*)?['"]/g,
+        /import\(\s*['"]@lexdistill\/([^/'"]+)(?:\/[^'"]*)?['"]/g,
       ];
       for (const pattern of patterns) {
         for (const m of text.matchAll(pattern)) {
           const pkg = m[1] as string;
           // apps 内应用互引（web → gateway）走 tsconfig paths，不在 packages 集合内，属既有状态，此处放行。
           if (pkg === 'gateway') continue;
-          if (!live.has(pkg)) bad.push(`${full}: @study-studio/${pkg}`);
+          if (!live.has(pkg)) bad.push(`${full}: @lexdistill/${pkg}`);
         }
       }
     };

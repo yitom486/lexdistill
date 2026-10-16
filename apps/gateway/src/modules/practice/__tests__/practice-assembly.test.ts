@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import {
   assemblePracticeRun,
@@ -8,7 +8,7 @@ import {
   buildTranslationQuestionsFromCards,
 } from '../application/practice-assembly.js';
 import { LearningContentTool } from '../../learning-content/public.js';
-import type { Flashcard, PracticeBlockSpec } from '@study-studio/protocol';
+import type { Flashcard, PracticeBlockSpec } from '@lexdistill/protocol';
 
 describe('practice assembly by block spec (P5-E4)', () => {
   let repo: DrizzleLearnerRepository;

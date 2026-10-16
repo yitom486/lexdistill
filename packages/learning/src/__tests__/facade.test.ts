@@ -33,8 +33,8 @@ import {
   summarizeLearningEvidence as summarizeViaCore,
   recordSkillAttempt as recordViaCore,
   buildProfileSnapshot as snapshotViaCore,
-} from '@study-studio/learner-core';
-import type { FsrsState as FsrsStateViaCore } from '@study-studio/learning-algorithms';
+} from '@lexdistill/learner-core';
+import type { FsrsState as FsrsStateViaCore } from '@lexdistill/learning-algorithms';
 
 /** C6 learning 表面锁：具名导出即本包子目录的实现本身，不漂移、不包装。 */
 describe('learning 入口', () => {

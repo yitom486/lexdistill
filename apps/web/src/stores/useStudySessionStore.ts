@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { GeneratedQuestion } from '@study-studio/protocol';
-import type { DailyPlanStepKind, DailyPlanStepTemplate, DailyPlanNavigateTarget } from '@study-studio/learner-core';
+import type { GeneratedQuestion } from '@lexdistill/protocol';
+import type { DailyPlanStepKind, DailyPlanStepTemplate, DailyPlanNavigateTarget } from '@lexdistill/learner-core';
 import type { AiTutorContext } from './tutor-context.js';
 import { usePreferencesStore } from './usePreferencesStore.js';
 
@@ -210,8 +210,28 @@ export const useStudySessionStore = create<StudySessionState>()(
   },
     }),
     {
-      name: 'lingua_studio_session',
-      storage: createJSONStorage(() => sessionStorage),
+      name: 'lexdistill_session',
+      storage: createJSONStorage(() => ({
+        getItem: (name: string) => {
+          try {
+            const current = sessionStorage.getItem(name);
+            if (current !== null) return current;
+            return sessionStorage.getItem('lingua_studio_session');
+          } catch {
+            return null;
+          }
+        },
+        setItem: (name: string, val: string) => {
+          try {
+            sessionStorage.setItem(name, val);
+          } catch {}
+        },
+        removeItem: (name: string) => {
+          try {
+            sessionStorage.removeItem(name);
+          } catch {}
+        },
+      })),
       partialize: (state) => ({
         activeTab: state.activeTab,
         cardFilter: state.cardFilter,

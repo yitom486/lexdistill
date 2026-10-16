@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { ok, err, isOk, type Result, BusinessError, translateToBusinessError } from '@study-studio/shared';
-import { TextbookASTSchema } from '@study-studio/document-model';
-import type { DocumentItem, TextbookInspectionDocSummary, TextbookInspectionResult } from '@study-studio/protocol';
+import { ok, err, isOk, type Result, BusinessError, translateToBusinessError } from '@lexdistill/shared';
+import { TextbookASTSchema } from '@lexdistill/document-model';
+import type { DocumentItem, TextbookInspectionDocSummary, TextbookInspectionResult } from '@lexdistill/protocol';
 import type { ContentRepository } from '../ports.js';
 import { readLocalPdfFile } from './pdf-import/local-file.js';
 

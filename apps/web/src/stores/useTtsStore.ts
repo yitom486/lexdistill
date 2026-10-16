@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { TtsPurpose } from '@study-studio/speech';
+import { createMigratedStorage } from './store-storage.js';
+import type { TtsPurpose } from '@lexdistill/speech';
 import {
   speechStudio,
   type SpeechStudioConfig,
@@ -202,7 +203,8 @@ export const useTtsStore = create<TtsStoreState>()(
       };
     },
     {
-      name: 'study_studio_tts_config',
+      name: 'lexdistill_tts_config',
+      storage: createMigratedStorage(['study_studio_tts_config']),
       version: 2,
       migrate: migrateTtsPreferences,
       partialize: (state) => ({

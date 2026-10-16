@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ImportEvent } from '@study-studio/document-model';
+import type { ImportEvent } from '@lexdistill/document-model';
 
 const messageSchema = z.object({ text: z.string().optional(), reasoning: z.string().optional() });
 const failureSchema = z.object({ code: z.string().optional(), message: z.string(), retryable: z.boolean().optional(), details: z.unknown().optional() });

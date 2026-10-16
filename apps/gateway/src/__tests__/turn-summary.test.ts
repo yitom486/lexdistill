@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { GatewayServer } from '../runtime/gateway-runtime.js';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { WsEventTypes, type WsEnvelope, type TurnExecutionSummary } from '@study-studio/protocol';
-import { isOk, ok, err, BusinessError } from '@study-studio/shared';
+import { WsEventTypes, type WsEnvelope, type TurnExecutionSummary } from '@lexdistill/protocol';
+import { isOk, ok, err, BusinessError } from '@lexdistill/shared';
 import { buildTurnExecutionSummary, formatAgentLocalFallbackNote } from '../runtime/turn-summary-builder.js';
-import type { AgentEvent, AgentSession } from '@study-studio/agent-runtime';
-import type { Result } from '@study-studio/shared';
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import type { AgentEvent, AgentSession } from '@lexdistill/agent-runtime';
+import type { Result } from '@lexdistill/shared';
+import type { AgentAdapter } from '@lexdistill/agent-runtime';
 import { memoryAcpLedgerBackend } from '../runtime/acp-history/acp-conversation-ledger.js';
 
 // ---------------------------------------------------------------------------

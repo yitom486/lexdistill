@@ -1,4 +1,4 @@
-import type { TextbookInspectionDocSummary, TextbookInspectionResult } from '@study-studio/protocol';
+import type { TextbookInspectionDocSummary, TextbookInspectionResult } from '@lexdistill/protocol';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { ImportOptions } from './ImportOptions.js';

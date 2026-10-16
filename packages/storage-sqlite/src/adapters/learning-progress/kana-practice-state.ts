@@ -3,7 +3,7 @@ import type {
   KanaPracticeMemory,
   KanaPracticeScriptType,
   FsrsState,
-} from '@study-studio/learner-core';
+} from '@lexdistill/learner-core';
 import { kanaPracticeStates } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
 

@@ -1,4 +1,4 @@
-import { logger } from '@study-studio/shared';
+import { logger } from '@lexdistill/shared';
 import { detectTauri } from './capabilities.js';
 
 export interface AvailableAppUpdate {

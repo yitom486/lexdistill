@@ -20,7 +20,7 @@ it('TTS provider failure → gateway SSE → playback warning and error callback
   const { createTtsRoutes } = await import('../../../../gateway/src/transport/http/tts-routes.js');
   const { LocalTTSError } = await import('gemini-tts-studio/server');
   const { speechStudio } = await import('../../utils/audio.js');
-  const { BusinessError } = await import('@study-studio/shared');
+  const { BusinessError } = await import('@lexdistill/shared');
   const { fetchTtsStream, TtsStreamError } = await import('../tts-stream.js');
   const originalFetch = globalThis.fetch;
   let upstreamError: unknown;

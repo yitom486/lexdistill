@@ -12,8 +12,8 @@ import type {
   AgentPoolDriver,
   AgentPoolDriverOptions,
   AgentPoolLease,
-} from '@study-studio/agent-runtime';
-import { BusinessError, isOk } from '@study-studio/shared';
+} from '@lexdistill/agent-runtime';
+import { BusinessError, isOk } from '@lexdistill/shared';
 import { resolveAcpPoolAgent } from './acp-pool-agent.js';
 
 interface AgentpoolsLeaseLike {

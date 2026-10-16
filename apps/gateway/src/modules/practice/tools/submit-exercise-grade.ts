@@ -1,6 +1,6 @@
-import { SubmitExerciseGradeSchema, type ExerciseGrade, type TextbookExerciseAttempt } from '@study-studio/protocol';
-import { ToolLocations, ToolPermissions, type ToolDefinition, type ToolExecutionContext } from '@study-studio/tool-core';
-import { BusinessError, err, type Result } from '@study-studio/shared';
+import { SubmitExerciseGradeSchema, type ExerciseGrade, type TextbookExerciseAttempt } from '@lexdistill/protocol';
+import { ToolLocations, ToolPermissions, type ToolDefinition, type ToolExecutionContext } from '@lexdistill/tool-core';
+import { BusinessError, err, type Result } from '@lexdistill/shared';
 
 export interface GradeBinding {
   userId: string; active: boolean; repairs: number; repairLimit: number;

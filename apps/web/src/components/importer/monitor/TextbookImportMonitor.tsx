@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
+import type { TextbookPipelineJobSnapshot } from '@lexdistill/protocol';
 import { useImportMonitorQuery, useSavedTextbookContent } from '../../../queries/textbook-import-monitor.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs.js';
 import { Button } from '../../ui/button.js';

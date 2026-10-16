@@ -1,5 +1,5 @@
-import type { CardReviewRating } from '@study-studio/protocol';
-import { addDays, err, nowIso, ok, type Result, BusinessError } from '@study-studio/shared';
+import type { CardReviewRating } from '@lexdistill/protocol';
+import { addDays, err, nowIso, ok, type Result, BusinessError } from '@lexdistill/shared';
 import type { ReviewScheduler, SchedulerInput, SchedulerOutput } from './contracts.js';
 
 /**

@@ -1,11 +1,11 @@
 import { describe, expect, it, afterEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
-import type { StructureClass } from '@study-studio/protocol';
+import { isOk } from '@lexdistill/shared';
+import type { StructureClass } from '@lexdistill/protocol';
 import {
   markdownToAst,
   groupSectionsByClasses,
   groundClassesByTitle,
-} from '@study-studio/content';
+} from '@lexdistill/content';
 import { convertPdfToAst } from '../application/pdf-import/pdf-import-service.js';
 import { extractRequestClasses } from '../http/pdf-import-routes.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';

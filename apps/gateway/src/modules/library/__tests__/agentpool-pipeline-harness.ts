@@ -4,7 +4,7 @@
  * 生产 ask 由真实模型发起；测试里 ask 只计数，内容由 onChapterScope 脚本
  * 经 scope.submission 直接提交（走真实校验、暂存与事务），与提示词文本无关。
  */
-import type { AgentPoolDriver, AgentPoolLease } from '@study-studio/agent-runtime';
+import type { AgentPoolDriver, AgentPoolLease } from '@lexdistill/agent-runtime';
 import { TextbookMcpRegistry } from '../mcp/textbook-mcp-server.js';
 import type { McpChapterScope } from '../mcp/textbook-mcp-scope.js';
 import type { LessonExtractionJob } from '../application/lesson-batch-extractor.js';

@@ -5,7 +5,7 @@ import {
   ok,
   type Result,
   translateToBusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   backfillPitchPronunciation,
   insertEntries,
@@ -14,13 +14,13 @@ import {
   type DictionaryPackage,
   type DictionaryPackageManifest,
 } from './dictionary-packages.js';
-import { extractZip } from '@study-studio/archive';
+import { extractZip } from '@lexdistill/archive';
 import {
   parseIndex,
   parseYomitanDictionary,
   slugifyTitle,
   type YomitanPitchRow,
-} from '@study-studio/lexicon';
+} from '@lexdistill/lexicon';
 
 /**
  * Yomitan 词典包导入（clean-room 实现，未复制 Yomitan GPL 代码）。

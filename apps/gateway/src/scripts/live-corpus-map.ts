@@ -1,6 +1,6 @@
 import { stat, readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import {
   mapPdfPages,
   MAX_MAP_PAGES,
@@ -9,13 +9,13 @@ import {
 
 /**
  * 本机私人教材结构预览探针（只读 opt-in）。
- * - 只认环境变量 STUDY_STUDIO_LIVE_PDF；未设置 → 打印用法并 exit 0（CI 安全，不碰磁盘）；
+ * - 只认环境变量 LEXDISTILL_LIVE_PDF；未设置 → 打印用法并 exit 0（CI 安全，不碰磁盘）；
  * - 文件缺失/非法 → 友好错误，非 0 退出，不抛底层栈；
  * - 只调现有 mapPdfPages（窗口默认 ≤ MAX_MAP_PAGES=30），只打印摘要，不 dump 全文；
- * - 禁止 saveCanonicalAst、不写默认生产 study-studio.db（本脚本无任何写库代码）。
+ * - 禁止 saveCanonicalAst、不写默认生产 lexdistill.db（本脚本无任何写库代码）。
  * 验收剧本见 docs/pdf-live-corpus-playbook.md。
  */
-export const LIVE_PDF_ENV = 'STUDY_STUDIO_LIVE_PDF';
+export const LIVE_PDF_ENV = 'LEXDISTILL_LIVE_PDF';
 
 export function usageText(): string {
   return [

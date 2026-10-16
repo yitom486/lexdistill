@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { TextbookExerciseAttemptSchema, TextbookExerciseHistorySchema, TextbookGrowthResponseSchema, type SubmitTextbookExercise } from '@study-studio/protocol';
-import { BusinessError, translateToBusinessError } from '@study-studio/shared';
+import { TextbookExerciseAttemptSchema, TextbookExerciseHistorySchema, TextbookGrowthResponseSchema, type SubmitTextbookExercise } from '@lexdistill/protocol';
+import { BusinessError, translateToBusinessError } from '@lexdistill/shared';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';

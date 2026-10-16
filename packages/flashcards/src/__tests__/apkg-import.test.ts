@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { ok, err, isOk, isErr, BusinessError } from '@study-studio/shared';
+import { ok, err, isOk, isErr, BusinessError } from '@lexdistill/shared';
 import {
   importParsedApkgNotes,
   type ApkgImportPorts,

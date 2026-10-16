@@ -15,7 +15,7 @@ const GATEWAY_VERSION = process.env.npm_package_version ?? 'dev';
 function healthBody(deps: GatewayDeps): Record<string, string | number> {
   return {
     status: 'ok',
-    service: 'Lingua Studio Agent Gateway',
+    service: 'LexDistill Agent Gateway',
     port: deps.port,
     timestamp: Date.now(),
     bootId: BOOT_ID,

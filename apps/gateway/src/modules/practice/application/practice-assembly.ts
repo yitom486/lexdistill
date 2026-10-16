@@ -1,9 +1,9 @@
-import { ok, err, isOk, type Result, BusinessError, generateId } from '@study-studio/shared';
-import type { Flashcard, GeneratedQuestion, PracticeBlockSpec, PracticePlanRun, LearnerLevel } from '@study-studio/protocol';
-import { isLessonLocked, isQuestionAllowed, resolveStudyGate, tierCapForLevel } from '@study-studio/learner-core';
-import type { AssessmentBlueprint } from '@study-studio/learning';
+import { ok, err, isOk, type Result, BusinessError, generateId } from '@lexdistill/shared';
+import type { Flashcard, GeneratedQuestion, PracticeBlockSpec, PracticePlanRun, LearnerLevel } from '@lexdistill/protocol';
+import { isLessonLocked, isQuestionAllowed, resolveStudyGate, tierCapForLevel } from '@lexdistill/learner-core';
+import type { AssessmentBlueprint } from '@lexdistill/learning';
 import type { LearningRepository } from '../ports.js';
-import type { LearnerRepository } from '@study-studio/learner-core';
+import type { LearnerRepository } from '@lexdistill/learner-core';
 import type { ContentRepository } from '../../library/ports.js';
 import type { PersistableQuestion } from '../persistence/questions.js';
 import type { LearningContentInput, LearningContentOutput } from '../../learning-content/public.js';
@@ -15,7 +15,7 @@ import {
   mapPoolQuestion,
   mapQuestionType,
   type PoolQuestionRow,
-} from '@study-studio/learning';
+} from '@lexdistill/learning';
 
 /**
  * M7-16 题构造兼容出口：实现已迁入练习核心包（经 learning 统一入口转出），
@@ -25,7 +25,7 @@ export {
   acceptedDbTypesForBlock,
   buildVocabQuestionsFromCards,
   buildTranslationQuestionsFromCards,
-} from '@study-studio/learning';
+} from '@lexdistill/learning';
 
 /**
  * P5：练习运行题目装配。

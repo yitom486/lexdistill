@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { applyOrphanCleanup, applySeedSourceFix, REPAIR_ALLOWLIST } from '@study-studio/storage-sqlite';
+import { applyOrphanCleanup, applySeedSourceFix, REPAIR_ALLOWLIST } from '@lexdistill/storage-sqlite';
 
 /** R1-A：首次 apply 有修改，第二次为 0；白名单之外不动。 */
 const open: Database[] = [];
@@ -67,12 +67,12 @@ describe('R1-B seed source fix', () => {
     db.run(`
       CREATE TABLE dictionary_sources (id TEXT PRIMARY KEY, language TEXT NOT NULL, provider TEXT NOT NULL, version TEXT NOT NULL, source_url TEXT NOT NULL, license_name TEXT NOT NULL, license_url TEXT NOT NULL, attribution TEXT NOT NULL, entry_count INTEGER NOT NULL DEFAULT 0, imported_at TEXT NOT NULL);
       CREATE TABLE local_dictionary_entries (id TEXT PRIMARY KEY, language TEXT NOT NULL, headword TEXT NOT NULL, source_id TEXT);
-      INSERT INTO dictionary_sources VALUES ('study-studio-starter-v1-ja','ja','Lingua Studio','v1','u','l','u','a',24,'t');
+      INSERT INTO dictionary_sources VALUES ('lexdistill-starter-v1-ja','ja','LexDistill','v1','u','l','u','a',24,'t');
     `);
     // 旧种子写法：未后缀 source_id；en 源行缺失；第三方悬空一行
     const ins = db.prepare('INSERT INTO local_dictionary_entries VALUES (?,?,?,?)');
-    ins.run('starter_ja_ame', 'ja', '雨', 'study-studio-starter-v1');
-    ins.run('starter_en_apple', 'en', 'apple', 'study-studio-starter-v1');
+    ins.run('starter_ja_ame', 'ja', '雨', 'lexdistill-starter-v1');
+    ins.run('starter_en_apple', 'en', 'apple', 'lexdistill-starter-v1');
     ins.run('third_party_x', 'ja', '第三', 'some-deleted-pack');
     return db;
   }
@@ -82,9 +82,9 @@ describe('R1-B seed source fix', () => {
     open.push(db);
     const first = applySeedSourceFix(db);
     // en 源行被补上
-    expect(first.ensuredSources).toContain('study-studio-starter-v1-en');
-    const ja = first.updated.find((u) => u.group === 'study-studio-starter-v1-ja');
-    const en = first.updated.find((u) => u.group === 'study-studio-starter-v1-en');
+    expect(first.ensuredSources).toContain('lexdistill-starter-v1-en');
+    const ja = first.updated.find((u) => u.group === 'lexdistill-starter-v1-ja');
+    const en = first.updated.find((u) => u.group === 'lexdistill-starter-v1-en');
     expect(ja?.updated).toBe(1);
     expect(en?.updated).toBe(1);
     expect(first.totalUpdated).toBe(2);

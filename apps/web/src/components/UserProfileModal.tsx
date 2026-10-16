@@ -34,8 +34,8 @@ import { toast } from 'sonner';
 import { invalidateAllLearningQueries } from '../queries/useLearnerQueries.js';
 import { getLearningShellConfig } from '../learning/learning-shell.js';
 import { sound } from '../utils/audio.js';
-import type { StudyGoal, LearnerLevel, JlptLevel } from '@study-studio/protocol';
-import type { TargetLanguage } from '@study-studio/learner-core';
+import type { StudyGoal, LearnerLevel, JlptLevel } from '@lexdistill/protocol';
+import type { TargetLanguage } from '@lexdistill/learner-core';
 import {
   LEARNER_LEVELS,
   STUDY_GOAL_TRACK_GROUPS,

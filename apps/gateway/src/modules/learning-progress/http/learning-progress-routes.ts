@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
-import { isOk, BusinessError } from '@study-studio/shared';
-import type { LearnerProfile } from '@study-studio/protocol';
-import type { MistakeEntry } from '@study-studio/learner-core';
+import { isOk, BusinessError } from '@lexdistill/shared';
+import type { LearnerProfile } from '@lexdistill/protocol';
+import type { MistakeEntry } from '@lexdistill/learner-core';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { runLearningAnalysis, buildAnalysisSnapshot } from '../application/learning-analysis.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';

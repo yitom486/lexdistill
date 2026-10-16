@@ -1,6 +1,6 @@
-import type { AgentAdapter, AgentEvent, AgentInput, CreateSessionOptions, AgentSession } from '@study-studio/agent-runtime';
-import type { LessonContent } from '@study-studio/document-model';
-import { BusinessError, err, ok, type Result } from '@study-studio/shared';
+import type { AgentAdapter, AgentEvent, AgentInput, CreateSessionOptions, AgentSession } from '@lexdistill/agent-runtime';
+import type { LessonContent } from '@lexdistill/document-model';
+import { BusinessError, err, ok, type Result } from '@lexdistill/shared';
 import type { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { PDFDocument } from 'pdf-lib';
 
@@ -30,14 +30,14 @@ export function submissionFromPrompt(message: string) {
 }
 export interface ModelTurn {
   sessionId: string; turnId: string; input: AgentInput;
-  submit: (raw: unknown, kind?: import('@study-studio/document-model').TextbookContentKind) => Promise<Result<unknown, BusinessError>>;
+  submit: (raw: unknown, kind?: import('@lexdistill/document-model').TextbookContentKind) => Promise<Result<unknown, BusinessError>>;
 }
 export const requiredContent = {
   grammar: { items: [{ title: '方向表达', explanation: 'へ表示方向。', examples: [{ text: '学校へ行く。' }] }] },
   vocabulary: { items: [{ word: '学校', reading: 'がっこう', meaning: '学校', level: 'N5' }] },
   exercises: { items: [{ type: 'CHOICE', prompt: '方向助词？', options: ['へ', 'を'], answer: 'へ', difficultyTier: 1, difficultyReason: '单一助词识别' }] },
 };
-export async function submitRequired(submit: ModelTurn['submit'], already: readonly import('@study-studio/document-model').TextbookContentKind[] = []) {
+export async function submitRequired(submit: ModelTurn['submit'], already: readonly import('@lexdistill/document-model').TextbookContentKind[] = []) {
   for (const kind of Object.keys(requiredContent) as Array<keyof typeof requiredContent>) {
     if (already.includes(kind)) continue;
     const result = await submit(requiredContent[kind], kind); if (!result.ok) throw result.error;
@@ -56,7 +56,7 @@ export function pipelineModel(tool: TextbookContentTools, handle?: (turn: ModelT
           const callId = `call:${inputs.length}`;
           const turnId = `turn:${inputs.length}`;
           let toolCalls = 0;
-          const submit = (raw: unknown, kind: import('@study-studio/document-model').TextbookContentKind = 'articles') => tool.tools.find(item => item.kind === kind)!.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId: ++toolCalls === 1 ? callId : `${callId}:${toolCalls}`, turnId });
+          const submit = (raw: unknown, kind: import('@lexdistill/document-model').TextbookContentKind = 'articles') => tool.tools.find(item => item.kind === kind)!.execute(raw, { sessionId: options.sessionId, userId: options.userId, callId: ++toolCalls === 1 ? callId : `${callId}:${toolCalls}`, turnId });
           if (handle) await handle({ sessionId: options.sessionId, turnId, input, submit });
           else {
             const candidate = submissionFromPrompt(input.message);

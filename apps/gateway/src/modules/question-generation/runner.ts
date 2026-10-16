@@ -1,10 +1,10 @@
-import { BusinessError, err, isOk, ok } from '@study-studio/shared';
-import type { ToolRegistry } from '@study-studio/tool-core';
-import type { AgentAdapter, AgentSession } from '@study-studio/agent-runtime';
-import { resolveAgentFirstMessage } from '@study-studio/agent-runtime';
-import type { ExternalToolExecutor } from '@study-studio/agent-runtime';
-import type { ToolDefinition } from '@study-studio/tool-core';
-import type { GenerationBinding, GenerationBlueprint, GenerationConfig, GenerationRunLimits } from '@study-studio/protocol';
+import { BusinessError, err, isOk, ok } from '@lexdistill/shared';
+import type { ToolRegistry } from '@lexdistill/tool-core';
+import type { AgentAdapter, AgentSession } from '@lexdistill/agent-runtime';
+import { resolveAgentFirstMessage } from '@lexdistill/agent-runtime';
+import type { ExternalToolExecutor } from '@lexdistill/agent-runtime';
+import type { ToolDefinition } from '@lexdistill/tool-core';
+import type { GenerationBinding, GenerationBlueprint, GenerationConfig, GenerationRunLimits } from '@lexdistill/protocol';
 import { GENERATION_TOOL_NAMES, createQuestionGenerationTools } from './tools.js';
 import type { GenerationAudioRenderer, QuestionGenerationRepository } from './ports.js';
 import { assertBlueprintFitsConfig, verifyPaperMeetsBlueprint } from './blueprint.js';

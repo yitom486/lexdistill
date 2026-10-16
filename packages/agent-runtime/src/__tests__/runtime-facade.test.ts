@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as runtime from '@study-studio/agent-runtime';
-import { AcpAdapter, ResponsesAdapter, type AgentAdapter } from '@study-studio/agent-runtime';
+import * as runtime from '@lexdistill/agent-runtime';
+import { AcpAdapter, ResponsesAdapter, type AgentAdapter } from '@lexdistill/agent-runtime';
 
 /**
  * M2-1 agent-runtime 外观自检（所属包内断言，无反向边）。
@@ -67,6 +67,6 @@ describe('M2-1 agent-runtime facade', () => {
       throw new Error('apps/gateway/package.json missing dependencies');
     }
     const table = deps as Record<string, unknown>;
-    expect(table['@study-studio/agent-runtime']).toBe('workspace:*');
+    expect(table['@lexdistill/agent-runtime']).toBe('workspace:*');
   });
 });

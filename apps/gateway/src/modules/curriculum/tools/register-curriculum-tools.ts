@@ -1,4 +1,4 @@
-import type { ToolRegistry } from '@study-studio/tool-core';
+import type { ToolRegistry } from '@lexdistill/tool-core';
 import type { ContentRepository } from '../../library/ports.js';
 import { LearningCurriculumTool } from './learning-curriculum-tool.js';
 

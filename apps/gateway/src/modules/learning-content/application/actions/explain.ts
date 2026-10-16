@@ -1,4 +1,4 @@
-import { err, isOk, ok, type Result, BusinessError } from '@study-studio/shared';
+import { err, isOk, ok, type Result, BusinessError } from '@lexdistill/shared';
 import type { LearningContentRepository } from '../../ports.js';
 import type { LearningContentInput, LearningContentOutput, LearningContentContext } from '../../contracts.js';
 import { MSG, loadTemplates } from './shared.js';

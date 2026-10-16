@@ -1,5 +1,5 @@
 import { groundGrammarPoints, groundVocabularies } from '../application/pdf-import/vocab-enrich.js';
-import type { TextbookGrammar, TextbookVocabulary } from '@study-studio/document-model';
+import type { TextbookGrammar, TextbookVocabulary } from '@lexdistill/document-model';
 
 const TEXT = 'ご飯を食べる。水を飲む。学校へ行く。先生に会う。';
 

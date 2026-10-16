@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { TextbookPipelineSettingsSchema, type TocEntry } from '@study-studio/document-model';
+import { TextbookPipelineSettingsSchema, type TocEntry } from '@lexdistill/document-model';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { getPlatform } from '../../platform/capabilities.js';

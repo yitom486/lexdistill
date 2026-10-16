@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRight, GitCompareArrows, Info, Lightbulb, Volume2 } from 'lucide-react';
-import type { KanaItem } from '@study-studio/protocol';
+import type { KanaItem } from '@lexdistill/protocol';
 import { speechStudio, sound } from '../../../utils/audio.js';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';

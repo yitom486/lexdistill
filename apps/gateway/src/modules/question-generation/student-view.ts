@@ -1,4 +1,4 @@
-import type { BankMaterial, BankQuestionRecord, GenerationPaperDetail } from '@study-studio/protocol';
+import type { BankMaterial, BankQuestionRecord, GenerationPaperDetail } from '@lexdistill/protocol';
 
 export interface StudentBankQuestion {
   id: string; language: BankQuestionRecord['language']; category: BankQuestionRecord['category'];

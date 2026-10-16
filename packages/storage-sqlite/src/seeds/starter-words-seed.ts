@@ -14,7 +14,7 @@ export interface StarterWordSeed {
   partOfSpeech?: string | undefined;
 }
 
-export const STARTER_SOURCE_ID = 'study-studio-starter-v1';
+export const STARTER_SOURCE_ID = 'lexdistill-starter-v1';
 export const STARTER_SOURCE_LABEL = '开箱词包';
 export const STARTER_LICENSE = 'Project-authored starter vocabulary';
 

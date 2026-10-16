@@ -3,7 +3,7 @@ import { Volume2 } from 'lucide-react';
 import { Button } from '../ui/button.js';
 import { Tabs, TabsList, TabsTrigger, TabsIndicator } from '../ui/tabs.js';
 import { sound, speechStudio } from '../../utils/audio.js';
-import type { HangulItem } from '@study-studio/protocol';
+import type { HangulItem } from '@lexdistill/protocol';
 import type { MatrixTab } from './hangul-drill.js';
 
 interface HangulMatrixProps {

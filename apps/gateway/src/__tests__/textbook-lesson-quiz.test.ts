@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
-import type { DocumentItem } from '@study-studio/protocol';
-import type { TextbookLesson } from '@study-studio/document-model';
+import { isOk } from '@lexdistill/shared';
+import type { DocumentItem } from '@lexdistill/protocol';
+import type { TextbookLesson } from '@lexdistill/document-model';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import {
   buildTextbookLessonQuestions,

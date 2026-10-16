@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from 'bun';
-import { isOk, generateId } from '@study-studio/shared';
-import { WsEventTypes, type WsEnvelope } from '@study-studio/protocol';
+import { isOk, generateId } from '@lexdistill/shared';
+import { WsEventTypes, type WsEnvelope } from '@lexdistill/protocol';
 import type { GatewayServer } from '../../runtime/gateway-runtime.js';
 
 export interface GatewayWsData {

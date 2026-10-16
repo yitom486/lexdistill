@@ -1,6 +1,6 @@
 import type { AgentEvent } from './event.js';
 import type { AgentInput } from './context.js';
-import type { Result, BusinessError } from '@study-studio/shared';
+import type { Result, BusinessError } from '@lexdistill/shared';
 
 /** 对齐各引擎审批决策枚举 */
 export type ApprovalDecision =

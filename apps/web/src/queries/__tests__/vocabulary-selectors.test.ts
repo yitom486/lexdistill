@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { getWordUsageList, selectVocabularyForCard } from '../vocabulary.js';
-import type { VocabularyEntry } from '@study-studio/protocol';
+import type { VocabularyEntry } from '@lexdistill/protocol';
 
 const entry = (id: string, word: string): VocabularyEntry => ({
   id, word, reading: '', language: 'ja', meaning: word, level: null, collected: false, sources: [],

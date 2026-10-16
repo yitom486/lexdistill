@@ -1,6 +1,6 @@
 import { promises as fsp, createReadStream } from 'node:fs';
 import path from 'node:path';
-import { BusinessError, err, ok, type Result } from '@study-studio/shared';
+import { BusinessError, err, ok, type Result } from '@lexdistill/shared';
 
 /**
  * 本地路径直读（大文件模式）。

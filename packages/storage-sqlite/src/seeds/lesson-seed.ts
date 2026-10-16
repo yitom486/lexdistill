@@ -3,7 +3,7 @@
  * 项目自撰中文讲解与例句译文；例句均为基础句型，不复制任何教材原文。
  * id 即技能 id（= quiz testedSkillId）：有讲义且未学完的技能，系统代选时不出题。
  */
-import type { LearnerLevel } from '@study-studio/protocol';
+import type { LearnerLevel } from '@lexdistill/protocol';
 
 export interface LessonExampleSeed {
   ja: string;

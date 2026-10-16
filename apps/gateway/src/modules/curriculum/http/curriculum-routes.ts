@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
-import { isOk, BusinessError, generateId } from '@study-studio/shared';
+import { isOk, BusinessError, generateId } from '@lexdistill/shared';
 import {
   listNewsTopics,
   type HangulScriptType,
   type ReadingPassageOrigin,
   type ReadingPassageSet,
   type ReadingQuestion,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import { generateNewsPassage } from '../application/generate-news-passage.js';
 import {
@@ -17,7 +17,7 @@ import {
   DEFAULT_CONTENT_LANGUAGE,
 } from '../application/content-language-policy.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
-import type { KanaPracticeScriptType } from '@study-studio/learner-core';
+import type { KanaPracticeScriptType } from '@lexdistill/learner-core';
 
 function parseKanaQueueLimit(value: string | undefined): number {
   if (!value) return 10;

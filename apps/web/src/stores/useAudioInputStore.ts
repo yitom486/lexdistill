@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { createMigratedStorage } from './store-storage.js';
 
 export interface AudioInputStoreState {
   preferredDeviceId: string;
@@ -13,7 +14,8 @@ export const useAudioInputStore = create<AudioInputStoreState>()(
       setPreferredDeviceId: (preferredDeviceId: string) => set({ preferredDeviceId }),
     }),
     {
-      name: 'study_studio_audio_input_config',
+      name: 'lexdistill_audio_input_config',
+      storage: createMigratedStorage(['study_studio_audio_input_config']),
       version: 1,
     }
   )

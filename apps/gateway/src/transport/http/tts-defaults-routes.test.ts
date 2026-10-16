@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { TTS_PREVIEW_TEXTS } from '@study-studio/speech';
+import { TTS_PREVIEW_TEXTS } from '@lexdistill/speech';
 import { createTtsDefaultsRoutes } from './tts-defaults-routes.js';
 
 describe('GET /api/tts-studio/defaults', () => {

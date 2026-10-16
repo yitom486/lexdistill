@@ -2,7 +2,7 @@ import { Pause, Play } from 'lucide-react';
 import { Button } from '../ui/button.js';
 import { useListeningPlayback } from '../../hooks/useListeningPlayback.js';
 import { trackToSpeechLang } from '../../config/speech-language.js';
-import type { GeneratedQuestion } from '@study-studio/protocol';
+import type { GeneratedQuestion } from '@lexdistill/protocol';
 
 interface Props {
   question: GeneratedQuestion;

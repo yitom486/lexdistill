@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { isOk, isErr } from '@study-studio/shared';
+import { isOk, isErr } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { LearningPracticeTool } from '../modules/practice/tools/learning-practice-tool.js';
 import { LearningAssessTool } from '../modules/practice/tools/learning-assess-tool.js';
 import { LearningPlanTool } from '../transport/tools/learning-plan-tool.js';
-import type { PracticeBlockSpec, PracticePlanTemplate } from '@study-studio/protocol';
+import type { PracticeBlockSpec, PracticePlanTemplate } from '@lexdistill/protocol';
 
 describe('P5 PhaseB practice tools', () => {
   let repo: DrizzleLearnerRepository;

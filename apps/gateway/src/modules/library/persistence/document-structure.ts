@@ -6,15 +6,15 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { and, eq } from 'drizzle-orm';
-import { documentStructures } from '@study-studio/storage-sqlite';
+import { documentStructures } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { getDocumentById } from './documents-annotations.js';
 import type {
   HeadingCandidate,
   StructureClass,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 
 export interface SavedDocumentStructure {
   documentId: string;

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import type { AgentAdapter, AgentEvent, AgentImageAttachment, AgentSession } from '@study-studio/agent-runtime';
-import { ok } from '@study-studio/shared';
+import type { AgentAdapter, AgentEvent, AgentImageAttachment, AgentSession } from '@lexdistill/agent-runtime';
+import { ok } from '@lexdistill/shared';
 import { extractTocWithLlm, loadTocImageAttachments, MAX_TOC_IMAGE_BYTES, MAX_TOC_IMAGE_COUNT } from '../application/toc-extractor.js';
 import { LibraryProposeTocTool } from '../tools/library-propose-toc-tool.js';
 import { buildTocExtractionPromptForEmbeddedImages, buildTocExtractionPromptForEmbeddedText } from '../application/prompts/toc-extraction-prompt.js';

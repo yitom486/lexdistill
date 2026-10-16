@@ -25,7 +25,7 @@ export interface AudioCacheStats {
   totalBytes: number;
 }
 
-const DB_NAME = 'study_studio_audio_cache_db';
+const DB_NAME = 'lexdistill_audio_cache_db';
 const DB_VERSION = 1;
 const STORE_NAME = 'audio_records';
 

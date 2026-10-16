@@ -1,7 +1,7 @@
 import { afterEach, expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TextbookASTSchema, type LessonContent } from '@study-studio/document-model';
+import { TextbookASTSchema, type LessonContent } from '@lexdistill/document-model';
 import { convertAstToTextbookBook } from '../importer/textbook-converter.js';
 import { useImportTextbookMutation, useTextbooksQuery } from '../../queries/textbooks-annotations.js';
 import { StructuredLessonPanel } from './StructuredLessonPanel.js';

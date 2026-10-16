@@ -1,4 +1,4 @@
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import type { AgentAdapter } from '@lexdistill/agent-runtime';
 import {
   BusinessError,
   err,
@@ -8,18 +8,18 @@ import {
   ok,
   translateToBusinessError,
   type Result,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   WsEventTypes,
   type DocumentItem,
   type EnrichJobFailedLesson,
   type EnrichJobSnapshot,
   type WsEnvelope,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import {
   parseTextbookAST,
   type TextbookAST,
-} from '@study-studio/document-model';
+} from '@lexdistill/document-model';
 import { enrichCancelledError, enrichLessonVocab } from './vocab-enrich.js';
 import { fireLinesProjection, type LinesProjectionHook } from '../lines-projection-hook.js';
 

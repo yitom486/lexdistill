@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { sound } from '../../utils/audio.js';
 import { fireSuccessConfetti } from '../magicui/index.js';
-import type { QuizGradingResult } from '@study-studio/protocol';
+import type { QuizGradingResult } from '@lexdistill/protocol';
 import type { SubjectiveExercise } from '../../models/practice.js';
 import { useGradeSubjectiveMutation } from '../../queries/useAgentMutations.js';
 

@@ -1,11 +1,11 @@
-import { createDrizzleDb } from '@study-studio/storage-sqlite';
+import { createDrizzleDb } from '@lexdistill/storage-sqlite';
 import {
   installOewnPackage,
   OEWN_2025_URL,
 } from '../modules/dictionary/application/dictionary-packages.js';
-import { parseOewnXml } from '@study-studio/lexicon';
+import { parseOewnXml } from '@lexdistill/lexicon';
 
-export { parseOewnXml } from '@study-studio/lexicon';
+export { parseOewnXml } from '@lexdistill/lexicon';
 
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
@@ -22,7 +22,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const dbPath = process.env.STUDY_STUDIO_DB ?? 'study-studio.db';
+  const dbPath = process.env.STUDY_STUDIO_DB ?? 'lexdistill.db';
   const { sqlite } = createDrizzleDb(dbPath);
   try {
     const result = await installOewnPackage(sqlite);

@@ -1,4 +1,4 @@
-import type { LessonContent, ContentDirectoryNode } from '@study-studio/document-model';
+import type { LessonContent, ContentDirectoryNode } from '@lexdistill/document-model';
 import { ContentSource } from './ContentSource.js';
 import { DirectoryGroups } from './DirectoryGroups.js';
 import { StructuredBody, type BodyActions } from './StructuredBody.js';

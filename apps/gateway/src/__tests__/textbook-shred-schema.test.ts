@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import type { DocumentItem } from '@study-studio/protocol';
+import type { DocumentItem } from '@lexdistill/protocol';
 
 /**
  * v14/v30 教材 shred 表：只验表结构与约束（shred 写逻辑下一轮）。

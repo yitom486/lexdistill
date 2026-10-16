@@ -4,9 +4,9 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, isOk, type Result, type BusinessError } from '@study-studio/shared';
-import type { LearnerRepository } from '@study-studio/learner-core';
+} from '@lexdistill/tool-core';
+import { ok, isOk, type Result, type BusinessError } from '@lexdistill/shared';
+import type { LearnerRepository } from '@lexdistill/learner-core';
 
 export const FlashcardsDueInputSchema = z.object({
   userId: z.string().min(1).max(64),

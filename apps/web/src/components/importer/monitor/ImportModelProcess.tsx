@@ -1,4 +1,4 @@
-import type { ImportEvent, ContentDirectoryNode } from '@study-studio/document-model';
+import type { ImportEvent, ContentDirectoryNode } from '@lexdistill/document-model';
 import { ImportInteraction } from './ImportInteraction.js';
 import { ImportEventDetail } from './ImportEventDetail.js';
 

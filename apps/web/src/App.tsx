@@ -162,7 +162,7 @@ export function App() {
     void checkForAppUpdate()
       .then((update) => {
         if (!active || !update) return;
-        toast(`Lingua Studio ${update.version} 已可用`, {
+        toast(`LexDistill ${update.version} 已可用`, {
           description: update.notes || '包含稳定性改进与学习体验优化。',
           duration: 12_000,
           action: {

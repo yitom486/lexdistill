@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'bun:test';
-import { TextbookASTSchema } from '@study-studio/document-model';
+import { TextbookASTSchema } from '@lexdistill/document-model';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { TextbookContentTools } from '../tools/textbook-content-tools.js';
 import { submitRequired } from './textbook-pipeline-fixtures.js';

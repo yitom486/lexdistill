@@ -1,6 +1,6 @@
-import type { AgentAdapter, AgentImageAttachment } from '@study-studio/agent-runtime';
-import { BusinessError, err, generateId, ok, logger, translateToBusinessError, type Result } from '@study-studio/shared';
-import { TextbookPipelineSettingsSchema, type TocEntry } from '@study-studio/document-model';
+import type { AgentAdapter, AgentImageAttachment } from '@lexdistill/agent-runtime';
+import { BusinessError, err, generateId, ok, logger, translateToBusinessError, type Result } from '@lexdistill/shared';
+import { TextbookPipelineSettingsSchema, type TocEntry } from '@lexdistill/document-model';
 import { buildTocExtractionPrompt, buildTocExtractionPromptForEmbeddedImages, buildTocExtractionPromptForEmbeddedText } from './prompts/toc-extraction-prompt.js';
 import { LibraryProposeTocTool, type ProposedToc } from '../tools/library-propose-toc-tool.js';
 import type { ImportMonitor } from './import-monitor.js';

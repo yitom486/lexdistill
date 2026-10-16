@@ -1,6 +1,6 @@
-import type { BankGradeSubmit, ExerciseGrade } from '@study-studio/protocol';
-import { BankGradeSubmitSchema, ExerciseGradeSchema } from '@study-studio/protocol';
-import { BusinessError, err, isOk, ok, translateToBusinessError } from '@study-studio/shared';
+import type { BankGradeSubmit, ExerciseGrade } from '@lexdistill/protocol';
+import { BankGradeSubmitSchema, ExerciseGradeSchema } from '@lexdistill/protocol';
+import { BusinessError, err, isOk, ok, translateToBusinessError } from '@lexdistill/shared';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { submitPracticeAttempt } from '../domain/record-practice-attempt.js';
 import { serializePracticeWrite } from './serialized-write.js';

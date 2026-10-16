@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ok, err, Result, BusinessError } from '@study-studio/shared';
+import { ok, err, Result, BusinessError } from '@lexdistill/shared';
 import { planTextbookTasks } from './textbook-tasks.js';
 
 /**

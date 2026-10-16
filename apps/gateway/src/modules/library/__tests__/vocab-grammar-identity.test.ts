@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
-import type { DocumentItem } from '@study-studio/protocol';
+import { isOk } from '@lexdistill/shared';
+import type { DocumentItem } from '@lexdistill/protocol';
 import {
   groundVocabularies,
   groundGrammarPoints,
@@ -107,20 +107,20 @@ describe('vocab/grammar id 生成事实', () => {
     const res = await appendPdfToDocument(
       {
         saveDocument: async (doc: DocumentItem) => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok(doc);
         },
         saveCanonicalAst: async (docBase, book) => {
           savedAst = JSON.stringify(book);
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ ...docBase, astJson: savedAst } as typeof baseDoc);
         },
         getDocument: async () => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ ...baseDoc });
         },
         projectLinesSegments: async () => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ inserted: 0, skipped: 0 });
         },
         loadInspector: async () => ({

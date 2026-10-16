@@ -45,8 +45,8 @@ const CROSS_MODULE_ALLOWLIST = new Set([
   'modules/learning-content/ports.ts -> modules/library/ports.js',
   'modules/learning-content/ports.ts -> modules/practice/ports.js',
   // learning-content reuses dictionary sampling and curriculum seed reads through domain APIs.
-  // E2b：yomitan 改直引 @study-studio/archive，library/public 中转边消除。
-  // E2b：apkg-import 改直引 @study-studio/archive，library/public 中转边消除。
+  // E2b：yomitan 改直引 @lexdistill/archive，library/public 中转边消除。
+  // E2b：apkg-import 改直引 @lexdistill/archive，library/public 中转边消除。
   // flashcards.collect 复用词典 collect 的输出类型（type-only；与查词面板同一命令）。
   'modules/flashcards/tools/flashcards-collect-tool.ts -> modules/dictionary/public.js',
   // 草稿域复用相遇词 term_key 归一 + 回填（同键跨包稳定；accept 与 collect 同级信号）。
@@ -60,7 +60,7 @@ const CROSS_MODULE_ALLOWLIST = new Set([
   'modules/flashcards/tools/flashcards-collect-tool.ts -> modules/dictionary/ports.js',
   'modules/learning-progress/tools/mistakes-resolve-tool.ts -> modules/practice/ports.js',
   'modules/practice/application/practice-assembly.ts -> modules/library/ports.js',
-  // E2b：epub-reader 已迁入 @study-studio/content/document，archive 走包引用，
+  // E2b：epub-reader 已迁入 @lexdistill/content/document，archive 走包引用，
   // 跨模块深路径边消除（删包由 content/document 内聚测试兜底）。
   // 网页正文复用新闻管线的 Readability 抽取纯函数（抓取层自备 SSRF 防护）。
   'modules/library/application/document-import/url-reader.ts -> modules/curriculum/infrastructure/news-article-fetch.js',
@@ -165,7 +165,7 @@ describe('gateway module boundaries (G5)', () => {
 
       // R3：共享基础设施 persistence 不得反向依赖领域模块。
       // 注：infrastructure/ 根门面是过渡期兼容委托方，豁免；
-      // `infrastructure/db/` 已于 M4/D2 整体迁入 `@study-studio/storage-sqlite`，本仓不再存在。
+      // `infrastructure/db/` 已于 M4/D2 整体迁入 `@lexdistill/storage-sqlite`，本仓不再存在。
       if (
         rel.startsWith('infrastructure/persistence/') &&
         normTarget.startsWith('modules/')

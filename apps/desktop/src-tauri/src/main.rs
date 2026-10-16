@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    study_studio_desktop_lib::run();
+    lexdistill_desktop_lib::run();
 }

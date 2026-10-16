@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { Flashcard, PracticeBlockSpec } from '@study-studio/protocol';
+import type { Flashcard, PracticeBlockSpec } from '@lexdistill/protocol';
 import {
   acceptedDbTypesForBlock,
   buildVocabQuestionsFromCards,

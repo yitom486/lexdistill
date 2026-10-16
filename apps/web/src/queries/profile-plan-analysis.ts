@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CourseRouteSnapshot, UnitRouteItem, DailyStudyPlan, DailyTaskProgress, SkillMetric } from '@study-studio/learner-core';
-import type { LearningAnalysisReport } from '@study-studio/protocol';
-import { logger } from '@study-studio/shared';
+import type { CourseRouteSnapshot, UnitRouteItem, DailyStudyPlan, DailyTaskProgress, SkillMetric } from '@lexdistill/learner-core';
+import type { LearningAnalysisReport } from '@lexdistill/protocol';
+import { logger } from '@lexdistill/shared';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';

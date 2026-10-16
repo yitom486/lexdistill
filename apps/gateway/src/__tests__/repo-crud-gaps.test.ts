@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
-import { isOk, isErr } from '@study-studio/shared';
-import type { GeneratedQuestion, QuizGradingResult } from '@study-studio/protocol';
-import type { TextbookAST } from '@study-studio/document-model';
-import { createMistakeEntry } from '@study-studio/learner-core';
+import { isOk, isErr } from '@lexdistill/shared';
+import type { GeneratedQuestion, QuizGradingResult } from '@lexdistill/protocol';
+import type { TextbookAST } from '@lexdistill/document-model';
+import { createMistakeEntry } from '@lexdistill/learner-core';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 
 /**

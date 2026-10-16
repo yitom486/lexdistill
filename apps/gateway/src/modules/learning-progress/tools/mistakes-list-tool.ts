@@ -4,10 +4,10 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, isOk, type Result, type BusinessError } from '@study-studio/shared';
-import type { MistakeEntry } from '@study-studio/learner-core';
-import type { LearnerRepository } from '@study-studio/learner-core';
+} from '@lexdistill/tool-core';
+import { ok, isOk, type Result, type BusinessError } from '@lexdistill/shared';
+import type { MistakeEntry } from '@lexdistill/learner-core';
+import type { LearnerRepository } from '@lexdistill/learner-core';
 
 export const MistakesListInputSchema = z.object({
   userId: z.string().min(1).max(64),

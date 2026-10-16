@@ -4,10 +4,10 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, err, type Result, BusinessError, isOk } from '@study-studio/shared';
-import type { DocumentItem, AnnotationItem, NewsTopic } from '@study-studio/protocol';
-import { listNewsTopics } from '@study-studio/protocol';
+} from '@lexdistill/tool-core';
+import { ok, err, type Result, BusinessError, isOk } from '@lexdistill/shared';
+import type { DocumentItem, AnnotationItem, NewsTopic } from '@lexdistill/protocol';
+import { listNewsTopics } from '@lexdistill/protocol';
 import type { ContentRepository } from '../ports.js';
 
 export const LearningLibraryInputSchema = z.object({

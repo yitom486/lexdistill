@@ -4,7 +4,7 @@ import { sound } from '../utils/audio.js';
 import { useAgentGateway } from '../hooks/useAgentGateway.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
-import type { ContextSnapshot } from '@study-studio/agent-runtime';
+import type { ContextSnapshot } from '@lexdistill/agent-runtime';
 import {
   buildTutorBootstrapPrompt,
   buildTutorOfflineReply,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Check, X, Sparkles } from 'lucide-react';
-import type { VocabularyEntry } from '@study-studio/protocol';
+import type { VocabularyEntry } from '@lexdistill/protocol';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { Progress } from '../ui/progress.js';

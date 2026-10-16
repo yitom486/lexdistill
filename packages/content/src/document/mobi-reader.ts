@@ -1,4 +1,4 @@
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 
 /**
  * MOBI 文本提取（clean-room，自研 PalmDB 解析；只做“学习型文本抽取”，不做排版渲染）。

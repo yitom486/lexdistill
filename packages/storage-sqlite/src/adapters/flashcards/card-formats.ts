@@ -7,13 +7,13 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   BUILTIN_CARD_FORMATS,
   getBuiltinCardFormat,
   validateCardFormat,
   type AnkiCardFormat,
-} from '@study-studio/flashcards';
+} from '@lexdistill/flashcards';
 import { ankiCardFormats } from '../../schema.js';
 import type { DrizzleDb } from '../../connection.js';
 

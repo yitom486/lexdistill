@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { PracticeBlockSpec, PracticeItemAttempt, PracticePlanRun } from '@study-studio/protocol';
+import type { PracticeBlockSpec, PracticeItemAttempt, PracticePlanRun } from '@lexdistill/protocol';
 import { buildLocalRunSummary } from '../index.js';
 
 /**

@@ -3,7 +3,7 @@ import type { PdfInspectorLike } from '../../../infrastructure/pdf-runtime/pdf-r
 import { collectLayoutCandidates } from '../application/pdf-import/layout-headings.js';
 
 /**
- * M8-6：纯规则单测已迁入 `@study-studio/content`（src/pdf）；
+ * M8-6：纯规则单测已迁入 `@lexdistill/content`（src/pdf）；
  * 本文件只保留 collectLayoutCandidates 的异常降级、空结果与运行时收窄行为。
  */
 

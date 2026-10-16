@@ -8,15 +8,15 @@ import {
   nowIso,
   isOk,
   generateId,
-} from '@study-studio/shared';
-import type { QuizAttemptRecord } from '@study-studio/learner-core';
-import { GeneratedQuestionSchema } from '@study-studio/protocol';
-import { quizAttempts, quizQuestions, SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
+} from '@lexdistill/shared';
+import type { QuizAttemptRecord } from '@lexdistill/learner-core';
+import { GeneratedQuestionSchema } from '@lexdistill/protocol';
+import { quizAttempts, quizQuestions, SqliteQuestionGenerationRepository } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import {
   normalizeTrackLanguage,
   inferLanguageFromSkillId,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { resolveActiveLanguage } from '../../learning-progress/public.js';
 
 /**

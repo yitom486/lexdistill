@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { listAgentRuntimes, resolveAgentRuntimeId, runtimeSupportsSessionTools } from '../runtime/router/runtime-catalog.js';
 import { SessionToolBridge } from '../runtime/mcp/session-tool-bridge.js';
 import { AcpAdapterPool } from '../infrastructure/acp/acp-adapter-pool.js';
-import { ok } from '@study-studio/shared';
+import { ok } from '@lexdistill/shared';
 
 describe('resolveAgentRuntimeId', () => {
   it('已知 id 原样；空/未知/留守 id 一律回落 codex-acp（无旧分支）', () => {

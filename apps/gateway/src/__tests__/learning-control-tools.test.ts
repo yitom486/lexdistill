@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { LearningProgressTool } from '../modules/learning-progress/tools/learning-progress-tool.js';
 import { LearningCurriculumTool } from '../modules/curriculum/tools/learning-curriculum-tool.js';

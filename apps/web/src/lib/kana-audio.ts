@@ -7,7 +7,7 @@
  * 全站假名发音统一走这里：单字（矩阵/讲义/声调示范）、整行连播（行指南/记忆法），
  * 单词例句等多字非假名串不在此列（走实时 TTS）。
  */
-import type { KanaItem } from '@study-studio/protocol';
+import type { KanaItem } from '@lexdistill/protocol';
 import { speechStudio } from '../utils/audio.js';
 import { KANA_AUDIO_MANIFEST } from './kana-audio-manifest.js';
 import { KANA_CHAR_TO_ID } from './kana-char-map.js';

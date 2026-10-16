@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { buildTermKey } from '@study-studio/storage-sqlite';
+import { buildTermKey } from '@lexdistill/storage-sqlite';
 
 function seedEntry(
   repo: DrizzleLearnerRepository,

@@ -1,4 +1,4 @@
-import type { ImportEvent } from '@study-studio/document-model';
+import type { ImportEvent } from '@lexdistill/document-model';
 
 /** A file's persisted trace can contain several runs; never present them as one. */
 export function selectImportRun(events: readonly ImportEvent[], jobId?: string): ImportEvent[] {

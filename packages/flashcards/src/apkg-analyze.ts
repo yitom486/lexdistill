@@ -2,7 +2,7 @@ import {
   ok,
   type Result,
   type BusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   guessFieldMapping,
   analyzeTemplateCompat,

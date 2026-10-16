@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { FolderInput, LoaderCircle } from 'lucide-react';
-import { FIELD_MARKERS } from '@study-studio/learner-core';
+import { FIELD_MARKERS } from '@lexdistill/learner-core';
 import { Button } from './ui/button.js';
 import {
   Dialog,

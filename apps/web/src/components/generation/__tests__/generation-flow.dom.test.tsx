@@ -1,5 +1,5 @@
 import { expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { bootDomBackend } from './generation-dom-harness.js';
 
 const runIt = it as unknown as (name: string, ms: number, fn: () => Promise<void>) => void;

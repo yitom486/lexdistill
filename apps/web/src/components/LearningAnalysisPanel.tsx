@@ -4,7 +4,7 @@ import { useMotionPreference } from '../hooks/useMotionPreference.js';
 import { readCssDurationSeconds } from '../lib/css-tokens.js';
 import { toast } from 'sonner';
 import { Brain, RefreshCw, Lightbulb, Target, BookOpen, Sparkles } from 'lucide-react';
-import type { LearningAnalysisReport, LearningSuggestion } from '@study-studio/protocol';
+import type { LearningAnalysisReport, LearningSuggestion } from '@lexdistill/protocol';
 import {
   useLearningAnalysisQuery,
   useRefreshLearningAnalysisMutation,

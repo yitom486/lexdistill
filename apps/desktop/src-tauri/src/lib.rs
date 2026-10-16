@@ -126,16 +126,30 @@ async fn platform_window_close(window: tauri::Window) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 // P4-B：Agent Gateway sidecar 生命周期与数据库备份
 // 网关以编译产物 sidecar 随壳启动（`bun scripts/build-sidecar.ts` 产出
-// `binaries/study-studio-gateway-<target-triple>`），库路径指向系统应用数据目录，
+// `binaries/lexdistill-gateway-<target-triple>`），库路径指向系统应用数据目录，
 // 重启后学习数据保留；前端在启动时读取本次进程协商出的本机端口。
 // ---------------------------------------------------------------------------
 
 /// 网关 SQLite 库路径：系统应用数据目录（重启保留、卸载清理，区别于仓库根开发库）。
 fn gateway_db_path(app: &AppHandle) -> std::path::PathBuf {
-    app.path()
+    let app_data = app
+        .path()
         .app_data_dir()
-        .unwrap_or_else(|_| std::env::temp_dir())
-        .join("study-studio.db")
+        .unwrap_or_else(|_| std::env::temp_dir());
+    let legacy_db = app_data.join("lexdistill.db");
+    let new_db = app_data.join("lexdistill.db");
+    if !new_db.exists() && legacy_db.exists() {
+        let _ = std::fs::copy(&legacy_db, &new_db);
+        let _ = std::fs::copy(
+            app_data.join("lexdistill.db-wal"),
+            app_data.join("lexdistill.db-wal"),
+        );
+        let _ = std::fs::copy(
+            app_data.join("lexdistill.db-shm"),
+            app_data.join("lexdistill.db-shm"),
+        );
+    }
+    new_db
 }
 
 /// sidecar 子进程句柄：保活至应用退出（Tauri 退出时自动回收）。
@@ -327,9 +341,9 @@ fn gateway_connection(state: State<'_, GatewayPort>) -> Result<GatewayConnection
 
 fn gateway_sidecar_path(app: &AppHandle) -> Result<PathBuf, String> {
     let filename = if cfg!(windows) {
-        "study-studio-gateway.exe"
+        "lexdistill-gateway.exe"
     } else {
-        "study-studio-gateway"
+        "lexdistill-gateway"
     };
     let mut candidates = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
@@ -366,9 +380,12 @@ fn dev_gateway_entry(repo_root: &std::path::Path) -> Option<(PathBuf, Vec<String
 }
 
 /// Debug 桌面构建默认从仓库源码启动 Gateway；Release 默认走预编译 sidecar。
-/// STUDY_STUDIO_GATEWAY_BUN=0 可在 Debug 下强制测试 sidecar；=1 可显式强制源码模式。
+/// LEXDISTILL_GATEWAY_BUN=0 可在 Debug 下强制测试 sidecar；=1 可显式强制源码模式。
 fn dev_gateway_command() -> Option<(PathBuf, Vec<String>, PathBuf)> {
-    let use_source = match std::env::var("STUDY_STUDIO_GATEWAY_BUN").as_deref() {
+    let use_source = match std::env::var("LEXDISTILL_GATEWAY_BUN")
+        .or_else(|_| std::env::var("STUDY_STUDIO_GATEWAY_BUN"))
+        .as_deref()
+    {
         Ok("1") => true,
         Ok("0") => false,
         _ => cfg!(debug_assertions),
@@ -395,7 +412,7 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
     if let Err(e) = std::fs::create_dir_all(&data_dir) {
         eprintln!("[sidecar] 创建应用数据目录失败：{e}");
     }
-    let db_path = data_dir.join("study-studio.db");
+    let db_path = gateway_db_path(app);
 
     let sidecar_path = match gateway_sidecar_path(app) {
         Ok(path) => path,
@@ -429,7 +446,9 @@ fn spawn_gateway_sidecar(app: &AppHandle, port: u16) {
     }
     command
         .args(&extra_args)
+        .env("LEXDISTILL_DB", &db_path)
         .env("STUDY_STUDIO_DB", &db_path)
+        .env("LEXDISTILL_PDF_RUNTIME_DIR", &pdf_runtime_dir)
         .env("STUDY_STUDIO_PDF_RUNTIME_DIR", &pdf_runtime_dir)
         .env("GATEWAY_PORT", port.to_string())
         .stdin(Stdio::piped())
@@ -511,7 +530,7 @@ async fn platform_backup_database(app: AppHandle) -> Result<String, String> {
     let dest = app
         .dialog()
         .file()
-        .set_file_name("study-studio-backup.db")
+        .set_file_name("lexdistill-backup.db")
         .add_filter("SQLite 数据库", &["db"])
         .blocking_save_file()
         .ok_or_else(|| "未选择保存路径".to_string())?;
@@ -587,7 +606,7 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running Lingua Studio desktop application");
+        .expect("error while running LexDistill desktop application");
 }
 
 #[cfg(test)]
@@ -632,7 +651,7 @@ mod tests {
                 .args([
                     "-c",
                     "IFS= read -r line; printf graceful",
-                    "study-studio-graceful-test",
+                    "lexdistill-graceful-test",
                 ])
                 .stdin(std::process::Stdio::piped())
                 .stdout(std::process::Stdio::piped())

@@ -4,7 +4,7 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
+} from '@lexdistill/tool-core';
 import {
   ok,
   err,
@@ -12,10 +12,10 @@ import {
   BusinessError,
   extractErrorText,
   isOk,
-} from '@study-studio/shared';
-import type { LearnerRepository } from '@study-studio/learner-core';
-import { createMistakeEntry } from '@study-studio/learner-core';
-import type { GeneratedQuestion, QuizGradingResult } from '@study-studio/protocol';
+} from '@lexdistill/shared';
+import type { LearnerRepository } from '@lexdistill/learner-core';
+import { createMistakeEntry } from '@lexdistill/learner-core';
+import type { GeneratedQuestion, QuizGradingResult } from '@lexdistill/protocol';
 
 export const LearningProgressInputSchema = z.object({
   action: z.enum([

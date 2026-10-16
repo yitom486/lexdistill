@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { BusinessError, err, generateId, ok, translateToBusinessError, type Result } from '@study-studio/shared';
-import { canonicalizeTocEntries, type SaveTextbookOutlineRequest, type SaveTextbookOutlineResult } from '@study-studio/document-model';
+import { BusinessError, err, generateId, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
+import { canonicalizeTocEntries, type SaveTextbookOutlineRequest, type SaveTextbookOutlineResult } from '@lexdistill/document-model';
 import type { ContentRepository } from '../ports.js';
 import { readLocalPdfFile } from './pdf-import/local-file.js';
 import { findTextbookByFingerprint } from './textbook-inspector.js';

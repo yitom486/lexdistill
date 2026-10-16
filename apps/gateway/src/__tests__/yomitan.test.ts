@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import {
   backfillPitchPronunciation,
   listDictionaryPackages,
@@ -9,8 +9,8 @@ import {
   installYomitanFromBytes,
   type YomitanInstallMeta,
 } from '../modules/dictionary/application/yomitan.js';
-import { parseYomitanDictionary } from '@study-studio/lexicon';
-import { initSchema } from '@study-studio/storage-sqlite';
+import { parseYomitanDictionary } from '@lexdistill/lexicon';
+import { initSchema } from '@lexdistill/storage-sqlite';
 
 function memDb(): Database {
   const sqlite = new Database(':memory:');
@@ -253,7 +253,7 @@ describe('Kanjium 真包（live，网络可达时）', () => {
       console.warn('[yomitan-test] 无网络，跳过 live 断言');
       return;
     }
-    const { extractZip } = await import('@study-studio/archive');
+    const { extractZip } = await import('@lexdistill/archive');
     const files = extractZip(zipBytes).map((e) => ({ path: e.path, data: e.data }));
     const parsed = parseYomitanDictionary(files, 'yt');
     expect(parsed.index.format).toBe(3);

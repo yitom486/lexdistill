@@ -33,20 +33,20 @@ const PACKAGES = [
 
 const ALLOWED_WORKSPACE_DEPS: Record<string, string[]> = {
   'shared': [],
-  'protocol': ['@study-studio/shared', '@study-studio/document-model'],
-  'tool-core': ['@study-studio/shared', '@study-studio/protocol'],
-  'agent-runtime': ['@study-studio/shared', '@study-studio/tool-core', 'zod'],
-  'learner-core': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/learning-algorithms', '@study-studio/flashcards'],
-  'speech': ['@study-studio/shared'],
-  'learning-algorithms': ['@study-studio/shared', '@study-studio/protocol'],
-  'flashcards': ['@study-studio/shared'],
-  'ai-content': ['@study-studio/shared', '@study-studio/learning', '@study-studio/protocol'],
-  'lexicon': ['@study-studio/shared'],
-  'learning': ['@study-studio/shared', '@study-studio/protocol', '@study-studio/document-model', '@study-studio/learner-core', '@study-studio/learning-algorithms'],
-  'document-model': ['@study-studio/shared'],
-  'content': ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol', '@study-studio/archive'],
-  'storage-sqlite': ['@study-studio/protocol', '@study-studio/document-model', '@study-studio/shared', '@study-studio/flashcards', '@study-studio/content', '@study-studio/learner-core', '@study-studio/learning', '@study-studio/learning-algorithms'],
-  'archive': ['@study-studio/shared'],
+  'protocol': ['@lexdistill/shared', '@lexdistill/document-model'],
+  'tool-core': ['@lexdistill/shared', '@lexdistill/protocol'],
+  'agent-runtime': ['@lexdistill/shared', '@lexdistill/tool-core', 'zod'],
+  'learner-core': ['@lexdistill/shared', '@lexdistill/protocol', '@lexdistill/learning-algorithms', '@lexdistill/flashcards'],
+  'speech': ['@lexdistill/shared'],
+  'learning-algorithms': ['@lexdistill/shared', '@lexdistill/protocol'],
+  'flashcards': ['@lexdistill/shared'],
+  'ai-content': ['@lexdistill/shared', '@lexdistill/learning', '@lexdistill/protocol'],
+  'lexicon': ['@lexdistill/shared'],
+  'learning': ['@lexdistill/shared', '@lexdistill/protocol', '@lexdistill/document-model', '@lexdistill/learner-core', '@lexdistill/learning-algorithms'],
+  'document-model': ['@lexdistill/shared'],
+  'content': ['@lexdistill/shared', '@lexdistill/document-model', '@lexdistill/protocol', '@lexdistill/archive'],
+  'storage-sqlite': ['@lexdistill/protocol', '@lexdistill/document-model', '@lexdistill/shared', '@lexdistill/flashcards', '@lexdistill/content', '@lexdistill/learner-core', '@lexdistill/learning', '@lexdistill/learning-algorithms'],
+  'archive': ['@lexdistill/shared'],
 };
 
 const FORBIDDEN_DEP_FRAGMENTS = ['openai', 'anthropic', 'agentclientprotocol'];
@@ -117,7 +117,7 @@ describe('M1-1 package 依赖方向', () => {
         for (const frag of FORBIDDEN_DEP_FRAGMENTS) {
           expect(lower.includes(frag)).toBe(false);
         }
-        if (key.startsWith('@study-studio/')) {
+        if (key.startsWith('@lexdistill/')) {
           expect(ALLOWED_WORKSPACE_DEPS[name] ?? []).toContain(key);
         }
       }
@@ -130,7 +130,7 @@ describe('M1-1 package 依赖方向', () => {
   });
 
   it('tool-core/protocol/learner-core/shared：不触达适配器与厂商 SDK', async () => {
-    const pattern = /@study-studio\/agent-(codex|responses)|@agentclientprotocol|@anthropic\/|from\s+['"]openai['"]/i;
+    const pattern = /@lexdistill\/agent-(codex|responses)|@agentclientprotocol|@anthropic\/|from\s+['"]openai['"]/i;
     const hits: string[] = [];
     for (const name of ['tool-core', 'protocol', 'learner-core', 'shared'] as const) {
       hits.push(...(await filesWith(pkgSrc(name), pattern)));
@@ -206,7 +206,7 @@ describe('M1-1 package 依赖方向', () => {
   }
 
   it('lexicon/morphology+sources：实现内聚，仅相对路径与 shared', async () => {
-    const pattern = /from\s+['"]@study-studio\/(?!shared['"])/;
+    const pattern = /from\s+['"]@lexdistill\/(?!shared['"])/;
     const hits: string[] = [];
     for (const sub of ['morphology', 'sources'] as const) {
       hits.push(...(await filesWith(join(repoRoot(), 'packages', 'lexicon', 'src', sub), pattern)));
@@ -217,38 +217,38 @@ describe('M1-1 package 依赖方向', () => {
   it('learning/scheduling+practice：实现内聚（排程仅 algorithms/protocol/shared；组卷仅 shared/protocol/document-model，禁反向依赖 learner-core）', async () => {
     const schedHits = await filesWith(
       join(repoRoot(), 'packages', 'learning', 'src', 'scheduling'),
-      /from\s+['"](?!\.|bun:test)(?!@study-studio\/shared['"]|@study-studio\/protocol['"]|@study-studio\/learning-algorithms['"])/
+      /from\s+['"](?!\.|bun:test)(?!@lexdistill\/shared['"]|@lexdistill\/protocol['"]|@lexdistill\/learning-algorithms['"])/
     );
     expect(schedHits.filter((f) => !f.includes('__tests__'))).toEqual([]);
     const practiceHits = await filesWith(
       join(repoRoot(), 'packages', 'learning', 'src', 'practice'),
-      /from\s+['"](?!\.|bun:test)(?!@study-studio\/shared['"]|@study-studio\/protocol['"]|@study-studio\/document-model['"])/
+      /from\s+['"](?!\.|bun:test)(?!@lexdistill\/shared['"]|@lexdistill\/protocol['"]|@lexdistill\/document-model['"])/
     );
     expect(practiceHits.filter((f) => !f.includes('__tests__'))).toEqual([]);
   });
 
   it('document-model：教材 AST 正典，仅依赖 shared 与 zod（禁 Gateway/learner/Agent/Web/SQLite/Drizzle）', async () => {
     expect(
-      await relativeImportsOnly('document-model', ['@study-studio/shared', 'zod'])
+      await relativeImportsOnly('document-model', ['@lexdistill/shared', 'zod'])
     ).toEqual([]);
   });
 
   it('content：Content 域纯解析层，仅依赖 shared/document-model/protocol（禁 Gateway/SQLite/Drizzle/learner-core/Agent/Web/网络/PDF runtime）', async () => {
     // E2b：src/document 为 Node-only 子入口（archive 依赖），由下条用例单独锁定，此处排除。
     expect(
-      await relativeImportsOnly('content', ['@study-studio/shared', '@study-studio/document-model', '@study-studio/protocol'], ['__tests__', 'document'])
+      await relativeImportsOnly('content', ['@lexdistill/shared', '@lexdistill/document-model', '@lexdistill/protocol'], ['__tests__', 'document'])
     ).toEqual([]);
   });
 
   it('content/document：Node-only 文档子入口，仅依赖 shared/archive（禁 drizzle/bun:sqlite/Gateway/网络直引；epub 符号禁上浮由 document-surface 测试锁）', async () => {
     expect(
-      await relativeImportsOnly('content', ['@study-studio/shared', '@study-studio/archive'], ['__tests__'], 'document')
+      await relativeImportsOnly('content', ['@lexdistill/shared', '@lexdistill/archive'], ['__tests__'], 'document')
     ).toEqual([]);
   });
 
   it('archive：最小解包器，仅依赖 shared（禁领域/Gateway/网络/drizzle；第二实现禁令见包 README）', async () => {
     expect(
-      await relativeImportsOnly('archive', ['@study-studio/shared', 'node:zlib'])
+      await relativeImportsOnly('archive', ['@lexdistill/shared', 'node:zlib'])
     ).toEqual([]);
   });
 
@@ -256,7 +256,7 @@ describe('M1-1 package 依赖方向', () => {
     const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
-    expect(deps['@study-studio/archive']).toBe('workspace:*');
+    expect(deps['@lexdistill/archive']).toBe('workspace:*');
   });
 
   // E2g：extract-headings.ts / markdown-to-ast.ts 薄垫片已删除（消费者直引包）；
@@ -268,7 +268,7 @@ describe('M1-1 package 依赖方向', () => {
       'modules/library/application/pdf-import/pdf-import-service.ts',
     ]) {
       const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
-      expect(text).toContain('@study-studio/content');
+      expect(text).toContain('@lexdistill/content');
     }
   });
 
@@ -276,7 +276,7 @@ describe('M1-1 package 依赖方向', () => {
     const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
-    expect(deps['@study-studio/content']).toBe('workspace:*');
+    expect(deps['@lexdistill/content']).toBe('workspace:*');
   });
 
   it('flashcards/render+integrations：实现内聚（render 零外部依赖；integrations 仅 shared/解析运行时）', async () => {
@@ -287,7 +287,7 @@ describe('M1-1 package 依赖方向', () => {
     expect(renderHits.filter((f) => !f.includes('__tests__'))).toEqual([]);
     const integHits = await filesWith(
       join(repoRoot(), 'packages', 'flashcards', 'src', 'integrations'),
-      /from\s+['"](?!\.|bun:test|node:|@study-studio\/shared['"]|bun:sqlite['"])/
+      /from\s+['"](?!\.|bun:test|node:|@lexdistill\/shared['"]|bun:sqlite['"])/
     );
     expect(integHits.filter((f) => !f.includes('__tests__'))).toEqual([]);
   });
@@ -295,22 +295,22 @@ describe('M1-1 package 依赖方向', () => {
   it('learner-core 卡片兼容出口：垫片只许引用 render 子入口（禁根入口的 Node-only APKG 链；R1 Web 构建回归锁）', async () => {
     for (const file of ['card-templates.ts', 'pitch-graph.ts']) {
       const text = await readFile(join(repoRoot(), 'packages', 'learner-core', 'src', file), 'utf-8');
-      expect(text).toContain('@study-studio/flashcards/render');
-      expect(text).not.toMatch(/from\s+['"]@study-studio\/flashcards['"]/);
+      expect(text).toContain('@lexdistill/flashcards/render');
+      expect(text).not.toMatch(/from\s+['"]@lexdistill\/flashcards['"]/);
     }
   });
 
   it('apps/web 禁直引 flashcards 根入口（含 Node-only APKG 链；一律经 learner-core 垫片）', async () => {
     const hits = await filesWith(
       join(repoRoot(), 'apps', 'web', 'src'),
-      /from\s+['"]@study-studio\/flashcards['"]/
+      /from\s+['"]@lexdistill\/flashcards['"]/
     );
     expect(hits).toEqual([]);
   });
 
   it('ai-content：确定性内容规则，仅依赖 shared/learning/protocol（禁 AgentAdapter/Gateway/SQLite/Web/SDK）', async () => {
     expect(
-      await relativeImportsOnly('ai-content', ['@study-studio/shared', '@study-studio/learning', '@study-studio/protocol'])
+      await relativeImportsOnly('ai-content', ['@lexdistill/shared', '@lexdistill/learning', '@lexdistill/protocol'])
     ).toEqual([]);
   });
 
@@ -319,17 +319,17 @@ describe('M1-1 package 依赖方向', () => {
       join(repoRoot(), 'apps', 'gateway', 'src', 'modules', 'learning-progress', 'application', 'learning-analysis.ts'),
       'utf-8'
     );
-    expect(text).toContain('@study-studio/ai-content');
+    expect(text).toContain('@lexdistill/ai-content');
   });
 
   it('learning：领域组合入口 + 快照/建议用例，仅组合 shared/protocol/document-model/learner/algorithms', async () => {
     expect(
       await relativeImportsOnly('learning', [
-        '@study-studio/shared',
-        '@study-studio/protocol',
-        '@study-studio/document-model',
-        '@study-studio/learner-core',
-        '@study-studio/learning-algorithms',
+        '@lexdistill/shared',
+        '@lexdistill/protocol',
+        '@lexdistill/document-model',
+        '@lexdistill/learner-core',
+        '@lexdistill/learning-algorithms',
       ])
     ).toEqual([]);
   });
@@ -337,7 +337,7 @@ describe('M1-1 package 依赖方向', () => {
   it('flashcards：卡片领域包，仅依赖 shared 与解析必需运行时（禁 Gateway/learner-core/Agent/Web）', async () => {
     expect(
       await relativeImportsOnly('flashcards', [
-        '@study-studio/shared',
+        '@lexdistill/shared',
         'bun:sqlite',
         'node:fs',
         'node:os',
@@ -356,7 +356,7 @@ describe('M1-1 package 依赖方向', () => {
       'modules/flashcards/application/card-preview.ts',
     ]) {
       const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
-      expect(text).toContain('@study-studio/flashcards');
+      expect(text).toContain('@lexdistill/flashcards');
     }
   });
 
@@ -364,12 +364,12 @@ describe('M1-1 package 依赖方向', () => {
     const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
-    expect(deps['@study-studio/flashcards']).toBe('workspace:*');
+    expect(deps['@lexdistill/flashcards']).toBe('workspace:*');
   });
 
   it('lexicon：词典领域包，实现内聚，仅依赖 shared', async () => {
     expect(
-      await relativeImportsOnly('lexicon', ['@study-studio/shared'])
+      await relativeImportsOnly('lexicon', ['@lexdistill/shared'])
     ).toEqual([]);
   });
 
@@ -381,7 +381,7 @@ describe('M1-1 package 依赖方向', () => {
       'scripts/import-oewn.ts',
     ]) {
       const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
-      expect(text).toContain('@study-studio/lexicon');
+      expect(text).toContain('@lexdistill/lexicon');
     }
   });
 
@@ -389,7 +389,7 @@ describe('M1-1 package 依赖方向', () => {
     const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
-    expect(deps['@study-studio/lexicon']).toBe('workspace:*');
+    expect(deps['@lexdistill/lexicon']).toBe('workspace:*');
   });
 
   it('gateway/web 教材统一入口：教材 AST 符号一律走 document-model，不走 protocol', async () => {
@@ -401,7 +401,7 @@ describe('M1-1 package 依赖方向', () => {
       for (const file of files) {
         const text = await readFile(file, 'utf-8');
         for (const line of text.split('\n')) {
-          if (sym.test(line) && line.includes(`from '@study-studio/protocol'`)) {
+          if (sym.test(line) && line.includes(`from '@lexdistill/protocol'`)) {
             hits.push(`${file}: ${line.trim()}`);
           }
         }
@@ -414,7 +414,7 @@ describe('M1-1 package 依赖方向', () => {
     const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
-    expect(deps['@study-studio/document-model']).toBe('workspace:*');
+    expect(deps['@lexdistill/document-model']).toBe('workspace:*');
   });
 
   it('gateway 学习入口一律走 learning（删包即断链，安装与类型检查兜底）', async () => {
@@ -423,7 +423,7 @@ describe('M1-1 package 依赖方向', () => {
       'modules/review/__tests__/review-commit.test.ts',
     ]) {
       const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
-      expect(text).toContain('@study-studio/learning');
+      expect(text).toContain('@lexdistill/learning');
     }
   });
 
@@ -435,11 +435,11 @@ describe('M1-1 package 依赖方向', () => {
     ];
     for (const [file, symbols] of cases) {
       const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'src', file), 'utf-8');
-      expect(text).toContain('@study-studio/learning');
+      expect(text).toContain('@lexdistill/learning');
       for (const line of text.split('\n')) {
         for (const sym of symbols) {
           if (line.includes(sym) && line.includes('from')) {
-            expect(line).toContain('@study-studio/learning');
+            expect(line).toContain('@lexdistill/learning');
           }
         }
       }
@@ -450,7 +450,7 @@ describe('M1-1 package 依赖方向', () => {
     const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
-    expect(deps['@study-studio/learning']).toBe('workspace:*');
+    expect(deps['@lexdistill/learning']).toBe('workspace:*');
   });
 
   // D3 叶子规则（2026-09-14 修订，原“禁依赖领域模块”作废）：
@@ -460,14 +460,14 @@ describe('M1-1 package 依赖方向', () => {
   it('storage-sqlite：SQLite 适配层，仅依赖 protocol/document-model/shared/纯领域包 + drizzle/bun:sqlite/node（禁 Gateway/ports/编排/Agent/Web）', async () => {
     expect(
       await relativeImportsOnly('storage-sqlite', [
-        '@study-studio/protocol',
-        '@study-studio/document-model',
-        '@study-studio/shared',
-        '@study-studio/flashcards',
-        '@study-studio/content',
-        '@study-studio/learner-core',
-        '@study-studio/learning',
-        '@study-studio/learning-algorithms',
+        '@lexdistill/protocol',
+        '@lexdistill/document-model',
+        '@lexdistill/shared',
+        '@lexdistill/flashcards',
+        '@lexdistill/content',
+        '@lexdistill/learner-core',
+        '@lexdistill/learning',
+        '@lexdistill/learning-algorithms',
         'drizzle-orm',
         'bun:sqlite',
         'node:crypto',
@@ -481,13 +481,13 @@ describe('M1-1 package 依赖方向', () => {
 
   it('storage-sqlite 对 learner-core 的引用仅限 course-route 声明符号（kana 仅 type 边另锁；禁放宽）', async () => {
     const dir = join(repoRoot(), 'packages', 'storage-sqlite', 'src');
-    const hits = await filesWith(dir, /from\s+['"]@study-studio\/learner-core['"]/);
+    const hits = await filesWith(dir, /from\s+['"]@lexdistill\/learner-core['"]/);
     expect(hits).toEqual([
       join(dir, 'adapters', 'learning-progress', 'course-route.ts'),
       join(dir, 'adapters', 'learning-progress', 'kana-practice-state.ts'),
     ]);
     const text = await readFile(join(dir, 'adapters', 'learning-progress', 'course-route.ts'), 'utf-8');
-    const m = text.match(/import\s*\{([^}]*)\}\s*from\s*['"]@study-studio\/learner-core['"]/);
+    const m = text.match(/import\s*\{([^}]*)\}\s*from\s*['"]@lexdistill\/learner-core['"]/);
     expect(m).not.toBeNull();
     const syms = (m as RegExpMatchArray)[1]!
       .split(',')
@@ -501,12 +501,12 @@ describe('M1-1 package 依赖方向', () => {
 
   it('storage-sqlite 对 learning 的引用仅限 practice-plan 声明符号（禁放宽）', async () => {
     const dir = join(repoRoot(), 'packages', 'storage-sqlite', 'src');
-    const hits = await filesWith(dir, /from\s+['"]@study-studio\/learning['"]/);
+    const hits = await filesWith(dir, /from\s+['"]@lexdistill\/learning['"]/);
     expect(hits).toEqual([
       join(dir, 'adapters', 'practice', 'practice-plan.ts'),
     ]);
     const text = await readFile(hits[0] as string, 'utf-8');
-    const mm = [...text.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]@study-studio\/learning['"]/g)];
+    const mm = [...text.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]@lexdistill\/learning['"]/g)];
     expect(mm.length).toBeGreaterThan(0);
     for (const one of mm) {
       const syms = one[1]!
@@ -529,19 +529,19 @@ describe('M1-1 package 依赖方向', () => {
       'adapters', 'learning-progress', 'kana-practice-state.ts'
     );
     const text = await readFile(file, 'utf-8');
-    expect(text).toContain("from '@study-studio/learner-core'");
-    const valueImports = [...text.matchAll(/^import\s(?!\s*type\s)\{[^}]*\}\s*from\s*['"]@study-studio\/learner-core['"]/gm)];
+    expect(text).toContain("from '@lexdistill/learner-core'");
+    const valueImports = [...text.matchAll(/^import\s(?!\s*type\s)\{[^}]*\}\s*from\s*['"]@lexdistill\/learner-core['"]/gm)];
     expect(valueImports.map((v) => v[0])).toEqual([]);
   });
 
   it('storage-sqlite 对 content 的引用仅限文档种类纯表面（import-tasks 例外；禁放宽整个 content）', async () => {
     const dir = join(repoRoot(), 'packages', 'storage-sqlite', 'src');
-    const hits = await filesWith(dir, /from\s+['"]@study-studio\/content['"]/);
+    const hits = await filesWith(dir, /from\s+['"]@lexdistill\/content['"]/);
     expect(hits).toEqual([
       join(dir, 'adapters', 'document', 'import-tasks.ts'),
     ]);
     const text = await readFile(hits[0] as string, 'utf-8');
-    const m = text.match(/import\s*\{([^}]*)\}\s*from\s*['"]@study-studio\/content['"]/);
+    const m = text.match(/import\s*\{([^}]*)\}\s*from\s*['"]@lexdistill\/content['"]/);
     expect(m).not.toBeNull();
     const syms = (m as RegExpMatchArray)[1]!
       .split(',')
@@ -557,14 +557,14 @@ describe('M1-1 package 依赖方向', () => {
     const text = await readFile(join(repoRoot(), 'apps', 'gateway', 'package.json'), 'utf-8');
     const pkg = asRecord(JSON.parse(text) as unknown, 'apps/gateway package.json');
     const deps = asRecord(pkg['dependencies'] ?? {}, 'apps/gateway dependencies');
-    expect(deps['@study-studio/storage-sqlite']).toBe('workspace:*');
+    expect(deps['@lexdistill/storage-sqlite']).toBe('workspace:*');
   });
 });
 
 describe('M2-1 agent-runtime 外观', () => {
   it('contracts/ 实现内聚：仅相对路径与 shared/tool-core（禁适配器与厂商 SDK）', async () => {
     const pattern =
-      /from\s+['"](?!\.|bun:test)(?!@study-studio\/shared['"]|@study-studio\/tool-core['"])/;
+      /from\s+['"](?!\.|bun:test)(?!@lexdistill\/shared['"]|@lexdistill\/tool-core['"])/;
     const hits = await filesWith(join(repoRoot(), 'packages', 'agent-runtime', 'src', 'contracts'), pattern);
     expect(hits).toEqual([]);
   });
@@ -574,6 +574,6 @@ describe('M2-1 agent-runtime 外观', () => {
       join(repoRoot(), 'apps', 'gateway', 'src', 'runtime', 'gateway-runtime.ts'),
       'utf-8'
     );
-    expect(text).toContain('@study-studio/agent-runtime');
+    expect(text).toContain('@lexdistill/agent-runtime');
   });
 });

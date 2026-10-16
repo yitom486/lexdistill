@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { runDoctor } from '@study-studio/storage-sqlite';
+import { runDoctor } from '@lexdistill/storage-sqlite';
 
 /**
  * P0.5 种子完整性：新鲜库的 source 映射必须自洽。
@@ -23,12 +23,12 @@ describe('seed integrity（P0.5）', () => {
     const repo = freshRepo();
     const db: Database = repo.getRawDb();
     const ids = (
-      db.query(`SELECT id AS id FROM dictionary_sources WHERE id LIKE 'study-studio-%'`).all() as Array<{ id: string }>
+      db.query(`SELECT id AS id FROM dictionary_sources WHERE id LIKE 'lexdistill-%'`).all() as Array<{ id: string }>
     ).map((r) => r.id);
-    expect(ids).toContain('study-studio-starter-v1-ja');
-    expect(ids).toContain('study-studio-starter-v1-ko');
-    expect(ids).toContain('study-studio-starter-v1-en');
-    expect(ids).toContain('study-studio-n5-ja-v1-ja');
+    expect(ids).toContain('lexdistill-starter-v1-ja');
+    expect(ids).toContain('lexdistill-starter-v1-ko');
+    expect(ids).toContain('lexdistill-starter-v1-en');
+    expect(ids).toContain('lexdistill-n5-ja-v1-ja');
   });
 
   it('种子词条 source_id 全部可 resolve（doctor dict:entry-source PASS）', () => {

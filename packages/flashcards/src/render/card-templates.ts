@@ -395,10 +395,10 @@ const BUILTIN_CSS = [
 export const BUILTIN_CARD_FORMATS: AnkiCardFormat[] = [
   {
     id: 'study-basic',
-    name: 'Lingua Studio 基础',
+    name: 'LexDistill 基础',
     entryType: 'term',
-    deckName: 'Lingua Studio',
-    modelName: 'Lingua Basic',
+    deckName: 'LexDistill',
+    modelName: 'LexDistill Basic',
     fields: {
       Expression: '{expression}',
       Reading: '{reading}',

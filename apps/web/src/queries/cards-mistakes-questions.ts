@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { generateId, logger } from '@study-studio/shared';
-import type { FsrsState } from '@study-studio/learner-core';
-import type { CardReviewRating } from '@study-studio/protocol';
-import { GeneratedQuestionSchema, toUiQuizType } from '@study-studio/protocol';
+import { generateId, logger } from '@lexdistill/shared';
+import type { FsrsState } from '@lexdistill/learner-core';
+import type { CardReviewRating } from '@lexdistill/protocol';
+import { GeneratedQuestionSchema, toUiQuizType } from '@lexdistill/protocol';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import type {
   MistakeNotebookItem,

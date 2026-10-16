@@ -1,4 +1,4 @@
-import type { BusinessError, Result } from '@study-studio/shared';
+import type { BusinessError, Result } from '@lexdistill/shared';
 
 /**
  * M3-1 学习算法版本化契约（纯类型 + 轻量工厂类型，无运行时依赖）。

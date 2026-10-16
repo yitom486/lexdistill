@@ -1,4 +1,4 @@
-import type { TextbookLearningContent } from '@study-studio/document-model';
+import type { TextbookLearningContent } from '@lexdistill/document-model';
 import { BookOpen, BookText, Languages, ListChecks, MessageSquareText, ChevronRight, ArrowRight, Route, CheckCheck } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../ui/tabs.js';
 import { Badge } from '../../ui/badge.js';

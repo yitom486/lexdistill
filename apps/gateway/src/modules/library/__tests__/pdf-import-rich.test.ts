@@ -1,14 +1,14 @@
 ﻿import { describe, expect, it, afterEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
-import { extractTocEntries } from '@study-studio/content';
+import { extractTocEntries } from '@lexdistill/content';
 import {
   appendPdfToDocument,
   convertPdfToAst,
   importPdfDocument,
   mapPdfPages,
 } from '../application/pdf-import/pdf-import-service.js';
-import { tryParseTextbookAst } from '@study-studio/storage-sqlite';
+import { tryParseTextbookAst } from '@lexdistill/storage-sqlite';
 import { ensurePdfTestRuntime, pinProcessToTestRuntime } from './pdf-test-runtime.js';
 
 /**

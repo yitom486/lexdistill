@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TextbookLearningContentSchema } from '@study-studio/document-model';
+import { TextbookLearningContentSchema } from '@lexdistill/document-model';
 
 export const ExerciseGradeSchema = z.object({
   score: z.number().min(0).max(100), maxScore: z.literal(100),

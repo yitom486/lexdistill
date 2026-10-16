@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
-import type { HangulItem, HangulScriptType, KanaItem, ReadingPassageSet, NewsTopic } from '@study-studio/protocol';
-import { logger } from '@study-studio/shared';
+import type { HangulItem, HangulScriptType, KanaItem, ReadingPassageSet, NewsTopic } from '@lexdistill/protocol';
+import { logger } from '@lexdistill/shared';
 import { apiClient, GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { normalizeTrackLanguage } from '../learning/learning-shell.js';
@@ -240,7 +240,7 @@ export function useNewsTopicsQuery() {
       } catch (e) {
         logger.debug('[useNewsTopicsQuery] fallback to protocol NEWS_TOPICS', e);
       }
-      const { NEWS_TOPICS } = await import('@study-studio/protocol');
+      const { NEWS_TOPICS } = await import('@lexdistill/protocol');
       return [...NEWS_TOPICS];
     },
     staleTime: 1000 * 60 * 30,

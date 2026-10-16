@@ -1,4 +1,4 @@
-import type { ReadingPassageSet } from '@study-studio/protocol';
+import type { ReadingPassageSet } from '@lexdistill/protocol';
 
 export const INITIAL_READING_SEEDS: ReadingPassageSet[] = [
   {

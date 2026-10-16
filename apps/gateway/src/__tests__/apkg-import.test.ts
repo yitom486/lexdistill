@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promises as fsp } from 'node:fs';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import {
   readApkgFileBytes,
@@ -149,7 +149,7 @@ describe('apkg analyze', () => {
   });
 
   it('Windows 产包反斜杠路径归一化', async () => {
-    const { normalizeZipEntryPaths } = await import('@study-studio/archive');
+    const { normalizeZipEntryPaths } = await import('@lexdistill/archive');
     const normed = normalizeZipEntryPaths([
       { path: 'sub\\collection.anki2', data: new Uint8Array([1]) },
       { path: 'ok/media', data: new Uint8Array([2]) },

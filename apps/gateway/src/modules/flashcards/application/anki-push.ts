@@ -1,5 +1,5 @@
 import { eq, and } from 'drizzle-orm';
-import { ok, err, BusinessError, translateToBusinessError, type Result } from '@study-studio/shared';
+import { ok, err, BusinessError, translateToBusinessError, type Result } from '@lexdistill/shared';
 import { synthesizeUnified, UnifiedSynthesisError } from 'gemini-tts-studio/server';
 import {
   pushCardToAnki as pushCardToAnkiUseCase,
@@ -7,17 +7,17 @@ import {
   type AnkiPushResult as AnkiPushResultOut,
   type AnkiPushPorts,
   type FetchImpl,
-} from '@study-studio/flashcards';
+} from '@lexdistill/flashcards';
 import {
   flashcards,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 import { resolveCardSourceEntry } from './card-source.js';
-import { getCardFormat } from '@study-studio/storage-sqlite';
-import { getAnkiSettings } from '@study-studio/storage-sqlite';
+import { getCardFormat } from '@lexdistill/storage-sqlite';
+import { getAnkiSettings } from '@lexdistill/storage-sqlite';
 
 /**
- * M7-7 生词卡推送 Anki 薄组合层：编排已迁入 `@study-studio/flashcards`，
+ * M7-7 生词卡推送 Anki 薄组合层：编排已迁入 `@lexdistill/flashcards`，
  * 此处只做 port 配接——
  * 用户设置、卡片/媒体读取、TTS 调用、事务仍归 Gateway；对外签名、返回形状、
  * 错误语义不变（未启用不发请求、SSRF 守卫、重复/不可达行为由用例保留）。
@@ -26,7 +26,7 @@ export {
   type AnkiPushRequest,
   type AnkiPushResult,
   type AnkiPushTts,
-} from '@study-studio/flashcards';
+} from '@lexdistill/flashcards';
 
 export async function pushCardToAnki(
   deps: RepoDeps,

@@ -4,7 +4,7 @@ import {
   BusinessError,
   translateToBusinessError,
   type ErrorCategory,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 
 /**
  * 业务错误大类向标准 HTTP 状态码的映射字典

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { app } from '../index.js';
 import { mapCategoryToHttpStatus, type StandardErrorPayload } from '../errors/http-error-handler.js';
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 
 describe('Gateway Unified HTTP Error Handler', () => {
   it('should map categories to standard HTTP status codes correctly', () => {

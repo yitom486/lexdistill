@@ -4,7 +4,7 @@ import {
   type BusinessError,
   logger,
   translateToBusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 
 /**
  * lines 投影钩子（P2-2a；P2-2a1 修订）。

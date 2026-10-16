@@ -4,7 +4,7 @@ import { join, relative } from 'node:path';
 
 const ROOT = join(import.meta.dir, '..');
 const CHANGELOG_PATH = join(ROOT, 'CHANGELOG.md');
-const APP_NAME = 'Lingua Studio';
+const APP_NAME = 'LexDistill';
 
 type JsonObject = Record<string, unknown>;
 
@@ -98,7 +98,7 @@ async function syncVersion(version: string): Promise<void> {
   if (existsSync(lockPath)) {
     const lock = await Bun.file(lockPath).text();
     const lockNext = lock.replace(
-      /(name\s*=\s*"study-studio-desktop"\r?\nversion\s*=\s*")[^"]+("\s*\r?\n)/,
+      /(name\s*=\s*"lexdistill-desktop"\r?\nversion\s*=\s*")[^"]+("\s*\r?\n)/,
       `$1${version}$2`
     );
     if (lock !== lockNext) await Bun.write(lockPath, lockNext);

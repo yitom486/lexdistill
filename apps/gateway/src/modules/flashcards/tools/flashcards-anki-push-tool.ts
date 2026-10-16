@@ -4,8 +4,8 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, type Result, type BusinessError } from '@study-studio/shared';
+} from '@lexdistill/tool-core';
+import { ok, type Result, type BusinessError } from '@lexdistill/shared';
 import type { FlashcardsRepository } from '../ports.js';
 import type { AnkiPushResult } from '../application/anki-push.js';
 

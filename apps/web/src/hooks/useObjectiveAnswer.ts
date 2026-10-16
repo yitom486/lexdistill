@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
-import { generateId } from '@study-studio/shared';
+import { generateId } from '@lexdistill/shared';
 import { toast } from 'sonner';
-import type { ObjectiveAnswerResult } from '@study-studio/protocol';
+import type { ObjectiveAnswerResult } from '@lexdistill/protocol';
 import { useSubmitQuizMutation } from '../queries/useAgentMutations.js';
 
 export function useObjectiveAnswer(questionId: string, language: 'en' | 'ja' | 'ko', onRecorded?: (correct: boolean) => void) {

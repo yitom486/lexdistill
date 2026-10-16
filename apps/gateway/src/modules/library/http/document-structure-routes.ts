@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
-import { BusinessError, isOk } from '@study-studio/shared';
+import { BusinessError, isOk } from '@lexdistill/shared';
 import { formatBusinessErrorResponse } from '../../../errors/http-error-handler.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 

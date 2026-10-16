@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { initSchema, SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
-import { BusinessError, isOk, ok, err, type Result } from '@study-studio/shared';
-import { ToolRegistry } from '@study-studio/tool-core';
-import type { AgentAdapter, AgentEvent, AgentInput, AgentSession, CreateSessionOptions } from '@study-studio/agent-runtime';
-import type { ExternalToolExecutor } from '@study-studio/agent-runtime';
-import type { BankPaperReceipt, BankSubmitReceipt } from '@study-studio/protocol';
+import { initSchema, SqliteQuestionGenerationRepository } from '@lexdistill/storage-sqlite';
+import { BusinessError, isOk, ok, err, type Result } from '@lexdistill/shared';
+import { ToolRegistry } from '@lexdistill/tool-core';
+import type { AgentAdapter, AgentEvent, AgentInput, AgentSession, CreateSessionOptions } from '@lexdistill/agent-runtime';
+import type { ExternalToolExecutor } from '@lexdistill/agent-runtime';
+import type { BankPaperReceipt, BankSubmitReceipt } from '@lexdistill/protocol';
 import { GENERATION_TOOL_NAMES } from '../modules/question-generation/public.js';
 import { GenerationTaskService } from '../modules/question-generation/service.js';
 import { runGenerationTask } from '../modules/question-generation/runner.js';
@@ -160,8 +160,8 @@ describe('P1 dedicated generation runner with real tools and SQLite', () => {
 
   it('ACP 通路：按次克隆工具＋注册表执行＋用完注销，身份前置', async () => {
     const s = track(setup());
-    const { ToolRegistry } = await import('@study-studio/tool-core');
-    const { AcpAgentSession } = await import('@study-studio/agent-runtime');
+    const { ToolRegistry } = await import('@lexdistill/tool-core');
+    const { AcpAgentSession } = await import('@lexdistill/agent-runtime');
     const toolRegistry = new ToolRegistry();
     const seen: { options?: CreateSessionOptions; message?: string } = {};
     const cloneOf = (tools: { name: string }[], original: string): string => {
@@ -268,7 +268,7 @@ describe('P1 dedicated generation runner with real tools and SQLite', () => {
     expect(() => s.service.queryTask('other', task.taskId)).toThrow();
     await expect(s.service.cancelTask('other', task.taskId)).rejects.toThrow();
     // 主对话全局工具集未混入专用工具。
-    const { ToolRegistry } = await import('@study-studio/tool-core');
+    const { ToolRegistry } = await import('@lexdistill/tool-core');
     const global = new ToolRegistry();
     global.register({ name: 'learning.content', description: 'x', location: 'SERVER', permission: 'READ', schema: (await import('zod')).z.object({}), async execute() { return ok(null); } });
     expect(global.get('generation.submit')).toBeUndefined();

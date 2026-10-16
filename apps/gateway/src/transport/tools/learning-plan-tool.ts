@@ -4,11 +4,11 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { ok, err, isOk, type Result, BusinessError } from '@study-studio/shared';
-import type { DailyStudyPlan, LearnerRepository } from '@study-studio/learner-core';
-import type { PracticeBlockSpec } from '@study-studio/protocol';
-import { PracticeBlockSpecSchema } from '@study-studio/protocol';
+} from '@lexdistill/tool-core';
+import { ok, err, isOk, type Result, BusinessError } from '@lexdistill/shared';
+import type { DailyStudyPlan, LearnerRepository } from '@lexdistill/learner-core';
+import type { PracticeBlockSpec } from '@lexdistill/protocol';
+import { PracticeBlockSpecSchema } from '@lexdistill/protocol';
 import { buildAnalysisSnapshot } from '../../modules/learning-progress/application/learning-analysis.js';
 import { createProposal, type PracticeProposal } from '../../modules/practice/application/practice-proposal.js';
 

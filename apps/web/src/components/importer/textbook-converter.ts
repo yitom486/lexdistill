@@ -1,4 +1,4 @@
-import { planTextbookTasks, type TextbookAST } from '@study-studio/document-model';
+import { planTextbookTasks, type TextbookAST } from '@lexdistill/document-model';
 import type { TextbookBook, FuriganaWord } from '../../models/textbook.js';
 
 export interface GeneratedCardItem {

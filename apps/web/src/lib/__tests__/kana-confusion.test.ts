@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { confusionDistractors, voicingVariants } from '../kana-confusion.js';
-import type { KanaItem } from '@study-studio/protocol';
+import type { KanaItem } from '@lexdistill/protocol';
 
 function makeKana(
   id: string,

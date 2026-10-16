@@ -1,7 +1,7 @@
 import type { GenerationBinding, GenerationConfig, BankQuestionRecord, BankSubmitReceipt, BankMaterial, GenerationBlueprint, GenerationRunLimits,
   SubmitBankQuestions, QueryBank, ReadGenerationTextbook, AssembleBankPaper, BankPaperReceipt, BankAudioReceipt,
   GenerationTaskSnapshot, GenerationPaperDetail, GenerationPaperSummary, BankSubmissionRecord, GenerationTaskStatus,
-  GenerationTaskSummary } from '@study-studio/protocol';
+  GenerationTaskSummary } from '@lexdistill/protocol';
 
 export type { GenerationTaskSummary };
 

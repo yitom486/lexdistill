@@ -7,7 +7,7 @@ import {
   translateToBusinessError,
   generateId,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type { Database } from 'bun:sqlite';
 
 /**

@@ -1,14 +1,14 @@
-import type { ContextSnapshot, ContextFocusItem } from '@study-studio/agent-runtime';
-import { summarizeLearningEvidence } from '@study-studio/learning';
-import { COURSE_STAGES, type LearnerProfileSnapshot, type LearnerRepository } from '@study-studio/learner-core';
-import type { GeneratedQuestion, Flashcard } from '@study-studio/protocol';
+import type { ContextSnapshot, ContextFocusItem } from '@lexdistill/agent-runtime';
+import { summarizeLearningEvidence } from '@lexdistill/learning';
+import { COURSE_STAGES, type LearnerProfileSnapshot, type LearnerRepository } from '@lexdistill/learner-core';
+import type { GeneratedQuestion, Flashcard } from '@lexdistill/protocol';
 import {
   isOk,
   type Result,
   type BusinessError,
   normalizeTrackLanguage,
   type TrackLanguage,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import { buildTrackCoachMetadata, skillMatchesTrack } from '../coach-language-policy.js';
 
 export interface BuildTurnContextParams {

@@ -1,4 +1,4 @@
-import type { LearnerLevel } from '@study-studio/protocol';
+import type { LearnerLevel } from '@lexdistill/protocol';
 
 /**
  * M6-2 自 learner-core 迁入（C6 起归属 learning/src/practice；字节一致，行为不变）。

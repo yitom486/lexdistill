@@ -1,7 +1,7 @@
 import {
   type WsEnvelope,
   WsEventTypes,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import {
   err,
   type Result,
@@ -10,7 +10,7 @@ import {
   isOk,
   ok,
   normalizeTrackLanguage,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type { PracticeSubmissionRepository } from '../application/submit-practice-attempt.js';
 import { submitPracticeAttempt } from '../application/submit-practice-attempt.js';
 import type { PersistableQuestion } from '../persistence/questions.js';

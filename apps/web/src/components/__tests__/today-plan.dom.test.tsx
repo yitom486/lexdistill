@@ -1,6 +1,6 @@
 import { expect, it, mock } from 'bun:test';
 import React from 'react';
-import { COURSE_UNITS, courseUnitPlanStep } from '@study-studio/learner-core';
+import { COURSE_UNITS, courseUnitPlanStep } from '@lexdistill/learner-core';
 import { KANA_SEEDS } from '../../../../../packages/storage-sqlite/src/seeds/kana-seed.js';
 import { act, setupDom } from '../toc/__tests__/dom-setup.js';
 

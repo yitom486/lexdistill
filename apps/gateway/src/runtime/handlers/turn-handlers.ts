@@ -1,7 +1,7 @@
 import {
   type WsEnvelope,
   WsEventTypes,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import {
   ok,
   err,
@@ -10,12 +10,12 @@ import {
   generateId,
   isOk,
   normalizeTrackLanguage,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type { GatewayServer } from '../gateway-runtime.js';
-import type { ContextSnapshot } from '@study-studio/agent-runtime';
-import { AcpAgentSession } from '@study-studio/agent-runtime';
+import type { ContextSnapshot } from '@lexdistill/agent-runtime';
+import { AcpAgentSession } from '@lexdistill/agent-runtime';
 import { sanitizeSnapshotReading } from '../context/context-builder.js';
-import type { ToolDefinition } from '@study-studio/tool-core';
+import type { ToolDefinition } from '@lexdistill/tool-core';
 import type { AgentLane } from '../session/session-manager.js';
 import { buildGenericCoachReply } from '../coach-language-policy.js';
 import { selectAgentRoute } from '../router/agent-router.js';
@@ -343,7 +343,7 @@ export async function handleTurnSend(
           const needsIdentity = isNewAcpConversation
             || (agentThreadId ? server.acpLedger.ensureIdentityApplied(agentThreadId) : false);
           const sendMessage = needsIdentity
-            ? `你是 Lingua Studio（${trackLabel}学习应用）中的 AI 导师，只教${trackLabel}、只聊学习；直接用中文回答，正文前不加英文前缀、不自我介绍，直接讲内容。\n\n${userPrompt}`
+            ? `你是 LexDistill（${trackLabel}学习应用）中的 AI 导师，只教${trackLabel}、只聊学习；直接用中文回答，正文前不加英文前缀、不自我介绍，直接讲内容。\n\n${userPrompt}`
             : userPrompt;
           for await (const ev of agentSession.send({
             message: sendMessage,

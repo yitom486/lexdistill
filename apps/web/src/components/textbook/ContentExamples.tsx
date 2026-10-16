@@ -1,4 +1,4 @@
-import type { LessonContent } from '@study-studio/document-model';
+import type { LessonContent } from '@lexdistill/document-model';
 import { ContentSource } from './ContentSource.js';
 export function ContentExamples({ examples }: { examples: LessonContent['knowledgePoints'][number]['examples'] }) {
   return <div className="space-y-2">{examples.map(example => <div key={example.id} className="space-y-1 border-l border-line pl-3">

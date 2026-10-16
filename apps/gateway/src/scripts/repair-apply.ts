@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { Database } from 'bun:sqlite';
-import { runDoctor, formatDoctorReport } from '@study-studio/storage-sqlite';
-import { applyOrphanCleanup, formatOrphanApplyReport, applySeedSourceFix } from '@study-studio/storage-sqlite';
+import { runDoctor, formatDoctorReport } from '@lexdistill/storage-sqlite';
+import { applyOrphanCleanup, formatOrphanApplyReport, applySeedSourceFix } from '@lexdistill/storage-sqlite';
 
 /**
  * R1 历史修复 apply（写库！只读 dry-run 见 repair-plan.ts）。
@@ -12,7 +12,7 @@ import { applyOrphanCleanup, formatOrphanApplyReport, applySeedSourceFix } from 
 const target =
   process.argv[2] ??
   process.env.STUDY_STUDIO_DB ??
-  path.resolve(import.meta.dir, '../../../..', 'study-studio.db');
+  path.resolve(import.meta.dir, '../../../..', 'lexdistill.db');
 
 const sqlite = new Database(target);
 try {

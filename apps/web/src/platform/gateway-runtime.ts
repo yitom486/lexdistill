@@ -1,4 +1,4 @@
-import { logger } from '@study-studio/shared';
+import { logger } from '@lexdistill/shared';
 import { configureGatewayBaseUrl } from '../lib/api-client.js';
 import { gatewayClient } from '../lib/gateway-client.js';
 import { detectTauri } from './capabilities.js';

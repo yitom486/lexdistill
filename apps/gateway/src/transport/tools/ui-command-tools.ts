@@ -4,9 +4,9 @@ import {
   type ToolExecutionContext,
   ToolPermissions,
   ToolLocations,
-} from '@study-studio/tool-core';
-import { GeneratedQuestionSchema } from '@study-studio/protocol';
-import { ok, type Result, type BusinessError } from '@study-studio/shared';
+} from '@lexdistill/tool-core';
+import { GeneratedQuestionSchema } from '@lexdistill/protocol';
+import { ok, type Result, type BusinessError } from '@lexdistill/shared';
 
 export const UiNavigateInputSchema = z.object({
   target: z.enum([

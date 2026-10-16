@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { createMigratedStorage } from './store-storage.js';
 
 /**
  * 整本 enrich 任务 ID 台账（文档 → jobId）。
@@ -25,6 +26,9 @@ export const useEnrichJobLedgerStore = create<EnrichJobLedgerState>()(
           return { jobByDocument: next };
         }),
     }),
-    { name: 'study_studio_enrich_jobs' }
+    {
+      name: 'lexdistill_enrich_jobs',
+      storage: createMigratedStorage(['study_studio_enrich_jobs']),
+    }
   )
 );

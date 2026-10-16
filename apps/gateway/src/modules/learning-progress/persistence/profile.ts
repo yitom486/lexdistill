@@ -7,26 +7,26 @@ import {
   translateToBusinessError,
   nowIso,
   isOk,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type {
   SkillDimension,
   SkillMetric,
   SkillStatus,
   LearnerProfileSnapshot,
   LearnerProfile,
-} from '@study-studio/learner-core';
-import { JlptLevelSchema } from '@study-studio/protocol';
+} from '@lexdistill/learner-core';
+import { JlptLevelSchema } from '@lexdistill/protocol';
 import {
   learnerProfiles,
   learnerLanguageProfiles,
   skillMetrics,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import { normalizeTrackLanguage, inferLanguageFromSkillId } from '@study-studio/shared';
+import { normalizeTrackLanguage, inferLanguageFromSkillId } from '@lexdistill/shared';
 import {
   ensureLanguageProfile,
   mirrorLanguageProfileToMain,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 
 /**
  * 画像域（由 DrizzleLearnerRepository 搬迁而来，行为不变）。

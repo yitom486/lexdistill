@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { assemblePracticeRun } from '../application/practice-assembly.js';
 import {
   ASSESSMENT_BLUEPRINT_VERSION,
   attributeGroup,
   blueprintFor,
-} from '@study-studio/learning';
+} from '@lexdistill/learning';
 
 /** 阶段测评蓝图 v1：先定义考什么，再组卷；分项计分；覆盖不足只报告不判线。 */
 describe('assessment blueprint', () => {

@@ -1,8 +1,8 @@
 /** UI 音效与流式语音播放入口（全站唯一合成通道：网关 SSE 流）。 */
 
-import { BusinessError, translateToBusinessError } from '@study-studio/shared';
-import type { TtsPurpose } from '@study-studio/speech';
-import { bcp47ForTrack, normalizeTtsTrackLanguage } from '@study-studio/speech';
+import { BusinessError, translateToBusinessError } from '@lexdistill/shared';
+import type { TtsPurpose } from '@lexdistill/speech';
+import { bcp47ForTrack, normalizeTtsTrackLanguage } from '@lexdistill/speech';
 import { createTTSClient } from 'gemini-tts-studio/client';
 import { toast } from 'sonner';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';

@@ -1,6 +1,6 @@
 # `packages/` — 核心能力包阅读指南
 
-`packages/` 是 Lingua Studio 的共享能力层。这里的代码会被 `apps/gateway`、`apps/web` 或 Agent 适配器复用。
+`packages/` 是 LexDistill 的共享能力层。这里的代码会被 `apps/gateway`、`apps/web` 或 Agent 适配器复用。
 
 本目录采用**按能力拆分的模块化单体结构（Modular Monolith）**：各 Package 并非独立部署的微服务，而是通过 workspace 依赖协同工作的自治模块。
 
@@ -180,7 +180,7 @@ flowchart TD
   - `import-monitor.ts`：教材导入流水线的多维度打点监控器类型。
 
 #### `packages/storage-sqlite`
-- **定位**：Lingua Studio 的持久化唯一事实源（SSOT）。
+- **定位**：LexDistill 的持久化唯一事实源（SSOT）。
 - **核心模块**：
   - `schema.ts`：Drizzle ORM 表模型定义（教材表、知识点、生词、错题、学习画像等）。
   - `ddl.ts`：原生建表 SQL 与迁移执行器（保证建库幂等与零漂移）。
@@ -331,6 +331,6 @@ storage-sqlite (写入 review_logs，更新 user_cards 状态)
    - 系统内置业务工具优先走 `tool-core` 原生注册与进程内分发；MCP 仅作为可选的外部异构系统（Anki/Notion）桥接。
 5. **类型安全与 Hygiene**：
    - 全仓库严禁新增 `as any` 或 `: any`；所有外部输入一律先收窄。
-   - 错误传递全面采用 `Result<T, BusinessError>`，业务代码禁止散落 `console.*`，统一采用 `@study-studio/shared` 的 `logger`。
+   - 错误传递全面采用 `Result<T, BusinessError>`，业务代码禁止散落 `console.*`，统一采用 `@lexdistill/shared` 的 `logger`。
 6. **导出白名单制（No Wildcard Drift）**：
    - 新增领域包优先采用白名单具名重导出，严禁野性 `export *` 污染命名空间。

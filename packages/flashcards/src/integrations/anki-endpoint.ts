@@ -1,4 +1,4 @@
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 
 /**
  * M7-1 自 Gateway `flashcards/persistence/anki-settings.ts` 迁入（字节一致，行为不变）。

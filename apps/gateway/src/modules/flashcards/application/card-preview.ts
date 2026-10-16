@@ -1,19 +1,19 @@
-import { type Result, type BusinessError } from '@study-studio/shared';
+import { type Result, type BusinessError } from '@lexdistill/shared';
 import {
   previewCard as previewCardUseCase,
   narrowCardSourceEntry,
   type PreviewCardRequest as PreviewCardRequestIn,
   type PreviewCardResult as PreviewCardResultOut,
   type AnkiCardFormat,
-} from '@study-studio/flashcards';
+} from '@lexdistill/flashcards';
 import {
   getCardFormat,
   narrowSaveCardFormatInput,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 /**
- * M7-6 卡片预览薄组合层：领域渲染实现已迁入 `@study-studio/flashcards`，
+ * M7-6 卡片预览薄组合层：领域渲染实现已迁入 `@lexdistill/flashcards`，
  * 此处只做三件事——
  * 1. 用现有持久化能力实现最小读取 port（已存模板直读、草稿收窄复用
  *    `narrowSaveCardFormatInput`，只渲染不入库）；
@@ -24,7 +24,7 @@ export {
   narrowCardSourceEntry,
   type PreviewCardRequest,
   type PreviewCardResult,
-} from '@study-studio/flashcards';
+} from '@lexdistill/flashcards';
 
 export async function previewCard(
   deps: RepoDeps,

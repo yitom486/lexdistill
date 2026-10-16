@@ -1,4 +1,4 @@
-import type { HeadingCandidate } from '@study-studio/protocol';
+import type { HeadingCandidate } from '@lexdistill/protocol';
 import type { PageHeading } from './extract-headings.js';
 
 /**

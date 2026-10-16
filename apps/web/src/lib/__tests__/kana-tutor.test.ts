@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { buildKanaTutorContext } from '../kana-tutor.js';
-import type { KanaItem } from '@study-studio/protocol';
+import type { KanaItem } from '@lexdistill/protocol';
 import { KANA_SEEDS } from '../../../../../packages/storage-sqlite/src/seeds/kana-seed.js';
 
 const A: KanaItem = {

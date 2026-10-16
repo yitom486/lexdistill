@@ -5,7 +5,7 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 
 export class ToolRegistry {
   private readonly tools = new Map<string, ToolDefinition>();

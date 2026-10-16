@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { BusinessError, err, ok, translateToBusinessError } from '@study-studio/shared';
-import { ToolRegistry, type ToolExecutionContext } from '@study-studio/tool-core';
+import { BusinessError, err, ok, translateToBusinessError } from '@lexdistill/shared';
+import { ToolRegistry, type ToolExecutionContext } from '@lexdistill/tool-core';
 import { SubmitBankQuestionsSchema, QueryBankSchema, ReadGenerationTextbookSchema, GenerateBankAudioSchema, AssembleBankPaperSchema,
-  type GenerationBinding, type GenerationConfig, type GenerationBlueprint, type GenerationRunLimits } from '@study-studio/protocol';
+  type GenerationBinding, type GenerationConfig, type GenerationBlueprint, type GenerationRunLimits } from '@lexdistill/protocol';
 import type { GenerationAudioRenderer, QuestionGenerationRepository } from './ports.js';
 
 export const GENERATION_TOOL_NAMES = ['generation.config', 'generation.textbook', 'generation.pool', 'generation.submit', 'generation.audio', 'generation.paper'] as const;

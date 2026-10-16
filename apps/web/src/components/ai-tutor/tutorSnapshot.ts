@@ -1,4 +1,4 @@
-import type { ContextSnapshot } from '@study-studio/agent-runtime';
+import type { ContextSnapshot } from '@lexdistill/agent-runtime';
 import { normalizeTrackLanguage, type TrackLanguage } from '../../learning/learning-shell.js';
 import type { AiTutorContext } from '../../stores/tutor-context.js';
 

@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import type { ToolDefinition } from '@study-studio/tool-core';
-import { BusinessError, type Result } from '@study-studio/shared';
+import type { ToolDefinition } from '@lexdistill/tool-core';
+import { BusinessError, type Result } from '@lexdistill/shared';
 
 /**
  * 会话级工具 MCP 桥（ACP 多运行时底座；教材 textbook-mcp-server 的会话版）。

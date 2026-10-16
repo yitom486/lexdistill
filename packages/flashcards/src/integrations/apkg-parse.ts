@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 
 /**
  * M7-3 自 Gateway `flashcards/application/apkg-import.ts` 迁入（逻辑字节一致）。

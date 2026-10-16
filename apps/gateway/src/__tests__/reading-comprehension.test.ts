@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { app } from '../index.js';
-import { isOk } from '@study-studio/shared';
-import type { ReadingPassageSet } from '@study-studio/protocol';
+import { isOk } from '@lexdistill/shared';
+import type { ReadingPassageSet } from '@lexdistill/protocol';
 
 describe('Reading Comprehension Repository & Seeds (Companion Integration)', () => {
   let sqlite: Database;

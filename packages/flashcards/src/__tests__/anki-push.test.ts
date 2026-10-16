@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk, isErr, BusinessError } from '@study-studio/shared';
+import { isOk, isErr, BusinessError } from '@lexdistill/shared';
 import {
   pushCardToAnki,
   type AnkiPushPorts,

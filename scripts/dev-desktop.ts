@@ -20,7 +20,7 @@ function cleanupStaleDesktopProcesses(): void {
       const r = sh('powershell.exe', [
         '-NoProfile',
         '-Command',
-        'Get-Process -Name "study-studio-desktop" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id',
+        'Get-Process -Name "lexdistill-desktop", "lexdistill-desktop" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id',
       ]);
       if (r.ok && r.out.trim()) {
         const pids = r.out.trim().split(/\s+/).map(Number).filter((n) => Number.isSafeInteger(n) && n > 0);
@@ -121,7 +121,7 @@ async function main(): Promise<number> {
     );
   }
 
-  const tauriArgs = ['--filter', '@study-studio/desktop', 'dev'];
+  const tauriArgs = ['--filter', '@lexdistill/desktop', 'dev'];
   if (!isDefaultPort) {
     tauriArgs.push('--', '-c', '.dev-port-override.json');
   }

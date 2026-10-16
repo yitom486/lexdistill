@@ -1,4 +1,4 @@
-import type { TextbookLearningContent } from '@study-studio/document-model';
+import type { TextbookLearningContent } from '@lexdistill/document-model';
 import { ContentSource } from './ContentSource.js';
 
 export function LearningContentPanel({ content, section = 'ALL', showTranslation = true }: {

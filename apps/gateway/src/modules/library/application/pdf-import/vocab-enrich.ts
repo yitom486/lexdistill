@@ -1,12 +1,12 @@
-import { resolveAgentFirstMessage, type AgentAdapter } from '@study-studio/agent-runtime';
-import { BusinessError, err, isOk, logger, ok, translateToBusinessError, type Result } from '@study-studio/shared';
+import { resolveAgentFirstMessage, type AgentAdapter } from '@lexdistill/agent-runtime';
+import { BusinessError, err, isOk, logger, ok, translateToBusinessError, type Result } from '@lexdistill/shared';
 import {
   TextbookGrammarSchema,
   TextbookVocabularySchema,
   type TextbookAST,
   type TextbookGrammar,
   type TextbookVocabulary,
-} from '@study-studio/document-model';
+} from '@lexdistill/document-model';
 
 /**
  * AI 生词/文法抽取（PDF 导入第二刀）。

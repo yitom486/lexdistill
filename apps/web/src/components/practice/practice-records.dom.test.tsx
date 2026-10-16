@@ -2,7 +2,7 @@ import { expect, it } from 'bun:test';
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Hono } from 'hono';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../../../../gateway/src/infrastructure/drizzle-learner-repository.js';
 import { createAnswerRoutes } from '../../../../gateway/src/modules/practice/http/answer-routes.js';
 import type { GatewayDeps } from '../../../../gateway/src/composition/gateway-deps.js';

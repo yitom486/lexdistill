@@ -6,10 +6,10 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
-} from '@study-studio/shared';
-import type { Flashcard, CardReviewRating } from '@study-studio/protocol';
-import type { FsrsState, SchedulerOutput } from '@study-studio/learning-algorithms';
-import { reviewScheduleEvents } from '@study-studio/storage-sqlite';
+} from '@lexdistill/shared';
+import type { Flashcard, CardReviewRating } from '@lexdistill/protocol';
+import type { FsrsState, SchedulerOutput } from '@lexdistill/learning-algorithms';
+import { reviewScheduleEvents } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 /**

@@ -1,6 +1,6 @@
-import type { Result, BusinessError } from '@study-studio/shared';
-import type { TargetLanguage } from '@study-studio/learner-core';
-import type { AgentAdapter } from '@study-studio/agent-runtime';
+import type { Result, BusinessError } from '@lexdistill/shared';
+import type { TargetLanguage } from '@lexdistill/learner-core';
+import type { AgentAdapter } from '@lexdistill/agent-runtime';
 import type {
   LocalDictionaryEntry,
   DictionaryEntryCollection,
@@ -10,9 +10,9 @@ import type {
   EncounteredTerm,
   RecordTermExposureInput,
   RecordReadingExposuresInput,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import type { TermExampleItem } from './application/term-examples.js';
-import type { WordlistGroup } from '@study-studio/storage-sqlite';
+import type { WordlistGroup } from '@lexdistill/storage-sqlite';
 
 /**
  * M1-2 词典（lexicon）领域仓储能力契约。

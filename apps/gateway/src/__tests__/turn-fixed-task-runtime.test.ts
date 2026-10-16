@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { startGatewayServer } from '../index.js';
-import { WsEventTypes, type WsEnvelope } from '@study-studio/protocol';
-import { generateId } from '@study-studio/shared';
+import { WsEventTypes, type WsEnvelope } from '@lexdistill/protocol';
+import { generateId } from '@lexdistill/shared';
 
 /**
  * 固定工具任务运行时门禁回归：vocabulary.explain 在未验证运行时（agy）上

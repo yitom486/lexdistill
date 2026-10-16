@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { fileURLToPath } from 'node:url';
-import { TextbookInspectionResultSchema } from '@study-studio/protocol';
+import { TextbookInspectionResultSchema } from '@lexdistill/protocol';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';
 import { requiredContent } from './textbook-pipeline-fixtures.js';

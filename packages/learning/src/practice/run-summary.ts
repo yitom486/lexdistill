@@ -1,4 +1,4 @@
-import type { PracticeItemAttempt, PracticePlanRun } from '@study-studio/protocol';
+import type { PracticeItemAttempt, PracticePlanRun } from '@lexdistill/protocol';
 
 /**
  * M7-14 自 Gateway `practice/application/practice-summary.ts` 迁入

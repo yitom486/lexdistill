@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { courseUnitPlanStep } from '@study-studio/learner-core';
+import { courseUnitPlanStep } from '@lexdistill/learner-core';
 import { Check, ChevronDown, Footprints, Lock, RotateCcw } from 'lucide-react';
 import { sound } from '../utils/audio.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';

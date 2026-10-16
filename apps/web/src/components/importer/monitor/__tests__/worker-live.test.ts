@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { ImportEventSchema } from '@study-studio/document-model';
+import { ImportEventSchema } from '@lexdistill/document-model';
 import { summarizeWorkers } from '../WorkerLiveStrip.js';
 
 const base = {

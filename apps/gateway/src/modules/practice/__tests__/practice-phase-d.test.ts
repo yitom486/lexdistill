@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { isOk, isErr } from '@study-studio/shared';
+import { isOk, isErr } from '@lexdistill/shared';
 import type { AnalysisSnapshot } from '../../learning-progress/public.js';
 import {
   proposeTemplateFromSnapshot,
@@ -8,7 +8,7 @@ import {
   _clearProposalsForTest,
 } from '../application/practice-proposal.js';
 import { buildLocalRunSummary, summarizePracticeRun, type RunSummaryReport } from '../application/practice-summary.js';
-import type { PracticePlanRun, PracticeItemAttempt, PracticeBlockSpec } from '@study-studio/protocol';
+import type { PracticePlanRun, PracticeItemAttempt, PracticeBlockSpec } from '@lexdistill/protocol';
 
 /* ------------------------------------------------------------------ *
  * P5-PhaseD：AI 分析与质量收口

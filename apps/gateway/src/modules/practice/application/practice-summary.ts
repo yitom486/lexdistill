@@ -1,7 +1,7 @@
-import { ok, err, isOk, type Result, BusinessError, translateToBusinessError, nowIso } from '@study-studio/shared';
-import type { LearnerRepository } from '@study-studio/learner-core';
-import type { PracticeItemAttempt, PracticePlanRun } from '@study-studio/protocol';
-import { buildLocalRunSummary as buildLocalRunSummaryPure, type RunSummaryReport } from '@study-studio/learning';
+import { ok, err, isOk, type Result, BusinessError, translateToBusinessError, nowIso } from '@lexdistill/shared';
+import type { LearnerRepository } from '@lexdistill/learner-core';
+import type { PracticeItemAttempt, PracticePlanRun } from '@lexdistill/protocol';
+import { buildLocalRunSummary as buildLocalRunSummaryPure, type RunSummaryReport } from '@lexdistill/learning';
 
 /**
  * P5-PhaseD：练习运行汇总与下次建议（可审计、模型不可用回退本地规则）。
@@ -13,7 +13,7 @@ import { buildLocalRunSummary as buildLocalRunSummaryPure, type RunSummaryReport
  */
 
 /** 报告类型兼容出口：定义在 learning/src/practice，经 learning 转出以保持 Tool/测试链路不动。 */
-export type { RunSummaryReport } from '@study-studio/learning';
+export type { RunSummaryReport } from '@lexdistill/learning';
 
 export interface SummarizeOptions {
   repo: LearnerRepository;

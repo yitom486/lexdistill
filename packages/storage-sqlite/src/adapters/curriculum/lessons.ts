@@ -5,13 +5,13 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
-import type { LearnerLevel } from '@study-studio/protocol';
+} from '@lexdistill/shared';
+import type { LearnerLevel } from '@lexdistill/protocol';
 import type { Database } from 'bun:sqlite';
 import {
   normalizeTrackLanguage,
   type TrackLanguage,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 
 /**
  * D3 起家在 storage-sqlite（前身 gateway modules/curriculum/persistence/lessons.ts，

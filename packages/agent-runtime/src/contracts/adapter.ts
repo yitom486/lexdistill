@@ -1,6 +1,6 @@
 import type { AgentSession } from './session.js';
-import type { ToolDefinition } from '@study-studio/tool-core';
-import type { Result, BusinessError } from '@study-studio/shared';
+import type { ToolDefinition } from '@lexdistill/tool-core';
+import type { Result, BusinessError } from '@lexdistill/shared';
 
 export interface CreateSessionOptions {
   sessionId: string;

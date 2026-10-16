@@ -1,11 +1,11 @@
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../runtime/gateway-runtime.js';
-import { ensureCanonicalContentSources, SqliteQuestionGenerationRepository } from '@study-studio/storage-sqlite';
-import { AcpAdapter } from '@study-studio/agent-runtime';
+import { ensureCanonicalContentSources, SqliteQuestionGenerationRepository } from '@lexdistill/storage-sqlite';
+import { AcpAdapter } from '@lexdistill/agent-runtime';
 import { GenerationTaskService } from '../modules/question-generation/service.js';
 import { GenerationRunManager } from '../modules/question-generation/run-manager.js';
 import { resolveGenerationAudio } from '../modules/question-generation/public.js';
-import { BusinessError, isOk, logger } from '@study-studio/shared';
+import { BusinessError, isOk, logger } from '@lexdistill/shared';
 import { dbPath } from './config.js';
 
 /**

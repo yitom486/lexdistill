@@ -1,5 +1,5 @@
 import type { StudyCardItem } from '../models/learning.js';
-import type { CardSourceEntry } from '@study-studio/learner-core';
+import type { CardSourceEntry } from '@lexdistill/learner-core';
 
 /**
  * 复习卡 → 模板条目映射（纯函数，可单测）。

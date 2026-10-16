@@ -1,4 +1,4 @@
-import { TextbookLearningContentSchema } from '@study-studio/document-model';
+import { TextbookLearningContentSchema } from '@lexdistill/document-model';
 import type { LearningLibraryBook } from '../components/textbook/preview/library-view.js';
 import { previewLesson } from './textbook-learning-preview.js';
 

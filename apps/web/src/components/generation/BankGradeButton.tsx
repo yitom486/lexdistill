@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { BankSubmissionRecord } from '@study-studio/protocol';
+import type { BankSubmissionRecord } from '@lexdistill/protocol';
 import { Button } from '../ui/button.js';
 import { useGradeBankSubjectiveMutation } from '../../queries/generation.js';
 

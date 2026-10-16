@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
-import type { DocumentItem } from '@study-studio/protocol';
-import { markdownToAst } from '@study-studio/content';
+import { isOk } from '@lexdistill/shared';
+import type { DocumentItem } from '@lexdistill/protocol';
+import { markdownToAst } from '@lexdistill/content';
 import { appendPdfToDocument } from '../application/pdf-import/pdf-import-service.js';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 
@@ -129,21 +129,21 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
       {
         saveDocument: async (doc: typeof baseDoc) => {
           saved = doc;
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok(doc);
         },
         // 显式 atomic fake（内存实现：与 canonical 写同语义，astJson 内部生成）
         saveCanonicalAst: async (docBase, book) => {
           saved = { ...docBase, astJson: JSON.stringify(book) } as typeof baseDoc;
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok(saved);
         },
         getDocument: async () => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ ...baseDoc });
         },
         projectLinesSegments: async () => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ inserted: 0, skipped: 0 });
         },
         loadInspector: stubMarkdownInspector(MD_V2_DELETE),
@@ -215,21 +215,21 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
     expect(isOk(base)).toBe(true);
     if (!isOk(base)) return;
     const baseDoc = testDoc(JSON.stringify(base.value));
-    const { err, BusinessError } = await import('@study-studio/shared');
+    const { err, BusinessError } = await import('@lexdistill/shared');
     const res = await appendPdfToDocument(
       {
         saveDocument: async (doc) => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok(doc);
         },
         saveCanonicalAst: async () =>
           err(new BusinessError('E_INTERNAL', 'shred 失败（测试注入）', 'DATABASE', true)),
         getDocument: async () => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ ...baseDoc });
         },
         projectLinesSegments: async () => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ inserted: 0, skipped: 0 });
         },
         loadInspector: stubMarkdownInspector(MD_V2_DELETE),
@@ -249,19 +249,19 @@ describe('P1-A0 lesson id 生命周期（真实路径）', () => {
       {
         saveDocument: async (doc) => {
           plainSaves++;
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok(doc);
         },
         saveCanonicalAst: async (docBase, book) => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ ...docBase, astJson: JSON.stringify(book) } as typeof baseDoc);
         },
         getDocument: async () => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ ...baseDoc });
         },
         projectLinesSegments: async () => {
-          const { ok } = await import('@study-studio/shared');
+          const { ok } = await import('@lexdistill/shared');
           return ok({ inserted: 0, skipped: 0 });
         },
         loadInspector: stubMarkdownInspector(MD_V2_DELETE),

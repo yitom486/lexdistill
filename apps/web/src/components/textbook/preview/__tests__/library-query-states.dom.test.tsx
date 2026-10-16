@@ -1,7 +1,7 @@
 import { expect, it, mock } from 'bun:test';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TextbookASTSchema } from '@study-studio/document-model';
+import { TextbookASTSchema } from '@lexdistill/document-model';
 import { act, setupDom } from '../../../toc/__tests__/dom-setup.js';
 
 it('actual library query separates failed reads and saved cache from preview books', async () => {

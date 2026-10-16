@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DEFAULT_TEXTBOOK_PIPELINE_SETTINGS, TextbookPipelineSettingsSchema, type TextbookPipelineSettings } from '@study-studio/document-model';
+import { createMigratedStorage } from './store-storage.js';
+import { DEFAULT_TEXTBOOK_PIPELINE_SETTINGS, TextbookPipelineSettingsSchema, type TextbookPipelineSettings } from '@lexdistill/document-model';
 
 export interface PreferencesState {
   theme: 'light' | 'dark';
@@ -333,7 +334,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       setPipelineLanguage: (pipelineLanguage) => set({ pipelineLanguage }),
     }),
     {
-      name: 'study_studio_user_preferences',
+      name: 'lexdistill_user_preferences',
+      storage: createMigratedStorage(['study_studio_user_preferences']),
       version: 3,
       migrate: (persisted) => {
         const stored = typeof persisted === 'object' && persisted !== null ? persisted : {};

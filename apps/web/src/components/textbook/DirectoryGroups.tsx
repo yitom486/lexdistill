@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { ContentDirectoryNode } from '@study-studio/document-model';
+import type { ContentDirectoryNode } from '@lexdistill/document-model';
 
 interface Props<T extends { tocId?: string | undefined }> {
   directory?: readonly ContentDirectoryNode[]; items: readonly T[]; render: (items: T[]) => ReactNode;

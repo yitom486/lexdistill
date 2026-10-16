@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { ImportEventSchema } from '@study-studio/document-model';
+import { ImportEventSchema } from '@lexdistill/document-model';
 import { selectImportRun } from '../import-run-scope.js';
 
 const event = (sequence: number, jobId: string | null, name: string) => ImportEventSchema.parse({

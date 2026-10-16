@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { isOk } from '@study-studio/shared';
-import { ToolRegistry } from '@study-studio/tool-core';
+import { isOk } from '@lexdistill/shared';
+import { ToolRegistry } from '@lexdistill/tool-core';
 import {
   UiNavigateTool,
   UiPresentTool,

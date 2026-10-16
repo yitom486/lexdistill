@@ -1,9 +1,9 @@
 import { afterEach, expect, it } from 'bun:test';
-import { AcpAdapter, AcpAgentSession, type AgentAdapter, type AgentEvent, type CreateSessionOptions, type AgentSession, type AgentInput } from '@study-studio/agent-runtime';
-import { BusinessError, err, ok } from '@study-studio/shared';
-import { ToolRegistry } from '@study-studio/tool-core';
-import { TextbookExerciseAttemptSchema, TextbookExerciseHistorySchema, TextbookGrowthResponseSchema } from '@study-studio/protocol';
-import { haveSameGradingBasis, summarizeTextbookGrowth } from '@study-studio/learner-core';
+import { AcpAdapter, AcpAgentSession, type AgentAdapter, type AgentEvent, type CreateSessionOptions, type AgentSession, type AgentInput } from '@lexdistill/agent-runtime';
+import { BusinessError, err, ok } from '@lexdistill/shared';
+import { ToolRegistry } from '@lexdistill/tool-core';
+import { TextbookExerciseAttemptSchema, TextbookExerciseHistorySchema, TextbookGrowthResponseSchema } from '@lexdistill/protocol';
+import { haveSameGradingBasis, summarizeTextbookGrowth } from '@lexdistill/learner-core';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { GatewayServer } from '../../../runtime/gateway-runtime.js';
 import { createTextbookPracticeRoutes } from '../http/textbook-practice-routes.js';

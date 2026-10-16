@@ -1,4 +1,4 @@
-import type { ImportEvent } from '@study-studio/document-model';
+import type { ImportEvent } from '@lexdistill/document-model';
 
 export interface WorkerLiveInfo {
   sessionId: string;

@@ -1,4 +1,4 @@
-# `@study-studio/storage-sqlite` — SQLite 适配层（M4）
+# `@lexdistill/storage-sqlite` — SQLite 适配层（M4）
 
 > D2 起家于 `apps/gateway/src/infrastructure/db/`（机械搬迁，SQL 与逻辑逐字节不变）。
 > Gateway 保留数据库生命周期拥有（选库/装配/启停/health），本包只提供连接工厂与数据层实现。

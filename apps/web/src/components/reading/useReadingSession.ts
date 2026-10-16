@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import type { ReadingPassageSet } from '@study-studio/protocol';
+import type { ReadingPassageSet } from '@lexdistill/protocol';
 import { sound, speechStudio } from '../../utils/audio.js';
 import { openLookupPopup } from '../../lib/lookup-popup-bus.js';
 import { normalizeSelectionText, type LookupLanguage } from '../../lib/selection-text.js';

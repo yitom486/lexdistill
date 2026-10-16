@@ -6,11 +6,11 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
-} from '@study-studio/shared';
-import { quizAttempts, studyActivityLogs } from '@study-studio/storage-sqlite';
+} from '@lexdistill/shared';
+import { quizAttempts, studyActivityLogs } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '@study-studio/shared';
-import { getTodayString } from '@study-studio/shared';
+import type { TrackLanguage } from '@lexdistill/shared';
+import { getTodayString } from '@lexdistill/shared';
 
 /**
  * 新手带路（Beginner Trail）：零基础按天解锁的分阶段清单。

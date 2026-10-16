@@ -6,18 +6,18 @@ import {
   BusinessError,
   translateToBusinessError,
   nowIso,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   updateKanaPracticeMemory,
   type KanaPracticeMemory,
   type KanaPracticeScriptType,
-} from '@study-studio/learner-core';
-import type { HangulScriptType, SubmitReadingPractice } from '@study-studio/protocol';
-import { kanaPracticeStates, skillMetrics } from '@study-studio/storage-sqlite';
+} from '@lexdistill/learner-core';
+import type { HangulScriptType, SubmitReadingPractice } from '@lexdistill/protocol';
+import { kanaPracticeStates, skillMetrics } from '@lexdistill/storage-sqlite';
 import {
   parseKanaPracticeMemory,
   saveKanaPracticeMemory,
-} from '@study-studio/storage-sqlite';
+} from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 /**

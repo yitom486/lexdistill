@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
 import { GenerateAdaptiveQuizTool } from '../modules/practice/tools/generate-adaptive-quiz.js';
 import { GradeSubjectiveQuizTool } from '../modules/practice/tools/grade-subjective-quiz.js';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 
 describe('Adaptive Quiz Tools (M4)', () => {
   let repo: DrizzleLearnerRepository;

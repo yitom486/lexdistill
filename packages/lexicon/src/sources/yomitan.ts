@@ -1,4 +1,4 @@
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 import type { ParsedEntry } from './models.js';
 
 /**

@@ -1,4 +1,4 @@
-import { ok, err, type Result, BusinessError, isOk } from '@study-studio/shared';
+import { ok, err, type Result, BusinessError, isOk } from '@lexdistill/shared';
 import {
   type StudyContentLanguage,
   normalizeContentLanguage,

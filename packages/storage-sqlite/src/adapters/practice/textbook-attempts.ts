@@ -1,8 +1,8 @@
 import { and, desc, eq, max } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
-import { ChapterManifestSchema, TextbookLearningContentSchema } from '@study-studio/document-model';
-import { ExerciseSnapshotSchema, ExerciseGradeSchema, TextbookExerciseAttemptSchema, type ExerciseSnapshot, type ExerciseGrade, type SubmitTextbookExercise, type TextbookExerciseAttempt } from '@study-studio/protocol';
-import { BusinessError, generateId, nowIso } from '@study-studio/shared';
+import { ChapterManifestSchema, TextbookLearningContentSchema } from '@lexdistill/document-model';
+import { ExerciseSnapshotSchema, ExerciseGradeSchema, TextbookExerciseAttemptSchema, type ExerciseSnapshot, type ExerciseGrade, type SubmitTextbookExercise, type TextbookExerciseAttempt } from '@lexdistill/protocol';
+import { BusinessError, generateId, nowIso } from '@lexdistill/shared';
 import type { DrizzleDb } from '../../connection.js';
 import { documents, textbookExerciseItems, textbookKnowledge, practicePlanRuns, practiceItemAttempts, quizAttempts, aiArtifactRuns } from '../../schema.js';
 

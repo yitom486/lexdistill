@@ -9,7 +9,7 @@ import {
   BusinessError,
   translateToBusinessError,
   generateId,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 
 /**
  * 整库只读快照导出（P5-1）。

@@ -1,5 +1,5 @@
-import type { ToolRegistry } from '@study-studio/tool-core';
-import type { LearnerRepository } from '@study-studio/learner-core';
+import type { ToolRegistry } from '@lexdistill/tool-core';
+import type { LearnerRepository } from '@lexdistill/learner-core';
 import type { LearningRepository } from '../../practice/ports.js';
 import { LearningProgressTool } from './learning-progress-tool.js';
 import { MistakesListTool } from './mistakes-list-tool.js';

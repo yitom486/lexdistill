@@ -5,7 +5,7 @@ import { ResizableSplitPane } from './ui/resizable-split-pane.js';
 import { sound } from '../utils/audio.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { useLearningShell } from '../hooks/useLearningShell.js';
-import { NEWS_TOPICS } from '@study-studio/protocol';
+import { NEWS_TOPICS } from '@lexdistill/protocol';
 import { useNewsTopicsQuery } from '../queries/useLearnerQueries.js';
 import type { AiTutorContext } from './AiTutorDrawer.js';
 import { PlanIntentBanner } from './PlanIntentBanner.js';

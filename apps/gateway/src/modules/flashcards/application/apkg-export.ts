@@ -6,12 +6,12 @@ import {
   type Result,
   BusinessError,
   translateToBusinessError,
-} from '@study-studio/shared';
-import { buildCardContext, renderCard } from '@study-studio/learner-core';
-import { flashcards, readCardExamples } from '@study-studio/storage-sqlite';
+} from '@lexdistill/shared';
+import { buildCardContext, renderCard } from '@lexdistill/learner-core';
+import { flashcards, readCardExamples } from '@lexdistill/storage-sqlite';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
-import type { TrackLanguage } from '@study-studio/shared';
-import { getCardFormat } from '@study-studio/storage-sqlite';
+import type { TrackLanguage } from '@lexdistill/shared';
+import { getCardFormat } from '@lexdistill/storage-sqlite';
 import { resolveCardSourceEntry } from './card-source.js';
 
 /**
@@ -89,7 +89,7 @@ export function buildStoredZip(files: Array<{ name: string; data: Uint8Array }>)
 
 function sanitizeFilename(name: string): string {
   const clean = name.replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 80);
-  return clean || 'Lingua Studio';
+  return clean || 'LexDistill';
 }
 
 export async function exportApkgFromCards(
@@ -107,8 +107,8 @@ export async function exportApkgFromCards(
         new BusinessError('E_INVALID_INPUT', '找不到该卡片模板，请先选择或恢复内置模板', 'VALIDATION', false)
       );
     }
-    const deckName = options.deckName ?? format.deckName ?? 'Lingua Studio';
-    const modelName = format.modelName ?? 'Lingua Basic';
+    const deckName = options.deckName ?? format.deckName ?? 'LexDistill';
+    const modelName = format.modelName ?? 'LexDistill Basic';
     const rows = await deps.db
       .select()
       .from(flashcards)
@@ -146,7 +146,7 @@ export async function exportApkgFromCards(
         return v.replace(/\x1f/g, ' ');
       });
       const guid = `ss${card.id.replace(/[^A-Za-z0-9]/g, '').slice(0, 24) || processed}`;
-      const tags = `lingua-studio${card.sourceEntryId ? '' : ' custom'}`;
+      const tags = `lexdistill${card.sourceEntryId ? '' : ' custom'}`;
       notes.push({ id: processed, guid, mod: now, tags, flds: values.join('\x1f') });
     }
     const models = {

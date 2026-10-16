@@ -1,4 +1,4 @@
-import { generateId, logger } from '@study-studio/shared';
+import { generateId, logger } from '@lexdistill/shared';
 
 export interface TocVisionTraceEvent {
   at: string;

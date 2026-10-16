@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm';
-import { quizAttempts } from '@study-studio/storage-sqlite';
-import type { QuestionGenerationRepository } from '@study-studio/learner-core';
-import type { BankAnswerSubmit, BankQuestionRecord, BankSubmissionRecord, BankSubjectiveAnswerResult } from '@study-studio/protocol';
-import { BankSubjectiveAnswerResultSchema } from '@study-studio/protocol';
-import { BusinessError, inferLanguageFromSkillId } from '@study-studio/shared';
+import { quizAttempts } from '@lexdistill/storage-sqlite';
+import type { QuestionGenerationRepository } from '@lexdistill/learner-core';
+import type { BankAnswerSubmit, BankQuestionRecord, BankSubmissionRecord, BankSubjectiveAnswerResult } from '@lexdistill/protocol';
+import { BankSubjectiveAnswerResultSchema } from '@lexdistill/protocol';
+import { BusinessError, inferLanguageFromSkillId } from '@lexdistill/shared';
 import type { RepoDeps } from '../../../infrastructure/persistence/repo-context.js';
 
 export interface BankAnswerDeps { bank: QuestionGenerationRepository }

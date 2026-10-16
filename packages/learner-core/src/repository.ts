@@ -1,5 +1,5 @@
-import type { Result, BusinessError } from '@study-studio/shared';
-import type { LearnerLevel } from '@study-studio/protocol';
+import type { Result, BusinessError } from '@lexdistill/shared';
+import type { LearnerLevel } from '@lexdistill/protocol';
 import type { StudyGateSnapshot } from './skill-gate.js';
 import type { CourseRouteSnapshot } from './course-units.js';
 import type {
@@ -9,14 +9,14 @@ import type {
   DailyTaskProgress,
 } from './types.js';
 import type { DailyStudyPlan } from './daily-plan.js';
-import type { Flashcard } from '@study-studio/protocol';
+import type { Flashcard } from '@lexdistill/protocol';
 import type {
   PracticePlanTemplate,
   PracticePlanRun,
   PracticeItemAttempt,
   PracticeBlockSpec,
   PracticeRunStatus,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import type { MistakeEntry } from './mistake.js';
 
 export interface QuizAttemptRecord {
@@ -197,7 +197,7 @@ export interface LearnerRepository {
     runId: string
   ): Promise<
     Result<
-      Array<{ itemId: string; blockId: string; gradingMode: string; question: import('@study-studio/protocol').GeneratedQuestion }>,
+      Array<{ itemId: string; blockId: string; gradingMode: string; question: import('@lexdistill/protocol').GeneratedQuestion }>,
       BusinessError
     >
   >;

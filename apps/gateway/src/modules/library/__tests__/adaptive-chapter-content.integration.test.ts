@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { z } from 'zod';
-import type { TextbookContentKind } from '@study-studio/document-model';
+import type { TextbookContentKind } from '@lexdistill/document-model';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import type { GatewayDeps } from '../../../composition/gateway-deps.js';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';

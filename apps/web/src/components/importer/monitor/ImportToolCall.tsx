@@ -1,4 +1,4 @@
-import type { ContentDirectoryNode, ImportEvent } from '@study-studio/document-model';
+import type { ContentDirectoryNode, ImportEvent } from '@lexdistill/document-model';
 import { useEffect, useRef, useState } from 'react';
 import { ImportEventDetail } from './ImportEventDetail.js';
 

@@ -1,5 +1,5 @@
-import type { GeneratedQuestion } from '@study-studio/protocol';
-import { err, generateId, isOk, type Result, BusinessError } from '@study-studio/shared';
+import type { GeneratedQuestion } from '@lexdistill/protocol';
+import { err, generateId, isOk, type Result, BusinessError } from '@lexdistill/shared';
 import type { LearningContentTemplateRepository } from '../../ports.js';
 import type { LearningContentInput, LearningContentOutput, LearningContentContext } from '../../contracts.js';
 import { MSG, loadTemplates, maybeCollect, pickCycled } from './shared.js';

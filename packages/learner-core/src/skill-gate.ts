@@ -1,5 +1,5 @@
-import type { LearnerLevel } from '@study-studio/protocol';
-import { isOk, type Result, type BusinessError } from '@study-studio/shared';
+import type { LearnerLevel } from '@lexdistill/protocol';
+import { isOk, type Result, type BusinessError } from '@lexdistill/shared';
 
 /**
  * 组卷难度门（教学-first hotfix，见学习闭环“先讲后测”定位）。

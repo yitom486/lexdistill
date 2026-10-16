@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { LessonContent, ContentDirectoryNode } from '@study-studio/document-model';
+import type { LessonContent, ContentDirectoryNode } from '@lexdistill/document-model';
 import { DirectoryGroups } from './DirectoryGroups.js';
 import { ContentSource } from './ContentSource.js';
 import { VocabularyExplanation } from './VocabularyExplanation.js';

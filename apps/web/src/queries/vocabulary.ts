@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { VocabularyEntrySchema, VocabularyCollectionSchema, type VocabularyEntry, type VocabularyScope } from '@study-studio/protocol';
+import { VocabularyEntrySchema, VocabularyCollectionSchema, type VocabularyEntry, type VocabularyScope } from '@lexdistill/protocol';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
 import { DEFAULT_USER_ID, QUERY_KEYS } from './query-keys.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';

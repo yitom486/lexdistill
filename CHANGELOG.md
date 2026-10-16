@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Lingua Studio are documented here. Release notes are reused by the GitHub Release workflow.
+All notable changes to LexDistill are documented here. Release notes are reused by the GitHub Release workflow.
 
 ## [0.1.2] - 2026-09-08
 
@@ -22,7 +22,7 @@ All notable changes to Lingua Studio are documented here. Release notes are reus
 
 ## [0.1.0] - 2026-09-08
 
-The first public desktop release of Lingua Studio.
+The first public desktop release of LexDistill.
 
 ### Added
 

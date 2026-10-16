@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import { useRef, useEffect } from 'react';
-import type { CardReviewRating } from '@study-studio/protocol';
+import type { CardReviewRating } from '@lexdistill/protocol';
 import { fireSuccessConfetti } from '../magicui/index.js';
 import { sound } from '../../utils/audio.js';
 import { useStudySessionStore } from '../../stores/useStudySessionStore.js';

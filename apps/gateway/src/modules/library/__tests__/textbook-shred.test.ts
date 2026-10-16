@@ -1,6 +1,6 @@
 import {expect,it} from 'bun:test';
 import {DrizzleLearnerRepository} from '../../../infrastructure/drizzle-learner-repository.js';
-import type {TextbookAST} from '@study-studio/document-model';
+import type {TextbookAST} from '@lexdistill/document-model';
 it('structured file import writes learning tables, keeps item IDs and examples, and replaces atomically',async()=>{
  const repo=new DrizzleLearnerRepository(':memory:');try {
   const doc={id:'b',userId:'u',title:'B',sourceKind:'user_import' as const,language:'ja',content:'',createdAt:'t',updatedAt:'t'};

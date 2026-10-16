@@ -7,12 +7,12 @@ import {
   ok,
   type Result,
   translateToBusinessError,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import type {
   TextbookPipelineJobSnapshot,
-} from '@study-studio/protocol';
+} from '@lexdistill/protocol';
 import type { ContentRepository } from '../ports.js';
-import { planTextbookTasks } from '@study-studio/document-model';
+import { planTextbookTasks } from '@lexdistill/document-model';
 import {
   executeTextbookPipeline,
   type TextbookPipelineInput,

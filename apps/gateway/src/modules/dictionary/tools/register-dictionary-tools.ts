@@ -1,4 +1,4 @@
-import type { ToolRegistry } from '@study-studio/tool-core';
+import type { ToolRegistry } from '@lexdistill/tool-core';
 import type { LexiconRepository } from '../ports.js';
 import { DictionaryLookupTool } from './dictionary-lookup-tool.js';
 import { LearningEncountersTool } from './learning-encounters-tool.js';

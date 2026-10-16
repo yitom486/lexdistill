@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { count, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { documents, textbookArticles, seedMaterialization } from '@study-studio/storage-sqlite';
+import { documents, textbookArticles, seedMaterialization } from '@lexdistill/storage-sqlite';
 import { createGateway } from '../bootstrap/create-gateway.js';
 
 it('a fresh database stays free of textbook examples after gateway restart', async () => {

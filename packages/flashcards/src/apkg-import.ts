@@ -5,7 +5,7 @@ import {
   type Result,
   BusinessError,
   generateId,
-} from '@study-studio/shared';
+} from '@lexdistill/shared';
 import {
   extractMediaRefs,
   type ParsedApkg,

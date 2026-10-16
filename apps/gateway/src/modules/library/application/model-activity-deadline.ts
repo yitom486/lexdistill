@@ -1,4 +1,4 @@
-import { BusinessError } from '@study-studio/shared';
+import { BusinessError } from '@lexdistill/shared';
 
 /** 只由有效模型活动更新期限；超时先撤销本轮提交资格，再中断底层 Turn。 */
 export function awaitModelActivity<T>(pending: () => Promise<T>, controller: AbortController, timeoutMs: number, first: boolean, diagnostics?: () => Record<string, unknown>): Promise<T> {

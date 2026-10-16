@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge.js';
 import { toast } from 'sonner';
 import { getPlatform } from '../../platform/capabilities.js';
 import { DesktopWindowControls } from '../DesktopWindowControls.js';
-import { logger } from '@study-studio/shared';
+import { logger } from '@lexdistill/shared';
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
@@ -67,7 +67,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   handleCopyDetails = () => {
     const { error, errorInfo } = this.state;
-    const diagnosticText = `Lingua Studio Error Diagnostic
+    const diagnosticText = `LexDistill Error Diagnostic
 Error: ${error?.name}: ${error?.message}
 Stack: ${error?.stack || 'N/A'}
 Component Stack: ${errorInfo?.componentStack || 'N/A'}
@@ -126,7 +126,7 @@ UserAgent: ${getPlatform().getUserAgent()}
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="font-serif font-semibold text-base text-ink tracking-tight">
-                  Lingua Studio
+                  LexDistill
                 </span>
                 <Badge variant="destructive" className="text-[10px]">
                   系统容灾模式

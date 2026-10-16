@@ -1,6 +1,6 @@
-# Lingua Studio - AI 原生智能体流水线 (AI Pipelines)
+# LexDistill - AI 原生智能体流水线 (AI Pipelines)
 
-本目录记录 Lingua Studio 中 AI Agent 运行时、提示词工程、专精工具调用与长任务批处理流水线的核心技术规格与架构设计。
+本目录记录 LexDistill 中 AI Agent 运行时、提示词工程、专精工具调用与长任务批处理流水线的核心技术规格与架构设计。
 
 ---
 

@@ -1,8 +1,8 @@
-import { BusinessError } from '@study-studio/shared';
-import type { AgentAdapter } from '@study-studio/agent-runtime';
-import type { ToolRegistry } from '@study-studio/tool-core';
+import { BusinessError } from '@lexdistill/shared';
+import type { AgentAdapter } from '@lexdistill/agent-runtime';
+import type { ToolRegistry } from '@lexdistill/tool-core';
 import type { GenerationAudioRenderer, QuestionGenerationRepository } from './ports.js';
-import type { GenerationConfig } from '@study-studio/protocol';
+import type { GenerationConfig } from '@lexdistill/protocol';
 import type { GenerationTaskService } from './service.js';
 import { runGenerationTask } from './runner.js';
 

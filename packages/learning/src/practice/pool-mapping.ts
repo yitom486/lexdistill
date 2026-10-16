@@ -1,4 +1,4 @@
-import type { GeneratedQuestion } from '@study-studio/protocol';
+import type { GeneratedQuestion } from '@lexdistill/protocol';
 
 /**
  * M7-18 自 Gateway `practice/application/practice-assembly.ts` 迁入

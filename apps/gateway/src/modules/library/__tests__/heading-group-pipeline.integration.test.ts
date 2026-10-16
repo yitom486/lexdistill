@@ -3,7 +3,7 @@ import { mkdtempSync, existsSync, unlinkSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PDFDocument } from 'pdf-lib';
-import { SaveTextbookOutlineResultSchema, type TocEntry } from '@study-studio/document-model';
+import { SaveTextbookOutlineResultSchema, type TocEntry } from '@lexdistill/document-model';
 import { DrizzleLearnerRepository } from '../../../infrastructure/drizzle-learner-repository.js';
 import { createPdfImportRoutes } from '../http/pdf-import-routes.js';
 import { fixturePdf } from './textbook-pipeline-fixtures.js';

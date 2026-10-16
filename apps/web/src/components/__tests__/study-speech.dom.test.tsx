@@ -1,6 +1,6 @@
 import { expect, it, mock } from 'bun:test';
 import * as React from 'react';
-import type { VocabularyEntry } from '@study-studio/protocol';
+import type { VocabularyEntry } from '@lexdistill/protocol';
 import type { TtsStreamBody } from '../../lib/tts-stream.js';
 import { act, setupDom } from '../toc/__tests__/dom-setup.js';
 

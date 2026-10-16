@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { VocabularyEntry } from '@study-studio/protocol';
+import type { VocabularyEntry } from '@lexdistill/protocol';
 import { WordTutorPanel } from './WordTutorPanel.js';
 import { QUERY_KEYS } from '../queries/query-keys.js';
 import { getWordUsageList } from '../queries/vocabulary.js';

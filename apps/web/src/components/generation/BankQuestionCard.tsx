@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BankSubmissionRecord } from '@study-studio/protocol';
+import type { BankSubmissionRecord } from '@lexdistill/protocol';
 import { Button } from '../ui/button.js';
 import { Textarea } from '../ui/textarea.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';

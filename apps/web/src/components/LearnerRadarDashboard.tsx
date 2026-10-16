@@ -8,7 +8,7 @@ import { sound } from '../utils/audio.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { useLearningShell } from '../hooks/useLearningShell.js';
-import { summarizeLearningEvidence, type SkillMetric } from '@study-studio/learner-core';
+import { summarizeLearningEvidence, type SkillMetric } from '@lexdistill/learner-core';
 import type { StudyCardItem, MistakeNotebookItem } from '../models/learning.js';
 import { Tabs, TabsList, TabsTrigger, TabsIndicator } from './ui/tabs.js';
 import { Button } from './ui/button.js';

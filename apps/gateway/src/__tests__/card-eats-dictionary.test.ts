@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { isOk } from '@study-studio/shared';
+import { isOk } from '@lexdistill/shared';
 import { DrizzleLearnerRepository } from '../infrastructure/drizzle-learner-repository.js';
-import { buildTermKey } from '@study-studio/storage-sqlite';
+import { buildTermKey } from '@lexdistill/storage-sqlite';
 
 /**
  * 卡片吃词典（建卡注入）：收藏时把词典读音/释义/来源带进卡，

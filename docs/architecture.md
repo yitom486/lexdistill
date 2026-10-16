@@ -1,4 +1,4 @@
-# Lingua Studio - 系统架构设计规格说明书 (System Architecture Specification)
+# LexDistill - 系统架构设计规格说明书 (System Architecture Specification)
 
 > **文档版本**：v1.1（2026-09-23：明确桌面优先与 Android 伴随端运行边界）
 > **维护责任人**：首席系统架构师  
@@ -12,11 +12,11 @@
 
 ```mermaid
 C4Context
-    title Lingua Studio - 系统上下文图 (Level 1)
+    title LexDistill - 系统上下文图 (Level 1)
 
     Person(learner, "外语学习者", "使用 Web 浏览器或桌面客户端进行刷卡复习、练习做题、查看错题本及接受 AI 个性化批改与辅导")
 
-    System(studyStudio, "Lingua Studio 系统", "提供自适应练习出题、FSRS 间隔复习调度、AI 智能批改诊断、能力画像与学习资产管理")
+    System(studyStudio, "LexDistill 系统", "提供自适应练习出题、FSRS 间隔复习调度、AI 智能批改诊断、能力画像与学习资产管理")
 
     System_Ext(codexAppServer, "Codex App Server", "原生 Agent 执行引擎，提供 Thread/Turn 管理、流式生成、动态工具执行与沙箱审批")
     System_Ext(externalMcp, "外部 MCP 工具集", "Anki 同步、Notion 知识库导出等第三方工具集成")
@@ -34,7 +34,7 @@ C4Context
 
 ```mermaid
 C4Container
-    title Lingua Studio - 容器与子系统图 (Level 2)
+    title LexDistill - 容器与子系统图 (Level 2)
 
     Container_Boundary(c_client, "客户端层 (Client Layer)")
         Container(web_app, "Web 学习客户端 (apps/web)", "React 19, TypeScript, Vite, Tailwind, shadcn/ui", "展示学习卡片、答题界面、实时批改结果、错题本与优势/缺陷能力雷达")
