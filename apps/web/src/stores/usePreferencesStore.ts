@@ -103,43 +103,100 @@ export interface PreferencesState {
   setPipelinePoolSize: (poolSize: string) => void;
 }
 
-const applyThemeToDom = (theme: 'light' | 'dark') => {
+/**
+ * 浏览器支持 View Transitions 且用户未开启“减少动态效果”时才做交叉淡化。
+ */
+export function canAnimateThemeSwitch(
+  doc: Document = typeof document !== 'undefined' ? document : ({} as Document),
+  win: Window = typeof window !== 'undefined' ? window : ({} as Window)
+): boolean {
+  type ViewTransitionDocument = Document & {
+    startViewTransition?: (callback: () => void) => unknown;
+  };
+  if (typeof (doc as ViewTransitionDocument).startViewTransition !== 'function') {
+    return false;
+  }
+  try {
+    return !win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return true;
+  }
+}
+
+export const applyThemeToDom = (theme: 'light' | 'dark') => {
   if (typeof document !== 'undefined') {
     const root = document.documentElement;
     root.style.colorScheme = theme;
+    root.setAttribute('data-theme', theme);
     if (theme === 'dark') {
       root.classList.add('dark');
+      root.classList.remove('light');
     } else {
+      root.classList.add('light');
       root.classList.remove('dark');
     }
   }
 };
 
 /**
- * Change the theme as one document-level visual transition when supported by
- * the browser/WebView. The callback remains synchronous for Zustand state
- * updates and falls back safely on older WebViews.
+ * 应用主题视觉过渡（双层帧同步防撕裂机制）：
+ * 1. 根节点添加 .theme-transitioning，强行切断所有 DOM 元素私有的局部 transition，
+ *    避免与全局交叉淡化叠加导致局部不同步、脏斑与撕裂；
+ * 2. 在支持 View Transitions 且用户未开启“减少动态效果”时，由浏览器底层捕获新旧双帧
+ *    快照并执行平滑的整页交叉淡化；
+ * 3. 待新样式在 GPU 显存完全渲染稳定后，通过双重 requestAnimationFrame 安全移除
+ *    .theme-transitioning 类，无缝恢复日常交互过渡。
  */
-const runThemeTransition = (update: () => void) => {
+export const runThemeTransition = (update: () => void) => {
   if (typeof document === 'undefined') {
     update();
     return;
   }
 
-  type ViewTransitionDocument = Document & {
-    startViewTransition?: (callback: () => void) => unknown;
+  const root = document.documentElement;
+  root.classList.add('theme-transitioning');
+
+  const cleanup = () => {
+    // 双重 requestAnimationFrame：等新样式在 GPU 显存完全渲染稳定后再移除，避免恢复瞬间重新触发 transition
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          root.classList.remove('theme-transitioning');
+        });
+      });
+    } else {
+      root.classList.remove('theme-transitioning');
+    }
   };
-  const viewTransitionDocument = document as ViewTransitionDocument;
-  if (typeof viewTransitionDocument.startViewTransition !== 'function') {
+
+  let updateCalled = false;
+  const wrappedUpdate = () => {
+    updateCalled = true;
     update();
-    return;
+  };
+
+  if (canAnimateThemeSwitch()) {
+    try {
+      type ViewTransition = {
+        finished: Promise<unknown>;
+      };
+      type ViewTransitionDocument = Document & {
+        startViewTransition?: (callback: () => void) => ViewTransition;
+      };
+      const vt = (document as ViewTransitionDocument).startViewTransition?.(wrappedUpdate);
+      if (vt && typeof vt.finished?.finally === 'function') {
+        vt.finished.finally(cleanup);
+        return;
+      }
+    } catch {
+      // 异常时安全回退到瞬时更新
+    }
   }
 
-  try {
-    viewTransitionDocument.startViewTransition(update);
-  } catch {
-    update();
+  if (!updateCalled) {
+    wrappedUpdate();
   }
+  cleanup();
 };
 
 export const usePreferencesStore = create<PreferencesState>()(
@@ -178,6 +235,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       pipelineLanguage: 'ja',
 
       setTheme: (theme: 'light' | 'dark') => {
+        if (get().theme === theme) return;
         runThemeTransition(() => {
           applyThemeToDom(theme);
           set({ theme });

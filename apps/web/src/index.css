@@ -176,6 +176,15 @@
  * the View Transition API. This keeps modules without a transition utility
  * from switching abruptly while avoiding layout/transform animation.
  */
+/* ---------- 主题切换防撕裂 ---------- */
+/* 切换期间关掉所有元素自身的过渡，避免与整页交叉淡化叠加、各部分不同步产生撕裂感 */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition: none !important;
+}
+
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: var(--theme-transition-duration);
