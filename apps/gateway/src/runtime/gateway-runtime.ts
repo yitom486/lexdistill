@@ -72,10 +72,13 @@ export class GatewayServer {
   /** ACP 会话台账（历史/排队走 acp-client 的网关侧索引）。 */
   public readonly acpLedger: AcpConversationLedger;
 
+  private readonly adapterOverride?: AgentAdapter | undefined;
+
   /**
-   * 通用运行时选型：id 归一后一律走温复用池（未知 id 回落 codex-acp 默认）。
+   * 通用运行时选型：id 归一后一律走温复用池（未知 id 回落 codex-acp 默认；测试注入 mock adapter 优先）。
    */
   public resolveAgentAdapter(runtimeId?: string | undefined): AgentAdapter {
+    if (this.adapterOverride) return this.adapterOverride;
     return this.acpAdapterPool.get(resolveAgentRuntimeId(runtimeId));
   }
 
@@ -87,6 +90,7 @@ export class GatewayServer {
     runtimeId: string | undefined,
     batchName: string,
   ): { adapter: AgentAdapter; batchLane: string | null } {
+    if (this.adapterOverride) return { adapter: this.adapterOverride, batchLane: batchLane(batchName) };
     const resolved = resolveAgentRuntimeId(runtimeId);
     return { adapter: this.acpAdapterPool.get(resolved), batchLane: batchLane(batchName) };
   }
@@ -153,6 +157,7 @@ export class GatewayServer {
 
     // 默认适配器即 codex-acp 温复用池实例；各入口按 runtimeId 经
     // resolveAgentAdapter/resolveBatchAdapter 取池。
+    this.adapterOverride = adapterOverride;
     this.agentAdapter = adapterOverride ?? this.acpAdapterPool.get('codex-acp');
 
     registerGatewayTools(this.toolRegistry, this.learnerRepo, this.agentAdapter);
