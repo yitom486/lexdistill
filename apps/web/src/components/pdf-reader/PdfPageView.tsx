@@ -12,9 +12,10 @@ interface PdfPageViewProps {
   totalPages: number;
   showTranslation: boolean;
   collectPending: boolean;
+  cardsPending?: boolean;
   onCollectSentence: (sentence: string, translation: string) => void;
   onAskAiTutor: (text: string, contextPrompt: string) => void;
-  onAddSelectedToCards: () => void;
+  onAddVocabWord: (vocab: { kanji: string; kana: string; chinese: string }) => void;
 }
 
 /**
@@ -28,9 +29,10 @@ export function PdfPageView({
   totalPages,
   showTranslation,
   collectPending,
+  cardsPending,
   onCollectSentence,
   onAskAiTutor,
-  onAddSelectedToCards,
+  onAddVocabWord,
 }: PdfPageViewProps) {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -43,8 +45,8 @@ export function PdfPageView({
             {lesson.title}
           </span>
         </div>
-        <span className="font-mono text-[11px] text-ink-faint-soft">
-          PAGE {String(currentPage).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
+        <span className="font-mono text-xs text-ink-faint-soft">
+          课文内容
         </span>
       </div>
 
@@ -80,7 +82,7 @@ export function PdfPageView({
                         );
                         toast.info('已将整句提交给 AI 导师讲透');
                       }}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-gold-warm hover:bg-gold-warm/10 cursor-pointer transition-colors"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold text-gold-warm hover:bg-gold-warm/10 cursor-pointer transition-colors"
                       title="整句讲透：语法成分 + 助词接续 + 语感（不用先划选）"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
@@ -90,7 +92,7 @@ export function PdfPageView({
                       type="button"
                       onClick={() => onCollectSentence(dlg.japanese, dlg.chinese)}
                       disabled={collectPending}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-ink-faint-soft hover:text-gold-warm hover:bg-gold-warm/10 cursor-pointer transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold text-ink-faint-soft hover:text-gold-warm hover:bg-gold-warm/10 cursor-pointer transition-colors disabled:opacity-50"
                       title="收进生词草稿箱，确认后建成句子卡"
                     >
                       <BookmarkPlus className="w-3.5 h-3.5" />
@@ -125,7 +127,7 @@ export function PdfPageView({
                 <div className="text-xs font-bold text-gold-warm">
                   {gp.title}
                 </div>
-                <div className="text-[11px] font-mono text-ink-faint-soft">
+                <div className="text-xs font-mono text-ink-faint-soft">
                   接续: {gp.structure}
                 </div>
                 <p className="text-xs text-ink-ghost leading-normal">
@@ -152,8 +154,8 @@ export function PdfPageView({
                   <span className="font-bold text-ink">
                     {v.kanji}
                   </span>
-                  <span className="text-[11px] text-ink-faint-soft">({v.kana})</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-line-soft text-ink-faint-soft">
+                  <span className="text-xs text-ink-faint-soft">({v.kana})</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded-md bg-line-soft text-ink-faint-soft">
                     {v.pos}
                   </span>
                 </div>
@@ -162,7 +164,8 @@ export function PdfPageView({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => onAddSelectedToCards()}
+                    onClick={() => onAddVocabWord(v)}
+                    disabled={cardsPending}
                     className="h-7 w-7 text-ink-faint-soft hover:text-gold-warm"
                     title="加入闪卡"
                     aria-label={`将 ${v.kanji} 加入闪卡`}

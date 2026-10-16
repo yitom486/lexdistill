@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trash2, Play, Square, HardDrive, RefreshCw, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,16 +27,26 @@ export function AudioCacheManager() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const [activeAudio, setActiveAudio] = useState<HTMLAudioElement | null>(null);
+  const player = useRef<{ audio: HTMLAudioElement; url: string } | null>(null);
+  const releasePlayer = useCallback(() => {
+    if (!player.current) return;
+    const { audio, url } = player.current;
+    audio.onended = null;
+    audio.onerror = null;
+    audio.pause();
+    URL.revokeObjectURL(url);
+    player.current = null;
+  }, []);
+  useEffect(() => releasePlayer, [releasePlayer]);
 
   const statsQuery = useQuery({
     queryKey: ['audio-cache-stats'],
-    queryFn: () => getAudioCacheStats(),
+    queryFn: () => getAudioCacheStats(true),
   });
 
   const listQuery = useQuery({
     queryKey: ['audio-cache-list'],
-    queryFn: () => listAudioCache(200),
+    queryFn: () => listAudioCache(200, true),
   });
 
   const invalidate = () => {
@@ -45,7 +55,9 @@ export function AudioCacheManager() {
   };
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteAudioCache(id),
+    mutationFn: async (id: string) => {
+      if (!await deleteAudioCache(id)) throw new Error('删除音频缓存失败');
+    },
     onSuccess: () => {
       toast.success('已删除选定音频缓存');
       invalidate();
@@ -56,7 +68,7 @@ export function AudioCacheManager() {
   });
 
   const clearAllMutation = useMutation({
-    mutationFn: () => clearAllAudioCache(),
+    mutationFn: () => clearAllAudioCache(true),
     onSuccess: () => {
       toast.success('已清空全部音频缓存');
       invalidate();
@@ -68,33 +80,38 @@ export function AudioCacheManager() {
 
   const handlePlayPreview = (record: CachedAudioRecord) => {
     if (playingId === record.id) {
-      activeAudio?.pause();
-      setActiveAudio(null);
+      releasePlayer();
       setPlayingId(null);
       return;
     }
 
-    activeAudio?.pause();
+    releasePlayer();
     const url = URL.createObjectURL(record.blob);
     const audio = new Audio(url);
-    setActiveAudio(audio);
+    player.current = { audio, url };
     setPlayingId(record.id);
 
     audio.onended = () => {
-      URL.revokeObjectURL(url);
+      if (player.current?.audio !== audio) return;
+      releasePlayer();
       setPlayingId(null);
-      setActiveAudio(null);
     };
     audio.onerror = () => {
-      URL.revokeObjectURL(url);
+      if (player.current?.audio !== audio) return;
+      releasePlayer();
       setPlayingId(null);
-      setActiveAudio(null);
       toast.error('试听播放失败');
     };
-    void audio.play();
+    void audio.play().catch(() => {
+      if (player.current?.audio !== audio) return;
+      releasePlayer();
+      setPlayingId(null);
+      toast.error('试听播放失败');
+    });
   };
 
   const records = listQuery.data ?? [];
+  const statsReady = statsQuery.isSuccess;
   const filteredRecords = search.trim()
     ? records.filter((r) =>
         r.text.toLowerCase().includes(search.trim().toLowerCase()) ||
@@ -113,7 +130,11 @@ export function AudioCacheManager() {
           <HardDrive className="h-4 w-4 text-ink-mute" />
           <span className="text-sm font-medium text-ink">本地缓存空间</span>
           <Badge variant="outline" className="border-line text-xs font-normal text-ink-mute">
-            {stats.count} 条音频 · {formatBytes(stats.totalBytes)}
+            {statsReady
+              ? `${stats.count} 条音频 · ${formatBytes(stats.totalBytes)}`
+              : statsQuery.isError
+                ? '缓存统计读取失败'
+                : '正在读取缓存统计…'}
           </Badge>
         </div>
 
@@ -134,7 +155,7 @@ export function AudioCacheManager() {
             variant="outline"
             size="sm"
             className="h-8 gap-1 text-xs text-destructive hover:bg-surface"
-            disabled={stats.count === 0 || clearAllMutation.isPending}
+            disabled={!statsReady || !listQuery.isSuccess || stats.count === 0 || clearAllMutation.isPending}
             onClick={() => {
               if (window.confirm(`确定要清空全部 ${stats.count} 条本地音频缓存吗？再次播放需重新向云端请求。`)) {
                 clearAllMutation.mutate();
@@ -152,16 +173,32 @@ export function AudioCacheManager() {
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-mute" />
           <input
-            className="w-full rounded-xl border border-line bg-surface py-2 pl-9 pr-3 text-sm text-ink outline-none placeholder:text-ink-mute focus-visible:ring-1 focus-visible:ring-ring"
+            className="w-full rounded-xl border border-line bg-surface py-2 pl-9 pr-3 text-sm text-ink outline-none placeholder:text-ink-mute focus-visible:ring-1 focus-visible:ring-focus-ring"
             placeholder="搜索已缓存的朗读文案或音色名称…"
+            aria-label="搜索已缓存音频"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       )}
 
-      {/* 音频列表 */}
-      {filteredRecords.length === 0 ? (
+      {/* 音频列表：读取中 / 读取失败（可重试）/ 空 / 有数据四态，不拿空数组冒充 */}
+      {listQuery.isPending ? (
+        <div className="rounded-2xl border border-line-soft bg-surface-soft/50 py-8 text-center text-xs text-ink-mute">
+          正在读取本地音频缓存…
+        </div>
+      ) : listQuery.isError ? (
+        <div className="rounded-2xl border border-line-soft bg-surface-soft/50 py-8 text-center text-xs text-ink-mute">
+          <p>本地音频缓存读取失败，请重试。</p>
+          <button
+            type="button"
+            onClick={invalidate}
+            className="mt-2 underline underline-offset-2 text-accent-ink-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded"
+          >
+            重新读取
+          </button>
+        </div>
+      ) : filteredRecords.length === 0 ? (
         <div className="rounded-2xl border border-line-soft bg-surface-soft/50 py-8 text-center text-xs text-ink-mute">
           {search ? '未找到匹配的音频记录' : '暂无已保存的音频缓存。朗读后将自动保存在此处。'}
         </div>
@@ -177,11 +214,11 @@ export function AudioCacheManager() {
                   {record.text}
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-mute">
-                  <Badge variant="outline" className="border-line px-1.5 py-0 text-[11px] font-normal">
+                  <Badge variant="outline" className="border-line px-1.5 py-0 text-xs font-normal">
                     {record.provider} · {record.voice}
                   </Badge>
                   {record.model && (
-                    <span className="text-[11px]">{record.model}</span>
+                    <span className="text-xs">{record.model}</span>
                   )}
                   <span>·</span>
                   <span>{formatBytes(record.sizeBytes)}</span>

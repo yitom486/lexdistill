@@ -14,27 +14,36 @@ export function BookStructureRow({
   documentId: string | undefined;
   bookTitle: string;
 }) {
-  const { data: saved } = useDocumentStructureQuery(documentId);
-  if (!saved || saved.classes.length === 0) return null;
-  const lessons = saved.classes.filter((c) => c.kind === 'lesson').length;
-  const skills = [...new Set(saved.classes.map((c) => c.skillId).filter((s): s is string => !!s))];
+  const { data: saved, isError, refetch, isFetching } = useDocumentStructureQuery(documentId);
+  const classes = Array.isArray(saved?.classes) ? saved.classes : [];
+  if (classes.length === 0 && !isError) return null;
+  const lessons = classes.filter((c) => c.kind === 'lesson').length;
+  const skills = [...new Set(classes.map((c) => c.skillId).filter((s): s is string => !!s))];
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-ghost">
+    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-ink-ghost">
+      {isError && <>
+        <span role="status">结构存档读取失败{classes.length > 0 ? '，以下为上次读取结果。' : '。'}</span>
+        <button type="button" disabled={isFetching} onClick={() => void refetch()} className="underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">
+          {isFetching ? '正在重试…' : '重新读取结构存档'}
+        </button>
+      </>}
+      {classes.length > 0 && <>
       <span className="inline-flex items-center gap-1 font-bold">
         <ScanLine className="w-3.5 h-3.5 text-tone-amber-600" />
         AI 结构存档
       </span>
       <span>
         《{bookTitle}》判出 {lessons} 课
-        {saved.dropped > 0 && `（丢弃 ${saved.dropped} 条）`}
+        {saved && saved.dropped > 0 && `（丢弃 ${saved.dropped} 条）`}
       </span>
       {skills.slice(0, 6).map((s) => (
-        <Badge key={s} variant="amber" className="text-[10px] font-mono">
+        <Badge key={s} variant="amber" className="text-xs font-mono">
           {s}
         </Badge>
       ))}
       {skills.length > 6 && <span>+{skills.length - 6}</span>}
-      {saved.model && <span className="font-mono text-ink-stone-400">by {saved.model}</span>}
+      {saved?.model && <span className="font-mono text-ink-stone-400">by {saved.model}</span>}
+      </>}
     </div>
   );
 }

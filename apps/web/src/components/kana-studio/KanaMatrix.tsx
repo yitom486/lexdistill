@@ -3,12 +3,15 @@ import { Volume2, Lightbulb } from "lucide-react";
 import { Button } from "../ui/button.js";
 import { Badge } from "../ui/badge.js";
 import { getKanaCardHighlight, KanaRowLabel } from "../ja/kana/KanaRowLabel.js";
+import { GATEWAY_BASE_URL } from "../../lib/api-client.js";
 import type { KanaStudioState } from '../../hooks/useKanaStudio.js';
 import { KANA_COLUMN_CLASSES } from './types.js';
 export function KanaMatrix({ state }: {
     state: KanaStudioState;
 }) {
-    const { refetchKana, isKanaLoading, scriptMode, showRomaji, activeKana, groupedByRow, handlePlayAudio, handleSelectKana, handleOpenKanaGuide, handleOpenRowGuide } = state;
+    const { refetchKana, isKanaLoading, isKanaError, scriptMode, showRomaji, activeKana, groupedByRow, handlePlayAudio, handleSelectKana, handleOpenKanaGuide, handleOpenRowGuide } = state;
+    // 空矩阵三种情形：加载中 / 请求失败 / 成功但当前无条目。空数组本身不是故障证据。
+    const showFailure = !isKanaLoading && isKanaError && groupedByRow.length === 0;
     return (<motion.div key="matrix" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
             {groupedByRow.length > 0 ? (<div className="grid grid-cols-1 gap-4">
                 {groupedByRow.map(({ rowName, items }) => (<div key={rowName} className="grid grid-cols-1 gap-3 rounded-2xl border border-line-amber-900o10 bg-paper-soft p-3.5 dark:border-wash-amber-500o10 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:items-stretch sm:p-4 transition-colors">
@@ -58,17 +61,34 @@ export function KanaMatrix({ state }: {
                 })}
                   </div>
                 </div>))}
-              </div>) : (<div className="rounded-2xl border border-line-amber-900o10 bg-paper-soft p-6 text-center dark:border-wash-amber-500o10 transition-colors">
+              </div>) : isKanaLoading ? (<div className="rounded-2xl border border-line-hairline bg-paper-soft p-6 text-center transition-colors">
                 <p className="text-xs leading-relaxed text-ink-ghost">
-                  {isKanaLoading
-                ? '正在加载假名表…'
-                : '假名表暂时不可用，请确认网关已启动（默认 localhost:8080），然后重试。'}
+                  正在加载假名表…
                 </p>
-                {!isKanaLoading && (<Button type="button" size="sm" variant="outline" onClick={() => {
+              </div>) : showFailure ? (<div className="rounded-2xl border border-line-amber-900o10 bg-paper-soft p-6 text-center dark:border-wash-amber-500o10 transition-colors">
+                <p className="text-xs leading-relaxed text-ink-ghost">
+                  假名表读取失败。
+                </p>
+                <details className="mt-2 text-xs text-ink-faint-soft">
+                  <summary className="cursor-pointer hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded">
+                    查看连接诊断
+                  </summary>
+                  <p className="mt-1 leading-relaxed">假名表请求未成功，可检查网关连接与运行状态后重试。当前网关地址：{GATEWAY_BASE_URL}（默认 localhost:8080）。</p>
+                </details>
+                <Button type="button" size="sm" variant="outline" onClick={() => {
                     void refetchKana();
                 }} className="mt-3">
                     重新加载
-                  </Button>)}
+                  </Button>
+              </div>) : (<div className="rounded-2xl border border-line-hairline bg-paper-soft p-6 text-center transition-colors">
+                <p className="text-xs leading-relaxed text-ink-ghost">
+                  当前条件下暂无假名条目，可切换矩阵选项卡或重新加载。
+                </p>
+                <Button type="button" size="sm" variant="outline" onClick={() => {
+                    void refetchKana();
+                }} className="mt-3">
+                    重新加载
+                  </Button>
               </div>)}
 
 

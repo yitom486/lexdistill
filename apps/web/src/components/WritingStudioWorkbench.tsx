@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { PenLine, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,13 +16,30 @@ import {
 import { useGenerateWritingPromptsMutation } from '../queries/useLearnerQueries.js';
 import type { SubjectiveExercise } from '../models/practice.js';
 
+/** 体裁值（传网关的参数）→ 用户可读名称。值与参数不变，只换显示。 */
+export const WRITING_GENRE_LABELS: Record<string, string> = {
+  translation: '翻译',
+  email: '邮件',
+  essay: '短议论文',
+  diary: '日记',
+  news_response: '读后续写',
+};
+
 export function WritingStudioWorkbench() {
   const [genre, setGenre] = useState('translation');
   const [difficulty, setDifficulty] = useState('3');
   const [exercises, setExercises] = useState<SubjectiveExercise[] | undefined>(undefined);
   const generateMutation = useGenerateWritingPromptsMutation();
+  const generating = useRef(false);
+  const mounted = useRef(false);
+  const context = useRef('');
+  context.current = `${genre}:${difficulty}`;
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const handleGenerate = async () => {
+    if (generating.current) return;
+    generating.current = true;
+    const requestContext = context.current;
     sound.playClick();
     try {
       const prompts = await generateMutation.mutateAsync({
@@ -31,6 +48,7 @@ export function WritingStudioWorkbench() {
         count: 3,
         collect: true,
       });
+      if (!mounted.current || context.current !== requestContext) return;
       setExercises(
         prompts.map((p) => ({
           id: p.id,
@@ -42,9 +60,12 @@ export function WritingStudioWorkbench() {
           grammarFocus: p.grammarFocus,
         }))
       );
-      toast.success('题干已由 learning.content 生成');
+      toast.success('题干已生成并写入练习队列');
     } catch (error) {
+      if (!mounted.current || context.current !== requestContext) return;
       toast.error(error instanceof Error ? error.message : '生成失败，请重试。');
+    } finally {
+      generating.current = false;
     }
   };
 
@@ -64,32 +85,32 @@ export function WritingStudioWorkbench() {
               <h2 className="text-lg font-bold font-serif text-ink">
                 写作与翻译工作室
               </h2>
-              <Badge variant="amber" className="text-[10px]">
-                learning.content
+              <Badge variant="amber" className="text-xs">
+                写作练习
               </Badge>
             </div>
             <p className="text-xs text-ink-ghost mt-0.5">
-              体裁与难度驱动出题 · 提交走 Gateway 批改
+              体裁与难度驱动出题 · 提交后 AI 批改
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Select value={genre} onValueChange={(v) => v && setGenre(v)}>
-            <SelectTrigger className="w-[8.5rem]">
-              <SelectValue placeholder="体裁" />
+            <SelectTrigger className="w-[8.5rem]" aria-label="体裁">
+              <SelectValue>{WRITING_GENRE_LABELS[genre] ?? genre}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="translation">中译日/英</SelectItem>
-              <SelectItem value="email">邮件</SelectItem>
-              <SelectItem value="essay">短议论文</SelectItem>
-              <SelectItem value="diary">日记</SelectItem>
-              <SelectItem value="news_response">读后续写</SelectItem>
+              {Object.entries(WRITING_GENRE_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={difficulty} onValueChange={(v) => v && setDifficulty(v)}>
-            <SelectTrigger className="w-[7rem]">
-              <SelectValue placeholder="难度" />
+            <SelectTrigger className="w-[7rem]" aria-label="难度">
+              <SelectValue>{`难度 Lv.${difficulty}`}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {[1, 2, 3, 4, 5].map((d) => (
@@ -116,6 +137,7 @@ export function WritingStudioWorkbench() {
       </div>
 
       <SubjectiveWritingWorkbench
+        key={exercises?.map(exercise => exercise.id).join(':') ?? 'initial'}
         exercises={exercises}
         onExercisesChange={setExercises}
         genre={genre}

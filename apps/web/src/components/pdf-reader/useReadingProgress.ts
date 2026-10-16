@@ -24,13 +24,14 @@ export function useReadingProgress({ book, lesson, totalPages }: UseReadingProgr
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   const positionKey = book.documentId ?? book.id;
-  const { data: savedPosition } = useReadingPositionQuery(positionKey);
+  const positionQuery = useReadingPositionQuery(positionKey);
+  const savedPosition = positionQuery.data;
   const savePosition = useSaveReadingPositionMutation();
   const restoredLessonRef = useRef<string>('');
 
   React.useEffect(() => {
-    if (restoredLessonRef.current === lesson.id) return;
-    if (savedPosition === undefined) return; // 查询中：读写都暂停，等结果
+    if (restoredLessonRef.current === `${positionKey}:${lesson.id}`) return;
+    if (savedPosition === undefined || positionQuery.isError) return; // 查询中/失败：不覆盖存量位置
     if (savedPosition && savedPosition.lessonId === lesson.id) {
       const page = savedPosition.page;
       if (typeof page === 'number' && Number.isFinite(page) && page >= 1 && page <= totalPages) {
@@ -40,11 +41,11 @@ export function useReadingProgress({ book, lesson, totalPages }: UseReadingProgr
         setViewMode(savedPosition.viewMode);
       }
     }
-    restoredLessonRef.current = lesson.id;
-  }, [savedPosition, lesson.id, totalPages]);
+    restoredLessonRef.current = `${positionKey}:${lesson.id}`;
+  }, [savedPosition, lesson.id, totalPages, positionKey, positionQuery.isError]);
 
   React.useEffect(() => {
-    if (restoredLessonRef.current !== lesson.id) return;
+    if (positionQuery.isError || restoredLessonRef.current !== `${positionKey}:${lesson.id}`) return;
     const timer = setTimeout(() => {
       savePosition.mutate({
         documentId: positionKey,
@@ -53,7 +54,7 @@ export function useReadingProgress({ book, lesson, totalPages }: UseReadingProgr
     }, 800);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positionKey, lesson.id, currentPage, viewMode]);
+  }, [positionKey, lesson.id, currentPage, viewMode, savedPosition, positionQuery.isError]);
 
   return { viewMode, setViewMode, currentPage, setCurrentPage, positionKey };
 }

@@ -102,19 +102,20 @@ export function TextbookJsonImporterTab({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-wash-amber-500o5 border border-line-soft">
         <div className="flex items-center gap-2">
-          <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs font-semibold shadow-xs transition-colors">
+          <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs font-semibold shadow-xs transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-focus-ring">
             <Upload className="w-3.5 h-3.5" />
             上传教材 JSON 文件
             <input
               type="file"
               accept=".json"
-              className="hidden"
+              aria-label="上传教材 JSON 文件"
+              className="sr-only"
               onChange={handleFileUpload}
             />
           </label>
           <Button variant="secondary" size="sm" onClick={handleLoadSample}>
             <Sparkles className="w-3.5 h-3.5 text-tone-amber-500" />
-            载入官方样例《新编日语》
+            载入样例《新编日语》
           </Button>
         </div>
         <Button variant="ghost" size="sm" onClick={handleDownloadTemplate}>
@@ -139,9 +140,9 @@ export function TextbookJsonImporterTab({
         <textarea
           value={inputText}
           onChange={handleTextChange}
-          placeholder="请在此粘贴符合规范的 Textbook AST JSON，或点击上方载入官方样例..."
+          placeholder="请在此粘贴符合规范的 Textbook AST JSON，或点击上方载入样例..."
           rows={10}
-          className="w-full p-3 font-mono text-xs rounded-2xl bg-surface-ash border border-line-soft focus:outline-none focus:ring-2 focus:ring-tone-amber-500o40 text-ink-soft leading-relaxed resize-none shadow-inner"
+          className="w-full p-3 font-mono text-xs rounded-2xl bg-surface-ash border border-line-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring text-ink-soft leading-relaxed resize-none shadow-inner"
         />
       </div>
     </div>

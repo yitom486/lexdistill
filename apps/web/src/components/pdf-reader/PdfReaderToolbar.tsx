@@ -27,7 +27,7 @@ interface PdfReaderToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   showZoom: boolean;
-  annotationsCount: number;
+  annotationsCount: number | undefined;
   onStartQuiz: () => void;
 }
 
@@ -53,7 +53,7 @@ function PdfPageControls({
       >
         <ChevronLeft className="w-4 h-4" />
       </Button>
-      <span className="font-mono text-[11px] font-semibold px-2 py-0.5 rounded-md border border-line-hairline bg-surface/80 text-ink-faint-soft">
+      <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md border border-line-hairline bg-surface/80 text-ink-faint-soft">
         {String(currentPage).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
       </span>
       <Button
@@ -97,7 +97,7 @@ export function PdfReaderToolbar({
           <TabsIndicator />
           {!structuredAvailable && <TabsTrigger value="PDF_PAGE" className="px-3 py-1.5 text-xs gap-1.5">
             <BookOpen className="w-3.5 h-3.5" />
-            原版教材排版精读
+            课文排版
           </TabsTrigger>}
           <TabsTrigger value="STRUCTURED" className="px-3 py-1.5 text-xs gap-1.5">
             <Layers className="w-3.5 h-3.5" />
@@ -142,7 +142,7 @@ export function PdfReaderToolbar({
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </Button>
-            <span className="text-[11px] font-mono font-semibold px-1 text-ink-faint-soft">
+            <span className="text-xs font-mono font-semibold px-1 text-ink-faint-soft">
               {zoomLevel}%
             </span>
             <Button
@@ -158,10 +158,10 @@ export function PdfReaderToolbar({
           </div>
         )}
 
-        {annotationsCount > 0 && (
-          <Badge variant="amber" className="text-[11px] gap-1 px-2.5 py-1">
+        {annotationsCount !== undefined && annotationsCount > 0 && (
+          <Badge variant="amber" className="text-xs gap-1 px-2.5 py-1">
             <Highlighter className="w-3 h-3" />
-            <span>{annotationsCount} 条重点批注</span>
+            <span>{annotationsCount ?? '—'} 条重点批注</span>
           </Badge>
         )}
 

@@ -89,7 +89,7 @@ export function AgentSessionDrawer({
               <div>
                 <SheetTitle className="font-serif text-base text-ink flex items-center gap-2">
                   <span>{worker.lessonTitle || '未分配具体章节'}</span>
-                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-sans font-medium border
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-sans font-medium border
                     ${worker.stage === 'saved' ? 'bg-status-success-wash text-status-success-fg border-status-success-line-soft' :
                       worker.stage === 'failed' ? 'bg-status-danger-wash text-status-danger-fg border-status-danger-line-soft' :
                       'bg-status-warn-wash text-status-warn-fg border-status-warn-line-soft'}`}>
@@ -115,7 +115,7 @@ export function AgentSessionDrawer({
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 会话与思考流
-                <span className="text-[10px] text-ink-muted ml-0.5">({sessionEvents.length})</span>
+                <span className="text-xs text-ink-muted ml-0.5">({sessionEvents.length})</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="extracted" 
@@ -124,7 +124,7 @@ export function AgentSessionDrawer({
                 <Database className="w-3.5 h-3.5" />
                 提炼成果
                 {content && (
-                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 ml-1">
+                  <Badge variant="secondary" className="text-xs h-4 px-1.5 ml-1">
                     就绪
                   </Badge>
                 )}
@@ -136,7 +136,7 @@ export function AgentSessionDrawer({
                 <AlertTriangle className="w-3.5 h-3.5" />
                 异常与重试
                 {errors.length > 0 && (
-                  <Badge variant="destructive" className="text-[10px] h-4 px-1.5 ml-1">
+                  <Badge variant="destructive" className="text-xs h-4 px-1.5 ml-1">
                     {errors.length}
                   </Badge>
                 )}
@@ -212,7 +212,7 @@ export function AgentSessionDrawer({
                             <div className="mt-1.5 pl-2.5 border-l-2 border-line text-ink-muted font-serif">
                               <div>{g.examples[0].text}</div>
                               {g.examples[0].translation && (
-                                <div className="text-[11px]">{g.examples[0].translation}</div>
+                                <div className="text-xs">{g.examples[0].translation}</div>
                               )}
                             </div>
                           )}
@@ -270,14 +270,14 @@ export function AgentSessionDrawer({
                         <span className="font-mono font-medium text-accent-ink">
                           [{evt.category}] {evt.name}
                         </span>
-                        <span className="text-[10px] text-ink-muted font-mono">
+                        <span className="text-xs text-ink-muted font-mono">
                           {new Date(evt.occurredAt).toLocaleTimeString()}
                         </span>
                       </div>
 
                       {/* 详细描述 */}
                       {evt.detail ? (
-                        <pre className="mt-2 p-2 rounded-lg bg-paper-soft border border-line-soft/80 text-[11px] font-mono text-ink-muted overflow-x-auto max-h-40">
+                        <pre className="mt-2 p-2 rounded-lg bg-paper-soft border border-line-soft/80 text-xs font-mono text-ink-muted overflow-x-auto max-h-40">
                           {typeof evt.detail === 'string' ? evt.detail : JSON.stringify(evt.detail, null, 2)}
                         </pre>
                       ) : null}
@@ -294,7 +294,7 @@ export function AgentSessionDrawer({
               <div className="flex flex-col items-center justify-center py-12 text-center text-ink-muted">
                 <CheckCircle2 className="w-8 h-8 text-status-success-dot mb-2" />
                 <p className="text-xs font-medium text-ink">运行平稳，无异常阻断</p>
-                <p className="text-[11px] text-ink-muted mt-0.5">本会话当前未检测到格式冲突或模型拒收记录</p>
+                <p className="text-xs text-ink-muted mt-0.5">本会话当前未检测到格式冲突或模型拒收记录</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -309,7 +309,7 @@ export function AgentSessionDrawer({
                         ? String((err.detail as Record<string, unknown>).message)
                         : JSON.stringify(err.detail ?? { category: err.category, nodeId: err.nodeId, sessionId: err.sessionId, attemptId: err.attemptId, callId: err.callId })}
                     </p>
-                    <span className="text-[10px] text-ink-muted font-mono block">
+                    <span className="text-xs text-ink-muted font-mono block">
                       时间: {new Date(err.occurredAt).toLocaleString()}
                     </span>
                   </div>

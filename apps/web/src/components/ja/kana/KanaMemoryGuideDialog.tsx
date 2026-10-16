@@ -1,3 +1,4 @@
+import { KanaMemorySoundAnchors } from './KanaMemorySoundAnchors.js';
 import React from 'react';
 import { ArrowRight, BookOpen, GitCompareArrows, Info, Lightbulb, Sparkles } from 'lucide-react';
 
@@ -17,212 +18,16 @@ export interface KanaMemoryGuideDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface KanaMemoryVowel {
-  kana: string;
-  romaji: string;
-  hint: string;
-}
-
-interface KanaMemoryFamily {
-  name: string;
-  consonant: string;
-  sounds: string;
-  note: string;
-  audioText: string;
-}
-
-interface KanaMemoryKeySound {
-  kana: string;
-  romaji: string;
-  note: string;
-}
-
-interface KanaMemoryRule {
-  title: string;
-  body: string;
-}
-
-/**
- * 五十音总原则的结构化内容。
- *
- * 这是给弹窗和后续课程卡片使用的内容资产，不承载任何用户学习状态；
- * 用户的练习记录仍然由 Gateway/SQLite 维护。
- */
-export const KANA_MEMORY_GUIDE = {
-  vowels: [
-    { kana: 'あ', romaji: 'a', hint: '张开口的 a，先把声音立住。' },
-    { kana: 'い', romaji: 'i', hint: '嘴角稍微展开的 i，像两条细细的 i。' },
-    { kana: 'う', romaji: 'u', hint: '短而收的 u，嘴唇不要过度突出。' },
-    { kana: 'え', romaji: 'e', hint: '清楚的 e，用 えき (eki) 做词锚点。' },
-    { kana: 'お', romaji: 'o', hint: '口腔更圆的 o，和 あ (a) 并排听。' },
-  ] satisfies readonly KanaMemoryVowel[],
-  consonantFamilies: [
-    {
-      name: 'あ行',
-      consonant: '没有额外辅音',
-      sounds: 'あ (a) · い (i) · う (u) · え (e) · お (o)',
-      note: '五个元音，整张表的地基。',
-      audioText: 'あいうえお',
-    },
-    {
-      name: 'か行',
-      consonant: 'k',
-      sounds: 'か (ka) · き (ki) · く (ku) · け (ke) · こ (ko)',
-      note: 'k + 五个元音，规律非常整齐。',
-      audioText: 'かきくけこ',
-    },
-    {
-      name: 'さ行',
-      consonant: 's',
-      sounds: 'さ (sa) · し (shi) · す (su) · せ (se) · そ (so)',
-      note: 'し (shi) 是例外，不要机械读成 si。',
-      audioText: 'さしすせそ',
-    },
-    {
-      name: 'た行',
-      consonant: 't',
-      sounds: 'た (ta) · ち (chi) · つ (tsu) · て (te) · と (to)',
-      note: 'ち (chi)、つ (tsu) 不按 ti、tu 硬套。',
-      audioText: 'たちつてと',
-    },
-    {
-      name: 'な行',
-      consonant: 'n',
-      sounds: 'な (na) · に (ni) · ぬ (nu) · ね (ne) · の (no)',
-      note: '声音规律稳定，但 ぬ (nu)/め (me)/ね (ne) 长得很像。',
-      audioText: 'なにぬねの',
-    },
-    {
-      name: 'は行',
-      consonant: 'h',
-      sounds: 'は (ha) · ひ (hi) · ふ (fu) · へ (he) · ほ (ho)',
-      note: 'ふ (fu) 是接近 fu 的音，不是中文“夫”的复刻版。',
-      audioText: 'はひふへほ',
-    },
-    {
-      name: 'ま行',
-      consonant: 'm',
-      sounds: 'ま (ma) · み (mi) · む (mu) · め (me) · も (mo)',
-      note: '规律稳定，みみ (mimi)、もも (momo) 很适合做词锚点。',
-      audioText: 'まみむめも',
-    },
-    {
-      name: 'や行',
-      consonant: 'y',
-      sounds: 'や (ya) · ゆ (yu) · よ (yo)',
-      note: '现代基础表只有三个，别费劲寻找 yi、ye。',
-      audioText: 'やゆよ',
-    },
-    {
-      name: 'ら行',
-      consonant: 'r',
-      sounds: 'ら (ra) · り (ri) · る (ru) · れ (re) · ろ (ro)',
-      note: '舌尖轻弹一下，不是英语 r，也不是汉语 l。',
-      audioText: 'らりるれろ',
-    },
-    {
-      name: 'わ行',
-      consonant: 'w',
-      sounds: 'わ (wa) · を (o)',
-      note: 'を (o) 现代标准语通常读 o，主要出现在助词里。',
-      audioText: 'わを',
-    },
-    {
-      name: '特殊拍',
-      consonant: '—',
-      sounds: 'ん (n)',
-      note: '没有元音的鼻音，单独放在表格最后。',
-      audioText: 'ん',
-    },
-  ] satisfies readonly KanaMemoryFamily[],
-  keySounds: [
-    { kana: 'し', romaji: 'shi', note: '不要背成 si。' },
-    { kana: 'ち', romaji: 'chi', note: '不要背成 ti。' },
-    { kana: 'つ', romaji: 'tsu', note: '不要背成 tu，也不要和 し (shi) 混。' },
-    { kana: 'ふ', romaji: 'fu', note: '双唇轻触后送气，听音比谐音可靠。' },
-    { kana: 'ら', romaji: 'ra', note: '舌尖轻弹，别卷成英语 r。' },
-  ] satisfies readonly KanaMemoryKeySound[],
-  rules: [
-    {
-      title: '别背路线，背反应',
-      body: '顺着 あいうえお (a i u e o) 背得很顺，不代表单独看到 え (e) 不会失联。要尽早打乱顺序。',
-    },
-    {
-      title: '看和听要双向',
-      body: '看到 き (ki) 要能读，听到 ki 也要能找出 き (ki)。只会一个方向，记忆还没闭环。',
-    },
-    {
-      title: '相似字形要组团',
-      body: 'さ (sa)/き (ki)、ぬ (nu)/め (me)/ね (ne)、シ (shi)/ツ (tsu) 要并排比较，不要等错到怀疑人生才处理。',
-    },
-    {
-      title: '罗马字是脚手架',
-      body: '新学和答错反馈时可以显示，熟练后逐步隐藏。中文谐音只能临时救急，不能当长期读音。',
-    },
-    {
-      title: '把假名放进词里',
-      body: 'ね (ne) → ねこ (neko)，か (ka) → かお (kao)。假名一旦开始“有意义”，就不再像一堆散落的密码。',
-    },
-    {
-      title: '少量多次更稳',
-      body: '每次 5～10 分钟、每天多次，通常比一次硬坐两个小时更可靠。工作室一轮 10 题，不必每次刷完整表。',
-    },
-  ] satisfies readonly KanaMemoryRule[],
-} as const;
-
-
-function GuideSectionTitle({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="mb-4 flex items-start gap-3">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-wash-amber-500o15 text-accent-ink-strong">
-        <Sparkles className="h-4 w-4" />
-      </div>
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink-strong">
-          {eyebrow}
-        </p>
-        <h3 className="mt-0.5 text-lg font-serif font-bold text-ink">
-          {title}
-        </h3>
-        <p className="mt-1 text-xs leading-relaxed text-ink-faint">
-          {description}
-        </p>
-      </div>
-    </div>
-  );
-}
-
+import { KANA_MEMORY_GUIDE } from './kana-memory-guide.js';
+export { KANA_MEMORY_GUIDE } from './kana-memory-guide.js';
+import { GuideSectionTitle } from './GuideSectionTitle.js';
+import { KanaMemoryGuideHeader } from './KanaMemoryGuideHeader.js';
 export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-5xl overflow-hidden p-0">
         <div className="flex max-h-[92vh] flex-col">
-          <DialogHeader className="shrink-0 border-b border-line-amber-900o10 bg-linear-to-br from-grad-amber-50-amber-950o40 via-paper-soft to-grad-orange-50-orange-950o30 p-5 pr-12 dark:border-wash-amber-500o15 sm:p-7 sm:pr-14 transition-colors">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="amber" className="gap-1">
-                <BookOpen className="h-3 w-3" />
-                五十音记忆法
-              </Badge>
-              <span className="text-[11px] font-mono text-ink-ghost">
-                先看地图，再开始练
-              </span>
-            </div>
-            <DialogTitle className="mt-2 text-2xl leading-tight sm:text-3xl">
-              五十音，其实没有你想的那么多
-            </DialogTitle>
-            <DialogDescription className="max-w-3xl text-sm leading-relaxed">
-              它不是 46 个需要排队挨个背的陌生符号，而是一套“元音打地基、辅音来组队”的声音地图。
-              先看懂这张地图，记忆就不会变成和表格硬碰硬。
-            </DialogDescription>
-          </DialogHeader>
+          <KanaMemoryGuideHeader />
 
           <nav
             aria-label="五十音记忆法大纲"
@@ -277,7 +82,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                           label={`播放 ${vowel.kana}（${vowel.romaji}）发音`}
                         />
                       </div>
-                      <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+                      <p className="mt-2 text-xs leading-relaxed text-ink-faint">
                         {vowel.hint}
                       </p>
                     </div>
@@ -309,10 +114,10 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2">
-                          <Badge variant="outline" className="shrink-0 text-[11px]">
+                          <Badge variant="outline" className="shrink-0 text-xs">
                             {family.name}
                           </Badge>
-                          <span className="truncate text-[11px] font-mono text-ink-ghost">
+                          <span className="truncate text-xs font-mono text-ink-ghost">
                             {family.consonant}
                           </span>
                         </div>
@@ -324,7 +129,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                       <p className="mt-2 text-sm font-serif font-semibold tracking-wide text-ink">
                         {family.sounds}
                       </p>
-                      <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
+                      <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
                         {family.note}
                       </p>
                     </div>
@@ -382,19 +187,19 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                 <div className="grid gap-3 md:grid-cols-3">
                   <div className="rounded-2xl border border-line-orange-500o15 bg-veil-whiteo60-stone-900o35 p-3">
                     <p className="text-xs font-bold text-ink-orange-900-orange-200">汉字先来</p>
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-ink-mute">
+                    <p className="mt-1.5 text-xs leading-relaxed text-ink-mute">
                       汉字传入日本后，既拿来记意思，也拿来暂时借声音。这种借音写法叫万叶假名。
                     </p>
                   </div>
                   <div className="rounded-2xl border border-line-orange-500o15 bg-veil-whiteo60-stone-900o35 p-3">
                     <p className="text-xs font-bold text-ink-orange-900-orange-200">平假名出现</p>
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-ink-mute">
+                    <p className="mt-1.5 text-xs leading-relaxed text-ink-mute">
                       汉字草书越写越顺，慢慢变成圆润的平假名。例如 `あ (a)` 来自 `安` 的草书。
                     </p>
                   </div>
                   <div className="rounded-2xl border border-line-orange-500o15 bg-veil-whiteo60-stone-900o35 p-3">
                     <p className="text-xs font-bold text-ink-orange-900-orange-200">片假名分家</p>
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-ink-mute">
+                    <p className="mt-1.5 text-xs leading-relaxed text-ink-mute">
                       汉字切下一小片做标记，长成片假名。例如 `カ (ka)` 来自 `加` 的一部分。
                     </p>
                   </div>
@@ -423,7 +228,7 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                         <Lightbulb className="h-3.5 w-3.5" />
                         {rule.title}
                       </div>
-                      <p className="mt-2 text-[11px] leading-relaxed text-ink-mute">
+                      <p className="mt-2 text-xs leading-relaxed text-ink-mute">
                         {rule.body}
                       </p>
                     </div>
@@ -458,40 +263,10 @@ export function KanaMemoryGuideDialog({ open, onOpenChange }: KanaMemoryGuideDia
                   </div>
                 </div>
 
-                <div className="mt-3 rounded-3xl border border-tone-amber-500o25 bg-wash-amber-500o10 p-4 dark:bg-wash-amber-500o10 transition-colors">
-                  <div className="flex items-center gap-2 text-sm font-bold text-ink-amber-900-amber-200">
-                    <GitCompareArrows className="h-4 w-4" />
-                    这些音，建议直接点一下听
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {KANA_MEMORY_GUIDE.keySounds.map((item) => (
-                      <div
-                        key={item.kana}
-                        className="flex items-center gap-1.5 rounded-2xl border border-tone-amber-500o20 bg-veil-whiteo70-stone-900o45 px-2.5 py-1.5"
-                      >
-                        <span className="font-serif text-base font-bold text-ink">
-                          {item.kana}
-                        </span>
-                        <span className="font-mono text-[11px] text-accent-ink-strong">
-                          ({item.romaji})
-                        </span>
-                        <KanaGuideSpeakButton
-                          text={item.kana}
-                          label={`播放 ${item.kana}（${item.romaji}）发音`}
-                        />
-                        <span className="hidden text-[10px] text-ink-ghost sm:inline">
-                          {item.note}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-                    罗马字可以帮你搭桥，但耳朵才是最后验收员。尤其是 `し (shi)`、`ち (chi)`、`つ (tsu)`、`ふ (fu)` 和 `ら (ra)`，不要只看字母猜声音。
-                  </p>
-                </div>
+                <KanaMemorySoundAnchors />
               </section>
 
-              <div className="flex items-start gap-2 rounded-2xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o30 p-3 text-[11px] leading-relaxed text-ink-stone-500 dark:border-tone-stone-800 dark:text-ink-stone-400 transition-colors">
+              <div className="flex items-start gap-2 rounded-2xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o30 p-3 text-xs leading-relaxed text-ink-stone-500 dark:border-tone-stone-800 dark:text-ink-stone-400 transition-colors">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <p>
                   看完这张地图，就可以回到矩阵做一轮短练习。错了不用气馁：错误会告诉系统下一次该把哪个假名请回来复习。

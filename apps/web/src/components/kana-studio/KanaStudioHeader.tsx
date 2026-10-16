@@ -9,14 +9,17 @@ import { MatrixTab } from './types.js';
 export function KanaStudioHeader({ state }: {
     state: KanaStudioState;
 }) {
-    const { focusKanaIds, matrixTab, setMatrixTab, scriptMode, setScriptMode, showRomaji, setShowRomaji, setIsMemoryGuideOpen, isDrillActive, setIsDrillActive, setSelectedOption, setIsAnswered, setDrillRound, resetRoundStats, setWordIndex, setWordInput, setWordStudyDone } = state;
+    const { focusKanaIds, matrixTab, setMatrixTab, scriptMode, setScriptMode, showRomaji, setShowRomaji, setIsMemoryGuideOpen, isDrillActive, setIsDrillActive, setSelectedOption, setIsAnswered, setDrillRound, resetRoundStats, setWordIndex, setWordInput, setWordStudyDone, allKana, isKanaLoading } = state;
+    // 自测需要假名表真实可用；无数据时禁用并说明原因，不伪装能开始
+    const drillUnavailable = isKanaLoading || allKana.length === 0;
+    const drillDisabledReason = isKanaLoading ? '假名表加载中，稍候可自测' : '暂无假名数据，无法开始自测';
     return (<div className="bg-paper-soft rounded-2xl p-4 sm:p-6 border border-line-accent shadow-sm">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <Badge variant="amber">课程底座</Badge>
+              <Badge variant="amber">假名入门</Badge>
               <span className="text-xs text-ink-ghost">
-                权威字形 · 标准发音 · 熟练度回写
+                平假名与片假名的认读、发音与自测
               </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-serif font-bold text-ink mt-1">
@@ -69,7 +72,7 @@ export function KanaStudioHeader({ state }: {
               <span>五十音记忆法</span>
             </Button>
 
-            {/* 自测模式切换 */}
+            {/* 自测模式切换：数据门槛只限制进入，返回矩阵始终可用 */}
             <ShimmerButton onClick={() => {
             sound.playClick();
             const enteringDrill = !isDrillActive;
@@ -82,7 +85,7 @@ export function KanaStudioHeader({ state }: {
             setWordInput('');
             setWordStudyDone(false);
             resetRoundStats();
-        }} className="px-3.5 py-1.5 text-xs font-semibold gap-1.5 shadow-md">
+        }} disabled={!isDrillActive && drillUnavailable} className="px-3.5 py-1.5 text-xs font-semibold gap-1.5 shadow-md" title={isDrillActive ? '返回假名矩阵' : (drillUnavailable ? drillDisabledReason : '启动假名自测')}>
               <Award className="w-3.5 h-3.5"/>
               <span>{isDrillActive ? '返回假名矩阵' : '启动假名自测'}</span>
             </ShimmerButton>

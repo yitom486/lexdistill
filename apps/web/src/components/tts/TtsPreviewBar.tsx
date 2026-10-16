@@ -9,6 +9,8 @@ interface Props {
   lang: SupportedLanguage;
   /** 网关下发的轨道试音文案；为空表示配置未就绪。 */
   serverText: string;
+  /** 输入框占位：父级按试音配置三态（同步中/失败/未下发）给出，失败时绝不显示“正在同步”。 */
+  previewPlaceholder?: string;
   /** 用户覆盖输入（空即使用服务端文案）。 */
   userText: string;
   onUserTextChange: (next: string) => void;
@@ -18,7 +20,7 @@ interface Props {
  * 试听条：一套播放状态（合成→本地缓存→重播），同一按钮按状态切换。
  * 同一组合命中本地缓存即免费重播，不再合成计费；任一条件变化自动转回试听。
  */
-export function TtsPreviewBar({ lang, serverText, userText, onUserTextChange }: Props) {
+export function TtsPreviewBar({ lang, serverText, previewPlaceholder, userText, onUserTextChange }: Props) {
   const rate = useTtsStore((s) => s.rate);
   const setRate = useTtsStore((s) => s.setRate);
   const isSpeaking = useTtsStore((s) => s.isSpeaking);
@@ -58,15 +60,15 @@ export function TtsPreviewBar({ lang, serverText, userText, onUserTextChange }: 
             <span className="text-xs font-normal text-ink-mute">{effectiveText.length} 字</span>
           </span>
           <input
-            className="mt-3 w-full rounded-xl border border-line bg-surface px-4 py-3 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-3 w-full rounded-xl border border-line bg-surface px-4 py-3 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             value={userText}
             onChange={(e) => onUserTextChange(e.target.value)}
-            placeholder={serverText || '正在同步试音文案…'}
+            placeholder={previewPlaceholder ?? (serverText || '输入句子试听…')}
           />
         </label>
         <div>
           <div className="mb-5 flex justify-between text-base font-semibold text-ink"><span>语速</span><span>{rate.toFixed(1)}×</span></div>
-          <Slider value={rate} min={0.5} max={1.5} step={0.1} onValueChange={(value) => {
+          <Slider aria-label="朗读语速" value={rate} min={0.5} max={1.5} step={0.1} onValueChange={(value) => {
             const next = Array.isArray(value) ? value[0] : value;
             if (typeof next === 'number') setRate(next);
           }} />

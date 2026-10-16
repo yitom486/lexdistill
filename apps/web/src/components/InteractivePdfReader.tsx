@@ -1,18 +1,11 @@
 import React, { useState } from 'react';
 import { LearningContentPanel } from './textbook/LearningContentPanel.js';
 import { StructuredLessonPanel } from './textbook/StructuredLessonPanel.js';
-import { toast } from 'sonner';
-import { sound } from '../utils/audio.js';
-import { openLookupPopup } from '../lib/lookup-popup-bus.js';
-import {
-  normalizeSelectionText,
-  type LookupLanguage,
-} from '../lib/selection-text.js';
 import type { TextbookBook, TextbookLesson } from '../models/textbook.js';
-import { useAnnotationsQuery, useAddAnnotationMutation, useProposeCardDraftMutation } from '../queries/useLearnerQueries.js';
+import { usePdfReaderActions } from './pdf-reader/usePdfReaderActions.js';
 import { useSelectionLookup } from './pdf-reader/useSelectionLookup.js';
 import { useReadingProgress } from './pdf-reader/useReadingProgress.js';
-import { PdfReaderToolbar, PdfPageControls } from './pdf-reader/PdfReaderToolbar.js';
+import { PdfReaderToolbar } from './pdf-reader/PdfReaderToolbar.js';
 import { SelectionLookupPopover } from './pdf-reader/SelectionLookupPopover.js';
 import { PdfPageView } from './pdf-reader/PdfPageView.js';
 import { StructuredLessonView } from './pdf-reader/StructuredLessonView.js';
@@ -20,7 +13,7 @@ import { StructuredLessonView } from './pdf-reader/StructuredLessonView.js';
 interface InteractivePdfReaderProps {
   book: TextbookBook;
   lesson: TextbookLesson;
-  onAddCard: (card: { front: string; back: string; category: string; prompt: string }) => void;
+  onAddCard: (card: { front: string; back: string; category: string; prompt: string }) => Promise<unknown>;
   onStartLessonQuiz: (lessonId: string, lessonTitle: string) => void;
   onAskAiTutor: (selectedText: string, contextPrompt: string) => void;
 }
@@ -38,6 +31,7 @@ export function InteractivePdfReader({
 }: InteractivePdfReaderProps) {
   const [showChineseTranslation, setShowChineseTranslation] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  // Preserve legacy position fields; this content layout has no verified original-PDF pagination.
   const totalPages = 3;
 
   const { viewMode, setViewMode, currentPage, setCurrentPage, positionKey } = useReadingProgress({
@@ -45,106 +39,11 @@ export function InteractivePdfReader({
     lesson,
     totalPages,
   });
-  const selection = useSelectionLookup({ lesson });
+  const selection = useSelectionLookup({ lesson, contextKey: book.documentId ?? book.id });
   const { selectedText, popupPosition, wordDetail } = selection;
 
-  // 划线批注持久化查询与新增
-  const { data: annotationsList = [] } = useAnnotationsQuery(book.id);
-  const addAnnotation = useAddAnnotationMutation();
-  // 句子草稿提议（课文收句子 → 草稿箱确认 → 句子卡；接受时不记相遇词）
-  const proposeDraft = useProposeCardDraftMutation();
-  const handleCollectSentence = (sentence: string, translation: string) => {
-    if (proposeDraft.isPending) return;
-    const text = sentence.trim();
-    if (!text) return;
-    sound.playClick();
-    proposeDraft.mutate(
-      {
-        drafts: [
-          {
-            language: book.language === 'EN' ? 'en' : book.language === 'KO' ? 'ko' : 'ja',
-            headword: text.slice(0, 500),
-            meanings: [translation.trim() || '(译文待补)'],
-            partOfSpeech: '课文句子',
-            source: 'import',
-            sourceRef: `${positionKey}/${lesson.id}`,
-            kind: 'sentence',
-            cardType: 'SENTENCE',
-          },
-        ],
-      },
-      {
-        onSuccess: (created) => {
-          sound.playCorrect();
-          toast.success(
-            created.length > 0 ? '已收进草稿箱，去生词闪卡页确认入库' : '这句已在草稿箱里了'
-          );
-        },
-        onError: (e) => {
-          sound.playMistake();
-          toast.error(e instanceof Error ? e.message : '收句子失败');
-        },
-      }
-    );
-  };
-
-  // 划选查词典：经总线复用全局查词浮层（本书自有浮层保留，各管各的选择）
-  const handleLookupSelection = () => {
-    const language: LookupLanguage =
-      book.language === 'EN' ? 'en' : book.language === 'KO' ? 'ko' : 'ja';
-    const text = normalizeSelectionText(selectedText);
-    if (!text || !popupPosition) {
-      toast.error('请先在课文中划选要查的词。');
-      return;
-    }
-    sound.playClick();
-    openLookupPopup({
-      text,
-      language,
-      x: popupPosition.x + 280,
-      y: popupPosition.y,
-      // P3-1 阅读上下文：查词 occurrence 带文档归属。
-      documentId: book.documentId ?? book.id,
-    });
-  };
-
-  const handleAddSelectedToCards = () => {
-    sound.playCorrect();
-    onAddCard({
-      front: wordDetail?.reading ? `${wordDetail.word} (${wordDetail.reading})` : selectedText,
-      back: wordDetail?.meaning || `来自《${book.shortTitle}》${lesson.title}`,
-      category: 'VOCAB',
-      prompt: `教材划词摘录: 《${book.shortTitle}》${lesson.title}`,
-    });
-    toast.success(`已加入 FSRS 闪卡：${selectedText}`);
-    selection.dismissSelection();
-  };
-
-  const handleAskTutorForSelection = () => {
-    sound.playClick();
-    const isEn = book.language === 'EN';
-    onAskAiTutor(
-      selectedText,
-      isEn
-        ? `在《${book.title}》${lesson.title} 的英文课文语境中，请深度剖析这段英语的句式结构、时态/从句成分以及中式英语(Chinglish)常见易错点：`
-        : `在《${book.title}》${lesson.title} 的课文语境中，请深度剖析这段日文的语法成分、敬体/简体用法以及母语者语感：`
-    );
-    selection.dismissSelection();
-    toast.info(`已将选句提交给 AI 导师进行深度解析`);
-  };
-
-  const handleSaveAnnotation = () => {
-    sound.playCorrect();
-    addAnnotation.mutate({
-      documentId: book.id,
-      kind: wordDetail ? 'VOCAB' : 'KEY_POINT',
-      quote: selectedText,
-      note: wordDetail?.meaning || `课文划线批注: 《${book.shortTitle}》${lesson.title}`,
-    });
-    toast.success(`已沉淀课文重点批注：${selectedText}`);
-    selection.dismissSelection();
-  };
-
+  const actions = usePdfReaderActions({ book, lesson, selection, positionKey, onAddCard, onAskAiTutor });
+  const { annotationsList, collectPending, handleCollectSentence, handleAddVocabToCards, handleAddSelectedToCards, handleSaveAnnotation, handleAskTutorForSelection, handleLookupSelection } = actions;
   const structuredAvailable = Boolean(lesson.content || lesson.learningContent);
   const showZoom = !structuredAvailable && viewMode === 'PDF_PAGE';
 
@@ -160,9 +59,10 @@ export function InteractivePdfReader({
         onZoomIn={() => setZoomLevel((z) => Math.min(z + 10, 130))}
         onZoomOut={() => setZoomLevel((z) => Math.max(z - 10, 80))}
         showZoom={showZoom}
-        annotationsCount={annotationsList.length}
+        annotationsCount={actions.annotationsQuery.data === undefined ? undefined : annotationsList.length}
         onStartQuiz={() => onStartLessonQuiz(lesson.id, lesson.title)}
       />
+      {actions.annotationsQuery.isError && <p role="alert" className="text-xs text-ink-ghost">批注更新失败，已读取批注仍保留。</p>}
 
       {/* 核心阅读视口容器（自有划选浮层：全局查词浮层不抢） */}
       <div
@@ -179,10 +79,11 @@ export function InteractivePdfReader({
             currentPage={currentPage}
             totalPages={totalPages}
             showTranslation={showChineseTranslation}
-            collectPending={proposeDraft.isPending}
+            collectPending={collectPending}
             onCollectSentence={handleCollectSentence}
             onAskAiTutor={onAskAiTutor}
-            onAddSelectedToCards={handleAddSelectedToCards}
+            onAddVocabWord={handleAddVocabToCards}
+            cardsPending={actions.cardsPending}
           />
         ) : (
           <StructuredLessonView
@@ -200,18 +101,12 @@ export function InteractivePdfReader({
           onSaveAnnotation={handleSaveAnnotation}
           onAskTutor={handleAskTutorForSelection}
           onLookup={handleLookupSelection}
+          cardsPending={actions.cardsPending}
+          annotationPending={actions.annotationPending}
+          onDismiss={selection.dismissSelection}
         />
       </div>
 
-      {/* 底部页码控制 (PDF 模式) */}
-      {!structuredAvailable && viewMode === 'PDF_PAGE' && (
-        <PdfPageControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPrev={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-          onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-        />
-      )}
     </div>
   );
 }

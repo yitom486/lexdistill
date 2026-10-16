@@ -64,7 +64,7 @@ export function GlobalPipelineTaskWidget() {
   if (isMinimized) {
     return (
       <div
-        className="fixed bottom-6 right-6 z-50 animate-in fade-in zoom-in-95 duration-200"
+        className="fixed bottom-6 right-6 z-50 animate-in fade-in zoom-in-95 duration-[var(--motion-layout-enter-duration)]"
         title={`《${activeJob.title}》整书提炼：${percent}% (${activeJob.doneLessons}/${activeJob.totalLessons})`}
       >
         <button
@@ -84,7 +84,7 @@ export function GlobalPipelineTaskWidget() {
           {/* 微光呼吸光环 */}
           {isRunning && (
             <span className="absolute -top-1 -right-1 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-tone-amber-400 opacity-75" />
+              <span className="animate-ping motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-tone-amber-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-tone-amber-500" />
             </span>
           )}
@@ -100,10 +100,10 @@ export function GlobalPipelineTaskWidget() {
           )}
 
           <div className="flex flex-col text-left">
-            <span className="text-[11px] font-bold tracking-tight text-ink">
+            <span className="text-xs font-bold tracking-tight text-ink">
               {isRunning ? `${percent}%` : isDone ? '提炼完成' : '提炼中断'}
             </span>
-            <span className="text-[9px] text-ink-muted truncate max-w-[80px]">
+            <span className="text-xs text-ink-muted truncate max-w-[80px]">
               {activeJob.doneLessons}/{activeJob.totalLessons} 课
             </span>
           </div>
@@ -115,7 +115,7 @@ export function GlobalPipelineTaskWidget() {
   // 展开进度胶囊态（Floating Capsule / Card）
   return (
     <div
-      className="fixed bottom-6 right-6 z-50 w-88 max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-surface/95 backdrop-blur-md shadow-2xl p-4 space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-200"
+      className="fixed bottom-6 right-6 z-50 w-88 max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-surface/95 backdrop-blur-md shadow-2xl p-4 space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-[var(--motion-layout-enter-duration)]"
     >
       {/* 头部信息 */}
       <div className="flex items-start justify-between gap-2 border-b border-line-soft pb-2.5">
@@ -128,7 +128,7 @@ export function GlobalPipelineTaskWidget() {
                 : 'bg-surface-elevated border-line text-ink-muted'
           }`}>
             {isRunning ? (
-              <Sparkles className="w-4 h-4 animate-pulse" />
+              <Sparkles className="w-4 h-4 animate-pulse motion-reduce:animate-none" />
             ) : isDone ? (
               <CheckCircle2 className="w-4 h-4" />
             ) : (
@@ -197,7 +197,7 @@ export function GlobalPipelineTaskWidget() {
         {/* 动态进度条 */}
         <div className="w-full h-2 rounded-full bg-surface-elevated border border-line overflow-hidden">
           <div
-            className={`h-full transition-all duration-300 rounded-full ${
+            className={`h-full transition-all duration-[var(--motion-progress-width-duration)] rounded-full ${
               isRunning
                 ? 'bg-tone-amber-500'
                 : isDone

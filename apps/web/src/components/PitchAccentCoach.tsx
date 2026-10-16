@@ -35,6 +35,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
     canvasRef,
     pitchPattern: currentWord?.pitchPattern ?? [],
     pitchType: currentWord?.pitchType ?? '',
+    contextKey: currentWord?.kanji ?? '',
   });
 
   if (!currentWord) {
@@ -43,9 +44,9 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
         <AlertCircle className="w-8 h-8 mx-auto text-gold-warm" />
         <p className="text-sm text-ink-faint">
           {pitchQuery.isError
-            ? '声调基准词表加载失败，请确认 Gateway 已启动后重试。'
+            ? '声调基准词表加载失败，请重试。'
             : pitchQuery.isLoading
-              ? '正在从 Gateway 读取声调基准词表…'
+              ? '正在读取声调基准词表…'
               : '本地词典库暂无声调基准词条，请先安装日语词典包。'}
         </p>
         {pitchQuery.isError && (
@@ -121,7 +122,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                   className="gap-1.5"
                 >
                   <Volume2 className="w-4 h-4" />
-                  <span>示范原音</span>
+                  <span>听示范</span>
                 </Button>
                 {onOpenTutor && (
                   <Button
@@ -171,7 +172,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                         <span className="text-xl font-bold text-ink font-serif">
                           {mora}
                         </span>
-                        <span className="text-[11px] text-ink-faint-soft font-mono">第 {idx + 1} 拍</span>
+                        <span className="text-xs text-ink-faint-soft font-mono">第 {idx + 1} 拍</span>
                       </div>
                     );
                   })}
@@ -194,7 +195,7 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
                     variant="link"
                     size="sm"
                     onClick={() => playModelVoice(currentWord.contrastPair!.kana)}
-                    className="h-auto p-0 text-[11px] gap-1"
+                    className="h-auto p-0 text-xs gap-1"
                   >
                     <Volume2 className="w-3 h-3" />
                     试听对比词声调
@@ -240,10 +241,11 @@ export function PitchAccentCoach({ onOpenTutor }: PitchAccentCoachProps) {
             <div className="space-y-2">
               {recorder.isRecording ? (
                 <div className="space-y-2">
-                  <Progress value={recorder.recordingProgress} />
+                  {recorder.phase === 'recording' && <Progress value={recorder.recordingProgress} />}
                   <p className="text-xs text-center text-gold-warm font-semibold">
-                    正在录音分析中... 请清晰朗读：{currentWord.kana}
+                    {recorder.phase === 'requesting' ? '正在等待麦克风权限…' : recorder.phase === 'analyzing' ? '正在分析录音…' : `正在录音，请朗读：${currentWord.kana}`}
                   </p>
+                  <Button size="sm" variant="outline" onClick={recorder.cancelRecording}>取消本次录音</Button>
                 </div>
               ) : (
                 <ShimmerButton

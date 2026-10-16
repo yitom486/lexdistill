@@ -19,6 +19,7 @@ export function ProviderSettingsSection() {
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
   const status = provider.data;
+  const statusKnown = provider.isSuccess;
   const saveForm = () => {
     sound.playClick();
     save.mutate(
@@ -40,11 +41,24 @@ export function ProviderSettingsSection() {
           <KeyRound className="w-3.5 h-3.5 text-tone-amber-500" />
           <span>自定义 API 供应商</span>
         </div>
-        {status && (
-          <Badge variant="outline" className="border-line-amber-500o30 px-1.5 py-0 text-sm text-accent-ink">
+        {provider.isPending ? (
+          <Badge variant="outline" className="border-line px-1.5 py-0 text-sm text-ink-ghost">
+            读取中…
+          </Badge>
+        ) : provider.isError ? (
+          <button
+            type="button"
+            onClick={() => void provider.refetch()}
+            title="重新读取供应商配置"
+            className="border-line-amber-500o30 px-1.5 py-0 text-sm text-accent-ink rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          >
+            读取失败，点击重试
+          </button>
+        ) : statusKnown && status ? (
+          <Badge variant="outline" className="border-line-amber-500o30 px-1.5 py-0 text-sm text-accent-ink max-w-48 truncate" title={status.configured && status.model ? status.model : undefined}>
             {status.configured ? `已配置${status.model ? ` · ${status.model}` : ''}` : '未配置'}
           </Badge>
-        )}
+        ) : null}
       </div>
       <p className="text-sm leading-relaxed text-ink-ghost">
         自备 OpenAI 兼容端点（地址/模型/Key）。保存后在 Agent 运行时下拉选“自定义 API…”即走该供应商；Key 只存本机网关，查询接口不回传。
@@ -57,7 +71,7 @@ export function ProviderSettingsSection() {
             value={baseUrl}
             onChange={event => setBaseUrl(event.target.value)}
             placeholder="https://api.example.com/v1"
-            className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           />
         </label>
         <label className="block">
@@ -67,7 +81,7 @@ export function ProviderSettingsSection() {
             value={model}
             onChange={event => setModel(event.target.value)}
             placeholder="gpt-4o-mini"
-            className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           />
         </label>
         <label className="block">
@@ -78,7 +92,7 @@ export function ProviderSettingsSection() {
             value={apiKey}
             onChange={event => setApiKey(event.target.value)}
             placeholder="sk-…"
-            className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           />
         </label>
       </div>

@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAudioInputStore } from '../stores/useAudioInputStore.js';
 
 export type MicPermissionState = 'idle' | 'requesting' | 'granted' | 'denied' | 'unsupported';
-
 export interface UseMicrophoneTesterResult {
   devices: MediaDeviceInfo[];
+  devicesReady: boolean;
+  devicesError: string | null;
   selectedDeviceId: string;
   setSelectedDeviceId: (id: string) => void;
   permissionState: MicPermissionState;
@@ -19,156 +20,142 @@ export interface UseMicrophoneTesterResult {
 export function useMicrophoneTester(): UseMicrophoneTesterResult {
   const selectedDeviceId = useAudioInputStore((s) => s.preferredDeviceId);
   const setSelectedDeviceId = useAudioInputStore((s) => s.setPreferredDeviceId);
-
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [devicesReady, setDevicesReady] = useState(false);
+  const [devicesError, setDevicesError] = useState<string | null>(null);
   const [permissionState, setPermissionState] = useState<MicPermissionState>('idle');
   const [isTesting, setIsTesting] = useState(false);
   const [inputLevel, setInputLevel] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
+  const mounted = useRef(true);
+  const requestEpoch = useRef(0);
+  const enumerationEpoch = useRef(0);
+  const requesting = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameIdRef = useRef<number | null>(null);
 
   const stopTest = useCallback(() => {
-    if (animFrameIdRef.current !== null) {
-      cancelAnimationFrame(animFrameIdRef.current);
-      animFrameIdRef.current = null;
-    }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
-    }
-
+    requestEpoch.current++;
+    requesting.current = false;
+    if (animFrameIdRef.current !== null) cancelAnimationFrame(animFrameIdRef.current);
+    animFrameIdRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    void audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
     analyserRef.current = null;
-    setIsTesting(false);
-    setInputLevel(0);
+    if (mounted.current) {
+      setIsTesting(false);
+      setInputLevel(0);
+      setPermissionState((state) => state === 'requesting' ? 'idle' : state);
+    }
   }, []);
 
   const refreshDevices = useCallback(async () => {
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
-      setPermissionState('unsupported');
+    const epoch = ++enumerationEpoch.current;
+    const current = () => mounted.current && epoch === enumerationEpoch.current;
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      if (current()) {
+        setPermissionState('unsupported');
+        setDevicesReady(true);
+        setDevicesError('当前环境不支持设备枚举。');
+      }
       return;
     }
+    if (current()) setDevicesReady(false);
     try {
-      const allDevices = await navigator.mediaDevices.enumerateDevices();
-      const audioInputs = allDevices.filter((d) => d.kind === 'audioinput');
-      setDevices(audioInputs);
+      const all = await navigator.mediaDevices.enumerateDevices();
+      if (current()) {
+        setDevices(all.filter((d) => d.kind === 'audioinput'));
+        setDevicesError(null);
+      }
     } catch {
-      // 忽略枚举失败
+      if (current()) setDevicesError('设备枚举失败，请点击“刷新设备”重试。');
+    } finally {
+      if (current()) setDevicesReady(true);
     }
   }, []);
 
   const startTest = useCallback(async () => {
+    if (requesting.current || !mounted.current) return;
     stopTest();
+    const epoch = requestEpoch.current;
+    const current = () => mounted.current && epoch === requestEpoch.current;
     setErrorMessage(null);
-
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+    if (!navigator.mediaDevices?.getUserMedia) {
       setPermissionState('unsupported');
       setErrorMessage('当前运行环境不支持音频采集 API。');
       return;
     }
-
+    requesting.current = true;
     setPermissionState('requesting');
-
     try {
-      const constraints: MediaStreamConstraints = {
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true,
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      });
+      // 权限对话框无法程序取消；迟到授权必须立即释放，不开始采集。
+      if (!current()) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       setPermissionState('granted');
-      setIsTesting(true);
-
-      // 获得权限后设备名称即可见，重新刷新设备列表
-      void refreshDevices();
-
-      const AudioContextConstructor =
-        window.AudioContext ||
+      const Constructor = window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioContextConstructor();
+      const ctx = new Constructor();
       audioContextRef.current = ctx;
-
-      const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.3;
-      source.connect(analyser);
+      ctx.createMediaStreamSource(stream).connect(analyser);
       analyserRef.current = analyser;
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
+      setIsTesting(true);
+      void refreshDevices();
+      const data = new Uint8Array(analyser.frequencyBinCount);
       const updateLevel = () => {
-        if (!analyserRef.current) return;
-        analyserRef.current.getByteFrequencyData(dataArray);
-
+        if (!current() || !analyserRef.current) return;
+        analyser.getByteFrequencyData(data);
         let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i] ?? 0;
-        }
-        const avg = sum / dataArray.length;
-        // 放大拾音动态范围映射到 0-100
-        const calculated = Math.min(100, Math.round((avg / 96) * 100));
-        setInputLevel(calculated);
-
+        for (const value of data) sum += value;
+        setInputLevel(Math.min(100, Math.round((sum / data.length / 96) * 100)));
         animFrameIdRef.current = requestAnimationFrame(updateLevel);
       };
-
       animFrameIdRef.current = requestAnimationFrame(updateLevel);
     } catch (err) {
+      if (!current()) return;
+      const permissionGranted = streamRef.current !== null;
       stopTest();
-      setPermissionState('denied');
-      const message =
-        err instanceof Error && err.name === 'NotAllowedError'
-          ? '麦克风权限已被拒绝，请在系统或应用设置中允许麦克风权限。'
-          : err instanceof Error
-            ? err.message
-            : '无法访问麦克风设备。';
-      setErrorMessage(message);
+      const name = err instanceof Error ? err.name : '';
+      const denied = name === 'NotAllowedError' || name === 'SecurityError';
+      setPermissionState(denied ? 'denied' : permissionGranted ? 'granted' : 'idle');
+      setErrorMessage(denied
+        ? '麦克风权限已被拒绝，请在系统或应用设置中允许麦克风权限。'
+        : name === 'NotFoundError' || name === 'OverconstrainedError'
+          ? '未找到所选麦克风，请刷新设备或改用系统默认。'
+          : name === 'NotReadableError'
+            ? '麦克风暂时无法使用，可能被其他应用占用。'
+            : '无法启动麦克风测试，请检查设备后重试。');
+    } finally {
+      if (current()) requesting.current = false;
     }
   }, [selectedDeviceId, stopTest, refreshDevices]);
 
-  // 初始化设备枚举
   useEffect(() => {
+    mounted.current = true;
     void refreshDevices();
-
-    const handleDeviceChange = () => {
-      void refreshDevices();
-    };
-
-    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.addEventListener) {
-      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
-      return () => {
-        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
-      };
-    }
-  }, [refreshDevices]);
-
-  // 组件卸载时安全回收资源
-  useEffect(() => {
+    const media = navigator.mediaDevices;
+    const handleChange = () => void refreshDevices();
+    media?.addEventListener?.('devicechange', handleChange);
     return () => {
+      mounted.current = false;
+      enumerationEpoch.current++;
+      media?.removeEventListener?.('devicechange', handleChange);
       stopTest();
     };
-  }, [stopTest]);
+  }, [refreshDevices, stopTest]);
 
-  return {
-    devices,
-    selectedDeviceId,
-    setSelectedDeviceId,
-    permissionState,
-    isTesting,
-    inputLevel,
-    errorMessage,
-    startTest,
-    stopTest,
-    refreshDevices,
-  };
+  return { devices, devicesReady, devicesError, selectedDeviceId, setSelectedDeviceId,
+    permissionState, isTesting, inputLevel, errorMessage, startTest, stopTest, refreshDevices };
 }

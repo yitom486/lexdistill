@@ -19,7 +19,7 @@ export function KanaDrill({ state }: {
                 <span className="text-xs text-ink-stone-500">
                   {isWordMode ? (wordList.length === 0 ? (<>{generateWords.isPending ? '抽词中…' : '暂无词语'}</>) : (<>第 {wordIndex + 1} / {wordList.length} 词</>)) : drillItems.length === 0 ? (<>{adaptiveKanaQueueQuery.isLoading ? '正在按练习记录组题…' : '暂无题目'}</>) : (<>第 {drillIndex + 1} / {drillItems.length} 题</>)}
                 </span>
-                {!isWordMode && drillItems.length > 0 && (<span className="text-[10px] px-1.5 py-0.5 rounded-md bg-veil-stone-200o70-stone-800 text-ink-ghost" title="题池跟随矩阵选项卡范围">
+                {!isWordMode && drillItems.length > 0 && (<span className="text-xs px-1.5 py-0.5 rounded-md bg-veil-stone-200o70-stone-800 text-ink-ghost" title="题池跟随矩阵选项卡范围">
                     {matrixTab === 'SEION'
                 ? '清音矩阵'
                 : matrixTab === 'DAKUON_HANDAKUON'

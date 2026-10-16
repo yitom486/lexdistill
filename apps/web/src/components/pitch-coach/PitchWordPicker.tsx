@@ -66,7 +66,7 @@ export function PitchWordPicker({ words, selectedWordIndex, onSelectWord }: Pitc
               value={dictionaryInput}
               onChange={(event) => setDictionaryInput(event.target.value)}
               placeholder="例如：雨、あめ、ame"
-              className="h-9 min-w-0 flex-1 rounded-xl border border-line-hairline bg-surface-coal/60 px-3 text-sm text-ink outline-none transition focus:border-gold-warm/50 focus:ring-2 focus:ring-gold-warm/20 sm:w-56"
+              className="h-9 min-w-0 flex-1 rounded-xl border border-line-hairline bg-surface-coal/60 px-3 text-sm text-ink outline-none transition focus-visible:border-tone-amber-500 focus-visible:ring-2 focus-visible:ring-focus-ring sm:w-56"
             />
             <Button type="submit" size="sm" disabled={!dictionaryInput.trim() || dictionaryLookup.isFetching}>
               <Search className="h-3.5 w-3.5" />
@@ -79,6 +79,21 @@ export function PitchWordPicker({ words, selectedWordIndex, onSelectWord }: Pitc
           <div className="mt-3 border-t border-line-hairline pt-3 transition-colors">
             {dictionaryLookup.isFetching ? (
               <p className="text-xs text-ink-stone-500">正在查询本地词典…</p>
+            ) : dictionaryLookup.isError ? (
+              <div className="space-y-2">
+                <p className="text-xs text-ink-stone-500">
+                  本地词典查询失败，请检查网关后重试。
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void dictionaryLookup.refetch()}
+                  className="gap-1 text-xs"
+                >
+                  重新查询
+                </Button>
+              </div>
             ) : dictionaryLookup.data?.entries.length ? (
               <div className="space-y-2">
                 {dictionaryLookup.data.entries.map((entry) => {
@@ -110,9 +125,9 @@ export function PitchWordPicker({ words, selectedWordIndex, onSelectWord }: Pitc
                       </div>
                       <p className="mt-1 text-xs text-ink-faint">{entry.meanings.join('；')}</p>
                       {pronunciation?.pitchPattern && (
-                        <p className="mt-1 font-mono text-[11px] text-ink-faint-soft">音调走向：{pronunciation.pitchPattern.join(' → ')}</p>
+                        <p className="mt-1 font-mono text-xs text-ink-faint-soft">音调走向：{pronunciation.pitchPattern.join(' → ')}</p>
                       )}
-                      <p className="mt-2 text-[11px] text-ink-faint-soft">来源：{entry.sourceLabel}</p>
+                      <p className="mt-2 text-xs text-ink-faint-soft">来源：{entry.sourceLabel}</p>
                     </div>
                   );
                 })}

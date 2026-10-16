@@ -1,28 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import { usePipelineProgress, stageLabels } from './usePipelineProgress.js';
+import { useState } from 'react';
 import type { TextbookPipelineJobSnapshot } from '@study-studio/protocol';
 import { 
   Bot, 
   Cpu, 
-  Layers, 
   CheckCircle2, 
   AlertCircle, 
-  Clock, 
   RotateCcw, 
   LayoutGrid, 
   ListTree, 
   Sparkles, 
-  Database, 
   BookOpen,
   ArrowRight,
-  ShieldAlert,
-  Play
 } from 'lucide-react';
-import { planTextbookTasks } from '@study-studio/document-model';
-import { useTextbookLessonSlotsQuery } from '../../queries/textbooks-annotations.js';
-import { useCancelPipelineJobMutation } from '../../queries/pipeline-jobs.js';
-import { useImportMonitorQuery } from '../../queries/textbook-import-monitor.js';
-import { useImportDirectory } from './monitor/useImportDirectory.js';
-import { selectImportRun } from './monitor/import-run-scope.js';
 import { Button } from '../ui/button.js';
 import { Progress } from '../ui/progress.js';
 import { Badge } from '../ui/badge.js';
@@ -36,124 +26,11 @@ interface Props {
   onReset: () => void;
 }
 
-const stageLabels: Record<string, string> = {
-  preparing: '裁剪章节材料',
-  queued: '队列排队中',
-  extracting: '模型深度提炼',
-  validating: '结构格式校验',
-  correcting: '模型自动修正',
-  model_retrying: '失败重试中',
-  saving: '入库持久化',
-  storage_retrying: '保存重试中',
-  saved: '已完成入库',
-  failed: '本轮失败',
-};
-
 export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: Props) {
   const [viewMode, setViewMode] = useState<'workers' | 'chapters'>('workers');
   const [selectedWorker, setSelectedWorker] = useState<WorkerStatusInfo | null>(null);
 
-  const slots = useTextbookLessonSlotsQuery(job.documentId, job.userId);
-  const cancel = useCancelPipelineJobMutation();
-  const monitorQuery = useImportMonitorQuery(job.userId, job.traceId ?? '', Boolean(job.traceId));
-
-  const allEvents = useMemo(() => {
-    return selectImportRun(monitorQuery.data?.events ?? [], job.jobId);
-  }, [monitorQuery.data?.events, job.jobId]);
-
-  const snapshot = useImportDirectory(job.userId, job.traceId ?? '', allEvents, Boolean(job.traceId));
-  const directory = snapshot?.directory ?? [];
-
-  const planned = useMemo(() => {
-    return slots.data?.length 
-      ? planTextbookTasks(slots.data.map(slot => ({ ...slot, id: slot.lessonId, level: slot.kind }))) 
-      : undefined;
-  }, [slots.data]);
-
-  const tasks = useMemo(() => {
-    return planned?.ok ? planned.value.map(t => t.root) : [];
-  }, [planned]);
-
-  const slotMap = useMemo(() => {
-    return new Map(tasks.map(t => [t.lessonId, t]));
-  }, [tasks]);
-
-  // 从 events 和 job 计算 Worker 池信息
-  const workers: WorkerStatusInfo[] = useMemo(() => {
-    const poolSize = job.concurrency ?? 6;
-    const sessionIds = [...new Set(allEvents.flatMap(e => e.sessionId ? [e.sessionId] : []))];
-
-    // 如果还没有 sessionIds，模拟初始的 poolSize 个槽位
-    const activeSlotsCount = Math.max(poolSize, sessionIds.length);
-    const result: WorkerStatusInfo[] = [];
-
-    for (let i = 0; i < activeSlotsCount; i++) {
-      const sid = sessionIds[i];
-      const workerIndex = i + 1;
-
-      if (!sid) {
-        // 空闲未唤醒槽位
-        result.push({
-          workerIndex,
-          sessionId: '',
-          stage: job.status === 'running' ? 'preparing' : 'idle',
-          stageText: job.status === 'running' ? '就绪待命' : '未启动',
-          attemptCount: 1,
-        });
-        continue;
-      }
-
-      // 提取该 session 最近的事件
-      const sEvents = allEvents.filter(e => e.sessionId === sid);
-      const latestEvent = sEvents.at(-1);
-      const boundNodeId = [...sEvents].reverse().find(e => e.nodeId)?.nodeId ?? undefined;
-      const lessonTitle = boundNodeId ? (slotMap.get(boundNodeId)?.title ?? directory.find(d => d.id === boundNodeId)?.title ?? boundNodeId) : undefined;
-      
-      const currentStageName = boundNodeId ? job.lessonStages?.[boundNodeId] : undefined;
-      const activity = boundNodeId ? job.lessonActivities?.[boundNodeId] : undefined;
-
-      let stage: WorkerStatusInfo['stage'] = 'idle';
-      if (currentStageName === 'saved') stage = 'saved';
-      else if (currentStageName === 'failed') stage = 'failed';
-      else if (currentStageName === 'correcting' || currentStageName === 'model_retrying' || currentStageName === 'storage_retrying') stage = 'retrying';
-      else if (currentStageName === 'extracting') stage = 'extracting';
-      else if (currentStageName === 'validating') stage = 'validating';
-      else if (currentStageName === 'preparing') stage = 'preparing';
-      else if (currentStageName === 'saving') stage = 'saving';
-      else if (latestEvent?.category === 'model') stage = 'thinking';
-      else if (job.status === 'running') stage = 'extracting';
-
-      // 统计产出
-      const stats = sEvents.reverse().find(e => e.category === 'storage' && e.name === 'committed' && e.detail)?.detail as {
-        vocabCount?: number | undefined;
-        grammarCount?: number | undefined;
-        exerciseCount?: number | undefined;
-        hasPassage?: boolean | undefined;
-      } | undefined;
-
-      const recentMsg = activity?.message || (latestEvent?.detail && typeof latestEvent.detail === 'object' && 'message' in latestEvent.detail ? String((latestEvent.detail as Record<string, unknown>).message) : undefined);
-      const lastTime = activity?.lastActivityAt ? new Date(activity.lastActivityAt).toLocaleTimeString() : undefined;
-
-      result.push({
-        workerIndex,
-        sessionId: sid,
-        stage,
-        stageText: currentStageName ? (stageLabels[currentStageName] ?? currentStageName) : (latestEvent ? `[${latestEvent.category}] ${latestEvent.name}` : '运行中'),
-        attemptCount: activity?.attempt ?? 1,
-        ...(latestEvent?.threadId ? { threadId: latestEvent.threadId } : {}),
-        ...(boundNodeId ? { nodeId: boundNodeId } : {}),
-        ...(lessonTitle ? { lessonTitle } : {}),
-        ...(activity ? { activity } : {}),
-        ...(recentMsg ? { recentMessage: recentMsg } : {}),
-        ...(lastTime ? { lastActiveTime: lastTime } : {}),
-        ...(stats ? { stats } : {}),
-      });
-    }
-
-    return result;
-  }, [allEvents, job, slotMap, directory]);
-
-  const activeWorkerCount = workers.filter(w => ['preparing', 'thinking', 'extracting', 'validating', 'saving', 'retrying'].includes(w.stage)).length;
+  const { slots, cancel, cancellingRef, monitorQuery, allEvents, directory, tasks, slotMap, workers, activeWorkerCount } = usePipelineProgress(job);
 
   return (
     <section className="space-y-5 rounded-2xl border border-line bg-surface p-6 text-ink shadow-sm">
@@ -162,13 +39,13 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <h3 className="font-serif text-xl font-bold text-ink">
-              《{job.title}》教材提炼中枢
+              《{job.title}》教材提炼进度
             </h3>
             <Badge 
               variant={job.status === 'done' ? 'default' : job.status === 'running' ? 'secondary' : 'outline'}
               className="font-sans text-xs px-2.5 py-0.5"
             >
-              {job.status === 'running' ? '🟢 并发提炼中' : job.status === 'done' ? '✅ 全书提炼完成' : job.status === 'cancelled' ? '⏸️ 已暂停' : '⚠️ 部分未完成'}
+              {job.status === 'running' ? '并发提炼中' : job.status === 'done' ? '全书提炼完成' : job.status === 'cancelled' ? '已暂停' : '部分未完成'}
             </Badge>
           </div>
           <p className="text-xs text-ink-muted">
@@ -184,14 +61,23 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
                 variant="outline" 
                 size="sm" 
                 disabled={cancel.isPending} 
-                onClick={() => cancel.mutate(job.jobId)}
+                onClick={() => {
+                  if (cancellingRef.current || cancel.isPending) return;
+                  cancellingRef.current = true;
+                  cancel.mutate(job.jobId, { onSettled: () => { cancellingRef.current = false; } });
+                }}
                 className="text-xs text-status-rose-fg hover:text-status-rose-fg-strong hover:bg-status-rose-wash-hover"
               >
-                中止提炼
+                {cancel.isPending ? '中止中…' : '中止提炼'}
               </Button>
               <Button size="sm" onClick={onClose} className="text-xs">
                 后台运行并返回
               </Button>
+              {cancel.isError && (
+                <p role="alert" className="text-xs text-ink-rose-600">
+                  中止失败：{(cancel.error as Error)?.message ?? '请重试'}
+                </p>
+              )}
             </>
           ) : (
             <>
@@ -232,7 +118,7 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
               <span>{activeWorkerCount}</span>
               <span className="text-xs font-normal text-ink-muted">/ {job.concurrency ?? 6} 活跃</span>
             </div>
-            <span className="text-[11px] text-ink-muted font-mono truncate max-w-[8rem]" title={job.model ?? '标准模型'}>
+            <span className="text-xs text-ink-muted font-mono truncate max-w-[8rem]" title={job.model ?? '标准模型'}>
               {job.model?.split('/').pop() ?? '标准多模态'}
             </span>
           </div>
@@ -242,13 +128,13 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
           <span className="text-xs text-ink-muted">成果收录统计</span>
           <div className="mt-2 flex items-baseline gap-3">
             <div>
-              <span className="text-[11px] text-ink-muted block">成功入库</span>
+              <span className="text-xs text-ink-muted block">成功入库</span>
               <span className="text-lg font-bold font-mono text-status-success-fg">
                 {job.successfulLessons}
               </span>
             </div>
             <div title="用完重试仍未成功；增量续跑会捡回这些章节">
-              <span className="text-[11px] text-ink-muted block">本轮失败</span>
+              <span className="text-xs text-ink-muted block">本轮失败</span>
               <span className="text-lg font-bold font-mono text-status-rose-fg">
                 {job.failedLessons.length}
               </span>
@@ -261,6 +147,7 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
           <div className="mt-2 flex items-center gap-1.5 bg-surface rounded-lg p-1 border border-line">
             <button
               onClick={() => setViewMode('workers')}
+              aria-pressed={viewMode === 'workers'}
               className={`flex-1 py-1 px-2 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-colors
                 ${viewMode === 'workers' ? 'bg-paper-soft text-ink font-semibold shadow-xs' : 'text-ink-muted hover:text-ink'}`}
             >
@@ -269,6 +156,7 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
             </button>
             <button
               onClick={() => setViewMode('chapters')}
+              aria-pressed={viewMode === 'chapters'}
               className={`flex-1 py-1 px-2 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-colors
                 ${viewMode === 'chapters' ? 'bg-paper-soft text-ink font-semibold shadow-xs' : 'text-ink-muted hover:text-ink'}`}
             >
@@ -355,7 +243,7 @@ export function TextbookPipelineProgress({ job, onRecheck, onClose, onReset }: P
                             </span>
                           ) : stageKey ? (
                             <span className="inline-flex items-center gap-1 text-status-warn-fg font-medium">
-                              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                              <Sparkles className="w-3.5 h-3.5 animate-pulse motion-reduce:animate-none" />
                               {stageLabels[stageKey] ?? stageKey}
                             </span>
                           ) : (

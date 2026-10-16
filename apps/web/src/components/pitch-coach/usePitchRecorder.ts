@@ -3,208 +3,115 @@ import { toast } from 'sonner';
 import { sound } from '../../utils/audio.js';
 import { readCssCustomProperty } from '../../lib/css-tokens.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
-import {
-  describePitchFeedback,
-  estimatePitchContour,
-  overallPitchScore,
-  scorePitchMatch,
-} from '../../lib/pitch-analyze.js';
-import { paintWaveFrame, type WaveColors } from './PitchCanvasVisualizer.js';
+import { describePitchFeedback, estimatePitchContour, overallPitchScore, scorePitchMatch } from '../../lib/pitch-analyze.js';
+import { paintWaveFrame } from './PitchCanvasVisualizer.js';
+import { describeMicError, releaseCapture, stopCapture, type PitchCapture } from './pitch-capture.js';
 
-export interface PitchEvalResult {
-  score: number;
-  fluency: number;
-  pitchMatch: number;
-  comment: string;
-}
-
-interface UsePitchRecorderOptions {
+export interface PitchEvalResult { score: number; fluency: number; pitchMatch: number; comment: string }
+interface Options {
   canvasRef: RefObject<HTMLCanvasElement | null>;
-  /** 当前词的声调模板（逐拍 H/L）与类型，用于真实跟读比对 */
   pitchPattern: Array<'L' | 'H'>;
   pitchType: string;
+  contextKey?: string;
   durationMs?: number;
 }
 
-/**
- * 跟读录音引擎：麦克风采集 → 波形循环绘制 → 落盘解码 → f0 轮廓比对打分。
- * 绘制本身由 PitchCanvasVisualizer.paintWaveFrame 承担，本 Hook 只拥有循环与数据。
- * 无麦克风/解码失败时如实返回，绝不编随机分数。
- */
-export function usePitchRecorder({
-  canvasRef,
-  pitchPattern,
-  pitchType,
-  durationMs = 2800,
-}: UsePitchRecorderOptions) {
-  const [isRecording, setIsRecording] = useState(false);
+/** A capture owns its microphone, final chunks and decoder until analysis or cancellation finishes. */
+export function usePitchRecorder({ canvasRef, pitchPattern, pitchType, contextKey = '', durationMs = 2800 }: Options) {
+  const [phase, setPhase] = useState<'idle' | 'requesting' | 'recording' | 'analyzing'>('idle');
   const [recordingProgress, setRecordingProgress] = useState(0);
   const [evalResult, setEvalResult] = useState<PitchEvalResult | null>(null);
-
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animFrameIdRef = useRef<number | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordedChunksRef = useRef<Blob[]>([]);
-  const colorsRef = useRef<WaveColors>({ trace: '', grid: '' });
-  const theme = usePreferencesStore((state) => state.theme);
-
+  const active = useRef<PitchCapture | null>(null);
+  const mounted = useRef(false);
+  const liveKey = useRef('');
+  const key = `${contextKey}:${pitchType}:${pitchPattern.join('')}`;
+  liveKey.current = key;
+  const theme = usePreferencesStore(state => state.theme);
+  const colors = () => ({ trace: readCssCustomProperty('--visual-pitch-trace'), grid: readCssCustomProperty('--line-hairline-strong') });
+  const cancelRecording = () => {
+    const capture = active.current;
+    active.current = null;
+    if (capture) releaseCapture(capture);
+    setPhase('idle');
+    setRecordingProgress(0);
+  };
   useEffect(() => {
-    colorsRef.current = {
-      trace: readCssCustomProperty('--visual-pitch-trace'),
-      grid: readCssCustomProperty('--line-hairline-strong'),
-    };
-  }, [theme]);
-
-  useEffect(() => {
+    mounted.current = true;
     return () => {
-      if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
-      try {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-          mediaRecorderRef.current.stop();
-        }
-      } catch {
-        // 卸载时尽力停止录音，忽略边缘异常
-      }
-      mediaRecorderRef.current = null;
-      if (audioContextRef.current) audioContextRef.current.close().catch(() => {});
+      mounted.current = false;
+      if (active.current) releaseCapture(active.current);
+      active.current = null;
     };
   }, []);
-
-  const analyzeRecording = async () => {
-    const chunks = recordedChunksRef.current;
-    recordedChunksRef.current = [];
-    const recorder = mediaRecorderRef.current;
-    mediaRecorderRef.current = null;
-    try {
-      if (recorder && recorder.state !== 'inactive') {
-        await new Promise<void>((resolve) => {
-          const done = () => resolve();
-          recorder.addEventListener('stop', done, { once: true });
-          try {
-            recorder.stop();
-          } catch {
-            done();
-          }
-          // 500ms 兜底，避免 stop 事件丢失时卡死
-          setTimeout(done, 500);
-        });
-      }
-    } catch {
-      // 忽略停止时的边缘异常，继续走解码分支
-    }
-
-    const ctx = audioContextRef.current;
-    try {
-      if (chunks.length === 0 || !ctx) {
-        setEvalResult(null);
-        toast.info('未检测到麦克风输入，本次只看波形演示，未打分。');
-        return;
-      }
-      const blob = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' });
-      const raw = await blob.arrayBuffer();
-      const decoded = await ctx.decodeAudioData(raw);
-      const samples = decoded.getChannelData(0);
-      const contour = estimatePitchContour(samples, decoded.sampleRate);
-      const result = scorePitchMatch(contour, pitchPattern);
-      const score = overallPitchScore(result);
-      sound.playCorrect();
-      setEvalResult({
-        score,
-        fluency: result.fluency,
-        pitchMatch: result.pitchMatch,
-        comment: describePitchFeedback(result, pitchType),
-      });
-      toast.success(`评测完成：综合 ${score} 分`);
-    } catch {
-      setEvalResult(null);
-      toast.info('录音解码失败，未打分，请重试一次。');
-    } finally {
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => {});
-        audioContextRef.current = null;
-      }
-      analyserRef.current = null;
-    }
-  };
-
-  const finishRecording = (stream: MediaStream | null) => {
-    setIsRecording(false);
-    if (stream) {
-      stream.getTracks().forEach((t) => t.stop());
-    }
-    void analyzeRecording();
-  };
+  useEffect(() => { cancelRecording(); setEvalResult(null); }, [key]);
+  useEffect(() => {
+    if (!active.current && canvasRef.current) paintWaveFrame(canvasRef.current, { analyser: null, elapsedSec: 0 }, colors());
+  }, [theme, key]);
 
   const startRecording = async () => {
+    if (active.current) return;
+    const capture: PitchCapture = { stream: null, context: null, recorder: null, frame: null, finishStop: null, chunks: [] };
+    active.current = capture;
+    const requestKey = key;
+    const pattern = [...pitchPattern];
+    const isCurrent = () => mounted.current && active.current === capture && liveKey.current === requestKey;
     sound.playClick();
     setEvalResult(null);
-    setIsRecording(true);
+    setPhase('requesting');
     setRecordingProgress(0);
-
-    let stream: MediaStream | null = null;
     try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const ctx = new AudioContext();
-        const source = ctx.createMediaStreamSource(stream);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-
-        audioContextRef.current = ctx;
-        analyserRef.current = analyser;
-
-        // 同步用 MediaRecorder 落盘，供随后解码做真实音高分析
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('当前环境不支持麦克风录音。');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!isCurrent()) { stream.getTracks().forEach(track => track.stop()); return; }
+      capture.stream = stream;
+      const context = new AudioContext();
+      capture.context = context;
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      context.createMediaStreamSource(stream).connect(analyser);
+      const recorder = new MediaRecorder(stream);
+      capture.recorder = recorder;
+      recorder.ondataavailable = event => { if (event.data.size > 0) capture.chunks.push(event.data); };
+      recorder.start();
+      setPhase('recording');
+      const started = Date.now();
+      const finish = async () => {
+        if (!isCurrent()) return;
+        setPhase('analyzing');
         try {
-          const recorder = new MediaRecorder(stream);
-          recordedChunksRef.current = [];
-          recorder.ondataavailable = (event) => {
-            if (event.data && event.data.size > 0) {
-              recordedChunksRef.current.push(event.data);
-            }
-          };
-          recorder.start();
-          mediaRecorderRef.current = recorder;
-        } catch {
-          recordedChunksRef.current = [];
-          mediaRecorderRef.current = null;
+          await stopCapture(capture);
+          capture.stream?.getTracks().forEach(track => track.stop());
+          capture.stream = null;
+          if (!isCurrent()) return;
+          if (!capture.chunks.length) throw new Error('未检测到录音数据，本次未打分。');
+          const raw = await new Blob(capture.chunks, { type: recorder.mimeType || 'audio/webm' }).arrayBuffer();
+          const decoded = await context.decodeAudioData(raw);
+          if (!isCurrent()) return;
+          const result = scorePitchMatch(estimatePitchContour(decoded.getChannelData(0), decoded.sampleRate), pattern);
+          const score = overallPitchScore(result);
+          setEvalResult({ score, fluency: result.fluency, pitchMatch: result.pitchMatch, comment: describePitchFeedback(result, pitchType) });
+          toast.success(`评测完成：综合 ${score} 分`);
+        } catch (cause) {
+          if (isCurrent()) toast.error(cause instanceof Error ? cause.message : '录音分析失败，本次未打分。');
+        } finally {
+          releaseCapture(capture);
+          if (active.current === capture) { active.current = null; if (mounted.current) setPhase('idle'); }
         }
-      }
-    } catch {
-      // 麦克风受限则使用模拟波形
+      };
+      const tick = () => {
+        if (!isCurrent()) { releaseCapture(capture); return; }
+        const elapsed = Date.now() - started;
+        if (canvasRef.current) paintWaveFrame(canvasRef.current, { analyser, elapsedSec: elapsed / 1000 }, colors());
+        setRecordingProgress(Math.min(100, elapsed / durationMs * 100));
+        if (elapsed < durationMs) capture.frame = requestAnimationFrame(tick);
+        else { capture.frame = null; void finish(); }
+      };
+      capture.frame = requestAnimationFrame(tick);
+    } catch (cause) {
+      if (isCurrent()) toast.error(describeMicError(cause));
+      releaseCapture(capture);
+      if (active.current === capture) { active.current = null; if (mounted.current) setPhase('idle'); }
     }
-
-    // 录音倒计时与波形循环
-    const startTime = Date.now();
-
-    const tick = () => {
-      const canvas = canvasRef.current;
-      if (canvas) {
-        paintWaveFrame(
-          canvas,
-          { analyser: analyserRef.current, elapsedSec: (Date.now() - startTime) / 1000 },
-          colorsRef.current
-        );
-      }
-      const progress = Math.min(100, ((Date.now() - startTime) / durationMs) * 100);
-      setRecordingProgress(progress);
-
-      if (Date.now() - startTime < durationMs) {
-        animFrameIdRef.current = requestAnimationFrame(tick);
-      } else {
-        finishRecording(stream);
-      }
-    };
-
-    animFrameIdRef.current = requestAnimationFrame(tick);
   };
-
-  return {
-    isRecording,
-    recordingProgress,
-    evalResult,
-    startRecording,
-    clearEvalResult: () => setEvalResult(null),
-  };
+  return { phase, isRecording: phase !== 'idle', recordingProgress, evalResult, startRecording, cancelRecording, clearEvalResult: () => setEvalResult(null) };
 }

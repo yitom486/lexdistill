@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useMotionPreference } from '../hooks/useMotionPreference.js';
 import {
   Play,
   Pause,
@@ -65,6 +66,8 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
   const { isSpeaking, currentText, rate, speak, stop, setRate } = useTts();
   const waveBaseDuration = readCssDurationSeconds('--motion-wave-tts-base-duration');
   const waveDurationStep = readCssDurationSeconds('--motion-wave-tts-step-duration');
+  // R10：减少动态效果时均衡器静止（播放态仍由图标/颜色表达）
+  const reduceMotion = useMotionPreference();
 
   // 当前实例是否正在发音
   const isCurrentPlaying = isSpeaking && currentText === text;
@@ -102,7 +105,7 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
         title={isCurrentPlaying ? '停止发音' : `标准发音 (${lang})`}
       >
         {isCurrentPlaying ? (
-          <VolumeX className="w-3.5 h-3.5 animate-pulse text-tone-amber-600" />
+          <VolumeX className="w-3.5 h-3.5 animate-pulse motion-reduce:animate-none text-tone-amber-600" />
         ) : (
           <Volume2 className="w-3.5 h-3.5 hover:scale-110 transition-transform" />
         )}
@@ -129,19 +132,19 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
       >
         {isCurrentPlaying ? (
           <>
-            <VolumeX className="w-4 h-4 animate-pulse" />
+            <VolumeX className="w-4 h-4 animate-pulse motion-reduce:animate-none" />
             <span>{label || '暂停'}</span>
             <span className="flex items-center gap-0.5 ml-1">
               <span
-                className="w-1 h-3 bg-tone-stone-950 rounded-full animate-bounce"
+                className="w-1 h-3 bg-tone-stone-950 rounded-full animate-bounce motion-reduce:animate-none"
                 style={{ animationDelay: 'var(--motion-tts-playing-dot-delay-start)' }}
               />
               <span
-                className="w-1 h-4 bg-tone-stone-950 rounded-full animate-bounce"
+                className="w-1 h-4 bg-tone-stone-950 rounded-full animate-bounce motion-reduce:animate-none"
                 style={{ animationDelay: 'var(--motion-tts-playing-dot-delay-middle)' }}
               />
               <span
-                className="w-1 h-2 bg-tone-stone-950 rounded-full animate-bounce"
+                className="w-1 h-2 bg-tone-stone-950 rounded-full animate-bounce motion-reduce:animate-none"
                 style={{ animationDelay: 'var(--motion-tts-playing-dot-delay-end)' }}
               />
             </span>
@@ -167,13 +170,17 @@ export const UnifiedTtsPlayer: React.FC<UnifiedTtsPlayerProps> = ({
           <motion.div
             key={i}
             animate={{
-              height: isCurrentPlaying ? [baseH * 0.35, baseH * 1.25, baseH * 0.5] : 4,
+              height: reduceMotion ? 4 : isCurrentPlaying ? [baseH * 0.35, baseH * 1.25, baseH * 0.5] : 4,
             }}
-            transition={{
-              repeat: Infinity,
-              duration: waveBaseDuration + (i % 5) * waveDurationStep,
-              ease: 'easeInOut',
-            }}
+            transition={
+              reduceMotion || !isCurrentPlaying
+                ? { duration: reduceMotion ? readCssDurationSeconds('--motion-reduced-duration') : waveBaseDuration }
+                : {
+                    repeat: Infinity,
+                    duration: waveBaseDuration + (i % 5) * waveDurationStep,
+                    ease: 'easeInOut',
+                  }
+            }
             className={`w-1.5 rounded-full transition-colors ${
               isCurrentPlaying ? 'bg-visual-tts-wave-active' : 'bg-visual-tts-wave-idle'
             }`}

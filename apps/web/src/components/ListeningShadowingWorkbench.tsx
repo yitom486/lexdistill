@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Headphones, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button.js';
@@ -13,8 +13,6 @@ import type { AiTutorContext } from './AiTutorDrawer.js';
 
 interface Props {
   onOpenTutor?: ((context: AiTutorContext) => void) | undefined;
-  onAddMistake?: (mistake: { categoryTag: string; prompt: string; sentence: string; userWrongAnswer: string;
-    correctAnswer: string; testedSkillId: string; reviewNote: string }) => void;
 }
 
 export function ListeningShadowingWorkbench({ onOpenTutor }: Props) {
@@ -28,14 +26,23 @@ function ListeningTrack({ language, onOpenTutor }: { language: 'en' | 'ja' | 'ko
   const [index, setIndex] = useState(0);
   const userId = useUserProfileStore(s => s.profile.userId);
   const generate = useGenerateDictationMutation(userId);
+  // 同步组题锁：与 disabled 双重保护同 tick 连击
+  const loadingRef = useRef(false);
+  const mounted = useRef(false);
+  const epoch = useRef(0);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; epoch.current += 1; }; }, []);
   const load = async () => {
-    try { const items = await generate.mutateAsync(); setPool(items); setIndex(0); }
-    catch (error) { toast.error(error instanceof Error ? error.message : '听写题加载失败'); }
+    if (loadingRef.current || generate.isPending) return;
+    loadingRef.current = true;
+    const requestEpoch = epoch.current;
+    try { const items = await generate.mutateAsync(); if (!mounted.current || requestEpoch !== epoch.current) return; setPool(items); setIndex(0); }
+    catch (error) { if (mounted.current && requestEpoch === epoch.current) toast.error(error instanceof Error ? error.message : '听写题加载失败'); }
+    finally { loadingRef.current = false; }
   };
   const item = pool[index];
   return <div className="mx-auto w-full max-w-4xl space-y-6 p-4 md:p-8">
     <h1 className="flex items-center gap-3 text-2xl font-semibold"><Headphones className="h-6 w-6" />精听与听写</h1>
-    <Tabs value={mode} onValueChange={setMode}><TabsList>
+    <Tabs value={mode} onValueChange={next => { epoch.current += 1; setMode(next); }}><TabsList>
       <TabsTrigger value="DICTATION">听写练习</TabsTrigger><TabsTrigger value="TEXTBOOK">教材精听</TabsTrigger><TabsIndicator />
     </TabsList></Tabs>
     {mode === 'TEXTBOOK' ? <TextbookListening language={language} /> : <>

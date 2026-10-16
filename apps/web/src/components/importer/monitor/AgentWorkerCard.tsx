@@ -62,7 +62,7 @@ export function AgentWorkerCard({ worker, onClickDetails }: AgentWorkerCardProps
 
   const statusIndicator = isRunning ? (
     <span className="relative flex h-2.5 w-2.5">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-warn-pulse opacity-75"></span>
+      <span className="animate-ping motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-status-warn-pulse opacity-75"></span>
       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-status-warn-dot"></span>
     </span>
   ) : isSuccess ? (
@@ -76,7 +76,17 @@ export function AgentWorkerCard({ worker, onClickDetails }: AgentWorkerCardProps
   return (
     <div 
       onClick={onClickDetails}
-      className={`group relative flex flex-col justify-between rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer overflow-hidden
+      onKeyDown={(e) => {
+        if (e.repeat || e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClickDetails();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={`查看会话详情${worker.lessonTitle ? `：${worker.lessonTitle}` : ''}（${worker.stageText}）`}
+      className={`group relative flex flex-col justify-between rounded-2xl border p-4.5 transition-all duration-[var(--motion-card-hover-duration)] cursor-pointer overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring
         ${isRunning 
           ? 'bg-gradient-to-br from-surface to-paper-soft border-status-warn-line-strong shadow-sm hover:border-status-warn-line-bold hover:shadow-md' 
           : isSuccess 
@@ -144,7 +154,7 @@ export function AgentWorkerCard({ worker, onClickDetails }: AgentWorkerCardProps
           </div>
         ) : null}
 
-        <div className="flex items-center justify-between pt-2 border-t border-line-soft text-[11px] text-ink-muted">
+        <div className="flex items-center justify-between pt-2 border-t border-line-soft text-xs text-ink-muted">
           <div className="flex items-center gap-2">
             {worker.attemptCount > 1 && (
               <span className="flex items-center gap-1 text-status-warn-fg font-mono">

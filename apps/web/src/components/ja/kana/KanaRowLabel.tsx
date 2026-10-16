@@ -120,7 +120,7 @@ export function KanaRowLabel({
       <span className="font-serif text-xs font-bold text-ink-faint sm:text-sm">
         {rowName}
       </span>
-      <span className="flex items-center gap-1 text-[10px] font-sans font-normal text-ink-stone-400 transition-colors group-hover:text-tone-amber-700 dark:text-ink-stone-500 dark:group-hover:text-ink-amber-300">
+      <span className="flex items-center gap-1 text-xs font-sans font-normal text-ink-stone-400 transition-colors group-hover:text-tone-amber-700 dark:text-ink-stone-500 dark:group-hover:text-ink-amber-300">
         <BookOpen className="h-3 w-3" />
         讲这一行
       </span>
@@ -135,7 +135,7 @@ export function KanaRowLabel({
       </Badge>
       <span
         className={cn(
-          'max-w-full truncate font-mono text-[10px] leading-4',
+          'max-w-full truncate font-mono text-xs leading-4',
           highlight.emphasis
             ? 'text-accent-ink-strong'
             : 'text-ink-hint'

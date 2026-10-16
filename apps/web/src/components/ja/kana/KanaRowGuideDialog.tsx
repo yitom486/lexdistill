@@ -122,7 +122,7 @@ export function KanaRowGuideDialog({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink-strong">
+                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent-ink-strong">
                             这一行先听一遍
                           </p>
                           <h3 className="mt-0.5 text-lg font-serif font-bold text-ink">
@@ -232,11 +232,11 @@ export function KanaRowGuideDialog({
                               <span className="font-serif text-lg font-bold text-ink">
                                 {example.word}
                               </span>
-                              <span className="font-mono text-[11px] text-ink-emerald-700-emerald-300">
+                              <span className="font-mono text-xs text-ink-emerald-700-emerald-300">
                                 {example.reading}
                               </span>
                             </div>
-                            <span className="text-[11px] text-ink-faint">
+                            <span className="text-xs text-ink-faint">
                               {example.meaning}
                             </span>
                           </div>
@@ -251,7 +251,7 @@ export function KanaRowGuideDialog({
                   </section>
                 )}
 
-                <p className="rounded-2xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o30 p-3 text-[11px] leading-relaxed text-ink-stone-500 dark:border-tone-stone-800 dark:text-ink-stone-400 transition-colors">
+                <p className="rounded-2xl border border-ink-stone-200 bg-veil-whiteo70-stone-900o30 p-3 text-xs leading-relaxed text-ink-stone-500 dark:border-tone-stone-800 dark:text-ink-stone-400 transition-colors">
                   先试着自己读一遍，再点播放按钮核对。读错不扣分，它只是告诉你这一行还需要再见几次。
                 </p>
               </div>

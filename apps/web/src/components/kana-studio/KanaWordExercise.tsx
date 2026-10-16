@@ -6,11 +6,14 @@ import type { KanaStudioState } from '../../hooks/useKanaStudio.js';
 export function KanaWordExercise({ state }: {
     state: KanaStudioState;
 }) {
-    const { allKana, scriptMode, drillMode, selectedOption, isAnswered, generateWords, collectEntry, wordInput, setWordInput, wordStudyDone, setWordStudyDone, currentWord, meaningOptions, handleSubmitWordInput, handleSelectMeaningOption, handleCollectWord, handleNextWord, handleRefreshWords } = state;
+    const { allKana, scriptMode, drillMode, selectedOption, isAnswered, generateWords, collectEntry, wordInput, setWordInput, wordStudyDone, setWordStudyDone, currentWord, meaningOptions, handleSubmitWordInput, handleSelectMeaningOption, handleCollectWord, handleNextWord, handleRefreshWords, wordFailed } = state;
     return (<div className="text-center py-6 space-y-4">
-                {!currentWord ? (<p className="text-xs text-ink-stone-500">
+                {!currentWord ? (wordFailed ? (<div className="space-y-2">
+                    <p className="text-xs text-ink-stone-500">假名单词加载失败，请检查网关后重试。</p>
+                    <Button onClick={handleRefreshWords} variant="outline" size="sm" className="gap-1.5 text-xs">重新加载</Button>
+                  </div>) : (<p className="text-xs text-ink-stone-500">
                     {generateWords.isPending ? '正在从本地词典抽词…' : '暂无可用词语，请先安装日语词典包。'}
-                  </p>) : !wordStudyDone ? (<div className="space-y-4">
+                  </p>)) : !wordStudyDone ? (<div className="space-y-4">
                     <p className="text-xs text-ink-stone-500">先学：看读音释义、跟读两遍，再去测验</p>
                     <div className="text-6xl font-serif font-bold text-ink">
                       {currentWord.kana}
@@ -33,7 +36,7 @@ export function KanaWordExercise({ state }: {
                 sound.playClick();
                 setWordStudyDone(true);
             }} size="sm" className="bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs px-6">
-                        记住了，去测验 ➔
+                        记住了，去测验
                       </Button>
                     </div>
                   </div>) : drillMode === 'WORD_DICTATION' ? (<div className="space-y-3">
@@ -74,7 +77,7 @@ export function KanaWordExercise({ state }: {
                 sound.playClick();
                 void speechStudio.speak(currentWord.audioText || currentWord.kana, { lang: 'JA', purpose: 'preview' });
             }} className="text-xs text-accent-ink hover:underline">
-                      🔊 播放发音
+                      播放发音
                     </button>
                     <div className="grid grid-cols-1 gap-3 pt-2 max-w-md mx-auto">
                       {meaningOptions.map((opt, idx) => {
@@ -113,7 +116,7 @@ export function KanaWordExercise({ state }: {
                       换一批
                     </Button>
                     <Button onClick={handleNextWord} size="sm" className="bg-tone-amber-600 hover:bg-tone-amber-700 text-tone-white text-xs px-6">
-                      下一词 ➔
+                      下一词
                     </Button>
                   </div>)}
               </div>);

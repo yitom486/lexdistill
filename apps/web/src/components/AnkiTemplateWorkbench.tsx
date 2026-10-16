@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { LoaderCircle, RotateCcw, Save } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 import { Button } from './ui/button.js';
 import {
   Dialog,
@@ -9,13 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog.js';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select.js';
 import {
   useCardFormatsQuery,
   usePreviewCardMutation,
@@ -26,20 +19,8 @@ import {
 } from '../queries/useLearnerQueries.js';
 import { useGatewayStore } from '../stores/useGatewayStore.js';
 import { sound } from '../utils/audio.js';
-
-/** 字段标记清单（与 learner-core FIELD_MARKERS 同步；Web 侧只做插入菜单，不做渲染）。 */
-const FIELD_MARKERS = [
-  'expression',
-  'reading',
-  'glossary',
-  'sentence',
-  'audio',
-  'tags',
-  'url',
-  'pitch-accent',
-  'frequency',
-  'furigana',
-] as const;
+import { AnkiTemplateEditor, type TemplateEditorField } from './anki-template/AnkiTemplateEditor.js';
+import { AnkiTemplatePreview } from './anki-template/AnkiTemplatePreview.js';
 
 /** 预览示例条目（演示数据；STATIC-DATA-INVENTORY 登记）。 */
 const SAMPLE_ENTRY: CardPreviewEntry = {
@@ -57,7 +38,8 @@ interface AnkiTemplateWorkbenchProps {
 }
 
 /**
- * 卡片模板工作台（设置页入口）。
+ * 卡片模板工作台（设置页入口）：容器只做状态编排与领域命令，
+ * 编辑列与预览列为纯展示子组件。
  * 左：模板编辑器（字段菜单点插 + 校验）＋右：实时预览（Gateway 渲染，沙箱 iframe，模板 JS 永不执行）。
  * 保存/恢复走领域命令；同一渲染链路供 flashcards.render Tool 复用。
  */
@@ -80,19 +62,23 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
   const lastAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const frontRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const applyFormat = (format: AnkiCardFormatInfo) => {
+    setLoadedKey(`${format.id}@${format.templateVersion}`);
+    setSelectedId(format.id);
+    setName(format.name);
+    setFieldsJson(JSON.stringify(format.fields, null, 2));
+    setFront(format.frontTemplate);
+    setBack(format.backTemplate);
+    setCss(format.css);
+    setFieldsError(null);
+  };
+
   const selected = formats.find((f) => f.id === selectedId) ?? formats[0];
   useEffect(() => {
     if (!selected) return;
     const key = `${selected.id}@${selected.templateVersion}`;
     if (key === loadedKey) return;
-    setLoadedKey(key);
-    setSelectedId(selected.id);
-    setName(selected.name);
-    setFieldsJson(JSON.stringify(selected.fields, null, 2));
-    setFront(selected.frontTemplate);
-    setBack(selected.backTemplate);
-    setCss(selected.css);
-    setFieldsError(null);
+    applyFormat(selected);
   }, [selected, loadedKey]);
 
   // 草稿变更防抖预览（只渲染不入库）。
@@ -123,19 +109,12 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, fieldsJson, front, back, css, name, selectedId]);
 
-  type EditorField = 'fields' | 'front' | 'back' | 'css';
-  const setByField = (field: EditorField, value: string) => {
+  const setByField = (field: TemplateEditorField, value: string) => {
     if (field === 'fields') setFieldsJson(value);
     else if (field === 'front') setFront(value);
     else if (field === 'back') setBack(value);
     else setCss(value);
   };
-  const areaProps = (field: EditorField) => ({
-    'data-field': field,
-    onFocus: (e: FocusEvent<HTMLTextAreaElement>) => {
-      lastAreaRef.current = e.currentTarget;
-    },
-  });
 
   const insertMarker = (marker: string) => {
     const token = `{${marker}}`;
@@ -145,7 +124,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
       frontRef.current?.focus();
       return;
     }
-    const field = (area.dataset['field'] ?? 'front') as EditorField;
+    const field = (area.dataset['field'] ?? 'front') as TemplateEditorField;
     const start = area.selectionStart ?? area.value.length;
     const end = area.selectionEnd ?? area.value.length;
     setByField(field, area.value.slice(0, start) + token + area.value.slice(end));
@@ -174,7 +153,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
       { ...selected, name: name.trim() || selected.name, fields, frontTemplate: front, backTemplate: back, css },
       {
         onSuccess: (r) => {
-          setLoadedKey(`${r.format.id}@${r.format.templateVersion}`);
+          applyFormat(r.format);
           toast.success(`模板已保存：${r.format.name}`);
         },
         onError: (e) => toast.error(e instanceof Error ? e.message : '模板保存失败。'),
@@ -187,7 +166,7 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
     sound.playClick();
     resetFormat.mutate(selected.id, {
       onSuccess: (r) => {
-        setLoadedKey(`${r.format.id}@${r.format.templateVersion}`);
+        applyFormat(r.format);
         toast.success('已恢复内置模板。');
       },
       onError: (e) => toast.error(e instanceof Error ? e.message : '恢复内置模板失败。'),
@@ -213,189 +192,59 @@ export function AnkiTemplateWorkbench({ open, onOpenChange }: AnkiTemplateWorkbe
           <p className="flex items-center gap-2 text-xs text-ink-stone-500">
             <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> 正在读取模板…
           </p>
+        ) : formatsQuery.isError ? (
+          <div className="text-xs text-ink-stone-500 space-y-2">
+            <p>模板列表读取失败，请检查网关后重试。</p>
+            <Button type="button" size="sm" variant="outline" onClick={() => void formatsQuery.refetch()} className="gap-1 text-xs">
+              重新读取
+            </Button>
+          </div>
         ) : !selected ? (
           <p className="text-xs text-ink-stone-500">暂无可用模板。</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Select
-                  value={selected.id}
-                  onValueChange={(v) => {
-                    if (typeof v === 'string') setSelectedId(v);
-                  }}
-                >
-                  <SelectTrigger className="h-8 flex-1 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formats.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.name}
-                        {f.userModified ? '（已修改）' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="h-8 w-32 rounded-lg border border-ink-stone-200 bg-tone-white px-2 text-xs dark:border-tone-stone-700 dark:bg-tone-stone-900 transition-colors"
-                  placeholder="模板名"
-                />
-              </div>
-              <div>
-                <p className="mb-1 text-[11px] font-medium text-ink-faint">
-                  插入字段标记（点按插入到光标处）
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {FIELD_MARKERS.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => insertMarker(m)}
-                      className="rounded-md border border-ink-stone-200 px-1.5 py-0.5 font-mono text-[10px] text-ink-stone-500 hover:border-tone-amber-500o50 hover:text-tone-amber-600 dark:border-tone-stone-700 dark:text-ink-stone-400 transition-colors"
-                    >
-                      {`{${m}}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-ink-faint">
-                  字段映射（JSON：Anki 字段名 → 字段模板）
-                </span>
-                <textarea
-                  value={fieldsJson}
-                  onChange={(e) => setFieldsJson(e.target.value)}
-                  {...areaProps('fields')}
-                  rows={5}
-                  spellCheck={false}
-                  className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900 transition-colors"
-                />
-              </label>
-              {fieldsError && <p className="text-[11px] text-ink-rose-600">{fieldsError}</p>}
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-ink-faint">
-                  正面模板
-                </span>
-                <textarea
-                  ref={frontRef}
-                  value={front}
-                  onChange={(e) => setFront(e.target.value)}
-                  {...areaProps('front')}
-                  rows={3}
-                  spellCheck={false}
-                  className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900 transition-colors"
-                />
-              </label>
-              <EditorArea
-                label="背面模板"
-                field="back"
-                value={back}
-                onChange={setBack}
-                rows={5}
-                onFocusArea={(area) => {
-                  lastAreaRef.current = area;
-                }}
-              />
-              <EditorArea
-                label="样式（CSS，仅作用于卡片预览与导出）"
-                field="css"
-                value={css}
-                onChange={setCss}
-                rows={6}
-                onFocusArea={(area) => {
-                  lastAreaRef.current = area;
-                }}
-              />
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={saveFormat.isPending}
-                  className="gap-1"
-                >
-                  {saveFormat.isPending ? (
-                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Save className="h-3.5 w-3.5" />
-                  )}
-                  保存模板
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={handleReset}
-                  disabled={resetFormat.isPending}
-                  className="gap-1"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  恢复内置
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <p className="text-[11px] font-medium text-ink-faint">
-                实时预览（示例词：{SAMPLE_ENTRY.headword}；模板脚本永不执行）
-              </p>
-              {preview.isPending && (
-                <p className="flex items-center gap-1.5 text-[11px] text-ink-stone-400">
-                  <LoaderCircle className="h-3 w-3 animate-spin" /> 渲染中…
-                </p>
-              )}
-              {previewDoc && (
-                <iframe
-                  title="卡片预览"
-                  sandbox=""
-                  srcDoc={previewDoc}
-                  className="h-72 w-full rounded-xl border border-ink-stone-200 bg-tone-white dark:border-tone-stone-700 transition-colors"
-                />
-              )}
-              {preview.data && preview.data.issues.length > 0 && (
-                <div className="rounded-xl border border-tone-amber-500o40 bg-wash-amber-500o5 p-2 text-[11px] text-accent-ink-strong">
-                  {preview.data.issues.map((issue) => (
-                    <p key={issue}>⚠ {issue}</p>
-                  ))}
-                </div>
-              )}
-              {preview.isError && (
-                <p className="text-[11px] text-ink-rose-600">
-                  {preview.error instanceof Error ? preview.error.message : '预览失败。'}
-                </p>
-              )}
-            </div>
+            <AnkiTemplateEditor
+              formats={formats}
+              selectedId={selected.id}
+              onSelectId={setSelectedId}
+              selectedName={selected.name}
+              name={name}
+              onNameChange={setName}
+              fieldsJson={fieldsJson}
+              onFieldsChange={setFieldsJson}
+              fieldsError={fieldsError}
+              front={front}
+              onFrontChange={setFront}
+              frontRef={frontRef}
+              back={back}
+              onBackChange={setBack}
+              css={css}
+              onCssChange={setCss}
+              onAreaFocus={(_field, area) => {
+                lastAreaRef.current = area;
+              }}
+              onInsertMarker={insertMarker}
+              onSave={handleSave}
+              onReset={handleReset}
+              savePending={saveFormat.isPending}
+              resetPending={resetFormat.isPending}
+            />
+            <AnkiTemplatePreview
+              sampleHeadword={SAMPLE_ENTRY.headword}
+              previewPending={preview.isPending}
+              previewDoc={previewDoc}
+              issues={preview.data?.issues ?? []}
+              previewError={
+                preview.isError
+                  ? preview.error instanceof Error
+                    ? preview.error.message
+                    : '预览失败。'
+                  : null
+              }
+            />
           </div>
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function EditorArea(props: {
-  label: string;
-  field: 'back' | 'css';
-  value: string;
-  rows: number;
-  onChange: (v: string) => void;
-  onFocusArea: (area: HTMLTextAreaElement) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-[11px] font-medium text-ink-faint">
-        {props.label}
-      </span>
-      <textarea
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-        data-field={props.field}
-        onFocus={(e) => props.onFocusArea(e.currentTarget)}
-        rows={props.rows}
-        spellCheck={false}
-        className="w-full rounded-lg border border-ink-stone-200 bg-tone-white p-2 font-mono text-[11px] dark:border-tone-stone-700 dark:bg-tone-stone-900 transition-colors"
-      />
-    </label>
   );
 }

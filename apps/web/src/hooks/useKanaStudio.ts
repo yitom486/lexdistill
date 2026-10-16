@@ -22,7 +22,7 @@ export function useKanaStudio(onOpenTutor?: (ctx: AiTutorContext) => void) {
     const intent = useStudySessionStore(s => s.planIntent);
     const unit = unitsForTrack('ja').find(u => u.id === intent?.courseUnitId);
     const focusKanaIds = unit?.evidence.type === 'kana-coverage' ? unit.evidence.kanaIds : undefined;
-    const { data: allKana = [], refetch: refetchKana, isLoading: isKanaLoading } = useCurriculumKanaQuery();
+    const { data: allKana = [], refetch: refetchKana, isLoading: isKanaLoading, isError: isKanaError } = useCurriculumKanaQuery();
     const practiceMutation = useKanaPracticeMutation();
     const [selectedMatrixTab, setMatrixTab] = useState<MatrixTab>('SEION');
     const focusType = allKana.find(k => focusKanaIds?.includes(k.id))?.type;
@@ -56,10 +56,12 @@ export function useKanaStudio(onOpenTutor?: (ctx: AiTutorContext) => void) {
     const [wordIndex, setWordIndex] = useState(0);
     const [wordInput, setWordInput] = useState('');
     const [wordStudyDone, setWordStudyDone] = useState(false);
+    // 单词表拉取失败标记：与成功空分开，失败给重试入口（R09c 接通，不再只显示“暂无可用词语”）
+    const [wordFailed, setWordFailed] = useState(false);
     const isWordMode = drillMode === 'WORD_DICTATION' || drillMode === 'WORD_MEANING';
     const currentWord: KanaWordItem | undefined = wordList[wordIndex];
     useEffect(() => {
-        if (!isDrillActive || !isWordMode || wordList.length > 0 || generateWords.isPending)
+        if (!isDrillActive || !isWordMode || wordList.length > 0 || generateWords.isPending || wordFailed)
             return;
         generateWords.mutate({ count: 8, script: scriptMode === 'KATAKANA' ? 'KATAKANA' : 'HIRAGANA' }, {
             onSuccess: (words) => {
@@ -67,10 +69,11 @@ export function useKanaStudio(onOpenTutor?: (ctx: AiTutorContext) => void) {
                 setWordIndex(0);
             },
             onError: () => {
+                setWordFailed(true);
                 toast.error('假名单词加载失败，请稍后重试。');
             },
         });
-    }, [isDrillActive, isWordMode, wordList.length, scriptMode, generateWords.isPending, generateWords.mutate]);
+    }, [isDrillActive, isWordMode, wordList.length, scriptMode, wordFailed, generateWords.isPending, generateWords.mutate]);
     useEffect(() => {
         if (!isDrillActive || drillMode !== 'WORD_DICTATION' || !currentWord)
             return;
@@ -346,6 +349,7 @@ export function useKanaStudio(onOpenTutor?: (ctx: AiTutorContext) => void) {
         setIsAnswered(false);
         setWordInput('');
         setWordStudyDone(false);
+        setWordFailed(false);
         resetRoundStats();
     };
     const handleAskTutor = (kana: KanaItem, extra?: {
@@ -362,6 +366,6 @@ export function useKanaStudio(onOpenTutor?: (ctx: AiTutorContext) => void) {
             ...(extra?.userPick ? { userPick: extra.userPick } : {}),
         }));
     };
-    return { focusKanaIds, allKana, refetchKana, isKanaLoading, practiceMutation, matrixTab, setMatrixTab, scriptMode, setScriptMode, showRomaji, setShowRomaji, activeKana, setActiveKana, isKanaGuideOpen, setIsKanaGuideOpen, isMemoryGuideOpen, setIsMemoryGuideOpen, activeRowGuide, setActiveRowGuide, isDrillActive, setIsDrillActive, drillMode, setDrillMode, drillIndex, setDrillIndex, drillStreak, setDrillStreak, selectedOption, setSelectedOption, isAnswered, setIsAnswered, drillCount, setDrillCount, drillRound, setDrillRound, drillAnswered, setDrillAnswered, drillCorrect, setDrillCorrect, resetRoundStats, generateWords, collectEntry, wordList, setWordList, wordIndex, setWordIndex, wordInput, setWordInput, wordStudyDone, setWordStudyDone, isWordMode, currentWord, filteredKanaList, groupedByRow, handlePlayAudio, handleSelectKana, handleOpenKanaGuide, handleOpenRowGuide, adaptiveKanaTypes, adaptiveKanaQueueQuery, drillItems, currentDrillKana, mixedPlan, activeMode, drillOptions, drillCorrectAnswer, handleSelectDrillOption, handleNextDrill, meaningOptions, recordWordResult, handleSubmitWordInput, handleSelectMeaningOption, handleCollectWord, handleNextWord, handleRefreshWords, handleAskTutor };
+    return { focusKanaIds, allKana, refetchKana, isKanaLoading, isKanaError, practiceMutation, matrixTab, setMatrixTab, scriptMode, setScriptMode, showRomaji, setShowRomaji, activeKana, setActiveKana, isKanaGuideOpen, setIsKanaGuideOpen, isMemoryGuideOpen, setIsMemoryGuideOpen, activeRowGuide, setActiveRowGuide, isDrillActive, setIsDrillActive, drillMode, setDrillMode, drillIndex, setDrillIndex, drillStreak, setDrillStreak, selectedOption, setSelectedOption, isAnswered, setIsAnswered, drillCount, setDrillCount, drillRound, setDrillRound, drillAnswered, setDrillAnswered, drillCorrect, setDrillCorrect, resetRoundStats, generateWords, collectEntry, wordList, setWordList, wordIndex, setWordIndex, wordInput, setWordInput, wordStudyDone, setWordStudyDone, wordFailed, setWordFailed, isWordMode, currentWord, filteredKanaList, groupedByRow, handlePlayAudio, handleSelectKana, handleOpenKanaGuide, handleOpenRowGuide, adaptiveKanaTypes, adaptiveKanaQueueQuery, drillItems, currentDrillKana, mixedPlan, activeMode, drillOptions, drillCorrectAnswer, handleSelectDrillOption, handleNextDrill, meaningOptions, recordWordResult, handleSubmitWordInput, handleSelectMeaningOption, handleCollectWord, handleNextWord, handleRefreshWords, handleAskTutor };
 }
 export type KanaStudioState = ReturnType<typeof useKanaStudio>;

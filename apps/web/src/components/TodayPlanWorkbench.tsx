@@ -17,6 +17,7 @@ import {
 import type { DailyPlanStep, DailyPlanStepKind } from '@study-studio/learner-core';
 import { NumberTicker } from './magicui/index.js';
 import { CourseRouteBanner } from './CourseRouteBanner.js';
+import { PlanSyncNote } from './today-plan/PlanSyncNote.js';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { Progress } from './ui/progress.js';
@@ -55,7 +56,7 @@ const STEP_KIND_LABEL: Record<DailyPlanStepKind, string> = {
  */
 export function TodayPlanWorkbench() {
   const shell = useLearningShell();
-  const { data: plan, isLoading, isError, refetch } = useDailyPlanQuery();
+  const { data: plan, isLoading, isError, isFetching, refetch } = useDailyPlanQuery();
   // 同 queryKey 命中 TanStack 缓存，无额外请求；仅决定 Hero 单/双栏
   const { data: route } = useCourseRouteQuery();
   const hasRoute = !!route && route.units.length > 0;
@@ -81,6 +82,15 @@ export function TodayPlanWorkbench() {
       }
     );
   };
+
+  const hasPlan = plan !== null && plan !== undefined;
+  // 状态矩阵（只读 query 状态，不自建 loading 机，不改缓存/重试策略）：
+  // 首读中 / 无数据失败 / 成功为空 / 后台刷新中 / 刷新失败但有缓存
+  const firstLoading = isLoading && !hasPlan;
+  const fatalError = isError && !hasPlan;
+  const emptyPlan = (plan?.totalCount ?? -1) === 0 || (plan?.steps.length ?? -1) === 0;
+  const stale = isError && hasPlan;
+  const refreshing = isFetching && hasPlan && !isError;
 
   const completed = plan?.completedCount ?? 0;
   const total = plan?.totalCount ?? 0;
@@ -117,25 +127,43 @@ export function TodayPlanWorkbench() {
             </div>
 
             <div className="flex items-end justify-between gap-3">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl sm:text-4xl font-bold font-mono text-accent-ink tracking-tight">
-                  <NumberTicker value={completed} />
-                </span>
-                <span className="text-xs text-ink-stone-500 font-medium">/ {total} 步已达成</span>
-              </div>
-              <span className="text-xs font-mono font-semibold text-ink-stone-500">{percent}%</span>
+              {hasPlan && !emptyPlan ? (
+                <>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-3xl sm:text-4xl font-bold font-mono text-accent-ink tracking-tight">
+                      <NumberTicker value={completed} />
+                    </span>
+                    <span className="text-xs text-ink-stone-500 font-medium">/ {total} 步已达成</span>
+                  </div>
+                  <span className="text-xs font-mono font-semibold text-ink-stone-500">{percent}%</span>
+                </>
+              ) : (
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-3xl sm:text-4xl font-bold font-mono text-ink-faint-soft tracking-tight">
+                    —
+                  </span>
+                  <span className="text-xs text-ink-stone-500 font-medium">
+                    {emptyPlan ? '今日暂无安排' : '计划暂未读取'}
+                  </span>
+                </div>
+              )}
             </div>
-            <Progress value={percent} className="h-1" indicatorClassName="bg-gold-warm" />
+            {/* 数值进度只在确有有效非空计划时渲染；未知/失败/成功空不暴露假零。
+                侧栏本地目标进度不受影响。 */}
+            {hasPlan && !emptyPlan && (
+              <Progress value={percent} className="h-1" indicatorClassName="bg-gold-warm" />
+            )}
+            <PlanSyncNote refreshing={refreshing} stale={stale} onRetry={() => void refetch()} />
           </div>
 
           <CourseRouteBanner className="lg:border-t-0 lg:border-l lg:pt-1 lg:pl-5" />
         </div>
       </div>
 
-      {isLoading && (
+      {firstLoading && (
         <p className="text-xs text-ink-stone-500">正在生成今日计划…</p>
       )}
-      {isError && (
+      {fatalError && (
         <div className="rounded-2xl border border-line-rose-500o20 bg-wash-rose-500o5 p-4 text-xs text-ink-rose-800-rose-200">
           暂时无法读取今日计划。
           <Button variant="ghost" size="sm" className="ml-2" onClick={() => void refetch()}>
@@ -144,13 +172,19 @@ export function TodayPlanWorkbench() {
         </div>
       )}
 
-      {plan && plan.steps.length > 0 && (
+      {emptyPlan && (
+        <p className="text-xs text-ink-faint-soft rounded-2xl border border-line-hairline p-4">
+          今日暂无待办，完成日常复习即可。
+        </p>
+      )}
+
+      {plan && !emptyPlan && plan.steps.length > 0 && (
         <p className="font-mono text-[10px] tracking-wider uppercase text-ink-stone-400 font-semibold px-1">
           研习节点 · {total} 项
         </p>
       )}
 
-      {plan && (
+      {plan && !emptyPlan && (
         <ol className="-mt-3 space-y-1.5">
           {plan.steps.map((step, index) => {
             const Icon = STEP_ICONS[step.kind];
@@ -166,7 +200,7 @@ export function TodayPlanWorkbench() {
                 </div>
                 <div
                   className={cn(
-                    'flex-1 min-w-0 rounded-xl p-3.5 sm:p-4 transition-all duration-150',
+                    'flex-1 min-w-0 rounded-xl p-3.5 sm:p-4 transition-all duration-[var(--motion-card-hover-duration)]',
                     step.done
                       ? 'border border-line-emerald-500o20 bg-wash-emerald-500o5'
                       : 'surface-card surface-card-hover'

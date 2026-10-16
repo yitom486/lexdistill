@@ -174,13 +174,15 @@ export function TtsVoiceLibrary({ previewText, lang }: Props) {
 
       <div className="mb-2 flex gap-2">
         <input
-          className="w-full rounded-xl border border-line bg-surface px-4 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="按名称或特点搜索音色"
+          className="w-full rounded-xl border border-line bg-surface px-4 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="快速搜索音色名称或特点…"
         />
         <input
-          className="w-32 shrink-0 rounded-xl border border-line bg-surface px-3 py-2 font-mono text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="按自定义音色 ID 选择"
+          className="w-32 shrink-0 rounded-xl border border-line bg-surface px-3 py-2 font-mono text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           value={customId}
           onChange={(e) => setCustomId(e.target.value)}
           placeholder="自定义 ID"
@@ -210,7 +212,7 @@ export function TtsVoiceLibrary({ previewText, lang }: Props) {
               key={voice.id}
               role="option"
               aria-selected={selected}
-              className={`relative rounded-xl border p-3 transition-colors ${selected ? 'border-ring ring-1 ring-ring' : 'border-line bg-surface'}`}
+              className={`relative rounded-xl border p-3 transition-colors ${selected ? 'border-focus-ring ring-1 ring-focus-ring' : 'border-line bg-surface'}`}
             >
               <button type="button" className="block w-full cursor-pointer text-left" onClick={() => handleSelectVoice(voice.id)}>
                 <div className="mb-1 flex items-center justify-between gap-1">

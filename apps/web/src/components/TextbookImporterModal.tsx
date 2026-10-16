@@ -25,14 +25,14 @@ import { Switch } from './ui/switch.js';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs.js';
 import { TextbookJsonImporterTab } from './importer/TextbookJsonImporterTab.js';
 import { TextbookPipelineImporterTab } from './importer/TextbookPipelineImporterTab.js';
-import { convertAstToTextbookBook, extractFsrsCardsFromAst } from './importer/textbook-converter.js';
+import { useJsonImportAction } from './importer/useJsonImportAction.js';
 import { parseTextbookAST } from '@study-studio/document-model';
 
 interface TextbookImporterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImportBook: (importedBook: TextbookBook, generatedCardsCount: number) => void;
-  onAddCardsBatch: (cards: { front: string; back: string; category: string; prompt: string }[]) => void;
+  onImportBook: (importedBook: TextbookBook, generatedCardsCount: number) => void | Promise<unknown>;
+  onAddCardsBatch: (cards: { front: string; back: string; category: string; prompt: string }[]) => void | Promise<unknown>;
   /** 已有教材（接力追加用；无 documentId 的未入库书不列入） */
   existingBooks?: Array<{ documentId: string; title: string; lessons: number }>;
   /** 直接激活选择已入库教材 */
@@ -93,31 +93,12 @@ export function TextbookImporterModal({
     reader.readAsText(fileOrPath);
   };
 
-  const handleConfirmImport = () => {
-    if (!parsedAST) return;
-    sound.playCorrect();
-
-    const convertedBook = convertAstToTextbookBook(parsedAST);
-    let totalCardsCount = 0;
-    if (autoGenerateCards) {
-      const generatedCards = extractFsrsCardsFromAst(parsedAST);
-      if (generatedCards.length > 0) {
-        onAddCardsBatch(generatedCards);
-        totalCardsCount = generatedCards.length;
-      }
-    }
-
-    onImportBook(convertedBook, totalCardsCount);
-    toast.success(
-      `成功导入《${convertedBook.title}》！已收录 ${convertedBook.lessons.length} 课${totalCardsCount > 0 ? `，生成 ${totalCardsCount} 张 FSRS 记忆卡片` : ''}`
-    );
-    onClose();
-  };
+  const jsonImport = useJsonImportAction({ parsedAST, autoGenerateCards, onImportBook, onAddCardsBatch, onClose });
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className={`overflow-hidden flex flex-col p-0 gap-0 bg-surface-warm text-ink transition-all duration-300
+        className={`overflow-hidden flex flex-col p-0 gap-0 bg-surface-warm text-ink transition-all duration-[var(--motion-dialog-expand-duration)]
           ${isExpanded 
             ? 'w-[96vw] max-w-[96vw] h-[94vh] max-h-[94vh] rounded-2xl' 
             : 'w-[92vw] max-w-5xl lg:max-w-6xl h-[88vh] max-h-[88vh] rounded-2xl'
@@ -132,7 +113,7 @@ export function TextbookImporterModal({
               </div>
               <div>
                 <DialogTitle className="font-serif text-lg font-bold text-ink">
-                  教材导入与智能提炼中枢
+                  教材导入
                 </DialogTitle>
                 <DialogDescription className="text-xs text-ink-muted">
                   选取教材、对齐目录物理页码，调动 Agent 并发池进行多会话结构化提炼入库。
@@ -233,7 +214,7 @@ export function TextbookImporterModal({
                     <Layers className="w-4 h-4 text-accent-ink" />
                     自动为全课生词生成 FSRS 记忆卡片
                   </div>
-                  <p className="text-[11px] text-ink-muted">
+                  <p className="text-xs text-ink-muted">
                     将提取{' '}
                     {parsedAST.lessons.reduce((acc, l) => acc + l.vocabularies.length, 0)}{' '}
                     个生词直接注入今日复习池
@@ -250,8 +231,9 @@ export function TextbookImporterModal({
             <Button variant="ghost" onClick={onClose} className="text-xs">
               取消
             </Button>
-            <Button disabled={!parsedAST} onClick={handleConfirmImport} className="text-xs">
-              确认导入并激活
+            {jsonImport.error && <p role="alert" className="text-xs text-ink-rose-600">{jsonImport.error}</p>}
+            <Button disabled={!parsedAST || jsonImport.pending} onClick={() => void jsonImport.confirm()} className="text-xs">
+              {jsonImport.pending ? '正在保存教材…' : '确认导入并激活'}
               <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </Button>
           </div>

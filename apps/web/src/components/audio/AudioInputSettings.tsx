@@ -13,6 +13,8 @@ import { useMicrophoneTester } from '../../hooks/useMicrophoneTester.js';
 export function AudioInputSettings() {
   const {
     devices,
+    devicesReady,
+    devicesError,
     selectedDeviceId,
     setSelectedDeviceId,
     permissionState,
@@ -37,7 +39,17 @@ export function AudioInputSettings() {
           {permissionState === 'granted' && (
             <Badge variant="emerald" className="gap-1">
               <CheckCircle2 className="h-3.5 w-3.5" />
-              麦克风可用
+              麦克风权限已允许
+            </Badge>
+          )}
+          {permissionState === 'requesting' && (
+            <Badge variant="outline" className="gap-1 text-ink-mute">
+              正在请求权限…
+            </Badge>
+          )}
+          {permissionState === 'idle' && (
+            <Badge variant="outline" className="gap-1 text-ink-mute">
+              尚未检测权限
             </Badge>
           )}
           {permissionState === 'denied' && (
@@ -75,12 +87,17 @@ export function AudioInputSettings() {
           <Select
             value={selectedDeviceId || '__default'}
             onValueChange={(val) => {
-              if (isTesting) stopTest();
+              stopTest();
               setSelectedDeviceId(val === '__default' || !val ? '' : val);
             }}
           >
-            <SelectTrigger className="min-h-12 w-full text-base">
-              <SelectValue placeholder="系统默认麦克风" />
+            <SelectTrigger className="min-h-12 w-full text-base" aria-label="输入设备">
+              <SelectValue placeholder="系统默认麦克风">
+                {selectedDeviceId
+                  ? (devices.find((d) => d.deviceId === selectedDeviceId)?.label ||
+                    '上次选择的设备（待识别）')
+                  : '系统默认麦克风'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__default">系统默认麦克风</SelectItem>
@@ -92,9 +109,15 @@ export function AudioInputSettings() {
             </SelectContent>
           </Select>
           <p className="mt-2 text-xs text-ink-mute">
-            {devices.length > 0
-              ? `已检测到 ${devices.length} 个拾音设备；未点击测试前部分系统可能隐去设备详细名称。`
-              : '正在枚举麦克风设备…若未显示请点击测试以授予权限。'}
+            {!devicesReady
+              ? '正在枚举麦克风设备…'
+              : devicesError
+                ? `${devicesError}${devices.length ? ' 列表保留上次识别的设备。' : ''}`
+              : devices.length > 0
+                ? `已检测到 ${devices.length} 个拾音设备；未点击测试前部分系统可能隐去设备详细名称。`
+                : permissionState === 'denied'
+                  ? '未发现可用麦克风，权限已被拒绝，请在系统设置中允许后点刷新设备。'
+                  : '未发现麦克风设备；若已连接请点击“刷新设备”，或点击测试以授予权限。'}
           </p>
         </div>
 
@@ -104,8 +127,9 @@ export function AudioInputSettings() {
             type="button"
             variant={isTesting ? 'default' : 'outline'}
             className="min-h-12 gap-2 px-6 text-base"
+            disabled={permissionState === 'unsupported'}
             onClick={() => {
-              if (isTesting) {
+              if (isTesting || permissionState === 'requesting') {
                 stopTest();
               } else {
                 void startTest();
@@ -113,7 +137,7 @@ export function AudioInputSettings() {
             }}
           >
             {isTesting ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            {isTesting ? '停止测试' : '测试麦克风'}
+            {permissionState === 'requesting' ? '取消等待授权' : isTesting ? '停止测试' : '测试麦克风'}
           </Button>
         </div>
       </div>
@@ -133,7 +157,7 @@ export function AudioInputSettings() {
         {/* 音量指示条 */}
         <div className="mt-3 relative h-3 w-full overflow-hidden rounded-full bg-veil-stone-200o60-stone-800">
           <div
-            className={`h-full rounded-full transition-all duration-75 ${
+            className={`h-full rounded-full transition-all duration-[var(--motion-vu-level-duration)] ${
               inputLevel > 80
                 ? 'bg-tone-amber-500'
                 : inputLevel > 15
