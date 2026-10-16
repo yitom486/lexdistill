@@ -11,6 +11,27 @@ import { App } from './App.js';
 import { ErrorBoundary } from './components/common/ErrorBoundary.js';
 import { configureGatewayForRuntime } from './platform/gateway-runtime.js';
 import { ensureTtsEngines } from './tts/tts-engines.js';
+// UI-R01：应用字体改为 npm 固定版本离线交付（OFL-1.1），不再依赖 Google Fonts 远程 CSS。
+// 必须用整权重 CSS（含 unicode-range），子集单文件无 unicode-range 会互相覆盖致缺字。
+// 完整许可与版权声明随 public/licenses/fonts 一同交付。
+// 只引入实际使用的字重：Geist 300 与 Newsreader 斜体在源码中零使用，已剔除。
+import '@fontsource/geist/400.css';
+import '@fontsource/geist/500.css';
+import '@fontsource/geist/600.css';
+import '@fontsource/geist/700.css';
+import '@fontsource/geist-mono/400.css';
+import '@fontsource/geist-mono/500.css';
+import '@fontsource/geist-mono/600.css';
+import '@fontsource/newsreader/400.css';
+import '@fontsource/newsreader/600.css';
+import '@fontsource/noto-sans-jp/400.css';
+import '@fontsource/noto-sans-jp/500.css';
+import '@fontsource/noto-sans-jp/600.css';
+import '@fontsource/noto-sans-jp/700.css';
+import '@fontsource/noto-sans-kr/400.css';
+import '@fontsource/noto-sans-kr/500.css';
+import '@fontsource/noto-sans-kr/600.css';
+import '@fontsource/noto-sans-kr/700.css';
 import './index.css';
 
 // 注册包驱动的统一 TTS 播放入口。

@@ -5,7 +5,7 @@
   "description": "Tauri v2 desktop container for Lingua Studio",
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build"
+    "build": "cd ../.. && tauri build --config apps/desktop/src-tauri/tauri.conf.json"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.4"
