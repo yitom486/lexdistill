@@ -172,14 +172,14 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
               }}
               aria-label="回到今日学习"
               title="回到今日学习"
-              className="w-8 h-8 rounded-lg border border-line-hairline bg-surface-coal text-gold-warm flex items-center justify-center shadow-xs cursor-pointer shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              className="w-8 h-8 rounded-lg border border-line-hairline bg-surface-coal text-gold-warm flex items-center justify-center shadow-xs cursor-pointer shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring overflow-hidden p-1"
             >
-              <BookOpen className="w-4 h-4" />
+              <img src="/lexdistill-mark.svg" alt="LexDistill" className="w-full h-full object-contain rounded-xs" />
             </motion.button>
 
             <div className="flex items-baseline gap-2">
               <span className="font-serif font-semibold text-base sm:text-lg text-ink tracking-tight truncate">
-                Lingua Studio
+                LexDistill
               </span>
             </div>
 

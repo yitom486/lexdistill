@@ -195,3 +195,4 @@ describe('usePreferencesStore: Anti-tearing Theme Transition', () => {
     });
   });
 });
+

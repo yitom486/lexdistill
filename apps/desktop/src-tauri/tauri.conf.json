@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Lingua Studio",
+  "productName": "LexDistill",
   "version": "0.1.2",
-  "identifier": "com.studystudio.desktop",
+  "identifier": "com.lexdistill.desktop",
   "build": {
     "beforeDevCommand": "bun run --filter @study-studio/gateway pdf:prepare && bun run --filter @study-studio/web dev",
     "devUrl": "http://localhost:3000",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Lingua Studio - AI 外语学习系统",
+        "title": "LexDistill - AI 外语学习系统",
         "width": 1200,
         "height": 800,
         "resizable": true,

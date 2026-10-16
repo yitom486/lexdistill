@@ -5,6 +5,7 @@
   "description": "Tauri v2 desktop container for Lingua Studio",
   "scripts": {
     "dev": "tauri dev",
+    "icon": "tauri icon",
     "build": "cd ../.. && tauri build --config apps/desktop/src-tauri/tauri.conf.json"
   },
   "devDependencies": {

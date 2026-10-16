@@ -1,6 +1,6 @@
-# Lingua Studio — 协作与工程原则
+# LexDistill — 协作与工程原则
 
-对外产品名为 **Lingua Studio**；Study Studio 保留为内部工程代号。当前产品只交付 Tauri 桌面端。
+对外产品名为 **LexDistill**。当前产品只交付 Tauri 桌面端。
 
 ## 协作原则
 
