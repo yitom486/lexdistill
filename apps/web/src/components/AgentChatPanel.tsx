@@ -1,21 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAgentGateway } from '../hooks/useAgentGateway.js';
 import { useSelectedRuntimeCaps } from '../hooks/useSelectedRuntimeCaps.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { usePreferencesStore } from '../stores/usePreferencesStore.js';
-import {
-  mapThreadItemsToBubbles,
-  markToolCallsDone,
-  stripTranscriptNoise,
-  upsertToolCall,
-} from '../lib/chat-transcript.js';
 import { sound } from '../utils/audio.js';
-import {
-  buildTutorFreeGreeting,
-  buildTutorOfflineReply,
-} from '../copy/tutor-track-copy.js';
+import { buildTutorFreeGreeting } from '../copy/tutor-track-copy.js';
 import { normalizeTrackLanguage } from '../learning/learning-shell.js';
 import {
   useArchiveAgentSessionMutation,
@@ -28,21 +19,23 @@ import {
   useDeleteAgentQueueItemMutation,
   useForkAgentSessionMutation,
   useQueueAgentMessageMutation,
-  AGENT_QUERY_KEYS,
 } from '../queries/useAgentQueries.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChatPanelHeader } from './agent-chat/ChatPanelHeader.js';
 import { ChatMessageList } from './agent-chat/ChatMessageList.js';
 import { ChatComposer } from './agent-chat/ChatComposer.js';
 import { useChatTurn } from './agent-chat/use-chat-turn.js';
+import { useCoachBootMessages } from './agent-chat/use-coach-boot.js';
+import { useChatDismiss } from './agent-chat/use-chat-dismiss.js';
+import { buildCoachClientSnapshot } from './agent-chat/coachSnapshot.js';
 import { useReadingFocusStore } from '../stores/useReadingFocusStore.js';
 import {
-  FALLBACK_EFFORTS,
   type ChatMessage,
   type AgentTurnHealth,
 } from './agent-chat/chat-shared.js';
 
 interface AgentChatPanelProps {
+  visible?: boolean;
   className?: string;
   onClose?: () => void;
 }
@@ -51,13 +44,12 @@ interface AgentChatPanelProps {
  * 对齐 Inkdown / Agent VS Code 风格：顶栏状态 + 底栏 mode/model/thinking + 流式气泡。
  * 仅经 Gateway；不引入厂商 SDK。
  */
-export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps) {
+export function AgentChatPanel({ className = '', onClose, visible = true }: AgentChatPanelProps) {
   const gateway = useAgentGateway();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
-  const bootedRef = useRef(false);
 
   const activeTab = useStudySessionStore((s) => s.activeTab);
   const profile = useUserProfileStore((s) => s.profile);
@@ -103,82 +95,38 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
   );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [composerSettingsOpen, setComposerSettingsOpen] = useState(false);
+  const dismiss = useChatDismiss(visible, onClose, setHistoryOpen, setComposerSettingsOpen);
   const [agentTurnHealth, setAgentTurnHealth] = useState<AgentTurnHealth>({ state: 'idle' });
   const lastCoachPromptRef = useRef<string | null>(null);
   const queueDrainRef = useRef(false);
 
-  // 档位回退常量（探针无档位时用；模型/档位选择一律走运行时探针）。
-  const effortOptions: readonly string[] = [...FALLBACK_EFFORTS];
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, busy]);
-
-  // 偏好水合后再决定问候语 / 恢复提示，避免先闪 greeting 再被 thread items 覆盖
-  // 无历史能力才直接问候；ACP 经网关台账恢复（首轮按需建会话）。
-  useEffect(() => {
-    if (bootedRef.current) return;
-    const boot = () => {
-      if (bootedRef.current) return;
-      bootedRef.current = true;
-      const threadId = usePreferencesStore.getState().coachThreadId;
-      if (threadId && (runtimeCaps.supportsThreads || runtimeCaps.supportsHistory)) {
-        setMessages([
-          {
-            id: 'resume',
-            role: 'system',
-            text: '正在恢复上次 Agent 会话…',
-          },
-        ]);
-      } else {
-        setMessages([
-          {
-            id: 'open',
-            role: 'assistant',
-            text: buildTutorFreeGreeting(track),
-          },
-        ]);
-      }
-    };
-    if (usePreferencesStore.persist.hasHydrated()) {
-      boot();
-      return;
-    }
-    return usePreferencesStore.persist.onFinishHydration(boot);
-  }, [track]);
-
-  useEffect(() => {
-    if (effortOptions.length && !effortOptions.includes(coachEffort)) {
-      setCoachEffort(effortOptions.includes('medium') ? 'medium' : effortOptions[0]!);
-    }
-  }, [effortOptions, coachEffort, setCoachEffort]);
+  // 初始问候 / 历史恢复展示（发送/队列/审批生命周期见 useChatTurn）。
+  useCoachBootMessages({
+    track,
+    setMessages,
+    coachThreadId,
+    threadItems,
+    threadItemsFetched,
+    supportsThreadsOrHistory:
+      runtimeCaps.supportsThreads || runtimeCaps.supportsHistory,
+  });
 
   // P3-3：标量订阅（稳定引用，防重渲染循环）；仅阅读页 store 非空才附 focus。
   const readingDocumentId = useReadingFocusStore((s) => s.documentId);
   const readingSurface = useReadingFocusStore((s) => s.surface);
   const snapshot = useCallback(() => {
-    return {
-      targetLanguage: track,
+    return buildCoachClientSnapshot({
+      track,
       learnerLevel: profile.overallLevel,
-      locale: 'zh-CN' as const,
-      ui: { activeTab, openTutor: true },
-      userIntentHint: 'FREE_COACH' as const,
-      // P3-3：仅阅读页（store 非空，即教材阅读器开着某书某课）附阅读 focus，
-      // 其他页面保持 undefined；可见性由服务端校验。
-      ...(readingDocumentId
-        ? {
-            focus: {
-              kind: 'READING_PASSAGE' as const,
-              surface: readingSurface ?? '阅读中',
-              documentId: readingDocumentId,
-            },
-          }
-        : {}),
-    };
+      activeTab,
+      readingDocumentId,
+      readingSurface,
+    });
   }, [track, profile.overallLevel, activeTab, readingDocumentId, readingSurface]);
 
-  /** 显式新建会话（清空 thread，下次 turn 会 start 新 thread） */
+  /** 显式新建会话（清空会话，下次发送开启新会话） */
   const startNewChat = () => {
+    if (busy) interrupt();
     sound.playClick();
     setCoachThreadId('');
     setMessages([
@@ -190,7 +138,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
     ]);
   };
 
-  /** 仅清屏，保留 coachThreadId，便于继续 resume */
+  /** 仅清屏，保留 coachThreadId，便于继续恢复 */
   const clearDisplay = () => {
     sound.playClick();
     setMessages([
@@ -198,20 +146,20 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
         id: `wipe_${Date.now()}`,
         role: 'system',
         text: coachThreadId
-          ? '已清屏（会话仍保留，发送消息将续写当前 thread）'
+          ? '已清屏（会话仍保留，发送消息将续写当前会话）'
           : '已清屏',
       },
     ]);
   };
 
   const openThread = (threadId: string) => {
+    if (busy) interrupt();
     sound.playClick();
     setCoachThreadId(threadId);
     setHistoryOpen(false);
   };
 
-  const enqueueQueued = () => {
-    const text = input.trim();
+  const enqueueQueued = () => {    const text = input.trim();
     if (!text) return;
     if (!coachThreadId) {
       toast.error('请先有一个活跃会话再加入队列');
@@ -221,7 +169,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
     setInput('');
     setMessages((prev) => [
       ...prev,
-      { id: `queue_${Date.now()}`, role: 'user', text: `排队 ${text}` },
+      { id: `queue_${Date.now()}`, role: 'user', text: `排队：${text}` },
     ]);
     queueMessage.mutate(
       { sessionId: coachThreadId, message: text },
@@ -231,33 +179,6 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
       }
     );
   };
-
-  // 选中 / 恢复历史 thread：把 items 映射成聊天气泡
-  useEffect(() => {
-    if (!coachThreadId) return;
-    if (threadItems.length) {
-      const mapped: ChatMessage[] = mapThreadItemsToBubbles(threadItems).map((b) => ({
-        ...b,
-        text: b.role === 'user' ? stripTranscriptNoise(b.text) : b.text,
-      }));
-      if (mapped.length) setMessages(mapped);
-      return;
-    }
-    if (threadItemsFetched) {
-      setMessages((prev) => {
-        if (prev.length === 1 && prev[0]?.id === 'resume') {
-          return [
-            {
-              id: `open_${Date.now()}`,
-              role: 'assistant',
-              text: buildTutorFreeGreeting(track),
-            },
-          ];
-        }
-        return prev;
-      });
-    }
-  }, [coachThreadId, threadItems, threadItemsFetched, track]);
 
   const {
     startQueuedTurn,
@@ -297,6 +218,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
 
   return (
     <div
+      onKeyDown={dismiss.onKeyDown}
       className={`flex flex-col h-full min-h-[420px] rounded-xl border border-line bg-paper-soft text-ink overflow-hidden shadow-xl ${className}`}
     >
         <ChatPanelHeader
@@ -321,7 +243,7 @@ export function AgentChatPanel({ className = '', onClose }: AgentChatPanelProps)
           setCoachPersistThread={setCoachPersistThread}
           archiveThread={archiveThread}
           clearDisplay={clearDisplay}
-          onClose={onClose}
+          onClose={onClose ? dismiss.close : undefined}
         />
 
         <ChatMessageList

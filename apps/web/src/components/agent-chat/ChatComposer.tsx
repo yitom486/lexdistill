@@ -79,7 +79,7 @@ export function ChatComposer(props: ChatComposerProps) {
     : (modelChoices.find(m => m.value === coachModelId)?.label ?? coachModelId);
   const probeError = runtimeOptions.data?.error;
   const effortChoices = (runtimeOptions.data?.efforts ?? []);
-  const effortValue = effortChoices.includes(coachEffort) ? coachEffort : '__auto__';
+  const effortValue = coachEffort || '__auto__';
   return (
     <footer className="shrink-0 p-3 pt-1.5">
       <div className="rounded-2xl border border-line bg-surface focus-within:border-tone-amber-500o40">
@@ -95,7 +95,7 @@ export function ChatComposer(props: ChatComposerProps) {
           rows={3}
           placeholder={
             busy
-              ? '生成中：Enter=steer；队列按钮=下一轮排队 · Shift+Enter 换行'
+              ? '生成中：Enter 追加引导 · 排队按钮留到下一轮 · Shift+Enter 换行'
               : '输入消息，Enter 发送 · Shift+Enter 换行'
           }
           className="w-full resize-none bg-transparent px-3 py-2.5 text-[13px] text-ink placeholder:text-ink-ghost outline-none min-h-[72px]"
@@ -122,12 +122,12 @@ export function ChatComposer(props: ChatComposerProps) {
             >
               <div>
                 <p className="text-xs font-medium text-ink">会话参数</p>
-                <p className="mt-0.5 text-[10px] text-ink-ghost">设置仅影响后续发送的消息</p>
+                <p className="mt-0.5 text-xs text-ink-ghost">设置仅影响后续发送的消息</p>
               </div>
 
               <div className="space-y-2">
                 <div className="space-y-0.5">
-                  <span className="block px-0.5 text-[10px] text-ink-ghost">审批</span>
+                  <span className="block px-0.5 text-xs text-ink-ghost">审批</span>
                   <Select
                     value={coachApprovalPolicy || 'never'}
                     onValueChange={(v) => v && setCoachApprovalPolicy(String(v))}
@@ -150,8 +150,8 @@ export function ChatComposer(props: ChatComposerProps) {
                 </div>
 
                 <div className="space-y-0.5">
-                  <span className="block px-0.5 text-[10px] text-ink-ghost">
-                    思考深度{effortChoices.length === 0 ? '（运行时默认）' : ''}
+                  <span className="block px-0.5 text-xs text-ink-ghost">
+                    思考深度{effortChoices.length === 0 ? (coachEffort ? '（已保存值未确认）' : '（运行时默认）') : ''}
                   </span>
                   <Select
                     value={effortValue}
@@ -159,12 +159,17 @@ export function ChatComposer(props: ChatComposerProps) {
                     disabled={busy || effortChoices.length === 0}
                   >
                     <SelectTrigger className={compactSelect}>
-                      <SelectValue>{effortValue === '__auto__' ? '运行时默认' : effortLabel(effortValue)}</SelectValue>
+                      <SelectValue>{effortValue === '__auto__' ? '运行时默认' : `${effortLabel(effortValue)}${effortChoices.includes(effortValue) ? '' : '（待确认）'}`}</SelectValue>
                     </SelectTrigger>
                     <SelectContent className="border-line bg-paper-soft text-ink">
                       <SelectItem value="__auto__" className={chatMenuItem}>
                         运行时默认
                       </SelectItem>
+                      {coachEffort && !effortChoices.includes(coachEffort) && (
+                        <SelectItem value={coachEffort} className={chatMenuItem} disabled>
+                          {effortLabel(coachEffort)}（待确认）
+                        </SelectItem>
+                      )}
                       {effortChoices.map((e) => (
                         <SelectItem key={e} value={e} className={chatMenuItem}>
                           {effortLabel(e)}
@@ -219,7 +224,7 @@ export function ChatComposer(props: ChatComposerProps) {
                 type="button"
                 size="icon"
                 className="size-7 shrink-0 rounded-full bg-tint-sky-600 hover:bg-tint-sky-500"
-                title="注入引导 (steer)"
+                title="追加引导"
                 disabled={!input.trim()}
                 onClick={() => void send(input)}
               >
@@ -260,10 +265,10 @@ export function ChatComposer(props: ChatComposerProps) {
           )}
         </div>
       </div>
-      <p className="mt-1.5 px-1 text-[10px] text-ink-ghost">
+      <p className="mt-1.5 px-1 text-xs text-ink-ghost">
         {runtimeCaps.supportsHistory
-          ? <>当前运行时：历史/队列走网关台账 · 用量面板不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>
-          : <>当前运行时：历史/队列/用量面板不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>}
+          ? <>当前运行时：历史与排队需要在线连接 · 用量暂不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>
+          : <>当前运行时：历史、排队与用量暂不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>}
       </p>
     </footer>
   );

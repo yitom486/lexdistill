@@ -1,19 +1,18 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useAgentContextUsageStore } from '../../stores/useAgentContextUsageStore.js';
 import type { useAgentGateway } from '../../hooks/useAgentGateway.js';
-import {
-  markToolCallsDone,
-  upsertToolCall,
-} from '../../lib/chat-transcript.js';
+import { markToolCallsDone } from '../../lib/chat-transcript.js';
 import { sound } from '../../utils/audio.js';
 import { buildTutorOfflineReply } from '../../copy/tutor-track-copy.js';
 import { AGENT_QUERY_KEYS } from '../../queries/useAgentQueries.js';
 import type { useQueryClient } from '@tanstack/react-query';
 import type { ChatMessage, AgentTurnHealth } from './chat-shared.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
+import { makeMessageStreamHandlers } from './chat-stream-handlers.js';
+import { useQueueDrain, resolveApprovalStatus } from './use-queue-drain.js';
 
-/** P2-1 拆分：AgentChatPanel 的轮次执行逻辑（发送/steer/队列消费/重试/审批/中断），纯搬运。 */
+/** P2-1 拆分 + R07：自由导师直接发送/重试/审批/中断；队列排空见 useQueueDrain。 */
 
 /** 传输层英文错误转中文安抚（原文落气泡会吓到用户；右上重试入口保持可用）。 */
 function friendlyTurnError(err: unknown, fallback: string): string {
@@ -21,7 +20,7 @@ function friendlyTurnError(err: unknown, fallback: string): string {
   const raw = e?.userMessage || e?.message || '';
   if (!raw) return fallback;
   if (raw === 'Gateway is not connected' || /gateway.*not connected/i.test(raw)) {
-    return '网关未连通，消息未发出：请确认网关已启动（默认 localhost:8080），然后点右上“重试”。';
+    return '导师服务未连接，消息未发出；请检查连接后重试。';
   }
   return raw;
 }
@@ -52,6 +51,16 @@ export interface ChatTurnDeps {
 }
 
 export function useChatTurn(deps: ChatTurnDeps) {
+  const turnEpochRef = useRef(0);
+  const runningRef = useRef(false);
+  const queueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveDeps = useRef(deps);
+  liveDeps.current = deps;
+  useEffect(() => () => {
+    turnEpochRef.current++;
+    if (queueTimerRef.current !== null) clearTimeout(queueTimerRef.current);
+    if (runningRef.current) liveDeps.current.gateway.interruptTurn('coach');
+  }, []);
   const {
     gateway,
     busy,
@@ -113,7 +122,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
       if (outcome === 'fallback') {
         setAgentTurnHealth({
           state: 'fallback',
-          message: failMessage || 'Agent 本轮未完成，已使用本地学习提示。',
+          message: failMessage || 'AI 导师本轮未完成，已使用本地学习提示。',
         });
         void refetchAgentStatus();
         return;
@@ -129,177 +138,21 @@ export function useChatTurn(deps: ChatTurnDeps) {
     [setAgentTurnHealth, refetchAgentStatus]
   );
 
-  const startQueuedTurn = useCallback(
-    (queuedSubmissionId?: string) => {
-      if (!gateway.isConnected) return;
-      if (queueDrainRef.current) return;
-      queueDrainRef.current = true;
-      sound.playClick();
-      const aiId = `a_q_${Date.now()}`;
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `sys_q_${Date.now()}`,
-          role: 'system',
-          text: '▶ 正在消费队列下一项…',
-        },
-        {
-          id: aiId,
-          role: 'assistant',
-          text: '',
-          reasoning: '',
-          streaming: true,
-          toolCalls: [],
-        },
-      ]);
-      setBusy(true);
-      setAgentTurnHealth({ state: 'running' });
-
-      const finish = (data: {
-        finalOutput?: string;
-        source?: string;
-        threadId?: string;
-        queueRemaining?: number;
-        toolWarnings?: string[];
-        contextUsage?: { used: number; size: number };
-        status?: 'COMPLETED' | 'INTERRUPTED' | 'FAILED';
-        outcome?: 'streamed' | 'fallback' | 'not_requested';
-        agentOutcome?: 'streamed' | 'fallback' | 'not_requested';
-        agentFailureMessage?: string;
-        failure?: {
-          code: string;
-          userMessage: string;
-          category: 'SESSION_CREATE' | 'STREAM' | 'QUEUE' | 'INTERRUPTED' | 'UNKNOWN';
-          retryable?: boolean;
-        };
-        fromQueue?: boolean;
-      }) => {
-        queueDrainRef.current = false;
-        recordAgentTurnCompletion(data);
-        if (data.toolWarnings?.length) {
-          toast.warning(data.toolWarnings.join('；'));
-        }
-        if (data.threadId) {
-          setCoachThreadId(data.threadId);
-          void queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.SESSIONS });
-          void queryClient.invalidateQueries({
-            queryKey: [...AGENT_QUERY_KEYS.QUEUE, data.threadId],
-          });
-        }
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== aiId) return m;
-            const next: ChatMessage = {
-              ...m,
-              text: data.finalOutput || m.text,
-              streaming: false,
-            };
-            const doneCalls = markToolCallsDone(m.toolCalls);
-            if (doneCalls) next.toolCalls = doneCalls;
-            if (data.source) next.source = data.source;
-            return next;
-          })
-        );
-        setBusy(false);
-        if ((data.queueRemaining ?? 0) > 0) {
-          window.setTimeout(() => startQueuedTurn(), 80);
-        }
-      };
-
-      const ok = gateway.startQueueStream({
-        lane: 'coach',
-        ...(queuedSubmissionId ? { queuedSubmissionId } : {}),
-        ...(coachApprovalPolicy ? { approvalPolicy: coachApprovalPolicy } : {}),
-        onDelta: (_d, acc) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, text: acc, streaming: true } : m))
-          );
-        },
-        onReasoningDelta: (_d, acc) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, reasoning: acc } : m))
-          );
-        },
-        onToolCall: (info) => {
-          setMessages((prev) =>
-            prev.map((m) => {
-              if (m.id !== aiId) return m;
-              return { ...m, toolCalls: upsertToolCall(m.toolCalls ?? [], info) };
-            })
-          );
-        },
-        onApprovalRequest: (info) => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `appr_${info.approvalId}`,
-              role: 'approval',
-              text: info.description,
-              approval: {
-                approvalId: info.approvalId,
-                action: info.action,
-                description: info.description,
-                riskLevel: info.riskLevel,
-                status: 'pending',
-                ...(typeof info.expiresAt === 'number'
-                  ? { expiresAt: info.expiresAt }
-                  : {}),
-              },
-            },
-          ]);
-        },
-        onApprovalResolved: (info) => {
-          setMessages((prev) =>
-            prev.map((m) => {
-              if (m.approval?.approvalId !== info.approvalId || !m.approval) return m;
-              if (m.approval.status !== 'pending') return m;
-              const status =
-                info.reason === 'timeout'
-                  ? 'timed_out'
-                  : info.reason === 'interrupt' || info.decision === 'cancel'
-                    ? 'cancelled'
-                    : info.decision === 'acceptForSession'
-                      ? 'accepted_session'
-                      : info.decision === 'accept'
-                        ? 'accepted'
-                        : 'declined';
-              return {
-                ...m,
-                approval: { ...m.approval, status },
-              };
-            })
-          );
-        },
-        onComplete: (data) => finish(data),
-        onError: (err) => {
-          queueDrainRef.current = false;
-          const msg = friendlyTurnError(err, '队列消费失败');
-          setAgentTurnHealth({ state: 'failed', message: msg });
-          void refetchAgentStatus();
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, text: msg, streaming: false } : m))
-          );
-          setBusy(false);
-        },
-      });
-      if (!ok) {
-        queueDrainRef.current = false;
-        setBusy(false);
-      }
-    },
-    [
-      gateway,
-      queueDrainRef,
-      setMessages,
-      setBusy,
-      setAgentTurnHealth,
-      recordAgentTurnCompletion,
-      setCoachThreadId,
-      queryClient,
-      coachApprovalPolicy,
-      refetchAgentStatus,
-    ]
-  );
+  const { startQueuedTurn } = useQueueDrain({
+    turnEpochRef,
+    runningRef,
+    queueTimerRef,
+    gateway,
+    queueDrainRef,
+    setMessages,
+    setBusy,
+    setAgentTurnHealth,
+    recordAgentTurnCompletion,
+    setCoachThreadId,
+    queryClient,
+    coachApprovalPolicy,
+    refetchAgentStatus,
+  });
 
   const send = useCallback(
     async (raw: string) => {
@@ -334,7 +187,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
 
       if (!gateway.isConnected) {
         const offline = buildTutorOfflineReply(track, text);
-        setAgentTurnHealth({ state: 'failed', message: 'Gateway 未连接，无法请求 Agent。' });
+        setAgentTurnHealth({ state: 'failed', message: '导师服务未连接，消息未发出。' });
         setMessages((prev) =>
           prev.map((m) => (m.id === aiId ? { ...m, text: offline, streaming: false } : m))
         );
@@ -342,6 +195,10 @@ export function useChatTurn(deps: ChatTurnDeps) {
         return;
       }
 
+      const epoch = ++turnEpochRef.current;
+      runningRef.current = true;
+      const isCurrent = () => turnEpochRef.current === epoch;
+      const stream = makeMessageStreamHandlers(aiId, setMessages, isCurrent);
       gateway.sendTurnStream({
         input: text,
         intent: 'FREE_COACH',
@@ -360,25 +217,9 @@ export function useChatTurn(deps: ChatTurnDeps) {
             ? { runtimeId: usePreferencesStore.getState().agentRuntimeId }
             : {}),
         },
-        onDelta: (_d, acc) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, text: acc, streaming: true } : m))
-          );
-        },
-        onReasoningDelta: (_d, acc) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, reasoning: acc } : m))
-          );
-        },
-        onToolCall: (info) => {
-          setMessages((prev) =>
-            prev.map((m) => {
-              if (m.id !== aiId) return m;
-              return { ...m, toolCalls: upsertToolCall(m.toolCalls ?? [], info) };
-            })
-          );
-        },
+        ...stream,
         onApprovalRequest: (info) => {
+          if (!isCurrent()) return;
           setMessages((prev) => [
             ...prev,
             {
@@ -399,28 +240,19 @@ export function useChatTurn(deps: ChatTurnDeps) {
           ]);
         },
         onApprovalResolved: (info) => {
+          if (!isCurrent()) return;
           setMessages((prev) =>
             prev.map((m) => {
               if (m.approval?.approvalId !== info.approvalId || !m.approval) return m;
               if (m.approval.status !== 'pending') return m;
-              const status =
-                info.reason === 'timeout'
-                  ? 'timed_out'
-                  : info.reason === 'interrupt' || info.decision === 'cancel'
-                    ? 'cancelled'
-                    : info.decision === 'acceptForSession'
-                      ? 'accepted_session'
-                      : info.decision === 'accept'
-                        ? 'accepted'
-                        : 'declined';
-              return {
-                ...m,
-                approval: { ...m.approval, status },
-              };
+              return { ...m, approval: { ...m.approval, status: resolveApprovalStatus(info) } };
             })
           );
         },
         onComplete: (data) => {
+          if (!isCurrent()) return;
+          const finishedEpoch = ++turnEpochRef.current;
+          runningRef.current = false;
           recordAgentTurnCompletion(data);
           if (data.threadId) {
             setCoachThreadId(data.threadId);
@@ -445,10 +277,16 @@ export function useChatTurn(deps: ChatTurnDeps) {
           );
           setBusy(false);
           if ((data.queueRemaining ?? 0) > 0) {
-            window.setTimeout(() => startQueuedTurn(), 80);
+            queueTimerRef.current = setTimeout(() => {
+              queueTimerRef.current = null;
+              if (turnEpochRef.current === finishedEpoch) startQueuedTurn();
+            }, 80);
           }
         },
         onError: (err) => {
+          if (!isCurrent()) return;
+          turnEpochRef.current++;
+          runningRef.current = false;
           const msg = friendlyTurnError(err, '导师服务暂时不可用，请稍后重试。');
           setAgentTurnHealth({ state: 'failed', message: msg });
           void refetchAgentStatus();
@@ -500,12 +338,7 @@ export function useChatTurn(deps: ChatTurnDeps) {
                 ...m,
                 approval: {
                   ...m.approval,
-                  status:
-                    decision === 'acceptForSession'
-                      ? 'accepted_session'
-                      : decision === 'accept'
-                        ? 'accepted'
-                        : 'declined',
+                  status: resolveApprovalStatus({ decision }),
                 },
               }
             : m
@@ -516,13 +349,19 @@ export function useChatTurn(deps: ChatTurnDeps) {
   );
 
   const interrupt = useCallback(() => {
+    turnEpochRef.current++;
+    runningRef.current = false;
+    if (queueTimerRef.current !== null) clearTimeout(queueTimerRef.current);
+    queueTimerRef.current = null;
     sound.playClick();
     queueDrainRef.current = false;
     gateway.interruptTurn('coach');
     setBusy(false);
     setAgentTurnHealth({ state: 'idle' });
     setMessages((prev) =>
-      prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))
+      prev.map((m) => m.approval?.status === 'pending'
+        ? { ...m, approval: { ...m.approval, status: 'cancelled' } }
+        : m.streaming ? { ...m, streaming: false } : m)
     );
   }, [queueDrainRef, gateway, setBusy, setAgentTurnHealth, setMessages]);
 

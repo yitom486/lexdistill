@@ -53,4 +53,4 @@ export const chatMenuItem =
   'text-ink-soft data-[highlighted]:bg-surface-slate-50-slate-800 data-[highlighted]:text-ink focus:bg-surface-slate-50-slate-800 focus:text-ink';
 
 export const compactSelect =
-  'h-7 min-w-0 w-full gap-1 overflow-hidden rounded-md border border-line bg-transparent px-2 text-[11px] text-ink-soft hover:border-tone-amber-500o40 hover:bg-surface-stone-100-stone-900 focus:ring-0 shadow-none';
+  'h-7 min-w-0 w-full gap-1 overflow-hidden rounded-md border border-line bg-transparent px-2 text-xs text-ink-soft hover:border-tone-amber-500o40 hover:bg-surface-stone-100-stone-900 focus:ring-0 shadow-none';

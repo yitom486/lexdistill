@@ -107,9 +107,9 @@ export function ChatTurnActivity({
             思考 · {effortLabel}
             {streaming ? (
               <span className="ml-auto inline-flex gap-0.5">
-                <span className="size-1 animate-bounce rounded-full bg-tint-violet-300 [animation-delay:var(--motion-chat-tool-dot-delay-first)]" />
-                <span className="size-1 animate-bounce rounded-full bg-tint-violet-300 [animation-delay:var(--motion-chat-tool-dot-delay-second)]" />
-                <span className="size-1 animate-bounce rounded-full bg-tint-violet-300" />
+                <span className="size-1 animate-bounce rounded-full bg-tint-violet-300 motion-reduce:animate-none [animation-delay:var(--motion-chat-tool-dot-delay-first)]" />
+                <span className="size-1 animate-bounce rounded-full bg-tint-violet-300 motion-reduce:animate-none [animation-delay:var(--motion-chat-tool-dot-delay-second)]" />
+                <span className="size-1 animate-bounce rounded-full bg-tint-violet-300 motion-reduce:animate-none" />
               </span>
             ) : null}
           </div>
@@ -164,7 +164,6 @@ export function StreamingReplyPlaceholder() {
 
   const hint = STREAMING_HINTS[hintIndex] ?? STREAMING_HINTS[0];
   const hintFadeDuration = readCssDurationSeconds('--motion-reply-hint-fade-duration');
-  const replyCharStagger = readCssDurationMilliseconds('--motion-reply-char-stagger');
 
   return (
     <p
@@ -184,8 +183,8 @@ export function StreamingReplyPlaceholder() {
           {Array.from(hint).map((ch, i) => (
             <span
               key={`${hint}-${i}`}
-              className="animate-reply-char"
-              style={{ animationDelay: `${i * replyCharStagger}ms` }}
+              className="animate-reply-char motion-reduce:animate-none"
+              style={{ animationDelay: `calc(var(--motion-reply-char-stagger) * ${i})` }}
             >
               {ch}
             </span>
