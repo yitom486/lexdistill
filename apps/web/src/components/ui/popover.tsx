@@ -12,14 +12,15 @@ export const PopoverContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof BasePopover.Popup> & {
     sideOffset?: number;
     align?: 'start' | 'center' | 'end';
+    anchor?: React.ComponentPropsWithoutRef<typeof BasePopover.Positioner>['anchor'];
   }
->(({ className, sideOffset = 6, align = 'center', children, ...props }, ref) => (
+>(({ className, sideOffset = 6, align = 'center', anchor, children, ...props }, ref) => (
   <BasePopover.Portal>
-    <BasePopover.Positioner sideOffset={sideOffset} align={align} className="z-50 outline-none">
+    <BasePopover.Positioner {...(anchor !== undefined ? { anchor } : {})} sideOffset={sideOffset} align={align} className="z-50 outline-none">
       <BasePopover.Popup
         ref={ref}
         className={cn(
-          'z-50 w-72 rounded-2xl border border-line-amber-900o15-amber-500o20 bg-paper-soft p-4 text-ink shadow-xl outline-none transition-all',
+          'z-50 w-72 rounded-2xl border border-line-hairline bg-surface p-4 text-ink shadow-xl outline-none transition-all',
           className
         )}
         {...props}

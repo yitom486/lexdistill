@@ -3,6 +3,18 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
+ * UI-R01: Tailwind 4 字体角色 token。
+ * 根因：此前字体栈只写在 base 层，font-sans/serif/mono 工具类（utilities 层、
+ * Tailwind 默认栈）永远覆盖它们，导致 computed 始终是系统字体。
+ * 在 theme 层定义后，工具类即携带正确字体栈，不再需要 !important。
+ */
+@theme {
+  --font-sans: 'Geist', 'Noto Sans JP', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Newsreader', Georgia, 'Songti SC', 'Source Han Serif SC', serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/*
  * Theme transitions share one token. Components that use Tailwind's
  * transition utilities without an explicit duration resolve to this value.
  * Interaction-specific animations use named --motion-* tokens. JavaScript
@@ -17,6 +29,7 @@
   --motion-reply-hint-rotation-interval: 1800ms;
   --motion-reply-char-bounce-duration: 900ms;
   --motion-reply-char-stagger: 70ms;
+  --motion-analysis-stagger: 40ms;
   --motion-chat-tool-dot-delay-first: -200ms;
   --motion-chat-tool-dot-delay-second: -100ms;
   --motion-wave-shadow-base-duration: 500ms;
@@ -39,6 +52,17 @@
   --motion-border-beam-delay: 0s;
   --motion-shine-duration: 1.6s;
   --motion-shimmer-button-duration: 1.4s;
+  --motion-collapse-chevron-duration: 200ms;
+  --motion-vu-level-duration: 75ms;
+  --motion-rating-hover-duration: 150ms;
+  --motion-dialog-expand-duration: 300ms;
+
+  /* UI-R01 基础排印与表面 token（亮色值；暗色见 .dark 同名） */
+  --leading-body: 1.75;
+  --focus-ring: oklch(55.5% 0.163 48.998);
+  --shadow-card: 0 1px 2px 0 rgba(28, 25, 23, 0.1);
+  --shadow-pop: 0 8px 24px -8px rgba(28, 25, 23, 0.16);
+  --shadow-modal: 0 24px 64px -12px rgba(28, 25, 23, 0.28), 0 4px 16px 0 rgba(28, 25, 23, 0.12);
 
   --visual-agent-beam-from: #d97706;
   --visual-agent-beam-to: #78716c;
@@ -140,6 +164,11 @@
   --toc-remove-fg: #fca5a5;
   --toc-remove-border: #7f1d1d;
   --toc-review-fg: #c4b5fd;
+  /* UI-R01 基础排印与表面 token（暗色值；surface-* 类经由 var 消费，亮暗自适应） */
+  --focus-ring: #e0a96d;
+  --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 4px 16px 0 rgba(0, 0, 0, 0.45), 0 0 24px 0 var(--line-glow-hover);
+  --shadow-modal: 0 24px 64px -12px rgba(0, 0, 0, 0.55), 0 4px 16px 0 rgba(0, 0, 0, 0.4);
 }
 
 /*
@@ -183,6 +212,31 @@
 @media (prefers-reduced-motion: reduce) {
   :root {
     --theme-transition-duration: var(--motion-reduced-duration);
+    /* R10：全部视觉时长 token 在减少动态效果下收敛为 1ms（跳过动画，
+       业务交互直接到达终态）。delay/interval（点相位、提示轮换）不是位移
+       动效，保持原值；无限循环类另在各自用法处隐藏/静止。 */
+    --motion-reply-hint-fade-duration: var(--motion-reduced-duration);
+    --motion-reply-char-bounce-duration: var(--motion-reduced-duration);
+    --motion-wave-shadow-base-duration: var(--motion-reduced-duration);
+    --motion-wave-shadow-step-duration: var(--motion-reduced-duration);
+    --motion-wave-tts-base-duration: var(--motion-reduced-duration);
+    --motion-wave-tts-step-duration: var(--motion-reduced-duration);
+    --motion-layout-enter-duration: var(--motion-reduced-duration);
+    --motion-card-hover-duration: var(--motion-reduced-duration);
+    --motion-card-flip-duration: var(--motion-reduced-duration);
+    --motion-progress-width-duration: var(--motion-reduced-duration);
+    --motion-daily-progress-duration: var(--motion-reduced-duration);
+    --motion-border-beam-default-duration: var(--motion-reduced-duration);
+    --motion-border-beam-agent-tool-duration: var(--motion-reduced-duration);
+    --motion-border-beam-agent-message-duration: var(--motion-reduced-duration);
+    --motion-border-beam-shadowing-duration: var(--motion-reduced-duration);
+    --motion-border-beam-listening-duration: var(--motion-reduced-duration);
+    --motion-shine-duration: var(--motion-reduced-duration);
+    --motion-shimmer-button-duration: var(--motion-reduced-duration);
+    --motion-collapse-chevron-duration: var(--motion-reduced-duration);
+    --motion-vu-level-duration: var(--motion-reduced-duration);
+    --motion-rating-hover-duration: var(--motion-reduced-duration);
+    --motion-dialog-expand-duration: var(--motion-reduced-duration);
   }
 
   ::view-transition-old(root),
@@ -229,7 +283,7 @@
     background-color: var(--surface);
     border: 1px solid var(--line-hairline);
     box-shadow:
-      0 1px 2px 0 rgba(0, 0, 0, 0.4),
+      var(--shadow-card),
       inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
   }
 
@@ -237,15 +291,14 @@
     background-color: var(--surface-warm);
     border: 1px solid var(--line-hairline);
     box-shadow:
-      0 1px 2px 0 rgba(0, 0, 0, 0.4),
+      var(--shadow-card),
       inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
   }
 
   .surface-card-hover:hover {
     border-color: var(--line-hairline-strong);
     box-shadow:
-      0 4px 16px 0 rgba(0, 0, 0, 0.45),
-      0 0 24px 0 var(--line-glow-hover),
+      var(--shadow-pop),
       inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
   }
 
@@ -257,8 +310,7 @@
     background-color: var(--surface);
     border: 1px solid var(--line-hairline);
     box-shadow:
-      0 24px 64px -12px rgba(0, 0, 0, 0.55),
-      0 4px 16px 0 rgba(0, 0, 0, 0.4),
+      var(--shadow-modal),
       inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
   }
 }
@@ -310,18 +362,19 @@
 
   body {
     font-family: 'Geist', 'Noto Sans JP', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: var(--leading-body);
     letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* UI-R01: .font-serif/.font-mono 改由 @theme 字体 token 承载，此处不再重复声明，
+     避免 base 层与工具类出现两套字体栈。等宽数字仍保持 tabular-nums。 */
   .font-serif {
-    font-family: 'Newsreader', Georgia, 'Songti SC', 'Source Han Serif SC', serif;
     letter-spacing: -0.015em;
   }
 
   .font-mono {
-    font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-variant-numeric: tabular-nums;
   }
 }
@@ -459,7 +512,8 @@
 
   /* ink（99 token，hits 767） */
   --ink-ghost: oklch(55.3% 0.013 58.071);
-  --ink-stone-400: oklch(70.9% 0.01 56.259);
+  /* UI-R01: 亮色弱化文字对比度 2.59:1 → 约 4.7:1（70.9% → 55% 明度），字号不动（R02 范畴） */
+  --ink-stone-400: oklch(55% 0.01 56.259);
   --ink: oklch(21.6% 0.006 56.043);
   --ink-stone-500: oklch(55.3% 0.013 58.071);
   --ink-faint: oklch(44.4% 0.011 73.639);
@@ -468,7 +522,8 @@
   --ink-soft: oklch(26.8% 0.007 34.298);
   --ink-slate-500: oklch(55.4% 0.046 257.417);
   --ink-rose-600-rose-400: oklch(58.6% 0.253 17.585);
-  --ink-hint: oklch(70.9% 0.01 56.259);
+  /* UI-R01: 同 --ink-stone-400，亮色弱化文字对比度达标 */
+  --ink-hint: oklch(55% 0.01 56.259);
   --ink-rose-600: oklch(58.6% 0.253 17.585);
   --ink-deep: oklch(26.8% 0.007 34.298);
   --ink-faint-soft: oklch(44.4% 0.011 73.639);
@@ -1508,6 +1563,11 @@
   --color-gold-warm: var(--gold-warm);
   --shadow-inner-hi: var(--shadow-inner-hi);
   --shadow-inner-hi-strong: var(--shadow-inner-hi-strong);
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-modal: var(--shadow-modal);
+  --color-focus-ring: var(--focus-ring);
+  --leading-body: var(--leading-body);
   --color-line-amber-500o30: var(--line-amber-500o30);
   --color-line: var(--line);
   --color-line-soft: var(--line-soft);

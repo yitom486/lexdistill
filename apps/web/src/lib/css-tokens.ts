@@ -5,6 +5,34 @@ export function readCssCustomProperty(property: CssCustomProperty): string {
   return window.getComputedStyle(document.documentElement).getPropertyValue(property).trim();
 }
 
+/**
+ * R10：系统“减少动态效果”偏好的运行时读取（matchMedia，每次调用都读当前值，
+ * 不在模块加载时缓存；jsdom 等无 matchMedia 环境回落为 false）。
+ * Confetti 等一次性动效在触发时调用；需要跟踪变化时用 watchReducedMotion。
+ */
+export function isReducedMotion(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * R10：订阅系统偏好变化，返回取消订阅函数。主题/偏好切换与动效收敛共用。
+ */
+export function watchReducedMotion(listener: (reduced: boolean) => void): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
+  const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const handler = (event: MediaQueryListEvent) => listener(event.matches);
+  if (typeof query.addEventListener === 'function') {
+    query.addEventListener('change', handler);
+    return () => query.removeEventListener('change', handler);
+  }
+  if (typeof query.addListener === 'function') {
+    query.addListener(handler);
+    return () => query.removeListener(handler);
+  }
+  return () => {};
+}
+
 export function readCssDurationMilliseconds(property: CssCustomProperty): number {
   const value = readCssCustomProperty(property);
   const match = /^(-?(?:\d+|\d*\.\d+))(ms|s)$/.exec(value);

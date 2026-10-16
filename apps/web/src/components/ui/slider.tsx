@@ -17,7 +17,7 @@ export const Slider = React.forwardRef<
     <BaseSlider.Control className="relative flex h-2 w-full items-center rounded-full bg-line-soft">
       <BaseSlider.Track className="relative h-full w-full rounded-full">
         <BaseSlider.Indicator className="absolute h-full rounded-full bg-tint-amber-500-amber-600" />
-        <BaseSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-tone-amber-600 bg-tone-white shadow-sm transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tone-amber-500" />
+        <BaseSlider.Thumb aria-label={props['aria-label']} aria-labelledby={props['aria-labelledby']} className="block h-4 w-4 rounded-full border-2 border-tone-amber-600 bg-tone-white shadow-sm transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tone-amber-500" />
       </BaseSlider.Track>
     </BaseSlider.Control>
   </BaseSlider.Root>

@@ -23,7 +23,7 @@ export function ShimmerButton({
       {...props}
     >
       <div
-        className="absolute -inset-full top-0 block h-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent to-grad-whiteo30 opacity-0 group-hover:animate-shine"
+        className="absolute -inset-full top-0 block h-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent to-grad-whiteo30 opacity-0 group-hover:animate-shine motion-reduce:animate-none"
         style={{
           animationDuration: 'var(--motion-shimmer-button-duration)',
         }}

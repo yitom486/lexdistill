@@ -9,5 +9,5 @@ export function ToggleGroup({ className, ...props }: ComponentProps<typeof BaseT
 }
 
 export function ToggleGroupItem({ className, ...props }: ComponentProps<typeof BaseToggle>) {
-  return <BaseToggle className={cn('inline-flex items-center gap-3 rounded-xl border border-line-soft bg-paper-soft px-4 py-3 text-sm text-ink transition-colors hover:bg-surface-warm data-[pressed]:border-line-accent data-[pressed]:bg-wash-amber-500o10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 cursor-pointer', className)} {...props} />;
+  return <BaseToggle className={cn('inline-flex items-center gap-3 rounded-xl border border-line-soft bg-paper-soft px-4 py-3 text-sm text-ink transition-colors hover:bg-surface-warm data-[pressed]:border-line-accent data-[pressed]:bg-wash-amber-500o10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50 cursor-pointer', className)} {...props} />;
 }

@@ -42,7 +42,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       >
         {children}
         {showCloseButton && (
-          <BaseDialog.Close className="absolute right-4 top-4 rounded-xl p-1 text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60 transition-colors focus:outline-none cursor-pointer">
+          <BaseDialog.Close className="absolute right-4 top-4 rounded-xl p-1 text-ink-faint-soft hover:text-ink hover:bg-surface-warm/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring cursor-pointer">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </BaseDialog.Close>

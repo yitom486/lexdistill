@@ -1,5 +1,5 @@
 import confetti from 'canvas-confetti';
-import { readCssCustomProperty } from '../../lib/css-tokens.js';
+import { isReducedMotion, readCssCustomProperty, watchReducedMotion } from '../../lib/css-tokens.js';
 
 function readCelebrationPalette() {
   return {
@@ -15,6 +15,12 @@ function readCelebrationPalette() {
 }
 
 export function fireSuccessConfetti() {
+  // R10：减少动态效果时跳过纸屑（成功toast照常，业务终态不变）
+  if (isReducedMotion()) return;
+  const stopWatching = watchReducedMotion((reduced) => {
+    if (reduced) confetti.reset();
+  });
+  const flights: Array<Promise<undefined> | null> = [];
   const count = 120;
   const palette = readCelebrationPalette();
   const defaults = {
@@ -23,11 +29,11 @@ export function fireSuccessConfetti() {
   };
 
   function fire(particleRatio: number, opts: confetti.Options) {
-    confetti({
+    flights.push(confetti({
       ...defaults,
       ...opts,
       particleCount: Math.floor(count * particleRatio),
-    });
+    }));
   }
 
   fire(0.25, {
@@ -55,4 +61,5 @@ export function fireSuccessConfetti() {
     spread: 120,
     startVelocity: 45,
   });
+  void Promise.all(flights).finally(stopWatching);
 }

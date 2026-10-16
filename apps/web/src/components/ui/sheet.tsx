@@ -36,7 +36,7 @@ export const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
       <BaseDialog.Popup
         ref={ref}
         className={cn(
-          'fixed z-50 flex h-full w-full max-w-lg flex-col border-line-amber-900o15 bg-surface-hfaf9f6 shadow-2xl outline-none transition-colors dark:border-tone-amber-500o20 dark:bg-surface-h1a1816',
+          'fixed z-50 flex h-full w-full max-w-lg flex-col border border-line-hairline bg-surface-hfaf9f6 shadow-2xl outline-none transition-colors dark:border-line-hairline dark:bg-surface-h1a1816',
           side === 'right' && 'inset-y-0 right-0 border-l',
           side === 'left' && 'inset-y-0 left-0 border-r',
           className
@@ -45,7 +45,7 @@ export const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
       >
         {children}
         {showClose && (
-          <BaseDialog.Close className="absolute right-4 top-4 rounded-xl p-1.5 text-ink-stone-400 transition-colors hover:bg-veil-stone-200o60 hover:text-tone-stone-700 dark:hover:bg-tone-stone-800 dark:hover:text-ink-stone-200 cursor-pointer">
+          <BaseDialog.Close className="absolute right-4 top-4 rounded-xl p-1.5 text-ink-faint-soft transition-colors hover:bg-surface-warm/60 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring cursor-pointer">
             <X className="h-5 w-5" />
             <span className="sr-only">Close</span>
           </BaseDialog.Close>
@@ -62,7 +62,7 @@ export const SheetHeader = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'flex flex-col space-y-1.5 border-b border-line-amber-900o10 p-4 transition-colors dark:border-wash-amber-500o15',
+      'flex flex-col space-y-1.5 border-b border-line-hairline p-4 transition-colors',
       className
     )}
     {...props}

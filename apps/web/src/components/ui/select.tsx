@@ -23,7 +23,7 @@ const SelectTrigger = React.forwardRef<
   <BaseSelect.Trigger
     ref={ref}
     className={cn(
-      'flex h-9 w-full items-center justify-between rounded-xl border border-line-hairline bg-surface-warm px-3 py-2 text-xs font-medium text-ink shadow-inner-hi ring-offset-background placeholder:text-ink-stone-400 focus:outline-none focus:ring-1 focus:ring-gold-warm disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer transition-all hover:border-gold-warm/40',
+      'flex h-9 w-full items-center justify-between rounded-xl border border-line-hairline bg-surface-warm px-3 py-2 text-xs font-medium text-ink shadow-inner-hi placeholder:text-ink-stone-400 focus:outline-none focus:ring-1 focus:ring-gold-warm disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer transition-all hover:border-gold-warm/40',
       className
     )}
     {...props}
