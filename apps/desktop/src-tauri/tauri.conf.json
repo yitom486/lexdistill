@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "LexDistill",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "identifier": "com.lexdistill.desktop",
   "build": {
     "beforeDevCommand": "bun run --filter @lexdistill/gateway pdf:prepare && bun run --filter @lexdistill/web dev",
     "devUrl": "http://localhost:3000",
-    "beforeBuildCommand": "bun run build:sidecar && bun run --filter @lexdistill/web build",
+    "beforeBuildCommand": "bun run --filter @lexdistill/gateway sidecar:build && bun run --filter @lexdistill/web build",
     "frontendDist": "../../web/dist"
   },
   "app": {

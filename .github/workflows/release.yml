@@ -23,12 +23,11 @@ jobs:
           - name: Linux x64
             os: ubuntu-22.04
             args: '--bundles deb,rpm'
-          - name: macOS Intel
-            os: macos-15-intel
-            args: ''
           - name: macOS Apple Silicon
             os: macos-15
             args: ''
+          # macOS Intel 不在交付目标内：PDF 运行时清单没有 darwin-x64 构件，
+          # 构建准备阶段会失败（见 docs/pdf-bundled-runtime.md）。
 
     steps:
       - name: Checkout

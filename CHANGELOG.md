@@ -2,6 +2,15 @@
 
 All notable changes to LexDistill are documented here. Release notes are reused by the GitHub Release workflow.
 
+## [0.2.1] - 2026-10-18
+
+### 修复
+
+- 桌面构建：`beforeBuildCommand` 改用 `--filter` 调用 Gateway sidecar 脚本。Tauri 在 `apps/desktop` 下执行该命令，原先的根级脚本名找不到，导致四个平台构建全部失败。
+- 发布矩阵移除 macOS Intel：PDF 运行时清单没有 `darwin-x64` 构件，该平台不在交付目标内（见 `docs/pdf-bundled-runtime.md`）。
+- 运行时目录补齐 `opencode-v2`（`@yitom/acp-client` 0.1.12 起提供）：前端目录、网关目录与相关断言对齐。
+- 测试门禁：默认单测超时提到 20s，避免机器负载下 5s 超时误报。
+
 ## [0.2.0] - 2026-10-18
 
 ### 聊天界面统一
