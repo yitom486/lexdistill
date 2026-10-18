@@ -4,6 +4,7 @@ import { GraduationCap, Footprints, Sparkles } from 'lucide-react';
 import { sound } from '../utils/audio.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
+import { usePreferencesStore } from '../stores/usePreferencesStore.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateAllLearningQueries, useLearnerProfileQuery } from '../queries/useLearnerQueries.js';
 import { getLearningShellConfig } from '../learning/learning-shell.js';
@@ -65,9 +66,23 @@ function useIsFresh(): boolean {
 }
 
 /**
+ * 引导是否该出现：只判状态，不碰副作用，便于单测锁定门禁。
+ * 已选过（onboardingCompleted）或本会话已跳过（dismissed）都不再出现。
+ */
+export function shouldShowOnboarding(state: {
+  fresh: boolean;
+  isFetched: boolean;
+  dismissed: boolean;
+  onboardingCompleted: boolean;
+}): boolean {
+  return state.fresh && state.isFetched && !state.dismissed && !state.onboardingCompleted;
+}
+
+/**
  * 首次启动定级（纯前端，无迁移）：
  * 选轨道 → 自评水平 → 入门进带路，自评高档指去画像页定级考。
- * 画像已有产出后永久不再出现；本会话可“先逛逛”跳过。
+ * 完成或跳过都会写 `onboardingCompleted`（Zustand persist），之后不再出现；
+ * 需要改档位去设置页。
  */
 export function OnboardingDialog() {
   const fresh = useIsFresh();
@@ -76,13 +91,21 @@ export function OnboardingDialog() {
   const profile = useUserProfileStore((s) => s.profile);
   const updateProfile = useUserProfileStore((s) => s.updateProfile);
   const setActiveTab = useStudySessionStore((s) => s.setActiveTab);
+  const onboardingCompleted = usePreferencesStore((s) => s.onboardingCompleted);
+  const completeOnboarding = usePreferencesStore((s) => s.completeOnboarding);
   const queryClient = useQueryClient();
   const [dismissed, setDismissed] = useState(false);
   const [track, setTrack] = useState<Track>('ja');
   const [level, setLevel] = useState<LearnerLevel>('NOVICE');
   const [saving, setSaving] = useState(false);
 
-  const open = fresh && isFetched && !dismissed;
+  /** 完成或跳过：本地标记一次，之后不再弹（跨重启生效）。 */
+  const finish = () => {
+    setDismissed(true);
+    completeOnboarding();
+  };
+
+  const open = shouldShowOnboarding({ fresh, isFetched, dismissed, onboardingCompleted });
   if (!open) return null;
 
   const shell = getLearningShellConfig(track);
@@ -99,7 +122,7 @@ export function OnboardingDialog() {
     await invalidateAllLearningQueries(queryClient);
     setSaving(false);
     sound.playCorrect();
-    setDismissed(true);
+    finish();
     if (goExam) {
       setActiveTab('RADAR');
       toast.success(`已切到${shell.trackName}轨道，去画像页考个级，免得内容太浅`);
@@ -113,7 +136,7 @@ export function OnboardingDialog() {
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) setDismissed(true);
+        if (!nextOpen) finish();
       }}
     >
       <DialogContent className="max-w-md">
@@ -185,7 +208,7 @@ export function OnboardingDialog() {
                 {saving ? '保存中…' : '去考个级'}
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => setDismissed(true)}>
+            <Button variant="ghost" size="sm" onClick={finish}>
               先逛逛
             </Button>
           </div>

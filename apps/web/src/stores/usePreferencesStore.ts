@@ -84,6 +84,13 @@ export interface PreferencesState {
   } | null;
   /** 题目导师抽屉宽度（px） */
   tutorPanelWidthPx: number;
+  /**
+   * 新人定级引导是否已完成/已跳过。
+   * 与「画像是否有产出」分开记：网关不可达或还没产生学习记录时，
+   * 只看画像会每次启动都弹一次。
+   */
+  onboardingCompleted: boolean;
+  completeOnboarding: () => void;
   /** Study Coach 选用的 Agent 模型 id；空=运行时默认 */
   coachModelId: string;
   /** Agent 运行时 id（codex-acp 默认；与 acp-client 内置运行时对齐） */
@@ -276,6 +283,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       tutorDrawerOpen: false,
       tutorContextSnapshot: null,
       tutorPanelWidthPx: 448,
+      onboardingCompleted: false,
+      completeOnboarding: () => set({ onboardingCompleted: true }),
       coachModelId: '',
       agentRuntimeId: 'codex-acp',
       runtimeModels: {},
