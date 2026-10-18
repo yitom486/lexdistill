@@ -355,7 +355,8 @@ it('题目导师面板：关闭不可 Tab 到达 + 焦点恢复 + 重开不隐�
   expect(interruptCalls).toContain('learning');
   await act(async () => { previous.onComplete({ finalOutput: '旧题结果', threadId: 'wrong-thread' }); });
   expect(doc.body.textContent).not.toContain('旧题结果');
-  expect(doc.body.textContent).toContain('导师正在组织讲解');
+  // 输入态提示由包的运行状态行统一给出（旧的「导师正在组织讲解」已随自维护列表退役）
+  expect(doc.body.textContent).toContain('正在思考');
 });
 
 it('题目导师离线打开：欢迎语可读 + 重发入口', async () => {

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { ChatEmptyState, ChatMessageList as YitomChatMessageList } from '@yitom/chat-ui';
 import { ListOrdered, Play, X } from 'lucide-react';
 import { Button } from '../ui/button.js';
@@ -12,6 +12,7 @@ import type { ChatMessage as LexChatMessage } from './chat-shared.js';
 import { adaptLexMessagesToYitom } from './chat-message-adapter.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { getTutorTrackCopy } from '../../copy/tutor-track-copy.js';
+import { getPlatform } from '../../platform/capabilities.js';
 
 interface ChatMessageListProps {
   queueItems: AgentQueuedSubmissionDto[];
@@ -57,6 +58,12 @@ export function ChatMessageList(props: ChatMessageListProps) {
   const theme = currentTheme === 'dark' ? 'dark' : 'light';
   const threadId = coachThreadId || 'coach-default';
   const copy = getTutorTrackCopy(track);
+
+  // 桌面端外链交给系统浏览器；返回 true 让包阻止 webview 就地导航
+  const handleLinkClick = useCallback((href: string) => {
+    void getPlatform().openExternalUrl(href);
+    return true;
+  }, []);
 
   const { messages: yitomMessages, pendingPermission } = useMemo(
     () => adaptLexMessagesToYitom(messages),
@@ -140,6 +147,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
         theme={theme}
         resolveMarkProposal={() => {}}
         onPermissionRespond={handlePermissionRespond}
+        onLinkClick={handleLinkClick}
         {...(endRef ? { bottomRef: endRef } : {})}
         className="flex-1"
         emptyState={

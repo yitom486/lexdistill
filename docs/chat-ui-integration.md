@@ -4,14 +4,15 @@
 
 ## 版本
 
-- `apps/web` 固定 `@yitom/chat-core` / `@yitom/chat-session` / `@yitom/chat-ui` **0.1.19**，`apps/gateway` 固定 `@yitom/acp-client` **^0.1.12**。
+- `apps/web` 固定 `@yitom/chat-core` / `@yitom/chat-session` / `@yitom/chat-ui` **0.1.21**，`apps/gateway` 固定 `@yitom/acp-client` **^0.1.12**。
 - 六包必须同版本；不同版本会让 branded 类型出现多份实例。升级见文末流程。
 
 ## 分工
 
 | 层 | 归属 | 文件 |
 |---|---|---|
-| 消息渲染、时间线编排、历史窗口、贴底跟滚、回到底部、运行状态行、审批卡 | `@yitom/chat-ui` 的 `ChatMessageList` | 包内 |
+| 消息渲染、时间线编排、历史窗口、贴底跟滚、回到底部、运行状态行、审批卡 | `@yitom/chat-ui` 的 `ChatMessageList` | 包内（自由导师与题目导师共用） |
+| 外链拦截（桌面端交给系统浏览器） | `onLinkClick` | 包内 context 下传，宿主传一次 |
 | 输入区形态、自增高、IME 守卫、Enter 发送、发送/停止按钮 | `@yitom/chat-ui` 的 `ChatComposer` | 包内 |
 | 顶栏骨架、状态胶囊（连接/就绪/请求中/回退/失败） | `@yitom/chat-ui` 的 `ChatPanelHeader` + `ChatStatusBadge` | 包内 |
 | 消息结构转换（扁平聚合消息 → thought / tool / agent 时间线消息） | 应用适配层 | `agent-chat/chat-message-adapter.ts` |
@@ -59,4 +60,5 @@
 
 ## 未完成
 
-`ai-tutor`（`TutorComposer` / `TutorMessageList` / `AiTutorDrawer`）与 `WordTutorPanel` 仍是第二、第三套手写渲染，尚未迁到同一渲染栈。
+- `WordTutorPanel` / `WordChatThread` 仍是第三套手写渲染（单词卡片的讲师问答，消息量小）。迁法与题目导师相同：写一个 `word-message-adapter`，列表换 `ChatMessageList`，导师专属徽标/朗读走 `renderMessageFooter`。
+- 题目导师已合并：`TutorMessageList` 只剩适配与尾部插槽，头像与琥珀气泡随统一渲染退役，身份由抽屉顶栏承担。

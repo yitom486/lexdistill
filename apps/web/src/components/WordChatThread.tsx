@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
+import { ChatMarkdown } from '@yitom/chat-ui';
 import { Button } from './ui/button.js';
-import { MarkdownText } from './common/MarkdownText.js';
+import { getPlatform } from '../platform/capabilities.js';
 import type { WordTutorMessage } from '../hooks/useWordTutor.js';
 
 interface WordChatThreadProps {
@@ -27,7 +28,19 @@ export function WordChatThread({
       {messages.length === 0 && <p className="text-xs text-ink-muted">在这里直接追问，回答实时显示；AI 调用工具更新内容后，释义自动刷新。</p>}
       {messages.map(message => <div key={message.id} className={message.sender === 'user' ? 'text-right' : ''}>
         <div className="inline-block max-w-full rounded-lg bg-paper px-3 py-2 text-left text-sm">
-          {message.sender === 'ai' ? <MarkdownText text={message.text || (message.isStreaming ? '思考中…' : '')} /> : message.text}
+          {message.sender === 'ai' ? (
+            <ChatMarkdown
+              text={message.text || (message.isStreaming ? '思考中…' : '')}
+              streaming={Boolean(message.isStreaming)}
+              className="markdown-preview agent-md min-w-0 max-w-full"
+              onLinkClick={(href) => {
+                void getPlatform().openExternalUrl(href);
+                return true;
+              }}
+            />
+          ) : (
+            message.text
+          )}
         </div>
         {!!message.toolCalls?.length && <p className="mt-0.5 text-xs text-ink-muted">调用工具：{message.toolCalls.map(tool => `${tool.toolName}${tool.done ? '✓' : '… '}`).join('、')}</p>}
       </div>)}
