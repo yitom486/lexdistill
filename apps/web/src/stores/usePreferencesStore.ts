@@ -3,6 +3,64 @@ import { persist } from 'zustand/middleware';
 import { createMigratedStorage } from './store-storage.js';
 import { DEFAULT_TEXTBOOK_PIPELINE_SETTINGS, TextbookPipelineSettingsSchema, type TextbookPipelineSettings } from '@lexdistill/document-model';
 
+/**
+ * 单一语种的聊天作用域。
+ *
+ * 一个「会话」的身份 = 语言 + 运行时 + 会话 id：切换语言或运行时都必须换一套状态，
+ * 否则上一语言的消息/队列/审批会串到下一语言里。
+ */
+export interface CoachScope {
+  /** 该语言上次使用的运行时；空=跟随全局 agentRuntimeId */
+  runtimeId: string;
+  /** 该语言当前会话 id；空=未开始 */
+  threadId: string;
+  modelId: string;
+  effort: string;
+  approvalPolicy: string;
+  collaborationMode: string;
+  persistThread: boolean;
+}
+
+export function defaultCoachScope(fallback: {
+  runtimeId: string;
+  threadId: string;
+  modelId: string;
+  effort: string;
+  approvalPolicy: string;
+  collaborationMode: string;
+  persistThread: boolean;
+}): CoachScope {
+  return { ...fallback };
+}
+
+/** 读取某语言的聊天作用域；未建过就沿用旧版全局字段（升级兼容），不会凭空串语言。 */
+export function coachScopeOf(
+  state: Pick<
+    PreferencesState,
+    | 'coachScopes'
+    | 'agentRuntimeId'
+    | 'coachThreadId'
+    | 'coachModelId'
+    | 'coachEffort'
+    | 'coachApprovalPolicy'
+    | 'coachCollaborationMode'
+    | 'coachPersistThread'
+  >,
+  language: string
+): CoachScope {
+  const scoped = state.coachScopes[language];
+  if (scoped) return scoped;
+  return defaultCoachScope({
+    runtimeId: state.agentRuntimeId,
+    threadId: state.coachThreadId,
+    modelId: state.coachModelId,
+    effort: state.coachEffort,
+    approvalPolicy: state.coachApprovalPolicy,
+    collaborationMode: state.coachCollaborationMode,
+    persistThread: state.coachPersistThread,
+  });
+}
+
 export interface PreferencesState {
   theme: 'light' | 'dark';
   furiganaEnabled: boolean;
@@ -39,6 +97,11 @@ export interface PreferencesState {
   coachApprovalPolicy: string;
   /** 恢复的 Agent 会话 id；空=新建 */
   coachThreadId: string;
+  /** 按语言隔离的聊天作用域：每种语言各有运行时、会话、模型与审批 */
+  coachScopes: Record<string, CoachScope>;
+  setCoachScope: (language: string, patch: Partial<CoachScope>) => void;
+  /** 首次进入某语言时，把旧版全局字段固化成该语言的作用域（幂等） */
+  ensureCoachScope: (language: string) => void;
   /** 学习闭环（题目导师 / 出题批改）Agent 会话；与聊天隔离 */
   learningThreadId: string;
   /** false=ephemeral 临时；true=落盘持久化 */
@@ -220,6 +283,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       coachEffort: 'medium',
       coachApprovalPolicy: 'never',
       coachThreadId: '',
+      coachScopes: {},
       learningThreadId: '',
       coachPersistThread: true,
       coachCollaborationMode: '',
@@ -285,6 +349,23 @@ export const usePreferencesStore = create<PreferencesState>()(
       setCoachEffort: (coachEffort: string) => set({ coachEffort }),
       setCoachApprovalPolicy: (coachApprovalPolicy: string) => set({ coachApprovalPolicy }),
       setCoachThreadId: (coachThreadId: string) => set({ coachThreadId }),
+      setCoachScope: (language: string, patch: Partial<CoachScope>) =>
+        set((state) => ({
+          coachScopes: {
+            ...state.coachScopes,
+            [language]: { ...coachScopeOf(state, language), ...patch },
+          },
+        })),
+      ensureCoachScope: (language: string) =>
+        set((state) => {
+          if (state.coachScopes[language]) return {};
+          return {
+            coachScopes: {
+              ...state.coachScopes,
+              [language]: coachScopeOf(state, language),
+            },
+          };
+        }),
       setLearningThreadId: (learningThreadId: string) => set({ learningThreadId }),
       setCoachPersistThread: (coachPersistThread: boolean) => set({ coachPersistThread }),
       setCoachCollaborationMode: (coachCollaborationMode: string) =>

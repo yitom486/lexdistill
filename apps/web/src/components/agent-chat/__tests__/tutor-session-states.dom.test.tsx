@@ -479,17 +479,20 @@ it('打开导师不改写运行时默认或尚未确认的思考偏好', async (
     useAgentGateway: () => ({ isConnected: false, sendTurnStream: () => false, interruptTurn: () => {}, connect: () => {} }),
   }));
   const { AgentChatPanel } = await import('../../AgentChatPanel.js');
-  const { usePreferencesStore } = await import('../../../stores/usePreferencesStore.js');
-  const before = usePreferencesStore.getState().coachEffort;
+  const { usePreferencesStore, coachScopeOf } = await import('../../../stores/usePreferencesStore.js');
+  const { useUserProfileStore } = await import('../../../stores/useUserProfileStore.js');
+  // 聊天参数按语言作用域存；测试必须写同一层，不能写旧的全局字段
+  const language = useUserProfileStore.getState().profile.targetLanguage;
+  const before = coachScopeOf(usePreferencesStore.getState(), language).effort;
   const originalFetch = globalThis.fetch;
   globalThis.fetch = Object.assign(async () => Response.json({ available: false, runtimes: [] }), { preconnect: originalFetch.preconnect });
   const client = makeClient();
   try {
-    usePreferencesStore.setState({ coachEffort: '' });
+    usePreferencesStore.getState().setCoachScope(language, { effort: '' });
     await act(async () => { dom!.root.render(<QueryClientProvider client={client}><AgentChatPanel /></QueryClientProvider>); });
-    expect(usePreferencesStore.getState().coachEffort).toBe('');
-    await act(async () => { usePreferencesStore.setState({ coachEffort: 'custom-depth' }); });
-    expect(usePreferencesStore.getState().coachEffort).toBe('custom-depth');
+    expect(coachScopeOf(usePreferencesStore.getState(), language).effort).toBe('');
+    await act(async () => { usePreferencesStore.getState().setCoachScope(language, { effort: 'custom-depth' }); });
+    expect(coachScopeOf(usePreferencesStore.getState(), language).effort).toBe('custom-depth');
     const settings = dom!.dom.window.document.querySelector<HTMLButtonElement>('button[aria-label="会话设置"]');
     await act(async () => { settings?.click(); });
     expect(dom!.dom.window.document.body.textContent).toContain('custom-depth（待确认）');
@@ -498,7 +501,7 @@ it('打开导师不改写运行时默认或尚未确认的思考偏好', async (
     await client.cancelQueries();
     client.clear();
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
-    usePreferencesStore.setState({ coachEffort: before });
+    usePreferencesStore.getState().setCoachScope(language, { effort: before });
     globalThis.fetch = originalFetch;
   }
 });

@@ -139,6 +139,7 @@ it('ACP 运行时：下拉显示已选模型名，脚注写历史/队列走台�
         coachModelId="gpt-6.1-sol" setCoachModelId={noop}
         enqueueQueued={noop} interrupt={noop} queueMessage={{ isPending: false }}
         coachThreadId=""
+        runtimeId="opencode"
       />
     </QueryClientProvider>,
   ));

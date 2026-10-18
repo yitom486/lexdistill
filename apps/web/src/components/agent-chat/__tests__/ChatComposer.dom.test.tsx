@@ -54,6 +54,7 @@ it('ChatComposer: 输入、IME 输入法守卫与回车发送逻辑验证', asyn
             interrupt={interruptMock}
             queueMessage={{ isPending: false }}
             coachThreadId="test-thread"
+            runtimeId="codex-acp"
           />
         </QueryClientProvider>
       );

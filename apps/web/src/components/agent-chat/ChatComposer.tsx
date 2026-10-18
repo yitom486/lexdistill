@@ -3,7 +3,6 @@ import { ListOrdered } from 'lucide-react';
 import { ChatComposer as ChatComposerShell } from '@yitom/chat-ui';
 import { Button } from '../ui/button.js';
 import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
-import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { useAgentRuntimeOptionsQuery } from '../../queries/useAgentQueries.js';
 import {
   Select,
@@ -34,6 +33,8 @@ export interface ChatComposerProps {
   interrupt: () => void;
   queueMessage: { isPending: boolean };
   coachThreadId: string;
+  /** 当前语言作用域下的运行时：模型与能力都按它探测 */
+  runtimeId: string;
   agentStatus?: AgentStatusDto | undefined;
 }
 
@@ -60,14 +61,14 @@ export function ChatComposer(props: ChatComposerProps) {
     interrupt,
     queueMessage,
     coachThreadId,
+    runtimeId,
     agentStatus,
   } = props;
 
-  const runtimeCaps = useSelectedRuntimeCaps();
-  const agentRuntimeId = usePreferencesStore((state) => state.agentRuntimeId);
+  const runtimeCaps = useSelectedRuntimeCaps(runtimeId);
   const runtimeOptions = useAgentRuntimeOptionsQuery(
-    agentRuntimeId || 'codex-acp',
-    !!agentRuntimeId,
+    runtimeId,
+    Boolean(runtimeId),
     coachModelId || undefined
   );
 

@@ -11,8 +11,30 @@ import { sound } from '../utils/audio.js';
 import { logger } from '@lexdistill/shared';
 import { fireTaskCompletedConfetti, fireGoldenBurstConfetti } from '../utils/confetti.js';
 import { GATEWAY_BASE_URL } from '../lib/api-client.js';
+import { defaultGoalForTrack, findStudyGoalOption } from '../config/learner-profile-options.js';
+import type { TargetLanguage } from '@lexdistill/learner-core';
 
 const DEFAULT_USER_ID = 'student_web_01';
+
+/**
+ * 语言与备考目标只有一份事实：两者跨语言时必须一起改。
+ *
+ * 只改目标 → 语言跟随目标；只改语言 → 目标落到该语言的默认赛道。
+ * 缺这一步时会出现「顶栏说日语、档案弹窗说英语」这种同屏两套语言的错位。
+ */
+function normalizeLanguageAndGoal(
+  profile: Pick<LearnerProfile, 'targetLanguage' | 'studyGoal'>,
+  updates: Partial<LearnerProfile>
+): Pick<LearnerProfile, 'targetLanguage' | 'studyGoal'> {
+  const goalLang = updates.studyGoal ? findStudyGoalOption(updates.studyGoal)?.lang : undefined;
+  const nextLanguage = (goalLang ?? updates.targetLanguage ?? profile.targetLanguage) as TargetLanguage;
+  const candidateGoal = updates.studyGoal ?? profile.studyGoal;
+  const goalMatches = findStudyGoalOption(candidateGoal)?.lang === nextLanguage;
+  return {
+    targetLanguage: nextLanguage,
+    studyGoal: goalMatches ? candidateGoal : defaultGoalForTrack(nextLanguage),
+  };
+}
 
 const getTodayDateString = () => new Date().toISOString().slice(0, 10);
 
@@ -123,8 +145,9 @@ export const useUserProfileStore = create<UserProfileState>()(
 
       updateProfile: async (updates: Partial<LearnerProfile>) => {
         const currentProfile = get().profile;
-        const newProfile = { ...currentProfile, ...updates };
-        const nextLang = updates.targetLanguage ?? currentProfile.targetLanguage;
+        const normalized = normalizeLanguageAndGoal(currentProfile, updates);
+        const newProfile = { ...currentProfile, ...updates, ...normalized };
+        const nextLang = normalized.targetLanguage;
 
         // 乐观更新本地状态（含打卡语种戳，驱动壳层即时刷新）
         set({
@@ -141,7 +164,7 @@ export const useUserProfileStore = create<UserProfileState>()(
           const res = await fetch(`${GATEWAY_BASE_URL}/api/profile/${currentProfile.userId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updates),
+            body: JSON.stringify({ ...updates, ...normalized }),
           });
           if (res.ok) {
             const updated = await res.json();

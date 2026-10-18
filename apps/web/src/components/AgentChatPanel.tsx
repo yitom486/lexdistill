@@ -1,10 +1,11 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { toast } from 'sonner';
 import { useAgentGateway } from '../hooks/useAgentGateway.js';
 import { useSelectedRuntimeCaps } from '../hooks/useSelectedRuntimeCaps.js';
 import { useStudySessionStore } from '../stores/useStudySessionStore.js';
 import { useUserProfileStore } from '../stores/useUserProfileStore.js';
-import { usePreferencesStore } from '../stores/usePreferencesStore.js';
+import { usePreferencesStore, coachScopeOf } from '../stores/usePreferencesStore.js';
 import { sound } from '../utils/audio.js';
 import { buildTutorFreeGreeting } from '../copy/tutor-track-copy.js';
 import { normalizeTrackLanguage } from '../learning/learning-shell.js';
@@ -53,20 +54,32 @@ export function AgentChatPanel({ className = '', onClose, visible = true }: Agen
 
   const activeTab = useStudySessionStore((s) => s.activeTab);
   const profile = useUserProfileStore((s) => s.profile);
-  const coachModelId = usePreferencesStore((s) => s.coachModelId);
-  const setCoachModelId = usePreferencesStore((s) => s.setCoachModelId);
-  const coachEffort = usePreferencesStore((s) => s.coachEffort);
-  const setCoachEffort = usePreferencesStore((s) => s.setCoachEffort);
-  const coachApprovalPolicy = usePreferencesStore((s) => s.coachApprovalPolicy);
-  const setCoachApprovalPolicy = usePreferencesStore((s) => s.setCoachApprovalPolicy);
-  const coachThreadId = usePreferencesStore((s) => s.coachThreadId);
-  const setCoachThreadId = usePreferencesStore((s) => s.setCoachThreadId);
-  const coachPersistThread = usePreferencesStore((s) => s.coachPersistThread);
-  const setCoachPersistThread = usePreferencesStore((s) => s.setCoachPersistThread);
-  const coachCollaborationMode = usePreferencesStore((s) => s.coachCollaborationMode);
-  const setCoachCollaborationMode = usePreferencesStore((s) => s.setCoachCollaborationMode);
 
+  // 聊天状态按语言隔离：每种语言各有运行时、会话、模型、审批与协作模式。
+  // 未建过的语言沿用旧版全局字段（升级兼容），ensureCoachScope 会把它固化成该语言的作用域。
   const track = normalizeTrackLanguage(profile.targetLanguage);
+  const scope = usePreferencesStore(useShallow((s) => coachScopeOf(s, track)));
+  const setScope = usePreferencesStore((s) => s.setCoachScope);
+  const ensureScope = usePreferencesStore((s) => s.ensureCoachScope);
+  useEffect(() => {
+    ensureScope(track);
+  }, [track, ensureScope]);
+
+  const { threadId: coachThreadId, modelId: coachModelId, effort: coachEffort } = scope;
+  const { approvalPolicy: coachApprovalPolicy, persistThread: coachPersistThread } = scope;
+  const coachCollaborationMode = scope.collaborationMode;
+  const setCoachModelId = (v: string) => setScope(track, { modelId: v });
+  const setCoachEffort = (v: string) => setScope(track, { effort: v });
+  const setCoachApprovalPolicy = (v: string) => setScope(track, { approvalPolicy: v });
+  const setCoachThreadId = (v: string) => setScope(track, { threadId: v });
+  const setCoachPersistThread = (v: boolean) => setScope(track, { persistThread: v });
+  const setCoachCollaborationMode = (v: string) => setScope(track, { collaborationMode: v });
+  // 该语言上次使用的运行时；空=跟随全局选择
+  const scopedRuntimeId = scope.runtimeId;
+  const setScopedRuntimeId = (v: string) => setScope(track, { runtimeId: v });
+  const globalRuntimeId = usePreferencesStore((s) => s.agentRuntimeId);
+  const effectiveRuntimeId = scopedRuntimeId || globalRuntimeId || 'codex-acp';
+
   const queryClient = useQueryClient();
 
   // 面板可见时轮询运行时就绪状态：空闲期运行时掉线，界面要能自己变
@@ -77,7 +90,7 @@ export function AgentChatPanel({ className = '', onClose, visible = true }: Agen
   // 与后端 ensureConnection single-flight 形成双保险（启动期只 spawn 一次）。
   const agentQueriesReady =
     Boolean(gateway.isConnected) && agentStatus?.available === true;
-  const runtimeCaps = useSelectedRuntimeCaps();
+  const runtimeCaps = useSelectedRuntimeCaps(effectiveRuntimeId);
   const { data: sessionsData, refetch: refetchThreads } = useAgentSessionsQuery(
     agentQueriesReady && (runtimeCaps.supportsThreads || runtimeCaps.supportsHistory)
   );
@@ -213,6 +226,24 @@ export function AgentChatPanel({ className = '', onClose, visible = true }: Agen
   const connected = gateway.isConnected;
   const agentAvailable = Boolean(agentStatus?.available);
 
+  // 语言或该语言的运行时一变 = 换一个会话域：上一域的流与消息不能带过来
+  const scopeKey = `${track}:${effectiveRuntimeId}`;
+  const scopeKeyRef = useRef(scopeKey);
+  useEffect(() => {
+    if (scopeKeyRef.current === scopeKey) return;
+    scopeKeyRef.current = scopeKey;
+    if (busy) interrupt();
+    setBusy(false);
+    setInput('');
+    setAgentTurnHealth({ state: 'idle' });
+    setMessages(
+      coachThreadId
+        ? [{ id: 'resume', role: 'system', text: '正在恢复上次会话…' }]
+        : [{ id: `open_${Date.now()}`, role: 'assistant', text: buildTutorFreeGreeting(track) }]
+    );
+    // 依赖只用于读取切换瞬间的值；守卫保证只在 scopeKey 真正变化时执行
+  }, [scopeKey, busy, coachThreadId, interrupt, setInput, track]);
+
   const composerSettingsNonDefault = Boolean(
     Boolean(coachCollaborationMode) ||
       (coachApprovalPolicy && coachApprovalPolicy !== 'never') ||
@@ -232,6 +263,8 @@ export function AgentChatPanel({ className = '', onClose, visible = true }: Agen
           lastCoachPrompt={lastCoachPromptRef.current}
           busy={busy}
           retryLastAgentTurn={retryLastAgentTurn}
+          runtimeId={effectiveRuntimeId}
+          onRuntimeSelect={setScopedRuntimeId}
           onRuntimeChange={() => startNewChat()}
           track={track}
           coachThreadId={coachThreadId}
@@ -268,6 +301,7 @@ export function AgentChatPanel({ className = '', onClose, visible = true }: Agen
           setInput={setInput}
           send={(raw) => void send(raw)}
           busy={busy}
+          runtimeId={effectiveRuntimeId}
           composerSettingsOpen={composerSettingsOpen}
           setComposerSettingsOpen={setComposerSettingsOpen}
           composerSettingsNonDefault={composerSettingsNonDefault}

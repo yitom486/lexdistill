@@ -28,7 +28,11 @@ interface ChatPanelHeaderProps {
   lastCoachPrompt: string | null;
   busy: boolean;
   retryLastAgentTurn: () => void;
-  /** 切换运行时后需要重置会话（顶栏选择器） */
+  /** 当前语言作用域下的运行时（不是全局值） */
+  runtimeId: string;
+  /** 切换该语言的运行时 */
+  onRuntimeSelect: (runtimeId: string) => void;
+  /** 切换运行时后需要重置会话 */
   onRuntimeChange?: (() => void) | undefined;
   track: TrackLanguage;
   coachThreadId: string;
@@ -94,6 +98,8 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
     lastCoachPrompt,
     busy,
     retryLastAgentTurn,
+    runtimeId,
+    onRuntimeSelect,
     onRuntimeChange,
     track,
     coachThreadId,
@@ -166,8 +172,12 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
           {/* 运行时切换上移到顶栏：输入区只留模型与发送，避免底栏挤成一排 */}
           <div className="w-[7.5rem] shrink-0">
             <AgentRuntimeSelect
+              value={runtimeId}
+              onValueChange={(v) => {
+                if (v) onRuntimeSelect(String(v));
+              }}
+              {...(onRuntimeChange ? { onRuntimeChange: () => onRuntimeChange() } : {})}
               disabled={busy}
-              {...(onRuntimeChange ? { onRuntimeChange } : {})}
             />
           </div>
           {runtimeCaps.supportsThreads || runtimeCaps.supportsHistory ? (

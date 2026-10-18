@@ -50,6 +50,15 @@
 
 要改正文密度或字体时，在本仓样式里写同名选择器覆盖即可（`@layer components` 之上）。
 
+## 状态隔离：语言 × 运行时 × 会话
+
+聊天状态按**语言**隔离，存在 `usePreferencesStore.coachScopes[language]`：每种语言各自记住运行时、会话 id、模型、思考档、审批策略与协作模式（Zustand `persist` 落盘，切回来即恢复）。
+
+- **会话身份 = 语言 + 运行时 + 会话 id**。换语言、或换该语言作用域内的运行时，都视为换一个会话域：正在流的回合会被打断，消息、输入、队列不跨域携带。
+- **运行时是每语言一份**（`scope.runtimeId`，空=跟随全局 `agentRuntimeId`）。顶栏选择器写的是当前语言的作用域，不动其他语言。
+- **升级兼容**：旧版单会话字段（`coachThreadId` / `coachModelId` …）只在「该语言还没建过作用域」时作为兜底；`ensureCoachScope(language)` 会把它固化成该语言的作用域，之后不再跟随全局。
+- **语言与备考目标是一份事实**：`useUserProfileStore.updateProfile` 统一归一化——只改目标则语言跟随目标；只改语言则目标落到该语言的默认赛道。缺这层会出现「顶栏说日语、档案弹窗说英语」。
+
 ## 升级流程
 
 1. 在 `D:\project\js\montree-chat` 改代码、升六包版本、本地 `bun run typecheck && bun run test && bun run build`。
