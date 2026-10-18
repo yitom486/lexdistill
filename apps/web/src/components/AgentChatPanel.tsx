@@ -232,6 +232,7 @@ export function AgentChatPanel({ className = '', onClose, visible = true }: Agen
           lastCoachPrompt={lastCoachPromptRef.current}
           busy={busy}
           retryLastAgentTurn={retryLastAgentTurn}
+          onRuntimeChange={() => startNewChat()}
           track={track}
           coachThreadId={coachThreadId}
           historyOpen={historyOpen}
@@ -276,7 +277,6 @@ export function AgentChatPanel({ className = '', onClose, visible = true }: Agen
           setCoachEffort={setCoachEffort}
           coachModelId={coachModelId}
           setCoachModelId={setCoachModelId}
-          onRuntimeChange={() => startNewChat()}
           enqueueQueued={enqueueQueued}
           interrupt={interrupt}
           queueMessage={queueMessage}

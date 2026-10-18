@@ -2,7 +2,6 @@ import React from 'react';
 import { ListOrdered } from 'lucide-react';
 import { ChatComposer as ChatComposerShell } from '@yitom/chat-ui';
 import { Button } from '../ui/button.js';
-import { AgentRuntimeSelect } from '../AgentRuntimeSelect.js';
 import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { useAgentRuntimeOptionsQuery } from '../../queries/useAgentQueries.js';
@@ -36,7 +35,6 @@ export interface ChatComposerProps {
   queueMessage: { isPending: boolean };
   coachThreadId: string;
   agentStatus?: AgentStatusDto | undefined;
-  onRuntimeChange?: (() => void) | undefined;
 }
 
 /**
@@ -63,7 +61,6 @@ export function ChatComposer(props: ChatComposerProps) {
     queueMessage,
     coachThreadId,
     agentStatus,
-    onRuntimeChange,
   } = props;
 
   const runtimeCaps = useSelectedRuntimeCaps();
@@ -84,8 +81,8 @@ export function ChatComposer(props: ChatComposerProps) {
   const effortChoices = runtimeOptions.data?.efforts ?? [];
 
   const capabilityHint = runtimeCaps.supportsHistory
-    ? '历史与排队需要在线连接 · 用量暂不可用'
-    : '历史、排队与用量暂不可用';
+    ? '历史与排队需在线连接 · 用量暂不可用'
+    : '历史、排队与用量不可用';
   // 就绪时网关消息多为英文诊断串，只在不可用时展示
   const hint =
     agentStatus && !agentStatus.available && agentStatus.message
@@ -121,14 +118,7 @@ export function ChatComposer(props: ChatComposerProps) {
               disabled={busy}
             />
 
-            <div className="min-w-0 max-w-[8rem] flex-1">
-              <AgentRuntimeSelect
-                disabled={busy}
-                {...(onRuntimeChange ? { onRuntimeChange } : {})}
-              />
-            </div>
-
-            <div className="min-w-0 max-w-[12rem] flex-1">
+            <div className="min-w-0 max-w-[14rem] flex-1">
               <Select
                 value={modelValue}
                 onValueChange={(v) => setCoachModelId(v === '__auto__' ? '' : String(v ?? ''))}

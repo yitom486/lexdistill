@@ -1,14 +1,12 @@
 import {
-  Gauge,
   KeyRound,
   Plus,
   Trash2,
-  Wifi,
-  WifiOff,
   X,
 } from 'lucide-react';
 import { ChatPanelHeader as ChatPanelHeaderShell, ChatStatusBadge } from '@yitom/chat-ui';
 import { Button } from '../ui/button.js';
+import { AgentRuntimeSelect } from '../AgentRuntimeSelect.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { useAgentContextUsageStore } from '../../stores/useAgentContextUsageStore.js';
 import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
@@ -30,6 +28,8 @@ interface ChatPanelHeaderProps {
   lastCoachPrompt: string | null;
   busy: boolean;
   retryLastAgentTurn: () => void;
+  /** 切换运行时后需要重置会话（顶栏选择器） */
+  onRuntimeChange?: (() => void) | undefined;
   track: TrackLanguage;
   coachThreadId: string;
   historyOpen: boolean;
@@ -61,20 +61,11 @@ interface ChatPanelHeaderProps {
   onClose?: (() => void) | undefined;
 }
 
-/** 上下文用量徽标（本轮结束时透传；配额见额度说明，两者口径不同）。 */
-function ContextUsageChip() {
+/** 上下文用量百分比（本轮结束时透传；无数据返回 null）。 */
+function useContextUsagePercent(): number | null {
   const usage = useAgentContextUsageStore(state => state.usage);
   if (!usage || !(usage.size > 0)) return null;
-  const percent = Math.min(100, Math.round((usage.used / usage.size) * 100));
-  return (
-    <span
-      className="inline-flex items-center gap-1 text-xs text-ink-ghost"
-      title={`上下文用量（本轮结束时）：${usage.used.toLocaleString()} / ${usage.size.toLocaleString()}`}
-    >
-      <Gauge className="size-3" />
-      上下文 {percent}%
-    </span>
-  );
+  return Math.min(100, Math.round((usage.used / usage.size) * 100));
 }
 
 /** 本轮健康度 → 状态胶囊。四档语义在包里统一，宿主只做映射。 */
@@ -103,6 +94,7 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
     lastCoachPrompt,
     busy,
     retryLastAgentTurn,
+    onRuntimeChange,
     track,
     coachThreadId,
     historyOpen,
@@ -122,12 +114,15 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
   const copy = getTutorTrackCopy(track);
   const runtimeCaps = useSelectedRuntimeCaps();
   const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
+  const usagePercent = useContextUsagePercent();
   const showTurnMessage =
     agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed';
 
-  const subtitle = showTurnMessage
+  // 两行封顶：标题行只放状态胶囊，说明行合并轨道与上下文用量
+  const subtitleBase = showTurnMessage
     ? (agentTurnHealth.message ?? '')
     : `${copy.headerHint}${agentRuntimeId && agentRuntimeId !== 'codex-acp' ? ` · ${agentRuntimeLabel(agentRuntimeId)}` : ''}${coachThreadId ? ' · 当前会话已保留' : ''}`;
+  const subtitle = usagePercent == null ? subtitleBase : `${subtitleBase} · 上下文 ${usagePercent}%`;
 
   return (
     <ChatPanelHeaderShell
@@ -163,17 +158,18 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
               重试
             </button>
           ) : null}
-          <ContextUsageChip />
         </>
       }
       subtitle={subtitle}
       actions={
         <>
-          {connected ? (
-            <Wifi className="mr-1 size-3.5 text-ink-emerald-700-emerald-400" />
-          ) : (
-            <WifiOff className="mr-1 size-3.5 text-ink-ghost" />
-          )}
+          {/* 运行时切换上移到顶栏：输入区只留模型与发送，避免底栏挤成一排 */}
+          <div className="w-[7.5rem] shrink-0">
+            <AgentRuntimeSelect
+              disabled={busy}
+              {...(onRuntimeChange ? { onRuntimeChange } : {})}
+            />
+          </div>
           {runtimeCaps.supportsThreads || runtimeCaps.supportsHistory ? (
             <ChatHistoryPopover
               historyOpen={historyOpen}
