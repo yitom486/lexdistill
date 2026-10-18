@@ -4,7 +4,7 @@
 
 ## 版本
 
-- `apps/web` 固定 `@yitom/chat-core` / `@yitom/chat-session` / `@yitom/chat-ui` **0.1.17**，`apps/gateway` 固定 `@yitom/acp-client` **^0.1.12**。
+- `apps/web` 固定 `@yitom/chat-core` / `@yitom/chat-session` / `@yitom/chat-ui` **0.1.18**，`apps/gateway` 固定 `@yitom/acp-client` **^0.1.12**。
 - 六包必须同版本；不同版本会让 branded 类型出现多份实例。升级见文末流程。
 
 ## 分工
@@ -17,8 +17,9 @@
 | 消息结构转换（扁平聚合消息 → thought / tool / agent 时间线消息） | 应用适配层 | `agent-chat/chat-message-adapter.ts` |
 | 逐条朗读、来源标签 | 应用插槽 | `agent-chat/ChatMessageList.tsx` 的 `renderMessageFooter` |
 | 排队条 | 应用 | 同上（列表上方固定条） |
+| 空态卡片 | `@yitom/chat-ui` 的 `ChatEmptyState` | 包内（文案由 `getTutorTrackCopy` 注入） |
+| 会话历史弹层（列表 + 新建 + 压缩/分叉/归档） | `@yitom/chat-ui` 的 `ChatHistoryMenu` | 包内；`ChatHistoryPopover.tsx` 只接 toast/音效/开关 |
 | 参数弹层、运行时与模型选择、加入下一轮队列 | 应用 | `ComposerSettingsPopover` / `ChatComposer.tsx` 的槽位 |
-| 会话历史、新会话、清屏、关闭 | 应用编排，包只给壳 | `ChatHistoryPopover` + 顶栏 actions |
 | 回合、排队、审批策略、运行时能力门控 | 应用 | `use-chat-turn.ts` |
 
 **不要再自建滚动容器、气泡壳或输入条**：形态与键盘语义在包里，自维护版本会和包的布局互相打架。宿主只决定"谁连接、发什么、怎么排队"。

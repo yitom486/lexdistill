@@ -44,6 +44,8 @@ it('P4 switches language cleanly and persists the adjusted comprehensive bluepri
     expect(task.blueprint).toMatchObject({ totalItems: 11, categoryCounts: { GRAMMAR: 3, LISTENING: 4 },
       listeningModes: { DIALOGUE: 2, PASSAGE: 1, NEWS: 1 } });
     expect(task.papers[0]!.questionIds).toHaveLength(11);
+    // 任务落库早于试卷渲染：等高负载下 UI 未画完会偶发 0，先等到 11 题出现再断言
+    await h.waitFor(() => h.doc.querySelectorAll('div[aria-label^="题目"]').length === 11);
     expect(h.doc.querySelectorAll('div[aria-label^="题目"]')).toHaveLength(11);
     expect(h.gradeCalls()).toBe(0);
   } finally { await h.cleanup(); }

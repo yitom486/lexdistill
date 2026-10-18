@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ChatMessageList as YitomChatMessageList } from '@yitom/chat-ui';
+import { ChatEmptyState, ChatMessageList as YitomChatMessageList } from '@yitom/chat-ui';
 import { ListOrdered, Play, X } from 'lucide-react';
 import { Button } from '../ui/button.js';
 import { UnifiedTtsPlayer } from '../UnifiedTtsPlayer.js';
@@ -11,6 +11,7 @@ import type { AgentQueuedSubmissionDto } from '../../queries/useAgentQueries.js'
 import type { ChatMessage as LexChatMessage } from './chat-shared.js';
 import { adaptLexMessagesToYitom } from './chat-message-adapter.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
+import { getTutorTrackCopy } from '../../copy/tutor-track-copy.js';
 
 interface ChatMessageListProps {
   queueItems: AgentQueuedSubmissionDto[];
@@ -55,6 +56,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
   const currentTheme = usePreferencesStore((s) => s.theme);
   const theme = currentTheme === 'dark' ? 'dark' : 'light';
   const threadId = coachThreadId || 'coach-default';
+  const copy = getTutorTrackCopy(track);
 
   const { messages: yitomMessages, pendingPermission } = useMemo(
     () => adaptLexMessagesToYitom(messages),
@@ -140,6 +142,13 @@ export function ChatMessageList(props: ChatMessageListProps) {
         onPermissionRespond={handlePermissionRespond}
         {...(endRef ? { bottomRef: endRef } : {})}
         className="flex-1"
+        emptyState={
+          <ChatEmptyState
+            title={`${copy.trackName}导师`}
+            description={`围绕${copy.levelScheme}的语法辨析、例句造句或备考建议，直接问就行。`}
+            hint="Enter 发送 · Shift+Enter 换行"
+          />
+        }
         renderMessageFooter={(message) => {
           const original = originalById.get(message.id);
           const speakable =
