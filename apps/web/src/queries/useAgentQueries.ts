@@ -81,8 +81,13 @@ export interface AgentQueuedSubmissionDto {
   clientUserMessageId: string;
 }
 
-/** Current runtime readiness exposed without provider-specific account details. */
-export function useAgentStatusQuery() {
+/**
+ * Current runtime readiness exposed without provider-specific account details.
+ *
+ * `refetchInterval`：面板打开时由调用方给轮询间隔。默认不轮询时，运行时就绪状态
+ * 只在回合结束后刷新一次，空闲期运行时掉线界面不会变——这正是「状态不更新」的来源。
+ */
+export function useAgentStatusQuery(options: { refetchInterval?: number | false } = {}) {
   return useQuery<AgentStatusDto>({
     queryKey: AGENT_QUERY_KEYS.STATUS,
     queryFn: async () => {
@@ -99,6 +104,7 @@ export function useAgentStatusQuery() {
       return (await res.json()) as AgentStatusDto;
     },
     staleTime: 1000 * 30,
+    refetchInterval: options.refetchInterval ?? false,
     retry: 1,
   });
 }

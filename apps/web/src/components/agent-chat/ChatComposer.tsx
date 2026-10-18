@@ -1,4 +1,6 @@
-import { ArrowUp, ListOrdered, Settings2, Square } from 'lucide-react';
+import React from 'react';
+import { ListOrdered } from 'lucide-react';
+import { ChatComposer as ChatComposerShell } from '@yitom/chat-ui';
 import { Button } from '../ui/button.js';
 import { AgentRuntimeSelect } from '../AgentRuntimeSelect.js';
 import { useSelectedRuntimeCaps } from '../../hooks/useSelectedRuntimeCaps.js';
@@ -11,14 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select.js';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
-import { sound } from '../../utils/audio.js';
-import type {
-  AgentStatusDto,
-} from '../../queries/useAgentQueries.js';
-import { APPROVAL_OPTIONS, chatMenuItem, compactSelect, effortLabel } from './chat-shared.js';
+import type { AgentStatusDto } from '../../queries/useAgentQueries.js';
+import { chatMenuItem, compactSelect } from './chat-shared.js';
+import { ComposerSettingsPopover } from './ComposerSettingsPopover.js';
 
-interface ChatComposerProps {
+export interface ChatComposerProps {
   input: string;
   setInput: (v: string) => void;
   send: (raw: string) => void;
@@ -40,7 +39,10 @@ interface ChatComposerProps {
   onRuntimeChange?: (() => void) | undefined;
 }
 
-/** P2-1 拆分：输入区 + 会话参数弹层 + 模型选择 + 发送/排队/停止（纯搬运自 AgentChatPanel）。 */
+/**
+ * 输入区宿主薄适配：形态、键盘语义、发送/停止由 `@yitom/chat-ui` 的 `ChatComposer` 提供。
+ * 这里只接业务——会话参数、运行时与模型选择、加入下一轮队列、底部能力提示。
+ */
 export function ChatComposer(props: ChatComposerProps) {
   const {
     input,
@@ -63,213 +65,115 @@ export function ChatComposer(props: ChatComposerProps) {
     agentStatus,
     onRuntimeChange,
   } = props;
+
   const runtimeCaps = useSelectedRuntimeCaps();
-  const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
+  const agentRuntimeId = usePreferencesStore((state) => state.agentRuntimeId);
   const runtimeOptions = useAgentRuntimeOptionsQuery(
     agentRuntimeId || 'codex-acp',
     !!agentRuntimeId,
-    coachModelId || undefined,
+    coachModelId || undefined
   );
-  // 模型/档位一律走运行时探针（旧目录已退役）。
-  const modelChoices = (runtimeOptions.data?.models ?? []);
-  const modelValue = modelChoices.some(m => m.value === coachModelId) ? coachModelId : '__auto__';
-  // 下拉显示用户真实选择（探针表命中才显示名）；探针失败时标题带错，不静默“默认”。
-  const resolvedModelLabel = modelValue === '__auto__'
-    ? '运行时默认'
-    : (modelChoices.find(m => m.value === coachModelId)?.label ?? coachModelId);
+
+  const modelChoices = runtimeOptions.data?.models ?? [];
+  const modelValue = modelChoices.some((m) => m.value === coachModelId) ? coachModelId : '__auto__';
+  const resolvedModelLabel =
+    modelValue === '__auto__'
+      ? '运行时默认'
+      : (modelChoices.find((m) => m.value === coachModelId)?.label ?? coachModelId);
   const probeError = runtimeOptions.data?.error;
-  const effortChoices = (runtimeOptions.data?.efforts ?? []);
-  const effortValue = coachEffort || '__auto__';
+  const effortChoices = runtimeOptions.data?.efforts ?? [];
+
+  const capabilityHint = runtimeCaps.supportsHistory
+    ? '历史与排队需要在线连接 · 用量暂不可用'
+    : '历史、排队与用量暂不可用';
+  // 就绪时网关消息多为英文诊断串，只在不可用时展示
+  const hint =
+    agentStatus && !agentStatus.available && agentStatus.message
+      ? `${capabilityHint} · ${agentStatus.message}`
+      : capabilityHint;
+
   return (
     <footer className="shrink-0 p-3 pt-1.5">
-      <div className="rounded-2xl border border-line bg-surface focus-within:border-tone-amber-500o40">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              void send(input);
-            }
-          }}
-          rows={3}
-          placeholder={
-            busy
-              ? '生成中：Enter 追加引导 · 排队按钮留到下一轮 · Shift+Enter 换行'
-              : '输入消息，Enter 发送 · Shift+Enter 换行'
-          }
-          className="w-full resize-none bg-transparent px-3 py-2.5 text-[13px] text-ink placeholder:text-ink-ghost outline-none min-h-[72px]"
-        />
-        <div className="flex items-center gap-0.5 border-t border-line px-1.5 py-1">
-          <Popover open={composerSettingsOpen} onOpenChange={setComposerSettingsOpen}>
-            <PopoverTrigger
-              className={`relative inline-flex size-7 shrink-0 items-center justify-center rounded-md text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink ${
-                composerSettingsOpen ? 'bg-surface-slate-50-slate-800 text-ink' : ''
-              }`}
-              title="Mode / 审批 / 思考"
-              aria-label="会话设置"
-              onClick={() => sound.playClick()}
-            >
-              <Settings2 className="size-3.5" />
-              {composerSettingsNonDefault && !composerSettingsOpen ? (
-                <span className="absolute top-1 right-1 size-1.5 rounded-full bg-ink-sky-700-sky-300" />
-              ) : null}
-            </PopoverTrigger>
-            <PopoverContent
-              align="start"
-              sideOffset={8}
-              className="w-72 space-y-3 border-line bg-paper-soft p-3 text-ink"
-            >
-              <div>
-                <p className="text-xs font-medium text-ink">会话参数</p>
-                <p className="mt-0.5 text-xs text-ink-ghost">设置仅影响后续发送的消息</p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="space-y-0.5">
-                  <span className="block px-0.5 text-xs text-ink-ghost">审批</span>
-                  <Select
-                    value={coachApprovalPolicy || 'never'}
-                    onValueChange={(v) => v && setCoachApprovalPolicy(String(v))}
-                    disabled={busy}
-                  >
-                    <SelectTrigger className={compactSelect}>
-                      <SelectValue>
-                        {APPROVAL_OPTIONS.find((o) => o.value === coachApprovalPolicy)?.label ||
-                          'Approve for me'}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="border-line bg-paper-soft text-ink">
-                      {APPROVAL_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value} className={chatMenuItem}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-0.5">
-                  <span className="block px-0.5 text-xs text-ink-ghost">
-                    思考深度{effortChoices.length === 0 ? (coachEffort ? '（已保存值未确认）' : '（运行时默认）') : ''}
-                  </span>
-                  <Select
-                    value={effortValue}
-                    onValueChange={(v) => v && setCoachEffort(v === '__auto__' ? '' : String(v))}
-                    disabled={busy || effortChoices.length === 0}
-                  >
-                    <SelectTrigger className={compactSelect}>
-                      <SelectValue>{effortValue === '__auto__' ? '运行时默认' : `${effortLabel(effortValue)}${effortChoices.includes(effortValue) ? '' : '（待确认）'}`}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="border-line bg-paper-soft text-ink">
-                      <SelectItem value="__auto__" className={chatMenuItem}>
-                        运行时默认
-                      </SelectItem>
-                      {coachEffort && !effortChoices.includes(coachEffort) && (
-                        <SelectItem value={coachEffort} className={chatMenuItem} disabled>
-                          {effortLabel(coachEffort)}（待确认）
-                        </SelectItem>
-                      )}
-                      {effortChoices.map((e) => (
-                        <SelectItem key={e} value={e} className={chatMenuItem}>
-                          {effortLabel(e)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <div className="min-w-0 flex-1">
-            <AgentRuntimeSelect
+      <ChatComposerShell
+        value={input}
+        onValueChange={setInput}
+        onSubmit={(val) => {
+          const text = val.trim();
+          if (!text) return false;
+          void send(text);
+          return true;
+        }}
+        running={busy}
+        onStop={interrupt}
+        aria-label="向导师发消息"
+        hint={hint}
+        toolbarStart={
+          <>
+            <ComposerSettingsPopover
+              open={composerSettingsOpen}
+              onOpenChange={setComposerSettingsOpen}
+              nonDefault={composerSettingsNonDefault}
+              approvalPolicy={coachApprovalPolicy}
+              onApprovalPolicyChange={setCoachApprovalPolicy}
+              effort={coachEffort}
+              onEffortChange={setCoachEffort}
+              effortChoices={effortChoices}
               disabled={busy}
-              {...(onRuntimeChange ? { onRuntimeChange } : {})}
             />
-          </div>
 
-          <div className="min-w-0 flex-1">
-            <Select
-              value={modelValue}
-              onValueChange={(v) => setCoachModelId(v === '__auto__' ? '' : String(v ?? ''))}
-              disabled={busy || modelChoices.length === 0}
-            >
-              <SelectTrigger
-                className={`${compactSelect} max-w-[14rem]`}
-                title={probeError || (modelChoices.length === 0 ? '当前运行时用自带默认模型' : undefined)}
+            <div className="min-w-0 max-w-[8rem] flex-1">
+              <AgentRuntimeSelect
+                disabled={busy}
+                {...(onRuntimeChange ? { onRuntimeChange } : {})}
+              />
+            </div>
+
+            <div className="min-w-0 max-w-[12rem] flex-1">
+              <Select
+                value={modelValue}
+                onValueChange={(v) => setCoachModelId(v === '__auto__' ? '' : String(v ?? ''))}
+                disabled={busy || modelChoices.length === 0}
               >
-                <SelectValue placeholder="Model">{resolvedModelLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent className="border-line bg-paper-soft text-ink">
-                <SelectItem value="__auto__" className={chatMenuItem}>
-                  运行时默认
-                </SelectItem>
-                {modelChoices.map((m) => (
-                  <SelectItem
-                    key={m.value}
-                    value={m.value}
-                    className={chatMenuItem}
-                  >
-                    {m.label}
+                <SelectTrigger
+                  className={`${compactSelect} whitespace-nowrap`}
+                  title={probeError || resolvedModelLabel}
+                  aria-label="选择模型"
+                >
+                  <SelectValue placeholder="Model">
+                    <span className="block min-w-0 truncate">{resolvedModelLabel}</span>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="border-line bg-paper-soft text-ink">
+                  <SelectItem value="__auto__" className={chatMenuItem}>
+                    运行时默认
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {busy ? (
-            <>
-              <Button
-                type="button"
-                size="icon"
-                className="size-7 shrink-0 rounded-full bg-tint-sky-600 hover:bg-tint-sky-500"
-                title="追加引导"
-                disabled={!input.trim()}
-                onClick={() => void send(input)}
-              >
-                <ArrowUp className="size-3.5" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                className="size-7 shrink-0 rounded-full bg-tint-violet-700 hover:bg-tint-violet-600"
-                title="加入下一轮队列"
-                disabled={!input.trim() || !coachThreadId || queueMessage.isPending}
-                onClick={enqueueQueued}
-              >
-                <ListOrdered className="size-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-7 shrink-0 rounded-full border-line"
-                title="停止"
-                onClick={interrupt}
-              >
-                <Square className="size-3" />
-              </Button>
-            </>
-          ) : (
+                  {modelChoices.map((m) => (
+                    <SelectItem key={m.value} value={m.value} className={chatMenuItem}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        }
+        renderActions={() =>
+          busy ? (
             <Button
               type="button"
               size="icon"
-              className="size-7 shrink-0 rounded-full bg-tint-sky-600 hover:bg-tint-sky-500"
-              title="发送"
-              disabled={!input.trim()}
-              onClick={() => void send(input)}
+              className="size-8 shrink-0 rounded-full border border-line"
+              variant="outline"
+              title="加入下一轮队列"
+              aria-label="加入下一轮队列"
+              disabled={!input.trim() || !coachThreadId || queueMessage.isPending}
+              onClick={enqueueQueued}
             >
-              <ArrowUp className="size-3.5" />
+              <ListOrdered className="size-4" />
             </Button>
-          )}
-        </div>
-      </div>
-      <p className="mt-1.5 px-1 text-xs text-ink-ghost">
-        {runtimeCaps.supportsHistory
-          ? <>当前运行时：历史与排队需要在线连接 · 用量暂不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>
-          : <>当前运行时：历史、排队与用量暂不可用{agentStatus?.message ? ` · ${agentStatus.message}` : ''}</>}
-      </p>
+          ) : null
+        }
+      />
     </footer>
   );
 }

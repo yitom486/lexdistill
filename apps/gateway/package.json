@@ -22,7 +22,7 @@
     "@lexdistill/speech": "workspace:*",
     "@lexdistill/storage-sqlite": "workspace:*",
     "@lexdistill/tool-core": "workspace:*",
-    "@yitom/acp-client": "^0.1.2",
+    "@yitom/acp-client": "^0.1.12",
     "agentpools": "^0.1.9",
     "drizzle-orm": "^0.45.2",
     "gemini-tts-studio": "0.3.2",

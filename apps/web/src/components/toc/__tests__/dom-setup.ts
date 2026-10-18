@@ -77,6 +77,14 @@ export async function setupDom(visual = false): Promise<DomHandle> {
     }
   }
   g.IS_REACT_ACT_ENVIRONMENT = true;
+  if (!g.ResizeObserver) {
+    g.ResizeObserver = class ResizeObserver {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    };
+    injected.push('ResizeObserver');
+  }
   if (!g.matchMedia) {
     g.matchMedia = () => ({
       matches: false,

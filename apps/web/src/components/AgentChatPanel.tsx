@@ -69,7 +69,10 @@ export function AgentChatPanel({ className = '', onClose, visible = true }: Agen
   const track = normalizeTrackLanguage(profile.targetLanguage);
   const queryClient = useQueryClient();
 
-  const { data: agentStatus, refetch: refetchAgentStatus } = useAgentStatusQuery();
+  // 面板可见时轮询运行时就绪状态：空闲期运行时掉线，界面要能自己变
+  const { data: agentStatus, refetch: refetchAgentStatus } = useAgentStatusQuery({
+    refetchInterval: visible ? 15_000 : false,
+  });
   // 次级探测门控：等 status 确认已联动再发。避免未联动/启动期 6 路打空，
   // 与后端 ensureConnection single-flight 形成双保险（启动期只 spawn 一次）。
   const agentQueriesReady =

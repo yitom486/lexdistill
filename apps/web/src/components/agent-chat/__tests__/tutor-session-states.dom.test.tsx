@@ -18,7 +18,7 @@ if (process.env['LINGUA_TUTOR_CHILD'] !== '1') {
     });
     const [exit, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
     expect({ exit, output: exit ? stdout + stderr : '' }).toEqual({ exit: 0, output: '' });
-  });
+  }, 20_000);
 } else {
 
 let dom: DomHandle | undefined;
@@ -409,14 +409,14 @@ it('首次直接打开恢复焦点，非模态关闭不抢外部阅读焦点', a
   expect(doc.activeElement).toBe(external);
 });
 
-it('自由导师列表：中文来源 + 粘底回到最新', async () => {
+it('自由导师列表：来源标签走尾部插槽，滚动交给通用列表', async () => {
   await freshDom();
   mockInfra();
   const { ChatMessageList } = await import('../ChatMessageList.js');
   const doc = dom!.dom.window.document;
   const endRef = { current: null as HTMLDivElement | null };
   const client = makeClient();
-  let listMessages = [
+  const listMessages = [
     { id: 'u1', role: 'user' as const, text: '你好' },
     { id: 'a1', role: 'assistant' as const, text: '你好呀', streaming: false, source: 'agent' },
   ];
@@ -439,32 +439,19 @@ it('自由导师列表：中文来源 + 粘底回到最新', async () => {
     );
   }); };
   await renderList();
-  expect(doc.body.textContent).toContain('由 AI 生成');
-  expect(doc.body.textContent!.includes('via')).toBe(false);
-  expect(doc.body.textContent).not.toContain('回到最新');
+  const text = doc.body.textContent ?? '';
+  expect(text).toContain('由 AI 生成');
+  expect(text.includes('via')).toBe(false);
+  expect(BANNED.some((word) => text.includes(word))).toBe(false);
+  // 旧自维护列表的控件不再出现
+  expect(text).not.toContain('回到最新');
 
-  // 模拟用户上翻：粘底松开后出现回到最新
-  const scroller = endRef.current!.parentElement as HTMLElement;
-  let ancestorScrollCalls = 0;
-  endRef.current!.scrollIntoView = () => { ancestorScrollCalls++; };
-  doc.documentElement.scrollTop = 35;
-  Object.defineProperty(scroller, 'scrollHeight', { value: 1000, configurable: true });
-  Object.defineProperty(scroller, 'clientHeight', { value: 200, configurable: true });
-  scroller.scrollTop = 100;
-  await act(async () => {
-    scroller.dispatchEvent(new dom!.dom.window.Event('scroll', { bubbles: true }));
-  });
-  expect(doc.body.textContent).toContain('回到最新');
-  listMessages = [...listMessages, { id: 'a2', role: 'assistant', text: '新增回复', streaming: true, source: 'agent' }];
-  await renderList();
-  expect(scroller.scrollTop).toBe(100);
-  expect(doc.documentElement.scrollTop).toBe(35);
-  const back = Array.from(doc.querySelectorAll('button')).find((b) => b.textContent === '回到最新') as HTMLButtonElement;
-  await act(async () => { back.click(); });
-  expect(doc.body.textContent).not.toContain('回到最新');
-  expect(scroller.scrollTop).toBe(1000);
-  expect(doc.documentElement.scrollTop).toBe(35);
-  expect(ancestorScrollCalls).toBe(0);
+  // 通用列表接管视口与贴底：宿主只提供底部哨兵，不再自建滚动容器
+  const viewport = doc.querySelector('[data-testid="chat-viewport"]');
+  expect(viewport).not.toBeNull();
+  expect(viewport!.contains(endRef.current)).toBe(true);
+  // 「回到底部」由 assistant-ui 提供，禁用态随离底状态切换（滚动行为本身由 chat-ui 自测覆盖）
+  expect(text).toContain('回到底部');
   client.clear();
 });
 

@@ -1,25 +1,16 @@
-import { useChatScroll } from './use-chat-scroll.js';
-import {
-  ArrowDown,
-  Bot,
-  ListOrdered,
-  Play,
-  ShieldAlert,
-  X,
-} from 'lucide-react';
+import React, { useMemo } from 'react';
+import { ChatMessageList as YitomChatMessageList } from '@yitom/chat-ui';
+import { ListOrdered, Play, X } from 'lucide-react';
 import { Button } from '../ui/button.js';
-import { BorderBeam } from '../magicui/index.js';
-import { ChatTurnActivity, StreamingReplyPlaceholder } from '../ChatTurnActivity.js';
-import { MarkdownText } from '../common/MarkdownText.js';
 import { UnifiedTtsPlayer } from '../UnifiedTtsPlayer.js';
 import { toSpeakableText } from '../../lib/speakable.js';
 import { trackToSpeechLang } from '../../config/speech-language.js';
 import type { TrackLanguage } from '../../learning/learning-shell.js';
-import { stripTranscriptNoise } from '../../lib/chat-transcript.js';
 import { sound } from '../../utils/audio.js';
 import type { AgentQueuedSubmissionDto } from '../../queries/useAgentQueries.js';
-import type { ChatMessage } from './chat-shared.js';
-import { effortLabel } from './chat-shared.js';
+import type { ChatMessage as LexChatMessage } from './chat-shared.js';
+import { adaptLexMessagesToYitom } from './chat-message-adapter.js';
+import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 
 interface ChatMessageListProps {
   queueItems: AgentQueuedSubmissionDto[];
@@ -27,12 +18,12 @@ interface ChatMessageListProps {
   startQueuedTurn: (queuedSubmissionId?: string) => void;
   coachThreadId: string;
   deleteQueueItem: { mutate: (vars: { sessionId: string; queuedId: string }) => void };
-  messages: ChatMessage[];
+  messages: LexChatMessage[];
   respondApproval: (
     approvalId: string,
     decision: 'accept' | 'acceptForSession' | 'decline'
   ) => void;
-  endRef: React.RefObject<HTMLDivElement | null>;
+  endRef?: React.RefObject<HTMLDivElement | null>;
   coachEffort: string;
   track: TrackLanguage;
 }
@@ -42,7 +33,12 @@ function sourceLabel(source: string): string {
   return '本地整理';
 }
 
-/** 队列横幅 + 消息气泡/审批卡；粘底阅读：用户上翻后不再强制拉回，右下角给回到最新。 */
+/**
+ * 消息列表宿主薄适配：
+ * 通用编排（assistant-ui 视口、历史分页、贴底跟滚、回到底部、运行状态行、
+ * 工作记录与审批卡）全部交给 @yitom/chat-ui 的 `ChatMessageList`；这里只留
+ * 状态订阅、消息结构转换、排队条，以及逐条朗读/来源标签的尾部插槽。
+ */
 export function ChatMessageList(props: ChatMessageListProps) {
   const {
     queueItems,
@@ -53,16 +49,43 @@ export function ChatMessageList(props: ChatMessageListProps) {
     messages,
     respondApproval,
     endRef,
-    coachEffort,
     track,
   } = props;
-  const { scrollRef, stickToLatest, handleScroll, jumpToLatest } = useChatScroll(messages, busy);
+
+  const currentTheme = usePreferencesStore((s) => s.theme);
+  const theme = currentTheme === 'dark' ? 'dark' : 'light';
+  const threadId = coachThreadId || 'coach-default';
+
+  const { messages: yitomMessages, pendingPermission } = useMemo(
+    () => adaptLexMessagesToYitom(messages),
+    [messages]
+  );
+
+  // 尾部插槽按 id 回查原始消息：朗读要正文以外的元数据（来源、是否仍在流式）
+  const originalById = useMemo(
+    () => new Map(messages.map((m) => [m.id, m])),
+    [messages]
+  );
+
+  const pendingApprovalId = useMemo(() => {
+    const appr = messages.find((m) => m.role === 'approval' && m.approval?.status === 'pending');
+    return appr?.approval?.approvalId ?? null;
+  }, [messages]);
+
+  const handlePermissionRespond = (optionId: string | null) => {
+    if (!pendingApprovalId) return;
+    if (optionId === 'accept' || optionId === 'acceptForSession' || optionId === 'decline') {
+      respondApproval(pendingApprovalId, optionId);
+    } else {
+      respondApproval(pendingApprovalId, 'decline');
+    }
+  };
 
   return (
-    <div ref={scrollRef} onScroll={handleScroll} className="relative min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 space-y-3">
+    <div className="flex min-h-0 flex-1 flex-col">
       {queueItems.length > 0 ? (
-        <div className="rounded-xl border border-line-sky-500o25 bg-wash-sky-500o5 px-2.5 py-2">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div className="shrink-0 border-b border-line-sky-500o25 bg-wash-sky-500o5 px-3 py-1.5">
+          <div className="mb-1 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-xs font-medium text-ink-sky-700-sky-300">
               <ListOrdered className="size-3" />
               排队中 · {queueItems.length}
@@ -96,10 +119,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
                   onClick={() => {
                     if (!coachThreadId) return;
                     sound.playClick();
-                    deleteQueueItem.mutate({
-                      sessionId: coachThreadId,
-                      queuedId: q.id,
-                    });
+                    deleteQueueItem.mutate({ sessionId: coachThreadId, queuedId: q.id });
                   }}
                 >
                   <X className="size-3" />
@@ -109,179 +129,39 @@ export function ChatMessageList(props: ChatMessageListProps) {
           </div>
         </div>
       ) : null}
-      {messages.map((m) => (
-        <div
-          key={m.id}
-          className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-        >
-          {m.role === 'system' ? (
-            <p className="w-full text-center text-xs text-ink-ghost">{m.text}</p>
-          ) : m.role === 'approval' && m.approval ? (
-            <div className="w-full max-w-[95%] rounded-xl border border-tone-amber-500o35 bg-wash-amber-500o10 px-3 py-2.5">
-              <div className="flex items-start gap-2">
-                <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-ink-amber-900-amber-200" />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div>
-                    <p className="text-xs font-medium text-ink-amber-900-amber-200">
-                      需要批准 · {m.approval.action}
-                    </p>
-                    <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-ink-ghost">
-                      {m.approval.description}
-                    </p>
-                  </div>
-                  {m.approval.status === 'pending' ? (
-                    <div className="space-y-2">
-                      {m.approval.expiresAt ? (
-                        <p className="text-xs text-ink-amber-800-amber-200">
-                          约 2 分钟内未操作将自动拒绝
-                        </p>
-                      ) : null}
-                      <div className="flex flex-wrap gap-1.5">
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-7 px-2.5 text-xs bg-tone-emerald-700 hover:bg-tone-emerald-600 text-tone-white"
-                          onClick={() =>
-                            respondApproval(m.approval!.approvalId, 'accept')
-                          }
-                        >
-                          允许
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2.5 text-xs border-line-emerald-500o30 bg-wash-emerald-500o10 text-ink-emerald-700-emerald-400 hover:bg-surface-stone-100-stone-900"
-                          onClick={() =>
-                            respondApproval(
-                              m.approval!.approvalId,
-                              'acceptForSession'
-                            )
-                          }
-                        >
-                          本会话允许
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2.5 text-xs border-line"
-                          onClick={() =>
-                            respondApproval(m.approval!.approvalId, 'decline')
-                          }
-                        >
-                          拒绝
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-ink-ghost">
-                      {m.approval.status === 'accepted'
-                        ? '已允许'
-                        : m.approval.status === 'accepted_session'
-                          ? '已允许（本会话）'
-                          : m.approval.status === 'timed_out'
-                            ? '已超时自动拒绝'
-                            : m.approval.status === 'cancelled'
-                              ? '已取消'
-                              : '已拒绝'}
-                    </p>
-                  )}
-                </div>
-              </div>
+
+      <YitomChatMessageList
+        messages={yitomMessages}
+        threadId={threadId}
+        prompting={busy}
+        pendingPermission={pendingPermission}
+        theme={theme}
+        resolveMarkProposal={() => {}}
+        onPermissionRespond={handlePermissionRespond}
+        {...(endRef ? { bottomRef: endRef } : {})}
+        className="flex-1"
+        renderMessageFooter={(message) => {
+          const original = originalById.get(message.id);
+          const speakable =
+            message.role === 'agent' && !message.streaming && message.text.trim()
+              ? toSpeakableText(message.text, track)
+              : null;
+          const source = original?.source && message.role === 'agent' ? sourceLabel(original.source) : null;
+          if (!speakable && !source) return null;
+          return (
+            <div className="mt-1 flex items-center gap-2">
+              {speakable ? (
+                <UnifiedTtsPlayer
+                  variant="inline"
+                  text={speakable}
+                  lang={trackToSpeechLang(track)}
+                />
+              ) : null}
+              {source ? <span className="text-xs text-ink-ghost">{source}</span> : null}
             </div>
-          ) : (
-            <>
-          {m.role !== 'user' && (
-            <div
-              className={`mt-0.5 w-7 h-7 rounded-full bg-surface-stone-100-stone-900 flex items-center justify-center shrink-0 ${
-                m.streaming ? 'ring-2 ring-halo-sky-400o40' : ''
-              }`}
-            >
-              <Bot
-                className={`w-3.5 h-3.5 ${
-                  m.streaming
-                    ? 'text-ink-sky-700-sky-300'
-                    : 'text-ink-emerald-700-emerald-400'
-                }`}
-              />
-            </div>
-          )}
-          {(() => {
-            const waitingFirstToken =
-              m.role !== 'user' &&
-              Boolean(m.streaming) &&
-              !m.text.trim() &&
-              !m.reasoning &&
-              !m.toolCalls?.length;
-            return (
-          <div
-            className={`relative max-w-[88%] rounded-2xl text-[13px] leading-relaxed ${ m.role === 'user' ? 'bg-surface-slate-50-slate-800 border border-line px-3 py-2 text-ink-slate-700-slate-300' : waitingFirstToken ? 'px-1 py-1 text-ink-ghost' : m.streaming ? 'overflow-hidden border border-line-sky-500o25 bg-surface-stone-100-stone-900 px-3 py-2 text-ink-soft' : 'px-3 py-2 bg-transparent text-ink-soft' }`}
-          >
-            {m.role !== 'user' && m.streaming && !waitingFirstToken ? (
-              <BorderBeam
-                size={140}
-                duration="var(--motion-border-beam-agent-message-duration)"
-                colorFrom="var(--visual-agent-beam-from)"
-                colorTo="var(--visual-agent-beam-to)"
-                borderWidth={1.25}
-              />
-            ) : null}
-            {m.role !== 'user' ? (
-              <ChatTurnActivity
-                streaming={Boolean(m.streaming)}
-                {...(m.reasoning ? { reasoning: m.reasoning } : {})}
-                effortLabel={effortLabel(coachEffort)}
-                {...(m.toolCalls ? { toolCalls: m.toolCalls } : {})}
-              />
-            ) : null}
-            {m.role === 'user' ? (
-              <div className="whitespace-pre-wrap break-words">{stripTranscriptNoise(m.text)}</div>
-            ) : waitingFirstToken ? (
-              <StreamingReplyPlaceholder />
-            ) : (
-              <div className="min-w-0 break-words">
-                <MarkdownText text={m.text} />
-                {m.streaming && m.text ? (
-                  <span className="ml-0.5 inline-block h-3.5 w-1.5 align-middle bg-wash-sky-400o80 animate-pulse motion-reduce:animate-none" />
-                ) : null}
-                {!m.streaming && (() => {
-                  const speakable = toSpeakableText(m.text, track);
-                  return speakable ? (
-                    <div className="mt-1">
-                      <UnifiedTtsPlayer
-                        variant="inline"
-                        text={speakable}
-                        lang={trackToSpeechLang(track)}
-                      />
-                    </div>
-                  ) : null;
-                })()}
-              </div>
-            )}
-            {!m.streaming && m.source ? (
-              <div className="mt-1.5 text-xs text-ink-ghost">
-                {sourceLabel(m.source)}
-              </div>
-            ) : null}
-          </div>
-            );
-          })()}
-            </>
-          )}
-        </div>
-      ))}
-      {!stickToLatest ? (
-        <button
-          type="button"
-          onClick={jumpToLatest}
-          className="sticky bottom-2 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-paper-soft px-2.5 py-1 text-xs text-ink-soft shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-        >
-          <ArrowDown className="size-3" />
-          回到最新
-        </button>
-      ) : null}
-      <div ref={endRef} />
+          );
+        }}
+      />
     </div>
   );
 }

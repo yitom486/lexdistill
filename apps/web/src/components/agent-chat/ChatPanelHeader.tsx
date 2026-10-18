@@ -7,6 +7,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
+import { ChatPanelHeader as ChatPanelHeaderShell, ChatStatusBadge } from '@yitom/chat-ui';
 import { Button } from '../ui/button.js';
 import { usePreferencesStore } from '../../stores/usePreferencesStore.js';
 import { useAgentContextUsageStore } from '../../stores/useAgentContextUsageStore.js';
@@ -76,6 +77,22 @@ function ContextUsageChip() {
   );
 }
 
+/** 本轮健康度 → 状态胶囊。四档语义在包里统一，宿主只做映射。 */
+function turnHealthBadge(health: AgentTurnHealth, message?: string) {
+  switch (health.state) {
+    case 'idle':
+      return null;
+    case 'healthy':
+      return <ChatStatusBadge tone="positive" label="本轮正常" />;
+    case 'running':
+      return <ChatStatusBadge tone="neutral" pulse label="请求中" />;
+    case 'fallback':
+      return <ChatStatusBadge tone="warning" label="本轮已回退" {...(message ? { title: message } : {})} />;
+    default:
+      return <ChatStatusBadge tone="danger" label="本轮失败" {...(message ? { title: message } : {})} />;
+  }
+}
+
 /** 自由导师顶栏：连接与执行状态 + 会话操作（历史弹层见 ChatHistoryPopover）。 */
 export function ChatPanelHeader(props: ChatPanelHeaderProps) {
   const {
@@ -107,71 +124,35 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
   const agentRuntimeId = usePreferencesStore(state => state.agentRuntimeId);
   const showTurnMessage =
     agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed';
+
+  const subtitle = showTurnMessage
+    ? (agentTurnHealth.message ?? '')
+    : `${copy.headerHint}${agentRuntimeId && agentRuntimeId !== 'codex-acp' ? ` · ${agentRuntimeLabel(agentRuntimeId)}` : ''}${coachThreadId ? ' · 当前会话已保留' : ''}`;
+
   return (
-    <header className="flex items-start justify-between gap-2 px-3 py-2.5 border-b border-line">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold tracking-tight font-serif text-ink">{copy.trackName}导师</span>
-          <span
-            className={`inline-flex items-center gap-1 text-xs ${
-              connected ? 'text-ink-emerald-700-emerald-400' : 'text-ink-ghost'
-            }`}
-          >
-            <span
-              className={`size-1.5 rounded-full ${
-                connected ? 'bg-ink-emerald-700-emerald-400' : 'bg-ink-ghost'
-              }`}
-            />
-            {connected ? '已连接' : '未连接'}
-          </span>
+    <ChatPanelHeaderShell
+      title={`${copy.trackName}导师`}
+      status={
+        <>
+          <ChatStatusBadge
+            tone={connected ? 'positive' : 'neutral'}
+            label={connected ? '已连接' : '未连接'}
+          />
           {agentAvailable ? (
-            <span
-              className="inline-flex items-center gap-1 text-xs text-ink-emerald-700-emerald-400"
-              title={agentStatus?.message}
-            >
-              <KeyRound className="size-3" />
-              助手就绪
-            </span>
+            <ChatStatusBadge
+              tone="positive"
+              icon={<KeyRound className="size-3" />}
+              label="助手就绪"
+              {...(agentStatus?.message ? { title: agentStatus.message } : {})}
+            />
           ) : (
-            <span className="text-xs text-ink-amber-900-amber-300" title={agentStatus?.message}>
-              助手未就绪
-            </span>
+            <ChatStatusBadge
+              tone="warning"
+              label="助手未就绪"
+              {...(agentStatus?.message ? { title: agentStatus.message } : {})}
+            />
           )}
-          {agentTurnHealth.state !== 'idle' ? (
-            <span
-              className={`inline-flex items-center gap-1 text-xs ${
-                agentTurnHealth.state === 'healthy'
-                  ? 'text-ink-emerald-700-emerald-400'
-                  : agentTurnHealth.state === 'running'
-                    ? 'text-ink-sky-700-sky-300'
-                    : agentTurnHealth.state === 'fallback'
-                      ? 'text-ink-amber-900-amber-300'
-                      : 'text-ink-rose-600-rose-400'
-              }`}
-              title={
-                showTurnMessage ? agentTurnHealth.message : undefined
-              }
-            >
-              <span
-                className={`size-1.5 rounded-full ${
-                  agentTurnHealth.state === 'healthy'
-                    ? 'bg-ink-emerald-700-emerald-400'
-                    : agentTurnHealth.state === 'running'
-                      ? 'bg-ink-sky-700-sky-300 animate-pulse motion-reduce:animate-none'
-                      : agentTurnHealth.state === 'fallback'
-                        ? 'bg-ink-amber-900-amber-300'
-                        : 'bg-ink-rose-600-rose-400'
-                }`}
-              />
-              {agentTurnHealth.state === 'healthy'
-                ? '本轮正常'
-                : agentTurnHealth.state === 'running'
-                  ? '请求中'
-                  : agentTurnHealth.state === 'fallback'
-                    ? '本轮已回退'
-                    : '本轮失败'}
-            </span>
-          ) : null}
+          {turnHealthBadge(agentTurnHealth, agentTurnHealth.state === 'fallback' || agentTurnHealth.state === 'failed' ? agentTurnHealth.message : undefined)}
           {showTurnMessage && lastCoachPrompt ? (
             <button
               type="button"
@@ -183,82 +164,73 @@ export function ChatPanelHeader(props: ChatPanelHeaderProps) {
             </button>
           ) : null}
           <ContextUsageChip />
-        </div>
-        <p
-          className={`mt-0.5 text-xs truncate ${
-            showTurnMessage
-              ? 'text-ink-amber-900-amber-300'
-              : 'text-ink-ghost'
-          }`}
-          title={showTurnMessage ? agentTurnHealth.message : undefined}
-        >
-          {showTurnMessage
-            ? agentTurnHealth.message
-            : `${copy.headerHint}${agentRuntimeId && agentRuntimeId !== 'codex-acp' ? ` · ${agentRuntimeLabel(agentRuntimeId)}` : ''}${coachThreadId ? ' · 当前会话已保留' : ''}`}
-        </p>
-      </div>
-      <div className="flex items-center gap-0.5 shrink-0">
-        {connected ? (
-          <Wifi className="size-3.5 text-ink-emerald-700-emerald-400 mr-1" />
-        ) : (
-          <WifiOff className="size-3.5 text-ink-ghost mr-1" />
-        )}
-        {runtimeCaps.supportsThreads || runtimeCaps.supportsHistory ? (
-          <ChatHistoryPopover
-            historyOpen={historyOpen}
-            setHistoryOpen={setHistoryOpen}
-            refetchThreads={refetchThreads}
-            sessions={sessions}
-            coachThreadId={coachThreadId}
-            startNewChat={startNewChat}
-            openSession={openSession}
-            compactThread={compactThread}
-            forkThread={forkThread}
-            coachPersistThread={coachPersistThread}
-            setCoachPersistThread={setCoachPersistThread}
-            archiveThread={archiveThread}
-          />
-        ) : (
-          <span className="inline-flex h-7 items-center px-1 text-xs text-ink-ghost" title="当前运行时不支持保留会话">
-            无历史面板
-          </span>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-7 text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
-          title="新对话（开启新会话）"
-          aria-label="新对话"
-          onClick={startNewChat}
-        >
-          <Plus className="size-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-7 text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
-          title="清屏（保留当前会话）"
-          aria-label="清屏"
-          onClick={clearDisplay}
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
-        {onClose ? (
+        </>
+      }
+      subtitle={subtitle}
+      actions={
+        <>
+          {connected ? (
+            <Wifi className="mr-1 size-3.5 text-ink-emerald-700-emerald-400" />
+          ) : (
+            <WifiOff className="mr-1 size-3.5 text-ink-ghost" />
+          )}
+          {runtimeCaps.supportsThreads || runtimeCaps.supportsHistory ? (
+            <ChatHistoryPopover
+              historyOpen={historyOpen}
+              setHistoryOpen={setHistoryOpen}
+              refetchThreads={refetchThreads}
+              sessions={sessions}
+              coachThreadId={coachThreadId}
+              startNewChat={startNewChat}
+              openSession={openSession}
+              compactThread={compactThread}
+              forkThread={forkThread}
+              coachPersistThread={coachPersistThread}
+              setCoachPersistThread={setCoachPersistThread}
+              archiveThread={archiveThread}
+            />
+          ) : (
+            <span className="inline-flex h-7 items-center px-1 text-xs text-ink-ghost" title="当前运行时不支持保留会话">
+              无历史面板
+            </span>
+          )}
           <Button
             type="button"
             variant="ghost"
             size="icon"
             className="size-7 text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
-            title="关闭面板（会话不断开）"
-            aria-label="关闭面板"
-            onClick={onClose}
+            title="新对话（开启新会话）"
+            aria-label="新对话"
+            onClick={startNewChat}
           >
-            <X className="size-3.5" />
+            <Plus className="size-3.5" />
           </Button>
-        ) : null}
-      </div>
-    </header>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
+            title="清屏（保留当前会话）"
+            aria-label="清屏"
+            onClick={clearDisplay}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+          {onClose ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7 text-ink-ghost hover:bg-surface-stone-100-stone-900 hover:text-ink"
+              title="关闭面板（会话不断开）"
+              aria-label="关闭面板"
+              onClick={onClose}
+            >
+              <X className="size-3.5" />
+            </Button>
+          ) : null}
+        </>
+      }
+    />
   );
 }

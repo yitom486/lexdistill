@@ -32,6 +32,8 @@ export function useCoachBootMessages({
   supportsThreadsOrHistory,
 }: CoachBootOptions) {
   const bootedRef = useRef(false);
+  /** 当前问候语所用的语种轨道；null 表示显示的不是开场问候（如会话恢复中）。 */
+  const greetingTrackRef = useRef<TrackLanguage | null>(null);
 
   // 偏好水合后再决定问候语 / 恢复提示，避免先闪 greeting 再被 thread items 覆盖
   useEffect(() => {
@@ -41,6 +43,7 @@ export function useCoachBootMessages({
       bootedRef.current = true;
       const threadId = usePreferencesStore.getState().coachThreadId;
       if (threadId && supportsThreadsOrHistory) {
+        greetingTrackRef.current = null;
         setMessages([
           {
             id: 'resume',
@@ -49,6 +52,7 @@ export function useCoachBootMessages({
           },
         ]);
       } else {
+        greetingTrackRef.current = track;
         setMessages([
           {
             id: 'open',
@@ -64,6 +68,26 @@ export function useCoachBootMessages({
     }
     return usePreferencesStore.persist.onFinishHydration(boot);
   }, [track, setMessages, supportsThreadsOrHistory]);
+
+  // 切换目标语种：只重写「还停在开场问候」的那条，已发生的对话不受影响。
+  // 缺这一步时，先开英语再切日语，顶栏已是日语导师而问候仍是英语文案。
+  useEffect(() => {
+    const shownTrack = greetingTrackRef.current;
+    if (shownTrack === null || shownTrack === track) return;
+    greetingTrackRef.current = track;
+    setMessages((prev) => {
+      const only = prev.length === 1 ? prev[0] : undefined;
+      if (!only || only.role !== 'assistant' || only.streaming) return prev;
+      if (!only.id.startsWith('open')) return prev;
+      return [
+        {
+          id: `open_${Date.now()}`,
+          role: 'assistant',
+          text: buildTutorFreeGreeting(track),
+        },
+      ];
+    });
+  }, [track, setMessages]);
 
   // 选中 / 恢复历史会话：把 items 映射成聊天气泡
   useEffect(() => {

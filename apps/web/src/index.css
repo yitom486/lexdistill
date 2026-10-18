@@ -1,4 +1,11 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "streamdown/styles.css";
+@import "katex/dist/katex.min.css";
+/* 聊天正文形态与动效由 @yitom/chat-ui 自带（关键帧、九格加载、agent-md 排版、动效 token）；
+   本仓只负责配色：见文件末尾的 shadcn 变量桥。 */
+@import "@yitom/chat-ui/styles.css";
+@source "../node_modules/@yitom/chat-ui/dist";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -87,6 +94,27 @@
 }
 
 @theme inline {
+  /* shadcn / @yitom/chat-ui 基础语义 token 映射 */
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--paper-soft);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--paper-soft);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--ink);
+  --color-primary-foreground: var(--paper);
+  --color-secondary: var(--surface);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface);
+  --color-muted-foreground: var(--ink-soft);
+  --color-accent: var(--surface);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--ink-rose-600);
+  --color-destructive-foreground: var(--tone-white);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--focus-ring);
+
   --default-transition-duration: var(--theme-transition-duration);
   --default-transition-timing-function: var(--theme-transition-timing-function);
   --color-visual-shadow-wave-active: var(--visual-shadow-wave-active);
@@ -1779,4 +1807,59 @@
   --color-worker-idle-fg: var(--worker-idle-fg);
   --color-worker-idle-line: var(--worker-idle-line);
   --color-worker-idle-dot: var(--worker-idle-dot);
+}
+
+/*
+ * chat-ui 变量契约。
+ *
+ * @yitom/chat-ui 的过程态（思考标题渐变、像素加载、进度条）把颜色写在**内联 style** 里，
+ * 读的是 shadcn 语义变量名（--foreground / --muted-foreground / --border …），
+ * 而 Tailwind 的 @theme 只产出 --color-*。缺这一层时：渐变取不到颜色，
+ * 配合 text-transparent 会让「工作中」等标签直接消失。此处只做同义映射，
+ * 不改主题取值；两套主题各声明一次，保证 .dark 挂在任意层级都生效。
+ */
+:root {
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--paper-soft);
+  --card-foreground: var(--ink);
+  --popover: var(--paper-soft);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--paper);
+  --secondary: var(--surface);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface);
+  --muted-foreground: var(--ink-soft);
+  --accent: var(--surface);
+  --accent-foreground: var(--ink);
+  --destructive: var(--ink-rose-600);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--focus-ring);
+
+  /* 过程态动效时长：包只给关键帧名，节奏由宿主 token 决定 */
+  --motion-shimmer-text-duration: 1.8s;
+  --motion-pixel-pulse-duration: 1.2s;
+}
+
+.dark {
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--paper-soft);
+  --card-foreground: var(--ink);
+  --popover: var(--paper-soft);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--paper);
+  --secondary: var(--surface);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface);
+  --muted-foreground: var(--ink-soft);
+  --accent: var(--surface);
+  --accent-foreground: var(--ink);
+  --destructive: var(--ink-rose-600);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--focus-ring);
 }
