@@ -2,6 +2,8 @@
 
 > AI-native adaptive language learning studio for Japanese, English, and Korean.
 
+仓库：<https://github.com/yitom486/lexdistill>
+
 LexDistill 是一个面向多语种学习的自适应学习工作室：提供 FSRS 闪卡、靶向自适应出题、主观题多维批改、
 错题本攻克流转、学情画像雷达。客户端只连接自研 Agent Gateway（HTTP + WebSocket），
 学习资产以 SQLite（`learner-core` Repository）为唯一事实源，可整体换模型而不丢失。
@@ -21,10 +23,23 @@ packages/
   shared/         Result/BusinessError、ID/时间、logger 门面
   protocol/       WS 信封/事件 + Zod 契约（题目、批改、计划、阅读、词典…）
   learner-core/   纯领域规则：FSRS、日计划、练习计划、画像/错题生命周期
-  agent-runtime/  Agent 统一入口：contracts（抽象契约）＋ adapters/codex（主力通路）＋ adapters/responses（灰度/旁路）
+  agent-runtime/  Agent 统一入口：contracts（抽象契约）＋ ACP 适配层（唯一通路，运行时由 Gateway 池化选择）
   tool-core/      Tool 契约、权限分级、ToolRegistry
 docs/           架构、协议、学习者模型、MVP 路线等正式文档
 ```
+
+## 聊天界面（外部 SDK）
+
+Agent 对话面板不在本仓实现：消息列表、输入区、顶栏状态、空态、会话历史与会话参数由
+`@yitom/chat-ui`（当前 `0.1.21`）提供，本仓只保留业务槽位、消息适配与壳层。
+
+```css
+/* apps/web/src/index.css：形态与动效随包走 */
+@import "@yitom/chat-ui/styles.css";
+```
+
+- 分工、插槽与升级流程：[`docs/chat-ui-integration.md`](./docs/chat-ui-integration.md)
+- SDK 自身文档：<https://github.com/yitom486/montree-chat>
 
 ## 快速开始
 
@@ -41,7 +56,7 @@ bun run dev:desktop   # Tauri 桌面壳（自动拉起 Gateway sidecar）
 
 ```bash
 bun run typecheck   # 全仓严格类型检查（tsc -b），提交前必须零报错
-bun run test:all    # 唯一正式门禁：全 workspace 测试（122 文件级，含 PDF native 38 E2E；显式排除 dist，见下）
+bun run test:all    # 唯一正式门禁：全 workspace 测试（显式排除 dist 编译产物）
 bun --filter @lexdistill/web build   # Web 生产构建
 bun run build:sidecar                  # 编译 Tauri Gateway sidecar
 bun run release:sync -- 0.1.0          # 同步所有包、Tauri、Cargo 与 Changelog 版本
@@ -79,6 +94,7 @@ bun run release -- 0.1.0               # 校验、提交、打 tag 并推送，�
 
 - 协作铁律：[`AGENTS.md`](./AGENTS.md)（业务↔厂商解耦、Gateway 边界、ContextSnapshot、Result 模式、测试标准）
 - 系统架构：[`docs/architecture.md`](./docs/architecture.md)
+- 聊天界面接入：[`docs/chat-ui-integration.md`](./docs/chat-ui-integration.md)
 - 通信协议：[`docs/protocol.md`](./docs/protocol.md)
 - Agent 运行时：[`docs/agent-runtime.md`](./docs/agent-runtime.md)
 - 学习者模型：[`docs/learner-model.md`](./docs/learner-model.md)
@@ -93,12 +109,12 @@ LexDistill 将学习者模型、课程资产和 Agent 能力组合成一个可�
 - **Spaced repetition**：使用 FSRS 管理词汇、语法和混淆句型卡片；
 - **AI tutoring**：通过 Agent Gateway 提供流式讲解、批改、诊断和练习生成；
 - **Learner-first**：学习记录、错题、卡片和学情指标以 SQLite 为唯一事实源；
-- **Provider-agnostic**：Codex、Responses 或未来的其他 Agent 都通过统一 Adapter 接入；
+- **Provider-agnostic**：所有 Agent 运行时都经 ACP 协议接入 Gateway，换模型或换厂商不触碰业务代码；
 - **桌面优先**：Tauri 桌面端是完整产品，复用 React 界面；Android 作为后续轻量伴随端评估，不要求本地 Agent。
 
-GitHub 项目简介：
+GitHub 项目简介（About）：
 
-> An adaptive, AI-native language learning studio with spaced repetition, targeted practice, learner modeling, and a provider-agnostic Agent Gateway.
+> LexDistill — adaptive, AI-native language learning studio for Japanese, English and Korean. FSRS spaced repetition, targeted practice, learner modeling, and a provider-agnostic ACP Agent Gateway. Tauri desktop.
 
 `.studio-internal/`（gitignored，不进公开仓库）为实现期内部沉淀：静态数据登记、
 AI Native 运行时设计、目标语种 UI 壳层、词典选型与各阶段计划。

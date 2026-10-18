@@ -17,6 +17,7 @@ export const AGENT_RUNTIME_OPTIONS: readonly AgentRuntimeOption[] = [
   { id: 'gemini', label: 'Gemini', hint: 'OAuth 或 API Key' },
   { id: 'copilot', label: 'Copilot', hint: 'GitHub 登录' },
   { id: 'opencode', label: 'OpenCode', hint: 'opencode 登录' },
+  { id: 'opencode-v2', label: 'OpenCode v2', hint: 'opencode v2 登录' },
   { id: 'cursor-cli', label: 'Cursor', hint: 'Cursor 登录或 Key' },
   { id: 'deepseek', label: 'DeepSeek', hint: 'DEEPSEEK_API_KEY' },
   { id: 'agy', label: 'agy', hint: '官方桥接免密' },

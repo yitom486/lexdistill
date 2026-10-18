@@ -2,6 +2,29 @@
 
 All notable changes to LexDistill are documented here. Release notes are reused by the GitHub Release workflow.
 
+## [0.2.0] - 2026-10-18
+
+### 聊天界面统一
+
+- 消息列表、输入区、顶栏状态、空态、会话历史、会话参数全部改由外部 SDK `@yitom/chat-ui` 提供（0.1.17 → 0.1.21），本仓只保留业务槽位与消息适配。
+- 题目导师并入同一渲染栈：删除第二套手写气泡、滚动与流式实现，导师专属内容改走尾部插槽（工具证据、来源徽标、离线重发、逐条朗读、追问）。
+- 桌面宿主外链改走系统浏览器，避免 webview 就地导航。
+- 表单与状态表达统一：状态胶囊四档语义、单选式会话参数、通用空态与会话历史弹层。
+
+### 平台与外壳
+
+- 全面更名为 LexDistill：包名、桌面壳、sidecar、持久化路径与全套图标。
+- 主题切换改为双帧同步，消除切换撕裂；桌面顶栏固定在所有浮层之上。
+
+### 架构
+
+- Agent 通路收敛为 ACP-only：移除 Codex 专用分支与死通道，网关按运行时池选择，批改与出题不再分叉。
+- 界面拆分：Settings、Dictionary、MistakeSprint、TodayPlan、阅读、韩语、教材等工作台拆为独立模块；语义 CSS token 与 Base UI 原语落地。
+
+### 依赖
+
+- `@yitom/chat-core` / `@yitom/chat-session` / `@yitom/chat-ui` 0.1.21，`@yitom/acp-client` ^0.1.12。
+
 ## [0.1.2] - 2026-09-08
 
 ### Changed

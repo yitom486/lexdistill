@@ -17,10 +17,10 @@ afterEach(() => {
   usePreferencesStore.setState({ agentRuntimeId: '' });
 });
 
-it('运行时目录与默认：8 运行时候选，缺席回落 ChatGPT', () => {
+it('运行时目录与默认：9 运行时候选，缺席回落 ChatGPT', () => {
   expect(DEFAULT_AGENT_RUNTIME_ID).toBe('codex-acp');
   expect(AGENT_RUNTIME_OPTIONS.map(option => option.id)).toEqual(
-    ['codex-acp', 'claude', 'gemini', 'copilot', 'opencode', 'cursor-cli', 'deepseek', 'agy']);
+    ['codex-acp', 'claude', 'gemini', 'copilot', 'opencode', 'opencode-v2', 'cursor-cli', 'deepseek', 'agy']);
   expect(agentRuntimeLabel('')).toBe('ChatGPT');
   expect(agentRuntimeLabel('deepseek')).toBe('DeepSeek');
   expect(agentRuntimeLabel('nope')).toBe('ChatGPT');
@@ -149,7 +149,7 @@ it('ACP 运行时：下拉显示已选模型名，脚注写历史/队列走台�
   // 下拉显示用户真实选择，而非一律“运行时默认”
   expect(doc.body.textContent).toContain('6.1 Sol');
   // 脚注如实：历史与排队需在线，用量暂不可用（R07 去“网关台账”内部术语）
-  expect(doc.body.textContent).toContain('历史与排队需要在线连接');
+  expect(doc.body.textContent).toContain('历史与排队需在线连接');
   expect(doc.body.textContent).toContain('用量暂不可用');
   client.clear();
   usePreferencesStore.setState({ coachModelId: '', coachEffort: '' });

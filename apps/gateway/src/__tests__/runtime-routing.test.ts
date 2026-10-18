@@ -18,10 +18,10 @@ describe('resolveAgentRuntimeId', () => {
 });
 
 describe('listAgentRuntimes', () => {
-  it('8 运行时齐全；codex 配置态为布尔', () => {
+  it('9 运行时齐全；codex 配置态为布尔', () => {
     const runtimes = listAgentRuntimes();
     expect(runtimes.map(entry => entry.id)).toEqual(
-      ['codex-acp', 'claude', 'gemini', 'copilot', 'opencode', 'cursor-cli', 'deepseek', 'agy']);
+      ['codex-acp', 'claude', 'gemini', 'copilot', 'opencode', 'opencode-v2', 'cursor-cli', 'deepseek', 'agy']);
     expect(typeof runtimes.find(entry => entry.id === 'codex-acp')?.configured).toBe('boolean');
   });
 

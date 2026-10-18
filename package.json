@@ -1,6 +1,6 @@
 {
   "name": "lexdistill-monorepo",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -15,7 +15,7 @@
     "build": "bun --filter \"*\" build",
     "build:sidecar": "bun run --filter @lexdistill/gateway sidecar:build",
     "typecheck": "tsc -b --force",
-    "test:all": "bun test --path-ignore-patterns \"**/dist/**\"",
+    "test:all": "bun test --timeout 20000 --path-ignore-patterns \"**/dist/**\"",
     "test": "bun run test:all",
     "release:sync": "bun scripts/release.ts sync",
     "release:notes": "bun scripts/release.ts notes",

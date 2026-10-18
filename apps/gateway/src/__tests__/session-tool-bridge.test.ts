@@ -7,7 +7,7 @@ import { SessionToolBridge } from '../runtime/mcp/session-tool-bridge.js';
 import { DictionaryLookupTool } from '../modules/dictionary/tools/dictionary-lookup-tool.js';
 
 /** 前端目录 id 契约（apps/web/src/config/agent-runtimes.ts）：后端 id 必须与之一致，改一处必改另一处。 */
-const FRONTEND_RUNTIME_IDS = ['codex-acp', 'claude', 'gemini', 'copilot', 'opencode', 'cursor-cli', 'deepseek', 'agy'];
+const FRONTEND_RUNTIME_IDS = ['codex-acp', 'claude', 'gemini', 'copilot', 'opencode', 'opencode-v2', 'cursor-cli', 'deepseek', 'agy'];
 
 const repos: DrizzleLearnerRepository[] = [];
 
